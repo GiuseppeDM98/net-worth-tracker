@@ -5,7 +5,7 @@
  * transition; what only a browser knows is that the page is reached from the Allocazione button,
  * that every screen shows its step and its controls, that «Avanti» stays still until the step is
  * complete, that «Indietro» goes back, that the draft survives a reload (localStorage), that the
- * summary points back to the right screen, and — since AI-03 (2026-11-07) — that the rail says
+ * summary points back to the right screen, and — since 2026-11-07 — that the rail says
  * where the reader is, that the headline takes the focus after the slide, and that the run shows
  * its stages, the failed one and «Riprova».
  *

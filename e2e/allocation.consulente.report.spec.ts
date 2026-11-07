@@ -1,5 +1,5 @@
 /**
- * Allocazione › Consulente, the REPORT at 1440px (AI-03, 2026-11-07): every tile the model wrote
+ * Allocazione › Consulente, the REPORT at 1440px (2026-11-07): every tile the model wrote
  * wears the accent and «Applica» / «Chiedi una modifica» do not; the column cascades in once per
  * JS session and the proposed percentages count up with it; a failed run marks its strategy; a run
  * still going shows its stage rows with the typical duration and no clock; reduced motion plays

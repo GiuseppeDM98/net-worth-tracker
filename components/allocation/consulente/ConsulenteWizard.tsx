@@ -6,7 +6,7 @@
  * help line, the controls, the footer with the two buttons — so the reader learns the shape
  * once. The goals screen walks one goal per sub-screen and ends on «cosa manca?».
  *
- * The card is a SCENE (AI-03, 2026-11-07; DESIGN.md → The Path-Scene Rule): the headline, the
+ * The card is a SCENE (2026-11-07; DESIGN.md → The Path-Scene Rule): the headline, the
  * help and the body slide 24px from the side the reader is going to, under an eyebrow and a
  * footer that do not move, beside a rail that says where they are (`PathRail`). The direction is
  * state set by the same handler as the dispatch — never a ref read during render, which would

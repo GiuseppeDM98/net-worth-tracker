@@ -1,5 +1,5 @@
 /**
- * The Consulente's scene variants (lib/utils/motionVariants.ts, AI-03): the screen comes in from
+ * The Consulente's scene variants (lib/utils/motionVariants.ts, 2026-11-07): the screen comes in from
  * the side it is going to, leaves to the other; reduced motion is a cross-fade with no travel; a
  * question card enters by a translate only (decision 78).
  */

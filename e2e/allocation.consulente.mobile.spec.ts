@@ -1,5 +1,5 @@
 /**
- * Allocazione › Consulente at 390px (AI-03, 2026-11-07): the scene slides inside the card and
+ * Allocazione › Consulente at 390px (2026-11-07): the scene slides inside the card and
  * nothing overflows while it does; the rail is a strip above the card; the choice rows keep their
  * 44px; under reduced motion the screen appears in place and the headline still takes the focus.
  *

@@ -1,6 +1,6 @@
 /**
- * `PathRail` (components/ui/path-rail.tsx, AI-03): the path's eight ticks with ONE current step,
- * the interview's three (AI-04 passes them, `reached` the round number — decision 86) hidden
+ * `PathRail` (components/ui/path-rail.tsx, 2026-11-07): the path's eight ticks with ONE current step,
+ * the interview's three (the interview passes them, `reached` the round number — decision 86) hidden
  * until a round is on, the run's four fills hidden from the reader (the card's rows speak).
  */
 
@@ -53,6 +53,13 @@ describe('PathRail, path mode', () => {
     expect(tickOf(items[1])).toContain('var(--ai-accent)');
     expect(tickOf(items[2])).not.toContain('var(--ai-accent)');
   });
+
+  it('is a «Dove sei» landmark as tall as the run’s strip below desktop, so the card does not move (2026-11-07)', () => {
+    render(<PathRail mode="path" steps={STEPS} current={0} />);
+    const rail = screen.getByRole('navigation', { name: 'Dove sei' });
+    expect(rail.className).toContain('h-6');
+    expect(rail.className).toContain('desktop:h-auto');
+  });
 });
 
 describe('PathRail, run mode', () => {
@@ -70,6 +77,9 @@ describe('PathRail, run mode', () => {
     );
     const list = container.querySelector('ol[aria-label="Le fasi"]');
     expect(list?.getAttribute('aria-hidden')).toBe('true');
+    // No landmark around a hidden list: a reader would be offered an empty «Dove sei» (2026-11-07).
+    expect(screen.queryByRole('navigation', { hidden: true })).toBeNull();
+    expect(container.firstElementChild?.className).toContain('h-6');
     const items = Array.from(list?.querySelectorAll('li') ?? []);
     expect(items.map((item) => item.getAttribute('data-state'))).toEqual(['done', 'active', 'failed', 'pending']);
     const fillOf = (item: Element) => item.querySelector('[data-fill]')?.className ?? '';

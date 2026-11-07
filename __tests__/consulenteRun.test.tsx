@@ -1,5 +1,5 @@
 /**
- * `ConsulenteRun` (components/allocation/consulente/ConsulenteRun.tsx, AI-03): the active row with
+ * `ConsulenteRun` (components/allocation/consulente/ConsulenteRun.tsx, 2026-11-07): the active row with
  * its typical duration and its elapsed clock (hidden from the reader, the headline the ONE live
  * region), the failed stage with «Riprova», the finished run. Fake timers at a noon fixture.
  */

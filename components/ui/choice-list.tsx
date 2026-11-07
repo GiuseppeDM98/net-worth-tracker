@@ -3,8 +3,8 @@
 /**
  * A choice as 44px rows — a radio or a checkbox, the label, a hint — never a dropdown for two or
  * three options (DESIGN.md → The Question-Card Rule). ONE module for the Consulente's path, the
- * Compravendita's screens and the interview to come (AI-03, 2026-11-07: the two `ChoiceRows`
- * copies merged here; AI-04, AI-05 and AI-06 read this contract).
+ * Compravendita's screens and the interview to come (2026-11-07: the two `ChoiceRows`
+ * copies merged here; the interview's question cards and the Assistente's cards read this contract).
  *
  * Single mode is the Radix `RadioGroup` (its own roving focus); multiple mode is a `role="group"`
  * of checkboxes made ONE Tab stop by `useRovingFocus` (AGENTS.md § Accessibility). An `exclusive`

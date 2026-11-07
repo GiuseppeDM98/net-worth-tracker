@@ -40,7 +40,7 @@ interface TileBaseProps {
   /** Optional accessible label for the section; defaults to the eyebrow. */
   ariaLabel?: string;
   /**
-   * What the model wrote (DESIGN.md → The AI-Accent Rule, AI-03): the 1px accent border at rest,
+   * What the model wrote (DESIGN.md → The AI-Accent Rule, 2026-11-07): the 1px accent border at rest,
    * the glow on hover, the eyebrow in the accent — the words unchanged, so the accessible name is.
    * Never on a tile that only ASKS the model («Applica», «Chiedi una modifica»).
    */

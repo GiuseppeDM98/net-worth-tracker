@@ -183,7 +183,7 @@ export const goalLinkSettle: Variants = {
   },
 };
 
-// ─── The Consulente's scene (AI-03, 2026-11-07; DESIGN.md → The Path-Scene Rule) ──────────────
+// ─── The Consulente's scene (2026-11-07; DESIGN.md → The Path-Scene Rule) ──────────────
 
 /** The path's screen comes in from the side it is going to: +1 forward, −1 back. */
 export function sceneEnter(direction: 1 | -1): { x: number; opacity: number } {
@@ -204,7 +204,7 @@ export const sceneVariantsReduced: Variants = {
   center: { opacity: 1, transition: { duration: 0.15 } },
   exit: { opacity: 0, transition: { duration: 0.1 } },
 };
-/** A question or proposal card entering (DESIGN.md § 5, «Question card, entering»): a translate only, so MotionConfig reducedMotion="user" leaves nothing and the card appears. Read by AI-04 and AI-05. */
+/** A question or proposal card entering (DESIGN.md § 5, «Question card, entering»): a translate only, so MotionConfig reducedMotion="user" leaves nothing and the card appears. Written for the question and proposal cards to come (2026-11-06). */
 export const cardEnterVariants: Variants = {
   enter: { y: 8 },
   center: { y: 0, transition: { duration: 0.2, ease: easeOutQuart } },

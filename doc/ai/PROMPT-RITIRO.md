@@ -171,7 +171,7 @@ ORDINE DI LAVORO
    dell'indice; la spec fra parentesi accanto a una data in una guida o nel «Latest» di
    CLAUDE.md, che dice quando e da quale spec, non rimanda a un testo; le righe di
    `doc/guide/dipendenze.md` § Registro → Moves che AI-00 crea (data · pacchetto · da → a ·
-   avviso curato · PR) e la riga che AI-03 vi aggiunge per `jsdom` e `@testing-library/*`
+   avviso curato · PR) e la riga del 2026-11-07 (PR #507) per `jsdom` e `@testing-library/*`
    (decisione 21): sono dati, e al ritiro di quella spec l'etichetta diventa la PR e la
    data; le righe di DESIGN.md § 5 «AI Surfaces» che nominassero la spec che le implementa
    (il 2026-11-02 `grep -c -E "AI-0[0-6]" DESIGN.md` → 0: AI-01 scrive la sezione, AI-03..06
@@ -199,7 +199,7 @@ ORDINE DI LAVORO
    per l'accento sotto AA) e, per ciò che sembra un bug e non lo è, nei suoi § Per-page
    blind spots (`grep -ln "Per-page blind spots" doc/guide/*.md | wc -l`: 37 guide su 40 il
    2026-11-02); gli account, i fixture e le trappole del collaudo → doc/guide/e2e-emulatori.md
-   (la rotta finta e la chiave reale di `.env.local`, decisione 39, che AI-03 vi scrive) e
+   (la rotta finta e la chiave reale di `.env.local`, decisione 39, scritta lì il 2026-11-07) e
    la tabella dei fixture di WORKFLOW.md § 3; le invarianti → il test che le pinna
    (`__tests__/<modulo>.test.ts`; i componenti e gli hook in `.test.tsx` sul progetto `dom`,
    decisione 21, con l'intestazione che dice quale falsificazione l'ha vista rossa) e la
@@ -307,7 +307,7 @@ CANCELLI: nell'ordine di WORKFLOW.md § 3 «The commands that exist», e PRIMA d
 «24.x»; il Mac del 2026-11-02 dava v22.14.0, quindi `nvm use 24` prima) — `npx tsc
 --noEmit` pulito; `TZ=Europe/Rome npx vitest run` E `TZ=UTC npx vitest run` verdi (ogni
 fixture di data a mezzogiorno, quelle a ridosso della mezzanotte nominate con l'ora
-italiana — AGENTS.md § Commands; da AI-03 in poi la suite ha due progetti, `node` per
+italiana — AGENTS.md § Commands; dal 2026-11-07 (PR #507) la suite ha due progetti, `node` per
 `.test.ts` e `dom` per `.test.tsx`, decisione 21, e si leggono entrambi i totali), con i
 totali nel messaggio di commit e mai in CLAUDE.md (WORKFLOW.md § 2, «The outcome is one
 line, the signals are not»); `npm run lint` a zero; `npm run perf:budget` invariato dopo

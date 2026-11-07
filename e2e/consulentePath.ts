@@ -1,5 +1,5 @@
 /**
- * The Consulente's path in a browser, shared by its specs (desktop, mobile, report; AI-03,
+ * The Consulente's path in a browser, shared by its specs (desktop, mobile, report;
  * 2026-11-07). A helper, not a spec: no project collects it.
  *
  * Base account (`test@example.com`): the age may be missing from the settings, so the walk writes

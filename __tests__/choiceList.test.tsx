@@ -1,5 +1,5 @@
 /**
- * `ChoiceList` (components/ui/choice-list.tsx, AI-03): the single mode as a radiogroup, the
+ * `ChoiceList` (components/ui/choice-list.tsx, 2026-11-07): the single mode as a radiogroup, the
  * multiple mode as ONE Tab stop of checkboxes with the exclusive row (decision 55), the «Altro…»
  * field under its row with no focus jump. Invented options.
  */

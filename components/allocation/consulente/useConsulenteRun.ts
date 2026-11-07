@@ -25,7 +25,7 @@ import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdvicePropos
 
 export type ConsulenteRunState =
   | { kind: 'idle' }
-  /** `stageStartedAt`: `Date.now()` when the run opened or the stage changed (the elapsed clock of the stage row, AI-03). */
+  /** `stageStartedAt`: `Date.now()` when the run opened or the stage changed (the elapsed clock of the stage row, 2026-11-07). */
   | { kind: 'running'; answers: AllocationAdviceAnswers; stage: AllocationAdviceStage | null; stageStartedAt: number }
   | { kind: 'failed'; answers: AllocationAdviceAnswers; error: string; retryable: boolean; resumeFrom: AllocationAdviceRunStage }
   | { kind: 'done'; answers: AllocationAdviceAnswers };
@@ -79,10 +79,15 @@ export function useConsulenteRun(ownerId: string, onFinished: () => void) {
       // The chain's stages are run stages too; `revise` never starts here.
       setState({ kind: 'running', answers, stage: from === 'strategy' || from === 'revise' ? null : from, stageStartedAt: Date.now() });
 
+      // The stage in flight: a request that THROWS (a non-ok status, a stream the network drops) is
+      // remembered by the stage it was in, never by the chain's start — «Riprova» does not re-pay a
+      // stage the document already holds (2026-11-07).
+      let reached: AllocationAdviceRunStage = from;
       const run = async () => {
         const stages = ALLOCATION_ADVICE_RUN_STAGES.slice(ALLOCATION_ADVICE_RUN_STAGES.indexOf(from));
         let outcome: ConsulenteRunState = { kind: 'done', answers };
         for (const stage of stages) {
+          reached = stage;
           const result = await requestStage(ownerId, stage === 'strategy' ? { stage, answers } : { stage }, (reached) => setState({ kind: 'running', answers, stage: reached, stageStartedAt: Date.now() }));
           // The report's query rereads after every stage: a reload mid-run shows what landed.
           await queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
@@ -98,7 +103,7 @@ export function useConsulenteRun(ownerId: string, onFinished: () => void) {
       run()
         .catch((error: unknown) => {
           void queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
-          setState({ kind: 'failed', answers, error: error instanceof Error ? error.message : 'Impossibile avviare il percorso del Consulente', retryable: true, resumeFrom: from });
+          setState({ kind: 'failed', answers, error: error instanceof Error ? error.message : 'Impossibile avviare il percorso del Consulente', retryable: true, resumeFrom: reached });
         })
         .finally(() => {
           inFlight.current = false;

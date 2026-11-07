@@ -53,9 +53,10 @@
   «rispecchiano la realtà?» and the free text — and «Indietro» from the roles screen goes back to «cosa manca».
   The reducer is pure (`allocationAdviceDraftReducer`); `describeStepBlock` says why a screen does not advance
   (age and horizon missing, a new goal without a name).
-- **The path is a scene** (AI-03, 2026-11-07): `PathRail` draws the eight steps — a strip above the card below
+- **The path is a scene** (2026-11-07): `PathRail` draws the eight steps — a strip above the card below
   `desktop:`, a 160px column at 1440 with each step's name in 11px (a `sr-only` name on the strip), one
-  `aria-current="step"`, ticks that are not buttons. The headline and the body slide 24px in the direction of travel
+  `aria-current="step"`, ticks that are not buttons; the strip is 24px tall in both modes, so the card stays put when
+  the run replaces the path (2026-11-07). The headline and the body slide 24px in the direction of travel
   (`sceneVariants`: 0.25 s in, 0.18 s out; a 0.15 s fade under reduced motion) inside
   `AnimatePresence mode="wait" initial={false}`; the eyebrow and the footer stay; after a change the headline takes
   the focus, unless the reader already moved it, and on a mount nothing moves. The direction is state set with the
@@ -85,13 +86,14 @@
   half-written proposal read as a whole one. A turn the web search pauses (`pause_turn`, the ceiling of the loop
   on the server side) is resumed by sending the paused response back as an assistant message, up to
   `ALLOCATION_ADVICE_MAX_CONTINUATIONS` times, with the texts joined (2026-10-23; before, the pause failed the stage).
-- **The run says how long a stage usually takes** (AI-03, 2026-11-07): each row of `StageRows` prints
+- **The run says how long a stage usually takes** (2026-11-07): each row of `StageRows` prints
   `STAGE_COPY[stage].detail` and «di solito ~N min» (`STAGE_TYPICAL_MINUTES`: strategy 2, instruments 2, review 1,
   nothing for the context — about five minutes in all at effort `medium`, 2026-10-23); the active row adds the
   elapsed time («m:ss», `aria-hidden`, from `stageStartedAt`, stamped by `useConsulenteRun` at every `stage` event)
   and the accent on its frame; a failed run marks the stages before `resumeFrom` done and that one failed
   (`runStageStates`). `PathRail` in run mode fills one segment per stage when it becomes active: stage status, never
-  a percentage.
+  a percentage; its wrapper is a plain div (the list is `aria-hidden`): the «Dove sei» landmark is the path's alone
+  (2026-11-07).
 - **The CASHFLOW 12 MESI block** (2026-11): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
   `formatCashflowBlockForPrompt`) over `fetchCashflowBlockInputs(userId, now)` (lib/services/assistantMonthContextService.ts),
   ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
@@ -154,7 +156,9 @@
   (`maxDuration = 300`, body `{ userId, stage, answers? }`, the rate limit counts only the `strategy`) streams
   `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from)`) chains the three, reads
   each stream to its `done`, rereads the document after every stage; a failed or cut stage stays
-  `resumeFrom` and «Riprova» (`retry`) restarts from there on the persisted document, never from scratch. The review
+  `resumeFrom` and «Riprova» (`retry`) restarts from there on the persisted document, never from scratch — a request
+  that throws (a non-ok status, a stream the network drops) is remembered by the stage in flight too, never by the
+  chain's start (2026-11-07: before, a drop during the instruments marked the strategy failed and «Riprova» re-paid it). The review
   rereads strategy and instruments with the blocks put back in place (`withBlock`): the document keeps the stripped
   markdown and the structure, not the raw text. `runAllocationAdvice` stays the three in sequence, for whoever has no
   ceiling. A stage that still exceeds 300 s is a 504 with the document stopped on that stage: «Riprova» repeats it.
@@ -189,7 +193,7 @@
   the held classes the proposal drops appended at the end at 0), Strumenti (the candidates per sub-target,
   «in portafoglio» when already held, the `caveat` in amber), Obiettivi, Ruoli degli asset (only the changes that
   change something, `planRoleChanges`; a name not found is listed and ignored), Il report (markdown) or, without
-  one, La strategia, Chiedi una modifica, Applica. **Every tile the model wrote carries `generated`** (AI-03,
+  one, La strategia, Chiedi una modifica, Applica. **Every tile the model wrote carries `generated`** (since
   2026-11-07) — the 1px `--ai-accent` border, the accented eyebrow, the glow on hover and focus — and the two action
   tiles («Applica», «Chiedi una modifica») never do; «Le fasi» of the running view does. The column cascades once
   per JS session (`consulenteReportEntrance`, its own flag; never under reduced motion), and the proposed
@@ -219,7 +223,7 @@ doc/ai/README.md): **The Path-Scene Rule** (one stage, the rail that says where 
 stages, the slide forward and back, the report's cascade), **The Question-Card Rule** (the interview's cards; the
 scene's footer owns «Continua» and «Avvia la ricerca») and **The AI-Accent Rule** (the accent on what the model wrote
 and, on hover and focus only, on «Avvia il colloquio», «Continua», «Avvia la ricerca», «Riprova», «Rivedi il report»).
-The code follows it since the redesign of the path, the run and the report (AI-03, 2026-11-07): § The path, § The run
+The code follows it since the redesign of the path, the run and the report (2026-11-07, PR #507): § The path, § The run
 and § The report and «Applica» describe what renders; `app/globals.css` serves `oklch(0.56 0.2 305)` in `:root`,
 `oklch(0.65 0.2 305)` in `.dark` and `--ai-glow` once. The interview's screens are AI-04's.
 
