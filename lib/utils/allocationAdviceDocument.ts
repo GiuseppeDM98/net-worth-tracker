@@ -8,7 +8,7 @@
 
 import { toDate } from '@/lib/utils/dateHelpers';
 import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdviceProposal';
-import type { AllocationAdviceDocument, AllocationAdvicePriorPlan } from '@/types/allocationAdvice';
+import { ALLOCATION_ADVICE_STAGES, type AllocationAdviceDocument, type AllocationAdvicePriorPlan, type AllocationAdviceRunStage, type AllocationAdviceStage } from '@/types/allocationAdvice';
 
 type Data = Record<string, unknown>;
 
@@ -42,6 +42,28 @@ export function pageShowsReport(args: { document: AllocationAdviceDocument | nul
   if (document === null || runActive) return false;
   const visible = document.status === 'ready' || document.status === 'applied' || document.status === 'failed' || (document.status === 'running' && !isRunStale(document, openedAt));
   return visible && (redoAt === null || redoAt !== document.updatedAt.getTime());
+}
+
+// ─── The run's stage rows (AI-03, 2026-11-07) ─────────────────────────────────
+
+export type StageRowState = 'done' | 'active' | 'pending' | 'failed';
+
+/** The display stage of a run request: `revise` re-enters the review. */
+export function stageOfRunStage(stage: AllocationAdviceRunStage): AllocationAdviceStage {
+  return stage === 'revise' ? 'review' : stage;
+}
+
+/**
+ * Each of the four stages with its state: `running` lights `stage` and marks the ones before it
+ * done (`null`: all pending, the run is opening); `failed` marks `stage` failed; `done` marks all
+ * done. ONE reading for the run's screen, the rail and the report's «in corso» view.
+ */
+export function runStageStates(at: { status: 'running' | 'failed' | 'done'; stage: AllocationAdviceStage | null }): { stage: AllocationAdviceStage; state: StageRowState }[] {
+  const reached = at.status === 'done' ? ALLOCATION_ADVICE_STAGES.length : at.stage === null ? -1 : ALLOCATION_ADVICE_STAGES.indexOf(at.stage);
+  return ALLOCATION_ADVICE_STAGES.map((stage, index) => ({
+    stage,
+    state: index < reached ? 'done' : index === reached ? (at.status === 'failed' ? 'failed' : 'active') : 'pending',
+  }));
 }
 
 /** The plan in force a new run must read, or null when the last document has no finished report. */

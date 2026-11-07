@@ -183,6 +183,33 @@ export const goalLinkSettle: Variants = {
   },
 };
 
+// ─── The Consulente's scene (AI-03, 2026-11-07; DESIGN.md → The Path-Scene Rule) ──────────────
+
+/** The path's screen comes in from the side it is going to: +1 forward, −1 back. */
+export function sceneEnter(direction: 1 | -1): { x: number; opacity: number } {
+  return { x: 24 * direction, opacity: 0 };
+}
+export function sceneExit(direction: 1 | -1): { x: number; opacity: number; transition: Transition } {
+  return { x: -24 * direction, opacity: 0, transition: { duration: 0.18, ease: easeOutQuart } };
+}
+/** The scene's three states, the `custom` prop of AnimatePresence as the direction (the resolvers are exported because a Variant is not callable in a test). */
+export const sceneVariants: Variants = {
+  enter: sceneEnter,
+  center: { x: 0, opacity: 1, transition: { duration: 0.25, ease: easeOutQuart } },
+  exit: sceneExit,
+};
+/** Under reduced motion: a cross-fade, no travel (MotionConfig would drop the x but keep a longer fade). */
+export const sceneVariantsReduced: Variants = {
+  enter: { opacity: 0 },
+  center: { opacity: 1, transition: { duration: 0.15 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+};
+/** A question or proposal card entering (DESIGN.md § 5, «Question card, entering»): a translate only, so MotionConfig reducedMotion="user" leaves nothing and the card appears. Read by AI-04 and AI-05. */
+export const cardEnterVariants: Variants = {
+  enter: { y: 8 },
+  center: { y: 0, transition: { duration: 0.2, ease: easeOutQuart } },
+};
+
 /** Table shell settle: subtle container continuity without animating table geometry. */
 export const tableShellSettle: Variants = {
   inactive: {

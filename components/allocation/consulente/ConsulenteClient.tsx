@@ -8,7 +8,7 @@
  * the two agents, persisted after each so a reload shows where it is), the REPORT (the verdict,
  * the proposal against today, the instruments, the goals, the roles, the text, and «Applica»
  * with one checkbox per thing it writes). Not a tile grid: like the Assistente, the content is
- * a conversation — here a form — so the page is one column at 720px and nothing is composed,
+ * a conversation — here a form — so the page is one column at 720px (900px at 1440, the path's rail beside the card) and nothing is composed,
  * lifted or remembered below `desktop:` (DESIGN.md → The Conversation-Is-Content Rule).
  *
  * No component computes a figure or writes a sentence: the reducer and the plans are

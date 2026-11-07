@@ -70,7 +70,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   custom property reading `''` in the browser while it is in `app/globals.css` (2026-08-30, `--chart-6/7/8`), is that
   cache. Delete the dist dir and restart before doubting your edit; prefer a fresh `NEXT_DIST_DIR=.next-throwaway`
   (keep the `.next-` prefix, what `.gitignore` matches) over someone else's; `next dev` rewrites `tsconfig.json`
-  (check it out again) and keeps writing briefly after it is stopped (delete the dir after the process is gone).
+  (two `include` lines per dist dir — check it out again) and keeps writing briefly after it is stopped (delete the
+  dir after the process is gone). **A throwaway server WITHOUT a key of `.env.local`** (2026-11-07, «Servizio AI non
+  configurato»): `cmd /c set X=` DELETES the variable and `@next/env` then loads the file's value; an EMPTY variable
+  survives only a node→node spawn (`spawn(process.execPath, [next, 'dev', …], { env: { …, X: '' } })`, not npm or cmd).
   **The plain `.next` can hold a PRODUCTION build** (`BUILD_ID`, `standalone/`, `routes-manifest.json`, 2026-09-24):
   `npm run dev:emulator` on it served `/login` and `/dashboard` but answered 404 on `/dashboard/fire-simulations` and
   on `/api/dashboard/overview` — routes that exist — while the `.next-e2e` server on :3100 served them; deleting
@@ -432,6 +435,14 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   `shellBoot.ts`): a scenario spreads its overrides over `baseOverviewPatch()`. **The hidden rest of a cut verdict is
   in the DOM**: `toContainText` on the verdict's region reads it, so «title only» is asserted with
   `getByText(/Il patrimonio vale/)` → `toBeHidden()`, never with `not.toContainText` (seen that day).
+- **A control that calls a model is pressed only on a FAKED route** (2026-11-07, decision 39 of the AI series):
+  `npm run dev:e2e` is `next dev`, which loads `.env.local`, so the owner's real `ANTHROPIC_API_KEY` reaches the server
+  on :3100 and enables the control (the Consulente's `configured`) — the key makes it pressable, never what answers
+  it. The spec installs `page.route('**/api/allocation-advice/run', …)` BEFORE the click and answers each request by
+  its `stage` with an SSE body (`data: {json}\n\n`: the `stage` events, then `done` or `error`); a request it must
+  hold to read a state is answered after the assertion. No dummy key in `package.json`, no real request from a spec.
+  Worked example: `e2e/allocation.consulente.spec.ts` › «runs the three stages on a faked route, a failed stage
+  retried from itself».
 - **Locators — the controls are not buttons** (2026-08-28: read the failure's page snapshot before guessing a second
   selector): the Cashflow picker is a `combobox` named «Periodo selezionato: {label}», `SegmentedPill` options are
   `tab`, the instalment toggle sits behind the «Impostazioni avanzate» disclosure, the two-step create dialog capitalises

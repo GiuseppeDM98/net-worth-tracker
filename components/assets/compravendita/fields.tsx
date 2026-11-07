@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * The fields the Compravendita screens share: a choice as rows, a money or number input, the account
+ * The fields the Compravendita screens share: a money or number input, the date, the account
  * picker and the category picker (a category or one of its subcategories, by allowed type). Module-level,
  * controlled, no state of their own — the draft is the reducer's (lib/utils/realEstateOperationDraft.ts).
+ * A choice as rows is the shared `ChoiceList` (components/ui/choice-list.tsx, since AI-03).
  */
 
 import type { Asset } from '@/types/assets';
@@ -12,44 +13,10 @@ import { EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import type { CategoryChoice } from '@/types/realEstateOperation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 export const FIELD_HEIGHT_CLASS = 'h-11 desktop:h-9';
-
-/** A choice as 44px rows: a radio, the label, the description — never a dropdown for two or three options. */
-export function ChoiceRows<T extends string>({
-  name,
-  value,
-  options,
-  onChange,
-  label,
-}: {
-  name: string;
-  value: T;
-  options: ReadonlyArray<{ value: T; label: string; description?: string }>;
-  onChange: (value: T) => void;
-  /** The group's accessible name. */
-  label: string;
-}) {
-  return (
-    <RadioGroup value={value} onValueChange={(next) => onChange(next as T)} aria-label={label} className="divide-y divide-border rounded-xl border border-border">
-      {options.map((option) => {
-        const id = `${name}-${option.value}`;
-        return (
-          <div key={option.value} className="flex items-start gap-3 px-4 py-3">
-            <RadioGroupItem value={option.value} id={id} className="mt-1" />
-            <Label htmlFor={id} className="flex min-h-11 flex-1 cursor-pointer flex-col items-start justify-center gap-0.5 text-left desktop:min-h-0">
-              <span className="text-[14px] font-medium text-foreground">{option.label}</span>
-              {option.description && <span className="text-[13px] font-normal leading-[1.45] text-muted-foreground">{option.description}</span>}
-            </Label>
-          </div>
-        );
-      })}
-    </RadioGroup>
-  );
-}
 
 /** '' → null, a number otherwise: an empty field is «not typed», never 0. */
 export function numberOrNull(value: string): number | null {

@@ -59,15 +59,15 @@ export const STEP_COPY: Record<AllocationAdviceStep, { eyebrow: string; question
 };
 
 export const LOSS_TOLERANCE_OPTIONS = [
-  { value: 'bassa' as const, label: 'Bassa', description: 'Un −10% mi farebbe vendere o dormire male.' },
-  { value: 'media' as const, label: 'Media', description: 'Reggerei un −25% senza vendere, con fatica.' },
-  { value: 'alta' as const, label: 'Alta', description: 'Reggerei un −40% senza vendere, e comprerei ancora.' },
+  { value: 'bassa' as const, label: 'Bassa', hint: 'Un −10% mi farebbe vendere o dormire male.' },
+  { value: 'media' as const, label: 'Media', hint: 'Reggerei un −25% senza vendere, con fatica.' },
+  { value: 'alta' as const, label: 'Alta', hint: 'Reggerei un −40% senza vendere, e comprerei ancora.' },
 ];
 
 export const DISTRIBUTION_POLICY_OPTIONS = [
-  { value: 'accumulazione' as const, label: 'Accumulazione', description: 'Reinveste i proventi, nessuna tassazione annua sui dividendi.' },
-  { value: 'distribuzione' as const, label: 'Distribuzione', description: 'Incassi dividendi e cedole in conto.' },
-  { value: 'indifferente' as const, label: 'Scegli tu', description: 'Il Consulente motiva la scelta.' },
+  { value: 'accumulazione' as const, label: 'Accumulazione', hint: 'Reinveste i proventi, nessuna tassazione annua sui dividendi.' },
+  { value: 'distribuzione' as const, label: 'Distribuzione', hint: 'Incassi dividendi e cedole in conto.' },
+  { value: 'indifferente' as const, label: 'Scegli tu', hint: 'Il Consulente motiva la scelta.' },
 ];
 
 export const EXCHANGE_OPTIONS = ['Borsa Italiana (Milano, XMIL)', 'Xetra (Francoforte)', 'Euronext (Parigi / Amsterdam)', 'London Stock Exchange'];
@@ -104,6 +104,16 @@ export const STAGE_COPY: Record<AllocationAdviceStage, { label: string; detail: 
 export function describeRunHeadline(stage: AllocationAdviceStage | null): string {
   if (stage === null) return 'Avvio il percorso.';
   return `${STAGE_COPY[stage].label}.`;
+}
+
+/** What a stage usually takes, in minutes (about five in all at effort `medium`, 2026-10-23; decision 50). */
+export const STAGE_TYPICAL_MINUTES: Record<AllocationAdviceStage, number> = { context: 0, strategy: 2, instruments: 2, review: 1 };
+
+/** «di solito ~N min»; null when N is 0 (the context: the row prints no duration). */
+export function describeStageTypical(stage: AllocationAdviceStage): string | null {
+  const minutes = STAGE_TYPICAL_MINUTES[stage];
+  if (minutes <= 0) return null;
+  return `di solito ~${minutes} min`;
 }
 
 // ─── The report ───────────────────────────────────────────────────────────────

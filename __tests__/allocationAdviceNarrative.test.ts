@@ -18,9 +18,11 @@ import {
   describeReviewInvite,
   reviewDueState,
   describeRunHeadline,
+  describeStageTypical,
   EXCHANGE_OPTIONS,
   EXCHANGE_OTHER,
   isListedExchange,
+  STAGE_TYPICAL_MINUTES,
 } from '@/lib/utils/allocationAdviceNarrative';
 
 const NOW = new Date('2026-10-20T12:00:00.000Z');
@@ -144,5 +146,17 @@ describe('the exchange list (2026-10-20)', () => {
     expect(isListedExchange('SIX Swiss Exchange')).toBe(false);
     expect(isListedExchange('')).toBe(false);
     expect(EXCHANGE_OPTIONS).not.toContain(EXCHANGE_OTHER);
+  });
+});
+
+describe('the stages’ typical durations (AI-03)', () => {
+  it('names the four stages at 0 · 2 · 2 · 1 minutes', () => {
+    expect(STAGE_TYPICAL_MINUTES).toEqual({ context: 0, strategy: 2, instruments: 2, review: 1 });
+  });
+
+  it('prints «di solito ~N min», and nothing for the context', () => {
+    expect(describeStageTypical('strategy')).toBe('di solito ~2 min');
+    expect(describeStageTypical('review')).toBe('di solito ~1 min');
+    expect(describeStageTypical('context')).toBeNull();
   });
 });

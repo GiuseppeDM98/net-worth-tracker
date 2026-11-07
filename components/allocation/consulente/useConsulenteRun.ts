@@ -25,7 +25,8 @@ import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdvicePropos
 
 export type ConsulenteRunState =
   | { kind: 'idle' }
-  | { kind: 'running'; answers: AllocationAdviceAnswers; stage: AllocationAdviceStage | null }
+  /** `stageStartedAt`: `Date.now()` when the run opened or the stage changed (the elapsed clock of the stage row, AI-03). */
+  | { kind: 'running'; answers: AllocationAdviceAnswers; stage: AllocationAdviceStage | null; stageStartedAt: number }
   | { kind: 'failed'; answers: AllocationAdviceAnswers; error: string; retryable: boolean; resumeFrom: AllocationAdviceRunStage }
   | { kind: 'done'; answers: AllocationAdviceAnswers };
 
@@ -76,13 +77,13 @@ export function useConsulenteRun(ownerId: string, onFinished: () => void) {
       if (inFlight.current) return;
       inFlight.current = true;
       // The chain's stages are run stages too; `revise` never starts here.
-      setState({ kind: 'running', answers, stage: from === 'strategy' || from === 'revise' ? null : from });
+      setState({ kind: 'running', answers, stage: from === 'strategy' || from === 'revise' ? null : from, stageStartedAt: Date.now() });
 
       const run = async () => {
         const stages = ALLOCATION_ADVICE_RUN_STAGES.slice(ALLOCATION_ADVICE_RUN_STAGES.indexOf(from));
         let outcome: ConsulenteRunState = { kind: 'done', answers };
         for (const stage of stages) {
-          const result = await requestStage(ownerId, stage === 'strategy' ? { stage, answers } : { stage }, (reached) => setState({ kind: 'running', answers, stage: reached }));
+          const result = await requestStage(ownerId, stage === 'strategy' ? { stage, answers } : { stage }, (reached) => setState({ kind: 'running', answers, stage: reached, stageStartedAt: Date.now() }));
           // The report's query rereads after every stage: a reload mid-run shows what landed.
           await queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
           if (!result.ok) {
