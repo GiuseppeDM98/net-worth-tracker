@@ -70,21 +70,28 @@
   half-written proposal read as a whole one. A turn the web search pauses (`pause_turn`, the ceiling of the loop
   on the server side) is resumed by sending the paused response back as an assistant message, up to
   `ALLOCATION_ADVICE_MAX_CONTINUATIONS` times, with the texts joined (2026-10-23; before, the pause failed the stage).
-- **The CASHFLOW 12 MESI block** (2026-11, AI-02): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
+- **The CASHFLOW 12 MESI block** (2026-11): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
   `formatCashflowBlockForPrompt`) over `fetchCashflowBlockInputs(userId, now)` (lib/services/assistantMonthContextService.ts),
   ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
   the aggregates; the current month up to today stands apart, its rows after today declared as scheduled and not
   counted; the series covers the whole recorded history — from the first month holding a row (a transfer never
   opens it), never before `cashflowHistoryStartYear`, always the 12 full months, no cap (decision 81, 2026-11-07);
+  the header names that floor when it cuts the series or leaves a row out, with the count of the rows left out
+  («storico contato dal 2025-01, 2 righe precedenti escluse», 2026-11-07);
   the rows after the current month serve the commitments' next date only. Income is a signed sum, dividends and coupons (`dividendIncomeCategoryId`) out of the sources; the
   concentration reading is on the FIRST source's share (≥ 70% «una fonte dominante», the first two ≥ 80% «due fonti
   principali»), the HHI printed beside it. Spending by type and by category id (key by id, label by name), a loan's
   instalment counted whole. The medians (QUARTILE.INC) count from the first full month holding a row, never before
-  `cashflowHistoryStartYear`, none under 3 months. The commitments are the recorded series and instalment plans, the
+  `cashflowHistoryStartYear`, none under 3 months. The commitments are the recorded series and instalment plans (an amount's change read from the floor on, their
+  number, total and next date over every row of the record, 2026-11-07), the
   loans the `debt` rows by `debtAssetId`, the transfers apart (those touching a property named). The accounts are
   `isCashAccount` (types/assets.ts) with the balance `calculateAssetValue` gives (injected as `assetValueOf`) and their
-  default debit/credit roles. Every cut is stated in the text. A failed read fails the context stage, retryable — never
-  a strategy without the block. The contract sizes the goals' `monthlyContribution` on the block's median monthly
+  default debit/credit roles. Every cut is stated in the text, every absence has its sentence («nessuna uscita
+  registrata negli ultimi 12 mesi pieni», «nessuna fonte con entrate positive», «nessuna rata nei 12 mesi pieni»),
+  a source at or below zero is listed with no share and out of the HHI, and one item left out reads in the singular
+  («e altra 1 fonte»). The strategy prints the block after its data, under the note every surface carries
+  (`formatCashflowBlockSection`, 2026-11-07). A failed read fails the context stage, retryable — never a strategy
+  without the block. The contract sizes the goals' `monthlyContribution` on the block's median monthly
   savings and the cash reserve on its median spending and accounts (decision 46). Amounts print through
   `cachedFormatCurrencyEUR`: it-IT does not group four digits («1200 €», but «31.200 €») and puts U+00A0 before «€»
   — what the formatter prints, not a typo to «fix».

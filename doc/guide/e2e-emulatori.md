@@ -32,7 +32,7 @@
   process list before doubting the code.
 
 ## Emulator Exercise Scripts
-- **An expected string typed by hand never matches an Intl amount** (2026-11-07, AI-02 phase D): it-IT puts U+00A0
+- **An expected string typed by hand never matches an Intl amount** (2026-11-07, a throwaway emulator check of the cashflow block): it-IT puts U+00A0
   between the figure and «€», so a `toEqual` on lines written with a plain space fails on a diff whose two sides
   look identical. Normalise `/[  ]/g` to a space in the throwaway, or build the expectation with the formatter.
 - **A module two scripts or a test share is a `.ts`, imported with no extension** (2026-11-03, `scripts/mirrorCollections.ts`):

@@ -349,7 +349,7 @@ describe('generateWeeklyBudgetComment', () => {
     expect(await generateWeeklyBudgetComment(data)).toBeNull();
   });
 
-  it('prints the note and the cashflow block under the budgets, and nothing without one (decision 81)', async () => {
+  it('prints the note and the cashflow block under the budgets, and nothing without one (decision 81, 2026-11-07)', async () => {
     anthropicCreateMock.mockResolvedValue(answer('Spesa al 50% del tetto.', 'end_turn'));
     await generateWeeklyBudgetComment(data, '--- CASHFLOW 12 MESI (x) ---\nX');
     await generateWeeklyBudgetComment(data);
@@ -363,7 +363,7 @@ describe('generateWeeklyBudgetComment', () => {
   });
 });
 
-describe('buildAndSendWeeklyBudget — the cashflow block (decision 81)', () => {
+describe('buildAndSendWeeklyBudget — the cashflow block (decision 81, 2026-11-07)', () => {
   const now = new Date(2026, 5, 15, 12);
   const previousKey = process.env.ANTHROPIC_API_KEY;
 
@@ -396,6 +396,13 @@ describe('buildAndSendWeeklyBudget — the cashflow block (decision 81)', () => 
     expect(readCashflowBlockMock).toHaveBeenCalledWith('u1', now);
     const prompt = (anthropicCreateMock.mock.calls[0][0] as { messages: { content: string }[] }).messages[0].content;
     expect(prompt).toContain('--- CASHFLOW 12 MESI (x) ---\nX');
+  });
+
+  it('with no API key reads no block and spends no call (2026-11-07)', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    expect(await buildAndSendWeeklyBudget('u1', ['a@example.com'], now)).toBe(true);
+    expect(readCashflowBlockMock).not.toHaveBeenCalled();
+    expect(anthropicCreateMock).not.toHaveBeenCalled();
   });
 
   it('a failed read sends the email without the comment and spends no call', async () => {

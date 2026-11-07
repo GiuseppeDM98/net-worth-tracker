@@ -777,7 +777,7 @@ describe('Assistant private API routes', () => {
       ['chat', { chatContext: 'ytd' }],
       ['chat', { chatContext: 'history' }],
       ['chat', { chatContext: 'none' }],
-    ])('%s %o reads the block once, for the owner, and hands it to the stream — never on the SSE (decision 81)', async (mode, extra) => {
+    ])('%s %o reads the block once, for the owner, and hands it to the stream — never on the SSE (decision 81, 2026-11-07)', async (mode, extra) => {
       const response = await streamRequest({ mode, ...extra });
       expect(response.status).toBe(200);
       const streamText = await response.text();
@@ -787,6 +787,16 @@ describe('Assistant private API routes', () => {
       const args = streamAssistantResponseMock.mock.calls[0][0] as { cashflowBlock: string | null };
       expect(args.cashflowBlock).toContain('--- CASHFLOW 12 MESI');
       expect(streamText).not.toContain('CASHFLOW 12 MESI');
+    });
+
+    it('a co-owner reads the OWNER\'s block, never their own (2026-11-07)', async () => {
+      verifyIdTokenMock.mockResolvedValue({ uid: 'co-owner' });
+      accountAccessDocGetMock.mockResolvedValue({ exists: true, data: () => ({ memberUids: ['co-owner'] }) });
+      const response = await streamRequest({ mode: 'ytd_analysis' });
+      expect(response.status).toBe(200);
+      await response.text();
+      expect(fetchCashflowBlockInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchCashflowBlockInputsMock.mock.calls[0][0]).toBe('user-1');
     });
 
     it.each(['ytd_analysis', 'chat'])('%s: a failed read answers the 500, never a silent empty block', async (mode) => {

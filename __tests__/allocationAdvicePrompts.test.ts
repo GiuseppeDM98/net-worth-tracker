@@ -95,9 +95,12 @@ describe('the CASHFLOW 12 MESI block in the strategy (2026-11)', () => {
   };
   const BLOCK = '--- CASHFLOW 12 MESI (x) ---\nX';
 
-  it('goes after the data and before the plan in force', () => {
+  it('goes after the data, under the note every surface carries (owner, 2026-11-07), and before the plan in force', () => {
+    const note = "Il blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi, qualunque sia il periodo in esame: le cifre di un periodo vengono dai blocchi del periodo; usalo per l'andamento recente, la capacità di risparmio e la sua stabilità, gli impegni ricorrenti e i conti.";
     const prompt = buildStrategyPrompt(ANSWERS, 'DATI', { priorPlan: plan, cashflowBlock: BLOCK });
-    expect(prompt.userContent).toContain('DATI\n\n--- CASHFLOW 12 MESI (x) ---\nX\n\n--- IL PIANO IN VIGORE');
+    expect(prompt.userContent).toContain(`DATI\n\n${note}\n--- CASHFLOW 12 MESI (x) ---\nX\n\n--- IL PIANO IN VIGORE`);
+    const noPlan = buildStrategyPrompt(ANSWERS, 'DATI', { cashflowBlock: BLOCK });
+    expect(noPlan.userContent).toContain(`DATI\n\n${note}\n--- CASHFLOW 12 MESI (x) ---\nX\nProponi l'allocazione`);
   });
 
   it('names the block among the exhaustive ones only when it is there, and points income, spending and savings at it', () => {

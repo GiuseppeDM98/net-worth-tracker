@@ -89,7 +89,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The weekly budget email is a SEPARATE module and nothing in it is weekly**: it is *sent* on Sunday, but its numbers
   are month-to-date and year-to-date. `buildCommentContext` (pure, exported, tested) states the day-of-month, tags the
   overall as a MENSILE ceiling with an A FINE MESE projection and forbids "fine anno"/"settimana" for monthly budgets.
-  **When you add a figure here or to its prompt, name its window.**
+  **When you add a figure here or to its prompt, name its window** (the cashflow block under the budgets names its
+  own, in its header and its note).
 - Over-budget rows carry `overspendExpenses` (actual overruns only) sourced from `getPeriodExpensesForItem` so they
   reconcile with the row's `spent`. Always run user notes through `escapeHtml`.
 - **Comparison data is deterministic, AI only interprets**: **net worth = end-of-period snapshots (point-in-time);
@@ -111,9 +112,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   builders): `generateEmailAiComment` and `buildAndSendWeeklyBudget` read it at the send instant through
   `readCashflowBlockForPrompt`; it closes the periodic user turn and sits under the weekly budgets, `system`
   untouched. A failed read sends the email WITHOUT the comment and spends no call — never a comment on a silent
-  empty cashflow.
+  empty cashflow; with no API key the weekly email does not read the block at all (2026-11-07).
 - **The prompt BODY is the assistant's own block**: `buildEmailAiPrompt` = `formatBundleForPrompt(bundle, label)` +
-  the sections only the email has (market effect, comparisons, category deltas, Hall of Fame, budget alerts). Do not
+  the sections only the email has (market effect, comparisons, category deltas, Hall of Fame, budget alerts,
+  household split), then the CASHFLOW 12 MESI block under its note — the one figure that is not the window's. Do not
   re-list what the bundle already carries — the largest single expenses are the standing example — and do not add a
   second cashflow computation: `resolveEmailPeriodRange` hands the email's own window to the range builder, whose
   baseline is by construction the same snapshot the email calls `previousNetWorth`.
@@ -186,4 +188,7 @@ PDF half seen from inside the section, this is the recipe for both surfaces.
   December and measures from January. TWR, ROI and the two yields are annualised over 9 months against the page's 10; the
   dividends received are the same. The TOTAL export has the page's whole-history window, and its twelve yield fields were
   equal to the page's, field by field.
+- **An email with an AI comment reads the cashflow twice** (2026-11-07): the periodic one the bundle on its window
+  and the CASHFLOW 12 MESI block on the whole history, the weekly one the budget rows and the block — two queries
+  apart, accepted for a cron that sends a handful.
 - **Fuori dal DOM restano tre punti ciechi**: le email non rispecchiano i cinque temi nominati (scelta — si leggono su una scheda bianca); «un hex sta solo in `printTokens`» è documentato ma **non applicato da un linter**; e `@react-pdf/renderer` scarta in SILENZIO ogni carattere fuori da WinAnsi (`pdfSafeText` copre U+2212; frecce, simboli ed emoji no). Le tre superfici si verificano solo renderizzandole, e **nessuna di quelle verifiche è nella suite**. doc/guide/email-pdf.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

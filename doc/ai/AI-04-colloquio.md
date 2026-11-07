@@ -1,7 +1,8 @@
 # AI-04 — The interview: the critical friend before the strategy
 
-> Series `doc/ai/` (README.md § 5): **depends on AI-01 (retired on 2026-11-06, in develop since 2026-11-06, PR #503): The Question-Card Rule, The AI-Accent Rule), **AI-02** (the
-> cashflow block the interview reads, the prompt builders' options object) **and AI-03** (`ChoiceList`, `PathRail`
+> Series `doc/ai/` (README.md § 5): **depends on AI-01** (retired on 2026-11-06, in develop since 2026-11-06, PR #503: The Question-Card Rule, The
+> AI-Accent Rule), **AI-02** (retired on 2026-11-07, in develop since 2026-11-07, PR #505: the cashflow block the
+> interview reads, the prompt builders' options object) **and AI-03** (`ChoiceList`, `PathRail`
 > with its `interview` prop, `Tile`'s `generated`, the component-test harness of decision 21); **AI-06 depends on it**
 > (`lib/utils/questionSet.ts`, `QuestionCard`). Written on 2026-11-01 from `develop` @ b9411a4d. Executes decisions 4,
 > 6, 8 and the adopted choices A1–A6, A22. The Consulente's concept is B «La scena» (decision 74, 2026-11-06; the
@@ -20,7 +21,7 @@
 - **The answers are thin where the money is**: `AllocationAdviceAnswers` (`lib/utils/allocationAdviceProposal.ts:54`
   @ b9411a4d) has age, horizon, loss tolerance (3 options), exchange, broker, distribution policy, goals, roles,
   `avoid`, `notes` — no income stability, no emergency fund size, no dependants, no expected big expense, no debt plan;
-  the cashflow block of AI-02 shows the facts, not the user's intentions about them.
+  the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`) shows the facts, not the user's intentions about them.
 - **The run's contract is one request per stage, and every stage but the strategy needs a document**
   (`app/api/allocation-advice/run/route.ts:53-56` @ b9411a4d): `stage` ∈ `ALLOCATION_ADVICE_RUN_STAGES` ∪ `revise`,
   anything else a 400 «Fase del percorso non riconosciuta»; `answers` parsed only for `strategy` (`route.ts:57-62`
@@ -378,8 +379,10 @@ the client reads every event's round through `interviewRoundStoredSchema.safePar
     `buildInterviewPrompt(answers, dataBlock, opts: { cashflowBlock: string; priorPlan: AllocationAdvicePriorPlan | null;
     previousRounds: AllocationAdviceInterviewRound[]; roundNumber: number; revision?: { requests: string; report: string }
     | null })` → `{ system: `${CONSULENTE_CORE}\n${INTERVIEW_CONTRACT}`, userContent }`. `userContent`, in order:
-    `formatAnswersForPrompt(answers)`; the strategy's data intro line (extracted as a module constant `DATA_INTRO`,
-    shared by the two builders so they never drift); `dataBlock`; `opts.cashflowBlock` when not empty;
+    `formatAnswersForPrompt(answers)`; the strategy's data intro sentence for a run WITH the block (today the first
+    branch of `exhaustive` in `buildStrategyPrompt`, extracted as a module constant `DATA_INTRO`, shared by the two
+    builders so they never drift); `dataBlock`; `opts.cashflowBlock` under its note, as the strategy prints it
+    (`formatCashflowBlockSection(cashflowBlock).slice(0, 2)`, decision 81);
     `formatPriorPlanForPrompt(opts.priorPlan)` when given; with previous rounds «--- LE TORNATE PRECEDENTI ---» and
     `formatQuestionAnswersForPrompt(opts.previousRounds, 'Tornata')`; with `revision` «--- IL REPORT DA RIVEDERE ---»
     with `revision.report`, «--- LE RICHIESTE DELL'UTENTE, in ordine (l'ultima è quella nuova) ---» with
@@ -394,7 +397,7 @@ the client reads every event's round through `interviewRoundStoredSchema.safePar
     «non risposta» vuol dire che ha saltato il colloquio prima di rispondere.», the rounds
     (`formatQuestionAnswersForPrompt(interview.rounds, 'Tornata')`), and when skipped «L'utente ha saltato il
     colloquio dopo {describeRoundCount(n)}.».
-  - AI-02's options objects gain `interview`: `buildStrategyPrompt(answers, dataBlock, opts?: { priorPlan?;
+  - The prompt builders' options objects gain `interview`: `buildStrategyPrompt(answers, dataBlock, opts?: { priorPlan?;
     cashflowBlock?; interview?: AllocationAdviceInterview | null })` prints the block right after
     `formatAnswersForPrompt(answers)`, closed by «Tieni conto di queste risposte nella sezione «La situazione».» when
     it holds a round; `buildReviewPrompt(answers, strategyMarkdown, instrumentsMarkdown, candidates, opts?:
@@ -429,11 +432,11 @@ La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfie
   - `ALLOCATION_ADVICE_INTERVIEW_MAX_TOKENS = 16000`; `INTERVIEW_FORMAT = { type: 'json_schema' as const, schema:
     betaZodOutputFormat(interviewRoundSchema).schema }` (module-local, like `ALLOCATION_ANSWER_FORMAT`).
   - A module-local `buildConsulenteContext(userId, now): Promise<{ dataBlock: string; cashflowBlock: string }>` —
-    the two reads in ONE `Promise.all([buildAssistantYtdContext(userId), fetchCashflowBlockInputs(userId, now)])`
-    (AI-02's `runStrategy` already does so inline: this spec extracts that pair into the helper), then
-    `formatBundleForPrompt(bundle)` and `formatCashflowBlockForPrompt(buildCashflowBlock(expenses, input))` — used by
+    the two reads in ONE `Promise.all([buildAssistantYtdContext(userId), readCashflowBlockForPrompt(userId, now)])`
+    (`runStrategy` does the same pair inline today, through `fetchCashflowBlockInputs`: this spec extracts it into the
+    helper), then `formatBundleForPrompt(bundle)` — used by
     `runStrategy` and `runInterviewRound`, so the interview reads exactly the strategy's data (A4). A failed read rejects, and the route
-    streams its generic retryable error (AI-02-Q9: a failed read is never a silent zero).
+    streams its generic retryable error (a failed read is never a silent zero, doc/guide/consulente.md § The run).
   - `export async function runInterviewRound(args: RunInterviewRoundArgs): Promise<void>` with
     `RunInterviewRoundArgs = { userId: string; answers: AllocationAdviceAnswers; previousRounds:
     AllocationAdviceInterviewRound[]; revision?: { requests: string } | null; onRound: (round:
@@ -645,7 +648,7 @@ La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfie
   `buildStrategyPrompt`, `buildReviewPrompt`, `buildRevisionPrompt` (the closing lines present only with a round).
   Mutations: the block before the answers → the order fails; the round number in the contract → the `toBe` fails.
 - `__tests__/allocationAdviceRun.test.ts`: the mock of `@/lib/services/assistantMonthContextService` serves
-  `fetchCashflowBlockInputs` (as AI-02 left it); `runInterviewRound` makes ONE call with `model ===
+  `fetchCashflowBlockInputs` (as it does since 2026-11-07); `runInterviewRound` makes ONE call with `model ===
   ALLOCATION_ADVICE_STRATEGY_MODEL`, `output_config.effort === ALLOCATION_ADVICE_STRATEGY_EFFORT`, `max_tokens ===
   ALLOCATION_ADVICE_INTERVIEW_MAX_TOKENS`, the format's keys `['note', 'satisfied', 'questions']`, no `tools`;
   `onRound` once, with the answering model, a Date `askedAt`, `allowOther: true`; `getMock` once, `setMock` and
@@ -788,7 +791,7 @@ ricerca» for whoever wants the old path.
 - `AGENTS.md` (991 lines; net 0): the first Consulente bullet (`AGENTS.md:451` @ ce26af4d) is rewritten with the
   clause «then an interview of up to three rounds of questions that writes nothing until the strategy (2026-11;
   `questionSet.ts` is the one question schema, shared with the Assistente); the strategy and the interview read the
-  YTD bundle AND the cashflow block (`lib/utils/cashflowBlock.ts`, AI-02 leaves this bullet to this spec)» after
+  YTD bundle AND the cashflow block (`lib/utils/cashflowBlock.ts`)» (the strategy's half already stands in § Assistant · Assistente since 2026-11-07) after
   «the draft on the browser)»;
   `AGENTS.md:455` @ ce26af4d «A probe never runs the Consulente: the E2E spec walks the screens and stops at «Avvia la
   ricerca».» becomes «A probe never runs the Consulente's model: the E2E specs fake `/api/allocation-advice/run` with

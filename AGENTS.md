@@ -474,7 +474,7 @@ file used to carry.
 
 ### Assistant · Assistente → `doc/guide/assistente.md`
 - The context service runs server-side (`adminDb` directly); every mode maps to its own builder in `stream/route.ts` (a missing branch silently falls through to monthly); `buildAssistantPeriodRangeContext` is the FIFTH builder.
-- ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 4 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's strategy and of the emails' AI comments (decision 81). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
+- ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 5 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's strategy and of the emails' AI comments, always under the same note (decision 81, 2026-11-07). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
 - A silent cap in a context builder becomes a hallucinated "N/D": a cap either does not exist or is stated in the text the model reads. `ASSISTANT_SYSTEM_CORE` is shared with `buildEmailAiPrompt`.
 - A free question with NO context still gets the portfolio of today (`buildAssistantTodayContext` → `AssistantTodayContext`, the sixth argument of `buildChatPrompt`, 2026-10-20): the period bundle is a chosen period's, never a substitute for the portfolio.
 - THE PROPOSAL PROTOCOL: the AI never writes — it emits ONE fenced ```goal-proposal block, the write happens on the user's Conferma via `POST /api/goals` (a new goal) or `PATCH /api/goals` (`goalId`, a rewrite in place, 2026-10-20); `goalProposal.ts` owns the ONE zod schema, quotas travel by instrument NAME and the card resolves them to ids.
@@ -928,7 +928,7 @@ file used to carry.
   GREEN, the test is the bug** — one of five, each met here: another line holds the property (name it in the test, or it
   is deleted as dead code — 2026-09-21: the re-cap of `splitFromSurplus`, `estimateSaleTax`'s floor, the explicit
   `tabIndex` beside `AsideToggle`'s `itemProps`; 2026-11-07, the after-today guard on the cashflow block's first series
-  row); a test added beside others is proven by a falsification that turns
+  row and three dead conjuncts of its counting, deleted at the retirement); a test added beside others is proven by a falsification that turns
   ONLY it red (2026-09-28, `__tests__/exposureEngine.test.ts`); the ASSERTION is the inert one — suspect its anchor
   (2026-09-21, the monthly email: `toContain('1400')` matched the caption, not the `<td align="right">` cell); the
   fixture makes a branch unreachable (`allocateByShare`'s rounding correction cannot fire on two shares); the test PINS

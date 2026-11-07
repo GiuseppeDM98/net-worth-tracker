@@ -1,9 +1,10 @@
 # AI-05 — Assistente › Registra: the mode, the context, the proposal, the confirmation
 
-> Series `doc/ai/` (README.md § 5): **depends on AI-03** (the AI accent in CSS and `Tile generated`, DESIGN.md § 5
-> «AI Surfaces», the RTL harness of decision 21); **AI-06 depends on it**. Written on 2026-11-01 from `develop` @
+> Series `doc/ai/` (README.md § 5): **depends on AI-02** (retired on 2026-11-07, in develop since 2026-11-07, PR #505: the
+> CASHFLOW 12 MESI block and `buildCashAccountLines`) **and AI-03** (the AI accent in CSS and `Tile generated`,
+> DESIGN.md § 5 «AI Surfaces», the RTL harness of decision 21); **AI-06 depends on it**. Written on 2026-11-01 from `develop` @
 > b9411a4d. Executes decisions 5, 9 (the first two row kinds: expenses and income — transfers and instalments are
-> AI-06), 11, 16, 17, 18, 26, 28, 58–63 and the adopted choices A9–A14. The user's sentence that must work at the end
+> AI-06), 11, 16, 17, 18, 26, 28, 58–63, 82 and the adopted choices A9–A14. The user's sentence that must work at the end
 > of this spec: «Ciao, ho fatto spesa per 103 euro, per favore segnalo» → a card «Spesa · 103,00 € · Cibo › Spesa ·
 > oggi · Conto principale» → «Conferma» → the row in Cashflow › Tracciamento. § 4 Client is written for the Assistente's
 > concept B «La scena» (decision 74, 2026-11-06), a conversation column with cards; criterion 20, its § 4 step and
@@ -314,12 +315,21 @@ once, even after a reload.
     `MotionConfig reducedMotion="always"` the wrapper's style holds no `transform`; `expenseProposalCard.test.tsx`
     asserts the card's root is a `motion.div` with `cardEnterVariants`. Mutation: wrap the whole grid in the scene →
     the «no `data-scene` on the tile» assertion fails; drop the reduced branch → the `transform` assertion fails.
+21. **Registra reads the CASHFLOW 12 MESI block like every other mode** (decision 82, 2026-11-07): the route's one
+    `readCashflowBlockForPrompt(body.userId, now)` serves `register` too, and `buildRegisterPrompt` prints it after the
+    register block, under its note, as `buildChatPrompt` does (a blank line, then
+    `formatCashflowBlockSection(cashflowBlock).slice(0, 2)`), never in `system`; a failed read is the route's 500, as
+    in every mode. Proof: `assistantPromptBundle.test.ts` (the note and the block between the register block and
+    «Richiesta utente: …», `system` identical with and without it); `assistantRoutes.test.ts` (`register` →
+    `fetchCashflowBlockInputs` called once with the owner's id, the block handed to `streamAssistantResponse`).
+    Mutation: skip the read in `register` → the route test fails.
 
 ## 3. Decisions
 
 - **Owner**: decisions 5, 9 (expenses and income here), 11, 16, 17, 18; of 2026-11-01: 21 (component tests in RTL),
   26 (the whole page under AI Surfaces), 28 (the month block), 58 (one thread per Italian day), 59 (`month=YYYY-MM`),
-  60 (4000 characters), 61 (five cards), 62 (the browser panel), 63 (future dates). **Adopted**: A9–A14 as amended in
+  60 (4000 characters), 61 (five cards), 62 (the browser panel), 63 (future dates); of 2026-11-07: 82 (the cashflow
+  block in Registra too). **Adopted**: A9–A14 as amended in
   README § 4.
 - **The month block's sources** (decision 28): the three totals come from `getDashboardOverview` — the Panoramica's
   read, fresh for the Italian day, invalidated by every create, so after a «Conferma» the next message sees the row.
@@ -448,7 +458,7 @@ defaults named; «--- CENTRI DI COSTO ---»; «--- INTESTATARI ---»; «--- ULTI
 Categoria [id] › Sottocategoria [id] · Conto [id] · centro · intestatario · «nota» · fuori budget · serie ×N`, the
 window's first day and the count read); «--- IL MESE ---» (criterion 5). Amounts in the block are
 `formatNumberIt(value, 2) + ' €'` (`lib/utils/formatters.ts:171` @ ce26af4d); the series frequency through
-`resolveRecurrenceFrequency`. `buildCashAccountLines` is AI-02's (`lib/utils/cashflowBlock.ts`, X-F11): its line carries
+`resolveRecurrenceFrequency`. `buildCashAccountLines` lives in `lib/utils/cashflowBlock.ts` (X-F11): its line carries
 `id`, and Registra needs every cash account, a zero balance included, because the user may name it.
 
 ### `lib/utils/expenseProposal.ts` (pure, shared with AI-06)
@@ -511,9 +521,10 @@ backtick or tilde — the offset react-markdown's hast `pre` node carries in `po
   riga puoi commentarla con IL MESE (per esempio il budget della sua categoria), senza inventare cifre»; «ogni blocco
   sta su righe sue, fuori da elenchi e citazioni»; «le righe proposte nei messaggi precedenti l'utente le ha già
   confermate o ignorate: non riproporle, salvo che te lo chieda».
-  `buildRegisterPrompt(prompt, preferences, memoryItems, registerBlock)` →
+  `buildRegisterPrompt(prompt, preferences, memoryItems, registerBlock, cashflowBlock: string | null)` →
   `{ system: `${ASSISTANT_SYSTEM_CORE}\n\n${REGISTER_CONTRACT}`, userContent }`, `userContent` = the response-style line, the memory block exactly as `buildChatPrompt` builds it
-  (`prompts.ts:1032-1034` @ ce26af4d), the register block, «Richiesta utente: …».
+  (`prompts.ts:1032-1034` @ ce26af4d), the register block, the cashflow block under its note (criterion 21),
+  «Richiesta utente: …».
 - `anthropicStream.ts`: `ASSISTANT_REGISTER_MAX_TOKENS = 16000` beside the other two (`:21-22` @ ce26af4d);
   `StreamAssistantResponseArgs.registerBlock?: string | null`; `buildPrompt` routes `register` first;
   `max_tokens` takes the register budget; `isStructuredAnalysis` unchanged.
@@ -523,12 +534,13 @@ backtick or tilde — the offset react-markdown's hast `pre` node carries in `po
   min 1); answer?: string (≤ 2000) }` with `answer` present only when `status === 'answered'`.
 - `stream/route.ts`: `parseOr400(assistantStreamRequestSchema, await request.json())` replaces the cast and the empty
   prompt check; `register` → `fetchRegisterInputs(userId, now)` → `buildAssistantRegisterContext` → the block, then
-  `{ type: 'register', summary }` after `meta` and before the text; `enableWebSearch` false; thread creation with
+  `{ type: 'register', summary }` after `meta` and before the text; the cashflow block read as in every mode
+  (criterion 21); `enableWebSearch` false; thread creation with
   `buildThreadTitleFromPrompt(prompt, mode, now)`; metadata: a register thread keeps its title, every mode's preview
   through `stripFencedBlocks`. A rejection of `fetchRegisterInputs`' core reads is today's 500 «Impossibile avviare lo
   stream dell'assistente» (`:411-415` @ ce26af4d), before any event.
-- `lib/services/assistantMonthContextService.ts`: `fetchSettings` (`:169-193` @ ce26af4d; AI-02 already added
-  `defaultDebitCashAssetId` and `defaultCreditCashAssetId` for the account lines) maps also `costCentersEnabled`,
+- `lib/services/assistantMonthContextService.ts`: `fetchSettings` (`:169-193` @ ce26af4d; it already maps
+  `defaultDebitCashAssetId` and `defaultCreditCashAssetId` for the account lines, since 2026-11-07) maps also `costCentersEnabled`,
   `expenseSplitEnabled` (read here) and
   `transferFeeCategoryId`, `transferFeeSubCategoryId`, `assistantMemoryEnabled` (read by AI-06; the memory switch's
   settings field is `assistantMemoryEnabled`, `types/assets.ts:421` @ ce26af4d — this spec's prompt follows
@@ -689,9 +701,9 @@ Pure (`.test.ts`, node):
   Mutation: `listFencedBlocks` ranking across languages → `goal:0` becomes `goal:5`.
 - `__tests__/assistantStreamBuffer.test.ts` (new): criterion 10. Mutation: adopt the id on every message → the user
   message loses its id and the test fails.
-- `assistantPromptBundle.test.ts`: criterion 6's prompt half. Mutation: interpolate the date in `REGISTER_CONTRACT` →
+- `assistantPromptBundle.test.ts`: criterion 6's prompt half and criterion 21's. Mutation: interpolate the date in `REGISTER_CONTRACT` →
   `expect(a.system).toBe(b.system)` fails.
-- `assistantRoutes.test.ts`: criteria 1 (context route), 2, 12 (title kept, preview). Mutation: keep the cast →
+- `assistantRoutes.test.ts`: criteria 1 (context route), 2, 12 (title kept, preview), 21. Mutation: keep the cast →
   `mode: 'weekly'` reaches the chat builder.
 - `assistantThreadRoutes.test.ts`: criterion 12, `getDefaultThreadTitle('register')`. Mutation: process-zone date.
 - `__tests__/assistantMessageRoute.test.ts` (new) and `assistantThreadsStore.test.ts`: criterion 10's server half.
@@ -821,7 +833,7 @@ doc/ai/AI-05-assistente-registra.md, le scene dell'Assistente in doc/ai/referenc
 (`node -v`). Implementa AI-05 così com'è scritta: la modalità `register` in OGNI punto del nuovo commento WARNING di
 types/assistant.ts; lo zod sul body con tutti i campi e il tetto di 4000 caratteri in ogni modalità, il contatore da
 3800; il contesto puro con gli id, la finestra italiana, le serie raccolte in una riga, il blocco IL MESE da
-getDashboardOverview e dal livello puro del Budget; il protocollo ```expense-proposal SOLO nel prompt di Registra
+getDashboardOverview e dal livello puro del Budget; il blocco CASHFLOW 12 MESI anche in Registra (decisione 82); il protocollo ```expense-proposal SOLO nel prompt di Registra
 (ASSISTANT_SYSTEM_CORE invariato, provato da asserzioni not.toContain e da expect(a.system).toBe(b.system)), al massimo
 cinque card per messaggio con l'indice derivato da listFencedBlocks; la card con i servizi di oggi, il saving, le
 quattro invalidazioni e il link a Cashflow con month=YYYY-MM; lo stato `proposals` sul messaggio con la route PATCH,

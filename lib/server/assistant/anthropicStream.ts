@@ -47,9 +47,10 @@ interface StreamAssistantResponseArgs {
 /**
  * Selects the appropriate prompt builder based on the assistant mode.
  *
- * For month_analysis: uses the full structured bundle so Claude has reliable
- * numbers and knows exactly what data is/isn't available.
- * For chat: uses a lighter prompt without numeric context.
+ * Each analysis mode uses its structured bundle builder, so Claude has reliable numbers and
+ * knows exactly what data is/isn't available; the chat uses the free prompt, with the period
+ * bundle when a context is attached and today's portfolio otherwise. Every mode also carries the
+ * CASHFLOW 12 MESI block (2026-11-07).
  *
  * Returns { system, userContent } — system is the cacheable static block
  * (role, domain, guardrails, this mode's output contract); userContent is
