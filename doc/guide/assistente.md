@@ -29,7 +29,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   never as a new bundle field, which all four other builders would then have to fill.
 - **One aggregator per block, not two**: every figure of the BUNDLE comes from a single `buildCashflowBreakdown` call
   per builder, so `Σ expensesByCategory[].total === cashflow.totalExpenses` holds structurally. `transactionCount`
-  **excludes transfers**, and a new required bundle field means updating ALL 4 builders (month/year/ytd/history). The
+  **excludes transfers**, and a new required bundle field means updating ALL 5 builders (month/year/ytd/history/period range). The
   CASHFLOW 12 MESI block every prompt carries beside the bundle (2026-11, every mode since decision 81) is built by
   `buildCashflowBlock` on its own read of the whole history (`fetchCashflowBlockInputs`) and never enters the bundle
   nor the `context` SSE event.
@@ -55,11 +55,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Every builder takes the CASHFLOW 12 MESI block** (2026-11; every surface since decision 81, 2026-11-07): the
   four analyses as their fifth argument, printed after the numeric block and before «Domanda dell'utente»; the chat
   as its seventh, right before «Richiesta utente» with or without a period; `buildEmailAiPrompt` as its sixth, at
-  the end of the user turn; `generateWeeklyBudgetComment` as its second, under the budgets. ONE note over it
-  everywhere (`formatCashflowBlockSection`): the block is the whole recorded history whatever the period, a
+  the end of the user turn; `generateWeeklyBudgetComment` as its second, under the budgets; the Consulente's
+  strategy after its data block (doc/guide/consulente.md § The run). ONE note over it everywhere
+  (`formatCashflowBlockSection`): the block is the whole recorded history whatever the period, a
   period's figures stay its bundle's. `system` is the same with or without it. The route, the periodic comment and
   the weekly one read it through `readCashflowBlockForPrompt` (lib/server/assistant/cashflowBlockPrompt.ts): a
   failed read answers 500 on the stream and sends an email without its AI comment — never a silent empty block.
+  The weekly email with no API key reads no block (2026-11-07): there is no comment for it to serve.
 
 ### The portfolio block — the assistant sees everything (2026-10-20)
 - **`bundle.portfolio` is REQUIRED and built by ONE pure function**, `buildAssistantPortfolioContext`
@@ -313,4 +315,9 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
   stream has closed — possibly a minute later. The second read is what honours a `memoryEnabled` switched off while
   the answer was streaming, and what dedupes against an item added from the panel meanwhile; it runs in the
   background, off the reader's wait. Do not hand the first read down to it.
+- **Every message reads the whole cashflow history** (decision 81, 2026-11-07): the route's
+  `readCashflowBlockForPrompt` reads every expense row up to the Italian end of the month 12 ahead, in every mode,
+  apart from the period's own read — a period's rows are read twice, and the read grows with the history. Accepted:
+  one Admin query per message, off the browser; the block is never cached across messages, so a row confirmed a
+  minute ago is in the next answer.
 - **A confirmed goal proposal can be confirmed again after a reload** (accepted for v1): reopening the thread re-parses the fenced block and a second press creates a SECOND goal. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

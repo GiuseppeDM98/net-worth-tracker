@@ -118,6 +118,7 @@ export interface CashflowBlock {
   windows: {
     aggregateFromYm: string; aggregateToYm: string; currentYm: string; todayIso: string; seriesFromYm: string;
     floorYm: string | null;                     // `${cashflowHistoryStartYear}-01`, null when the setting is absent
+    beforeFloorRows: number;                    // rows up to today the floor leaves out (transfers aside)
     medianFromYm: string | null; medianMonths: number;
   };
   income: { total: number; dividends: number; sources: IncomeSource[]; sourcesCut: { count: number; total: number };
@@ -262,10 +263,15 @@ export function buildCashflowBlock(expenses: readonly Expense[], input: Cashflow
   // already ignores it.
   const firstRow = rows.find((r) => r.row.type !== 'transfer' && r.idx >= floor);
   const seriesFrom = Math.min(firstRow ? firstRow.idx : aggregateFrom, aggregateFrom);
+  // The rows the floor leaves out, declared in the header: the silent-cap rule (2026-11-07).
+  const beforeFloorRows = rows.filter((r) => r.row.type !== 'transfer' && r.idx < floor && r.day <= todayIso).length;
 
-  const isFullCounted = (r: DatedRow) => r.idx >= seriesFrom && r.idx < current && r.idx >= floor;
+  // No `idx >= seriesFrom` here: the series opens at the first row past the floor, so a counted row is
+  // never before it. The rows after today in the current month are «scheduled» in the loop below, which
+  // drops them before these tests — so the current month needs no day check either (2026-11-07).
+  const isFullCounted = (r: DatedRow) => r.idx < current && r.idx >= floor;
   const inAggregate = (r: DatedRow) => isFullCounted(r) && r.idx >= aggregateFrom;
-  const isCurrentCounted = (r: DatedRow) => r.idx === current && r.day <= todayIso;
+  const isCurrentCounted = (r: DatedRow) => r.idx === current;
 
   // ── The series ──
   const series: MonthRow[] = [];
@@ -431,8 +437,8 @@ export function buildCashflowBlock(expenses: readonly Expense[], input: Cashflow
   }));
 
   // ── The medians: from the first full month holding a counted row, never before the floor ──
-  const firstDataIdx = series.findIndex((month, i) =>
-    seriesFrom + i <= aggregateTo && month.state === 'full' && month.rows > 0);
+  // A month before the floor holds no counted row, so `rows > 0` already keeps it out.
+  const firstDataIdx = series.findIndex((month, i) => seriesFrom + i <= aggregateTo && month.rows > 0);
   let medianFrom: number | null = null;
   let medianMonths = 0;
   let volatility: CashflowBlock['volatility'] = null;
@@ -477,13 +483,17 @@ export function buildCashflowBlock(expenses: readonly Expense[], input: Cashflow
     const future = group.rows.filter((r) => r.day > todayIso);
     const reference = past.length > 0 ? past[past.length - 1] : future[0];
     const amount = roundToCents(Math.abs(reference.row.amount));
+    // The amount's history starts at the floor like every figure of the block (2026-11-07); the plan's
+    // number, total and next date read every row of it, since they are the record's own.
+    const priced = past.filter((r) => r.idx >= floor);
     let change: Commitment['change'] = null;
-    if (past.length > 0) {
+    if (priced.length > 0) {
       const cents = (r: DatedRow) => Math.round(Math.abs(r.row.amount) * 100);
-      let runStart = past.length - 1;
-      while (runStart > 0 && cents(past[runStart - 1]) === cents(reference)) runStart -= 1;
+      const latest = priced[priced.length - 1];
+      let runStart = priced.length - 1;
+      while (runStart > 0 && cents(priced[runStart - 1]) === cents(latest)) runStart -= 1;
       if (runStart > 0) {
-        change = { from: roundToCents(Math.abs(past[runStart - 1].row.amount)), sinceYm: past[runStart].ym };
+        change = { from: roundToCents(Math.abs(priced[runStart - 1].row.amount)), sinceYm: priced[runStart].ym };
       }
     }
     const nextIso = future.length > 0 ? future[0].day : null;
@@ -550,7 +560,7 @@ export function buildCashflowBlock(expenses: readonly Expense[], input: Cashflow
   }
   loans.sort((a, b) => (b.monthly ?? 0) - (a.monthly ?? 0) || compareLabels(a.name ?? '', b.name ?? ''));
 
-  // ── The accounts: a closed account with no role is no use to the strategy ──
+  // ── The accounts: a closed account with no role is no use to whoever reads the block ──
   const accounts = buildCashAccountLines(input.assets, settings, input.assetValueOf).filter((line) => {
     const asset = assetById.get(line.id);
     return !(asset?.quantity === 0 && line.roles.length === 0);
@@ -568,6 +578,7 @@ export function buildCashflowBlock(expenses: readonly Expense[], input: Cashflow
       todayIso,
       seriesFromYm: ymOf(seriesFrom),
       floorYm,
+      beforeFloorRows,
       medianFromYm: medianFrom === null ? null : ymOf(medianFrom),
       medianMonths,
     },
@@ -827,10 +838,17 @@ export function formatCashflowBlockForPrompt(block: CashflowBlock): string {
   const floorInSeries = floorIdx !== null
     && floorIdx > ymIndex(windows.seriesFromYm)
     && floorIdx <= ymIndex(windows.currentYm);
+  // The floor is named when it cuts the series OR leaves a row out (2026-11-07): a series that simply
+  // opens on it would otherwise read as «the first recorded month».
+  const left = windows.beforeFloorRows > 0
+    ? `, ${count(windows.beforeFloorRows, 'riga precedente esclusa', 'righe precedenti escluse')}`
+    : '';
+  const floor = windows.floorYm !== null && (floorInSeries || windows.beforeFloorRows > 0)
+    ? `; storico contato dal ${windows.floorYm}${left}`
+    : '';
   const header = `--- CASHFLOW 12 MESI (ultimi 12 mesi pieni: ${windows.aggregateFromYm} → ${windows.aggregateToYm}; `
     + `il mese in corso ${windows.currentYm} fino al ${windows.todayIso}, a parte; `
-    + `serie mensile: ${windows.seriesFromYm} → ${windows.currentYm}`
-    + `${floorInSeries ? `; storico contato dal ${windows.floorYm}` : ''}) ---`;
+    + `serie mensile: ${windows.seriesFromYm} → ${windows.currentYm}${floor}) ---`;
   return [
     header,
     formatIncome(block),

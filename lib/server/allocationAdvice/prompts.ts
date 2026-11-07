@@ -20,7 +20,7 @@
 import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import type { AllocationAdviceAnswers, AllocationAdviceProposal, InstrumentCandidates } from '@/lib/utils/allocationAdviceProposal';
 import type { AllocationAdvicePriorPlan } from '@/types/allocationAdvice';
-import type { AssistantPromptParts } from '@/lib/server/assistant/prompts';
+import { formatCashflowBlockSection, type AssistantPromptParts } from '@/lib/server/assistant/prompts';
 
 function eur(value: number): string {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
@@ -165,7 +165,8 @@ export function buildStrategyPrompt(
     exhaustive,
     '',
     dataBlock,
-    ...(cashflowBlock ? ['', cashflowBlock] : []),
+    // Under the note every surface carries (owner, 2026-11-07); the blank lines are this prompt's own.
+    ...(cashflowBlock ? ['', ...formatCashflowBlockSection(cashflowBlock).slice(0, 2)] : []),
     ...(priorPlan ? ['', formatPriorPlanForPrompt(priorPlan)] : []),
     "Proponi l'allocazione ottimale per questo investitore, come descritto nel contratto di risposta.",
   ].join('\n');

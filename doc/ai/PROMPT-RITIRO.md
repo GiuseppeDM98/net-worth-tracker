@@ -48,7 +48,7 @@ modello sempre finta (`page.route`, decisione 39) e il documento dell'emulatore 
 fase D. NON sono segnali: il deploy su `main` o in produzione (arriva dopo l'intera serie),
 l'uso vero del proprietario (una run reale del Consulente con il colloquio, una spesa
 registrata davvero dalla chat), il giro F sul mirror della sessione di implementazione, una
-preview Vercel che non chiama ciò che spende (AI-02 § 8: la preview non chiama mai
+preview Vercel che non chiama ciò che spende (la preview non chiama mai
 `/api/allocation-advice/run` né un'analisi). Il
 caso reale NON è un prerequisito: dove è a portata di giorni lo si cerca e lo si scrive,
 ma non lo si aspetta mai — ciò che l'uso vero insegnerà diventa feedback e poi una spec

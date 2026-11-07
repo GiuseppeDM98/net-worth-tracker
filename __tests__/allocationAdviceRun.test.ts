@@ -23,7 +23,9 @@ vi.mock('@/lib/server/allocationAdvice/store', () => ({
   getAllocationAdviceAdmin: getMock,
 }));
 vi.mock('@/lib/services/assistantMonthContextService', () => ({ buildAssistantYtdContext: ytdMock, fetchCashflowBlockInputs: cashflowMock }));
-vi.mock('@/lib/server/assistant/prompts', () => ({
+// Partial: the strategy prints the cashflow block through the real `formatCashflowBlockSection`.
+vi.mock('@/lib/server/assistant/prompts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/server/assistant/prompts')>()),
   formatBundleForPrompt: () => 'DATI',
   formatPortfolioForPrompt: () => ['STRUMENTI'],
 }));

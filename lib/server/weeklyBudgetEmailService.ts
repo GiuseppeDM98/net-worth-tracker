@@ -568,13 +568,16 @@ export async function buildAndSendWeeklyBudget(
   const data = await buildWeeklyBudgetData(userId, now);
   if (!data) return false;
 
-  // A failed read of the cashflow block sends the email without the comment (decision 81).
-  const aiComment = await readCashflowBlockForPrompt(userId, now)
-    .then((cashflowBlock) => generateWeeklyBudgetComment(data, cashflowBlock))
-    .catch((error) => {
-      console.error('[weeklyBudgetEmail] cashflow block read failed:', error);
-      return null;
-    });
+  // A failed read of the cashflow block sends the email without the comment (owner, 2026-11-07); with
+  // no key there is no comment to write, so the whole-history read is skipped too.
+  const aiComment = process.env.ANTHROPIC_API_KEY
+    ? await readCashflowBlockForPrompt(userId, now)
+        .then((cashflowBlock) => generateWeeklyBudgetComment(data, cashflowBlock))
+        .catch((error) => {
+          console.error('[weeklyBudgetEmail] cashflow block read failed:', error);
+          return null;
+        })
+    : null;
   if (aiComment) data.aiComment = aiComment;
 
   const resend = new Resend(process.env.RESEND_API_KEY);

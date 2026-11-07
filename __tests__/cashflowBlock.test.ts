@@ -227,6 +227,27 @@ describe('income and its concentration', () => {
     expect(printBlock(rows)).toContain('Fonte 19 810 € 4% (1); e altre 5 fonti, 3900 €. Concentrazione: fonti diversificate');
   });
 
+  it('lists a source at or below zero after the others, with no share, out of the HHI', () => {
+    const rows = [row('2026-05-10', 'income', 3000, salary), row('2026-06-10', 'income', -200, refunds)];
+    const block = buildCashflowBlock(rows, input());
+    expect(block.income.sources.map((s) => [s.label, s.total, s.share])).toEqual([['Stipendio', 3000, 100], ['Rimborsi', -200, null]]);
+    expect(block.income.hhi).toBe(1);
+    expect(printBlock(rows)).toContain('Fonti (totale, quota, mesi presenti): Stipendio 3000 € 100% (1), Rimborsi -200 € (1). Concentrazione: una fonte dominante (100%), HHI 1,00.');
+  });
+
+  it('sources that are all at or below zero read «nessuna entrata», and say there is no positive source', () => {
+    const rows = [row('2026-06-10', 'income', -200, refunds)];
+    const block = buildCashflowBlock(rows, input());
+    expect(block.income).toMatchObject({ reading: 'nessuna entrata', hhi: null, topShare: null });
+    expect(printBlock(rows)).toContain('Fonti (totale, quota, mesi presenti): Rimborsi -200 € (1). Concentrazione: nessuna fonte con entrate positive.');
+  });
+
+  it('declares one source left out in the singular', () => {
+    const rows = Array.from({ length: CASHFLOW_BLOCK_SOURCE_CAP + 1 }, (_, i) =>
+      row('2026-05-10', 'income', 1000 - i * 10, { categoryId: `inc-${i}`, categoryName: `Fonte ${String(i).padStart(2, '0')}` }));
+    expect(printBlock(rows)).toContain('; e altra 1 fonte, 800 €. Concentrazione');
+  });
+
   it('names a source by its subcategory, the current names read from the category document', () => {
     const rows = [row('2026-05-10', 'income', 2000, { ...salary, categoryName: 'Vecchio nome', subCategoryId: 's-a', subCategoryName: 'A' })];
     const categories = [category('inc-sal', 'Stipendio', 'income', [['s-a', 'Azienda A']])];
@@ -248,6 +269,23 @@ describe('spending', () => {
     expect(block.spending.byType).toEqual({ necessary: 600, nonNecessary: 400, debt: 0, unclassified: 0 });
     expect(printBlock(rows, { categories })).toContain(
       'Per categoria: Casa (Spese Necessarie) 600 € (60%); Casa (Spese Non Necessarie) 400 € (40%).');
+  });
+
+  it('without the category documents, qualifies two «Casa» by the rows\' own type', () => {
+    const rows = [
+      row('2026-05-10', 'fixed', -600, { categoryId: 'c-casa-n', categoryName: 'Casa' }),
+      row('2026-05-11', 'variable', -400, { categoryId: 'c-casa-v', categoryName: 'Casa' }),
+    ];
+    expect(buildCashflowBlock(rows, input()).spending.byCategory.map((c) => c.label)).toEqual([
+      'Casa (Spese Necessarie)', 'Casa (Spese Non Necessarie)',
+    ]);
+  });
+
+  it('says «nessuna uscita» with no spending row, and one subcategory left out in the singular', () => {
+    expect(printBlock([])).toContain('Uscite: nessuna uscita registrata negli ultimi 12 mesi pieni.');
+    const rows = Array.from({ length: CASHFLOW_BLOCK_SUBCATEGORY_CAP + 1 }, (_, i) =>
+      row('2026-05-10', 'variable', -(i + 1), { categoryId: 'c-a', categoryName: 'Alfa', subCategoryId: `sub-${i}`, subCategoryName: `S${String(i + 1).padStart(2, '0')}` }));
+    expect(printBlock(rows)).toContain('. E altra 1 sottocategoria minore, 1 € in tutto, già nei totali delle categorie.');
   });
 
   it('declares the rows with no type, in the line and as a column of the series', () => {
@@ -325,7 +363,7 @@ describe('the series', () => {
     expect(text).toContain('\n2026-11 (in corso, fino al 2026-11-15): 0 / 0 / 100 / 0 / -100 / —\n');
   });
 
-  it('covers the whole recorded history, with no cap (decision 81)', () => {
+  it('covers the whole recorded history, with no cap (owner, 2026-11-07)', () => {
     const rows = [row('2020-03-10', 'variable', -100), row('2026-10-10', 'variable', -100)];
     const block = buildCashflowBlock(rows, input());
     // 2020-03 → 2026-11: 6 years and 9 months.
@@ -344,13 +382,16 @@ describe('the series', () => {
     expect(buildCashflowBlock(rows, input()).windows.seriesFromYm).toBe('2025-11');
   });
 
-  it('a row before the floor year never opens the series, and counts nowhere', () => {
+  it('a row before the floor year never opens the series, counts nowhere, and the header says it left it out', () => {
+    // The floor opens no month of the series here, yet a row was dropped: the header names the cut
+    // (the silent-cap rule, 2026-11-07).
     const rows = [row('2024-12-10', 'variable', -500), row('2025-12-10', 'variable', -100)];
     const settings = { cashflowHistoryStartYear: 2025 };
     const block = buildCashflowBlock(rows, input({ settings }));
     expect(block.series[0]).toMatchObject({ ym: '2025-11', state: 'full', rows: 0 });
     expect(block.spending.total).toBe(100);
-    expect(printBlock(rows, { settings })).toContain('serie mensile: 2025-11 → 2026-11) ---');
+    expect(block.windows.beforeFloorRows).toBe(1);
+    expect(printBlock(rows, { settings })).toContain('serie mensile: 2025-11 → 2026-11; storico contato dal 2025-01, 1 riga precedente esclusa) ---');
   });
 
   it('a floor inside the 12 full months prints the months before it and names it in the header', () => {
@@ -362,10 +403,11 @@ describe('the series', () => {
     expect(block.spending.total).toBe(100);
     const text = printBlock(rows, { settings });
     expect(text).toContain("\n2025-12: prima dell'inizio dello storico\n");
-    expect(text).toContain('serie mensile: 2025-11 → 2026-11; storico contato dal 2026-01) ---');
+    expect(text).toContain('serie mensile: 2025-11 → 2026-11; storico contato dal 2026-01, 1 riga precedente esclusa) ---');
+    expect(printBlock([row('2026-02-10', 'variable', -100)], { settings })).toContain('serie mensile: 2025-11 → 2026-11; storico contato dal 2026-01) ---');
   });
 
-  it('the floor outside the series is not in the header', () => {
+  it('the floor outside the series, with no row before it, is not in the header', () => {
     expect(printBlock([], { settings: { cashflowHistoryStartYear: 2020 } })).toContain('serie mensile: 2025-11 → 2026-11) ---');
   });
 });
@@ -408,11 +450,12 @@ describe('the medians', () => {
   });
 
   it('never start before the floor year', () => {
-    const rows = [row('2024-12-10', 'fixed', -100), row('2026-09-10', 'fixed', -100), row('2026-10-10', 'fixed', -100)];
-    const block = buildCashflowBlock(rows, input({ todayIso: '2025-11-15', settings: { cashflowHistoryStartYear: 2025 } }));
-    // Without the floor the 2024-12 row would open an 11-month span; from the floor 2025-01 no full month holds a row.
-    expect(block.windows.medianMonths).toBe(0);
-    expect(block.volatility).toBeNull();
+    // The floor guard of the counted rows is the ONE line that holds this (2026-11-07): without it the
+    // 2025-12 row would open an 11-month span.
+    const rows = [row('2025-12-10', 'fixed', -100), row('2026-08-10', 'fixed', -100), row('2026-09-10', 'fixed', -200), row('2026-10-10', 'fixed', -300)];
+    const block = buildCashflowBlock(rows, input({ settings: { cashflowHistoryStartYear: 2026 } }));
+    expect(block.windows).toMatchObject({ medianFromYm: '2026-08', medianMonths: 3 });
+    expect(block.volatility?.spending).toEqual({ q1: 150, median: 200, q3: 250 });
   });
 });
 
@@ -430,7 +473,21 @@ describe('the commitments', () => {
   it('a legacy series with no recurringFrequency is monthly', () => {
     const legacy = { isRecurring: true, recurringParentId: 'old', categoryId: 'svago', categoryName: 'Svago' };
     const rows = [row('2026-10-05', 'variable', -10, legacy), row('2026-12-05', 'variable', -10, legacy)];
+    // The printer reads anything but 'yearly' as «mensile»: the field is what proves the default.
+    expect(buildCashflowBlock(rows, input()).commitments.items[0].frequency).toBe('monthly');
     expect(printBlock(rows)).toContain('Svago mensile 10 € (prossima 2026-12-05)');
+  });
+
+  it('an amount change before the floor year is never printed (2026-11-07)', () => {
+    const gym = { isRecurring: true, recurringParentId: 'gym', categoryId: 'salute', categoryName: 'Salute' };
+    const rows = [
+      row('2025-12-05', 'variable', -40, gym),
+      ...months('2026-01', 12).map((ym) => row(`${ym}-05`, 'variable', -45, gym)),
+    ];
+    const block = buildCashflowBlock(rows, input({ settings: { cashflowHistoryStartYear: 2026 } }));
+    expect(block.commitments.items[0]).toMatchObject({ amount: 45, change: null, nextIso: '2026-12-05' });
+    // Without the floor the 2025-12 row is a change.
+    expect(buildCashflowBlock(rows, input()).commitments.items[0].change).toEqual({ from: 40, sinceYm: '2026-01' });
   });
 
   it('a yearly series, an amount change, an ended series', () => {
@@ -518,6 +575,37 @@ describe('the loans', () => {
     expect(printBlock(rows)).toContain('Rate di prestito: prestito eliminato 100 €/mese (mediana su 1 rata; prossima 2026-12-01). 2 rate senza prestito collegato, 300 €.');
   });
 
+  it('a `debt` row with no loan inside a series or a plan is the commitment\'s, never an unlinked instalment', () => {
+    const rows = [
+      row('2026-05-10', 'debt', -100, { isRecurring: true, recurringParentId: 'p', categoryId: 'prestiti', categoryName: 'Prestiti' }),
+      row('2026-06-10', 'debt', -50, { installmentParentId: 'plan', installmentNumber: 1, installmentTotal: 2, categoryId: 'prestiti', categoryName: 'Prestiti' }),
+      row('2026-07-10', 'debt', -200),
+    ];
+    const block = buildCashflowBlock(rows, input());
+    expect(block.loans.unlinked).toEqual({ rows: 1, total: 200 });
+    expect(block.commitments.items.map((c) => c.key).sort()).toEqual(['p', 'plan']);
+  });
+
+  it('names a loan only when the asset IS a loan, and the next instalment skips a payoff', () => {
+    const assets = [...loans, asset('acc-a', 'Conto A', 'cash', 'cash', 1000)];
+    const rows = [
+      row('2026-09-01', 'debt', -100, { debtAssetId: 'acc-a' }),
+      row('2026-10-01', 'debt', -100, car),
+      row('2026-11-20', 'debt', -2000, { debtAssetId: 'loan-car', isDebtPayoff: true }),
+      row('2026-12-01', 'debt', -100, car),
+    ];
+    const block = buildCashflowBlock(rows, input({ assets }));
+    // Equal medians: ordered by name, and a nameless line sorts first.
+    expect(block.loans.items.map((l) => [l.debtAssetId, l.name, l.nextIso])).toEqual([
+      ['acc-a', null, null], ['loan-car', 'Prestito auto', '2026-12-01'],
+    ]);
+  });
+
+  it('a loan with no instalment in the 12 months and none ahead says so, its payoff in brackets', () => {
+    const rows = [row('2026-06-20', 'debt', -5000, { debtAssetId: 'loan-car', isDebtPayoff: true })];
+    expect(printBlock(rows, { assets: loans })).toContain('Rate di prestito: Prestito auto: nessuna rata nei 12 mesi pieni (estinzioni anticipate 5000 €).');
+  });
+
   it('a loan with no instalment yet reads «prima rata il …»; none at all reads «nessuna»', () => {
     const rows = [row('2026-12-01', 'debt', -100, { debtAssetId: 'loan-car' })];
     expect(printBlock(rows, { assets: loans })).toContain('Rate di prestito: Prestito auto: prima rata il 2026-12-01.');
@@ -549,6 +637,11 @@ describe('transfers and the rows that count', () => {
     expect(printBlock(rows, { assets })).toContain(
       'Trasferimenti fra conti: 3 righe, 6500 € mossi, di cui 1 verso o da immobili, 5000 € (non contati né fra le entrate né fra le uscite).');
     expect(printBlock([])).toContain('Trasferimenti fra conti: nessuno.');
+  });
+
+  it('a transfer FROM a property is named too', () => {
+    const rows = [row('2026-05-10', 'transfer', 3000, { linkedCashAssetId: 'home', transferCashAssetId: 'acc-a' })];
+    expect(buildCashflowBlock(rows, input({ assets })).transfers.property).toEqual({ rows: 1, moved: 3000 });
   });
 });
 
@@ -584,7 +677,7 @@ describe('the accounts', () => {
 });
 
 describe('the printed block', () => {
-  it('is printed whole, in the § 4 shape', () => {
+  it('is printed whole, line for line', () => {
     const categories = [
       category('inc-sal', 'Stipendio', 'income', [['s-a', 'Azienda A']]),
       category('inc-div', 'Dividendi', 'income'),
@@ -634,7 +727,7 @@ describe('the printed block', () => {
       .map((n) => `Abbonamenti › S${String(n).padStart(2, '0')} mensile ${n} € (prossima 2026-12-01)`)
       .join('; ');
     const expected = [
-      '--- CASHFLOW 12 MESI (ultimi 12 mesi pieni: 2025-11 → 2026-10; il mese in corso 2026-11 fino al 2026-11-15, a parte; serie mensile: 2025-01 → 2026-11) ---',
+      '--- CASHFLOW 12 MESI (ultimi 12 mesi pieni: 2025-11 → 2026-10; il mese in corso 2026-11 fino al 2026-11-15, a parte; serie mensile: 2025-01 → 2026-11; storico contato dal 2025-01, 2 righe precedenti escluse) ---',
       'Entrate: 24.100 € in 12 mesi (di cui dividendi e cedole 100 €, fuori dalle fonti). Fonti (totale, quota, mesi presenti): Stipendio › Azienda A 24.000 € 100% (12). Concentrazione: una fonte dominante (100%), HHI 1,00.',
       'Uscite: 9600 € in 12 mesi — Spese Necessarie 8400 € (88%), Spese Non Necessarie 0 € (0%), Debiti 1200 € (13%). Per categoria: Casa 8400 € (88%: Affitto 8400 €); Prestiti 1200 € (13%).',
       'Risparmio: 14.500 € in 12 mesi, il 60% delle entrate; le rate contano per intero: la quota capitale riduce il debito.',
