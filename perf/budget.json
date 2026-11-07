@@ -5,8 +5,8 @@
       "raisedBy": "2026-10-11: la landing rende le tessere della Panoramica (CashflowTile con la didascalia del calendario e NarrativeText, PatrimonioTile con i blocchi sollevabili): 509,5 → 511,2 KB gz; tetto = misura +2% come #432 e #436, OK del proprietario 2026-10-11. Misura prima/dopo in doc/guide/velocita.md § Registro"
     },
     "/dashboard": {
-      "initialJsGzKB": 626,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 616,4 (2026-10-17) → 623,7 con le funzioni dopo il 17 (passo maggiore: 1c7fea18, IntestatariTile) → 625,9 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 627,
+      "raisedBy": "#507: AI-03, Tile legge lib/constants/aiAccent.ts (la superficie generata) — 625,7 → 626,0 (perf:build) e 626,1 (npm run build) sulla stessa macchina (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/allocation": {
       "initialJsGzKB": 604,
@@ -37,8 +37,8 @@
       "raisedBy": "#497: KB gz misurati sulla stessa macchina, 616,3 → 618,4 (952fe509 +1) → 620,5 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/history": {
-      "initialJsGzKB": 777,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 772,8 → 774,3 (952fe509 +1,5) → 776,4 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 778,
+      "raisedBy": "#507: AI-03, Tile legge lib/constants/aiAccent.ts (la superficie generata) — 776,6 → 777,9 sulla stessa macchina, 33 → 34 chunk iniziali (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/pension": {
       "initialJsGzKB": 677,
@@ -61,8 +61,8 @@
       "raisedBy": "#497: KB gz misurati sulla stessa macchina, 473,4 → 476 (952fe509 +1,8; 406049b7 +0,8) → 478,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assets/compravendita": {
-      "initialJsGzKB": 594,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, la route è nata senza tetto il 2026-10-21 (d6464235): 591,7 → 593,9 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 595,
+      "raisedBy": "#507: AI-03, ChoiceList al posto di ChoiceRows (la modalità multipla porta Checkbox e useRovingFocus) — 593,1 → 594,3 sulla stessa macchina (doc/guide/velocita.md § Registro dei tetti alzati)"
     }
   },
   "sharedGzKB": 535,

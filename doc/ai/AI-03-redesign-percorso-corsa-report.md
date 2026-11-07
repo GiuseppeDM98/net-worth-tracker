@@ -13,6 +13,10 @@
 > there.
 > Read adversarially on 2026-11-01: 46 findings applied, the decisions 21–73 in README.md § 3 (this spec: decisions
 > 14, 15, 21, 22, 26, 33, 34, 35, 36, 37, 39, 49, 50, 51, 52, 55).
+> Reread on 2026-11-07, at the start of the implementation session (the targeted reading of the parts decision 78
+> rewrote): four findings, decisions 84–87 in README.md § 3 — the active stage row's frame inside the `divide-y` list,
+> the border width a filled control lacks, `interview.reached` as the round number, the surface class without
+> `motion-safe:`.
 
 ## 1. The problem today (evidence on the code)
 
@@ -297,8 +301,9 @@ export function PathRail(props: PathRailProps): React.JSX.Element;
   buttons and carry no handler.
 - **`interview`** (accepted here, passed by AI-04): a sibling `<ol aria-label="Il colloquio">` after the path's list,
   three `<li>` «Tornata N di 3» drawn as ticks; `aria-hidden="true"` and `opacity-50` while `reached === null`; with a
-  number, readable, the tornate before `reached` done, `reached` current with `aria-current="step"`, and the path's
-  eight all done with no `aria-current` (the rail has ONE current step). Its ticks light in the accent one round at
+  number — the ROUND number, 1-based, as AI-04 passes it (decision 86, 2026-11-07): `reached: 2` is «Tornata 2 di 3» —
+  readable, the tornate numbered below `reached` done, the one numbered `reached` current with `aria-current="step"`,
+  and the path's eight all done with no `aria-current` (the rail has ONE current step). Its ticks light in the accent one round at
   a time: `bg-[color:var(--ai-accent)]` on `reached` and on the tornate before it, `bg-border` ahead (DESIGN.md →
   The Path-Scene Rule; decision 78, 2026-11-06).
 - **Run mode**: `<ol aria-label="Le fasi" aria-hidden="true">` of four segments (the stage rows of the card are the
@@ -375,7 +380,9 @@ export const cardEnterVariants: Variants = {
   screen of a mount (a load, a reload with a draft, «Rifai il percorso», «Torna al riepilogo») is drawn in place and
   nothing is focused.
 - The new hooks of the Wizard (`useState` for the direction, two `useRef`, `useReducedMotion`) sit before its early
-  `return <ConsulenteRun …/>` (:185-188). «Avvia la ricerca» (:343-345) takes `AI_CONTROL_ACCENT_CLASS`.
+  `return <ConsulenteRun …/>` (:185-188). «Avvia la ricerca» (:343-345) takes `AI_CONTROL_ACCENT_CLASS` with `border border-transparent` — the shadcn
+  `default` variant has no border width, only `outline` has, so without it the hover colours nothing and DESIGN.md's
+  «1px ring on a filled control» never shows (decision 85, 2026-11-07).
 
 ### The run
 
@@ -416,13 +423,18 @@ export function runStageStates(at: { status: 'running' | 'failed' | 'done'; stag
   with `aria-hidden="true"`, and a `sr-only` state word («, fatto», «, in corso», «, non riuscito»; none for pending).
   The active row takes `AI_GENERATED_SURFACE_CLASS` — the 1px `--ai-accent` border at rest and the glow on hover
   and focus-visible, «the run's active stage» of DESIGN.md → The AI-Accent Rule (A21; decision 78, 2026-11-06) —
-  and no left border.
-- `useElapsed(since: number): string`, local to `ConsulenteRun.tsx`: `now` in state, a 1 s `setInterval` in an effect
-  cleared on unmount, «m:ss» of `Math.max(0, now - since)`.
+  and no left border. Inside the `divide-y` list a `<li>` has no border of its own, so the class alone would colour
+  its divider only: the active row also takes `relative z-[1] -m-px border first:rounded-t-xl last:rounded-b-xl`, a
+  1px frame laid over the list's border and dividers in its band, its corners the list's on the first and the last
+  row (decision 84, 2026-11-07).
+- `useElapsed(since: number | null): string`, local to `ConsulenteRun.tsx` and called on every render (a hook never
+  sits behind a branch: `null` while the run is not running — no interval, `''`): `now` in state, a 1 s `setInterval`
+  in an effect cleared on unmount, «m:ss» of `Math.max(0, now - since)`.
 - `ConsulenteRun` renders the wrapper with `PathRail mode="run"` (the stages from `runStageStates` labelled with
   `STAGE_COPY[stage].label`) and the card: the headline (the ONE live region, unchanged), the error sentence,
   `StageRows` (with `elapsed` only while running), «Puoi lasciare la pagina: ogni fase viene salvata appena finisce.»
-  and, after a failure, «Torna al riepilogo» and «Riprova» (`AI_CONTROL_ACCENT_CLASS`).
+  and, after a failure, «Torna al riepilogo» and «Riprova» (`AI_CONTROL_ACCENT_CLASS` with `border border-transparent`:
+  a filled `Button` has no border width, decision 85).
 
 ### The report
 
@@ -435,9 +447,9 @@ export function runStageStates(at: { status: 'running' | 'failed' | 'done'; stag
 - **`lib/constants/aiAccent.ts`** (new):
 
 ```ts
-/** What the model wrote: the 1px accent border at rest; the glow on hover and while a control inside has the keyboard focus (decision 36). */
+/** What the model wrote: the 1px accent border at rest; the glow on hover and while a control inside has the keyboard focus (decision 36). The 200 ms shadow fade carries no `motion-safe:` guard — a fade is not motion, and the control class and DESIGN.md's table transition under reduced motion too (decision 87, 2026-11-07). */
 export const AI_GENERATED_SURFACE_CLASS =
-  'border-[color:var(--ai-accent)] motion-safe:transition-shadow motion-safe:duration-200 hover:shadow-[0_0_14px_var(--ai-glow)] has-[:focus-visible]:shadow-[0_0_14px_var(--ai-glow)]';
+  'border-[color:var(--ai-accent)] transition-shadow duration-200 hover:shadow-[0_0_14px_var(--ai-glow)] has-[:focus-visible]:shadow-[0_0_14px_var(--ai-glow)]';
 export const AI_GENERATED_EYEBROW_CLASS = 'text-[color:var(--ai-accent)]';
 /**
  * A control that calls the model (The AI-Accent Rule): on hover and on keyboard focus only, the border turns the
@@ -451,7 +463,7 @@ export const AI_CONTROL_ACCENT_LABEL_CLASS = 'hover:text-[color:var(--ai-accent)
 
 - **`ConsulenteReport.tsx`**: `generated` on «Allocazione proposta», «Strumenti», «Obiettivi», «Ruoli degli asset»,
   «Il report», «La strategia» and, in the running view, «Le fasi»; never on «Applica» nor «Chiedi una modifica»
-  (decision 49; AI-04's «Il colloquio» stays without it, decision 79). «Rivedi il report» takes `AI_CONTROL_ACCENT_CLASS`.
+  (decision 49; AI-04's «Il colloquio» stays without it, decision 79). «Rivedi il report» takes `AI_CONTROL_ACCENT_CLASS` with `border border-transparent` (decision 85).
 - **The running view** (:154-173): «Le fasi» holds `StageRows rows={runStageStates({ status: 'running', stage: document.stage })}`
   with no `elapsed` (a reload does not know when the stage began; the aside keeps «avviato il …»); it does not
   cascade.
@@ -525,7 +537,9 @@ export const AI_CONTROL_ACCENT_LABEL_CLASS = 'hover:text-[color:var(--ai-accent)
   - the faked route answers a request whole, so a state between two events of one request cannot be held: the test
     holds a whole REQUEST (the retried instruments) to read the active row;
   - the faked run ends on the run screen's «La proposta è pronta.»: nothing is written, the document in the emulators
-    is the one the spec found (or none), and the page stays on `ConsulenteRun` because `run.state` is `done`;
+    is the one the spec found (or none), and the page stays on `ConsulenteRun` because the report stays hidden —
+    `redoAt` still equals the untouched document's `updatedAt`, or there is no document — and the Wizard renders the
+    run's screen for a `done` state (`pageShowsReport` reads `runActive` for `running` and `failed` only);
   - after «Torna al riepilogo» the Wizard's card mounts again: `initial={false}` draws it in place.
 - **Cases that do not change**: the demo (`ConsulenteClient` returns its `EmptyState` before the Wizard,
   `ConsulenteClient.tsx:96-103 @ ce26af4d`); a shared-account viewer (the draft, the run and the report already read
@@ -548,9 +562,11 @@ export const AI_CONTROL_ACCENT_LABEL_CLASS = 'hover:text-[color:var(--ai-accent)
   textbox). Invented options («Uno», «Due», «Altro…», «Preferisco non dire»). Mutations: § 2 criterion 1.
 - `__tests__/pathRail.test.tsx` (new): path mode — «Il percorso» with 8 `listitem`, exactly one `[aria-current="step"]`
   whose text is `STEP_COPY.borsa.eyebrow` at `current={2}`; no `interview` → no «Il colloquio» list even with
-  `{ hidden: true }`; `reached: null` → the list found only with `{ hidden: true }`, `aria-hidden="true"`, three items,
-  the path keeps its current step; `reached: 1` → the list readable, the current step on its second item, none on the
-  path, one `[aria-current]` in the container; run mode — `ol[aria-label="Le fasi"]` with `aria-hidden="true"` and
+  `{ hidden: true }`; `reached: null` → `queryByRole('list', { name: 'Il colloquio' })` null and ONE readable list (an `aria-hidden`
+  element has no accessible name, accname step 2A, so `{ hidden: true }` with a `name` finds nothing either: the
+  element is taken from the DOM, `ol[aria-label="Il colloquio"]`, and is among `getAllByRole('list', { hidden: true })`),
+  `aria-hidden="true"`, three items, the path keeps its current step; `reached: 2` → the list readable, the current step on its second item («Tornata 2
+  di 3»), the first done, none on the path, one `[aria-current]` in the container (decision 86: the round number); run mode — `ol[aria-label="Le fasi"]` with `aria-hidden="true"` and
   four `li` whose `data-state` follow the input. Mutation: the interview's items inside the path's `<ol>` → 11 → red;
   `aria-current` on both lists → 2 → red.
 - `__tests__/tile.test.tsx` (new): `generated` → the region «Il report» has `data-generated` and the accent border
@@ -628,7 +644,9 @@ export const AI_CONTROL_ACCENT_LABEL_CLASS = 'hover:text-[color:var(--ai-accent)
     opacity < 0.5; more than one text sampled and the last «70,0%»; «Rivedi il report» `toHaveClass(/var\(--ai-glow\)/)`;
     then «Torna all'Allocazione», the «Consulente» link, the probe reset → the least opacity 1 and the one text
     «70,0%».
-  - `failed` with a strategy and no report: the region «La strategia» has `data-generated`, «Applica» has not.
+  - `failed` with a strategy and no report: the region «La strategia» has `data-generated`, and so do «Allocazione
+    proposta» and «Obiettivi», drawn from the strategy's proposal (3 in all — seen on the first run of the spec,
+    2026-11-07); «Applica» has not, «Chiedi una modifica» is absent.
   - `running` at `instruments`, `startedAt` now: the region «Le fasi» has `data-generated`, its
     `li[data-state="active"]` reads «Cerco gli strumenti» and «di solito ~2 min», no text `/\d+:\d\d/` in it.
   - a describe with reduced motion, `ready`: the least opacity 1, one text sampled.

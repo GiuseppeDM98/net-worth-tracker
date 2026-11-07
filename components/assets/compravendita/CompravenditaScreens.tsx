@@ -31,7 +31,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { AccountField, CategoryField, ChoiceRows, DateField, FIELD_HEIGHT_CLASS, NumberField } from './fields';
+import { ChoiceList } from '@/components/ui/choice-list';
+import { AccountField, CategoryField, DateField, FIELD_HEIGHT_CLASS, NumberField } from './fields';
 
 export interface ScreenProps {
   screen: RealEstateOperationScreen;
@@ -46,17 +47,17 @@ export interface ScreenProps {
 const NEW_PROPERTY = '__new__';
 
 const KIND_OPTIONS = [
-  { value: 'purchase' as const, label: 'Compro casa', description: 'Caparra, rogito, mutuo, polizze, costi: la casa entra in Patrimonio.' },
-  { value: 'sale' as const, label: 'Vendo casa', description: 'Caparra ricevuta, rogito, estinzione del mutuo: la casa esce dal patrimonio.' },
+  { value: 'purchase' as const, label: 'Compro casa', hint: 'Caparra, rogito, mutuo, polizze, costi: la casa entra in Patrimonio.' },
+  { value: 'sale' as const, label: 'Vendo casa', hint: 'Caparra ricevuta, rogito, estinzione del mutuo: la casa esce dal patrimonio.' },
 ];
 const EVENT_OPTIONS = [
-  { value: 'preliminare' as const, label: 'Preliminare', description: 'Il compromesso: si versa o si riceve la caparra, si paga l’agenzia.' },
-  { value: 'rogito' as const, label: 'Rogito', description: 'L’atto dal notaio: il resto del prezzo, il mutuo, le polizze, i costi.' },
+  { value: 'preliminare' as const, label: 'Preliminare', hint: 'Il compromesso: si versa o si riceve la caparra, si paga l’agenzia.' },
+  { value: 'rogito' as const, label: 'Rogito', hint: 'L’atto dal notaio: il resto del prezzo, il mutuo, le polizze, i costi.' },
 ];
-const LIFE_MODE_OPTIONS: ReadonlyArray<{ value: LifePolicyMode; label: string; description: string }> = [
-  { value: 'monthly', label: 'Mensile', description: 'Un premio al mese, con la rata: una serie fino a quando dura.' },
-  { value: 'single', label: 'Premio unico pagato', description: 'Una spesa al rogito.' },
-  { value: 'financed', label: 'Premio unico finanziato', description: 'Un prestito ha pagato il premio: le sue rate mensili lo rimborsano.' },
+const LIFE_MODE_OPTIONS: ReadonlyArray<{ value: LifePolicyMode; label: string; hint: string }> = [
+  { value: 'monthly', label: 'Mensile', hint: 'Un premio al mese, con la rata: una serie fino a quando dura.' },
+  { value: 'single', label: 'Premio unico pagato', hint: 'Una spesa al rogito.' },
+  { value: 'financed', label: 'Premio unico finanziato', hint: 'Un prestito ha pagato il premio: le sue rate mensili lo rimborsano.' },
 ];
 
 export function ScreenBody(props: ScreenProps) {
@@ -96,8 +97,8 @@ export function ScreenBody(props: ScreenProps) {
 function OperazioneScreen({ answers, dispatch, context }: ScreenProps) {
   return (
     <div className="flex flex-col gap-4">
-      <ChoiceRows name="re-kind" label="Operazione" value={answers.kind} options={KIND_OPTIONS} onChange={(kind) => dispatch({ type: 'patch', patch: { kind, propertyId: null } })} />
-      <ChoiceRows name="re-event" label="Evento" value={answers.event} options={EVENT_OPTIONS} onChange={(event) => dispatch({ type: 'patch', patch: { event } })} />
+      <ChoiceList mode="single" name="re-kind" label="Operazione" value={answers.kind} options={KIND_OPTIONS} onChange={(kind) => dispatch({ type: 'patch', patch: { kind, propertyId: null } })} />
+      <ChoiceList mode="single" name="re-event" label="Evento" value={answers.event} options={EVENT_OPTIONS} onChange={(event) => dispatch({ type: 'patch', patch: { event } })} />
       <DateField id="re-date" label="Data dell’evento" value={answers.eventDateIso} max={context.todayIso} onChange={(eventDateIso) => dispatch({ type: 'patch', patch: { eventDateIso } })} />
     </div>
   );
@@ -170,7 +171,7 @@ function OwnershipField({ answers, dispatch, familyMembers }: Pick<ScreenProps, 
   return (
     <div className="flex flex-col gap-2">
       <p className={TILE_SUB_EYEBROW_CLASS}>Intestatari</p>
-      <ChoiceRows name="re-owner" label="Intestatari" value={ownership.mode} options={options} onChange={setMode} />
+      <ChoiceList mode="single" name="re-owner" label="Intestatari" value={ownership.mode} options={options} onChange={setMode} />
       {ownership.mode === 'member' && (
         <Select value={ownership.memberId} onValueChange={(memberId) => dispatch({ type: 'patch', patch: { ownership: { mode: 'member', memberId } } })}>
           <SelectTrigger aria-label="Intestatario" className={FIELD_HEIGHT_CLASS}>
@@ -265,14 +266,15 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <p className={TILE_SUB_EYEBROW_CLASS}>Scoppio e incendio</p>
-        <ChoiceRows
+        <ChoiceList
+          mode="single"
           name="re-home-insurance"
           label="Polizza scoppio e incendio"
           value={home.mode}
           options={[
             { value: 'none', label: 'Nessuna' },
-            { value: 'single', label: 'Pagata tutta al rogito', description: 'Una spesa nel giorno del rogito.' },
-            { value: 'monthly', label: 'Mensile con la rata', description: `Una serie a parte, nello stesso giorno della rata${end ? `, fino a ${end}` : ''}.` },
+            { value: 'single', label: 'Pagata tutta al rogito', hint: 'Una spesa nel giorno del rogito.' },
+            { value: 'monthly', label: 'Mensile con la rata', hint: `Una serie a parte, nello stesso giorno della rata${end ? `, fino a ${end}` : ''}.` },
           ]}
           onChange={(mode) => patchHome({ mode, firstIso: answers.mortgage.firstInstalmentIso, months: home.months ?? (answers.mortgage.years ? Math.round(answers.mortgage.years * 12) : null) })}
         />
@@ -336,7 +338,7 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
                 <span className="text-[13px] font-normal text-muted-foreground">{LIFE_POLICY_LINK_HINT}</span>
               </Label>
             </div>
-            <ChoiceRows name={`re-life-${index}-mode`} label={`Come si paga la polizza vita ${index + 1}`} value={policy.mode} options={LIFE_MODE_OPTIONS} onChange={(mode) => dispatch({ type: 'updateLifePolicy', index, patch: { mode } })} />
+            <ChoiceList mode="single" name={`re-life-${index}-mode`} label={`Come si paga la polizza vita ${index + 1}`} value={policy.mode} options={LIFE_MODE_OPTIONS} onChange={(mode) => dispatch({ type: 'updateLifePolicy', index, patch: { mode } })} />
             <div className="grid grid-cols-1 gap-4 tablet:grid-cols-2">
               <NumberField id={`re-life-${index}-amount`} label={policy.mode === 'monthly' ? 'Premio mensile, in euro' : 'Premio unico, in euro'} value={policy.amount} onChange={(amount) => dispatch({ type: 'updateLifePolicy', index, patch: { amount } })} />
               {policy.mode === 'monthly' && (
@@ -447,7 +449,7 @@ function CentroScreen({ answers, dispatch, context }: ScreenProps) {
   ];
   return (
     <div className="flex flex-col gap-4">
-      <ChoiceRows name="re-center" label="Centro di costo" value={center.mode} options={options} onChange={(mode) => dispatch({ type: 'patch', patch: { costCenter: { ...center, mode, existingId: mode === 'existing' ? center.existingId || open[0]?.id || '' : center.existingId } } })} />
+      <ChoiceList mode="single" name="re-center" label="Centro di costo" value={center.mode} options={options} onChange={(mode) => dispatch({ type: 'patch', patch: { costCenter: { ...center, mode, existingId: mode === 'existing' ? center.existingId || open[0]?.id || '' : center.existingId } } })} />
       {center.mode === 'new' && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="re-center-name">Nome del centro</Label>

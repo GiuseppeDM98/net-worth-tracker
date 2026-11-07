@@ -10,8 +10,8 @@
 
 | | |
 | --- | --- |
-| **Last audit** | 2026-11-06 (`npm audit --json`, on the lock of 5db48808, unchanged since 2026-11-03) |
-| **Result** | **32 advisories**: 9 high · 23 moderate, no critical, no low (41 on 2026-11-03 on the same lock — nine moderate rows of the eslint and `firebase-tools` chains left the registry's advisories; 54 before the upgrade) |
+| **Last audit** | 2026-11-07 (`npm audit --json`, on the lock of AI-03 — the four harness devDependencies added to the lock of 2026-11-03, § Registro › Moves) |
+| **Result** | **32 advisories**: 9 high · 23 moderate, no critical, no low — the same on 2026-11-06 on the previous lock (41 on 2026-11-03 on that lock — nine moderate rows of the eslint and `firebase-tools` chains left the registry's advisories; 54 before the upgrade) |
 | **Frameworks** | Next.js `^16.4.2` · React 19 (compiler on) · firebase `^12.5.0` (12.19.0) · firebase-admin `^14.5.0` · zod `^4.6.7` · `@anthropic-ai/sdk` `^0.115.0` · storybook `^10.6.5` · firebase-tools `^15.24.0` (15.33.0) · vitest `^4.1.12` |
 | **Node** | 24.x (`engines.node`, held by `__tests__/vercelConfig.test.ts`) |
 | **Next step** | none open: the next audit opens the next session (WORKFLOW.md rule 8) |
@@ -59,9 +59,7 @@ The open rows of the audit of 2026-11-03. Compared at every session start; a row
 | 2026-11-03 | body-parser | 1.20.8 → 1.20.9 · 2.3.0 → 2.4.0 | DoS on a compressed body | #497 |
 | 2026-11-03 | qs · fast-uri · ip-address | 6.16.0 → 6.16.2 · 3.1.8 → 3.1.9 · 10.7.3 → 10.7.5 | DoS in stringify; URI spoofing; quadratic zone match | #497 |
 | 2026-11-03 | @hono/node-server | 1.19.17 → 2.1.6 (published 2026-11-02, the newest in `@modelcontextprotocol/sdk`'s `^1.19.9 \|\| ^2.0.5`; a major inside the parent's range) | `serveStatic` decoding the path twice | #497 |
-
-AI-03 adds its `jsdom` / `@testing-library/*` row here and runs the gate below once (doc/ai README, decision 21).
-`@testing-library/dom` 10.4.2 and `user-event` 14.6.8 are already hoisted, under storybook, undeclared.
+| 2026-11-07 | jsdom · @testing-library/react · @testing-library/dom · @testing-library/user-event | new devDependencies at exact versions: 30.1.3 · 16.3.3 · 10.4.2 · 14.6.8 (the newest stable at least seven days old; `dom` and `user-event` were already hoisted under storybook, now declared) | none — the component-test harness of the `dom` project in `vitest.config.ts` (AI-03, doc/ai README decision 21); the gate below run once, 0 new advisories (32, unchanged) | #507 |
 
 ## How an upgrade is done
 

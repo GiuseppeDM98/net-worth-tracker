@@ -93,7 +93,10 @@
   --warning-foreground: oklch(0.468 0.098 75);
   --warning-border: oklch(0.855 0.062 85);
   --positive: oklch(0.482 0.194 149.214);
-  --ai-accent: oklch(0.65 0.2 305);
+  /* The AI accent (DESIGN.md § 5 «AI Surfaces»): 0.56 on white, 0.65 in the dark; the glow is read
+     from the accent, once — `.dark` sits on <html>, the same element, so it follows with no copy. */
+  --ai-accent: oklch(0.56 0.2 305);
+  --ai-glow: color-mix(in oklch, var(--ai-accent) 40%, transparent);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);

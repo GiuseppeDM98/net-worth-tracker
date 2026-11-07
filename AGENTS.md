@@ -454,7 +454,7 @@ file used to carry.
 - STRUCTURE IS NEVER PARSED FROM PROSE: the strategy and the review answer as a structured output, `{ markdown, proposal }` (`allocationAdviceAnswerSchema`, 2026-10-23 — the API guarantees the shape, not the sums: classes without a fixed amount sum to 100, sleeves sum to 100 or are empty, names copied EXACTLY from the STRUMENTI block, all checked by `parseAllocationAnswer`; a goal's mix travels as `{ assetClass, percentage }` pairs, because the API writes an object's keys in schema order and a mix written out of order fell short of 100); a strategy that breaks them fails the run, a review that does keeps the strategy's proposal. The instrument search keeps ONE fenced ```instrument-candidates block: web search answers with citations, which structured outputs refuse (400).
 - «Applica» shows its plans before writing, one checkbox each (`allocationAdviceApply.ts`): the targets through `setSettings`, a role through `updateAssetAllocationRole` (the ONE field; the other asset writers delete absent fields), the goals as a whole document through `saveGoalData` with over-100% quotas reduced and SAID; the «applied» route records it; the review date lives in the document and reaches the Allocazione header through `describeReviewBy`.
 - «Chiedi una modifica» on the report is a `revise` request (`runRevise`, `buildRevisionPrompt`): the review again with the previous report and every request so far, `document.revisions` appended, the status back to `ready`; never a new strategy or search.
-- A probe never runs the Consulente: the E2E spec walks the screens and stops at «Avvia la ricerca».
+- A probe never SPENDS on the Consulente (2026-11-01): the E2E specs answer `/api/allocation-advice/run` with `page.route` before pressing «Avvia la ricerca» — the `.env.local` key only enables it on :3100 (doc/guide/e2e-emulatori.md § Browser-Driven E2E); the real run is made once, on the mirror.
 - Il resto — the reducer and its sub-screens, the stale run, the demo gate, the prompts' contract — in `doc/guide/consulente.md`.
 
 ### Previdenza · Fondo Pensione → `doc/guide/previdenza.md`
@@ -779,6 +779,13 @@ file used to carry.
   again to undo it (2026-11-07: a chat mutation stayed applied until restored by hand). **`next dev`
   rewrites `tsconfig.json`** (an extra dist dir in `include`, the formatting): a stray `tsconfig.json` in a diff is
   checked out again, never committed (2026-10-10).
+- **Components and hooks are tested under jsdom** (2026-11-07, AI-03): `__tests__/<name>.test.tsx` runs in the `dom`
+  project of `vitest.config.ts` (Testing Library, `@testing-library/user-event`, `__tests__/domSetup.ts` for cleanup,
+  `ResizeObserver` and `matchMedia`), `.test.ts` in the `node` one; plain assertions, no jest-dom. An `aria-hidden`
+  element has NO accessible name (accname step 2A): `getByRole(…, { name, hidden: true })` finds nothing — take it from
+  the DOM (`querySelector`) and check it is among `getAllByRole(…, { hidden: true })` (`__tests__/pathRail.test.tsx`).
+  A test that reads a clock uses `vi.useFakeTimers` on a noon fixture; a hook's `Date.now()` stamps
+  `vi.useFakeTimers({ toFake: ['Date'] })` + `vi.setSystemTime` (`__tests__/useConsulenteRun.test.tsx`).
 - **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, no new
   `eslint-disable`; a local named `module` is refused by `@next/next/no-assign-module-variable` (2026-09-28). The config
   ignores `.agents/**` and the `.next-*/**` dist dirs.

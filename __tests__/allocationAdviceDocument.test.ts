@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS } from '@/lib/utils/allocationAdviceDocument';
+import { isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS, runStageStates, stageOfRunStage } from '@/lib/utils/allocationAdviceDocument';
 
 const AT = new Date('2026-10-20T10:00:00.000Z');
 
@@ -79,5 +79,26 @@ describe('pageShowsReport (2026-10-20)', () => {
   it('hides the document «Rifai il percorso» was pressed on, and shows a newer one', () => {
     expect(pageShowsReport({ document: doc('ready'), redoAt: AT.getTime(), openedAt: now, runActive: false })).toBe(false);
     expect(pageShowsReport({ document: doc('ready'), redoAt: AT.getTime() - 1, openedAt: now, runActive: false })).toBe(true);
+  });
+});
+
+describe('the run’s stage rows (AI-03)', () => {
+  it('reads revise as the review', () => {
+    expect(stageOfRunStage('revise')).toBe('review');
+    expect(stageOfRunStage('instruments')).toBe('instruments');
+  });
+
+  it('lights the stage, marks the ones before it done and the rest pending', () => {
+    const states = (rows: ReturnType<typeof runStageStates>) => rows.map((row) => row.state);
+    expect(runStageStates({ status: 'running', stage: null })).toEqual([
+      { stage: 'context', state: 'pending' },
+      { stage: 'strategy', state: 'pending' },
+      { stage: 'instruments', state: 'pending' },
+      { stage: 'review', state: 'pending' },
+    ]);
+    expect(states(runStageStates({ status: 'running', stage: 'instruments' }))).toEqual(['done', 'done', 'active', 'pending']);
+    expect(states(runStageStates({ status: 'failed', stage: 'strategy' }))).toEqual(['done', 'failed', 'pending', 'pending']);
+    expect(states(runStageStates({ status: 'failed', stage: 'review' }))).toEqual(['done', 'done', 'done', 'failed']);
+    expect(states(runStageStates({ status: 'done', stage: null }))).toEqual(['done', 'done', 'done', 'done']);
   });
 });

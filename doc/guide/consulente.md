@@ -12,7 +12,11 @@
 - **Page**: `app/dashboard/allocation/consulente/page.tsx` (the gate on the `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` flag, as
   for the Assistente, and `configured` = the key read on the server), `components/allocation/consulente/ConsulenteClient.tsx`
   (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens), `ConsulenteRun.tsx` (the
-  stages via SSE), `ConsulenteReport.tsx` (verdict, tiles, markdown, «Applica»).
+  run's screen and `StageRows`, which the report's running view shares), `ConsulenteReport.tsx` (verdict, tiles,
+  markdown, «Applica»).
+- **Primitives**: `components/ui/choice-list.tsx` (`ChoiceList`, every choice of the path and of the Compravendita),
+  `components/ui/path-rail.tsx` (`PathRail`: the path's eight ticks, the run's four segments), `Tile`'s `generated`
+  and the classes of `lib/constants/aiAccent.ts`, `sceneVariants` in `lib/utils/motionVariants.ts`.
 - **Pure**: `lib/utils/allocationAdviceProposal.ts` (the zod schemas of the answers, the proposal and the candidates; the
   fenced block), `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage, the prefilled
   answers), `allocationAdviceApply.ts` (the plans of «Applica»: targets, roles, goals; today's base; the loss
@@ -29,10 +33,13 @@
   `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
 - **Suites to run after a change here**: `allocationAdviceProposal`, `allocationAdviceDraft`, `allocationAdviceApply`,
   `allocationAdviceNarrative`, `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes`,
-  `cashflowBlock`, `assistantMonthContextService` ·
+  `cashflowBlock`, `assistantMonthContextService`, `motionVariants` and the Testing Library suites `choiceList`,
+  `pathRail`, `tile`, `consulenteRun`, `useConsulenteRun` ·
   `reactCompilerCoverage` (a ternary inside a `||` in the Wizard was skipped on the first day) · **Browser**
-  `e2e/allocation.consulente.spec.ts` (the eight screens on the base fixture, NEVER the run: a test does not open a
-  control that spends).
+  `e2e/allocation.consulente.spec.ts` (the eight screens on the base fixture, and the run on a route faked with
+  `page.route`: a test never spends), `allocation.consulente.mobile.spec.ts` (390: the strip, 44px, the overflow,
+  reduced motion), `allocation.consulente.report.spec.ts` (planted documents: the accent, the cascade, the
+  count-up).
 
 ## The path
 
@@ -46,6 +53,13 @@
   «rispecchiano la realtà?» and the free text — and «Indietro» from the roles screen goes back to «cosa manca».
   The reducer is pure (`allocationAdviceDraftReducer`); `describeStepBlock` says why a screen does not advance
   (age and horizon missing, a new goal without a name).
+- **The path is a scene** (AI-03, 2026-11-07): `PathRail` draws the eight steps — a strip above the card below
+  `desktop:`, a 160px column at 1440 with each step's name in 11px (a `sr-only` name on the strip), one
+  `aria-current="step"`, ticks that are not buttons. The headline and the body slide 24px in the direction of travel
+  (`sceneVariants`: 0.25 s in, 0.18 s out; a 0.15 s fade under reduced motion) inside
+  `AnimatePresence mode="wait" initial={false}`; the eyebrow and the footer stay; after a change the headline takes
+  the focus, unless the reader already moved it, and on a mount nothing moves. The direction is state set with the
+  dispatch, never a ref (the React Compiler would skip the Wizard). Every choice is a `ChoiceList` row.
 - **The draft lives on THIS browser** (`allocation-advice-draft:{uid}`, `readStoredDraft`/`writeStoredDraft`,
   `try/catch` on every access): a finished run deletes it; a previous document prefills the answers.
 - **The loss scenarios are euros on today's base** (`lossScenarios(currentAllocationOnBase(assets).baseTotal)`):
@@ -55,7 +69,8 @@
   roles of the home / pension funds / illiquid assets from the role the assets carry today (`resolveAllocationRoleWithin`),
   the exchange `DEFAULT_EXCHANGE`.
 - **The summary is a list of rows, each a link to its screen** (`goto`); «Avvia la ricerca» is
-  disabled without the key on the server («Servizio AI non configurato»).
+  disabled without the key on the server («Servizio AI non configurato»); it glows on hover and focus only
+  (`AI_CONTROL_ACCENT_CLASS`, DESIGN.md → The AI-Accent Rule).
 
 ## The run
 
@@ -70,6 +85,13 @@
   half-written proposal read as a whole one. A turn the web search pauses (`pause_turn`, the ceiling of the loop
   on the server side) is resumed by sending the paused response back as an assistant message, up to
   `ALLOCATION_ADVICE_MAX_CONTINUATIONS` times, with the texts joined (2026-10-23; before, the pause failed the stage).
+- **The run says how long a stage usually takes** (AI-03, 2026-11-07): each row of `StageRows` prints
+  `STAGE_COPY[stage].detail` and «di solito ~N min» (`STAGE_TYPICAL_MINUTES`: strategy 2, instruments 2, review 1,
+  nothing for the context — about five minutes in all at effort `medium`, 2026-10-23); the active row adds the
+  elapsed time («m:ss», `aria-hidden`, from `stageStartedAt`, stamped by `useConsulenteRun` at every `stage` event)
+  and the accent on its frame; a failed run marks the stages before `resumeFrom` done and that one failed
+  (`runStageStates`). `PathRail` in run mode fills one segment per stage when it becomes active: stage status, never
+  a percentage.
 - **The CASHFLOW 12 MESI block** (2026-11): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
   `formatCashflowBlockForPrompt`) over `fetchCashflowBlockInputs(userId, now)` (lib/services/assistantMonthContextService.ts),
   ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
@@ -166,7 +188,12 @@
 - **The tiles**: Allocazione proposta (today → proposal per class, `buildProposalRows` on `currentAllocationOnBase`,
   the held classes the proposal drops appended at the end at 0), Strumenti (the candidates per sub-target,
   «in portafoglio» when already held, the `caveat` in amber), Obiettivi, Ruoli degli asset (only the changes that
-  change something, `planRoleChanges`; a name not found is listed and ignored), Il report (markdown), Applica.
+  change something, `planRoleChanges`; a name not found is listed and ignored), Il report (markdown) or, without
+  one, La strategia, Chiedi una modifica, Applica. **Every tile the model wrote carries `generated`** (AI-03,
+  2026-11-07) — the 1px `--ai-accent` border, the accented eyebrow, the glow on hover and focus — and the two action
+  tiles («Applica», «Chiedi una modifica») never do; «Le fasi» of the running view does. The column cascades once
+  per JS session (`consulenteReportEntrance`, its own flag; never under reduced motion), and the proposed
+  percentages count up with it (620 ms).
 - **«Applica» shows the plans BEFORE writing, one tick per item** (owner, 2026-10-20): the targets
   (`buildTargetsFromProposal` → `setSettings({ targets })`, which REPLACES the targets document as Impostazioni does;
   a class absent from the proposal disappears from the targets), the roles (`updateAssetAllocationRole`, an `updateDoc`
@@ -192,15 +219,16 @@ doc/ai/README.md): **The Path-Scene Rule** (one stage, the rail that says where 
 stages, the slide forward and back, the report's cascade), **The Question-Card Rule** (the interview's cards; the
 scene's footer owns «Continua» and «Avvia la ricerca») and **The AI-Accent Rule** (the accent on what the model wrote
 and, on hover and focus only, on «Avvia il colloquio», «Continua», «Avvia la ricerca», «Riprova», «Rivedi il report»).
-The code follows it from the redesign of the path, the run and the report on (AI-03); until then § The path, § The run
-and § The report and «Applica» describe what renders, and `app/globals.css` serves `oklch(0.65 0.2 305)` in both modes
-with no `--ai-glow` (the light value and the glow land with that redesign).
+The code follows it since the redesign of the path, the run and the report (AI-03, 2026-11-07): § The path, § The run
+and § The report and «Applica» describe what renders; `app/globals.css` serves `oklch(0.56 0.2 305)` in `:root`,
+`oklch(0.65 0.2 305)` in `.dark` and `--ai-glow` once. The interview's screens are AI-04's.
 
 ## Composizione mobile
 
 No composition, by choice: like the Assistente (DESIGN.md → The Conversation-Is-Content Rule) the content is
-a path — one column at 720px, one card per screen, buttons at 44px below `desktop:`; no strip, no closed rows,
-no `mobile-sections:` memory. It is not among the surfaces of `mobile:census` (the route is not in
+a path — one column at 720px (900px at 1440, the rail's 160px column beside the card), one card per screen, buttons
+at 44px below `desktop:`; no `VerdictStrip` — the rail's ticks above the card are not one: the page is still not a
+composed page —, no closed rows, no `mobile-sections:` memory. It is not among the surfaces of `mobile:census` (the route is not in
 `navigation.ts`: it is reached from Allocazione's «Consulente» button, on desktop in the header and below the tiles
 on a phone, and from the row under the Assistente's conversation).
 
@@ -225,7 +253,12 @@ on a phone, and from the row under the Assistente's conversation).
 - **The E2E spec opens over a finished report** (2026-10-20: two real runs on the E2E account at :3100 left a `ready`
   document in the emulators, and the full Playwright run went red twice on «Passo 1 di 8»): `openConsulente` waits for
   step 1 OR «Rifai il percorso» and clicks the latter. The emulators keep `allocationAdvice/test-user-1` between runs;
-  a real run on that account is never cleaned by the suite.
+  a real run on that account is never cleaned by the suite. `allocation.consulente.report.spec.ts` plants its
+  documents on that account and puts back the one it found, or deletes its own when there was none.
+- **The ticks are not buttons**: the path is linear (`describeStepBlock` holds «Avanti»); the Summary's rows are the
+  only jumps.
+- **The elapsed time is `aria-hidden`**, and the report's running view has none: the headline is the one live region,
+  and a reload does not know when the stage began.
 - **The exchange is a closed list, with «Altra…» opening a free field** (owner, 2026-10-20: the first version was an
   `Input` over a `datalist`, whose arrow looked like a dropdown and was not one): `ExchangeField` shows
   `EXCHANGE_OPTIONS` plus `EXCHANGE_OTHER`; «Altra…» is LOCAL state so the field stays open while the text is empty
@@ -243,5 +276,7 @@ on a phone, and from the row under the Assistente's conversation).
 - **The demo has no Consulente**: it writes the settings, and the demo's settings are everyone's (`useDemoMode`).
 - **The rules are inert until they are deployed** (`npx firebase deploy --only firestore:rules`; done by the owner on 2026-10-20, the Consulente tried in production): before the deploy
   the page does not read the document (permission-denied → the read fails and the page says so).
-- **No E2E spec of the run**, by the rule of the tests that do not spend; the real run was made on the
-  mirror on 2026-10-20 with the owner's key (the outcomes in the session's SESSION_NOTES and in the commit).
+- **The run in the browser runs on a faked route**: `e2e/allocation.consulente.spec.ts` answers
+  `/api/allocation-advice/run` with `page.route` (`doc/guide/e2e-emulatori.md` § Browser-Driven E2E) — the order of
+  the requests, the rows, a failed stage and «Riprova»; the real run was made on the mirror on 2026-10-20 with the
+  owner's key (the outcomes in that session's SESSION_NOTES and in the commit).
