@@ -97,6 +97,9 @@
 
 ## 🔧 Improvements
 
+- **Allocazione — Consulente, il cashflow** — Improved what the strategy reads: besides the portfolio, your whole cashflow history (income and how concentrated it is, spending by category, the monthly savings and how steady they are, the recurring commitments and loan instalments, the balance of your accounts), so the goals' monthly contributions and the cash reserve rest on what you actually save.
+- **Assistente AI — il cashflow in ogni risposta** — Improved every mode of the assistant (month, year, year-to-date, history and the free chat, with or without a period): it also reads your whole cashflow history, so an answer can compare a period with your recent income, spending, savings and commitments.
+- **Email — il cashflow nel commento AI** — Improved the AI comment of the periodic emails and of the weekly budget email: it also reads your whole cashflow history, so it can set the period against how much you usually spend and save.
 - **Ogni pagina (telefono e tablet in verticale) — le tendine** — Every dropdown now opens as a sheet from the bottom of the screen instead of a small list beside the field: the type, account, loan, period and filter pickers, the account menu under «Altro», the category icon picker and the assistant's preferences, with thumb-sized rows and a backdrop; Categoria and Sottocategoria (and the dividend's instrument, the Storico month) open a sheet with the search field at the top and «Aggiungi …» at the bottom.
 - **Ogni modulo — niente suggerimenti automatici** — The browser no longer proposes previously typed values on the app's fields (amounts, names, notes, dates, search), and the password managers keep their icon out of them; the login and registration fields still offer your saved credentials.
 

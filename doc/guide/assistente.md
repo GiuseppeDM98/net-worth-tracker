@@ -2,7 +2,7 @@
 
 > **When to open this guide** — whoever touches `app/dashboard/assistant/*`, `components/assistant/*`,
 > `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`,
-> `lib/utils/{assistantNarrative,assistantPeriodOptions,expenseBreakdown,goalProposal}.ts`,
+> `lib/utils/{assistantNarrative,assistantPeriodOptions,cashflowBlock,expenseBreakdown,goalProposal}.ts`,
 > `lib/hooks/useAssistantStreaming.ts`, `app/api/ai/assistant/*`, `app/api/goals/route.ts`. In
 > `AGENTS.md` the stub with the essentials stays; here is the full rule. Modules and files: § *Files* below.
 > No permanent E2E spec: both blocks state «no Playwright spec» (the throwaway specs
@@ -12,9 +12,9 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `store.ts` → `mergeMemoryItem`), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
+- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `store.ts` → `mergeMemoryItem`), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`) and `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, its rules in doc/guide/consulente.md § The run); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
 - **The portfolio block** (2026-10-20): pure `lib/utils/assistantPortfolioContext.ts` (`buildAssistantPortfolioContext`, `emptyAssistantPortfolioContext` for the fixtures), printed by `formatPortfolioForPrompt` in `prompts.ts`; the Italian month bounds `getItalyMonthBoundsUtc`/`getItalyMonthRangeBoundsUtc` in `lib/utils/dateHelpers.ts`. The Consulente of Allocazione is its own guide: doc/guide/consulente.md.
-- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `dateHelpers` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
+- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `dateHelpers`, `cashflowBlock`, `anthropicStream` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
 
 ## Assistant
 
@@ -27,9 +27,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   every periodic email). The `{year, month}` selector cannot encode a range, so its `selector` is the window's CLOSING
   month and the window travels as the first `dataQuality.notes` entry plus `formatBundleForPrompt`'s `periodLabel` —
   never as a new bundle field, which all four other builders would then have to fill.
-- **One aggregator, not two**: every cashflow figure comes from a single `buildCashflowBreakdown` call per builder, so
-  `Σ expensesByCategory[].total === cashflow.totalExpenses` holds structurally. `transactionCount` **excludes
-  transfers**, and a new required bundle field means updating ALL 4 builders (month/year/ytd/history).
+- **One aggregator per block, not two**: every figure of the BUNDLE comes from a single `buildCashflowBreakdown` call
+  per builder, so `Σ expensesByCategory[].total === cashflow.totalExpenses` holds structurally. `transactionCount`
+  **excludes transfers**, and a new required bundle field means updating ALL 4 builders (month/year/ytd/history). The
+  CASHFLOW 12 MESI block every prompt carries beside the bundle (2026-11, every mode since decision 81) is built by
+  `buildCashflowBlock` on its own read of the whole history (`fetchCashflowBlockInputs`) and never enters the bundle
+  nor the `context` SSE event.
 - **Removing an `AssistantMode` ripples past the WARNING checklist in `types/assistant.ts`**: grep `Record<AssistantMode,
   …>` too (`assistantFollowUps.ts`'s `CURATED_FOLLOW_UPS` is the live site).
 
@@ -49,6 +52,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **`ASSISTANT_SYSTEM_CORE` is shared with `buildEmailAiPrompt`**, so its phrasing about the goals block stays
   conditional: **check every consumer before extending the core unconditionally**, or a surface starts talking about
   data it was never given.
+- **Every builder takes the CASHFLOW 12 MESI block** (2026-11; every surface since decision 81, 2026-11-07): the
+  four analyses as their fifth argument, printed after the numeric block and before «Domanda dell'utente»; the chat
+  as its seventh, right before «Richiesta utente» with or without a period; `buildEmailAiPrompt` as its sixth, at
+  the end of the user turn; `generateWeeklyBudgetComment` as its second, under the budgets. ONE note over it
+  everywhere (`formatCashflowBlockSection`): the block is the whole recorded history whatever the period, a
+  period's figures stay its bundle's. `system` is the same with or without it. The route, the periodic comment and
+  the weekly one read it through `readCashflowBlockForPrompt` (lib/server/assistant/cashflowBlockPrompt.ts): a
+  failed read answers 500 on the stream and sends an email without its AI comment — never a silent empty block.
 
 ### The portfolio block — the assistant sees everything (2026-10-20)
 - **`bundle.portfolio` is REQUIRED and built by ONE pure function**, `buildAssistantPortfolioContext`

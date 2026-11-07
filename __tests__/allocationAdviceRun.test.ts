@@ -11,7 +11,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdviceProposal';
 
 let firstWrite: unknown = null;
-const { setMock, patchMock, getMock, ytdMock } = vi.hoisted(() => ({ setMock: vi.fn(), patchMock: vi.fn(), getMock: vi.fn(), ytdMock: vi.fn() }));
+const { setMock, patchMock, getMock, ytdMock, cashflowMock } = vi.hoisted(() => ({ setMock: vi.fn(), patchMock: vi.fn(), getMock: vi.fn(), ytdMock: vi.fn(), cashflowMock: vi.fn() }));
+const EMPTY_CASHFLOW_INPUTS = { expenses: [], todayIso: '2026-10-20', categories: [], assets: [], settings: null, assetValueOf: () => 0 };
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: {} }));
@@ -21,7 +22,7 @@ vi.mock('@/lib/server/allocationAdvice/store', () => ({
   patchAllocationAdviceAdmin: patchMock,
   getAllocationAdviceAdmin: getMock,
 }));
-vi.mock('@/lib/services/assistantMonthContextService', () => ({ buildAssistantYtdContext: ytdMock }));
+vi.mock('@/lib/services/assistantMonthContextService', () => ({ buildAssistantYtdContext: ytdMock, fetchCashflowBlockInputs: cashflowMock }));
 vi.mock('@/lib/server/assistant/prompts', () => ({
   formatBundleForPrompt: () => 'DATI',
   formatPortfolioForPrompt: () => ['STRUMENTI'],
@@ -108,6 +109,7 @@ describe('runAllocationAdvice', () => {
     setMock.mockImplementation(async (document: unknown) => { firstWrite = structuredClone(document); });
     patchMock.mockResolvedValue(undefined);
     ytdMock.mockResolvedValue({ portfolio: {} });
+    cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
   });
 
   it('runs the three stages in order, on their models, efforts and formats, with web search only for the instruments, and persists each', async () => {
@@ -225,6 +227,7 @@ describe('runAllocationAdviceStage', () => {
     setMock.mockResolvedValue(undefined);
     patchMock.mockResolvedValue(undefined);
     ytdMock.mockResolvedValue({ portfolio: {} });
+    cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
   });
 
   it('the strategy creates the document and stops there; the instruments continue the persisted one from the store', async () => {
@@ -352,5 +355,44 @@ describe('runAllocationAdviceStage', () => {
 
     await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'strategy', onStage: vi.fn() })).rejects.toMatchObject({ stage: 'strategy', retryable: false });
     expect(calls).not.toHaveBeenCalled();
+  });
+  // ── The CASHFLOW 12 MESI block (2026-11): read once per strategy, never by the later stages ──
+  const userTurn = (call: unknown[]) => String((call[0] as { messages: { content: string }[] }).messages[0].content);
+
+  it('a whole run reads the cashflow block ONCE, with the owner and the run clock, and only the strategy carries it', async () => {
+    const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(PROPOSAL), 'end_turn', 'opus'));
+    await runAllocationAdvice({ userId: 'u1', answers: ANSWERS, onStage: vi.fn(), now: NOW });
+    expect(cashflowMock).toHaveBeenCalledTimes(1);
+    expect(cashflowMock).toHaveBeenCalledWith('u1', NOW);
+    const [strategy, instruments, review] = calls.mock.calls.map(userTurn);
+    expect(strategy).toContain('--- CASHFLOW 12 MESI (');
+    expect(strategy).toContain('FAMIGLIA e CASHFLOW 12 MESI sono esaustivi');
+    expect(instruments).not.toContain('CASHFLOW 12 MESI');
+    expect(review).not.toContain('CASHFLOW 12 MESI');
+  });
+
+  it('the instruments, the review and a revision never read the cashflow block', async () => {
+    answerWith(message(instrumentsText, 'end_turn', 'sonnet', true));
+    await runAllocationAdviceStage({ userId: 'u1', stage: 'instruments', document: afterStrategy(), onStage: vi.fn() });
+    const withInstruments = { ...afterStrategy(), instruments: { markdown: '- trovato.', candidates: null, model: 'sonnet', webSearchUsed: true, finishedAt: NOW } };
+    answerWith(message(reviewText(PROPOSAL)));
+    await runAllocationAdviceStage({ userId: 'u1', stage: 'review', document: structuredClone(withInstruments), onStage: vi.fn() });
+    answerWith(message(reviewText(PROPOSAL)));
+    const withReport = { ...structuredClone(withInstruments), report: { markdown: 'r', proposal: PROPOSAL as never, model: 'o', finishedAt: NOW } };
+    await runAllocationAdviceStage({ userId: 'u1', stage: 'revise', document: withReport, request: 'meno cripto', onStage: vi.fn() });
+    expect(cashflowMock).not.toHaveBeenCalled();
+  });
+
+  it('a failed cashflow read fails the strategy at the context, retryable, and calls no model (never a silent empty block)', async () => {
+    cashflowMock.mockRejectedValue(new Error('read failed'));
+    const calls = vi.spyOn(Anthropic.Beta.Messages.prototype, 'stream');
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'strategy', answers: ANSWERS, onStage: vi.fn(), now: NOW })).rejects.toMatchObject({
+      stage: 'context',
+      retryable: true,
+      message: 'Il percorso si è interrotto per un errore imprevisto. Riprova fra qualche istante.',
+    });
+    expect(calls).not.toHaveBeenCalled();
+    expect(patchMock.mock.calls.at(-1)?.[1]).toMatchObject({ status: 'failed', stage: 'context' });
   });
 });

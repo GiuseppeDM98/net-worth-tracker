@@ -113,7 +113,7 @@ const PROPOSAL_SCHEMA_TEXT = [
 const STRATEGY_CONTRACT = [
   '# Cosa devi produrre',
   "La risposta è UN oggetto JSON con due campi, `markdown` e `proposal`. In `markdown` l'analisi per l'utente, con queste sezioni:",
-  '1. **La situazione** — cosa vedi nel portafoglio di oggi rispetto a orizzonte, tolleranza e obiettivi (2-4 frasi).',
+  '1. **La situazione** — cosa vedi nel portafoglio di oggi e nel cashflow (entrate e loro concentrazione, spesa, capacità di risparmio) rispetto a orizzonte, tolleranza e obiettivi (2-4 frasi).',
   "2. **L'allocazione proposta** — ogni classe con la percentuale e il perché; per ogni classe i sotto-target (nome e % della classe); la liquidità come percentuale o come riserva fissa in euro, dicendo quale e perché.",
   '3. **Casa, fondi pensione e illiquidi** — il ruolo scelto dall\'utente e il tuo giudizio su di esso.',
   '4. **Obiettivi** — per ogni obiettivo tenuto o nuovo: a quali strumenti POSSEDUTI legarlo e con quale quota (percentuale dello strumento), coerente con la sua scadenza e priorità; le quote dello stesso strumento su più obiettivi non superano il 100%; un obiettivo che l\'utente ha segnato da eliminare non compare.',
@@ -125,6 +125,8 @@ const STRATEGY_CONTRACT = [
   'In `proposal` la proposta strutturata, con questi campi:',
   PROPOSAL_SCHEMA_TEXT,
   'Vincoli: le "targetPercentage" delle classi senza "fixedAmount" sommano esattamente a 100; ogni classe compare una volta; i nomi in "assetName" sono copiati ESATTAMENTE dal blocco STRUMENTI; "assetRoles" contiene solo gli strumenti il cui ruolo deve CAMBIARE o che l\'utente ha nominato (casa, fondi pensione, illiquidi), non tutti; un sotto-target che corrisponde a uno strumento già posseduto lo nomina in "instrument". Il nome di un sotto-target è la SOTTOCATEGORIA che gli strumenti posseduti portano già nel blocco STRUMENTI (es. «All World», «Bond Singoli»): un sotto-target con un nome nuovo resta vuoto finché l\'utente non riclassifica lo strumento a mano — se lo proponi, dillo nel testo.',
+  // The goals' contributions and the cash reserve rest on the cashflow block (owner, 2026-11-01).
+  'I "monthlyContribution" degli obiettivi stanno dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI (se la superano, dillo e perché); la riserva di liquidità si misura sulla spesa mensile mediana e sui conti liquidi del blocco.',
 ].join('\n');
 
 /** The last report and its requests, as the strategy reads them (2026-10-20). */
@@ -145,12 +147,25 @@ export function formatPriorPlanForPrompt(plan: AllocationAdvicePriorPlan): strin
   ].join('\n');
 }
 
-export function buildStrategyPrompt(answers: AllocationAdviceAnswers, dataBlock: string, priorPlan: AllocationAdvicePriorPlan | null = null): AssistantPromptParts {
+/**
+ * The strategy's user turn: the answers, the portfolio's data, the CASHFLOW 12 MESI block (2026-11)
+ * and the plan in force, in this order. `system` is the same for every user, with or without the block.
+ */
+export function buildStrategyPrompt(
+  answers: AllocationAdviceAnswers,
+  dataBlock: string,
+  opts: { priorPlan?: AllocationAdvicePriorPlan | null; cashflowBlock?: string } = {}
+): AssistantPromptParts {
+  const { priorPlan = null, cashflowBlock } = opts;
+  const exhaustive = cashflowBlock
+    ? "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA e CASHFLOW 12 MESI sono esaustivi. Il blocco CASHFLOW del periodo copre solo l'anno in corso: per entrate, spesa e risparmio usa il blocco CASHFLOW 12 MESI."
+    : "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI e FAMIGLIA sono esaustivi.";
   const userContent = [
     formatAnswersForPrompt(answers),
-    "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI e FAMIGLIA sono esaustivi.",
+    exhaustive,
     '',
     dataBlock,
+    ...(cashflowBlock ? ['', cashflowBlock] : []),
     ...(priorPlan ? ['', formatPriorPlanForPrompt(priorPlan)] : []),
     "Proponi l'allocazione ottimale per questo investitore, come descritto nel contratto di risposta.",
   ].join('\n');

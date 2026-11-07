@@ -29,6 +29,8 @@ interface StreamAssistantResponseArgs {
   contextBundle: AssistantMonthContextBundle | null;
   // A free question with no period: the portfolio of today (2026-10-20). Null elsewhere.
   todayContext?: AssistantTodayContext | null;
+  // The CASHFLOW 12 MESI block, read by the route for every mode (decision 81, 2026-11-07).
+  cashflowBlock?: string | null;
   month?: AssistantMonthSelectorValue | null;
   preferences: AssistantPreferences;
   // Active memory items for this user, injected into the prompt so Claude can
@@ -60,7 +62,8 @@ function buildPrompt(
   month: AssistantMonthSelectorValue | null | undefined,
   preferences: AssistantPreferences,
   memoryItems: AssistantMemoryItem[] = [],
-  todayContext: AssistantTodayContext | null = null
+  todayContext: AssistantTodayContext | null = null,
+  cashflowBlock: string | null = null
 ): AssistantPromptParts {
   const MONTH_NAMES = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -70,27 +73,28 @@ function buildPrompt(
     ? `${MONTH_NAMES[month.month - 1]} ${month.year}`
     : undefined;
 
+  // Every mode receives the cashflow block (decision 81, 2026-11-07).
   if (mode === 'month_analysis' && contextBundle) {
-    return buildMonthAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+    return buildMonthAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }
 
   // Year, YTD, and history modes all use their own structured prompt builder with context.
   // Falls through to chat if context is somehow unavailable.
   if (mode === 'year_analysis' && contextBundle) {
-    return buildYearAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+    return buildYearAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }
 
   if (mode === 'ytd_analysis' && contextBundle) {
-    return buildYtdAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+    return buildYtdAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }
 
   if (mode === 'history_analysis' && contextBundle) {
-    return buildHistoryAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+    return buildHistoryAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }
 
   // Chat mode: pass the bundle when available so Claude has real numbers.
   // The prompt builder uses it without forcing a fixed response structure.
-  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, todayContext);
+  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, todayContext, cashflowBlock);
 }
 
 /**
@@ -172,6 +176,7 @@ export async function streamAssistantResponse({
   prompt,
   contextBundle,
   todayContext = null,
+  cashflowBlock = null,
   month,
   preferences,
   memoryItems = [],
@@ -203,7 +208,7 @@ export async function streamAssistantResponse({
     // route declares `maxDuration = 300` so a long answer is not cut by the platform.
     const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
     const chatMaxTokens = ASSISTANT_CHAT_MAX_TOKENS;
-    const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, todayContext);
+    const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, todayContext, cashflowBlock);
     const stream = await anthropic.beta.messages.create({
       model: ASSISTANT_MODEL,
       // A policy decline is re-run on the fallback model inside this stream (aiModels.ts). The

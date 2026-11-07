@@ -17,7 +17,8 @@
   fenced block), `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage, the prefilled
   answers), `allocationAdviceApply.ts` (the plans of «Applica»: targets, roles, goals; today's base; the loss
   scenarios), `allocationAdviceNarrative.ts` (every sentence), `allocationAdviceDocument.ts` (the document mapper
-  for both SDKs), `lib/utils/sseReader.ts`.
+  for both SDKs), `lib/utils/sseReader.ts`, `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, shared with
+  every mode of the Assistente and the emails' AI comments, decision 81).
 - **Server**: `lib/server/allocationAdvice/prompts.ts` (the three prompts), `run.ts` (the orchestration: context →
   strategy → instruments → review, persisted at every stage), `store.ts` (Admin, `allocationAdvice/{uid}`);
   `app/api/allocation-advice/run/route.ts` (SSE, `maxDuration = 300`, 6 runs an hour), `applied/route.ts`.
@@ -27,7 +28,8 @@
 - **Models**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5) and
   `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
 - **Suites to run after a change here**: `allocationAdviceProposal`, `allocationAdviceDraft`, `allocationAdviceApply`,
-  `allocationAdviceNarrative`, `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes` ·
+  `allocationAdviceNarrative`, `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes`,
+  `cashflowBlock`, `assistantMonthContextService` ·
   `reactCompilerCoverage` (a ternary inside a `||` in the Wizard was skipped on the first day) · **Browser**
   `e2e/allocation.consulente.spec.ts` (the eight screens on the base fixture, NEVER the run: a test does not open a
   control that spends).
@@ -58,7 +60,8 @@
 ## The run
 
 - **Three calls in series, persisted at every stage** (`runAllocationAdvice`; on the owner's account, mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
-  of the Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, portfolio block included); the strategy
+  of the Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, portfolio block included) and the
+  CASHFLOW 12 MESI block, read beside it before the strategy stage (2026-11); the strategy
   on Opus 5.5 (effort `medium`, `max_tokens` 32 000, no tool); the instruments on Sonnet 5.5 (effort `high`) with
   `web_search_20260209` (`max_uses` 20, `ALLOCATION_ADVICE_WEB_SEARCH_MAX_USES`); the review on Opus 5.5. Each call is a stream read to the
   end by the SDK's accumulator (`beta.messages.stream(...).finalMessage()`): `stop_reason` and the model that
@@ -67,6 +70,24 @@
   half-written proposal read as a whole one. A turn the web search pauses (`pause_turn`, the ceiling of the loop
   on the server side) is resumed by sending the paused response back as an assistant message, up to
   `ALLOCATION_ADVICE_MAX_CONTINUATIONS` times, with the texts joined (2026-10-23; before, the pause failed the stage).
+- **The CASHFLOW 12 MESI block** (2026-11, AI-02): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
+  `formatCashflowBlockForPrompt`) over `fetchCashflowBlockInputs(userId, now)` (lib/services/assistantMonthContextService.ts),
+  ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
+  the aggregates; the current month up to today stands apart, its rows after today declared as scheduled and not
+  counted; the series covers the whole recorded history — from the first month holding a row (a transfer never
+  opens it), never before `cashflowHistoryStartYear`, always the 12 full months, no cap (decision 81, 2026-11-07);
+  the rows after the current month serve the commitments' next date only. Income is a signed sum, dividends and coupons (`dividendIncomeCategoryId`) out of the sources; the
+  concentration reading is on the FIRST source's share (≥ 70% «una fonte dominante», the first two ≥ 80% «due fonti
+  principali»), the HHI printed beside it. Spending by type and by category id (key by id, label by name), a loan's
+  instalment counted whole. The medians (QUARTILE.INC) count from the first full month holding a row, never before
+  `cashflowHistoryStartYear`, none under 3 months. The commitments are the recorded series and instalment plans, the
+  loans the `debt` rows by `debtAssetId`, the transfers apart (those touching a property named). The accounts are
+  `isCashAccount` (types/assets.ts) with the balance `calculateAssetValue` gives (injected as `assetValueOf`) and their
+  default debit/credit roles. Every cut is stated in the text. A failed read fails the context stage, retryable — never
+  a strategy without the block. The contract sizes the goals' `monthlyContribution` on the block's median monthly
+  savings and the cash reserve on its median spending and accounts (decision 46). Amounts print through
+  `cachedFormatCurrencyEUR`: it-IT does not group four digits («1200 €», but «31.200 €») and puts U+00A0 before «€»
+  — what the formatter prints, not a typo to «fix».
 - **The structure is never read from the prose** (the Assistente's rule): strategy and review answer with
   a structured output, ONE object `{ markdown, proposal }` (`allocationAdviceAnswerSchema`, since 2026-10-23): the
   API guarantees the shape, not the sums and the limits (the SDK moves them into the schema's descriptions), and
@@ -177,6 +198,9 @@ no `mobile-sections:` memory. It is not among the surfaces of `mobile:census` (t
 on a phone, and from the row under the Assistente's conversation).
 
 ## Per-page blind spots
+- **The strategy reads this year's rows twice** (2026-11): the YTD bundle and the cashflow block query them apart —
+  accepted, the bundle stays the Assistente's, and the block is read once per strategy, never by the instruments or
+  the review.
 - **The review invite** (owner, 2026-10-20, after applying the first production plan: «nei giorni vicino alla data,
   un pulsante "revisione con il Consulente"»): `reviewDueState(document, todayIso)` (lib/utils/allocationAdviceNarrative.ts)
   says `later · soon · due` against the applied plan's `reviewByIso` — `soon` within `REVIEW_SOON_DAYS` (30), `due`

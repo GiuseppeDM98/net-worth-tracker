@@ -860,7 +860,8 @@ export function buildMonthAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  cashflowBlock?: string
 ): AssistantPromptParts {
   const monthLabel = getAssistantPeriodLabel(bundle.selector);
   const numericBlock = formatBundleForPrompt(bundle);
@@ -882,10 +883,24 @@ export function buildMonthAnalysisPrompt(
     'Di seguito trovi i dati finanziari del mese, estratti in modo affidabile dal sistema:',
     '',
     numericBlock,
+    ...formatCashflowBlockSection(cashflowBlock),
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ].join('\n');
 
   return { system: `${ASSISTANT_SYSTEM_CORE}\n\n${MONTH_FORMAT_CONTRACT}`, userContent };
+}
+
+/**
+ * The note over the CASHFLOW 12 MESI block (lib/utils/cashflowBlock.ts), the same on every surface that
+ * carries it — every mode of the Assistente and the emails' AI comments (decision 81, 2026-11-07): the
+ * block is the whole recorded history whatever the period in question, so a period's figures stay its
+ * bundle's. In `userContent`, never in `system`.
+ */
+const CASHFLOW_BLOCK_NOTE = "Il blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi, qualunque sia il periodo in esame: le cifre di un periodo vengono dai blocchi del periodo; usalo per l'andamento recente, la capacità di risparmio e la sua stabilità, gli impegni ricorrenti e i conti.";
+
+/** The note, the block and a blank line — or nothing without a block. */
+export function formatCashflowBlockSection(cashflowBlock?: string | null): string[] {
+  return cashflowBlock ? [CASHFLOW_BLOCK_NOTE, cashflowBlock, ''] : [];
 }
 
 /**
@@ -900,7 +915,8 @@ export function buildYearAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  cashflowBlock?: string
 ): AssistantPromptParts {
   const yearLabel = `Anno ${bundle.selector.year}`;
   const isCurrentYear = bundle.dataQuality.isPartialMonth;
@@ -928,6 +944,7 @@ export function buildYearAnalysisPrompt(
     'Di seguito trovi i dati finanziari aggregati per l\'anno, estratti in modo affidabile dal sistema:',
     '',
     numericBlock,
+    ...formatCashflowBlockSection(cashflowBlock),
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ].join('\n');
 
@@ -944,7 +961,8 @@ export function buildYtdAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  cashflowBlock?: string
 ): AssistantPromptParts {
   const yearLabel = `${bundle.selector.year}`;
   const numericBlock = formatBundleForPrompt(bundle);
@@ -967,6 +985,7 @@ export function buildYtdAnalysisPrompt(
     'Di seguito trovi i dati finanziari YTD, estratti in modo affidabile dal sistema:',
     '',
     numericBlock,
+    ...formatCashflowBlockSection(cashflowBlock),
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ].join('\n');
 
@@ -983,7 +1002,8 @@ export function buildHistoryAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  cashflowBlock?: string
 ): AssistantPromptParts {
   const startYear = bundle.selector.year;
   const numericBlock = formatBundleForPrompt(bundle);
@@ -1005,6 +1025,7 @@ export function buildHistoryAnalysisPrompt(
     'Di seguito trovi i dati finanziari aggregati sull\'intero periodo storico:',
     '',
     numericBlock,
+    ...formatCashflowBlockSection(cashflowBlock),
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ].join('\n');
 
@@ -1027,7 +1048,8 @@ export function buildChatPrompt(
   monthLabel: string | undefined,
   memoryItems: AssistantMemoryItem[] = [],
   contextBundle?: AssistantMonthContextBundle | null,
-  todayContext?: AssistantTodayContext | null
+  todayContext?: AssistantTodayContext | null,
+  cashflowBlock?: string | null
 ): AssistantPromptParts {
   const memoryBlock = preferences.memoryEnabled
     ? formatMemoryForPrompt(memoryItems)
@@ -1062,6 +1084,8 @@ export function buildChatPrompt(
     userSections.push(noDataNote);
   }
 
+  // The CASHFLOW 12 MESI block, with or without a period (decision 81, 2026-11-07).
+  if (cashflowBlock) userSections.push('', ...formatCashflowBlockSection(cashflowBlock).slice(0, 2));
   userSections.push('', `Richiesta utente: ${prompt.trim()}`);
 
   return {

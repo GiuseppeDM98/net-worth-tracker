@@ -72,7 +72,7 @@ describe('the plan in force («il piano in vigore e il perché», 2026-10-20)', 
   };
 
   it('goes after the data, with its dates, its review and its requests, and leaves the system untouched', () => {
-    const withPlan = buildStrategyPrompt(ANSWERS, 'DATI', plan);
+    const withPlan = buildStrategyPrompt(ANSWERS, 'DATI', { priorPlan: plan });
     const without = buildStrategyPrompt(ANSWERS, 'DATI');
     expect(withPlan.system).toBe(without.system);
     expect(withPlan.system).toContain('**Rispetto al piano precedente**');
@@ -85,6 +85,43 @@ describe('the plan in force («il piano in vigore e il perché», 2026-10-20)', 
     const block = formatPriorPlanForPrompt({ ...plan, appliedAt: null, revisions: [], reviewByIso: null, reviewReason: null });
     expect(block).toContain('(il report del percorso precedente, del 2026-10-20; mai applicato alle impostazioni) ---');
     expect(block).toContain('Nessuna richiesta di modifica fu fatta su quel report.');
+  });
+});
+
+describe('the CASHFLOW 12 MESI block in the strategy (2026-11)', () => {
+  const plan = {
+    reportMarkdown: '# Report', revisions: [], finishedAt: new Date('2026-10-20T10:00:00.000Z'),
+    appliedAt: null, reviewByIso: null, reviewReason: null,
+  };
+  const BLOCK = '--- CASHFLOW 12 MESI (x) ---\nX';
+
+  it('goes after the data and before the plan in force', () => {
+    const prompt = buildStrategyPrompt(ANSWERS, 'DATI', { priorPlan: plan, cashflowBlock: BLOCK });
+    expect(prompt.userContent).toContain('DATI\n\n--- CASHFLOW 12 MESI (x) ---\nX\n\n--- IL PIANO IN VIGORE');
+  });
+
+  it('names the block among the exhaustive ones only when it is there, and points income, spending and savings at it', () => {
+    const withBlock = buildStrategyPrompt(ANSWERS, 'DATI', { cashflowBlock: BLOCK });
+    const without = buildStrategyPrompt(ANSWERS, 'DATI');
+    expect(withBlock.userContent).toContain('PREVIDENZA, MUTUI, FAMIGLIA e CASHFLOW 12 MESI sono esaustivi. Il blocco CASHFLOW del periodo copre solo l\'anno in corso: per entrate, spesa e risparmio usa il blocco CASHFLOW 12 MESI.');
+    expect(without.userContent).not.toContain('CASHFLOW 12 MESI');
+    expect(without.userContent).toContain('PREVIDENZA, MUTUI e FAMIGLIA sono esaustivi.');
+  });
+
+  it('keeps system byte-identical with and without the block, and across users', () => {
+    const a = buildStrategyPrompt(ANSWERS, 'DATI A', { cashflowBlock: BLOCK });
+    const b = buildStrategyPrompt({ ...ANSWERS, age: 60 }, 'DATI B');
+    expect(a.system).toBe(b.system);
+    expect(a.system).not.toContain('sono esaustivi');
+    expect(a.system).not.toContain(BLOCK);
+  });
+
+  it('carries the situation over the cashflow and the line that sizes the goals and the reserve on the block (owner, 2026-11-01)', () => {
+    const { system } = buildStrategyPrompt(ANSWERS, 'DATI');
+    expect(system).toContain('1. **La situazione** — cosa vedi nel portafoglio di oggi e nel cashflow (entrate e loro concentrazione, spesa, capacità di risparmio) rispetto a orizzonte, tolleranza e obiettivi (2-4 frasi).');
+    expect(system).toContain('I "monthlyContribution" degli obiettivi stanno dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI (se la superano, dillo e perché); la riserva di liquidità si misura sulla spesa mensile mediana e sui conti liquidi del blocco.');
+    // Right after the «Vincoli» element.
+    expect(system).toMatch(/Vincoli: [^\n]*\nI "monthlyContribution" degli obiettivi/);
   });
 });
 

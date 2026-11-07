@@ -67,8 +67,10 @@ import {
   buildResponseStyleInstruction,
   ASSISTANT_SYSTEM_CORE,
   buildEmailPeriodicFormatContract,
+  formatCashflowBlockSection,
   type AssistantPromptParts,
 } from '@/lib/server/assistant/prompts';
+import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import {
   buildAssistantPeriodRangeContext,
   type AssistantPeriodRange,
@@ -698,7 +700,8 @@ export function buildEmailAiPrompt(
   comparison: PeriodComparison,
   bundle: AssistantMonthContextBundle,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[]
+  memoryItems: AssistantMemoryItem[],
+  cashflowBlock?: string | null
 ): AssistantPromptParts {
   const label = periodTitle(emailData);
 
@@ -730,6 +733,8 @@ export function buildEmailAiPrompt(
     ...formatHallOfFameForPrompt(emailData),
     ...formatBudgetAlertsForPrompt(emailData),
     ...formatExpenseSplitForPrompt(emailData, label),
+    // The CASHFLOW 12 MESI block, after the period's sections (decision 81, 2026-11-07).
+    ...(cashflowBlock ? ['', ...formatCashflowBlockSection(cashflowBlock)] : []),
   ].join('\n');
 
   return {
@@ -797,12 +802,17 @@ export async function generateEmailAiComment(
       preferences.includeDummySnapshots
     );
 
+    // The CASHFLOW 12 MESI block (decision 81, 2026-11-07); a failed read lands in the catch below:
+    // the email goes out without the comment, never with a comment on a silent empty cashflow.
+    const cashflowBlock = await readCashflowBlockForPrompt(userId, new Date());
+
     const { system, userContent } = buildEmailAiPrompt(
       emailData,
       comparison,
       bundle,
       preferences,
-      memoryItems
+      memoryItems,
+      cashflowBlock
     );
 
     // Lazy import so a module-level `new Anthropic()` never breaks test environments

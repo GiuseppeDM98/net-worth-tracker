@@ -39,7 +39,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { MONTH_NAMES } from '@/lib/constants/months';
-import { getItalyMonthBoundsUtc, getItalyMonthRangeBoundsUtc, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDateIso, getItalyMonthBoundsUtc, getItalyMonthRangeBoundsUtc, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
 import { AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantTodayContext } from '@/types/assistant';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import { CashflowBreakdown, Expense, ExpenseCategory } from '@/types/expenses';
@@ -56,6 +56,10 @@ import { assignmentFraction, assignmentSlice } from '@/lib/utils/goalMath';
 import { formatOwnerSlice } from '@/lib/utils/assetOwnership';
 import { sliceUnit } from '@/lib/utils/assetSlice';
 import { buildAssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
+import {
+  CASHFLOW_BLOCK_FUTURE_MONTHS,
+  type CashflowBlockInput,
+} from '@/lib/utils/cashflowBlock';
 
 const MAX_ALLOCATION_CHANGES = 5;
 
@@ -175,7 +179,7 @@ async function fetchSettings(userId: string): Promise<AssetAllocationSettings | 
   if (!data) {
     return null;
   }
-  // Only the fields needed for context building — not the full settings shape.
+  // Only the fields needed for context building — not the full settings shape — each new reader adds its fields here.
   // targets is included so the prompt can show allocation target vs current gap;
   // the two goal flags decide whether the goals block exists at all and whether
   // those targets are still the ones the app measures against.
@@ -188,6 +192,9 @@ async function fetchSettings(userId: string): Promise<AssetAllocationSettings | 
     // The household and the owner's age, for the portfolio block (2026-10-20).
     familyMembers: data.familyMembers ?? [],
     userAge: data.userAge,
+    // The two default accounts, for the CASHFLOW 12 MESI block's account roles (2026-11).
+    defaultDebitCashAssetId: data.defaultDebitCashAssetId,
+    defaultCreditCashAssetId: data.defaultCreditCashAssetId,
   } as AssetAllocationSettings;
 }
 
@@ -297,6 +304,32 @@ async function fetchExpenseCategories(userId: string): Promise<ExpenseCategory[]
     const data = doc.data();
     return { id: doc.id, ...data, subCategories: data.subCategories || [] } as ExpenseCategory;
   });
+}
+
+/**
+ * The inputs of the CASHFLOW 12 MESI block (lib/utils/cashflowBlock.ts) in ONE expense read: every row
+ * up to the Italian end of the month 12 after the current one — the whole recorded history for the
+ * series (decision 81, 2026-11-07: no lower bound; the builder starts at the first month holding a
+ * row and never before `cashflowHistoryStartYear`) plus the rows ahead that give the commitments their
+ * next date. The end crosses years, so it is a `getItalyMonthBoundsUtc` call on month arithmetic, and
+ * the current month is the ITALIAN one: at 23:30 UTC on 31 October it is already November in Rome.
+ */
+export async function fetchCashflowBlockInputs(
+  userId: string,
+  now: Date
+): Promise<CashflowBlockInput & { expenses: Expense[] }> {
+  const { year, month } = getItalyMonthYear(now);
+  const current = year * 12 + (month - 1);
+  const last = current + CASHFLOW_BLOCK_FUTURE_MONTHS;
+  const start = new Date(0);   // the whole history: the query keeps its two-sided range, from the epoch
+  const end = getItalyMonthBoundsUtc(Math.floor(last / 12), (last % 12) + 1).end;
+  const [expenses, settings, assets, categories] = await Promise.all([
+    fetchExpenses(userId, start, end),
+    fetchSettings(userId),
+    fetchAssets(userId),
+    fetchExpenseCategories(userId),
+  ]);
+  return { expenses, todayIso: getItalyDateIso(now), categories, assets, settings, assetValueOf: calculateAssetValue };
 }
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────

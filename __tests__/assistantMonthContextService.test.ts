@@ -81,7 +81,10 @@ import {
   buildAssistantPeriodRangeContext,
   buildAssistantTodayContext,
   buildAssistantYearContext,
+  fetchCashflowBlockInputs,
 } from '@/lib/services/assistantMonthContextService';
+import { calculateAssetValue } from '@/lib/services/assetService';
+import { getItalyMonthBoundsUtc } from '@/lib/utils/dateHelpers';
 import { MonthlySnapshot } from '@/types/assets';
 import { Expense } from '@/types/expenses';
 
@@ -933,5 +936,43 @@ describe('goals block', () => {
 
     expect(bundle.goals?.items[0].name).toBe('Acquisto Casa');
     expect(bundle.goals?.items[0].currentValue).toBe(10_000);
+  });
+});
+
+// ─── The CASHFLOW 12 MESI block's inputs (2026-11) ─────────────────────────────────────
+
+describe('fetchCashflowBlockInputs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSettings('div-cat', { defaultDebitCashAssetId: 'acc-debit', defaultCreditCashAssetId: 'acc-credit', cashflowHistoryStartYear: 2025 });
+    mockAssets([makeAssetDoc('acc-debit', 'cash', 1000)]);
+    mockExpenses([makeExpenseDoc(-50, 'svago', new Date('2026-05-10T10:00:00Z'), { type: 'variable' })]);
+    expenseWhereCalls.length = 0;
+  });
+
+  it.each([
+    // now, today in Rome, last month of the read (the first is the whole history: decision 81)
+    ['2026-11-15T10:00:00Z', '2026-11-15', [2027, 11]],
+    ['2026-01-15T10:00:00Z', '2026-01-15', [2027, 1]],
+    // 23:30 UTC on 31 October is already 1 November in Rome: the current month is November.
+    ['2026-10-31T23:30:00Z', '2026-11-01', [2027, 11]],
+  ] as const)('at %s reads ONE window of expenses: the whole history to an Italian end', async (nowIso, todayIso, [ly, lm]) => {
+    const result = await fetchCashflowBlockInputs('user1', new Date(nowIso));
+
+    expect(expensesGetMock).toHaveBeenCalledTimes(1);
+    const [start, end] = queriedExpenseBounds();
+    expect(start.toISOString()).toBe('1970-01-01T00:00:00.000Z');
+    expect(end.toISOString()).toBe(getItalyMonthBoundsUtc(ly, lm).end.toISOString());
+    expect(expenseWhereCalls.find((call) => call.field === 'userId')?.value).toBe('user1');
+    expect(result.todayIso).toBe(todayIso);
+    expect(result.expenses).toHaveLength(1);
+    expect(result.assets.map((a) => a.id)).toEqual(['acc-debit']);
+    expect(result.settings).toMatchObject({
+      dividendIncomeCategoryId: 'div-cat',
+      cashflowHistoryStartYear: 2025,
+      defaultDebitCashAssetId: 'acc-debit',
+      defaultCreditCashAssetId: 'acc-credit',
+    });
+    expect(result.assetValueOf).toBe(calculateAssetValue);
   });
 });
