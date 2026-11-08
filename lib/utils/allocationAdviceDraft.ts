@@ -7,19 +7,30 @@
  * The screens are `ALLOCATION_ADVICE_STEPS`; the goals screen has sub-screens: one per goal
  * (index 0..n−1) and a last one (index n) that asks whether the goals reflect reality and what
  * is missing. `next` on the last goal sub-screen leaves the goals screen.
+ *
+ * After the summary the interview (2026-11-08): `phase` says whether the summary or the
+ * interview scene is open, `interview` holds the rounds with their answers, written in place
+ * (`interviewReducer`), so the same localStorage effect persists them across a reload.
  */
 
 import type { Asset, AssetAllocationSettings } from '@/types/assets';
 import type { GoalBasedInvestingData } from '@/types/goals';
-import { ALLOCATION_ADVICE_STEPS, type AllocationAdviceStep } from '@/types/allocationAdvice';
-import type { AllocationAdviceAnswers, AnswerGoal } from '@/lib/utils/allocationAdviceProposal';
+import { ALLOCATION_ADVICE_STEPS, type AllocationAdviceDocument, type AllocationAdviceInterview, type AllocationAdviceStep } from '@/types/allocationAdvice';
+import { interviewSchema, type AllocationAdviceAnswers, type AnswerGoal } from '@/lib/utils/allocationAdviceProposal';
+import { interviewReducer, type InterviewAction } from '@/lib/utils/allocationAdviceInterview';
 import { resolveAllocationRoleWithin } from '@/lib/utils/allocationUtils';
+
+export type AllocationAdviceDraftPhase = 'path' | 'interview';
 
 export interface AllocationAdviceDraft {
   step: number;
   /** Only read on the goals screen: 0..goals.length (the last is «cosa manca»). */
   goalIndex: number;
   answers: AllocationAdviceAnswers;
+  /** The summary's screens, or the interview scene after it (2026-11-08). */
+  phase: AllocationAdviceDraftPhase;
+  /** The rounds asked so far with their answers; absent before the first «Avvia il colloquio». */
+  interview?: AllocationAdviceInterview;
 }
 
 export type AllocationAdviceDraftAction =
@@ -30,7 +41,10 @@ export type AllocationAdviceDraftAction =
   | { type: 'addGoal' }
   | { type: 'updateGoal'; index: number; patch: Partial<AnswerGoal> }
   | { type: 'removeGoal'; index: number }
-  | { type: 'reset'; draft: AllocationAdviceDraft };
+  | { type: 'reset'; draft: AllocationAdviceDraft }
+  /** `'interview'` opens the scene and makes sure an interview exists (the rounds kept, `skipped` cleared). */
+  | { type: 'phase'; phase: AllocationAdviceDraftPhase }
+  | { type: 'interview'; action: InterviewAction };
 
 export const DEFAULT_EXCHANGE = 'Borsa Italiana (Milano, XMIL)';
 
@@ -92,8 +106,9 @@ export function initialAnswers(
   };
 }
 
+/** The answers only: a document's interview never enters a draft (criterion 8 of AI-04). */
 export function initialDraft(answers: AllocationAdviceAnswers): AllocationAdviceDraft {
-  return { step: 0, goalIndex: 0, answers };
+  return { step: 0, goalIndex: 0, answers, phase: 'path' };
 }
 
 /**
@@ -155,6 +170,11 @@ export function allocationAdviceDraftReducer(draft: AllocationAdviceDraft, actio
     }
     case 'reset':
       return action.draft;
+    case 'phase':
+      if (action.phase === 'interview') return { ...draft, phase: 'interview', interview: { rounds: draft.interview?.rounds ?? [], skipped: false } };
+      return { ...draft, phase: 'path' };
+    case 'interview':
+      return { ...draft, interview: interviewReducer(draft.interview ?? { rounds: [], skipped: false }, action.action) };
     default:
       return draft;
   }
@@ -187,7 +207,12 @@ export function draftStorageKey(ownerId: string): string {
   return `allocation-advice-draft:${ownerId}`;
 }
 
-/** The draft stored on this browser, or null; a stored draft from another shape is ignored. */
+/**
+ * The draft stored on this browser, or null; a stored draft from another shape is ignored. The
+ * interview (2026-11-08) is validated with `interviewSchema` — `askedAt` back to a Date — and a
+ * failing value is dropped, the rest of the draft kept; `phase: 'interview'` is kept only with at
+ * least one valid round, so a draft stored before AI-04 reads `phase: 'path'` and no interview.
+ */
 export function readStoredDraft(storage: Pick<Storage, 'getItem'> | null, ownerId: string): AllocationAdviceDraft | null {
   if (!storage) return null;
   try {
@@ -195,10 +220,45 @@ export function readStoredDraft(storage: Pick<Storage, 'getItem'> | null, ownerI
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<AllocationAdviceDraft>;
     if (typeof parsed.step !== 'number' || typeof parsed.goalIndex !== 'number' || !parsed.answers || typeof parsed.answers !== 'object') return null;
-    return { step: Math.max(0, Math.min(ALLOCATION_ADVICE_STEPS.length - 1, parsed.step)), goalIndex: parsed.goalIndex, answers: parsed.answers as AllocationAdviceAnswers };
+    const interview = parsed.interview === undefined ? null : interviewSchema.safeParse(parsed.interview);
+    const rounds = interview?.success ? interview.data : null;
+    return {
+      step: Math.max(0, Math.min(ALLOCATION_ADVICE_STEPS.length - 1, parsed.step)),
+      goalIndex: parsed.goalIndex,
+      answers: parsed.answers as AllocationAdviceAnswers,
+      phase: parsed.phase === 'interview' && rounds !== null && rounds.rounds.length > 0 ? 'interview' : 'path',
+      ...(rounds ? { interview: rounds } : {}),
+    };
   } catch {
     return null;
   }
+}
+
+/**
+ * The stored draft as the Wizard reopens it over the last document (criterion 8 of AI-04):
+ * «Rifai il percorso» never prefills an interview a run already used, so the stored interview is
+ * dropped — and the phase set back to the summary — unless its last round was asked AFTER the
+ * document's `updatedAt` (a path redone over the report and reloaded mid-interview, whose rounds
+ * stay). With no document the draft is kept as it is; an interview with zero rounds is dropped.
+ */
+export function reopenStoredDraft(draft: AllocationAdviceDraft | null, lastDocument: AllocationAdviceDocument | null): AllocationAdviceDraft | null {
+  if (!draft) return null;
+  const rounds = draft.interview?.rounds ?? [];
+  if (rounds.length === 0) {
+    if (draft.interview === undefined && draft.phase === 'path') return draft;
+    return withoutInterview(draft);
+  }
+  if (!lastDocument) return draft;
+  const lastAsked = rounds[rounds.length - 1].askedAt.getTime();
+  if (lastAsked > lastDocument.updatedAt.getTime()) return draft;
+  return withoutInterview(draft);
+}
+
+/** The draft back on the summary, its interview gone. */
+function withoutInterview(draft: AllocationAdviceDraft): AllocationAdviceDraft {
+  const next: AllocationAdviceDraft = { ...draft, phase: 'path' };
+  delete next.interview;
+  return next;
 }
 
 export function writeStoredDraft(storage: Pick<Storage, 'setItem'> | null, ownerId: string, draft: AllocationAdviceDraft): void {

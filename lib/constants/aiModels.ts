@@ -55,10 +55,11 @@ export const EMAIL_ANALYSIS_MODEL = 'claude-sonnet-5-5';
 export const MEMORY_EXTRACTION_MODEL = 'claude-haiku-5-5';
 
 /**
- * The Consulente of the Allocazione page (2026-10-20, owner's decision): the strategy and the
- * final review on the current Opus — «le cose più difficili e importanti» — and the instrument
- * search, which is reading and verifying listings with web search, on the current Sonnet. Both
- * opt into the server-side fallback (`SERVER_SIDE_FALLBACK_BETA`), both read `stop_reason`.
+ * The Consulente of the Allocazione page (2026-10-20, owner's decision): the strategy, the
+ * final review and, since 2026-11-08, the interview round that precedes them on the current
+ * Opus — «le cose più difficili e importanti» — and the instrument search, which is reading and
+ * verifying listings with web search, on the current Sonnet. Both opt into the server-side
+ * fallback (`SERVER_SIDE_FALLBACK_BETA`), both read `stop_reason`.
  */
 export const ALLOCATION_ADVICE_STRATEGY_MODEL = 'claude-opus-5-5';
 export const ALLOCATION_ADVICE_INSTRUMENTS_MODEL = 'claude-sonnet-5-5';

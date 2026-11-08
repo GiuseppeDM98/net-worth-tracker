@@ -15,6 +15,12 @@
  * fund that is 90% equity is 5% of its equity sleeve); the sector weights are already shares of
  * the sleeve and are not touched. Without a usable `stockPosition` the weights stay as they came
  * and the profile says so (`holdingsBasis: 'fund'`), so the method note can tell the reader.
+ *
+ * A bond fund's `topHoldings.bondHoldings` — effective duration and average maturity, in years —
+ * rides in the same module since 2026-11-08 (the Consulente's bond block): no extra call, kept
+ * only when Yahoo gives a positive figure. Every fund answer is stamped `schema: FUND_PROFILE_SCHEMA`,
+ * so the service can tell a document written before the field existed from one Yahoo answered
+ * without it.
  */
 import YahooFinance from 'yahoo-finance2';
 import type { ExposureLegSlice, InstrumentFundProfile, InstrumentStockProfile } from '@/types/exposure';
@@ -33,6 +39,8 @@ interface RawTopHoldings {
   stockPosition?: number | null;
   holdings?: Array<{ symbol?: string | null; holdingName?: string | null; holdingPercent?: number | null }> | null;
   sectorWeightings?: Array<Record<string, number | null | undefined>> | null;
+  /** Yahoo's bond block, years; present only for funds that hold bonds. */
+  bondHoldings?: { duration?: number | null; maturity?: number | null } | null;
 }
 
 interface RawFundSummary {
@@ -46,6 +54,14 @@ interface RawStockSummary {
 }
 
 // ─── Normalisation, pure ─────────────────────────────────────────────────────
+
+/** The shape of a fund answer: bumped when a field is added, so older cached answers are asked again once. */
+export const FUND_PROFILE_SCHEMA = 2;
+
+/** A positive, finite number of years, else null: Yahoo writes 0 or nothing for a fund without bonds. */
+function positiveYears(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
 
 /** A fund's answer as the cache stores it: sleeve-normalised holdings, the sectors as they came, the family. */
 export function normalizeFundAnswer(summary: RawFundSummary | null | undefined, now: Date): InstrumentFundProfile {
@@ -66,13 +82,17 @@ export function normalizeFundAnswer(summary: RawFundSummary | null | undefined, 
     .map(([key, weight]) => ({ key, label: sectorLabel(key), weight }));
 
   const family = summary?.fundProfile?.family;
+  const durationYears = positiveYears(topHoldings?.bondHoldings?.duration);
+  const maturityYears = positiveYears(topHoldings?.bondHoldings?.maturity);
 
   return {
     fetchedAt: now.toISOString(),
+    schema: FUND_PROFILE_SCHEMA,
     ...(holdings.length > 0 ? { holdings } : {}),
     ...(sectors.length > 0 ? { sectors } : {}),
     holdingsBasis: stockPosition ? 'sleeve' : 'fund',
     family: typeof family === 'string' && family.trim() !== '' ? family : null,
+    ...(durationYears !== null || maturityYears !== null ? { bond: { durationYears, maturityYears } } : {}),
   };
 }
 

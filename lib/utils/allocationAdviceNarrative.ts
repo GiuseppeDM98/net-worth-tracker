@@ -7,7 +7,7 @@
 import type { Narrative, PageVerdictModel } from '@/lib/utils/narrative';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
-import type { AllocationAdviceDocument, AllocationAdviceStage, AllocationAdviceStep } from '@/types/allocationAdvice';
+import type { AllocationAdviceDocument, AllocationAdviceInterview, AllocationAdviceStage, AllocationAdviceStep } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 
 const prose = (text: string): Narrative[number] => ({ text });
@@ -91,6 +91,57 @@ export const REVISION_COPY = {
   placeholder: 'es. vorrei liberarmi degli ETF obbligazionari e concentrarmi sui bond singoli, per arrivare a 50.000 € in titoli di Stato',
   running: 'Rivedo il report con la tua richiesta…',
 } as const;
+
+// ─── The interview (2026-11-08) ───────────────────────────────────────────────
+
+/** Every label of the interview: the summary's footer, the scene, the report's tile and the revision tile (doc/ai/AI-04-colloquio.md). */
+export const INTERVIEW_COPY = {
+  /** The summary, with no round yet. */
+  start: 'Avvia il colloquio',
+  skipAndRun: 'Salta il colloquio e avvia la ricerca',
+  /** The summary, with rounds. */
+  resume: 'Torna al colloquio',
+  restart: 'Ricomincia il colloquio',
+  /** The scene. */
+  eyebrow: (round: number, total: number) => `Colloquio · tornata ${round} di ${total}`,
+  waitingHeadline: 'Il Consulente legge le tue risposte e i tuoi dati.',
+  asking: 'Il Consulente legge le tue risposte e i tuoi dati…',
+  back: 'Indietro',
+  skip: 'Salta il colloquio',
+  next: 'Continua',
+  run: 'Avvia la ricerca',
+  retry: 'Riprova',
+  notConfigured: 'Servizio AI non configurato',
+  /** The card's eyebrow. */
+  asks: (index: number, total: number) => `Il Consulente chiede · ${index} di ${total}`,
+  /** The report's tile. */
+  tileTitle: 'Il colloquio',
+  roundEyebrow: (index: number) => `Tornata ${index}`,
+  unanswered: 'non risposta',
+  noQuestions: 'nessuna domanda',
+  skippedAside: 'saltato',
+  /** The revision tile. */
+  revise: 'Rivedi il report',
+  skipQuestions: 'Salta le domande',
+  revisionAsked: 'Il Consulente ha chiesto',
+} as const;
+
+/**
+ * The ONE singular/plural rule of «tornata», read by the prompt's header, the tile's aside and the
+ * summary. Here and not in `allocationAdviceInterview.ts`: the Allocazione page loads this module
+ * (`describeReviewBy`), and that one reaches zod through `questionSet` (2026-11-08, +34 KB gz seen
+ * on `/dashboard/allocation` before the move).
+ */
+export function describeRoundCount(n: number): string {
+  return n === 1 ? '1 tornata' : `${n} tornate`;
+}
+
+/** The tile's aside: «2 tornate», «2 tornate · saltato»; null with zero rounds (no tile, decision 53). */
+export function describeInterviewAside(interview: AllocationAdviceInterview | null | undefined): string | null {
+  if (!interview || interview.rounds.length === 0) return null;
+  const count = describeRoundCount(interview.rounds.length);
+  return interview.skipped ? `${count} · ${INTERVIEW_COPY.skippedAside}` : count;
+}
 
 // ─── The run ──────────────────────────────────────────────────────────────────
 

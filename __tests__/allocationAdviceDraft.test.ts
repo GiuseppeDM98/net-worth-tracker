@@ -16,10 +16,12 @@ import {
   readStoredDraft,
   reconcileDraftGoals,
   removedGoalIds,
+  reopenStoredDraft,
   stepOf,
   writeStoredDraft,
   type AllocationAdviceDraft,
 } from '@/lib/utils/allocationAdviceDraft';
+import type { AllocationAdviceDocument, AllocationAdviceInterview, AllocationAdviceInterviewRound } from '@/types/allocationAdvice';
 
 function draftWithGoals(count: number): AllocationAdviceDraft {
   const answers = initialAnswers(null, null, []);
@@ -208,5 +210,97 @@ describe('reconcileDraftGoals (2026-10-20)', () => {
     const same = { goals: draft.answers.goals.map((goal) => ({ id: goal.goalId as string, name: goal.name, priority: goal.priority, color: '#000', createdAt: new Date(), updatedAt: new Date() })), assignments: [] };
     expect(reconcileDraftGoals(draft, same)).toBe(draft);
     expect(reconcileDraftGoals(draft, null).answers.goals).toEqual([]);
+  });
+});
+
+// ── The interview in the draft (2026-11-08, criteria 7 and 8 of AI-04) ──────────────────
+const ROUND: AllocationAdviceInterviewRound = {
+  note: 'Vedo un reddito concentrato.',
+  satisfied: false,
+  questions: [{ id: 'reddito', kind: 'single', text: 'Quanto dipendi dal reddito?', why: "l'86% delle entrate", options: [{ value: 'tutto', label: 'Interamente' }, { value: 'meta', label: 'Metà' }], allowOther: true }],
+  answers: [{ questionId: 'reddito', value: 'tutto' }],
+  model: 'opus-finto',
+  askedAt: new Date('2026-11-08T12:00:00'),
+};
+const TWO: AllocationAdviceInterview = { rounds: [ROUND, { ...ROUND, note: 'Resta la riserva.', answers: [], askedAt: new Date('2026-11-08T12:05:00') }], skipped: false };
+
+function memoryStore(): Storage {
+  const store = new Map<string, string>();
+  return { length: 0, clear: () => store.clear(), getItem: (key: string) => store.get(key) ?? null, key: () => null, removeItem: (key: string) => void store.delete(key), setItem: (key: string, value: string) => void store.set(key, value) };
+}
+
+function failedDocument(updatedAt: Date): AllocationAdviceDocument {
+  const answers = initialAnswers(null, null, []);
+  return { userId: 'u1', status: 'failed', answers, stage: 'strategy', createdAt: updatedAt, updatedAt, startedAt: updatedAt, strategy: null, instruments: null, report: null, error: 'x', applied: null, interview: null };
+}
+
+describe('the draft reducer and the interview', () => {
+  it('«phase: interview» opens the scene with an interview whose rounds are kept and skipped cleared; «phase: path» goes back', () => {
+    const summary = advance(draftWithGoals(0), 20);
+    expect(summary.phase).toBe('path');
+    expect(summary.interview).toBeUndefined();
+    const opened = allocationAdviceDraftReducer(summary, { type: 'phase', phase: 'interview' });
+    expect(opened).toMatchObject({ phase: 'interview', interview: { rounds: [], skipped: false } });
+    const withRounds = allocationAdviceDraftReducer({ ...summary, interview: { ...TWO, skipped: true } }, { type: 'phase', phase: 'interview' });
+    expect(withRounds.interview).toEqual({ rounds: TWO.rounds, skipped: false });
+    const back = allocationAdviceDraftReducer(withRounds, { type: 'phase', phase: 'path' });
+    expect(back.phase).toBe('path');
+    expect(back.interview).toEqual(withRounds.interview);
+  });
+
+  it('«interview» delegates to the interview reducer, from an empty interview when there is none', () => {
+    const summary = advance(draftWithGoals(0), 20);
+    const received = allocationAdviceDraftReducer(summary, { type: 'interview', action: { type: 'roundReceived', round: ROUND } });
+    expect(received.interview?.rounds[0].answers).toEqual([]);
+    const answered = allocationAdviceDraftReducer(received, { type: 'interview', action: { type: 'answer', questionId: 'reddito', value: 'meta' } });
+    expect(answered.interview?.rounds[0].answers).toEqual([{ questionId: 'reddito', value: 'meta' }]);
+    expect(allocationAdviceDraftReducer(answered, { type: 'interview', action: { type: 'reset' } }).interview).toEqual({ rounds: [], skipped: false });
+  });
+});
+
+describe('the stored draft keeps the interview (criterion 7)', () => {
+  it('round-trips a draft with two rounds, askedAt back as a Date', () => {
+    const storage = memoryStore();
+    const draft: AllocationAdviceDraft = { ...advance(draftWithGoals(0), 20), phase: 'interview', interview: TWO };
+    writeStoredDraft(storage, 'u1', draft);
+    const read = readStoredDraft(storage, 'u1');
+    expect(read).toEqual(draft);
+    expect(read?.interview?.rounds[1].askedAt).toBeInstanceOf(Date);
+  });
+
+  it('drops a malformed interview and keeps the answers, and reads a draft stored before AI-04 as path with no interview', () => {
+    const storage = memoryStore();
+    const draft = advance(draftWithGoals(1), 2);
+    storage.setItem(draftStorageKey('u1'), JSON.stringify({ ...draft, phase: 'interview', interview: { rounds: 'no', skipped: false } }));
+    const read = readStoredDraft(storage, 'u1');
+    expect(read?.answers).toEqual(draft.answers);
+    expect(read?.interview).toBeUndefined();
+    expect(read?.phase).toBe('path');
+    storage.setItem(draftStorageKey('u2'), JSON.stringify({ step: draft.step, goalIndex: draft.goalIndex, answers: draft.answers }));
+    expect(readStoredDraft(storage, 'u2')).toEqual({ ...draft, phase: 'path' });
+    // The scene phase needs a round: with none it is the summary.
+    storage.setItem(draftStorageKey('u3'), JSON.stringify({ ...draft, phase: 'interview', interview: { rounds: [], skipped: false } }));
+    expect(readStoredDraft(storage, 'u3')).toMatchObject({ phase: 'path', interview: { rounds: [], skipped: false } });
+  });
+});
+
+describe('reopenStoredDraft (criterion 8)', () => {
+  const draft: AllocationAdviceDraft = { ...advance(draftWithGoals(0), 20), phase: 'interview', interview: TWO };
+
+  it('drops an interview older than the last document and sets the phase back; keeps one asked after it', () => {
+    const dropped = reopenStoredDraft(draft, failedDocument(new Date('2026-11-08T13:00:00')));
+    expect(dropped?.interview).toBeUndefined();
+    expect(dropped?.phase).toBe('path');
+    expect(dropped?.answers).toEqual(draft.answers);
+    expect(reopenStoredDraft(draft, failedDocument(new Date('2026-11-08T12:01:00')))).toEqual(draft);
+  });
+
+  it('keeps the draft with no document, drops an interview with zero rounds, and passes null through', () => {
+    expect(reopenStoredDraft(draft, null)).toEqual(draft);
+    const empty: AllocationAdviceDraft = { ...draft, interview: { rounds: [], skipped: false } };
+    expect(reopenStoredDraft(empty, null)).toEqual({ ...advance(draftWithGoals(0), 20), phase: 'path' });
+    expect(reopenStoredDraft(null, failedDocument(new Date()))).toBeNull();
+    const plain = advance(draftWithGoals(0), 3);
+    expect(reopenStoredDraft(plain, failedDocument(new Date()))).toBe(plain);
   });
 });

@@ -14,7 +14,7 @@ vi.mock('yahoo-finance2', () => ({
   },
 }));
 
-import { normalizeFundAnswer, normalizeStockAnswer, yahooProfileSource } from '@/lib/server/exposure/yahooSource';
+import { FUND_PROFILE_SCHEMA, normalizeFundAnswer, normalizeStockAnswer, yahooProfileSource } from '@/lib/server/exposure/yahooSource';
 
 const NOW = new Date('2026-09-28T10:00:00.000Z');
 
@@ -66,8 +66,17 @@ describe('normalizeFundAnswer', () => {
 
   it('answers an empty profile, never undefined fields, when Yahoo has nothing', () => {
     const profile = normalizeFundAnswer({ topHoldings: null, fundProfile: { family: '  ' } }, NOW);
-    expect(profile).toEqual({ fetchedAt: '2026-09-28T10:00:00.000Z', holdingsBasis: 'fund', family: null });
+    expect(profile).toEqual({ fetchedAt: '2026-09-28T10:00:00.000Z', schema: FUND_PROFILE_SCHEMA, holdingsBasis: 'fund', family: null });
     expect(normalizeFundAnswer(undefined, NOW).family).toBeNull();
+  });
+
+  it("keeps a bond fund's duration and average maturity in years, stamped with the schema; nothing when Yahoo writes 0 or nothing (2026-11-08)", () => {
+    const bond = normalizeFundAnswer({ topHoldings: { bondHoldings: { duration: 2.42, maturity: 9.807 } } }, NOW);
+    expect(bond.bond).toEqual({ durationYears: 2.42, maturityYears: 9.807 });
+    expect(bond.schema).toBe(FUND_PROFILE_SCHEMA);
+    expect(normalizeFundAnswer({ topHoldings: { bondHoldings: { duration: 0, maturity: null } } }, NOW).bond).toBeUndefined();
+    expect(normalizeFundAnswer({ topHoldings: { bondHoldings: { duration: null, maturity: 5 } } }, NOW).bond).toEqual({ durationYears: null, maturityYears: 5 });
+    expect(normalizeFundAnswer({ topHoldings: { stockPosition: 0.9 } }, NOW).bond).toBeUndefined();
   });
 });
 

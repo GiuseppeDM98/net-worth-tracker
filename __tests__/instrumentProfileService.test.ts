@@ -18,7 +18,7 @@ vi.mock('@/lib/firebase/admin', () => ({ adminDb: { collection: vi.fn() } }));
 vi.mock('yahoo-finance2', () => ({ default: class {} }));
 
 import { createAdminProfileCacheStore, resolveInstrumentProfiles, type ProfileCacheStore } from '@/lib/server/exposure/instrumentProfileService';
-import type { YahooProfileSource } from '@/lib/server/exposure/yahooSource';
+import { FUND_PROFILE_SCHEMA, type YahooProfileSource } from '@/lib/server/exposure/yahooSource';
 
 const NOW = new Date('2026-09-28T10:00:00.000Z');
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -43,7 +43,7 @@ function memoryStore(initial: Record<string, Partial<InstrumentProfile>> = {}) {
 
 function fakeSource(answers: { fund?: Partial<InstrumentFundProfile> | null; stock?: Partial<InstrumentStockProfile> | null } = {}) {
   const fetchFund = vi.fn(async (_ticker: string, now: Date): Promise<InstrumentFundProfile | null> =>
-    answers.fund === null ? null : { fetchedAt: now.toISOString(), holdingsBasis: 'sleeve', family: 'Vanguard', holdings: [{ key: 'NVDA', label: 'Nvidia', weight: 0.05 }], ...answers.fund },
+    answers.fund === null ? null : { fetchedAt: now.toISOString(), schema: FUND_PROFILE_SCHEMA, holdingsBasis: 'sleeve', family: 'Vanguard', holdings: [{ key: 'NVDA', label: 'Nvidia', weight: 0.05 }], ...answers.fund },
   );
   const fetchStock = vi.fn(async (_ticker: string, now: Date): Promise<InstrumentStockProfile | null> =>
     answers.stock === null ? null : { fetchedAt: now.toISOString(), sectorKey: 'technology', longName: 'Apple Inc.', ...answers.stock },
@@ -60,7 +60,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('resolveInstrumentProfiles — the TTL per module', () => {
   it('serves a fresh useful answer with ZERO Yahoo calls and dates the footer with it', async () => {
-    const cachedFund: InstrumentFundProfile = { fetchedAt: daysAgo(10), holdingsBasis: 'sleeve', family: 'Vanguard', holdings: [{ key: 'NVDA', label: 'Nvidia', weight: 0.05 }] };
+    const cachedFund: InstrumentFundProfile = { fetchedAt: daysAgo(10), schema: FUND_PROFILE_SCHEMA, holdingsBasis: 'sleeve', family: 'Vanguard', holdings: [{ key: 'NVDA', label: 'Nvidia', weight: 0.05 }] };
     const { store, writes } = memoryStore({ 'VWCE.DE': { fund: cachedFund } });
     const { source, fetchFund } = fakeSource();
 
@@ -86,7 +86,7 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
   });
 
   it('retries an EMPTY answer after 24 hours, not before', async () => {
-    const emptyFund = (fetchedAt: string): InstrumentFundProfile => ({ fetchedAt, holdingsBasis: 'fund', family: null });
+    const emptyFund = (fetchedAt: string): InstrumentFundProfile => ({ fetchedAt, schema: FUND_PROFILE_SCHEMA, holdingsBasis: 'fund', family: null });
 
     const young = memoryStore({ 'VWCE.DE': { fund: emptyFund(hoursAgo(23)) } });
     const youngSource = fakeSource();
@@ -134,6 +134,29 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
   });
 });
 
+describe('resolveInstrumentProfiles — the schema of a fund answer (2026-11-08)', () => {
+  it('asks Yahoo once more for a fund answer written before `schema` existed, whatever its age; a bond-only answer is useful and then lives the 30-day TTL', async () => {
+    const legacy = memoryStore({ 'VWCE.DE': { fund: { fetchedAt: daysAgo(1), holdingsBasis: 'sleeve', family: 'Vanguard' } } });
+    const legacySource = fakeSource({ fund: { holdings: undefined, family: null, bond: { durationYears: 2.4, maturityYears: 9.8 } } });
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source: legacySource.source, store: legacy.store });
+    await settle();
+    expect(legacySource.fetchFund).toHaveBeenCalledTimes(1);
+    expect(response.profiles['VWCE.DE'].fund?.bond).toEqual({ durationYears: 2.4, maturityYears: 9.8 });
+    expect(legacy.documents.get('VWCE.DE')?.fund?.schema).toBe(FUND_PROFILE_SCHEMA);
+
+    const again = fakeSource();
+    await resolveInstrumentProfiles([fundRequest], { now: new Date(NOW.getTime() + 2 * 24 * 60 * 60 * 1000), source: again.source, store: legacy.store });
+    expect(again.fetchFund).not.toHaveBeenCalled();
+  });
+
+  it('a stock answer has no schema and is never refetched for it', async () => {
+    const { store } = memoryStore({ AAPL: { stock: { fetchedAt: daysAgo(2), sectorKey: 'technology', longName: 'Apple Inc.' } } });
+    const { source, fetchStock } = fakeSource();
+    await resolveInstrumentProfiles([stockRequest], { now: NOW, source, store });
+    expect(fetchStock).not.toHaveBeenCalled();
+  });
+});
+
 describe('resolveInstrumentProfiles — one document, two modules', () => {
   it('keeps the first module’s own fetchedAt when the second module is asked later', async () => {
     const { store, documents } = memoryStore();
@@ -154,7 +177,7 @@ describe('resolveInstrumentProfiles — one document, two modules', () => {
 
   it('answers the oldest date among the modules USED, across tickers', async () => {
     const { store } = memoryStore({
-      'VWCE.DE': { fund: { fetchedAt: daysAgo(3), holdingsBasis: 'sleeve', family: 'Vanguard' } },
+      'VWCE.DE': { fund: { fetchedAt: daysAgo(3), schema: FUND_PROFILE_SCHEMA, holdingsBasis: 'sleeve', family: 'Vanguard' } },
       AAPL: { stock: { fetchedAt: daysAgo(12), sectorKey: 'technology', longName: 'Apple Inc.' }, fund: { fetchedAt: daysAgo(29), holdingsBasis: 'fund', family: 'Nobody' } },
     });
     const { source, fetchFund, fetchStock } = fakeSource();
@@ -175,7 +198,7 @@ describe('resolveInstrumentProfiles — nothing of the user’s, nothing that ca
     await settle();
 
     const fundKeys = Object.keys(documents.get('VWCE.DE')?.fund ?? {}).sort();
-    expect(fundKeys).toEqual(['family', 'fetchedAt', 'holdings', 'holdingsBasis']);
+    expect(fundKeys).toEqual(['family', 'fetchedAt', 'holdings', 'holdingsBasis', 'schema']);
     const stockKeys = Object.keys(documents.get('AAPL')?.stock ?? {}).sort();
     expect(stockKeys).toEqual(['fetchedAt', 'longName', 'sectorKey']);
     expect(Object.keys(documents.get('AAPL') ?? {}).sort()).toEqual(['stock', 'ticker']);

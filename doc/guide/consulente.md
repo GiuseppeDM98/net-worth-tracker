@@ -2,7 +2,8 @@
 
 > **When to open this guide** — whoever touches `app/dashboard/allocation/consulente/*`,
 > `components/allocation/consulente/*`, `lib/server/allocationAdvice/*`, `app/api/allocation-advice/*`,
-> `lib/utils/allocationAdvice{Proposal,Draft,Apply,Narrative,Document}.ts`, `lib/hooks/useAllocationAdvice.ts`,
+> `lib/utils/allocationAdvice{Proposal,Draft,Apply,Narrative,Document,Interview}.ts`, `lib/utils/questionSet.ts`,
+> `components/ui/question-card.tsx`, `lib/hooks/useAllocationAdvice.ts`,
 > `lib/services/allocationAdviceService.ts`, `types/allocationAdvice.ts`. In `AGENTS.md` the stub with the
 > essentials stays; here is the full rule. Born on 2026-10-20 (owner's decision: «io sinceramente farei tutto
 > adesso in questa sessione»).
@@ -11,35 +12,51 @@
 
 - **Page**: `app/dashboard/allocation/consulente/page.tsx` (the gate on the `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` flag, as
   for the Assistente, and `configured` = the key read on the server), `components/allocation/consulente/ConsulenteClient.tsx`
-  (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens), `ConsulenteRun.tsx` (the
+  (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens and the interview's scene),
+  `ConsulenteInterviewScene.tsx` (the rounds' cards, the skeleton, the scene's footer; 2026-11-08),
+  `useConsulenteInterview.ts` (one round per gesture, aborted by «Salta il colloquio»), `ConsulenteRun.tsx` (the
   run's screen and `StageRows`, which the report's running view shares), `ConsulenteReport.tsx` (verdict, tiles,
-  markdown, «Applica»).
+  markdown, «Applica»), `ConsulenteInterviewTile.tsx` («Il colloquio»), `ConsulenteRevisionTile.tsx` («Chiedi una
+  modifica» with its round).
 - **Primitives**: `components/ui/choice-list.tsx` (`ChoiceList`, every choice of the path and of the Compravendita),
-  `components/ui/path-rail.tsx` (`PathRail`: the path's eight ticks, the run's four segments), `Tile`'s `generated`
+  `components/ui/question-card.tsx` (`QuestionCard`: ONE question a model asks, shared with the Assistente's in-chat
+  questions), `components/ui/path-rail.tsx` (`PathRail`: the path's eight ticks, the interview's three, the run's
+  four segments), `Tile`'s `generated`
   and the classes of `lib/constants/aiAccent.ts`, `sceneVariants` in `lib/utils/motionVariants.ts`.
-- **Pure**: `lib/utils/allocationAdviceProposal.ts` (the zod schemas of the answers, the proposal and the candidates; the
-  fenced block), `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage, the prefilled
-  answers), `allocationAdviceApply.ts` (the plans of «Applica»: targets, roles, goals; today's base; the loss
+- **Pure**: `lib/utils/questionSet.ts` (the one question schema — kinds, options, the reserved rows «Altro…» and
+  «Preferisco non dire», the lenient parser, the describer of an answer, the prompt lines — shared with the
+  Assistente), `allocationAdviceInterview.ts` (the interview's reducer, `canRequestRound`, the block sentence; it reaches zod
+  through `questionSet`, so nothing the Allocazione page loads may import it — «1 tornata» / «N tornate» is
+  `describeRoundCount` in the narrative for that reason), `lib/utils/allocationAdviceProposal.ts` (the zod schemas of the answers, the proposal and the
+  candidates; the fenced block; the interview round's wire and stored shapes, `parseInterviewRound`),
+  `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage with its `phase` and `interview`,
+  `reopenStoredDraft`, the prefilled answers), `allocationAdviceApply.ts` (the plans of «Applica»: targets, roles, goals; today's base; the loss
   scenarios), `allocationAdviceNarrative.ts` (every sentence), `allocationAdviceDocument.ts` (the document mapper
   for both SDKs), `lib/utils/sseReader.ts`, `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, shared with
   every mode of the Assistente and the emails' AI comments, decision 81).
-- **Server**: `lib/server/allocationAdvice/prompts.ts` (the three prompts), `run.ts` (the orchestration: context →
-  strategy → instruments → review, persisted at every stage), `store.ts` (Admin, `allocationAdvice/{uid}`);
-  `app/api/allocation-advice/run/route.ts` (SSE, `maxDuration = 300`, 6 runs an hour), `applied/route.ts`.
+- **Server**: `lib/server/allocationAdvice/prompts.ts` (the three prompts, the interview's and the IL COLLOQUIO
+  block), `run.ts` (the orchestration: context → strategy → instruments → review, persisted at every stage;
+  `runInterviewRound`, which persists nothing; the OBBLIGAZIONI block and the previous paths read beside the
+  context, 2026-11-08), `store.ts` (Admin, `allocationAdvice/{uid}` and the archive `allocationAdvice/{uid}/history`);
+  `lib/utils/allocationAdviceBonds.ts` (pure: which holdings are the bond part, which cost a profile read, the block);
+  `app/api/allocation-advice/run/route.ts` (SSE, `maxDuration = 300`, 12 model requests an hour per warm instance:
+  interview rounds, strategy, revise), `applied/route.ts`.
 - **Client**: `lib/services/allocationAdviceService.ts` (the read under the rules), `lib/hooks/useAllocationAdvice.ts`
   (`queryKeys.allocationAdvice.all`), `lib/services/assetService.ts → updateAssetAllocationRole` (the ONLY field
   «Applica» touches on an asset), `firestore.rules` (`read: canAccess`, `write: false`).
-- **Models**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5) and
-  `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
-- **Suites to run after a change here**: `allocationAdviceProposal`, `allocationAdviceDraft`, `allocationAdviceApply`,
-  `allocationAdviceNarrative`, `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes`,
-  `cashflowBlock`, `assistantMonthContextService`, `motionVariants` and the Testing Library suites `choiceList`,
-  `pathRail`, `tile`, `consulenteRun`, `useConsulenteRun` ·
+- **Models**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5: the interview, the
+  strategy, the review) and `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
+- **Suites to run after a change here**: `questionSet`, `allocationAdviceInterview`, `allocationAdviceProposal`,
+  `allocationAdviceDraft`, `allocationAdviceDocument`, `allocationAdviceApply`, `allocationAdviceNarrative`,
+  `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes`, `cashflowBlock`,
+  `assistantMonthContextService`, `motionVariants` and the Testing Library suites `choiceList`, `pathRail`, `tile`,
+  `questionCard`, `consulenteInterviewTile`, `consulenteRun`, `useConsulenteRun`, `useConsulenteInterview` ·
   `reactCompilerCoverage` (a ternary inside a `||` in the Wizard was skipped on the first day) · **Browser**
-  `e2e/allocation.consulente.spec.ts` (the eight screens on the base fixture, and the run on a route faked with
-  `page.route`: a test never spends), `allocation.consulente.mobile.spec.ts` (390: the strip, 44px, the overflow,
-  reduced motion), `allocation.consulente.report.spec.ts` (planted documents: the accent, the cascade, the
-  count-up).
+  `e2e/allocation.consulente.spec.ts` (the eight screens), `allocation.consulente.interview.spec.ts` and
+  `.interview.mobile.spec.ts` (the interview), `allocation.consulente.mobile.spec.ts` (390: the strip, 44px, the
+  overflow, reduced motion), `allocation.consulente.report.spec.ts` (the report, the revision's round):
+  `/api/allocation-advice/run` is always faked with `page.route` (`e2e/consulenteInterview.ts` scripts the rounds and
+  records the bodies), no test spends.
 
 ## The path
 
@@ -69,9 +86,27 @@
 - **The prefilled answers** (`initialAnswers`): the age from the settings, the goals from FIRE › Obiettivi, the
   roles of the home / pension funds / illiquid assets from the role the assets carry today (`resolveAllocationRoleWithin`),
   the exchange `DEFAULT_EXCHANGE`.
-- **The summary is a list of rows, each a link to its screen** (`goto`); «Avvia la ricerca» is
-  disabled without the key on the server («Servizio AI non configurato»); it glows on hover and focus only
-  (`AI_CONTROL_ACCENT_CLASS`, DESIGN.md → The AI-Accent Rule).
+- **The summary is a list of rows, each a link to its screen** (`goto`); its primary is «Avvia il colloquio» («Torna
+  al colloquio» once a round exists, with «Ricomincia il colloquio»), its secondary «Salta il colloquio e avvia la
+  ricerca»; both are disabled without the key («Servizio AI non configurato»); the primary glows on hover and focus
+  only (`AI_CONTROL_ACCENT_CLASS`, DESIGN.md → The AI-Accent Rule), the skip never (decision 78).
+- **The interview** (2026-11-08, doc/ai/AI-04-colloquio.md): after the summary, a scene of its own in the same card
+  (`ConsulenteInterviewScene`; «Passo N di 8» untouched, the eyebrow «Colloquio · tornata N di 3» its only
+  `TILE_EYEBROW_CLASS`), where the Consulente reads answers and data and asks 0–4 pointed questions, up to three
+  rounds: `canRequestRound` is false once three rounds stand, when the last is `satisfied`, when it asked nothing
+  or when the user skipped; «Continua» asks the next round with every previous round and its answers, otherwise the
+  primary reads «Avvia la ricerca». A received round enters the draft AT ONCE with `answers: []` and every answer is
+  written into that last round in place (`interviewReducer`), so `writeStoredDraft` persists it and a reload shows
+  the round without a request (`phase: 'interview'` kept only with a valid round, `readStoredDraft`); the Wizard
+  opens through `reopenStoredDraft`, which drops a stored interview older than the last document's `updatedAt`
+  («Rifai il percorso» never prefills rounds a run already used). «Salta il colloquio» commits the rounds as they
+  stand — an unanswered question has no entry, the prompt prints «non risposta» — and starts the strategy with
+  `skipped: true`; while a round is asked the scene shows the previous note over a skeleton of two cards
+  (`aria-busy`, «Indietro» and the primary held) and the skip aborts the fetch (`AbortController`; the slot is
+  spent, the late event ignored). The rail's three ticks light one round at a time (`PathRail.interview.reached`,
+  the round number, 1-based). Every `QuestionCard` carries «Altro…» (forced by the parser, decision 54) and
+  «Preferisco non dire» last, both exclusive rows in a multiple question (decision 55), and no button: the footer owns
+  the one primary of a round (decision 38).
 
 ## The run
 
@@ -94,6 +129,34 @@
   (`runStageStates`). `PathRail` in run mode fills one segment per stage when it becomes active: stage status, never
   a percentage; its wrapper is a plain div (the list is `aria-hidden`): the «Dove sei» landmark is the path's alone
   (2026-11-07).
+- **The OBBLIGAZIONI block** (owner, 2026-11-08, after AI-04's phase F: «se uno ha ETF obbligazionari analizzare
+  anche le loro duration … per proporre un altro ETF che copra una duration diversa»): `lib/utils/allocationAdviceBonds.ts`
+  (pure) over the holdings of the YTD bundle — the single bonds by TYPE (`bond`, with `maturityIso` from
+  `bondDetails.maturityDate` and the coupon the DIVIDENDI facts know), the funds by CLASS (`bonds`, never an account or
+  a loan) with the effective duration and the average maturity Yahoo publishes (`topHoldings.bondHoldings`, read as
+  `InstrumentFundProfile.bond` through the Esposizione's shared profile cache, `resolveInstrumentProfiles` with the
+  `fund` module, one request per bond ETF with a raw ticker: a cached document written before the field existed is
+  asked once more whatever its age, `schema` in `yahooSource.ts`). The block closes the data of the interview and
+  the strategy (`buildConsulenteContext`) and the holdings of the instrument search; three absences are named apart
+  («scadenza non registrata», «duration non pubblicata da Yahoo», «duration non letta» when the profile read threw —
+  a failed read never fails the run). Yahoo's figures are «secondo Yahoo, non verificate»: the instruments contract
+  makes the second agent confirm a bond ETF's duration with the web search and write it in the candidate's
+  `duration` (years, 0–40, `instrumentCandidateSchema`; the report prints « · duration 2,4 anni»), the strategy
+  contract makes every bond sub-target say which horizon and which goal it covers (and which horizon stays
+  uncovered), the interview contract asks what the bond part is for and whether singles or ETFs when the block has
+  rows or the class will weigh. Not a fixed screen of the path (the eight are AI-01's): a reading rule.
+- **The previous paths** (owner, 2026-11-08: «tra un anno ha paura e lo rifa … il consulente nota nelle sue parole
+  della paura o della fomo»): a new path's interview rounds and strategy read «--- I PERCORSI PRECEDENTI ---»
+  (`formatPreviousPathsForPrompt`): the live document when it has a report — nothing has replaced it during the
+  interview; at the strategy it is read before the new one — then the archive, the most recent first, at most
+  `ALLOCATION_ADVICE_HISTORY_LIMIT` (6). Per path: its dates, the answers of then in two lines, the user's own
+  words (what was missing, the notes, the goals' notes), the interview of then with its answers
+  (`formatQuestionAnswersForPrompt`), the requests for changes, the proposal in one line. The plan in force stays
+  printed whole before it (IL PIANO IN VIGORE); the revision's round reads neither (its report is the context). The
+  reading rule in both contracts: a change in tolerance, horizon, goals or constraints the data do not explain is a
+  question (interview) or a sentence of «La situazione» (strategy); fear, haste or euphoria read in the words — of
+  then or of today — are said with the sentence that shows them, never judged. A failed archive read never fails a
+  path: the block says it and lists the live one alone.
 - **The CASHFLOW 12 MESI block** (2026-11): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
   `formatCashflowBlockForPrompt`) over `fetchCashflowBlockInputs(userId, now)` (lib/services/assistantMonthContextService.ts),
   ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
@@ -142,6 +205,18 @@
   as Timestamp and come back as Date field by field (`mapAllocationAdviceData`, shared by the two SDKs). States:
   `draft · running · ready · failed · applied`; `stage` says where the run is or where it stopped. A `running` run
   older than 20 minutes (`RUN_STALE_AFTER_MS`) is considered dead and the page reopens the path.
+- **The archive** `allocationAdvice/{uid}/history/{createdAt ISO}` (owner, 2026-11-08, after AI-04's phase F): the
+  document a new path replaces is copied there whole, BEFORE the new one is written, when it has a report
+  (`archiveAllocationAdviceAdmin`; a path abandoned before its report leaves no trace; the same path archived twice
+  overwrites itself). Admin only, both ways (`rules: read, write: false` on the subcollection; `mirror:remove`'s
+  `recursiveDelete` takes it with the document). Nothing on a page reads it yet: the Consulente does — see the run.
+- **Reset of one account** (`npm run consulente:reset -- <email>`, `scripts/consulenteReset.mts`, 2026-11-08): the
+  owner's tool for «rifare il giro da zero» in production at the end of the AI series. Dry run by default (prints the
+  target project, the uid, the document's status and dates, the applied summary, the archived paths); with `--yes` it
+  writes a JSON backup under `~/Documents/Backup/net-worth-consulente/` and `recursiveDelete`s
+  `allocationAdvice/{uid}` with its `history`, then re-reads to prove both are gone. It never touches what «Applica»
+  wrote (targets, roles, goals), the shared profile cache or another account; `consulente:reset:emulator` is the same
+  against the emulators (tried on the E2E account on 2026-11-08). The browser's draft is not on the server.
 - **The run starts from the click, never from an effect** (`useConsulenteRun`, 2026-10-20): a first cut opened the stream
   in a `useEffect` with a guard on a ref, and React's StrictMode (dev) mounts the effect twice — the guard kept the
   FIRST closure, already cancelled by its cleanup, and every event was discarded: the page stayed on «Avvio il
@@ -153,7 +228,8 @@
   with the strategy alone at 210 s. So `runAllocationAdviceStage` runs ONE stage (`AllocationAdviceRunStage`: `strategy`,
   which creates the document from the answers and includes the context · `instruments` · `review`, which read the
   persisted document — `document` passed in memory by the whole run, read from the store by the route) and the route
-  (`maxDuration = 300`, body `{ userId, stage, answers? }`, the rate limit counts only the `strategy`) streams
+  (`maxDuration = 300`, body `{ userId, stage, answers?, request?, interview?, revision? }`, the rate limit counts
+  the interview rounds, the `strategy` and `revise`: 12 an hour per warm instance) streams
   `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from)`) chains the three, reads
   each stream to its `done`, rereads the document after every stage; a failed or cut stage stays
   `resumeFrom` and «Riprova» (`retry`) restarts from there on the persisted document, never from scratch — a request
@@ -163,7 +239,18 @@
   markdown and the structure, not the raw text. `runAllocationAdvice` stays the three in sequence, for whoever has no
   ceiling. A stage that still exceeds 300 s is a 504 with the document stopped on that stage: «Riprova» repeats it.
 - **The answers enter through the same door that wrote them**: `allocationAdviceAnswersSchema` is the schema of the
-  screens AND of the route (`parseOr400`).
+  screens AND of the route (`parseOr400`); the interview through `interviewSchema` (`askedAt` coerced to a Date).
+- **The interview round** (2026-11-08): `stage: 'interview'` is a branch of the route that never enters
+  `runAllocationAdviceStage` — `runInterviewRound` builds the strategy's context (the YTD bundle and the cashflow
+  block, read once), calls the strategy's model and effort with 16 000 tokens, `interviewRoundSchema` as the
+  structured output and no web search, and streams ONE terminal event, `interview` (the round with its model and
+  clock) or `error`; it writes nothing to `allocationAdvice/{uid}`. The parser is lenient because the API keeps only
+  types, required and `additionalProperties` of the schema: five questions keep four, a repeated id or a one-option
+  question is refused and logged, the reserved option values dropped, a note over 600 characters cut. The strategy
+  writes `interview` into the new document and prints it (the IL COLLOQUIO block, `formatInterviewForPrompt`) right
+  after the answers, closed by «Tieni conto di queste risposte nella sezione «La situazione».»; the review prints the
+  same block; a skip with zero rounds is the one sentence «L'utente ha saltato il colloquio.». `system` never changes.
+  The route refuses a skipped interview, a fourth round and a revision round after one (400, no slot).
 
 ## The report and «Applica»
 
@@ -181,14 +268,22 @@
 - **«Chiedi una modifica» relaunches ONLY the review** (owner, 2026-10-20, during the tour: «vorrei liberarmi degli
   ETF obbligazionari per i bond singoli… meglio dirlo all'inizio?»): a request born AFTER reading the report does not
   cost a «Rifai il percorso». The tile under «Il report» (`useConsulenteRevision`, `REVISION_COPY`) sends the route
-  `stage: 'revise'` with `request` (1–1000 characters, counted in the rate limit as a run); `runRevise` requires a
+  `stage: 'revise'` with `request` (1–1000 characters; one round of questions about it first, «Salta le domande»
+  available; the round and the revise each take a slot; the round stored as `revisionInterview`, printed by
+  `buildRevisionPrompt` after the requests and shown under the last request — decision 24); `runRevise` requires a
   finished report, re-enters `stage: 'review'`, calls Opus 5.5 with `buildRevisionPrompt` — strategy and instruments
   with the blocks put back, the previous report, ALL the requests in order (the last is the new one), the review's
   contract plus the section «La tua richiesta» where the request is not sensible or has a cost — and replaces
   `report` (revised proposal, or the previous one if the block is malformed), appends to `document.revisions`
   (`{ request, at }`, always an array from the mapper) and brings the state back to `ready` (a plan already applied
   is to be applied again). The tile lists the requests made; «Applica» is disabled while the review is running. A
-  request worth knowing BEFORE (a constraint, a class to avoid) still goes in the «Vincoli» screen.
+  request worth knowing BEFORE (a constraint, a class to avoid) still goes in the «Vincoli» screen. The revision's
+  round lives in the tile's memory (`ConsulenteRevisionTile`), not in the draft: a round with no question sends the
+  revision at once, «Salta le domande» while the round is asked aborts it and sends `{ rounds: [], skipped: true }`.
+- **«Il colloquio»** (`ConsulenteInterviewTile`, between «Il report» — or «La strategia» — and «Chiedi una modifica»):
+  the rounds the Consulente asked before the strategy, each with its note, its questions and what the user answered
+  («non risposta» for what was skipped), the aside «1 tornata» / «N tornate» (« · saltato» when skipped); nothing
+  with zero rounds (decision 53). It recaps the user's own words, so it does NOT wear `generated` (decision 79).
 - **The tiles**: Allocazione proposta (today → proposal per class, `buildProposalRows` on `currentAllocationOnBase`,
   the held classes the proposal drops appended at the end at 0), Strumenti (the candidates per sub-target,
   «in portafoglio» when already held, the `caveat` in amber), Obiettivi, Ruoli degli asset (only the changes that
@@ -240,6 +335,21 @@ on a phone, and from the row under the Assistente's conversation).
 - **The strategy reads this year's rows twice** (2026-11): the YTD bundle and the cashflow block query them apart —
   accepted, the bundle stays the Assistente's, and the block is read once per strategy, never by the instruments or
   the review.
+- **A bond ETF's duration in the context is Yahoo's, up to 30 days old, and may differ from the factsheet**
+  (2026-11-08): the block says «secondo Yahoo, non verificate» and the instruments contract has the second agent
+  confirm it before a candidate carries `duration`; a fund Yahoo does not describe («non pubblicata») is still in the
+  block with its value, so the strategy can ask the search for it. The context never rereads Yahoo: the Esposizione's
+  TTL rules it.
+- **A path abandoned before its report is not in the archive** (2026-11-08): the previous paths are those with a
+  report; «Riprova» after a failed strategy creates a new document with the same answers, and archiving the failed
+  one would have listed the same words twice. The one exception the model sees: the live document without a report
+  is listed as nothing, not as «fallito».
+- **The report reaches neither the PDF nor the emails** (checked on 2026-11-08: no reader of `allocationAdvice` under
+  `lib/server/`, `lib/services/` or `app/api/` other than the Consulente's own routes): it lives on its page alone. The
+  review date and its reason are the footer of «Allocazione proposta», and `proposal.risks` has no surface; the report
+  read as a BOOK — one page per section of the review's text with the figures of its tile, the rail as the index, a
+  page as an address — is doc/ai/AI-07-report-libro.md (written on 2026-11-08 on the owner's call, implemented after
+  AI-06).
 - **The review invite** (owner, 2026-10-20, after applying the first production plan: «nei giorni vicino alla data,
   un pulsante "revisione con il Consulente"»): `reviewDueState(document, todayIso)` (lib/utils/allocationAdviceNarrative.ts)
   says `later · soon · due` against the applied plan's `reviewByIso` — `soon` within `REVIEW_SOON_DAYS` (30), `due`
@@ -280,7 +390,14 @@ on a phone, and from the row under the Assistente's conversation).
 - **The demo has no Consulente**: it writes the settings, and the demo's settings are everyone's (`useDemoMode`).
 - **The rules are inert until they are deployed** (`npx firebase deploy --only firestore:rules`; done by the owner on 2026-10-20, the Consulente tried in production): before the deploy
   the page does not read the document (permission-denied → the read fails and the page says so).
-- **The run in the browser runs on a faked route**: `e2e/allocation.consulente.spec.ts` answers
-  `/api/allocation-advice/run` with `page.route` (`doc/guide/e2e-emulatori.md` § Browser-Driven E2E) — the order of
-  the requests, the rows, a failed stage and «Riprova»; the real run was made on the mirror on 2026-10-20 with the
-  owner's key (the outcomes in that session's SESSION_NOTES and in the commit).
+- **The run's E2E specs fake the route**: one `page.route` handler (`e2e/consulenteInterview.ts`) scripts the
+  interview's rounds and records the strategy and revise bodies, answered with an error so the chain stops
+  (`doc/guide/e2e-emulatori.md` § Browser-Driven E2E); no test spends, and the real run is made once per change on
+  the mirror (2026-10-20 with the owner's key; the outcomes in that session's SESSION_NOTES and in the commit).
+- **The interview writes nothing**: its rounds live in the draft until the strategy, and a cleared storage loses them.
+- **A round abandoned** («Salta il colloquio» while it is asked, or leaving the page) **still costs its slot**; its
+  late answer is ignored.
+- **The revision's round lives in the tile's memory**: a reload before «Rivedi il report» loses it, and its slot.
+- **Twelve requests an hour**: a run with three rounds is four, a revision with its round two.
+- **«Rifai il percorso» drops an interview the document on screen already used** (`reopenStoredDraft`): only rounds
+  asked after that document's `updatedAt` survive.

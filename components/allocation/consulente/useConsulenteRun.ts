@@ -20,15 +20,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { forEachSseEvent } from '@/lib/utils/sseReader';
 import { queryKeys } from '@/lib/query/queryKeys';
-import { ALLOCATION_ADVICE_RUN_STAGES, type AllocationAdviceRunEvent, type AllocationAdviceRunStage, type AllocationAdviceStage } from '@/types/allocationAdvice';
+import { ALLOCATION_ADVICE_RUN_STAGES, type AllocationAdviceInterview, type AllocationAdviceRunEvent, type AllocationAdviceRunStage, type AllocationAdviceStage } from '@/types/allocationAdvice';
 import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdviceProposal';
 
+/** The interview rides with the answers (2026-11-08): «Riprova» on a failed strategy resends it (criterion 15 of AI-04). */
 export type ConsulenteRunState =
   | { kind: 'idle' }
   /** `stageStartedAt`: `Date.now()` when the run opened or the stage changed (the elapsed clock of the stage row, 2026-11-07). */
-  | { kind: 'running'; answers: AllocationAdviceAnswers; stage: AllocationAdviceStage | null; stageStartedAt: number }
-  | { kind: 'failed'; answers: AllocationAdviceAnswers; error: string; retryable: boolean; resumeFrom: AllocationAdviceRunStage }
-  | { kind: 'done'; answers: AllocationAdviceAnswers };
+  | { kind: 'running'; answers: AllocationAdviceAnswers; interview: AllocationAdviceInterview | null; stage: AllocationAdviceStage | null; stageStartedAt: number }
+  | { kind: 'failed'; answers: AllocationAdviceAnswers; interview: AllocationAdviceInterview | null; error: string; retryable: boolean; resumeFrom: AllocationAdviceRunStage }
+  | { kind: 'done'; answers: AllocationAdviceAnswers; interview: AllocationAdviceInterview | null };
 
 /** The response's body, or the route's own sentence as a failure. */
 async function openRunBody(response: Response): Promise<ReadableStream<Uint8Array>> {
@@ -46,7 +47,7 @@ export type StageOutcome = { ok: true } | { ok: false; error: string; retryable:
 /** One stage's request, read to its end: `done` to go on, `error` or a cut to stop there. */
 export async function requestStage(
   ownerId: string,
-  payload: { stage: AllocationAdviceRunStage; answers?: AllocationAdviceAnswers; request?: string },
+  payload: { stage: AllocationAdviceRunStage; answers?: AllocationAdviceAnswers; request?: string; interview?: AllocationAdviceInterview | null },
   onStage: (stage: AllocationAdviceStage) => void
 ): Promise<StageOutcome> {
   const response = await authenticatedFetch('/api/allocation-advice/run', {
@@ -73,11 +74,11 @@ export function useConsulenteRun(ownerId: string, onFinished: () => void) {
   const inFlight = useRef(false);
 
   const start = useCallback(
-    (answers: AllocationAdviceAnswers, from: AllocationAdviceRunStage = 'strategy') => {
+    (answers: AllocationAdviceAnswers, from: AllocationAdviceRunStage = 'strategy', interview: AllocationAdviceInterview | null = null) => {
       if (inFlight.current) return;
       inFlight.current = true;
       // The chain's stages are run stages too; `revise` never starts here.
-      setState({ kind: 'running', answers, stage: from === 'strategy' || from === 'revise' ? null : from, stageStartedAt: Date.now() });
+      setState({ kind: 'running', answers, interview, stage: from === 'strategy' || from === 'revise' ? null : from, stageStartedAt: Date.now() });
 
       // The stage in flight: a request that THROWS (a non-ok status, a stream the network drops) is
       // remembered by the stage it was in, never by the chain's start — «Riprova» does not re-pay a
@@ -85,14 +86,14 @@ export function useConsulenteRun(ownerId: string, onFinished: () => void) {
       let reached: AllocationAdviceRunStage = from;
       const run = async () => {
         const stages = ALLOCATION_ADVICE_RUN_STAGES.slice(ALLOCATION_ADVICE_RUN_STAGES.indexOf(from));
-        let outcome: ConsulenteRunState = { kind: 'done', answers };
+        let outcome: ConsulenteRunState = { kind: 'done', answers, interview };
         for (const stage of stages) {
           reached = stage;
-          const result = await requestStage(ownerId, stage === 'strategy' ? { stage, answers } : { stage }, (reached) => setState({ kind: 'running', answers, stage: reached, stageStartedAt: Date.now() }));
+          const result = await requestStage(ownerId, stage === 'strategy' ? { stage, answers, interview } : { stage }, (reached) => setState({ kind: 'running', answers, interview, stage: reached, stageStartedAt: Date.now() }));
           // The report's query rereads after every stage: a reload mid-run shows what landed.
           await queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
           if (!result.ok) {
-            outcome = { kind: 'failed', answers, error: result.error, retryable: result.retryable, resumeFrom: stage };
+            outcome = { kind: 'failed', answers, interview, error: result.error, retryable: result.retryable, resumeFrom: stage };
             break;
           }
         }
@@ -103,7 +104,7 @@ export function useConsulenteRun(ownerId: string, onFinished: () => void) {
       run()
         .catch((error: unknown) => {
           void queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
-          setState({ kind: 'failed', answers, error: error instanceof Error ? error.message : 'Impossibile avviare il percorso del Consulente', retryable: true, resumeFrom: reached });
+          setState({ kind: 'failed', answers, interview, error: error instanceof Error ? error.message : 'Impossibile avviare il percorso del Consulente', retryable: true, resumeFrom: reached });
         })
         .finally(() => {
           inFlight.current = false;
@@ -112,10 +113,10 @@ export function useConsulenteRun(ownerId: string, onFinished: () => void) {
     [ownerId, onFinished, queryClient]
   );
 
-  /** After a failure: the same answers, from the stage that failed. */
+  /** After a failure: the same answers and the same interview, from the stage that failed. */
   const retry = useCallback(() => {
     if (state.kind !== 'failed') return;
-    start(state.answers, state.resumeFrom);
+    start(state.answers, state.resumeFrom, state.interview);
   }, [state, start]);
 
   const reset = useCallback(() => setState({ kind: 'idle' }), []);

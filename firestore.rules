@@ -168,6 +168,13 @@ service cloud.firestore {
     match /allocationAdvice/{userId} {
       allow read: if canAccess(userId);
       allow write: if false;
+
+      // Lo storico dei percorsi (2026-11-08): il documento che un nuovo percorso sostituisce,
+      // archiviato dall'Admin SDK quando ha un report; lo legge solo il Consulente (gli ultimi
+      // sei, per il colloquio e la strategia), il client mai.
+      match /history/{pathId} {
+        allow read, write: if false;
+      }
     }
 
     // Collezione goalBasedInvesting - obiettivi di investimento (doc id = ownerUid)

@@ -128,3 +128,80 @@ describe('useConsulenteRun', () => {
     await waitFor(() => expect(result.current.state).toMatchObject({ kind: 'failed', error: 'Servizio non disponibile.', retryable: true, resumeFrom: 'instruments' }));
   });
 });
+
+describe('the interview rides with the run (criterion 15 of AI-04, 2026-11-08)', () => {
+  it('sends the interview with the strategy, keeps it in every state, and «Riprova» on a failed strategy resends it', async () => {
+    const streams = [sseResponse(), sseResponse(), sseResponse(), sseResponse()];
+    authenticatedFetch.mockImplementation(() => Promise.resolve(streams.shift()!.response));
+    const [first, retried, instruments, review] = [...streams];
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result } = renderHook(() => useConsulenteRun('u1', vi.fn()), { wrapper });
+    const interview = {
+      rounds: [{ note: 'Vedo un reddito concentrato.', satisfied: false, questions: [], answers: [], model: 'opus-finto', askedAt: new Date(T0) }],
+      skipped: false,
+    };
+
+    act(() => {
+      result.current.start(answers, 'strategy', interview);
+    });
+    expect(result.current.state).toMatchObject({ kind: 'running', interview });
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(1));
+    const sent = JSON.parse(authenticatedFetch.mock.calls[0][1].body);
+    expect(sent).toMatchObject({ userId: 'u1', stage: 'strategy', interview: { skipped: false } });
+    expect(sent.interview.rounds[0].askedAt).toBe(new Date(T0).toISOString());
+
+    await act(async () => {
+      first.send({ type: 'stage', stage: 'strategy' });
+      first.send({ type: 'error', error: 'Ricerca interrotta: ornitorinco.', retryable: true });
+      first.close();
+      await flush();
+    });
+    await waitFor(() => expect(result.current.state).toMatchObject({ kind: 'failed', resumeFrom: 'strategy', interview }));
+
+    act(() => {
+      result.current.retry();
+    });
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(authenticatedFetch.mock.calls[1][1].body)).toMatchObject({ stage: 'strategy', interview: { skipped: false } });
+    await act(async () => {
+      retried.send({ type: 'done' });
+      retried.close();
+      await flush();
+    });
+    // The chain goes on without the interview: the later stages read it from the document.
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(3));
+    expect(JSON.parse(authenticatedFetch.mock.calls[2][1].body)).toEqual({ userId: 'u1', stage: 'instruments' });
+    await act(async () => {
+      instruments.send({ type: 'done' });
+      instruments.close();
+      await flush();
+    });
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(4));
+    await act(async () => {
+      review.send({ type: 'done' });
+      review.close();
+      await flush();
+    });
+    await waitFor(() => expect(result.current.state).toMatchObject({ kind: 'done', interview }));
+  });
+
+  it('without an interview the strategy body carries null, as before', async () => {
+    const strategy = sseResponse();
+    authenticatedFetch.mockImplementation(() => Promise.resolve(strategy.response));
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result } = renderHook(() => useConsulenteRun('u1', vi.fn()), { wrapper });
+    act(() => {
+      result.current.start(answers);
+    });
+    expect(result.current.state).toMatchObject({ kind: 'running', interview: null });
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(authenticatedFetch.mock.calls[0][1].body)).toEqual({ userId: 'u1', stage: 'strategy', answers, interview: null });
+    await act(async () => {
+      strategy.send({ type: 'error', error: 'x', retryable: false });
+      strategy.close();
+      await flush();
+    });
+  });
+});

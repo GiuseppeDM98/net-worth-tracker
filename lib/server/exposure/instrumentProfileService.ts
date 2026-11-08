@@ -15,7 +15,9 @@
  * able to heal). Yahoo failing with a stale answer in cache — useful or empty — the stale one is
  * served, and its `fetchedAt` says how old it is (an old empty answer still dates the footer, and
  * reads «non letto» exactly as no answer would). `force` asks Yahoo whatever the age, and keeps
- * the last cached answer if Yahoo fails.
+ * the last cached answer if Yahoo fails. A fund answer whose `schema` is not the current one
+ * (`FUND_PROFILE_SCHEMA`: the documents written before `bond` existed, 2026-11-08) is asked again
+ * once whatever its age, then lives its normal TTL.
  *
  * Two stages, timed apart for the route's `Server-Timing` (since 2026-10-05): every cached
  * document is read first, in parallel (`db`), then Yahoo is asked for what is missing, expired or
@@ -34,7 +36,7 @@ import type {
   ProfileRequest,
 } from '@/types/exposure';
 import type { ServerTimingRecorder } from '@/lib/server/serverTiming';
-import { yahooProfileSource, type YahooProfileSource } from './yahooSource';
+import { FUND_PROFILE_SCHEMA, yahooProfileSource, type YahooProfileSource } from './yahooSource';
 
 export const INSTRUMENT_PROFILE_CACHE_COLLECTION = 'instrument-profile-cache';
 /** A fund's composition changes slowly; a month is the horizon the tile's footer dates. */
@@ -76,7 +78,7 @@ export function createAdminProfileCacheStore(db: Pick<typeof adminDb, 'collectio
 // ─── Freshness, per module ───────────────────────────────────────────────────
 
 function isUsefulFund(profile: InstrumentFundProfile): boolean {
-  return !!(profile.holdings?.length || profile.sectors?.length || profile.family);
+  return !!(profile.holdings?.length || profile.sectors?.length || profile.family || profile.bond);
 }
 
 function isUsefulStock(profile: InstrumentStockProfile): boolean {
@@ -86,6 +88,8 @@ function isUsefulStock(profile: InstrumentStockProfile): boolean {
 function isFresh<M extends ProfileModule>(module: M, data: ModuleData[M], now: Date): boolean {
   const fetched = Date.parse(data.fetchedAt);
   if (Number.isNaN(fetched)) return false;
+  // An older shape is stale whatever its date: asked once more, written back with the current one.
+  if (module === 'fund' && (data as InstrumentFundProfile).schema !== FUND_PROFILE_SCHEMA) return false;
   const useful = module === 'fund' ? isUsefulFund(data as InstrumentFundProfile) : isUsefulStock(data as InstrumentStockProfile);
   return now.getTime() - fetched < (useful ? USEFUL_PROFILE_TTL_MS : EMPTY_PROFILE_TTL_MS);
 }

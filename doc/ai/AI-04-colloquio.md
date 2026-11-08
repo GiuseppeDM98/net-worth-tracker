@@ -844,3 +844,39 @@ mio «pronto». Un branch, un commit, solo dopo il mio OK con il riassunto del d
 Model: **Fable 5.1**, effort **xhigh**. Estimated size: 1 long session, ~7 h; ~260 lines pure (`questionSet`,
 `allocationAdviceInterview`, the proposal's schemas, the draft), ~140 `question-card.tsx`, ~220 server (prompts, run,
 route), ~340 client (the scene, two hooks, two tiles, Wizard, Report), ~600 tests, two new E2E specs and two extended.
+
+## 12. Added at the implementation, on the owner's call (2026-11-08, after phase F; decisions 89–91)
+
+Two additions the owner asked for after the real run on the mirror, implemented in the same branch and commit; a
+third deferred to a spec of its own. None changes §§ 4–7 above: the interview's contract gains two reading rules, the
+data two blocks.
+
+- **The bond part, «Dati + prompt»** (decision 89). `lib/utils/allocationAdviceBonds.ts` (pure, `__tests__/allocationAdviceBonds.test.ts`):
+  `selectBondHoldings` (singles by type `bond`, funds by class `bonds`), `bondProfileRequests` (one `fund` request per bond
+  ETF with a raw ticker), `formatBondTermsBlock` → «--- OBBLIGAZIONI: SCADENZE E DURATION ---» with three named absences.
+  The data: `InstrumentFundProfile.bond { durationYears, maturityYears }` from Yahoo's `topHoldings.bondHoldings`
+  (`normalizeFundAnswer`), `schema` on every fund answer so the cached documents of the older shape are asked once more
+  (`isFresh`); `AssistantHoldingRow.profileTicker` and `maturityIso`. The run: `readBondTermsBlock` under the data of
+  `buildConsulenteContext` (interview + strategy) and under the holdings of `runInstruments`; a thrown profile read is
+  logged and the block says «non letta». The contracts: the interview asks what the bond part is for and singles vs
+  ETFs; the strategy's bond sub-targets name horizon and goal; the instruments agent verifies a bond ETF's duration and
+  writes `duration` (`instrumentCandidateSchema`, 0–40 years; the report prints « · duration N anni»); the review reports it.
+  Proof: `allocationAdviceRun.test.ts` («the bond block in the Consulente context»: no bond → the one sentence and no
+  profile call; the ETF's request and Yahoo's figure to the strategy and the instruments alike; a rejected read never
+  fails the round), `allocationAdvicePrompts.test.ts`, `exposureYahooSource`, `instrumentProfileService`,
+  `assistantPortfolioContext`, `allocationAdviceProposal`.
+- **The previous paths** (decision 90). `store.ts` → `archiveAllocationAdviceAdmin(document)` (to
+  `allocationAdvice/{uid}/history/{createdAt ISO}`, whole, `archivedAt` added) and `listAllocationAdviceHistoryAdmin(userId, limit)`
+  (by `createdAt` desc); `firestore.rules` denies the subcollection to the client. `run.ts` → `readPreviousPaths(userId, live)`
+  (the live document when it has a report, then the archive, cut at `ALLOCATION_ADVICE_HISTORY_LIMIT` = 6; a failed read is
+  `archiveRead: false`) and `archivePreviousPath(previous)` (only with a report, BEFORE `setAllocationAdviceAdmin` of the
+  new document, a failure logged); the strategy stage and `runInterviewRound` (a new path only) pass `previousPaths` to
+  `buildStrategyPrompt` / `buildInterviewPrompt`, which print `formatPreviousPathsForPrompt` after the plan in force.
+  The contracts' reading rule: a change the data do not explain is a question (interview) or a sentence of «La
+  situazione» (strategy); fear, haste or euphoria in the words are said with the sentence that shows them, never
+  judged. Proof: `allocationAdviceRun.test.ts` («the previous paths»: the archive before the write, the order most recent
+  first, no archive without a report, the revision's round reads neither, a failed read or copy never fails the path),
+  `allocationAdvicePrompts.test.ts` («formatPreviousPathsForPrompt»).
+- **The report as a book** (decision 91): deferred to a spec of its own, [AI-07-report-libro.md](AI-07-report-libro.md), written the
+  same day (decisions 92–96: the mock as the first step of its implementation, the text split by section, the pager, «Chiedi una
+  modifica» as the page before «Applica», `?pagina=`); implemented after AI-06. Nothing of it is in this branch's code.
