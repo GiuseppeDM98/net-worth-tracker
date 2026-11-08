@@ -27,7 +27,7 @@ const statesOf = (container: HTMLElement) => Array.from(container.querySelectorA
 
 describe('ConsulenteRun', () => {
   it('shows the active stage with what it usually takes and a clock the reader does not hear', () => {
-    const { container } = render(<ConsulenteRun state={{ kind: 'running', answers, stage: 'strategy', stageStartedAt: Date.now() - 61_000 }} onRetry={noop} onBack={noop} />);
+    const { container } = render(<ConsulenteRun state={{ kind: 'running', answers, interview: null, stage: 'strategy', stageStartedAt: Date.now() - 61_000 }} onRetry={noop} onBack={noop} />);
     expect(container.querySelectorAll('[aria-live]')).toHaveLength(1);
     expect(statesOf(container)).toEqual(['done', 'active', 'pending', 'pending']);
     const active = container.querySelector(`${ROWS}[data-state="active"]`) as HTMLElement;
@@ -47,7 +47,7 @@ describe('ConsulenteRun', () => {
 
   it('marks the failed stage, keeps no clock and offers «Riprova» as an AI control', () => {
     const { container } = render(
-      <ConsulenteRun state={{ kind: 'failed', answers, error: 'Ricerca interrotta: ornitorinco.', retryable: true, resumeFrom: 'instruments' }} onRetry={noop} onBack={noop} />
+      <ConsulenteRun state={{ kind: 'failed', answers, interview: null, error: 'Ricerca interrotta: ornitorinco.', retryable: true, resumeFrom: 'instruments' }} onRetry={noop} onBack={noop} />
     );
     expect(statesOf(container)).toEqual(['done', 'done', 'failed', 'pending']);
     expect(screen.getByRole('status').textContent).toBe('Il percorso non si è concluso.');
@@ -57,7 +57,7 @@ describe('ConsulenteRun', () => {
   });
 
   it('shows every stage done when the run has finished', () => {
-    const { container } = render(<ConsulenteRun state={{ kind: 'done', answers }} onRetry={noop} onBack={noop} />);
+    const { container } = render(<ConsulenteRun state={{ kind: 'done', answers, interview: null }} onRetry={noop} onBack={noop} />);
     expect(statesOf(container)).toEqual(['done', 'done', 'done', 'done']);
     expect(screen.getByRole('status').textContent).toBe('La proposta è pronta.');
   });

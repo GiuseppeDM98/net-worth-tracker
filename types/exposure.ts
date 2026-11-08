@@ -57,6 +57,19 @@ export interface InstrumentFundProfile {
   holdingsBasis: 'sleeve' | 'fund';
   /** `fundProfile.family` as Yahoo writes it; null when Yahoo has none. */
   family: string | null;
+  /**
+   * A bond fund's effective duration and average maturity in YEARS, from `topHoldings.bondHoldings`
+   * (2026-11-08, the Consulente's bond block, doc/guide/consulente.md § The run); absent when Yahoo
+   * publishes neither — an equity fund, an ETC. Yahoo's figure, unverified: the Consulente's second
+   * agent confirms it with the web search before it names a candidate's duration.
+   */
+  bond?: { durationYears: number | null; maturityYears: number | null };
+  /**
+   * How this module's answer was read (`FUND_PROFILE_SCHEMA` in `yahooSource.ts`). A document
+   * written before `bond` existed has none and is asked to Yahoo once more whatever its age; still
+   * nothing of a user's — it says how Yahoo's answer was normalised, not who asked.
+   */
+  schema?: number;
 }
 
 export interface InstrumentStockProfile {

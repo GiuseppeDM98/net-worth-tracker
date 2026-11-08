@@ -99,9 +99,12 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   nothing touches the disk. The child re-keys everything to `prod-mirror` (`userId` on every row, the snapshot ids
   `{uid}-{y}-{m}`, the per-user docs), creates `mirror@example.com` / `test1234`, and leaves the caches out so the app
   recomputes with the current math. The account is a standard; the data is removed at the end of the session
-  (`MIRROR_UID=… npm run mirror:remove` clears one seeded under another id). **What the app writes during a tour goes
+  (`MIRROR_UID=… npm run mirror:remove` clears one seeded under another id). **The Consulente's reset of one account**
+  (`npm run consulente:reset -- <email>`, production, dry run without `--yes`; `consulente:reset:emulator` here) is
+  the only other script that touches production, and only `allocationAdvice/{uid}` with its `history`
+  (doc/guide/consulente.md § The run). **What the app writes during a tour goes
   too** (2026-11-03, `TOUR_ONLY_DOCS` in `scripts/mirrorCollections.ts`, held against `firestore.rules` by
-  `__tests__/mirrorCollections.test.ts`): a Consulente run leaves `allocationAdvice/prod-mirror`, the theme `userPreferences/prod-mirror`, a chat
+  `__tests__/mirrorCollections.test.ts`): a Consulente run leaves `allocationAdvice/prod-mirror` (and, under it, the `history` of the paths it replaced, 2026-11-08), the theme `userPreferences/prod-mirror`, a chat
   `assistantMemory/prod-mirror` and the `messages` under its thread (`recursiveDelete`: a delete does not cascade), a grant `account-access/prod-mirror`,
   and none is read from production; a new per-account document the app writes joins that list. Check after a tour by listing the emulator's collections for `prod-mirror`. A saved `.emulator-data` older than that
   date may bring a `userPreferences/prod-mirror` back at the next start: it is local and git-ignored.
@@ -115,7 +118,14 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   2026-09-13) still answers 200 and writes a full export into a directory of THAT name in the repo root, which `git
   status` then shows as untracked: delete it. **Stopping a background task (`TaskStop`) kills only the npm wrapper**
   (2026-09-19): `next dev`, the `firebase` CLI and the Firestore `java` stay LISTENING on 3000/4000/4400/8080/9099 —
-  read `netstat -ano`, confirm each PID's command line is this repo's, then `Stop-Process -Id … -Force`. **A port 3000
+  read `netstat -ano`, confirm each PID's command line is this repo's, then `Stop-Process -Id … -Force`. **Under the
+  agent's sandbox `netstat -ano` and `Get-NetTCPConnection` may list NONE of the emulators' ports (8080, 9099, 4000)
+  nor :3000 while every one of them answers** (2026-11-08): «alive or dead» is decided with a request — `curl -s -o
+  /dev/null -w "%{http_code}" http://127.0.0.1:<port>/` (200 from all four) — never with the listener list. **Kill by the
+  TREE's PIDs, never by a loose command-line pattern** (2026-11-08): list `Win32_Process` filtered on this repo's path,
+  read each command line, then `taskkill /PID <pid> /T /F` on the wrappers you started; a filter on
+  `start-server.js` without the port killed the owner's `next dev` (its inner process carries no «dev» in its own
+  command line), and `*next*build*` killed the dev server's Turbopack workers (their path is `.next\dev\build\chunks`). **A port 3000
   held by another app sends `next dev` to 3001 on its own** (2026-09-19: a foreign app answered `/login` with a redirect
   to `/it/login`, and the probe waited for a form that never came): read the «Local:» line of the dev log first.
   **A port 3100 held by another app is REUSED by Playwright** (`reuseExistingServer` is on locally, the port fixed in

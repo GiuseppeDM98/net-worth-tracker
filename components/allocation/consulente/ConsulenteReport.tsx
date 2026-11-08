@@ -10,9 +10,11 @@
  * `saveGoalData`) and then the «applied» route records them; every reader's key is invalidated.
  *
  * What the model wrote wears the AI accent (`generated`, DESIGN.md → The AI-Accent Rule,
- * 2026-11-07); «Applica» and «Chiedi una modifica» do not: they ask, they do not say. The column
- * cascades in ONCE per JS session (a reload plays it again, a client navigation back does not,
- * reduced motion never) and the proposed percentages count up with it.
+ * 2026-11-07); «Applica», «Chiedi una modifica» (`ConsulenteRevisionTile`, 2026-11-08) and «Il
+ * colloquio» (`ConsulenteInterviewTile`: the user's own answers recapped, decision 79) do not:
+ * they ask, or they quote the user, they do not say. The column cascades in ONCE per JS session
+ * (a reload plays it again, a client navigation back does not, reduced motion never) and the
+ * proposed percentages count up with it.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -32,22 +34,22 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { useAllocationAdvice } from '@/lib/hooks/useAllocationAdvice';
 import { useConsulenteRevision } from './useConsulenteRevision';
 import { StageRows } from './ConsulenteRun';
+import { ConsulenteInterviewTile } from './ConsulenteInterviewTile';
+import { ConsulenteRevisionTile } from './ConsulenteRevisionTile';
 import { buildTargetsFromProposal, currentAllocationOnBase, planGoalDocument, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
 import { runStageStates } from '@/lib/utils/allocationAdviceDocument';
 import { removedGoalIds } from '@/lib/utils/allocationAdviceDraft';
-import { buildConsulenteVerdict, buildProposalRows, describeApplySummary, describeProposalReading, describeRunHeadline, REVISION_COPY } from '@/lib/utils/allocationAdviceNarrative';
+import { buildConsulenteVerdict, buildProposalRows, describeApplySummary, describeProposalReading, describeRunHeadline } from '@/lib/utils/allocationAdviceNarrative';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
-import { formatDate, formatPercentageIt, formatSignedPoints, formatCurrency } from '@/lib/utils/formatters';
+import { formatDate, formatNumberIt, formatPercentageIt, formatSignedPoints, formatCurrency } from '@/lib/utils/formatters';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
 import { useCountUp } from '@/lib/utils/useCountUp';
-import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 /** Once per JS session: its own flag (the Panoramica's stays page-local). */
@@ -113,7 +115,6 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, onRedo }
   // A run still going rereads the document while it lasts.
   useAllocationAdvice(ownerId, { enabled: document.status === 'running' });
   const revision = useConsulenteRevision(ownerId);
-  const [revisionRequest, setRevisionRequest] = useState('');
   const revising = revision.state.kind === 'running';
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
   // Today's Italian day once per mount: the applied verdict says when the review is near or due.
@@ -268,6 +269,7 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, onRedo }
                             {candidate.isin ? ` · ${candidate.isin}` : ''}
                             {candidate.ticker ? ` · ${candidate.ticker}` : ''}
                             {candidate.ter !== undefined ? ` · TER ${formatPercentageIt(candidate.ter, 2)}` : ''}
+                            {candidate.duration !== undefined ? ` · duration ${formatNumberIt(candidate.duration, 1)} anni` : ''}
                             {candidate.policy ? ` · ${candidate.policy}` : ''}
                             {` · ${candidate.exchange}`}
                           </span>
@@ -344,34 +346,6 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, onRedo }
         </motion.div>
       )}
 
-      {document.report && (
-        <motion.div variants={cardItem}>
-          <Tile eyebrow="Chiedi una modifica" aside={revising ? 'in corso' : `${(document.revisions ?? []).length} ${(document.revisions ?? []).length === 1 ? 'richiesta' : 'richieste'}`} reading={[{ text: REVISION_COPY.reading }]}>
-            {(document.revisions ?? []).length > 0 && (
-              <ol className="mt-3 list-decimal space-y-1 pl-5 text-[13px] leading-[1.45] text-foreground" aria-label="Le richieste fatte">
-                {(document.revisions ?? []).map((row) => (
-                  <li key={row.at.getTime()}>
-                    {row.request} <span className="text-muted-foreground">· {formatDate(row.at)}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-            <div className="mt-3 flex flex-col gap-1.5">
-              <Label htmlFor="consulente-revision">{REVISION_COPY.label}</Label>
-              <Textarea id="consulente-revision" rows={3} value={revisionRequest} onChange={(event) => setRevisionRequest(event.target.value)} placeholder={REVISION_COPY.placeholder} disabled={revising} maxLength={1000} />
-            </div>
-            <p role="status" className={cn('mt-2 min-h-[1.25rem] text-[12px]', revision.state.kind === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>
-              {revision.state.kind === 'failed' ? revision.state.error : revising ? REVISION_COPY.running : ''}
-            </p>
-            <div className="mt-3 flex justify-end">
-              <Button type="button" className={cn('h-11 border border-transparent desktop:h-9', AI_CONTROL_ACCENT_CLASS)} disabled={revising || revisionRequest.trim() === ''} onClick={() => revision.revise(revisionRequest.trim(), () => setRevisionRequest(''))}>
-                Rivedi il report
-              </Button>
-            </div>
-          </Tile>
-        </motion.div>
-      )}
-
       {!document.report && document.strategy && (
         <motion.div variants={cardItem}>
           <Tile eyebrow="La strategia" generated aside={`${document.strategy.model} · ${formatDate(document.strategy.finishedAt)}`}>
@@ -381,6 +355,19 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, onRedo }
               </ReactMarkdown>
             </div>
           </Tile>
+        </motion.div>
+      )}
+
+      {/* After the text, before «Chiedi una modifica» (criterion 9 of AI-04); nothing with zero rounds. */}
+      {document.interview && document.interview.rounds.length > 0 && (
+        <motion.div variants={cardItem}>
+          <ConsulenteInterviewTile interview={document.interview} />
+        </motion.div>
+      )}
+
+      {document.report && (
+        <motion.div variants={cardItem}>
+          <ConsulenteRevisionTile ownerId={ownerId} document={document} revision={revision} />
         </motion.div>
       )}
 

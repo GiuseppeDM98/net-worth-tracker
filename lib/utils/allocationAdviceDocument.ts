@@ -8,12 +8,30 @@
 
 import { toDate } from '@/lib/utils/dateHelpers';
 import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdviceProposal';
-import { ALLOCATION_ADVICE_STAGES, type AllocationAdviceDocument, type AllocationAdvicePriorPlan, type AllocationAdviceRunStage, type AllocationAdviceStage } from '@/types/allocationAdvice';
+import {
+  ALLOCATION_ADVICE_STAGES,
+  type AllocationAdviceDocument,
+  type AllocationAdviceInterview,
+  type AllocationAdvicePriorPlan,
+  type AllocationAdviceRunStage,
+  type AllocationAdviceStage,
+} from '@/types/allocationAdvice';
 
 type Data = Record<string, unknown>;
 
 function dateOrNull(value: unknown): Date | null {
   return value ? toDate(value as Date) : null;
+}
+
+/** The interview as stored (2026-11-08): each round's `askedAt` through `toDate`, the rest as written; null when absent (older documents). */
+function interviewOrNull(value: unknown): AllocationAdviceInterview | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as { rounds?: unknown; skipped?: unknown };
+  const rounds = Array.isArray(record.rounds) ? (record.rounds as Data[]) : [];
+  return {
+    rounds: rounds.map((round) => ({ ...(round as unknown as AllocationAdviceInterview['rounds'][number]), askedAt: toDate(round.askedAt as Date) })),
+    skipped: record.skipped === true,
+  };
 }
 
 function withFinishedAt<T extends { finishedAt: unknown }>(value: unknown): (Omit<T, 'finishedAt'> & { finishedAt: Date }) | null {
@@ -97,5 +115,7 @@ export function mapAllocationAdviceData(userId: string, data: Data): AllocationA
     revisions: Array.isArray(data.revisions)
       ? (data.revisions as Data[]).map((row) => ({ request: String(row.request ?? ''), at: toDate(row.at as Date) }))
       : [],
+    interview: interviewOrNull(data.interview),
+    revisionInterview: interviewOrNull(data.revisionInterview),
   };
 }

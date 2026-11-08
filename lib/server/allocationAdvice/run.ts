@@ -8,22 +8,38 @@ import {
   ALLOCATION_ADVICE_STRATEGY_MODEL,
   SERVER_SIDE_FALLBACK_BETA,
 } from '@/lib/constants/aiModels';
-import { buildAssistantYtdContext, fetchCashflowBlockInputs } from '@/lib/services/assistantMonthContextService';
-import { buildCashflowBlock, formatCashflowBlockForPrompt } from '@/lib/utils/cashflowBlock';
+import { buildAssistantYtdContext } from '@/lib/services/assistantMonthContextService';
+import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import { formatBundleForPrompt, formatPortfolioForPrompt } from '@/lib/server/assistant/prompts';
-import { buildInstrumentsPrompt, buildReviewPrompt, buildRevisionPrompt, buildStrategyPrompt } from './prompts';
-import { getAllocationAdviceAdmin, patchAllocationAdviceAdmin, setAllocationAdviceAdmin } from './store';
+import { buildInstrumentsPrompt, buildInterviewPrompt, buildReviewPrompt, buildRevisionPrompt, buildStrategyPrompt } from './prompts';
+import { archiveAllocationAdviceAdmin, getAllocationAdviceAdmin, listAllocationAdviceHistoryAdmin, patchAllocationAdviceAdmin, setAllocationAdviceAdmin } from './store';
 import {
   ALLOCATION_PROPOSAL_BLOCK,
   INSTRUMENT_CANDIDATES_BLOCK,
   allocationAdviceAnswerSchema,
+  interviewRoundSchema,
   parseAllocationAnswer,
   parseInstrumentCandidatesLenient,
+  parseInterviewRound,
   stripFencedBlocks,
   type AllocationAdviceAnswers,
 } from '@/lib/utils/allocationAdviceProposal';
-import type { AllocationAdviceDocument, AllocationAdvicePriorPlan, AllocationAdviceRunStage, AllocationAdviceStage } from '@/types/allocationAdvice';
+import {
+  ALLOCATION_ADVICE_HISTORY_LIMIT,
+  type AllocationAdviceDocument,
+  type AllocationAdviceInterview,
+  type AllocationAdviceInterviewRound,
+  type AllocationAdvicePreviousPaths,
+  type AllocationAdvicePriorPlan,
+  type AllocationAdviceRunStage,
+  type AllocationAdviceStage,
+} from '@/types/allocationAdvice';
 import { priorPlanOf } from '@/lib/utils/allocationAdviceDocument';
+import { bondProfileRequests, formatBondTermsBlock, selectBondHoldings } from '@/lib/utils/allocationAdviceBonds';
+import type { AssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
+import { getItalyDateIso } from '@/lib/utils/dateHelpers';
+import { resolveInstrumentProfiles } from '@/lib/server/exposure/instrumentProfileService';
+import type { InstrumentProfile } from '@/types/exposure';
 
 /**
  * The Consulente's run (2026-10-20): the context, then three model calls in series — the
@@ -39,10 +55,17 @@ import { priorPlanOf } from '@/lib/utils/allocationAdviceDocument';
  * (markdown + proposal, `allocationAdviceAnswerSchema`); the instrument search keeps its fenced
  * block, because web search answers with citations and structured outputs refuse them. Both
  * models opt into the server-side fallback (aiModels.ts).
+ *
+ * The interview (2026-11-08, doc/ai/AI-04-colloquio.md) is a request of its own,
+ * `runInterviewRound`: one call on Opus 5.5 that reads the strategy's context and answers a round
+ * of questions as a structured output. It never enters `runAllocationAdviceStage` and writes
+ * nothing — the rounds live in the browser's draft until the strategy's body carries them.
  */
 
 /** Output budget per call: thinking AND text; a strategy with its block is a few thousand tokens, the rest is reasoning. */
 export const ALLOCATION_ADVICE_MAX_TOKENS = 32000;
+/** An interview round is a note and at most four questions: half the strategy's budget, most of it reasoning. */
+export const ALLOCATION_ADVICE_INTERVIEW_MAX_TOKENS = 16000;
 /**
  * How many searches the instrument agent may run. Twelve ran out on the owner's thirteen sleeves
  * (2026-10-20: two left unverified «perché il limite di ricerche è finito prima»); the prompt now
@@ -66,12 +89,15 @@ interface CollectedAnswer {
   webSearchUsed: boolean;
 }
 
+/** The stage a model call belongs to: the document's four, or the interview, which no document holds. */
+type CallStage = AllocationAdviceStage | 'interview';
+
 /** An agent that did not finish: the stage it was in and the product's sentence for it. */
 export class AllocationAdviceStageError extends Error {
-  stage: AllocationAdviceStage;
+  stage: CallStage;
   retryable: boolean;
 
-  constructor(stage: AllocationAdviceStage, message: string, retryable = false) {
+  constructor(stage: CallStage, message: string, retryable = false) {
     super(message);
     this.name = 'AllocationAdviceStageError';
     this.stage = stage;
@@ -93,9 +119,11 @@ export const ALLOCATION_ADVICE_MAX_CONTINUATIONS = 3;
  * make the SDK throw on a proposal that breaks a sum, where the run keeps the markdown instead.
  */
 const ALLOCATION_ANSWER_FORMAT = { type: 'json_schema' as const, schema: betaZodOutputFormat(allocationAdviceAnswerSchema).schema };
+/** The interview round's wire form (`interviewRoundSchema`): `note` first, so the model reads before it asks. */
+const INTERVIEW_FORMAT = { type: 'json_schema' as const, schema: betaZodOutputFormat(interviewRoundSchema).schema };
 
 /** A stage's answer is usable only when the model finished on its own. */
-function assertFinished(stage: AllocationAdviceStage, answer: CollectedAnswer): void {
+function assertFinished(stage: CallStage, answer: CollectedAnswer): void {
   if (answer.stopReason === 'end_turn' || answer.stopReason === 'stop_sequence') return;
   if (answer.stopReason === 'refusal') {
     throw new AllocationAdviceStageError(stage, 'Il modello ha rifiutato di rispondere su questi dati. Riprova riformulando le note del percorso.');
@@ -112,8 +140,10 @@ interface ModelCall {
   effort: 'low' | 'medium' | 'high';
   /** Web search: the instrument stage only — its citations rule out a structured answer. */
   webSearch?: boolean;
-  /** The structured answer: the strategy and the review. */
-  structured?: boolean;
+  /** The structured answer's wire schema: the strategy, the review and the revision (`ALLOCATION_ANSWER_FORMAT`), the interview (`INTERVIEW_FORMAT`). */
+  format?: { type: 'json_schema'; schema: Record<string, unknown> };
+  /** The output budget; `ALLOCATION_ADVICE_MAX_TOKENS` when absent. */
+  maxTokens?: number;
 }
 
 /**
@@ -122,7 +152,7 @@ interface ModelCall {
  * accumulator names the model that finished, not the one that declined. A paused turn is resumed
  * up to `ALLOCATION_ADVICE_MAX_CONTINUATIONS` times, its text kept.
  */
-async function callModel(stage: AllocationAdviceStage, call: ModelCall): Promise<CollectedAnswer> {
+async function callModel(stage: CallStage, call: ModelCall): Promise<CollectedAnswer> {
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: call.prompt.userContent }];
   const texts: string[] = [];
   let webSearchUsed = false;
@@ -134,10 +164,10 @@ async function callModel(stage: AllocationAdviceStage, call: ModelCall): Promise
           model: call.model,
           betas: [SERVER_SIDE_FALLBACK_BETA],
           fallbacks: 'default',
-          max_tokens: ALLOCATION_ADVICE_MAX_TOKENS,
+          max_tokens: call.maxTokens ?? ALLOCATION_ADVICE_MAX_TOKENS,
           system: call.prompt.system,
           thinking: { type: 'adaptive' },
-          output_config: { effort: call.effort, ...(call.structured ? { format: ALLOCATION_ANSWER_FORMAT } : {}) },
+          output_config: { effort: call.effort, ...(call.format ? { format: call.format } : {}) },
           ...(call.webSearch
             ? {
                 tools: [
@@ -194,6 +224,8 @@ export interface RunAllocationAdviceStageArgs {
   document?: AllocationAdviceDocument | null;
   /** «Chiedi una modifica»: what the user asked on the finished report; required by `revise`. */
   request?: string;
+  /** The interview (2026-11-08): the path's rounds for the strategy, the revision's round for `revise`; null or absent when none. */
+  interview?: AllocationAdviceInterview | null;
   onStage: (stage: AllocationAdviceStage) => void;
   now?: Date;
 }
@@ -209,7 +241,8 @@ function withBlock(markdown: string, language: string, block: unknown): string {
   return `${markdown}\n\n\`\`\`${language}\n${JSON.stringify(block)}\n\`\`\``;
 }
 
-function newDocument(userId: string, answers: AllocationAdviceAnswers, now: Date): AllocationAdviceDocument {
+/** The strategy's document, the interview's ONLY writer (criterion 6 of AI-04). */
+function newDocument(userId: string, answers: AllocationAdviceAnswers, now: Date, interview: AllocationAdviceInterview | null = null): AllocationAdviceDocument {
   return {
     userId,
     status: 'running',
@@ -223,7 +256,72 @@ function newDocument(userId: string, answers: AllocationAdviceAnswers, now: Date
     report: null,
     error: null,
     applied: null,
+    interview,
+    revisionInterview: null,
   };
+}
+
+/**
+ * The OBBLIGAZIONI block (2026-11-08, the owner's addition after AI-04's phase F): the single
+ * bonds' maturities from the portfolio context, the bond ETFs' duration and average maturity from
+ * the Esposizione's shared profile cache (Yahoo once per ticker, then 30 days) — a read that may
+ * fail without failing the run: the block then says the profiles were not read.
+ */
+async function readBondTermsBlock(portfolio: AssistantPortfolioContext, now: Date): Promise<string> {
+  const requests = bondProfileRequests(selectBondHoldings(portfolio.holdings).funds);
+  let profiles: Record<string, InstrumentProfile> = {};
+  let profilesRead = true;
+  if (requests.length > 0) {
+    try {
+      profiles = (await resolveInstrumentProfiles(requests, { now })).response.profiles;
+    } catch (error) {
+      profilesRead = false;
+      console.error('[consulente] bond profiles not read', error);
+    }
+  }
+  return formatBondTermsBlock({ holdings: portfolio.holdings, coupons: portfolio.dividends.coupons, profiles, profilesRead, todayIso: getItalyDateIso(now) }).join('\n');
+}
+
+/**
+ * The paths before this one (2026-11-08): the live document when it has a report — during the
+ * interview nothing has replaced it yet, at the strategy it is read before the new one — then the
+ * archive, the most recent first, cut at `ALLOCATION_ADVICE_HISTORY_LIMIT`. A failed archive read
+ * never fails a path: the block says it and lists the live one alone.
+ */
+async function readPreviousPaths(userId: string, live: AllocationAdviceDocument | null): Promise<AllocationAdvicePreviousPaths> {
+  let archived: AllocationAdviceDocument[] = [];
+  let archiveRead = true;
+  try {
+    archived = await listAllocationAdviceHistoryAdmin(userId, ALLOCATION_ADVICE_HISTORY_LIMIT);
+  } catch (error) {
+    archiveRead = false;
+    console.error('[consulente] history not read', error);
+  }
+  return { paths: [...(live?.report ? [live] : []), ...archived].slice(0, ALLOCATION_ADVICE_HISTORY_LIMIT), archiveRead };
+}
+
+/** The document a new path replaces goes to the archive when it has a report; a failed copy is logged, never the path's failure. */
+async function archivePreviousPath(previous: AllocationAdviceDocument | null): Promise<void> {
+  if (!previous?.report) return;
+  try {
+    await archiveAllocationAdviceAdmin(previous);
+  } catch (error) {
+    console.error('[consulente] previous path not archived', error);
+  }
+}
+
+/**
+ * The strategy's context, read once per call: the YTD bundle, the fullest picture of the year
+ * the app has, with every portfolio block the assistant reads, and under it the OBBLIGAZIONI
+ * block (2026-11-08); beside them the CASHFLOW 12 MESI block (2026-11), on its own read of the
+ * whole history. Shared by the strategy and the interview (2026-11-08), so a round reads exactly
+ * the strategy's data. A failed read rejects here and fails the caller, retryable: never a
+ * strategy on a silent empty cashflow.
+ */
+async function buildConsulenteContext(userId: string, now: Date): Promise<{ dataBlock: string; cashflowBlock: string }> {
+  const [bundle, cashflowBlock] = await Promise.all([buildAssistantYtdContext(userId), readCashflowBlockForPrompt(userId, now)]);
+  const bondBlock = await readBondTermsBlock(bundle.portfolio, now);
+  return { dataBlock: `${formatBundleForPrompt(bundle)}\n\n${bondBlock}`, cashflowBlock };
 }
 
 /** The stage begins: the document says so before the model is called, so a cut leaves it there. */
@@ -235,24 +333,20 @@ async function enterStage(document: AllocationAdviceDocument, stage: AllocationA
   onStage(stage);
 }
 
-async function runStrategy(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, priorPlan: AllocationAdvicePriorPlan | null, now: Date): Promise<void> {
-  // The context: the YTD bundle, the fullest picture of the year the app has, with every
-  // portfolio block the assistant reads; beside it the CASHFLOW 12 MESI block (2026-11), read once
-  // per strategy — the goals' contributions and the cash reserve are sized on it. A failed read
-  // rejects here and fails the stage, retryable: never a strategy on a silent empty cashflow.
-  const [bundle, cashflow] = await Promise.all([
-    buildAssistantYtdContext(document.userId),
-    fetchCashflowBlockInputs(document.userId, now),
-  ]);
-  const dataBlock = formatBundleForPrompt(bundle);
-  const { expenses, ...input } = cashflow;
-  const cashflowBlock = formatCashflowBlockForPrompt(buildCashflowBlock(expenses, input));
+async function runStrategy(
+  document: AllocationAdviceDocument,
+  onStage: (stage: AllocationAdviceStage) => void,
+  priorPlan: AllocationAdvicePriorPlan | null,
+  now: Date,
+  previousPaths: AllocationAdvicePreviousPaths | null = null
+): Promise<void> {
+  const { dataBlock, cashflowBlock } = await buildConsulenteContext(document.userId, now);
   await enterStage(document, 'strategy', onStage);
   const answer = await callModel('strategy', {
     model: ALLOCATION_ADVICE_STRATEGY_MODEL,
-    prompt: buildStrategyPrompt(document.answers, dataBlock, { priorPlan, cashflowBlock }),
+    prompt: buildStrategyPrompt(document.answers, dataBlock, { priorPlan, cashflowBlock, interview: document.interview, previousPaths }),
     effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
-    structured: true,
+    format: ALLOCATION_ANSWER_FORMAT,
   });
   const parsed = parseAllocationAnswer(answer.text);
   if (!parsed?.proposal) {
@@ -264,11 +358,12 @@ async function runStrategy(document: AllocationAdviceDocument, onStage: (stage: 
   await patchAllocationAdviceAdmin(document.userId, { strategy: document.strategy });
 }
 
-async function runInstruments(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void): Promise<void> {
+async function runInstruments(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, now: Date): Promise<void> {
   const proposal = document.strategy?.proposal;
   if (!proposal) throw new AllocationAdviceStageError('instruments', 'Manca la strategia da cui partire. Avvia di nuovo la ricerca.', false);
   const bundle = await buildAssistantYtdContext(document.userId);
-  const holdingsBlock = formatPortfolioForPrompt(bundle.portfolio).join('\n');
+  // The holdings and, under them, the OBBLIGAZIONI block: the agent reads the durations it must confirm.
+  const holdingsBlock = [...formatPortfolioForPrompt(bundle.portfolio), '', await readBondTermsBlock(bundle.portfolio, now)].join('\n');
   await enterStage(document, 'instruments', onStage);
   const answer = await callModel('instruments', {
     model: ALLOCATION_ADVICE_INSTRUMENTS_MODEL,
@@ -301,10 +396,11 @@ async function runReview(document: AllocationAdviceDocument, onStage: (stage: Al
       document.answers,
       withBlock(strategy.markdown, ALLOCATION_PROPOSAL_BLOCK, strategy.proposal),
       withBlock(instruments.markdown, INSTRUMENT_CANDIDATES_BLOCK, instruments.candidates),
-      instruments.candidates
+      instruments.candidates,
+      { interview: document.interview }
     ),
     effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
-    structured: true,
+    format: ALLOCATION_ANSWER_FORMAT,
   });
   // The review's proposal when valid, the strategy's otherwise: a review that breaks a sum loses
   // its structure, never the proposal.
@@ -320,7 +416,7 @@ async function runReview(document: AllocationAdviceDocument, onStage: (stage: Al
  * with the previous report and every request so far — a couple of minutes on Opus 5.5 instead
  * of a whole new run. The report and its proposal are replaced; the requests stay on the document.
  */
-async function runRevise(document: AllocationAdviceDocument, request: string, onStage: (stage: AllocationAdviceStage) => void): Promise<void> {
+async function runRevise(document: AllocationAdviceDocument, request: string, interview: AllocationAdviceInterview | null, onStage: (stage: AllocationAdviceStage) => void): Promise<void> {
   const { strategy, instruments, report } = document;
   if (!strategy?.proposal || !instruments || !report) throw new AllocationAdviceStageError('review', "Non c'è un report finito da rivedere. Avvia la ricerca.");
   const requests = [...(document.revisions ?? []).map((row) => row.request), request];
@@ -333,17 +429,76 @@ async function runRevise(document: AllocationAdviceDocument, request: string, on
       withBlock(instruments.markdown, INSTRUMENT_CANDIDATES_BLOCK, instruments.candidates),
       instruments.candidates,
       withBlock(report.markdown, ALLOCATION_PROPOSAL_BLOCK, report.proposal),
-      requests
+      requests,
+      { interview }
     ),
     effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
-    structured: true,
+    format: ALLOCATION_ANSWER_FORMAT,
   });
   const reviewed = parseAllocationAnswer(answer.text);
   if (reviewed && !reviewed.proposal) console.warn('[consulente] revision proposal refused', reviewed.refused);
   document.report = { markdown: reviewed?.markdown ?? answer.text, proposal: reviewed?.proposal ?? report.proposal, model: answer.model, finishedAt: new Date() };
   document.revisions = [...(document.revisions ?? []), { request, at: new Date() }];
+  document.revisionInterview = interview ?? null;
   document.status = 'ready';
-  await patchAllocationAdviceAdmin(document.userId, { report: document.report, revisions: document.revisions, status: 'ready' });
+  await patchAllocationAdviceAdmin(document.userId, { report: document.report, revisions: document.revisions, revisionInterview: document.revisionInterview, status: 'ready' });
+}
+
+// ─── The interview, a request of its own (2026-11-08) ─────────────────────────
+
+export interface RunInterviewRoundArgs {
+  userId: string;
+  answers: AllocationAdviceAnswers;
+  /** The rounds already asked, each with the answers given; empty for round 1. */
+  previousRounds: AllocationAdviceInterviewRound[];
+  /** «Chiedi una modifica»: the ONE round about the written request, over the finished report. */
+  revision?: { requests: string } | null;
+  onRound: (round: Omit<AllocationAdviceInterviewRound, 'answers'>) => void;
+  now?: Date;
+}
+
+/**
+ * One round of the interview: reads the store ONCE (`getAllocationAdviceAdmin`, null for a
+ * first-time user — the plan in force, or the report a revision is about), builds the strategy's
+ * context, calls Opus 5.5 with `interviewRoundSchema` as the structured output and hands the
+ * round to `onRound`. It never writes: no `setAllocationAdviceAdmin`, no
+ * `patchAllocationAdviceAdmin`, no `enterStage` — the rounds live in the browser's draft until
+ * the strategy's body carries them (decision 23). A failure rejects with an
+ * `AllocationAdviceStageError` of stage `'interview'`.
+ */
+export async function runInterviewRound({ userId, answers, previousRounds, revision = null, onRound, now = new Date() }: RunInterviewRoundArgs): Promise<void> {
+  const stored = await getAllocationAdviceAdmin(userId);
+  let revisionBlock: { requests: string; report: string } | null = null;
+  if (revision) {
+    const report = stored?.report;
+    if (!stored || !report || !stored.strategy?.proposal) throw new AllocationAdviceStageError('interview', "Non c'è un report finito da rivedere. Avvia la ricerca.");
+    const requests = [...(stored.revisions ?? []).map((row) => row.request), revision.requests];
+    revisionBlock = {
+      requests: requests.map((request, index) => `${index + 1}. ${request}`).join('\n'),
+      report: withBlock(report.markdown, ALLOCATION_PROPOSAL_BLOCK, report.proposal),
+    };
+  }
+  // A new path reads the paths before it; the revision's round reads its own report instead.
+  const [{ dataBlock, cashflowBlock }, previousPaths] = await Promise.all([buildConsulenteContext(userId, now), revision ? null : readPreviousPaths(userId, stored)]);
+  const answer = await callModel('interview', {
+    model: ALLOCATION_ADVICE_STRATEGY_MODEL,
+    prompt: buildInterviewPrompt(answers, dataBlock, {
+      cashflowBlock,
+      priorPlan: revision ? null : priorPlanOf(stored),
+      previousRounds,
+      roundNumber: previousRounds.length + 1,
+      revision: revisionBlock,
+      previousPaths,
+    }),
+    effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
+    maxTokens: ALLOCATION_ADVICE_INTERVIEW_MAX_TOKENS,
+    format: INTERVIEW_FORMAT,
+  });
+  // Lenient: the questions that parse are kept, the refused go to the log (the silent-cap rule).
+  const { round, refused } = parseInterviewRound(answer.text);
+  for (const reason of refused) console.warn('[consulente] interview question refused', reason);
+  if (!round) throw new AllocationAdviceStageError('interview', 'Il modello non ha prodotto domande leggibili. Riprova.', true);
+  onRound({ ...round, model: answer.model, askedAt: new Date() });
 }
 
 /**
@@ -351,14 +506,20 @@ async function runRevise(document: AllocationAdviceDocument, request: string, on
  * continue the persisted one; `revise` reruns the review on a finished report with `request`. Resolves with the document as it stands after the stage; rejects
  * with an `AllocationAdviceStageError` after persisting the failure (stage, words, retryable).
  */
-export async function runAllocationAdviceStage({ userId, stage, answers, document: given, request, onStage, now = new Date() }: RunAllocationAdviceStageArgs): Promise<AllocationAdviceDocument> {
+export async function runAllocationAdviceStage({ userId, stage, answers, document: given, request, interview = null, onStage, now = new Date() }: RunAllocationAdviceStageArgs): Promise<AllocationAdviceDocument> {
   let document: AllocationAdviceDocument;
-  // The plan in force, read BEFORE the new document replaces it: the strategy continues it.
+  // The plan in force and the paths before, read BEFORE the new document replaces the last one:
+  // the strategy continues the plan and compares today with then; the replaced document, when it
+  // has a report, is archived first — a crash between the two leaves the old document live.
   let priorPlan: AllocationAdvicePriorPlan | null = null;
+  let previousPaths: AllocationAdvicePreviousPaths | null = null;
   if (stage === 'strategy') {
     if (!answers) throw new AllocationAdviceStageError('strategy', 'Mancano le risposte del percorso. Torna al riepilogo e riparti.');
-    priorPlan = priorPlanOf(given ?? (await getAllocationAdviceAdmin(userId)));
-    document = newDocument(userId, answers, now);
+    const previous = given ?? (await getAllocationAdviceAdmin(userId));
+    priorPlan = priorPlanOf(previous);
+    previousPaths = await readPreviousPaths(userId, previous);
+    await archivePreviousPath(previous);
+    document = newDocument(userId, answers, now, interview);
     await setAllocationAdviceAdmin(document);
     onStage('context');
   } else {
@@ -368,12 +529,12 @@ export async function runAllocationAdviceStage({ userId, stage, answers, documen
   }
 
   try {
-    if (stage === 'strategy') await runStrategy(document, onStage, priorPlan, now);
-    else if (stage === 'instruments') await runInstruments(document, onStage);
+    if (stage === 'strategy') await runStrategy(document, onStage, priorPlan, now, previousPaths);
+    else if (stage === 'instruments') await runInstruments(document, onStage, now);
     else if (stage === 'review') await runReview(document, onStage);
     else {
       if (!request) throw new AllocationAdviceStageError('review', 'Scrivi cosa vuoi cambiare nel report.');
-      await runRevise(document, request, onStage);
+      await runRevise(document, request, interview, onStage);
     }
     return document;
   } catch (error) {
@@ -384,7 +545,8 @@ export async function runAllocationAdviceStage({ userId, stage, answers, documen
     if (!(error instanceof AllocationAdviceStageError)) console.error('[consulente] run failed', error);
     document.status = 'failed';
     document.error = failure.message;
-    await patchAllocationAdviceAdmin(userId, { status: 'failed', error: failure.message, stage: failure.stage });
+    // Never 'interview' here (the interview has its own entry point); the narrowing is for the type.
+    await patchAllocationAdviceAdmin(userId, { status: 'failed', error: failure.message, stage: failure.stage === 'interview' ? documentStageOf(stage) : failure.stage });
     throw failure;
   }
 }

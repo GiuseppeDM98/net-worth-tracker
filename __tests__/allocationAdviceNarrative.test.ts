@@ -55,6 +55,7 @@ function document(overrides: Partial<AllocationAdviceDocument> = {}): Allocation
     report: { markdown: '# Report', proposal: PROPOSAL, model: 'claude-opus-5-5', finishedAt: NOW },
     error: null,
     applied: null,
+    interview: null,
     ...overrides,
   };
 }

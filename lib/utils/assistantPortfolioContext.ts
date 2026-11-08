@@ -42,6 +42,7 @@ import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { describeAssetOwnerLabel } from '@/lib/utils/assetOwnership';
 import { getItalyDateIso, toDate } from '@/lib/utils/dateHelpers';
+import { instrumentTicker, isQuotedInstrument } from '@/lib/utils/exposureRequests';
 import { sliceFraction } from '@/lib/utils/assetSlice';
 import { goalAssetValue, isGoalAsset } from '@/lib/utils/goalAssetValue';
 import { couponFrequencyLabel, getNextCouponDate, hasCouponPayments, resolveCoupon, resolveInflationIndexation } from '@/lib/utils/couponUtils';
@@ -64,6 +65,8 @@ export interface AssistantHoldingRow {
   name: string;
   /** The display ticker when it differs from the name; absent on an account or a hand-valued holding. */
   ticker?: string;
+  /** The raw `asset.ticker`, the key of the Esposizione's profile cache (2026-11-08, the Consulente's bond block); absent on an unquoted holding. */
+  profileTicker?: string;
   type: string;
   assetClass: string;
   subCategory?: string;
@@ -81,6 +84,8 @@ export interface AssistantHoldingRow {
   /** «di Marcella», «Giuseppe 273 quote, 692 in comune», null when the whole asset is in comune. */
   owner: string | null;
   isLiquid: boolean;
+  /** A bond's redemption date (`bondDetails.maturityDate`) as an ISO day; only on a `bond` with its details (2026-11-08). */
+  maturityIso?: string;
   /** The property a loan finances, by name; only on a loan. */
   financedAssetName?: string;
   /**
@@ -312,10 +317,13 @@ function buildHoldingRows(
     // What the goals can hold of it: a property net of its loans (lib/utils/goalAssetValue.ts).
     const goalValueEur = assignedFraction !== null ? goalAssetValue(asset, assets, valueOf) : 0;
 
+    const profileTicker = isQuotedInstrument(asset) ? instrumentTicker(asset) : '';
     rows.push({
       assetId: asset.id,
       name: asset.name.trim(),
       ...(tickerOf(asset) ? { ticker: tickerOf(asset) } : {}),
+      ...(profileTicker ? { profileTicker } : {}),
+      ...(asset.type === 'bond' && asset.bondDetails ? { maturityIso: getItalyDateIso(toDate(asset.bondDetails.maturityDate)) } : {}),
       type: asset.type,
       assetClass: asset.assetClass,
       ...(asset.subCategory ? { subCategory: asset.subCategory } : {}),

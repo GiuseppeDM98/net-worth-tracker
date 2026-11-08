@@ -9,10 +9,11 @@
  * where the reader is, that the headline takes the focus after the slide, and that the run shows
  * its stages, the failed one and «Riprova».
  *
- * It presses «Avvia la ricerca» only on a route faked with `page.route`: the `.env.local` key
- * enables the button, no request reaches the server (doc/guide/e2e-emulatori.md § Browser-Driven
- * E2E). A real run is covered by `allocationAdviceRun` (the SDK simulated) and, on 2026-10-20, by
- * a real run on the mirror.
+ * It presses «Salta il colloquio e avvia la ricerca» only on a route faked with `page.route`: the
+ * `.env.local` key enables the button, no request reaches the server (doc/guide/e2e-emulatori.md
+ * § Browser-Driven E2E). A real run is covered by `allocationAdviceRun` (the SDK simulated) and,
+ * on 2026-10-20, by a real run on the mirror. The interview that precedes the run (2026-11-08) has
+ * its own specs, `allocation.consulente.interview*.spec.ts`.
  */
 
 import { test, expect } from '@playwright/test';
@@ -92,7 +93,8 @@ test('walks the eight screens, «Avanti» held until a screen is complete, and �
   await page.locator('#consulente-avoid').fill('niente leva');
   await next(page);
 
-  // Step 8: the summary rows, each a link back; the run button present, an AI control, never pressed here.
+  // Step 8: the summary rows, each a link back; «Avvia il colloquio» (an AI control) beside the skip
+  // that starts the run (never accented, decision 78); neither pressed here (2026-11-08).
   await expect(page.getByRole('heading', { name: /Passo 8 di 8/ })).toBeVisible();
   const summary = page.getByRole('list', { name: 'Le tue risposte' });
   await expect(summary).toContainText('35 anni · 20 anni di orizzonte');
@@ -100,8 +102,10 @@ test('walks the eight screens, «Avanti» held until a screen is complete, and �
   await expect(summary).toContainText('distribuzione');
   await expect(summary).toContainText('Fondo figli');
   await expect(summary).toContainText('evita: niente leva');
-  await expect(page.getByRole('button', { name: 'Avvia la ricerca' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Avvia la ricerca' })).toHaveClass(/var\(--ai-glow\)/);
+  await expect(page.getByRole('button', { name: 'Avvia il colloquio' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Avvia il colloquio' })).toHaveClass(/var\(--ai-glow\)/);
+  await expect(page.getByRole('button', { name: 'Salta il colloquio e avvia la ricerca' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Salta il colloquio e avvia la ricerca' })).not.toHaveClass(/ai-glow/);
 
   // «Indietro» returns to the constraints; the summary's row opens its screen.
   await page.getByRole('button', { name: 'Indietro' }).click();
@@ -159,7 +163,8 @@ test('runs the three stages on a faked route, a failed stage retried from itself
 
   await openConsulente(page);
   await walkToSummary(page);
-  const start = page.getByRole('button', { name: 'Avvia la ricerca' });
+  // The run without the interview (2026-11-08): the strategy body carries `{ rounds: [], skipped: true }`.
+  const start = page.getByRole('button', { name: 'Salta il colloquio e avvia la ricerca' });
   await expect(start).toBeEnabled();
   await start.click();
 

@@ -102,3 +102,30 @@ describe('the run’s stage rows (2026-11-07)', () => {
     expect(states(runStageStates({ status: 'done', stage: null }))).toEqual(['done', 'done', 'done', 'done']);
   });
 });
+
+describe('the interview on the document (2026-11-08, criterion 6)', () => {
+  const round = { note: 'n', satisfied: false, questions: [], answers: [], model: 'opus-finto', askedAt: { toDate: () => AT } };
+
+  it('maps interview and revisionInterview, each round\'s askedAt through toDate', () => {
+    const document = mapAllocationAdviceData('u1', {
+      status: 'ready',
+      answers: {},
+      stage: 'review',
+      createdAt: AT,
+      updatedAt: AT,
+      interview: { rounds: [round, { ...round, askedAt: AT }], skipped: true },
+      revisionInterview: { rounds: [round], skipped: false },
+    });
+    expect(document.interview?.rounds.map((r) => r.askedAt)).toEqual([AT, AT]);
+    expect(document.interview?.skipped).toBe(true);
+    expect(document.interview?.rounds[0]).toMatchObject({ note: 'n', model: 'opus-finto', answers: [] });
+    expect(document.revisionInterview).toMatchObject({ skipped: false });
+    expect(document.revisionInterview?.rounds[0].askedAt).toEqual(AT);
+  });
+
+  it('maps an older document to interview null and revisionInterview null', () => {
+    const document = mapAllocationAdviceData('u1', { status: 'ready', answers: {}, stage: 'review', createdAt: AT, updatedAt: AT });
+    expect(document.interview).toBeNull();
+    expect(document.revisionInterview).toBeNull();
+  });
+});
