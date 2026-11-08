@@ -187,7 +187,7 @@ describe('the three prompts', () => {
   });
 });
 
-// ── The interview (2026-11-08, doc/ai/AI-04-colloquio.md) ──────────────────────────────
+// ── The interview (2026-11-08) ──────────────────────────────────────────────────────────
 const ROUND: AllocationAdviceInterviewRound = {
   note: 'Vedo un reddito concentrato.',
   satisfied: false,
@@ -204,7 +204,7 @@ const TWO: AllocationAdviceInterview = { rounds: [ROUND, { ...ROUND, note: 'Rest
 const PRIOR = { reportMarkdown: '# Report\nIl piano di prima.', revisions: [], finishedAt: new Date('2026-10-20T12:00:00'), appliedAt: null, reviewByIso: null, reviewReason: null };
 const CASHFLOW = '--- CASHFLOW 12 MESI (x) ---\nX';
 
-describe('formatInterviewForPrompt (criterion 5)', () => {
+describe('formatInterviewForPrompt (the IL COLLOQUIO block, 2026-11-08)', () => {
   it('prints nothing for null or an interview with no round that was not skipped', () => {
     expect(formatInterviewForPrompt(null)).toBe('');
     expect(formatInterviewForPrompt({ rounds: [], skipped: false })).toBe('');
@@ -227,7 +227,7 @@ describe('formatInterviewForPrompt (criterion 5)', () => {
   });
 });
 
-describe('the strategy, the review and the revision read the interview, system unchanged (criterion 5)', () => {
+describe('the strategy, the review and the revision read the interview, system unchanged (2026-11-08)', () => {
   it('the strategy prints the block right after the answers, closed by the line on «La situazione», only with a round', () => {
     const without = buildStrategyPrompt(ANSWERS, 'DATI', { cashflowBlock: CASHFLOW });
     const withInterview = buildStrategyPrompt(ANSWERS, 'DATI', { cashflowBlock: CASHFLOW, interview: TWO });
@@ -256,7 +256,7 @@ describe('the strategy, the review and the revision read the interview, system u
     expect(without.userContent).not.toContain('colloquio');
   });
 
-  it("the revision prints ITS round after the requests, framed by its two lines, only with a round (criterion 13)", () => {
+  it("the revision prints ITS round after the requests, framed by its two lines, only with a round (decision 24)", () => {
     const requests = ['meno cripto', 'solo bond singoli'];
     const without = buildRevisionPrompt(ANSWERS, 'S', 'I', null, 'REPORT', requests);
     const withRound = buildRevisionPrompt(ANSWERS, 'S', 'I', null, 'REPORT', requests, { interview: ONE });
@@ -272,7 +272,7 @@ describe('the strategy, the review and the revision read the interview, system u
   });
 });
 
-describe('buildInterviewPrompt (criteria 5 and 12)', () => {
+describe('buildInterviewPrompt (the round\'s user turn and system, 2026-11-08)', () => {
   const base = { cashflowBlock: CASHFLOW, priorPlan: null, previousRounds: [], roundNumber: 1 };
 
   it('keeps system byte-identical across users, rounds, previous rounds, the plan in force and the revision; the contract is the critical friend', () => {
@@ -335,7 +335,7 @@ describe('buildInterviewPrompt (criteria 5 and 12)', () => {
   });
 });
 
-// ── The bonds by horizon (owner, 2026-11-08, after AI-04's phase F) ──────────────────────
+// ── The bonds by horizon (owner, 2026-11-08, after the interview's phase F on the mirror) ──────────────────────
 describe('the OBBLIGAZIONI block in the four contracts', () => {
   it('the interview asks what the bond part is for, the strategy ties each bond sub-target to a horizon, the search verifies and writes a duration, the review reports it', () => {
     expect(INTERVIEW_CONTRACT).toContain('Le obbligazioni: se il blocco OBBLIGAZIONI elenca titoli o ETF, o la classe dovrà avere peso nel piano, chiedi a cosa servono');
@@ -352,7 +352,7 @@ describe('the OBBLIGAZIONI block in the four contracts', () => {
   });
 });
 
-// ── The previous paths (owner, 2026-11-08, after AI-04's phase F) ──────────────────────────
+// ── The previous paths (owner, 2026-11-08, after the interview's phase F on the mirror) ──────────────────────────
 describe('formatPreviousPathsForPrompt', () => {
   const at = (iso: string) => new Date(`${iso}T10:00:00.000Z`);
   const pathDoc = (overrides: Partial<AllocationAdviceDocument> = {}): AllocationAdviceDocument => ({

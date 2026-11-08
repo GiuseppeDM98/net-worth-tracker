@@ -94,7 +94,7 @@ export const REVISION_COPY = {
 
 // ─── The interview (2026-11-08) ───────────────────────────────────────────────
 
-/** Every label of the interview: the summary's footer, the scene, the report's tile and the revision tile (doc/ai/AI-04-colloquio.md). */
+/** Every label of the interview: the summary's footer, the scene, the report's tile and the revision tile (2026-11-08). */
 export const INTERVIEW_COPY = {
   /** The summary, with no round yet. */
   start: 'Avvia il colloquio',
@@ -112,8 +112,6 @@ export const INTERVIEW_COPY = {
   run: 'Avvia la ricerca',
   retry: 'Riprova',
   notConfigured: 'Servizio AI non configurato',
-  /** The card's eyebrow. */
-  asks: (index: number, total: number) => `Il Consulente chiede · ${index} di ${total}`,
   /** The report's tile. */
   tileTitle: 'Il colloquio',
   roundEyebrow: (index: number) => `Tornata ${index}`,

@@ -421,7 +421,7 @@ describe('runAllocationAdviceStage', () => {
   });
 });
 
-// ── The interview round (2026-11-08, doc/ai/AI-04-colloquio.md § 6 criteria 1, 4, 5, 13) ─────────
+// ── The interview round (2026-11-08: no write, the format, the revision mode) ──────────────
 const QUESTION = (id: string, kind: 'single' | 'multiple' = 'single') => ({ id, kind, text: `Domanda ${id}?`, why: "copre l'86% delle entrate", options: [{ value: 'si', label: 'Sì' }, { value: 'no', label: 'No' }], allowOther: false });
 const roundText = (questions: unknown[], note = 'Vedo un reddito concentrato.', satisfied = false) => JSON.stringify({ note, satisfied, questions });
 const ROUND: AllocationAdviceInterviewRound = { note: 'Vedo un reddito concentrato.', satisfied: false, questions: [{ ...QUESTION('reddito'), allowOther: true }], answers: [{ questionId: 'reddito', value: 'si' }], model: 'opus-finto', askedAt: NOW };
@@ -458,7 +458,8 @@ describe('runInterviewRound', () => {
     expect(userContent).toContain('--- CASHFLOW 12 MESI (');
     expect(userContent).toContain('Questa è la tornata 1 di 3.');
     expect(cashflowMock).toHaveBeenCalledWith('u1', NOW);
-    // The round, with the model that answered and a clock; allowOther forced on.
+    // The store read once; the round, with the model that answered and a clock; allowOther forced on.
+    expect(getMock).toHaveBeenCalledTimes(1);
     expect(onRound).toHaveBeenCalledTimes(1);
     const round = onRound.mock.calls[0][0];
     expect(round).toMatchObject({ note: 'Vedo un reddito concentrato.', satisfied: false, model: 'opus-finto' });
@@ -480,6 +481,8 @@ describe('runInterviewRound', () => {
     expect(userContent).toContain('- Domanda reddito? (perché: copre l\'86% delle entrate) → Sì');
     expect(userContent).toContain('Questa è la tornata 2 di 3.');
     expect(onRound.mock.calls[0][0]).toMatchObject({ note: 'Basta così.', satisfied: true, questions: [] });
+    expect(setMock).not.toHaveBeenCalled();
+    expect(patchMock).not.toHaveBeenCalled();
   });
 
   it('keeps four of five questions and logs the fifth; a text that is not a round fails the interview, retryable, with no write', async () => {
@@ -498,7 +501,12 @@ describe('runInterviewRound', () => {
 
   it('a max_tokens cut and a refusal are said in the product\'s words, on the interview stage', async () => {
     answerWith(message(roundText([]), 'max_tokens'));
-    await expect(runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn() })).rejects.toMatchObject({ stage: 'interview', retryable: true, message: expect.stringMatching(/limite di lunghezza/) });
+    const cut = await runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn() }).catch((error: unknown) => error);
+    expect(cut).toBeInstanceOf(AllocationAdviceStageError);
+    expect(cut).toMatchObject({ stage: 'interview', retryable: true, message: expect.stringMatching(/limite di lunghezza/) });
+    // A failed round still writes nothing: the document is the strategy's alone.
+    expect(setMock).not.toHaveBeenCalled();
+    expect(patchMock).not.toHaveBeenCalled();
     answerWith(message('', 'refusal'));
     await expect(runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn() })).rejects.toMatchObject({ stage: 'interview', retryable: false });
   });
@@ -511,7 +519,7 @@ describe('runInterviewRound', () => {
     expect(patchMock).not.toHaveBeenCalled();
   });
 
-  it('in revision mode needs a finished report, prints it with every request numbered and no plan in force (criterion 13)', async () => {
+  it('in revision mode needs a finished report, prints it with every request numbered and no plan in force (decision 24)', async () => {
     const calls = vi.spyOn(Anthropic.Beta.Messages.prototype, 'stream');
     await expect(runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], revision: { requests: 'niente ornitorinchi' }, onRound: vi.fn() })).rejects.toMatchObject({ stage: 'interview', retryable: false, message: "Non c'è un report finito da rivedere. Avvia la ricerca." });
     getMock.mockResolvedValue(afterStrategy());
@@ -535,7 +543,7 @@ describe('runInterviewRound', () => {
   });
 });
 
-describe('the interview on the run (criteria 5 and 6)', () => {
+describe('the interview on the run (the IL COLLOQUIO block and the document, 2026-11-08)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
@@ -581,7 +589,7 @@ describe('the interview on the run (criteria 5 and 6)', () => {
     expect(firstWrite).toMatchObject({ interview: { rounds: [], skipped: true } });
   });
 
-  it('the revision prints ITS round and patches revisionInterview; a skipped one is patched as such (criterion 13)', async () => {
+  it('the revision prints ITS round and patches revisionInterview; a skipped one is patched as such (decision 24)', async () => {
     const withReport = { ...afterStrategy(), instruments: { markdown: '', candidates: null, model: 's', webSearchUsed: false, finishedAt: NOW }, report: { markdown: 'Prima versione.', proposal: PROPOSAL as never, model: 'o', finishedAt: NOW } };
     const calls = answerWith(message(reviewText(PROPOSAL)));
     await runAllocationAdviceStage({ userId: 'u1', stage: 'revise', document: structuredClone(withReport), request: 'niente ornitorinchi', interview: ONE_ROUND, onStage: vi.fn() });
@@ -598,7 +606,7 @@ describe('the interview on the run (criteria 5 and 6)', () => {
   });
 });
 
-// ── The OBBLIGAZIONI block (owner, 2026-11-08, after AI-04's phase F) ─────────────────────
+// ── The OBBLIGAZIONI block (owner, 2026-11-08, after the interview's phase F on the mirror) ─────────────────────
 describe('the bond block in the Consulente context', () => {
   const eur = (value: number) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
   /** Only what the block reads: the formatters of the rest are mocked above. */
@@ -664,7 +672,7 @@ describe('the bond block in the Consulente context', () => {
   });
 });
 
-// ── The previous paths (owner, 2026-11-08, after AI-04's phase F) ──────────────────────────
+// ── The previous paths (owner, 2026-11-08, after the interview's phase F on the mirror) ──────────────────────────
 describe('the previous paths: the archive and the block', () => {
   const finished = (createdIso: string, summary: string): AllocationAdviceDocument => ({
     ...afterStrategy(),
@@ -726,6 +734,7 @@ describe('the previous paths: the archive and the block', () => {
     const turn = userTurn(calls.mock.calls[0]);
     expect(turn).toContain('--- I PERCORSI PRECEDENTI (1 percorso, dal più recente; il report del primo è il piano in vigore) ---');
     expect(turn.indexOf('--- I PERCORSI PRECEDENTI')).toBeLessThan(turn.indexOf('Questa è la tornata 1 di 3.'));
+    expect(patchMock).not.toHaveBeenCalled();
 
     historyMock.mockClear();
     const revisionCalls = answerWith(message(roundText([], 'Nota.', true)));

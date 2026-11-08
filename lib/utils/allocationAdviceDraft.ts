@@ -106,7 +106,7 @@ export function initialAnswers(
   };
 }
 
-/** The answers only: a document's interview never enters a draft (criterion 8 of AI-04). */
+/** The answers only: a document's interview never enters a draft (2026-11-08: «Rifai il percorso» never prefills rounds a run already used). */
 export function initialDraft(answers: AllocationAdviceAnswers): AllocationAdviceDraft {
   return { step: 0, goalIndex: 0, answers, phase: 'path' };
 }
@@ -211,7 +211,7 @@ export function draftStorageKey(ownerId: string): string {
  * The draft stored on this browser, or null; a stored draft from another shape is ignored. The
  * interview (2026-11-08) is validated with `interviewSchema` — `askedAt` back to a Date — and a
  * failing value is dropped, the rest of the draft kept; `phase: 'interview'` is kept only with at
- * least one valid round, so a draft stored before AI-04 reads `phase: 'path'` and no interview.
+ * least one valid round, so a draft stored before 2026-11-08 reads `phase: 'path'` and no interview.
  */
 export function readStoredDraft(storage: Pick<Storage, 'getItem'> | null, ownerId: string): AllocationAdviceDraft | null {
   if (!storage) return null;
@@ -235,7 +235,7 @@ export function readStoredDraft(storage: Pick<Storage, 'getItem'> | null, ownerI
 }
 
 /**
- * The stored draft as the Wizard reopens it over the last document (criterion 8 of AI-04):
+ * The stored draft as the Wizard reopens it over the last document (2026-11-08):
  * «Rifai il percorso» never prefills an interview a run already used, so the stored interview is
  * dropped — and the phase set back to the summary — unless its last round was asked AFTER the
  * document's `updatedAt` (a path redone over the report and reloaded mid-interview, whose rounds

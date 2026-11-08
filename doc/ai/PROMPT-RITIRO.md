@@ -61,14 +61,14 @@ deploy --only firestore:rules` / `firestore:indexes`, SETUP.md: `grep -n
 `grep -n -i -E "firestore\.rules|firestore\.indexes|migrat" doc/ai/*.md` dava il 2026-11-02
 una sola riga, AI-05:335, sulla card degli obiettivi che «migra» al meccanismo nuovo — non
 è DDL. Lo si prova con `git diff <base>..<merge> -- firestore.rules firestore.indexes.json`
-vuoto. Dove una spec scrive CAMPI NUOVI su documenti esistenti — AI-04 `interview` e
+vuoto. Dove una spec scrive CAMPI NUOVI su documenti esistenti — il colloquio (PR #509) `interview` e
 `revisionInterview` su `allocationAdvice/{uid}`, AI-05 `proposals` sul messaggio del
 thread, AI-06 le regole di categorizzazione come item `preference` della memoria (la
 vecchia `archived`) — il segnale non è un DDL ma il documento scritto dall'emulatore nel
 collaudo (la fase D della spec: il test usa-e-getta `__tests__/zz-emulator-*.test.ts` con
 `FIRESTORE_EMULATOR_HOST`, o la lettura Admin dei documenti dell'E2E), citato nel messaggio
 di commit o in `SESSION_NOTES.md`; un documento vecchio senza il campo deve mappare a
-`null` (AI-04 criterio 6). Se una spec porta una regola, un indice o una migrazione, la
+`null` (il colloquio: `interviewOrNull` in `lib/utils/allocationAdviceDocument.ts`, 2026-11-08). Se una spec porta una regola, un indice o una migrazione, la
 clausola non vale: FERMATI e chiedi. Se un criterio non regge, un segnale manca o uno
 script non è stato speso, FERMATI e dillo: una spec si ritira intera, mai a metà, e non si
 ritira una spec la cui implementazione ha lasciato un «da decidere».
@@ -271,7 +271,7 @@ ORDINE DI LAVORO
    ritirate (`grep -n "retired on" doc/ai/README.md`). Lo stato vive in SEI punti, ciascuno
    da rileggere con `grep -n` e mai per numero di riga: (1) l'intestazione della spec, un
    blockquote in prosa (`sed -n 3,12p <SPEC>`: «Written on 2026-11-01 from `develop` @
-   b9411a4d … Read adversarially on 2026-11-01: N findings applied»; in AI-04 «Read
+   b9411a4d … Read adversarially on 2026-11-01: N findings applied»; in alcune spec «Read
    adversarially on» e la data stanno su due righe, quindi si cerca `grep -c "Read
    adversarially" doc/ai/AI-0*.md`, non la frase intera; la sessione di implementazione
    vi aggiunge «Implemented on <data>, PR #NNN» e può averla lasciata indietro mentre § 6

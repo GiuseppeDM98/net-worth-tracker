@@ -67,6 +67,12 @@ describe('ConsulenteInterviewTile', () => {
     expect(screen.getAllByText('non risposta')).toHaveLength(1);
   });
 
+  it('two rounds without a skip: the aside is «2 tornate» alone', () => {
+    render(<ConsulenteInterviewTile interview={{ rounds: [ROUND, SECOND], skipped: false }} />);
+    expect(screen.getByText('2 tornate')).not.toBeNull();
+    expect(screen.queryByText(/saltato/)).toBeNull();
+  });
+
   it('InterviewRoundRows says «nessuna domanda» for a round without questions and joins a list', () => {
     const { rerender } = render(<InterviewRoundRows questions={[]} answers={[]} />);
     expect(screen.getByText('nessuna domanda')).not.toBeNull();

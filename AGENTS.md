@@ -454,7 +454,7 @@ file used to carry.
 - STRUCTURE IS NEVER PARSED FROM PROSE: the strategy and the review answer as a structured output, `{ markdown, proposal }` (`allocationAdviceAnswerSchema`, 2026-10-23 — the API guarantees the shape, not the sums: classes without a fixed amount sum to 100, sleeves sum to 100 or are empty, names copied EXACTLY from the STRUMENTI block, all checked by `parseAllocationAnswer`; a goal's mix travels as `{ assetClass, percentage }` pairs, because the API writes an object's keys in schema order and a mix written out of order fell short of 100); a strategy that breaks them fails the run, a review that does keeps the strategy's proposal. The instrument search keeps ONE fenced ```instrument-candidates block: web search answers with citations, which structured outputs refuse (400).
 - «Applica» shows its plans before writing, one checkbox each (`allocationAdviceApply.ts`): the targets through `setSettings`, a role through `updateAssetAllocationRole` (the ONE field; the other asset writers delete absent fields), the goals as a whole document through `saveGoalData` with over-100% quotas reduced and SAID; the «applied» route records it; the review date lives in the document and reaches the Allocazione header through `describeReviewBy`.
 - «Chiedi una modifica» on the report is a `revise` request (`runRevise`, `buildRevisionPrompt`): the review again with the previous report and every request so far, `document.revisions` appended, the status back to `ready`; never a new strategy or search.
-- A probe never runs the Consulente's model (2026-11-01): the E2E specs fake `/api/allocation-advice/run` with one `page.route` handler (the interview's rounds scripted, the strategy and revise bodies recorded and answered with an error) — the `.env.local` key only enables the controls on :3100 (doc/guide/e2e-emulatori.md § Browser-Driven E2E); the real run is made once, on the mirror.
+- A probe never runs the Consulente's model (2026-11-01): the E2E specs fake `/api/allocation-advice/run` with `page.route` (one handler per spec: `e2e/consulenteInterview.ts` scripts the interview's rounds and records the strategy and revise bodies — a strategy answers with an error, a revise completes —, the run spec scripts its three stages and the retry) — the `.env.local` key only enables the controls on :3100 (doc/guide/e2e-emulatori.md § Browser-Driven E2E); the real run is made once, on the mirror.
 - Il resto — the reducer and its sub-screens, the stale run, the demo gate, the prompts' contract — in `doc/guide/consulente.md`.
 
 ### Previdenza · Fondo Pensione → `doc/guide/previdenza.md`
@@ -474,7 +474,7 @@ file used to carry.
 
 ### Assistant · Assistente → `doc/guide/assistente.md`
 - The context service runs server-side (`adminDb` directly); every mode maps to its own builder in `stream/route.ts` (a missing branch silently falls through to monthly); `buildAssistantPeriodRangeContext` is the FIFTH builder.
-- ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 5 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's strategy and of the emails' AI comments, always under the same note (decision 81, 2026-11-07). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
+- ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 5 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's interview and strategy and of the emails' AI comments, always under the same note (decision 81, 2026-11-07). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
 - A silent cap in a context builder becomes a hallucinated "N/D": a cap either does not exist or is stated in the text the model reads. `ASSISTANT_SYSTEM_CORE` is shared with `buildEmailAiPrompt`.
 - A free question with NO context still gets the portfolio of today (`buildAssistantTodayContext` → `AssistantTodayContext`, the sixth argument of `buildChatPrompt`, 2026-10-20): the period bundle is a chosen period's, never a substitute for the portfolio.
 - THE PROPOSAL PROTOCOL: the AI never writes — it emits ONE fenced ```goal-proposal block, the write happens on the user's Conferma via `POST /api/goals` (a new goal) or `PATCH /api/goals` (`goalId`, a rewrite in place, 2026-10-20); `goalProposal.ts` owns the ONE zod schema, quotas travel by instrument NAME and the card resolves them to ids.
@@ -556,7 +556,8 @@ file used to carry.
 - **Viewer vs owner**: `useAuth().user` is the viewer and never changes; `useActiveAccount().ownerId` is whose data is
   displayed. Data-scoped hooks and pages take `ownerId`; manual `useEffect` loaders include it in their deps.
 - **Three enforcement layers, kept in sync** over the grant `account-access/{ownerUid}`: `firestore.rules`,
-  `assertCanAccessAccount` on Admin routes, the client substituting `ownerId`. Rules changes are inert until deployed.
+  `assertCanAccessAccount` on Admin routes, the client substituting `ownerId`. Rules changes are inert until deployed — by hand, never by a merge
+  (the `history` rule PR #509 wrote reached production only on 2026-11-08, at its spec's retirement; decision 97 in `doc/ai/README.md`).
 - Il resto — l'auto-login dalla landing, dove resta `user.uid`, `memberUids` e la discovery, il banner demo, le rules
   per collezione, lo switcher in Sidebar E `SecondaryMenuDrawer` — in `doc/guide/account-condiviso-demo.md`.
 
@@ -785,7 +786,10 @@ file used to carry.
   element has NO accessible name (accname step 2A): `getByRole(…, { name, hidden: true })` finds nothing — take it from
   the DOM (`querySelector`) and check it is among `getAllByRole(…, { hidden: true })` (`__tests__/pathRail.test.tsx`).
   A test that reads a clock uses `vi.useFakeTimers` on a noon fixture; a hook's `Date.now()` stamps
-  `vi.useFakeTimers({ toFake: ['Date'] })` + `vi.setSystemTime` (`__tests__/useConsulenteRun.test.tsx`).
+  `vi.useFakeTimers({ toFake: ['Date'] })` + `vi.setSystemTime` (`__tests__/useConsulenteRun.test.tsx`). A Radix `Select`
+  opens on `fireEvent.pointerDown(trigger)` once `hasPointerCapture`, `releasePointerCapture` and `scrollIntoView` are
+  polyfilled on `HTMLElement.prototype`, and an option is picked by `focus()` + `keyDown` Enter — `userEvent.click` on it
+  selects nothing (2026-11-08, `__tests__/questionCard.test.tsx`).
 - **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, no new
   `eslint-disable`; a local named `module` is refused by `@next/next/no-assign-module-variable` (2026-09-28). The config
   ignores `.agents/**` and the `.next-*/**` dist dirs.

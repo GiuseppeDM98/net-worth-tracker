@@ -23,7 +23,7 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { ALLOCATION_ADVICE_RUN_STAGES, type AllocationAdviceInterview, type AllocationAdviceRunEvent, type AllocationAdviceRunStage, type AllocationAdviceStage } from '@/types/allocationAdvice';
 import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdviceProposal';
 
-/** The interview rides with the answers (2026-11-08): «Riprova» on a failed strategy resends it (criterion 15 of AI-04). */
+/** The interview rides with the answers (2026-11-08): «Riprova» on a failed strategy resends it. */
 export type ConsulenteRunState =
   | { kind: 'idle' }
   /** `stageStartedAt`: `Date.now()` when the run opened or the stage changed (the elapsed clock of the stage row, 2026-11-07). */

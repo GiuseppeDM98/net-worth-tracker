@@ -1,5 +1,5 @@
 /**
- * Allocazione › Consulente, the INTERVIEW at 390px (2026-11-08, doc/ai/AI-04-colloquio.md): the
+ * Allocazione › Consulente, the INTERVIEW at 390px (2026-11-08, doc/guide/consulente.md § The path): the
  * faked round 1 with two questions inside the card; every choice row and every footer button at
  * least 44px tall; «Altro…» opening its field; nothing past the right edge of `main` and no
  * horizontal scroll (the repo's overflow guard).

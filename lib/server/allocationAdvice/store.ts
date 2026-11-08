@@ -6,7 +6,8 @@ import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 
 /**
  * The Consulente's ONE document per account, `allocationAdvice/{userId}` (2026-10-20):
- * written only here, with the Admin SDK (the run and the «applied» route); read by the client
+ * written with the Admin SDK only — here by the run and the «applied» route; deleted whole, with its
+ * archive, by the ops scripts `consulente:reset` and `mirror:remove` (2026-11-08) —; read by the client
  * through `lib/services/allocationAdviceService.ts` under the rules (`read: canAccess`,
  * `write: false`). Dates travel as Timestamps and come back as Dates field by field
  * (`mapAllocationAdviceData`), never through JSON (AGENTS.md § Caching).

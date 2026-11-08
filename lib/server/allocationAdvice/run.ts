@@ -56,7 +56,7 @@ import type { InstrumentProfile } from '@/types/exposure';
  * block, because web search answers with citations and structured outputs refuse them. Both
  * models opt into the server-side fallback (aiModels.ts).
  *
- * The interview (2026-11-08, doc/ai/AI-04-colloquio.md) is a request of its own,
+ * The interview (2026-11-08; doc/guide/consulente.md § The run) is a request of its own,
  * `runInterviewRound`: one call on Opus 5.5 that reads the strategy's context and answers a round
  * of questions as a structured output. It never enters `runAllocationAdviceStage` and writes
  * nothing — the rounds live in the browser's draft until the strategy's body carries them.
@@ -241,7 +241,7 @@ function withBlock(markdown: string, language: string, block: unknown): string {
   return `${markdown}\n\n\`\`\`${language}\n${JSON.stringify(block)}\n\`\`\``;
 }
 
-/** The strategy's document, the interview's ONLY writer (criterion 6 of AI-04). */
+/** The strategy's document, the interview's ONLY writer (2026-11-08): no round writes before it. */
 function newDocument(userId: string, answers: AllocationAdviceAnswers, now: Date, interview: AllocationAdviceInterview | null = null): AllocationAdviceDocument {
   return {
     userId,
@@ -262,7 +262,7 @@ function newDocument(userId: string, answers: AllocationAdviceAnswers, now: Date
 }
 
 /**
- * The OBBLIGAZIONI block (2026-11-08, the owner's addition after AI-04's phase F): the single
+ * The OBBLIGAZIONI block (2026-11-08, the owner's addition after the interview's phase F on the mirror): the single
  * bonds' maturities from the portfolio context, the bond ETFs' duration and average maturity from
  * the Esposizione's shared profile cache (Yahoo once per ticker, then 30 days) — a read that may
  * fail without failing the run: the block then says the profiles were not read.
@@ -458,8 +458,9 @@ export interface RunInterviewRoundArgs {
 }
 
 /**
- * One round of the interview: reads the store ONCE (`getAllocationAdviceAdmin`, null for a
- * first-time user — the plan in force, or the report a revision is about), builds the strategy's
+ * One round of the interview: reads the document (`getAllocationAdviceAdmin`, null for a
+ * first-time user — the plan in force, or the report a revision is about) and, for a new path, the
+ * archive (`readPreviousPaths`, 2026-11-08), builds the strategy's
  * context, calls Opus 5.5 with `interviewRoundSchema` as the structured output and hands the
  * round to `onRound`. It never writes: no `setAllocationAdviceAdmin`, no
  * `patchAllocationAdviceAdmin`, no `enterStage` — the rounds live in the browser's draft until

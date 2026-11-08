@@ -117,6 +117,7 @@ describe('POST /api/allocation-advice/run', () => {
     ]);
     // No stage named is the first one, and the first one counts against the limit.
     expect(runMock.mock.calls[0][0]).toMatchObject({ userId: 'user-1', stage: 'strategy', answers: ANSWERS });
+    expect(rateLimitMock).toHaveBeenCalledWith('user-1:allocation-advice', 12, 3_600_000);
     expect(rateLimitMock).toHaveBeenCalledTimes(1);
   });
 
@@ -150,6 +151,7 @@ describe('POST /api/allocation-advice/run', () => {
     expect(response.status).toBe(200);
     await readSse(response);
     expect(runMock.mock.calls[0][0]).toMatchObject({ userId: 'user-1', stage: 'revise', request: 'solo bond singoli' });
+    expect(rateLimitMock).toHaveBeenCalledWith('user-1:allocation-advice', 12, 3_600_000);
     expect(rateLimitMock).toHaveBeenCalledTimes(1);
   });
 
@@ -159,7 +161,7 @@ describe('POST /api/allocation-advice/run', () => {
     expect(events).toEqual([{ type: 'error', error: 'Il servizio AI non ha risposto.', retryable: true }]);
   });
 
-  // ── The interview (2026-11-08, doc/ai/AI-04-colloquio.md § 6 criteria 1, 4) ─────────────
+  // ── The interview (2026-11-08: its own branch, the 400s, the rate limit) ─────────────
   const EMPTY_INTERVIEW = { rounds: [], skipped: false };
   const storedRound = (overrides: Record<string, unknown> = {}) => ({
     note: 'Vedo un reddito concentrato.',
@@ -229,6 +231,7 @@ describe('POST /api/allocation-advice/run', () => {
     rateLimitMock.mockReturnValueOnce({ allowed: false, retryAfterSeconds: 60 } as never);
     const limited = await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'interview', answers: ANSWERS, interview: EMPTY_INTERVIEW }));
     expect(limited.status).toBe(429);
+    expect(limited.headers.get('Retry-After')).toBe('60');
     expect(interviewMock).toHaveBeenCalledTimes(1);
   });
 

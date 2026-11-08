@@ -400,7 +400,9 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   the same way** (2026-10-08, the first full run on Next 16.4, PR #436): `apiResponse.text: Response has been disposed`
   inside `holdChunks`' route handler (`chunkProbe.ts:61`) — a chunk fetched by the handler was disposed before its body
   was read, i.e. the page had moved on; green ×2 alone right after (`--repeat-each=2`). If it returns, read the body
-  inside a `try` and `route.continue()` on the disposed one rather than widening a timeout.
+  inside a `try` and `route.continue()` on the disposed one rather than widening a timeout. **`e2e/cashflow.dividendi.spec.ts` › «the form
+  refuses in the reading line…» was red ONCE the same way** (2026-11-08, a full run that did not touch the Dividendi): the
+  picker's BTP option was not clicked within 30 s; green alone right after (4/4). A second red there is a pattern, not noise.
 - **A green suite on the emulators says nothing about a server dependency's MODULE LOADING on Vercel** (2026-10-08):
   `verifyIdToken` skips the signature against the Auth emulator, so the `jwks-rsa → jose` chain of firebase-admin never
   ran under Playwright, and 173 green tests preceded a deploy where every Admin route answered 500 (`ERR_REQUIRE_ESM`;
@@ -449,7 +451,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   `npm run dev:e2e` is `next dev`, which loads `.env.local`, so the owner's real `ANTHROPIC_API_KEY` reaches the server
   on :3100 and enables the control (the Consulente's `configured`) — the key makes it pressable, never what answers
   it. The spec installs `page.route('**/api/allocation-advice/run', …)` BEFORE the click and answers each request by
-  its `stage` with an SSE body (`data: {json}\n\n`: the `stage` events, then `done` or `error`); a request it must
+  its `stage` with an SSE body (`data: {json}\n\n`: the `stage` events, then `done` or `error`; an interview round is ONE `interview` event, `e2e/consulenteInterview.ts`); a request it must
   hold to read a state is answered after the assertion. No dummy key in `package.json`, no real request from a spec.
   Worked example: `e2e/allocation.consulente.spec.ts` › «runs the three stages on a faked route, a failed stage
   retried from itself».

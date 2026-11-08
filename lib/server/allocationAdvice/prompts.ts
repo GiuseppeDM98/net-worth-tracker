@@ -163,7 +163,7 @@ const STRATEGY_CONTRACT = [
   'Vincoli: le "targetPercentage" delle classi senza "fixedAmount" sommano esattamente a 100; ogni classe compare una volta; i nomi in "assetName" sono copiati ESATTAMENTE dal blocco STRUMENTI; "assetRoles" contiene solo gli strumenti il cui ruolo deve CAMBIARE o che l\'utente ha nominato (casa, fondi pensione, illiquidi), non tutti; un sotto-target che corrisponde a uno strumento già posseduto lo nomina in "instrument". Il nome di un sotto-target è la SOTTOCATEGORIA che gli strumenti posseduti portano già nel blocco STRUMENTI (es. «All World», «Bond Singoli»): un sotto-target con un nome nuovo resta vuoto finché l\'utente non riclassifica lo strumento a mano — se lo proponi, dillo nel testo.',
   // The goals' contributions and the cash reserve rest on the cashflow block (owner, 2026-11-01).
   'I "monthlyContribution" degli obiettivi stanno dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI (se la superano, dillo e perché); la riserva di liquidità si misura sulla spesa mensile mediana e sui conti liquidi del blocco.',
-  // The bonds by horizon (owner, 2026-11-08, after AI-04's phase F): the block OBBLIGAZIONI is the data, the goals' dates the horizons.
+  // The bonds by horizon (owner, 2026-11-08, after the interview's phase F on the mirror): the block OBBLIGAZIONI is the data, the goals' dates the horizons.
   "Nella classe Obbligazioni ogni sotto-target dice nel testo quale orizzonte copre (es. 1-3 anni, 3-7 anni) e quale obiettivo serve, a partire dalle scadenze degli obiettivi e dal blocco OBBLIGAZIONI (le scadenze dei titoli, le duration degli ETF): se l'orizzonte di un obiettivo resta scoperto, proponi il sotto-target che lo copre e di' che resta vuoto finché l'utente non ci mette uno strumento; se le scadenze possedute sono già allineate, dillo in una riga.",
   // The previous paths (owner, 2026-11-08): what changed since then, and whether the facts or the words moved it.
   "Se ci sono PERCORSI PRECEDENTI, «La situazione» dice cosa è cambiato rispetto ad allora — tolleranza, orizzonte, obiettivi, strumenti da tenere — e se il cambiamento nasce dai fatti (reddito, patrimonio, famiglia, obiettivi) o dalle parole dell'utente: se nelle sue parole, di allora o di oggi, leggi paura, fretta o euforia, nominale citando la frase che te lo fa pensare, senza giudicare; un piano che cambia direzione per emozione lo dice e propone il passo più piccolo che la rispetta.",
@@ -295,7 +295,7 @@ export function buildStrategyPrompt(
 }
 
 // ─── 0. The interview (Opus 5.5, 2026-11-08) ─────────────────────────────────
-// The critical friend before the strategy (doc/ai/AI-04-colloquio.md): up to three rounds of
+// The critical friend before the strategy (2026-11-08, doc/guide/consulente.md § The run): up to three rounds of
 // 0–4 questions, each born from a figure or an answer; the same stage asks ONE round about a
 // written «Chiedi una modifica». No advice, no proposal: the contract overrides the core's
 // «proponi» for this stage. The caps are written here and the round number in the user turn

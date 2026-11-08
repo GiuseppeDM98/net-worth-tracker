@@ -1,5 +1,5 @@
 /**
- * The Consulente's bond block (2026-11-08, the owner's addition after AI-04's phase F):
+ * The Consulente's bond block (2026-11-08, the owner's addition after the interview's phase F on the mirror):
  * «--- OBBLIGAZIONI: SCADENZE E DURATION ---», the one place the interview, the strategy and the
  * instrument search read what the bond part is made of — every single bond with its redemption
  * date and the years to it, every bond ETF with the effective duration and the average maturity

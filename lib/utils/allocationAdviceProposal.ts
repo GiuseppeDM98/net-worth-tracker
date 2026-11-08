@@ -84,7 +84,7 @@ export type AnswerGoal = z.infer<typeof answerGoalSchema>;
 
 // ─── The interview (Opus 5.5, 2026-11-08) ────────────────────────────────────
 // The critical friend before the strategy: up to three rounds of 0–4 questions on what the data
-// or the answers make doubtful (doc/ai/AI-04-colloquio.md). The question shape is the shared
+// or the answers make doubtful (2026-11-08, doc/guide/consulente.md § The run). The question shape is the shared
 // `lib/utils/questionSet.ts`; here the round and what the draft, the body and the document hold.
 
 /** The round on the wire (`output_config.format`): `note` first, so the model reads before it asks. */

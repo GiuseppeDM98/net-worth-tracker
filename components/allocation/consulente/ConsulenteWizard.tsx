@@ -16,7 +16,7 @@
  *
  * The reducer is `lib/utils/allocationAdviceDraft.ts` (pure, tested); the loss scenario of the
  * second screen is computed on the base of today's Allocazione (`currentAllocationOnBase`).
- * The last screen opens the INTERVIEW (2026-11-08, doc/ai/AI-04-colloquio.md): one more scene
+ * The last screen opens the INTERVIEW (2026-11-08, doc/guide/consulente.md § The path): one more scene
  * in the same card (`ConsulenteInterviewScene`), whose rounds live in the draft (`phase`,
  * `interview`) and are requested by this component's `useConsulenteInterview` from the click —
  * «Avvia il colloquio», «Continua», «Riprova» — never from an effect; «Salta il colloquio» aborts
@@ -27,7 +27,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Plus, Trash2 } from 'lucide-react';
-import { ALLOCATION_ADVICE_STEPS } from '@/types/allocationAdvice';
+import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, ALLOCATION_ADVICE_STEPS } from '@/types/allocationAdvice';
 import type { AllocationAdviceDocument, AllocationAdviceInterview } from '@/types/allocationAdvice';
 import type { Asset, AssetAllocationSettings } from '@/types/assets';
 import type { GoalBasedInvestingData } from '@/types/goals';
@@ -161,7 +161,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
     allocationAdviceDraftReducer,
     null,
     // A draft that comes back follows FIRE › Obiettivi: goals added since are added, deleted ones
-    // dropped; an interview a run already used is dropped too (`reopenStoredDraft`, criterion 8 of AI-04).
+    // dropped; an interview a run already used is dropped too (`reopenStoredDraft`, 2026-11-08).
     () => reconcileDraftGoals(reopenStoredDraft(readStoredDraft(storage, ownerId), lastDocument) ?? initialDraft(lastDocument?.answers ?? initialAnswers(settings, goalData, assets)), goalData)
   );
   // The draft follows every change onto this browser — the interview's rounds and answers included; a finished run clears it.
@@ -206,7 +206,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
   };
 
   // The interview's gestures. A round is requested from a click, never from an effect; the received
-  // round enters the draft at once with no answers (criterion 7 of AI-04).
+  // round enters the draft at once with no answers, so a reload shows it without a request (2026-11-08).
   const requestRound = (current: AllocationAdviceInterview) =>
     interviewRound.requestRound({ answers, interview: current }, (round) => dispatch({ type: 'interview', action: { type: 'roundReceived', round } }));
   const startInterview = () => {
@@ -238,11 +238,11 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
   const sceneKey = `${draft.step}:${draft.goalIndex}:${answers.goals.length}`;
   const variants = reduced ? sceneVariantsReduced : sceneVariants;
   const roundNumber = currentRoundNumber(interview, asking);
-  const interviewEyebrow = INTERVIEW_COPY.eyebrow(roundNumber, 3);
+  const interviewEyebrow = INTERVIEW_COPY.eyebrow(roundNumber, ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS);
 
   return (
     <div className={SCENE_GRID_CLASS}>
-      <PathRail mode="path" steps={STEP_NAMES} current={draft.step} interview={{ total: 3, reached: inInterview ? roundNumber : null }} />
+      <PathRail mode="path" steps={STEP_NAMES} current={draft.step} interview={{ total: ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, reached: inInterview ? roundNumber : null }} />
       <section className={cn(TILE_SURFACE_CLASS, SCENE_CARD_CLASS)} aria-label={inInterview ? interviewEyebrow : `Passo ${stepNumber} di ${ALLOCATION_ADVICE_STEPS.length}: ${copy.eyebrow}`}>
         {/* The summary and the interview trade places as whole scenes (the interview's eyebrow and footer are its own); the path's screens slide inside the second branch. */}
         <AnimatePresence mode="wait" initial={false} custom={direction}>

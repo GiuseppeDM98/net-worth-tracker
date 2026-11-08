@@ -213,7 +213,7 @@ describe('reconcileDraftGoals (2026-10-20)', () => {
   });
 });
 
-// ── The interview in the draft (2026-11-08, criteria 7 and 8 of AI-04) ──────────────────
+// ── The interview in the draft (2026-11-08: the round-trip, «Rifai il percorso») ──────────────────
 const ROUND: AllocationAdviceInterviewRound = {
   note: 'Vedo un reddito concentrato.',
   satisfied: false,
@@ -258,7 +258,7 @@ describe('the draft reducer and the interview', () => {
   });
 });
 
-describe('the stored draft keeps the interview (criterion 7)', () => {
+describe('the stored draft keeps the interview (2026-11-08)', () => {
   it('round-trips a draft with two rounds, askedAt back as a Date', () => {
     const storage = memoryStore();
     const draft: AllocationAdviceDraft = { ...advance(draftWithGoals(0), 20), phase: 'interview', interview: TWO };
@@ -268,7 +268,7 @@ describe('the stored draft keeps the interview (criterion 7)', () => {
     expect(read?.interview?.rounds[1].askedAt).toBeInstanceOf(Date);
   });
 
-  it('drops a malformed interview and keeps the answers, and reads a draft stored before AI-04 as path with no interview', () => {
+  it('drops a malformed interview and keeps the answers, and reads a draft stored before 2026-11-08 as path with no interview', () => {
     const storage = memoryStore();
     const draft = advance(draftWithGoals(1), 2);
     storage.setItem(draftStorageKey('u1'), JSON.stringify({ ...draft, phase: 'interview', interview: { rounds: 'no', skipped: false } }));
@@ -284,7 +284,7 @@ describe('the stored draft keeps the interview (criterion 7)', () => {
   });
 });
 
-describe('reopenStoredDraft (criterion 8)', () => {
+describe('reopenStoredDraft (2026-11-08)', () => {
   const draft: AllocationAdviceDraft = { ...advance(draftWithGoals(0), 20), phase: 'interview', interview: TWO };
 
   it('drops an interview older than the last document and sets the phase back; keeps one asked after it', () => {

@@ -103,7 +103,7 @@ describe('the run’s stage rows (2026-11-07)', () => {
   });
 });
 
-describe('the interview on the document (2026-11-08, criterion 6)', () => {
+describe('the interview on the document (2026-11-08: null when absent)', () => {
   const round = { note: 'n', satisfied: false, questions: [], answers: [], model: 'opus-finto', askedAt: { toDate: () => AT } };
 
   it('maps interview and revisionInterview, each round\'s askedAt through toDate', () => {

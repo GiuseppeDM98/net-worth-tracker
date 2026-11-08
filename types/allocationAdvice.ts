@@ -1,6 +1,7 @@
 /**
  * The «Consulente» of the Allocazione page (2026-10-20): a guided path — one question per
- * screen — whose answers, with the whole portfolio, go to two agents (Opus 5.5 for the strategy
+ * screen — then an interview of up to three rounds of questions (2026-11-08) — whose answers, with
+ * the whole portfolio, go to two agents (Opus 5.5 for the interview, the strategy
  * and the review, Sonnet 5.5 with web search for the instruments); the result is a report, a
  * proposal the user can apply to Impostazioni → Allocazione with one button, and a date to
  * review it by. The document lives in `allocationAdvice/{userId}`, written by the Admin SDK
@@ -30,7 +31,7 @@ export const ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS = 3;
 
 /**
  * How many previous paths the interview and the strategy read (2026-11-08, the owner's addition
- * after AI-04's phase F): the live document when it has a report, then the archive
+ * after the interview's phase F on the mirror): the live document when it has a report, then the archive
  * `allocationAdvice/{uid}/history`, the most recent first. Six is about three years of paths at
  * the review dates the Consulente proposes; the older ones stay archived, unread.
  */
