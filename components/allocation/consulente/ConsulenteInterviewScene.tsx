@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The INTERVIEW as a scene of the Wizard (2026-11-08, doc/ai/AI-04-colloquio.md; DESIGN.md →
+ * The INTERVIEW as a scene of the Wizard (2026-11-08, doc/guide/consulente.md § The path; DESIGN.md →
  * The Path-Scene Rule): after the summary, inside the path's card, the Consulente's rounds of
  * questions. Top to bottom: the eyebrow «Colloquio · tornata N di 3» (the scene's only
  * `TILE_EYEBROW_CLASS`, decision 57), the last round's `note` as the headline, the round's

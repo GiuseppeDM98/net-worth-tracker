@@ -37,7 +37,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   and takes 1,0 with 838.
 - **The one whole-history read is the server's, for the AI** (2026-11-07): `fetchCashflowBlockInputs`
   (lib/services/assistantMonthContextService.ts) reads every row up to the Italian end of the month 12 ahead, no
-  lower bound, for the CASHFLOW 12 MESI block of every Assistente mode, of the Consulente's strategy and of the
+  lower bound, for the CASHFLOW 12 MESI block of every Assistente mode, of the Consulente's interview and strategy and of the
   emails' AI comments (doc/guide/assistente.md § Prompt builders). It is an Admin read off the browser, not a page
   window: no hook and no key here.
 - **The windows, and the ONE module that defines them**: `trackingWindow(period)` — from the first day of the month

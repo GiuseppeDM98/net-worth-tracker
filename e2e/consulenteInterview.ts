@@ -1,6 +1,6 @@
 /**
  * The Consulente's INTERVIEW in a browser, shared by its specs (desktop, mobile, report;
- * 2026-11-08, doc/ai/AI-04-colloquio.md). A helper, not a spec: no project collects it.
+ * 2026-11-08, doc/guide/e2e-emulatori.md § Browser-Driven E2E). A helper, not a spec: no project collects it.
  *
  * The run route is ALWAYS faked here (`page.route`): three invented rounds answered in order,
  * the strategy failing on a decoy sentence so no run goes past its first stage, and a recorder of

@@ -225,7 +225,7 @@ test('the report shows «Il colloquio» with its two rounds, and the round asked
   await expect(page.locator('[data-generated]')).toHaveCount(4);
 });
 
-test('«Rivedi il report» asks one round first, then sends the revision with the answered round (criterion 13)', async ({ page }) => {
+test('«Rivedi il report» asks one round first, then sends the revision with the answered round (decision 24)', async ({ page }) => {
   await plant('ready');
   const recorder = await installFakeRun(page, { delayRoundMs: () => 1_000 });
   await openReport(page);

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * One ROUND of the interview as state started from a gesture (2026-11-08, doc/ai/AI-04-colloquio.md):
+ * One ROUND of the interview as state started from a gesture (2026-11-08, doc/guide/consulente.md § The path):
  * «Avvia il colloquio», «Continua», «Riprova» and «Rivedi il report» call `requestRound`, which sends
  * the route ONE `stage: 'interview'` request and reads its SSE stream to the terminal event — the
  * round (`interview`) or the product's sentence (`error`). The round crosses JSON, so it is read

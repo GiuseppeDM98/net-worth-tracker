@@ -3,7 +3,7 @@
 /**
  * «Chiedi una modifica» on a finished report (2026-10-20; its own file since 2026-11-08): the
  * requests made so far, the textarea, and — before the revision — ONE round of the Consulente's
- * questions about the written request (decision 24, doc/ai/AI-04-colloquio.md). «Rivedi il report»
+ * questions about the written request (decision 24, 2026-11-08). «Rivedi il report»
  * first asks the round (`useConsulenteInterview`, the textarea read-only, the skeleton); the round's
  * `QuestionCard`s appear under its note and «Rivedi il report» sends the revision once every
  * question is answered or declined; «Salta le domande» sends it at once with what is there —

@@ -2,7 +2,7 @@
  * `useConsulenteInterview` (components/allocation/consulente/useConsulenteInterview.ts, 2026-11-08):
  * one round per gesture — the `stage: 'interview'` body, the terminal `interview` event read back
  * through the stored schema (askedAt a Date), the route's `error` and a cut stream as failures,
- * `abort()` on «Salta il colloquio» ignoring what lands afterwards (criterion 9 of AI-04), a
+ * `abort()` on «Salta il colloquio» ignoring what lands afterwards (2026-11-08), a
  * second request while one runs ignored. The route is a mocked `authenticatedFetch`.
  */
 
@@ -141,7 +141,7 @@ describe('useConsulenteInterview', () => {
     expect(onRound).not.toHaveBeenCalled();
   });
 
-  it('abort() goes back to idle, aborts the request\'s signal and ignores the round that lands afterwards (criterion 9)', async () => {
+  it('abort() goes back to idle, aborts the request\'s signal and ignores the round that lands afterwards (2026-11-08)', async () => {
     const stream = sseResponse();
     authenticatedFetch.mockResolvedValueOnce(stream.response);
     const { result } = renderHook(() => useConsulenteInterview('u1'));

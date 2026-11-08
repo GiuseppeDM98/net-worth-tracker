@@ -4,7 +4,8 @@
  * ALLOCAZIONE › CONSULENTE (2026-10-20) — «come imposto la mia allocazione?»
  *
  * Three views on one page, by what the account holds: the PATH (one question per screen,
- * «Indietro» always available, the draft kept on this browser), the RUN (the three stages of
+ * «Indietro» always available, the draft kept on this browser, then the interview's rounds in the
+ * same card, 2026-11-08), the RUN (the three stages of
  * the two agents, persisted after each so a reload shows where it is), the REPORT (the verdict,
  * the proposal against today, the instruments, the goals, the roles, the text, and «Applica»
  * with one checkbox per thing it writes). Not a tile grid: like the Assistente, the content is

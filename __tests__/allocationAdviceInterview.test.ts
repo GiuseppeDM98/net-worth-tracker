@@ -1,7 +1,7 @@
 /**
  * The interview as the client holds it (lib/utils/allocationAdviceInterview.ts, 2026-11-08): the
- * reducer that writes every answer into the LAST round, the gate of the next round (criterion 3
- * of AI-04), the sentence that blocks the primary; the one singular/plural rule of «tornata» read
+ * reducer that writes every answer into the LAST round, the gate of the next round (the cap of
+ * three rounds), the sentence that blocks the primary; the one singular/plural rule of «tornata» read
  * from the narrative, where it lives.
  */
 
@@ -70,7 +70,7 @@ describe('interviewReducer', () => {
   });
 });
 
-describe('canRequestRound (criterion 3)', () => {
+describe('canRequestRound (the cap of three rounds, 2026-11-08)', () => {
   it('is true with no round and while the last round left something open under the cap', () => {
     expect(canRequestRound(EMPTY_INTERVIEW)).toBe(true);
     expect(canRequestRound(withRounds(1))).toBe(true);

@@ -2,46 +2,46 @@
 
 > Series `doc/ai/` (README.md § 5): **depends on AI-03** (retired on 2026-11-07, in develop since 2026-11-07, PR #507:
 > `PathRail`, `sceneVariants`, `SCENE_GRID_CLASS` / `SCENE_CARD_CLASS`, `Tile`'s `generated`, the RTL harness) **and
-> AI-04** (implemented on 2026-11-08 on `feat/consulente-colloquio`; the PR number is written at the merge: «Il
+> AI-04** (retired on 2026-11-08, in develop since 2026-11-08, PR #509: «Il
 > colloquio», `ConsulenteRevisionTile` with its round, the archive of the previous paths); **implemented after AI-06**
 > (order only: nothing of AI-05/AI-06 enters here). Written on 2026-11-08, the same day the owner asked for it, from
-> the working tree that became AI-04's commit — a line is cited `file:line @ AI-04`; the adversarial reading rewrites
+> the working tree that became commit 8af05f73 (PR #509) — a line is cited `file:line @ 8af05f73`; the adversarial reading rewrites
 > the hash. Executes decisions 91–96 (README.md § 3). **Not yet read adversarially**: the reading (prompt 07) precedes
 > the implementation, as README.md § 8 requires; the spec is a development instruction only after it.
 
 ## 1. The problem today (evidence on the code)
 
 - **The report is ONE column of up to nine blocks** (`components/allocation/consulente/ConsulenteReport.tsx:199-423`
-  @ AI-04): the verdict, «Allocazione proposta», «Strumenti», «Obiettivi», «Ruoli degli asset», «Il report» (the
+  @ 8af05f73): the verdict, «Allocazione proposta», «Strumenti», «Obiettivi», «Ruoli degli asset», «Il report» (the
   review's whole markdown in one tile, `:337-347`) or «La strategia» (`:349-359`), «Il colloquio» (`:362-366`),
   «Chiedi una modifica» (`:368-372`), «Applica» (`:374-422`). The reader scrolls past four tiles of figures before the
-  text that explains them, and «Applica» sits under everything. The owner, on 2026-11-08, after phase F of AI-04:
+  text that explains them, and «Applica» sits under everything. The owner, on 2026-11-08, after the interview's phase F (PR #509):
   «dividere il report finale in più parti evitando all'utente di scorrere in verticale, magari una specie di libro,
   dove ogni pagina ha un senso logico da sola e quelle dopo continuano il racconto».
 - **The text's structure is prescribed and unused.** The review's contract (`lib/server/allocationAdvice/prompts.ts:420-434`
-  @ AI-04, `REVIEW_CONTRACT`) asks seven sections in order — «In una frase», «L'allocazione proposta», «Gli strumenti»,
+  @ 8af05f73, `REVIEW_CONTRACT`) asks seven sections in order — «In una frase», «L'allocazione proposta», «Gli strumenti»,
   «Gli obiettivi», «Casa, fondi pensione e illiquidi», «Cosa fare adesso», «Rischi e revisione» — and the revision adds
   «La tua richiesta» right after the first (`:436-440`, `REVISION_CONTRACT`); the strategy's contract (`:149-159`,
   `STRATEGY_CONTRACT`) asks six — «La situazione», «L'allocazione proposta», «Casa, fondi pensione e illiquidi»,
   «Obiettivi», «Cosa cambia rispetto a oggi», «Rischi e revisione» — plus «Rispetto al piano precedente» when a plan is
   in force. `ReactMarkdown` renders the text whole (`ConsulenteReport.tsx:341-343`, `MARKDOWN_COMPONENTS` `:75-96`);
   nothing reads a heading.
-- **Two facts of the proposal have no surface**: `proposal.risks` (`lib/utils/allocationAdviceProposal.ts:201` @ AI-04,
+- **Two facts of the proposal have no surface**: `proposal.risks` (`lib/utils/allocationAdviceProposal.ts:201` @ 8af05f73,
   up to ten strings) is read by no component (checked on 2026-11-08: no `risks` in `components/`); the review date and
   its reason are the footer line of the «Allocazione proposta» tile (`ConsulenteReport.tsx:234-236`), a tile that
   answers another question.
 - **The rail knows the path and the run, not the report**: `PathRail` has two modes (`components/ui/path-rail.tsx:22-30`
-  @ AI-04) and by rule its ticks «are not buttons and carry no handler» (`:15`; DESIGN.md → The Path-Scene Rule). The
+  @ 8af05f73) and by rule its ticks «are not buttons and carry no handler» (`:15`; DESIGN.md → The Path-Scene Rule). The
   scene's grid and card classes are exported by the run (`ConsulenteRun.tsx:36-38`, `SCENE_GRID_CLASS`,
   `SCENE_CARD_CLASS`); the turn's mechanics — the direction as state, the element focused at the gesture, the headline
-  focused after the slide — live inside the Wizard (`ConsulenteWizard.tsx:191-205` @ AI-04) and nowhere else.
-- **One URL parameter, read on the server**: `?rivedi=1` (`app/dashboard/allocation/consulente/page.tsx:16-17` @ AI-04)
+  focused after the slide — live inside the Wizard (`ConsulenteWizard.tsx:191-205` @ 8af05f73) and nowhere else.
+- **One URL parameter, read on the server**: `?rivedi=1` (`app/dashboard/allocation/consulente/page.tsx:16-17` @ 8af05f73)
   opens the screens over the applied plan; no page of the report is an address, and no reader of `useSearchParams`
   exists on the route.
 - **The motion is the column's**: the cascade once per JS session (`consulenteReportEntrance`, `ConsulenteReport.tsx:55-56`,
   `:136-142`) and the proposed percentages counting up with it (`ProposedPct`, `:58-62`); the slide between screens is
-  `sceneVariants` / `sceneVariantsReduced` (`lib/utils/motionVariants.ts:186-206` @ AI-04).
-- **The tests pin the column**: `e2e/allocation.consulente.report.spec.ts:167-172` @ AI-04 counts four `[data-generated]`
+  `sceneVariants` / `sceneVariantsReduced` (`lib/utils/motionVariants.ts:186-206` @ 8af05f73).
+- **The tests pin the column**: `e2e/allocation.consulente.report.spec.ts:167-172` @ 8af05f73 counts four `[data-generated]`
   tiles at once and `:211-215` asserts the y-order of three regions; `allocation.consulente.mobile.spec.ts` probes the
   path's slide at 390 and never the report; the route has no `mobile:budget` entry by choice (doc/guide/consulente.md
   § Composizione mobile: «No composition»).
@@ -102,7 +102,7 @@ address; «Applica» is the last page. Each criterion: statement · proof · the
    the turn (+1 toward a higher index, −1 toward a lower one; `data-turn="forward" | "back"` on the sliding wrapper),
    the card clips its x-overflow, the first render does not animate, and after a turn the focus moves to the new
    page's headline — the card itself on `copertina` — only when the focus still sits where the gesture left it or on
-   `body` (the Wizard's rule, `ConsulenteWizard.tsx:11-16` @ AI-04), through the shared `useSceneTurn` (§ 4). Proof:
+   `body` (the Wizard's rule, `ConsulenteWizard.tsx:11-16` @ 8af05f73), through the shared `useSceneTurn` (§ 4). Proof:
    `__tests__/consulenteBook.test.tsx` — the first page's `aria-label`, «Avanti» → the second page's, `data-turn`
    `forward`, the headline `document.activeElement`; «Indietro» → `back`; `consulenteBook.test.tsx` also asserts
    exactly one `[data-scene]` at a time. E2E at 390 (`allocation.consulente.book.mobile.spec.ts`): the `[data-scene]`
@@ -164,7 +164,7 @@ address; «Applica» is the last page. Each criterion: statement · proof · the
    confermi», the reading of today. The two tiles become page bodies through their exported bodies (§ 4), so their
    RTL suites stay green unchanged. Proof: `report.spec.ts` re-targeted page by page (the duration line on page 3,
    «2 tornate» and «Preferisco non dire» on page 8, «1 richiesta» and the revision's round on page 9, the round-before-
-   revision flow of criterion 13 of AI-04 on page 9, «Applica» disabled on a failed document on the last page);
+   revision flow (the round before a revision, decision 24) on page 9, «Applica» disabled on a failed document on the last page);
    `consulenteBook.test.tsx` (the risks rows, the review aside). Mutation: keep the review sentence in the
    `allocazione` footer → the «printed once» assertion of `consulenteBook.test.tsx` fails.
 9. **Motion.** The page shown at open cascades its blocks once per JS session (`staggerContainer` × `cardItem` on the
@@ -486,7 +486,7 @@ PathRail mode 'book'; useSceneTurn estratto dal Wizard senza cambiare comportame
 scena, il footer, l'«Indice» su ResponsiveModal, ?pagina= con replaceState dal gesto; i corpi delle tessere spostati,
 non riscritti; i rischi e la data di revisione sulla pagina «Rischi e revisione». Test: le suite della § 6, Vitest in
 entrambe le zone, le sei spec Playwright del Consulente con la route SEMPRE finta, reactCompilerCoverage verde,
-perf:budget verde, First Load JS della route prima e dopo. Fermati e chiedimi se: un contratto di AI-03 o AI-04 nel
+perf:budget verde, First Load JS della route prima e dopo. Fermati e chiedimi se: un contratto del percorso (PR #507) o del colloquio (PR #509) nel
 codice, o una regola di DESIGN.md § 5, differisce da quello citato nella § 4; una suite verde prima di te diventa
 rossa per un motivo fuori da questa spec. Collaudo: § 7; la F sul mio report vero, in produzione dopo il deploy o sul
 mirror, al mio «pronto». Un branch, un commit, solo dopo il mio OK con il riassunto del diff. SESSION_NOTES.md non si

@@ -1,5 +1,5 @@
 /**
- * The interview as the client holds it (2026-11-08, doc/ai/AI-04-colloquio.md): the rounds the
+ * The interview as the client holds it (2026-11-08, doc/guide/consulente.md § The path): the rounds the
  * Consulente asked, each with the answers given so far, and whether the user skipped. Pure: the
  * reducer the draft delegates to, the gate of the next round, the sentence that blocks the
  * primary. The singular/plural rule of «tornata» (`describeRoundCount`) lives in the narrative,
@@ -8,7 +8,7 @@
  *
  * A received round enters `rounds` at once with `answers: []`, and every answer is written into
  * that last round in place — there is no separate current round — so the Wizard's existing draft
- * effect persists it (criterion 7).
+ * effect persists it, and a reload shows the round without a request (2026-11-08).
  */
 
 import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, type AllocationAdviceInterview, type AllocationAdviceInterviewRound } from '@/types/allocationAdvice';

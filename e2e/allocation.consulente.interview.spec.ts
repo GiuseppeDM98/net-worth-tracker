@@ -1,6 +1,6 @@
 /**
  * Allocazione › Consulente — the INTERVIEW at 1440px, on the base account (2026-11-08,
- * doc/ai/AI-04-colloquio.md).
+ * doc/guide/consulente.md § The path).
  *
  * WHY IT EXISTS: the rounds, the answers and the skip are a pure reducer held by Vitest; what only
  * a browser knows is that «Avvia il colloquio» opens the scene inside the card, that the cards

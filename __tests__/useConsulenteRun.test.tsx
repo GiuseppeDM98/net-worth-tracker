@@ -129,7 +129,7 @@ describe('useConsulenteRun', () => {
   });
 });
 
-describe('the interview rides with the run (criterion 15 of AI-04, 2026-11-08)', () => {
+describe('the interview rides with the run (2026-11-08)', () => {
   it('sends the interview with the strategy, keeps it in every state, and «Riprova» on a failed strategy resends it', async () => {
     const streams = [sseResponse(), sseResponse(), sseResponse(), sseResponse()];
     authenticatedFetch.mockImplementation(() => Promise.resolve(streams.shift()!.response));

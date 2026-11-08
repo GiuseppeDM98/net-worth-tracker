@@ -1,6 +1,6 @@
 # AI-06 — Registra: the detail questions, the four kinds, series, new categories, memory rules, the bridge
 
-> Series `doc/ai/` (README.md § 5): **depends on AI-04** (`questionSet.ts`, `parseQuestionsLenient`, `describeAnswer`,
+> Series `doc/ai/` (README.md § 5): **depends on AI-04** (retired on 2026-11-08, in develop since 2026-11-08, PR #509: `questionSet.ts`, `parseQuestionsLenient`, `describeAnswer`,
 > `QuestionCard` with `decline` and `otherSelect`) **and AI-05** (the mode, the proposal protocol, `listFencedBlocks`,
 > `proposalKey`, `resolveExpenseProposal`, `describeExpenseProposalState`, `ExpenseProposalCard`, `MessageIdContext`,
 > `RegisterRefsContext`, the persisted `proposals`); the last spec: **its retirement retires the folder**. Written on
@@ -55,7 +55,7 @@
   is written as a whole array, and the subcategory id is generated inline twice
   (`components/expenses/CategoryManagementDialog.tsx:636`, `lib/services/expenseImportService.ts:43` `genSubId` @
   ce26af4d). Every reader shares `queryKeys.expenses.categories(ownerId)` (`lib/query/queryKeys.ts:73` @ ce26af4d).
-- **The model cannot ask with options**: AI-05's contract asks in prose. AI-04 gives `QuestionCard` (no button inside,
+- **The model cannot ask with options**: AI-05's contract asks in prose. `components/ui/question-card.tsx` (in develop since 2026-11-08) gives `QuestionCard` (no button inside,
   `decline`, `otherSelect` answering `{ entity: id }`) and `parseQuestionsLenient(input: unknown)`, the only parser.
 - **A changed categorisation rule would be dropped**: `dedupeMemoryItems` (`lib/server/assistant/memoryExtraction.ts:280`
   @ ce26af4d) discards a candidate that `isSimilarText` (`:241`, bigram Jaccard ≥ 0.5) finds close to an active item of
@@ -180,7 +180,7 @@
    must be `single`, carry `allowOther: true`, and hold at most 3 options unless it is `category` (2–4). The answers
    leave as ONE user message, one line per question (decision 64): «{testo} → {etichetta} [id]» for an entity,
    «{testo} → Altro: {testo libero}», «{testo} → {etichetta1}, {etichetta2}», «{testo} → preferisco non dire». Proof:
-   `__tests__/questionSet.test.ts` (AI-04's, extended): the four line shapes, an entity picked from the Select
+   `__tests__/questionSet.test.ts` (in develop since 2026-11-08, extended): the four line shapes, an entity picked from the Select
    («Conto E [acc-5]»), two answers joined by one line break, an unanswered entry → `null`; `isEntityQuestion` on
    `account:from`, `loan`, `budget:x`; `entityQuestionProblems` on `allowOther: false`, on `multiple`, on four account
    options, none on four category options; `keepQuestionBlock(1)` true, `(2)` false;
@@ -376,7 +376,7 @@ export const expenseProposalSchema = z.object({
 `lib/services/expenseCategoryService.ts`; `CategoryManagementDialog.tsx:636` and `expenseImportService.ts:43` call it
 (the third copy is the card's: one rule, one place).
 
-### `questionSet.ts` additions (AI-04's module)
+### `questionSet.ts` additions (the module in develop since 2026-11-08)
 
 ```ts
 export const ASSISTANT_QUESTION_LANGUAGE = 'assistant-question';
@@ -428,7 +428,7 @@ export function formatQuestionAnswersAsMessage(entries: ReadonlyArray<{ question
   centri di costo' | 'Scegli fra tutti gli intestatari' | 'Scegli fra tutti i prestiti', items }`, where items are the
   cash accounts (plus `refs.properties` named «{nome} (immobile)» for the ids `account:from` and `account:to`), the
   centres without `archivedAt`, the members, `refs.loans`. With `readFailed` the card gets no `otherSelect` and «Altro…»
-  is AI-04's free-text row. A `category` question keeps the free-text «Altro…».
+  is the Consulente's free-text row (`QuestionCard`, 2026-11-08). A `category` question keeps the free-text «Altro…».
 - **«Rispondi»** renders under the last valid kept block only, as a `Button` of 44px (`h-11`) hover-accented (`AI_CONTROL_ACCENT_CLASS` + `border border-transparent`, decisions 36 and 85; The
   AI-Accent Rule, decision 36), enabled when `formatQuestionAnswersAsMessage` of every valid kept block is non-null and
   `answerable`. Its handler (a function of its own, awaited: AGENTS.md § React Compiler and the hooks rules) records,
@@ -595,7 +595,7 @@ first when `opts.afterWrittenCard`, then the contextual and curated chips, dedup
 ## 6. Tests per level (with the mutation that proves each)
 
 - `__tests__/expenseProposal.test.ts` (AI-05's, extended): criteria 1–6. Mutations: as written there.
-- `__tests__/questionSet.test.ts` (AI-04's, extended): criterion 8's pure functions.
+- `__tests__/questionSet.test.ts` (in develop since 2026-11-08, extended): criterion 8's pure functions.
 - `__tests__/assistantQuestionBlocks.test.ts` (new): indexes, bodies, `kept`, problems. Mutation: the body cut at the
   first «```» inside a JSON string → the block with «```» in its text red.
 - `__tests__/assistantQuestionBlock.test.tsx` (new, RTL `render`/`screen`/`userEvent`): criterion 9.
@@ -740,7 +740,7 @@ Leggi WORKFLOW.md, AGENTS.md (§ Assistant · Assistente, § Cashflow — expens
 § Commands), DESIGN.md § 5 «AI Surfaces» e The Question-Card Rule, doc/guide/assistente.md, doc/guide/cashflow.md
 (§ Expense Sign Convention and Type Changes: commissione, rata, estinzione, trasferimento su un immobile; § Recurring
 Series), doc/guide/cashflow-tracciamento.md, doc/guide/e2e-emulatori.md, doc/guide/prima-schermata.md,
-doc/ai/README.md § 3-4-7-8, doc/ai/AI-06-registra-domande-memoria-ponte.md e i diff di AI-04 e AI-05 (in develop).
+doc/ai/README.md § 3-4-7-8, doc/ai/AI-06-registra-domande-memoria-ponte.md e i diff del colloquio (PR #509) e di AI-05 (in develop).
 Implementa AI-06 così com'è scritta: lo schema esteso in expenseProposal.ts con il superRefine della § 4; il resolver
 con i conti per id e poi per nome fra conti e immobili, i prestiti, le regole del dialog e i «ignorato: …»; le
 categorie nuove scritte prima della riga; il protocollo ```assistant-question su questionSet.ts (parseQuestionsLenient
@@ -750,7 +750,7 @@ la frase dell'estrattore e supersedesCategorizationRule; la pagina Cashflow divi
 CashflowPageClient; il ponte in due punti con isAssistantBridgeShown; i follow-up.
 Test: le suite della § 6 in entrambe le zone (i test dei componenti in .test.tsx con React Testing Library), le spec
 Playwright della § 6 con lo stream SEMPRE finto e le asserzioni Admin sui dati, perf:budget, mobile:census e
-mobile:budget. Fermati e chiedimi se un contratto di AI-04 o AI-05 in develop non è quello della README § 7, o se una
+mobile:budget. Fermati e chiedimi se un contratto del colloquio (PR #509) o di AI-05 in develop non è quello della README § 7, o se una
 voce di mobile:budget si sposta. Collaudo: § 7, la fase F sul mirror al mio «pronto». Un branch, un commit, solo dopo
 il mio OK sul riassunto del diff. SESSION_NOTES.md non si committa.
 ```

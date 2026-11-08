@@ -16,7 +16,7 @@ import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, ALLOCATION_ADVICE_RUN_STAGES, t
  * request streams SSE (`stage` events, then `done` with the document, or `error`), and the
  * client chains the three (`useConsulenteRun`), retrying a failed stage from itself.
  *
- * `stage: 'interview'` (2026-11-08, doc/ai/AI-04-colloquio.md) is a branch of its own: with
+ * `stage: 'interview'` (2026-11-08; doc/guide/consulente.md § The run) is a branch of its own: with
  * `answers` and `interview` (the rounds so far; `revision: { requests }` for the ONE round before
  * a «Chiedi una modifica») it calls `runInterviewRound` — never `runAllocationAdviceStage`, no
  * write to `allocationAdvice/{uid}` — and streams one terminal event, `interview` or `error`.
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           if (stage === 'interview') {
-            // Its own entry point: one terminal event, no `done`, no write (criterion 1 of AI-04).
+            // Its own entry point: one terminal event, no `done`, no write to the document (2026-11-08).
             await runInterviewRound({
               userId,
               answers: answers as AllocationAdviceAnswers,

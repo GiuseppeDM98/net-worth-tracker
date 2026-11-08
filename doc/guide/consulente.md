@@ -2,7 +2,7 @@
 
 > **When to open this guide** — whoever touches `app/dashboard/allocation/consulente/*`,
 > `components/allocation/consulente/*`, `lib/server/allocationAdvice/*`, `app/api/allocation-advice/*`,
-> `lib/utils/allocationAdvice{Proposal,Draft,Apply,Narrative,Document,Interview}.ts`, `lib/utils/questionSet.ts`,
+> `lib/utils/allocationAdvice{Proposal,Draft,Apply,Narrative,Document,Interview,Bonds}.ts`, `lib/utils/questionSet.ts`,
 > `components/ui/question-card.tsx`, `lib/hooks/useAllocationAdvice.ts`,
 > `lib/services/allocationAdviceService.ts`, `types/allocationAdvice.ts`. In `AGENTS.md` the stub with the
 > essentials stays; here is the full rule. Born on 2026-10-20 (owner's decision: «io sinceramente farei tutto
@@ -34,7 +34,7 @@
   scenarios), `allocationAdviceNarrative.ts` (every sentence), `allocationAdviceDocument.ts` (the document mapper
   for both SDKs), `lib/utils/sseReader.ts`, `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, shared with
   every mode of the Assistente and the emails' AI comments, decision 81).
-- **Server**: `lib/server/allocationAdvice/prompts.ts` (the three prompts, the interview's and the IL COLLOQUIO
+- **Server**: `lib/server/allocationAdvice/prompts.ts` (the builders of the strategy, the instruments, the revision and the review, the interview's and the IL COLLOQUIO
   block), `run.ts` (the orchestration: context → strategy → instruments → review, persisted at every stage;
   `runInterviewRound`, which persists nothing; the OBBLIGAZIONI block and the previous paths read beside the
   context, 2026-11-08), `store.ts` (Admin, `allocationAdvice/{uid}` and the archive `allocationAdvice/{uid}/history`);
@@ -47,10 +47,10 @@
 - **Models**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5: the interview, the
   strategy, the review) and `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
 - **Suites to run after a change here**: `questionSet`, `allocationAdviceInterview`, `allocationAdviceProposal`,
-  `allocationAdviceDraft`, `allocationAdviceDocument`, `allocationAdviceApply`, `allocationAdviceNarrative`,
+  `allocationAdviceDraft`, `allocationAdviceDocument`, `allocationAdviceBonds`, `allocationAdviceApply`, `allocationAdviceNarrative`,
   `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes`, `cashflowBlock`,
   `assistantMonthContextService`, `motionVariants` and the Testing Library suites `choiceList`, `pathRail`, `tile`,
-  `questionCard`, `consulenteInterviewTile`, `consulenteRun`, `useConsulenteRun`, `useConsulenteInterview` ·
+  `questionCard`, `consulenteInterviewTile`, `consulenteRun`, `useConsulenteRun`, `useConsulenteInterview`; for the bond block `instrumentProfileService`, `exposureYahooSource`, `assistantPortfolioContext` ·
   `reactCompilerCoverage` (a ternary inside a `||` in the Wizard was skipped on the first day) · **Browser**
   `e2e/allocation.consulente.spec.ts` (the eight screens), `allocation.consulente.interview.spec.ts` and
   `.interview.mobile.spec.ts` (the interview), `allocation.consulente.mobile.spec.ts` (390: the strip, 44px, the
@@ -88,9 +88,9 @@
   the exchange `DEFAULT_EXCHANGE`.
 - **The summary is a list of rows, each a link to its screen** (`goto`); its primary is «Avvia il colloquio» («Torna
   al colloquio» once a round exists, with «Ricomincia il colloquio»), its secondary «Salta il colloquio e avvia la
-  ricerca»; both are disabled without the key («Servizio AI non configurato»); the primary glows on hover and focus
-  only (`AI_CONTROL_ACCENT_CLASS`, DESIGN.md → The AI-Accent Rule), the skip never (decision 78).
-- **The interview** (2026-11-08, doc/ai/AI-04-colloquio.md): after the summary, a scene of its own in the same card
+  ricerca»; both are disabled without the key («Servizio AI non configurato»); «Avvia il colloquio» glows on hover and focus
+  only (`AI_CONTROL_ACCENT_CLASS`, DESIGN.md → The AI-Accent Rule: it asks the model), «Torna al colloquio» and the skip never (decision 78).
+- **The interview** (2026-11-08, PR #509): after the summary, a scene of its own in the same card
   (`ConsulenteInterviewScene`; «Passo N di 8» untouched, the eyebrow «Colloquio · tornata N di 3» its only
   `TILE_EYEBROW_CLASS`), where the Consulente reads answers and data and asks 0–4 pointed questions, up to three
   rounds: `canRequestRound` is false once three rounds stand, when the last is `satisfied`, when it asked nothing
@@ -129,7 +129,7 @@
   (`runStageStates`). `PathRail` in run mode fills one segment per stage when it becomes active: stage status, never
   a percentage; its wrapper is a plain div (the list is `aria-hidden`): the «Dove sei» landmark is the path's alone
   (2026-11-07).
-- **The OBBLIGAZIONI block** (owner, 2026-11-08, after AI-04's phase F: «se uno ha ETF obbligazionari analizzare
+- **The OBBLIGAZIONI block** (owner, 2026-11-08, after the interview's phase F on the mirror: «se uno ha ETF obbligazionari analizzare
   anche le loro duration … per proporre un altro ETF che copra una duration diversa»): `lib/utils/allocationAdviceBonds.ts`
   (pure) over the holdings of the YTD bundle — the single bonds by TYPE (`bond`, with `maturityIso` from
   `bondDetails.maturityDate` and the coupon the DIVIDENDI facts know), the funds by CLASS (`bonds`, never an account or
@@ -205,7 +205,7 @@
   as Timestamp and come back as Date field by field (`mapAllocationAdviceData`, shared by the two SDKs). States:
   `draft · running · ready · failed · applied`; `stage` says where the run is or where it stopped. A `running` run
   older than 20 minutes (`RUN_STALE_AFTER_MS`) is considered dead and the page reopens the path.
-- **The archive** `allocationAdvice/{uid}/history/{createdAt ISO}` (owner, 2026-11-08, after AI-04's phase F): the
+- **The archive** `allocationAdvice/{uid}/history/{createdAt ISO}` (owner, 2026-11-08, after the interview's phase F on the mirror): the
   document a new path replaces is copied there whole, BEFORE the new one is written, when it has a report
   (`archiveAllocationAdviceAdmin`; a path abandoned before its report leaves no trace; the same path archived twice
   overwrites itself). Admin only, both ways (`rules: read, write: false` on the subcollection; `mirror:remove`'s
@@ -230,7 +230,7 @@
   persisted document — `document` passed in memory by the whole run, read from the store by the route) and the route
   (`maxDuration = 300`, body `{ userId, stage, answers?, request?, interview?, revision? }`, the rate limit counts
   the interview rounds, the `strategy` and `revise`: 12 an hour per warm instance) streams
-  `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from)`) chains the three, reads
+  `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from, interview)`) chains the three, reads
   each stream to its `done`, rereads the document after every stage; a failed or cut stage stays
   `resumeFrom` and «Riprova» (`retry`) restarts from there on the persisted document, never from scratch — a request
   that throws (a non-ok status, a stream the network drops) is remembered by the stage in flight too, never by the
@@ -320,7 +320,7 @@ scene's footer owns «Continua» and «Avvia la ricerca») and **The AI-Accent R
 and, on hover and focus only, on «Avvia il colloquio», «Continua», «Avvia la ricerca», «Riprova», «Rivedi il report»).
 The code follows it since the redesign of the path, the run and the report (2026-11-07, PR #507): § The path, § The run
 and § The report and «Applica» describe what renders; `app/globals.css` serves `oklch(0.56 0.2 305)` in `:root`,
-`oklch(0.65 0.2 305)` in `.dark` and `--ai-glow` once. The interview's screens are AI-04's.
+`oklch(0.65 0.2 305)` in `.dark` and `--ai-glow` once. The interview's scene followed on 2026-11-08 (PR #509).
 
 ## Composizione mobile
 
@@ -333,7 +333,7 @@ on a phone, and from the row under the Assistente's conversation).
 
 ## Per-page blind spots
 - **The strategy reads this year's rows twice** (2026-11): the YTD bundle and the cashflow block query them apart —
-  accepted, the bundle stays the Assistente's, and the block is read once per strategy, never by the instruments or
+  accepted, the bundle stays the Assistente's, and the block is read once per strategy and once per interview round (`buildConsulenteContext`), never by the instruments or
   the review.
 - **A bond ETF's duration in the context is Yahoo's, up to 30 days old, and may differ from the factsheet**
   (2026-11-08): the block says «secondo Yahoo, non verificate» and the instruments contract has the second agent
@@ -388,10 +388,10 @@ on a phone, and from the row under the Assistente's conversation).
 - **«Applica» is not idempotent on the goals**: pressed twice it would create the new goals twice — which is why
   after `done` the button stays disabled and the `applied` document no longer shows it.
 - **The demo has no Consulente**: it writes the settings, and the demo's settings are everyone's (`useDemoMode`).
-- **The rules are inert until they are deployed** (`npx firebase deploy --only firestore:rules`; done by the owner on 2026-10-20, the Consulente tried in production): before the deploy
+- **The rules are inert until they are deployed** (`npx firebase deploy --only firestore:rules`; done by the owner on 2026-10-20, the Consulente tried in production; the `history` rule of 2026-11-08 deployed by the retirement session on the owner's call — a merge deploys nothing): before the deploy
   the page does not read the document (permission-denied → the read fails and the page says so).
-- **The run's E2E specs fake the route**: one `page.route` handler (`e2e/consulenteInterview.ts`) scripts the
-  interview's rounds and records the strategy and revise bodies, answered with an error so the chain stops
+- **The run's E2E specs fake the route**: one `page.route` handler per spec — `e2e/consulenteInterview.ts` scripts the
+  interview's rounds and records the strategy and revise bodies (a strategy answers with an error so the chain stops, a revise completes), `allocation.consulente.spec.ts` scripts its three stages and the retry
   (`doc/guide/e2e-emulatori.md` § Browser-Driven E2E); no test spends, and the real run is made once per change on
   the mirror (2026-10-20 with the owner's key; the outcomes in that session's SESSION_NOTES and in the commit).
 - **The interview writes nothing**: its rounds live in the draft until the strategy, and a cleared storage loses them.

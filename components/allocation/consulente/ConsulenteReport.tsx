@@ -358,7 +358,7 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, onRedo }
         </motion.div>
       )}
 
-      {/* After the text, before «Chiedi una modifica» (criterion 9 of AI-04); nothing with zero rounds. */}
+      {/* After the text, before «Chiedi una modifica» (2026-11-08); nothing with zero rounds. */}
       {document.interview && document.interview.rounds.length > 0 && (
         <motion.div variants={cardItem}>
           <ConsulenteInterviewTile interview={document.interview} />

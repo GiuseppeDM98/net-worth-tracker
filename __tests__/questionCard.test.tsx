@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QuestionCard } from '@/components/ui/question-card';
 import { AI_GENERATED_SURFACE_CLASS } from '@/lib/constants/aiAccent';
@@ -75,7 +75,7 @@ describe('QuestionCard', () => {
     for (const token of AI_GENERATED_SURFACE_CLASS.split(' ')) expect(card.classList.contains(token), token).toBe(true);
     expect(card.className).not.toContain('bg-card');
     // No action button: the radios are Radix buttons, the one primary of a round is the scene's.
-    expect(container.querySelectorAll('button:not([role="radio"]):not([role="checkbox"])')).toHaveLength(0);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
   it('a custom eyebrow replaces the default; decline false drops the last row; a question without allowOther has no «Altro…»', () => {
@@ -85,6 +85,7 @@ describe('QuestionCard', () => {
     expect(screen.queryByText('Altro…')).toBeNull();
     expect(screen.queryByText('Preferisco non dire')).toBeNull();
     expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
   it('single: an option answers its value, the decline row the decline value, «Altro…» a blank other that keeps the row chosen while typing', async () => {
@@ -103,12 +104,15 @@ describe('QuestionCard', () => {
     const field = screen.getByRole('textbox', { name: `Altro — ${SINGLE.text}` });
     await userEvent.type(field, 'un fenicottero');
     expect(onAnswer).toHaveBeenLastCalledWith({ other: 'un fenicottero' });
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
     expect(screen.getByRole('radio', { name: 'Altro…' }).getAttribute('aria-checked')).toBe('true');
   });
 
   it('multiple: options add up as a list, «Altro…» and the decline are exclusive and clear the list', async () => {
     const onAnswer = vi.fn();
     render(<Host question={MULTIPLE} onAnswer={onAnswer} />);
+    const group = screen.getByRole('group', { name: MULTIPLE.text });
+    expect(within(group).getAllByRole('checkbox')).toHaveLength(4);
     await userEvent.click(screen.getByRole('checkbox', { name: 'I conti correnti' }));
     expect(onAnswer).toHaveBeenLastCalledWith(['conti']);
     await userEvent.click(screen.getByRole('checkbox', { name: 'I BTP a breve' }));
@@ -119,6 +123,11 @@ describe('QuestionCard', () => {
     expect(screen.getByRole('checkbox', { name: 'I conti correnti' }).getAttribute('aria-checked')).toBe('false');
     expect(screen.getByRole('checkbox', { name: 'Preferisco non dire' }).getAttribute('aria-checked')).toBe('true');
 
+    // An option after the decline replaces it (the decline row is exclusive, decision 55): without `exclusive` the list would keep both and still read as the decline.
+    await userEvent.click(screen.getByRole('checkbox', { name: 'I conti correnti' }));
+    expect(onAnswer).toHaveBeenLastCalledWith(['conti']);
+    expect(screen.getByRole('checkbox', { name: 'Preferisco non dire' }).getAttribute('aria-checked')).toBe('false');
+
     await userEvent.click(screen.getByRole('checkbox', { name: 'Altro…' }));
     expect(onAnswer).toHaveBeenLastCalledWith({ other: '' });
     expect(screen.getByRole('checkbox', { name: 'Preferisco non dire' }).getAttribute('aria-checked')).toBe('false');
@@ -127,6 +136,7 @@ describe('QuestionCard', () => {
     // An option after «Altro…» leaves the exclusive row.
     await userEvent.click(screen.getByRole('checkbox', { name: 'I BTP a breve' }));
     expect(onAnswer).toHaveBeenLastCalledWith(['btp']);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
   it('renders an existing answer: a typed other keeps «Altro…» checked with its text, a decline its row', () => {
@@ -137,6 +147,7 @@ describe('QuestionCard', () => {
     expect(screen.getByRole('checkbox', { name: 'Preferisco non dire' }).getAttribute('aria-checked')).toBe('true');
     rerender(<QuestionCard question={MULTIPLE} index={1} total={1} answer={['btp']} onAnswer={() => {}} />);
     expect(screen.getByRole('checkbox', { name: 'I BTP a breve' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
   it('with otherSelect the «Altro…» row shows a pick labelled by it, answers { entity } and types nothing', async () => {
@@ -148,5 +159,15 @@ describe('QuestionCard', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
     const trigger = screen.getByRole('combobox', { name: 'Quale conto' });
     expect(trigger).not.toBeNull();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    // A pick answers the entity. Radix's Select opens on pointerdown and calls pointer-capture and scroll APIs jsdom lacks.
+    HTMLElement.prototype.hasPointerCapture ??= () => false;
+    HTMLElement.prototype.releasePointerCapture ??= () => undefined;
+    HTMLElement.prototype.scrollIntoView ??= () => undefined;
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' });
+    const option = await screen.findByRole('option', { name: 'Conto ornitorinco' });
+    option.focus();
+    fireEvent.keyDown(option, { key: 'Enter' });
+    expect(onAnswer).toHaveBeenLastCalledWith({ entity: 'acc-2' });
   });
 });

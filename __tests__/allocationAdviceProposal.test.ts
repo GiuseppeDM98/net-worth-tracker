@@ -222,8 +222,8 @@ describe('parseInstrumentCandidatesLenient (2026-10-20)', () => {
   });
 });
 
-// ── The interview round (2026-11-08, doc/ai/AI-04-colloquio.md) ────────────────────────
-describe('parseInterviewRound (criterion 2)', () => {
+// ── The interview round (2026-11-08) ──────────────────────────────────────────────────
+describe('parseInterviewRound (lenient: the API keeps only part of the schema, 2026-11-08)', () => {
   const Q = (id: string) => ({ id, kind: 'single', text: `Domanda ${id}?`, why: "l'86% delle entrate", options: [{ value: 'si', label: 'Sì' }, { value: 'no', label: 'No' }], allowOther: true });
   const roundText = (questions: unknown[], extra: Record<string, unknown> = {}) => JSON.stringify({ note: 'Vedo un reddito concentrato.', satisfied: false, questions, ...extra });
 
