@@ -142,6 +142,15 @@ headless screenshot of the same page. The message says «Comparison N of M», wh
 side is which; the window rules of obligation 5 apply (one item per message, closed and counted before
 the next).
 
+**A window ends by itself, and is closed by its tree** (2026-11-09, after sixteen collaudo scripts of two
+closed sessions were found alive hours later, about a hundred Chromium). The script that opens a visible
+browser for the owner exits when the owner closes the **page** — closing a driven window closes the page,
+not the browser, so `browser.on("disconnected")` alone never fires —, when the browser goes, or after a
+time limit; never an endless wait. The repo writes that wait **once**, in a helper the throwaway scripts
+import, never again in each script. And stopping the background task kills the shell, not the tree
+beneath it (`npx → tsx → node → Chromium`): a window is closed by its root with the whole tree, then the
+count says zero.
+
 ### Standard phases, when they make sense
 
 | | Phase | What it establishes |
@@ -163,6 +172,13 @@ resource** (the test — must fail), with the same identical file or record.
 
 Restore any configuration that was changed, remove fixtures and test attachments, delete the script,
 and **record the outcome somewhere that survives the session** (`CLAUDE.md` or equivalent).
+
+**No collaudo script outlives its session** (2026-11-09). `node ~/.claude/processi-collaudo.mjs` counts the
+trees of `scripts/collaudo-*` alive in the repo and says whose they are: this session's (closed with
+`--chiudi`), another open session's (never touched), or nobody's known (named to the owner, closed with
+`--chiudi --anche-ignote` only on their yes). The count is the **first gate** of every repo's gate list:
+zero, or the gates do not start. The standard `settings.json` runs it with `--hook` at `SessionEnd`, so a
+session that ends closes its own windows; one that dies without ending is caught by the next gate.
 *A verification that was not recorded counts as not done.*
 
 **The outcome is one line, the signals are not** (2026-10-19). In `CLAUDE.md` the session's status
