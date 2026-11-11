@@ -14,7 +14,12 @@ import type { ReactNode } from 'react';
 const {
   createExpenseSettledOnDateMock, applyDebtRepaymentsMock, applyBalanceEffectsMock, authenticatedFetchMock,
   toastSuccessMock, toastErrorMock, demoModeMock, dialogPropsMock,
+  createCategoryMock, updateCategoryMock, getCategoryByIdMock, ensureTransferCategoryMock,
 } = vi.hoisted(() => ({
+  createCategoryMock: vi.fn(),
+  updateCategoryMock: vi.fn(),
+  getCategoryByIdMock: vi.fn(),
+  ensureTransferCategoryMock: vi.fn(),
   createExpenseSettledOnDateMock: vi.fn(),
   applyDebtRepaymentsMock: vi.fn(),
   applyBalanceEffectsMock: vi.fn(),
@@ -29,6 +34,13 @@ vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} })
 vi.mock('@/contexts/ActiveAccountContext', () => ({ useActiveAccount: () => ({ ownerId: 'owner-1' }) }));
 vi.mock('@/lib/hooks/useDemoMode', () => ({ useDemoMode: demoModeMock }));
 vi.mock('@/lib/services/expenseService', () => ({ createExpenseSettledOnDate: createExpenseSettledOnDateMock }));
+vi.mock('@/lib/services/expenseCategoryService', () => ({
+  createCategory: createCategoryMock,
+  updateCategory: updateCategoryMock,
+  getCategoryById: getCategoryByIdMock,
+  ensureTransferCategory: ensureTransferCategoryMock,
+  newSubCategoryId: () => '1700000000000-abc123def',
+}));
 vi.mock('@/lib/services/debtRepaymentService', () => ({ applyDebtRepayments: applyDebtRepaymentsMock }));
 vi.mock('@/lib/services/cashBalanceReconciliation', () => ({ applyBalanceEffects: applyBalanceEffectsMock }));
 vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch: authenticatedFetchMock }));
@@ -49,12 +61,13 @@ vi.mock('@/components/expenses/ExpenseDialog', () => ({
 
 import { ExpenseProposalCard } from '@/components/assistant/ExpenseProposalCard';
 import { MessageIdProvider } from '@/components/assistant/MessageIdContext';
+import { MessageQuestionsProvider } from '@/components/assistant/MessageQuestionsContext';
 import { RegisterRefsProvider } from '@/components/assistant/RegisterRefsContext';
 import { AI_GENERATED_EYEBROW_CLASS, AI_GENERATED_SURFACE_CLASS } from '@/lib/constants/aiAccent';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 import { PROPOSAL_INTERRUPTED_LINE, PROPOSAL_NO_ACCOUNT_LABEL, type ExpenseProposal, type ExpenseProposalRefs } from '@/lib/utils/expenseProposal';
-import { PROPOSAL_STATE_NOT_SAVED } from '@/lib/utils/dialogNarrative';
+import { EXPENSE_FEE_NEEDS_CATEGORY, PROPOSAL_STATE_NOT_SAVED } from '@/lib/utils/dialogNarrative';
 import type { Asset } from '@/types/assets';
 import type { AssistantMessage, AssistantProposalState } from '@/types/assistant';
 import type { ExpenseCategory } from '@/types/expenses';
@@ -91,7 +104,12 @@ interface HostOptions {
   proposals?: Record<string, AssistantProposalState>;
   readFailed?: boolean;
   index?: number;
+  refs?: Partial<ExpenseProposalRefs>;
+  /** The message also holds a valid question block (the contract forbids it; the card waits). */
+  withQuestion?: boolean;
 }
+
+const QUESTION_BLOCK = { index: 0, kept: true, problems: [], question: { id: 'account:debit', kind: 'single' as const, text: 'Da quale conto?', options: [{ value: 'acc-main', label: 'Conto principale' }, { value: 'acc-b', label: 'Conto B' }], allowOther: true } };
 
 /** The card under the two contexts the page gives it, the message holding its outcomes as the stream buffer does. */
 function renderCard(p: ExpenseProposal, options: HostOptions = {}) {
@@ -104,9 +122,11 @@ function renderCard(p: ExpenseProposal, options: HostOptions = {}) {
   };
   const tree = (current: AssistantMessage): ReactNode => (
     <QueryClientProvider client={queryClient}>
-      <RegisterRefsProvider refs={REFS} readFailed={options.readFailed ?? false} submitAnswer={async () => {}}>
+      <RegisterRefsProvider refs={{ ...REFS, ...options.refs }} readFailed={options.readFailed ?? false} submitAnswer={async () => {}}>
         <MessageIdProvider message={current} mode="register" recordProposal={recordProposal}>
-          <ExpenseProposalCard proposal={p} index={options.index ?? 0} />
+          <MessageQuestionsProvider blocks={options.withQuestion ? [QUESTION_BLOCK] : []} answerable>
+            <ExpenseProposalCard proposal={p} index={options.index ?? 0} />
+          </MessageQuestionsProvider>
         </MessageIdProvider>
       </RegisterRefsProvider>
     </QueryClientProvider>
@@ -200,7 +220,7 @@ describe('ExpenseProposalCard — what closes the buttons', () => {
 
   it('lists what it dropped and stays confirmable', () => {
     renderCard(proposal({ kind: 'income', type: 'income', categoryId: 'cat-stipendio', subCategoryId: undefined, excludeFromBudget: true }));
-    expect(screen.getByText('ignorato: «fuori budget» (vale solo per le spese)')).not.toBeNull();
+    expect(screen.getByText('ignorato: fuori budget')).not.toBeNull();
     expect((screen.getByRole('button', { name: 'Conferma' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -372,7 +392,168 @@ describe('ExpenseProposalCard — «Ignora» and «Modifica»', () => {
     expect(createExpenseSettledOnDateMock).not.toHaveBeenCalled();
     await waitFor(() => expect(authenticatedFetchMock).toHaveBeenCalledTimes(1));
     expect(JSON.parse(authenticatedFetchMock.mock.calls[0][1].body)).toMatchObject({ key: 'expense:0', status: 'written', writtenIds: ['exp-edited'], month: '2026-09' });
-    expect(screen.getByText('Registrata')).not.toBeNull();
+    // The form wrote it, maybe changed: the card says so.
+    expect(screen.getByText('registrata da Modifica')).not.toBeNull();
     expect(screen.getByRole('link', { name: 'apri in Cashflow' }).getAttribute('href')).toBe('/dashboard/cashflow?tab=tracking&month=2026-09&row=exp-edited');
+  });
+});
+
+// ── The four kinds, the categories written first, the counts (2026-11) ──
+
+const ACCOUNT_B = { id: 'acc-b', userId: 'owner-1', name: 'Conto B', type: 'cash', assetClass: 'cash', quantity: 500, currentPrice: 1, currency: 'EUR' } as Asset;
+const LOAN = { id: 'loan-1', userId: 'owner-1', name: 'Mutuo ornitorinco', type: 'loan', assetClass: 'cash', quantity: 1000, currentPrice: 1, currency: 'EUR', debtInterestRate: 1.2 } as Asset;
+const FEE_CATEGORY = { categoryId: 'cat-banca', categoryName: 'Banca', type: 'fixed' as const };
+const flat = (text: string | null | undefined) => (text ?? '').replace(/\s/g, ' ');
+
+describe('ExpenseProposalCard — transfers, instalments, series', () => {
+  it('writes a transfer between two accounts under the transfers’ category', async () => {
+    const user = userEvent.setup();
+    const { container } = renderCard(
+      proposal({ kind: 'transfer', type: 'transfer', categoryId: undefined, subCategoryId: undefined, fromAccount: 'acc-main', toAccount: 'conto b', amount: 500 }),
+      { refs: { cashAssets: [...REFS.cashAssets, ACCOUNT_B], categories: [...REFS.categories, category('cat-trasf', 'Trasferimenti', 'transfer')] } },
+    );
+    expect(flat(card(container).textContent)).toContain('Trasferimento · 500,00 € · Trasferimenti · oggi · Conto principale → Conto B');
+    await user.click(screen.getByRole('button', { name: 'Conferma' }));
+    await waitFor(() => expect(screen.getByText('Registrata')).not.toBeNull());
+    const [, form, categoryName, , , fee] = createExpenseSettledOnDateMock.mock.calls[0];
+    expect(form).toMatchObject({ type: 'transfer', categoryId: 'cat-trasf', linkedCashAssetId: 'acc-main', transferCashAssetId: 'acc-b' });
+    expect(categoryName).toBe('Trasferimenti');
+    expect(fee).toBeUndefined();
+    expect(toastSuccessMock).toHaveBeenCalledWith('Trasferimento creato con successo');
+  });
+
+  it('writes an instalment on its loan, printing the split', async () => {
+    const user = userEvent.setup();
+    const { container } = renderCard(
+      proposal({ kind: 'debt', type: 'debt', categoryId: 'cat-mutuo', subCategoryId: undefined, loanName: 'mutuo', amount: 12.34 }),
+      { refs: { loans: [LOAN], categories: [...REFS.categories, category('cat-mutuo', 'Mutuo', 'debt')] } },
+    );
+    const text = flat(card(container).textContent);
+    expect(text).toContain('11,34 €');
+    expect(text).toContain('1,00 €');
+    await user.click(screen.getByRole('button', { name: 'Conferma' }));
+    await waitFor(() => expect(screen.getByText('Registrata')).not.toBeNull());
+    expect(createExpenseSettledOnDateMock.mock.calls[0][1]).toMatchObject({ type: 'debt', debtAssetId: 'loan-1', linkedCashAssetId: 'acc-main' });
+    expect(applyDebtRepaymentsMock).toHaveBeenCalledWith(['debt-row']);
+    expect(toastSuccessMock).toHaveBeenCalledWith('Rata creata con successo');
+  });
+
+  it('writes a series with its fee in one call and counts parents and fees', async () => {
+    const user = userEvent.setup();
+    const ids = [...Array.from({ length: 12 }, (_, i) => `row-${i}`), ...Array.from({ length: 12 }, (_, i) => `fee-${i}`)];
+    createExpenseSettledOnDateMock.mockResolvedValue({ ids, parents: ids.slice(0, 12).map((id) => ({ id })), appliedEffects: [], appliedDebtRows: [] });
+    const { container, recordProposal } = renderCard(
+      proposal({ recurring: { frequency: 'monthly', count: 12 }, fee: { amount: 1.5 }, note: 'Abbonamento' }),
+      { refs: { feeCategory: FEE_CATEGORY } },
+    );
+    expect(flat(card(container).textContent)).toContain('12 occorrenze mensili, dal');
+    expect(flat(card(container).textContent)).toContain('commissione 1,50 € su ogni occorrenza');
+    await user.click(screen.getByRole('button', { name: 'Conferma' }));
+    await waitFor(() => expect(screen.getByText('12 righe registrate')).not.toBeNull());
+    expect(screen.getByText('+ 12 commissioni')).not.toBeNull();
+    expect(createExpenseSettledOnDateMock).toHaveBeenCalledTimes(1);
+    const [, form, , , , fee] = createExpenseSettledOnDateMock.mock.calls[0];
+    expect(form).toMatchObject({ isRecurring: true, recurringFrequency: 'monthly', recurringCount: 12 });
+    expect(fee).toEqual({ amount: 1.5, category: FEE_CATEGORY, notes: 'Commissione su Abbonamento' });
+    expect(recordProposal).toHaveBeenCalledWith('expense:0', { status: 'written', writtenIds: ids });
+    expect(toastSuccessMock).toHaveBeenCalledWith('12 voci ricorrenti con commissione create con successo');
+  });
+
+  it('opens «Modifica» on a series with its fee', async () => {
+    const user = userEvent.setup();
+    renderCard(proposal({ recurring: { frequency: 'monthly', count: 6, day: 5 }, fee: { amount: 2 } }), { refs: { feeCategory: FEE_CATEGORY } });
+    await user.click(screen.getByRole('button', { name: 'Modifica' }));
+    await screen.findByRole('dialog', { name: 'Modulo spesa' });
+    expect(dialogPropsMock.mock.calls.at(-1)?.[0].initialValues).toMatchObject({ isRecurring: true, recurringFrequency: 'monthly', recurringCount: 6, recurringDay: 5, fee: 2 });
+  });
+});
+
+describe('ExpenseProposalCard — what the card refuses', () => {
+  it('names the missing fee category with the door to Impostazioni, and closes «Conferma»', () => {
+    renderCard(proposal({ fee: { amount: 2 } }));
+    const link = screen.getByRole('link', { name: 'Impostazioni › Spese' });
+    expect(link.getAttribute('href')).toBe('/dashboard/settings?tab=spese');
+    expect(link.closest('li')?.textContent).toContain(EXPENSE_FEE_NEEDS_CATEGORY);
+    expect((screen.getByRole('button', { name: 'Conferma' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('shows the failed read, never «conto sconosciuto»', () => {
+    renderCard(proposal({ kind: 'transfer', type: 'transfer', categoryId: undefined, subCategoryId: undefined, fromAccount: 'acc-main', toAccount: 'Conto ignoto' }), { readFailed: true, refs: { cashAssets: [] } });
+    expect(screen.getByText('Registra · lettura fallita')).not.toBeNull();
+    expect(screen.queryByText(/conto sconosciuto/)).toBeNull();
+    expect((screen.getByRole('button', { name: 'Conferma' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('says an account with no category has none — not a failed read', () => {
+    renderCard(proposal(), { refs: { categories: [] } });
+    expect(screen.getByText('nessuna categoria configurata')).not.toBeNull();
+    expect(screen.queryByText('Registra · lettura fallita')).toBeNull();
+  });
+
+  it('waits for the answer when its message also asks a question', () => {
+    renderCard(proposal(), { withQuestion: true });
+    expect((screen.getByRole('button', { name: 'Conferma' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Rispondi prima alla domanda')).not.toBeNull();
+  });
+});
+
+describe('ExpenseProposalCard — the categories written before the row', () => {
+  it('creates a new category bare, invalidates the categories, then writes the row on its id', async () => {
+    const user = userEvent.setup();
+    createCategoryMock.mockResolvedValue('cat-new');
+    const { invalidate } = renderCard(proposal({ categoryId: undefined, subCategoryId: undefined, newCategory: { name: 'Ceramica', type: 'variable' } }));
+    expect(screen.getByText(/Nuova categoria: Ceramica \(Spese Non Necessarie\)/)).not.toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Conferma' }));
+    await waitFor(() => expect(screen.getByText('Registrata')).not.toBeNull());
+    expect(createCategoryMock).toHaveBeenCalledWith('owner-1', { name: 'Ceramica', type: 'variable', subCategories: [] });
+    expect(createCategoryMock.mock.invocationCallOrder[0]).toBeLessThan(createExpenseSettledOnDateMock.mock.invocationCallOrder[0]);
+    expect(createExpenseSettledOnDateMock.mock.calls[0][1]).toMatchObject({ categoryId: 'cat-new' });
+    expect(createExpenseSettledOnDateMock.mock.calls[0][2]).toBe('Ceramica');
+    expect(invalidate.mock.calls[0][0]?.queryKey).toEqual(queryKeys.expenses.categories('owner-1'));
+  });
+
+  it('appends a new subcategory to a FRESH read of its category, with no cascade', async () => {
+    const user = userEvent.setup();
+    // Another tab added «Pane» since the page read the categories.
+    getCategoryByIdMock.mockResolvedValue(category('cat-cibo', 'Cibo', 'variable', [['sub-spesa', 'Spesa'], ['sub-pane', 'Pane']]));
+    renderCard(proposal({ subCategoryId: undefined, newSubCategory: { categoryId: 'cat-cibo', name: 'Mercato' } }));
+    expect(screen.getByText(/Nuova sottocategoria: Cibo › Mercato/)).not.toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Conferma' }));
+    await waitFor(() => expect(screen.getByText('Registrata')).not.toBeNull());
+    expect(updateCategoryMock).toHaveBeenCalledTimes(1);
+    expect(updateCategoryMock.mock.calls[0]).toEqual([
+      'cat-cibo',
+      { subCategories: [{ id: 'sub-spesa', name: 'Spesa' }, { id: 'sub-pane', name: 'Pane' }, { id: '1700000000000-abc123def', name: 'Mercato' }] },
+    ]);
+    expect(updateCategoryMock.mock.invocationCallOrder[0]).toBeLessThan(createExpenseSettledOnDateMock.mock.invocationCallOrder[0]);
+    expect(createExpenseSettledOnDateMock.mock.calls[0][1]).toMatchObject({ categoryId: 'cat-cibo', subCategoryId: '1700000000000-abc123def' });
+    expect(createExpenseSettledOnDateMock.mock.calls[0][3]).toBe('Mercato');
+  });
+
+  it('creates the transfers’ category when there is none', async () => {
+    const user = userEvent.setup();
+    ensureTransferCategoryMock.mockResolvedValue('cat-trasf-new');
+    renderCard(
+      proposal({ kind: 'transfer', type: 'transfer', categoryId: undefined, subCategoryId: undefined, fromAccount: 'acc-main', toAccount: 'acc-b', amount: 50 }),
+      { refs: { cashAssets: [...REFS.cashAssets, ACCOUNT_B] } },
+    );
+    await user.click(screen.getByRole('button', { name: 'Conferma' }));
+    await waitFor(() => expect(screen.getByText('Registrata')).not.toBeNull());
+    expect(ensureTransferCategoryMock).toHaveBeenCalledWith('owner-1');
+    expect(createExpenseSettledOnDateMock.mock.calls[0][1]).toMatchObject({ categoryId: 'cat-trasf-new' });
+  });
+
+  it('keeps a category written for a row that then failed, and the retry writes no second one', async () => {
+    const user = userEvent.setup();
+    createCategoryMock.mockResolvedValue('cat-new');
+    createExpenseSettledOnDateMock.mockRejectedValueOnce(new Error('unavailable'));
+    renderCard(proposal({ categoryId: undefined, subCategoryId: undefined, newCategory: { name: 'Ceramica', type: 'variable' } }));
+    await user.click(screen.getByRole('button', { name: 'Conferma' }));
+    await waitFor(() => expect(screen.getByRole('alert')).not.toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Conferma' }));
+    await waitFor(() => expect(screen.getByText('Registrata')).not.toBeNull());
+    expect(createCategoryMock).toHaveBeenCalledTimes(1);
+    expect(createExpenseSettledOnDateMock).toHaveBeenCalledTimes(2);
+    expect(createExpenseSettledOnDateMock.mock.calls[1][1]).toMatchObject({ categoryId: 'cat-new' });
   });
 });

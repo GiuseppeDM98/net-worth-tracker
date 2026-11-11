@@ -403,7 +403,7 @@ export interface SavedExpense {
  * «Modifica» on its card. Part of the opening subject, like `expense` — the host passes a value
  * frozen at the click, or a refetch that rebuilt the object would reset what the user typed.
  */
-export type ExpenseDialogInitialValues = Partial<ExpenseFormData>;
+export type ExpenseDialogInitialValues = Partial<ExpenseFormData> & { fee?: number };
 
 interface ExpenseDialogProps {
   open: boolean;
@@ -1774,6 +1774,16 @@ export function ExpenseDialog({ open, onClose, expense, initialValues, onSuccess
         ...(initialValues?.link !== undefined ? { link: initialValues.link } : {}),
         ...(initialValues?.linkedCashAssetId !== undefined ? { linkedCashAssetId: initialValues.linkedCashAssetId } : {}),
         ...(initialValues?.excludeFromBudget !== undefined ? { excludeFromBudget: initialValues.excludeFromBudget } : {}),
+        // The kinds the card writes since 2026-11: a transfer's other end, an instalment's loan,
+        // a series (its day AFTER the date's, which sets it), the fee.
+        ...(initialValues?.transferCashAssetId !== undefined ? { transferCashAssetId: initialValues.transferCashAssetId } : {}),
+        ...(initialValues?.debtAssetId !== undefined ? { debtAssetId: initialValues.debtAssetId } : {}),
+        ...(initialValues?.isDebtPayoff !== undefined ? { isDebtPayoff: initialValues.isDebtPayoff } : {}),
+        ...(initialValues?.isRecurring !== undefined ? { isRecurring: initialValues.isRecurring } : {}),
+        ...(initialValues?.recurringFrequency !== undefined ? { recurringFrequency: initialValues.recurringFrequency } : {}),
+        ...(initialValues?.recurringCount !== undefined ? { recurringCount: initialValues.recurringCount } : {}),
+        ...(initialValues?.recurringDay !== undefined ? { recurringDay: initialValues.recurringDay } : {}),
+        ...(initialValues?.fee !== undefined ? { fee: initialValues.fee } : {}),
       });
     }
   }, [expense, initialValues, reset, open]);
@@ -1821,10 +1831,12 @@ export function ExpenseDialog({ open, onClose, expense, initialValues, onSuccess
   }, [defaultDebitCashAssetId, defaultCreditCashAssetId, selectedType, expense, initialValues, open, setValue]);
 
   useEffect(() => {
-    if (selectedDate && selectedIsRecurring && !expense) {
-      setValue('recurringDay', selectedDate.getDate());
-    }
-  }, [selectedDate, selectedIsRecurring, expense, setValue]);
+    if (!selectedDate || !selectedIsRecurring || expense) return;
+    // A series opened prefilled (the Assistente's «Modifica», 2026-11) keeps the day it names —
+    // «il 5 di ogni mese» from a date of the 20th — until the user moves the date.
+    const keepsPrefilledDay = initialValues?.recurringDay !== undefined && initialValues.date?.getTime() === selectedDate.getTime();
+    if (!keepsPrefilledDay) setValue('recurringDay', selectedDate.getDate());
+  }, [selectedDate, selectedIsRecurring, expense, initialValues, setValue]);
 
   const availableCategories = useMemo(
     () =>

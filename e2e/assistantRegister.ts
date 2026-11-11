@@ -287,3 +287,16 @@ export async function storedProposals(messageId: string): Promise<Record<string,
   const doc = await db.collection('assistantThreads').doc(THREAD_ID).collection('messages').doc(messageId).get();
   return (doc.data()?.proposals ?? {}) as Record<string, { status: string; writtenIds?: string[] }>;
 }
+
+/** An ```expense-proposal block of any kind (2026-11: transfer, debt, series, fee, new categories), written as given. */
+export function rawProposalBlock(proposal: Record<string, unknown>): string {
+  return ['```expense-proposal', JSON.stringify({ dateIso: italyDateIso(new Date()), reason: 'Come dici tu.', ...proposal }), '```'].join('\n');
+}
+
+/** An ```assistant-question block: ONE question object, as the model writes it. */
+export function questionBlock(question: { id: string; text: string; options: { value: string; label: string }[]; allowOther?: boolean }): string {
+  return ['```assistant-question', JSON.stringify({ kind: 'single', allowOther: true, ...question }), '```'].join('\n');
+}
+
+/** The question card of a block, by its question id. */
+export const questionCard = (page: Page, questionId: string) => page.locator(`[data-question-card="${questionId}"]`);

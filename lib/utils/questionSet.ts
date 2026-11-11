@@ -165,3 +165,73 @@ export function formatQuestionAnswersForPrompt(
   });
   return lines.join('\n');
 }
+
+// ── The Assistente's in-chat questions (2026-11) ──
+
+/** The fenced language of a question in an Assistente message: ONE question object per block. */
+export const ASSISTANT_QUESTION_LANGUAGE = 'assistant-question';
+/** The question blocks one message may carry: a block past the second renders as nothing (the prompt says so too). */
+export const ASSISTANT_QUESTION_MAX_PER_MESSAGE = 2;
+/** At most three options on a question about an account, a centre, a member or a loan; «Altro…» lists the rest. */
+const ENTITY_QUESTION_OPTIONS_MAX = 3;
+
+export type EntityQuestionKind = 'account' | 'center' | 'member' | 'loan' | 'category';
+const ENTITY_KINDS = new Set<string>(['account', 'center', 'member', 'loan', 'category']);
+
+/**
+ * The entity a question is about, read from its `id`'s segment before the first «:» («account:from»
+ * → account); null for any other question. Its options' values are the entities' ids.
+ */
+export function isEntityQuestion(question: Pick<Question, 'id'>): EntityQuestionKind | null {
+  const head = question.id.split(':')[0];
+  return question.id.includes(':') && ENTITY_KINDS.has(head) ? (head as EntityQuestionKind) : null;
+}
+
+/**
+ * Why an entity question may not render (the plain code block takes its place); `[]` for one that
+ * may, and for every other question. One answer only, «Altro…» always there (it is how the user
+ * reaches an entity the model did not list), and at most three options except on a category.
+ */
+export function entityQuestionProblems(question: Question): string[] {
+  const kind = isEntityQuestion(question);
+  if (kind === null) return [];
+  const problems: string[] = [];
+  if (question.kind === 'multiple') problems.push("domanda su un'entità: una sola scelta");
+  if (!question.allowOther) problems.push('domanda su un\'entità: "allowOther" deve essere true');
+  if (kind !== 'category' && question.options.length > ENTITY_QUESTION_OPTIONS_MAX) problems.push(`domanda su un'entità: al più ${ENTITY_QUESTION_OPTIONS_MAX} opzioni`);
+  return problems;
+}
+
+/** Whether the block of this rank among the message's question blocks renders: the first two only. */
+export function keepQuestionBlock(ordinal: number): boolean {
+  return ordinal < ASSISTANT_QUESTION_MAX_PER_MESSAGE;
+}
+
+/**
+ * One answer as a line of the user's reply: «{text} → {label} [id]» for an entity (picked among
+ * the options or from the Select), «{text} → Altro: …», «{text} → a, b», «{text} → preferisco non
+ * dire». The id travels in square brackets so the model copies it, not the label. Null when the
+ * answer is not given yet.
+ */
+export function formatQuestionAnswerAsMessage(question: Question, answer: QuestionAnswerValue, labels: Record<string, string>): string | null {
+  // The decline FIRST: its literal is a string, and would read as an unknown option's value.
+  if (answer === QUESTION_DECLINE_VALUE) return `${question.text} → preferisco non dire`;
+  if (typeof answer === 'object' && !Array.isArray(answer) && 'entity' in answer) {
+    if (answer.entity === '') return null;
+    return `${question.text} → ${labels[answer.entity] ?? answer.entity} [${answer.entity}]`;
+  }
+  if (typeof answer === 'string' && isEntityQuestion(question) !== null) {
+    const option = question.options.find((candidate) => candidate.value === answer);
+    return `${question.text} → ${option?.label ?? answer} [${answer}]`;
+  }
+  const described = describeAnswer(question, answer, labels);
+  return described === null ? null : `${question.text} → ${described}`;
+}
+
+/** The whole reply: one line per question, in order; null while any of them is unanswered. */
+export function formatQuestionAnswersAsMessage(
+  entries: ReadonlyArray<{ question: Question; answer: QuestionAnswerValue; labels: Record<string, string> }>
+): string | null {
+  const lines = entries.map(({ question, answer, labels }) => formatQuestionAnswerAsMessage(question, answer, labels));
+  return lines.length === 0 || lines.some((line) => line === null) ? null : lines.join('\n');
+}

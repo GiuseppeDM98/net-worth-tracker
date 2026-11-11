@@ -17,7 +17,7 @@ interface DividendTabAnswer {
   dividends: Dividend[];
 }
 
-/** The key both hooks read and every dividend write invalidates (`app/dashboard/cashflow/page.tsx`). */
+/** The key both hooks read and every dividend write invalidates (`components/cashflow/CashflowPageClient.tsx`). */
 export function dividendStatsQueryKey(ownerId: string | null | undefined) {
   return ['dividend-stats', ownerId ?? ''] as const;
 }

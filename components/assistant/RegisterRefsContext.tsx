@@ -2,7 +2,8 @@
 
 /**
  * What the page holds for a proposed row to be read against (2026-11): the categories, the cash
- * accounts, the cost centres and the household — the four reads the expense form makes, from the
+ * accounts, the properties and the loans, the fees' category, the cost centres and the household —
+ * from the four reads the expense form makes, from the
  * keys every page shares, so a visit after Cashflow opens with nothing to wait for.
  *
  * The page enables the reads in Registra only (the one mode in which an expense card renders) and
@@ -17,7 +18,10 @@ import { useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { calculateAssetValue } from '@/lib/services/assetService';
 import { buildAssistantRegisterContext, summarizeRegisterContext } from '@/lib/utils/assistantRegisterContext';
+import { resolveExpenseFeeCategory } from '@/lib/utils/expenseFee';
 import type { ExpenseProposalRefs } from '@/lib/utils/expenseProposal';
+import { isRepayableDebt } from '@/lib/utils/mortgageRepayment';
+import { isTransferableProperty } from '@/lib/utils/propertyTransfer';
 import { isCashAccount, type Asset, type FamilyMember } from '@/types/assets';
 import type { AssistantRegisterSummary } from '@/types/assistant';
 import type { CostCenter } from '@/types/costCenters';
@@ -65,15 +69,16 @@ export function useRegisterReads(ownerId: string | undefined, enabled: boolean):
     assetValueOf: calculateAssetValue,
   });
 
+  // The expense form's own lists: the properties a transfer may touch, the loans an instalment may repay, the fees' category.
   const refs: ExpenseProposalRefs = {
     categories,
     cashAssets: assets.filter(isCashAccount),
-    properties: [],
+    properties: assets.filter(isTransferableProperty),
     costCenters,
     members: settings?.familyMembers ?? EMPTY_MEMBERS,
     defaults: context.defaults,
-    loans: [],
-    feeCategory: null,
+    loans: assets.filter(isRepayableDebt),
+    feeCategory: resolveExpenseFeeCategory(categories, settings),
     settings: {
       costCentersEnabled: settings?.costCentersEnabled === true,
       expenseSplitEnabled: settings?.expenseSplitEnabled === true,

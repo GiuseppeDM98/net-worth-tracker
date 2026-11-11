@@ -64,7 +64,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **An optional tab's id is accepted by `getInitialTab` while its panel is gated on the setting**, which used to leave
   Cashflow **blank** — no tab bar, no content — for `?tab=split` or `?tab=cost-centers` with the feature off (a
   bookmark, a shared link, or turning the feature off with the tab open). `effectiveTab` is DERIVED in
-  `app/dashboard/cashflow/page.tsx` (never corrected in an effect, or there is a render where the page is empty) and
+  `components/cashflow/CashflowPageClient.tsx` (never corrected in an effect, or there is a render where the page is empty) and
   falls back to `tracking`; it is settled only once BOTH optional settings have loaded. Any future optional tab
   inherits the fix for free — and must read `effectiveTab`, not `activeTab`, in its header actions too.
 

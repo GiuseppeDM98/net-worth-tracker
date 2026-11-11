@@ -22,6 +22,7 @@
  */
 
 import Papa from 'papaparse';
+import { categoryMatchKey } from '@/lib/utils/expenseCategoryMatching';
 import { ExpenseCategory, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import {
   RawRow,
@@ -198,14 +199,6 @@ export function parseImportCsv(raw: string): RawRow[] {
 
 const norm = (s: string): string => s.trim().toLowerCase();
 
-/**
- * The category identity the import resolves against: (normalized name, type).
- * Shared with the commit layer (expenseImportService) so plan and write can never
- * disagree on which document a row attaches to.
- */
-export function categoryMatchKey(name: string, type: string): string {
-  return `${type}::${norm(name)}`;
-}
 
 /**
  * Turn raw rows into a full ImportPlan against the user's existing categories.

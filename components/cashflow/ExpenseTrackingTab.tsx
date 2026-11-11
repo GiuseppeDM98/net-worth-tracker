@@ -66,7 +66,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { X, Search, Download, Plus, ArrowRight } from 'lucide-react';
+import { X, Search, Download, Plus, ArrowRight, MessageSquarePlus } from 'lucide-react';
 import Link from 'next/link';
 
 import { ExpenseDialog, type SavedExpense } from '@/components/expenses/ExpenseDialog';
@@ -221,6 +221,8 @@ interface ExpenseTrackingTabProps {
    * the row is brought into view and marked. Read once at mount, forgotten by the next gesture.
    */
   linkedRowId?: string | null;
+  /** «Chiedi all'Assistente» beside «Aggiungi» in the axis (2026-11; the page computes `isAssistantBridgeShown`). */
+  showAssistantBridge?: boolean;
   /**
    * The tab is the one on screen. Every Cashflow tab stays mounted (`forceMount`), and a
    * `role="alert"` under `display: none` is never heard: `PageRest` remounts on activation
@@ -335,6 +337,7 @@ export function ExpenseTrackingTab({
   familyMembers,
   initialOwnerId = null,
   linkedRowId = null,
+  showAssistantBridge = false,
   active,
 }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
@@ -964,6 +967,16 @@ export function ExpenseTrackingTab({
         <Plus className="mr-1.5 h-4 w-4" />
         Aggiungi
       </Button>
+      {/* The bridge to Registra: a tablet in landscape only, as «Aggiungi» (in portrait the FAB is
+          the one add control, and «Altro» does not carry it). A link: no AI accent. */}
+      {showAssistantBridge && (
+        <Button asChild size="sm" variant="outline" className="max-desktop:portrait:hidden h-11 shrink-0">
+          <Link href="/dashboard/assistant?mode=registra">
+            <MessageSquarePlus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+            Chiedi all&apos;Assistente
+          </Link>
+        </Button>
+      )}
     </div>
   );
 

@@ -253,9 +253,17 @@ export function useAssistantStreaming({
     setStreamingMessageId(assistantMessageId);
     // Use renderedMessages (not the thread detail) as the base so that
     // messages from the previous stream are preserved even if React Query hasn't
-    // yet reloaded the thread after the last invalidation.
-    setStreamingMessages([
-      ...renderedMessages,
+    // yet reloaded the thread after the last invalidation. The buffer itself when it holds
+    // messages: a submit from an older render — the question cards' «Rispondi» records the
+    // answers, then sends (2026-11) — would otherwise drop the outcomes recorded since.
+    // With an empty buffer, the cached thread: where `recordProposal` writes for a thread opened
+    // from the list.
+    setStreamingMessages((current) => [
+      ...(current.length > 0
+        ? current
+        : selectedThreadId
+          ? (queryClient.getQueryData<AssistantThreadDetail>(queryKeys.assistant.thread(selectedThreadId))?.messages ?? renderedMessages)
+          : renderedMessages),
       userMessage,
       {
         id: assistantMessageId,

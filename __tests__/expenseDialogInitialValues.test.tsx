@@ -6,7 +6,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const NOW = new Date('2026-11-01T10:00:00Z');
@@ -111,5 +111,47 @@ describe('ExpenseDialog — initialValues', () => {
     await waitFor(() => expect(field('amount')?.value).toBe('20'));
     expect(field('subCategoryId')?.value).toBe('Bar');
     expect(field('notes')?.value).toBe('Caffè');
+  });
+});
+
+// ── The kinds the card writes since 2026-11: each widened field of the create reset ──
+
+describe('ExpenseDialog — initialValues of a transfer, an instalment, a series', () => {
+  beforeEach(() => {
+    reads.categories = [
+      ...(reads.categories as object[]),
+      { id: 'cat-trasf', userId: 'owner-1', name: 'Trasferimenti', type: 'transfer', subCategories: [], createdAt: NOW, updatedAt: NOW },
+      { id: 'cat-mutuo', userId: 'owner-1', name: 'Mutuo', type: 'debt', subCategories: [], createdAt: NOW, updatedAt: NOW },
+      { id: 'cat-banca', userId: 'owner-1', name: 'Banca', type: 'fixed', subCategories: [], createdAt: NOW, updatedAt: NOW },
+    ];
+    reads.assets = [
+      ...(reads.assets as object[]),
+      { id: 'loan-1', userId: 'owner-1', name: 'Mutuo ornitorinco', type: 'loan', assetClass: 'cash', quantity: 1000, currentPrice: 1, currency: 'EUR', debtInterestRate: 1.2 },
+    ];
+    reads.settings = { defaultDebitCashAssetId: 'acc-main', defaultCreditCashAssetId: 'acc-main', transferFeeCategoryId: 'cat-banca' };
+  });
+
+  it('opens a transfer on its destination and its fee', async () => {
+    renderDialog({ type: 'transfer', categoryId: 'cat-trasf', amount: 500, currency: 'EUR', date: new Date('2026-10-15T00:00:00'), linkedCashAssetId: 'acc-main', transferCashAssetId: 'acc-save', fee: 1.5 });
+    await waitFor(() => expect(field('transferCashAssetId')?.textContent).toContain('Conto risparmio'));
+    expect(field('fee')?.value).toBe('1.5');
+  });
+
+  it('opens an instalment on its loan and its payoff', async () => {
+    renderDialog({ type: 'debt', categoryId: 'cat-mutuo', amount: 300, currency: 'EUR', date: new Date('2026-10-15T00:00:00'), linkedCashAssetId: 'acc-main', debtAssetId: 'loan-1', isDebtPayoff: true });
+    await waitFor(() => expect(field('debtAssetId')?.textContent).toContain('Mutuo ornitorinco'));
+    expect(field('isDebtPayoff')?.checked).toBe(true);
+  });
+
+  it('opens a series on its cadence, its count and its day', async () => {
+    renderDialog({ ...PROPOSED, isRecurring: true, recurringFrequency: 'yearly', recurringCount: 3, recurringDay: 5 });
+    await waitFor(() => expect(field('isRecurring')?.getAttribute('aria-checked')).toBe('true'));
+    expect(field('recurringCount')?.value).toBe('3');
+    // The day asked, not the date's (15): the date's spread sets it first.
+    expect(field('recurringDay')?.value).toBe('5');
+    expect(screen.getByLabelText('Numero di anni *')).not.toBeNull();
+    // A date the user moves takes the day with it, as on any new series.
+    fireEvent.change(field('date')!, { target: { value: '2026-10-21' } });
+    await waitFor(() => expect(field('recurringDay')?.value).toBe('21'));
   });
 });
