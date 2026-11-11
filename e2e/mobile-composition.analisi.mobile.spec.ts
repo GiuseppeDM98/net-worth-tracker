@@ -14,6 +14,13 @@
  * only) — the Scheda stayed closed after the reload; (2) the panel test dropped from the Scheda's
  * Escape handler — Escape on the trigger closed the focus; (3) `expensesDeltaLifted` dropped from
  * the Periodo — «↓ 13,3%» visible under the sentence that prints it.
+ *
+ * A race of this test, not of the page (traced on 2026-11-11, red once on 2026-10-15, twice on
+ * 2026-11-11): on the SECOND opening the Scheda row is remembered open, so `aria-expanded` is true at
+ * the first render, before `landOnScheda`'s 50 ms timer lands the focus on its trigger (one landing,
+ * counted with a `focusin` log); a focus moved into the panel before that landing was taken back, and
+ * Escape on the trigger does nothing by design (2 runs in 20). The test waits for the landing first.
+ * Seen red, 3 runs of 3, with the timer at 300 ms and a 400 ms pause before Escape; green with the wait.
  */
 
 import { test, expect, type Page } from '@playwright/test';
@@ -72,6 +79,8 @@ test.describe('Analisi, composed for a phone', () => {
 
     await row.click();
     await expect(trigger(page, 'analisi-scheda')).toHaveAttribute('aria-expanded', 'true', { timeout: 30_000 });
+    // The landing first: the row is remembered open, so the attribute above can come before the focus.
+    await expect(trigger(page, 'analisi-scheda')).toBeFocused();
     await page.locator('#analisi-scheda-panel').getByRole('button', { name: /Indietro/ }).focus();
     await page.keyboard.press('Escape');
     await expect(trigger(page, 'analisi-scheda')).toHaveCount(0);

@@ -178,7 +178,7 @@ export function buildComposerPlaceholder(
   selectedYear: number
 ): string {
   const monthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
-  if (mode === 'register') return 'Scrivi cosa hai speso o incassato…';
+  if (mode === 'register') return 'Scrivi cosa hai speso, incassato o spostato…';
   if (mode === 'month_analysis') return `Scrivi la tua domanda su ${monthLabel}…`;
   if (mode === 'year_analysis') return `Scrivi la tua domanda sull'anno ${selectedYear}…`;
   if (mode === 'ytd_analysis') return "Scrivi la tua domanda sull'andamento da inizio anno…";

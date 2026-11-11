@@ -4,7 +4,7 @@
 
 ## ✨ New Features
 
-- **Assistente — Registra** — Added a «Registra» mode (the pencil in the Assistente's header): write what you spent or earned in your own words — «ho fatto spesa per 100 euro» — and the assistant, which knows your categories, accounts and recent rows, proposes up to five rows as cards you confirm, open in the expense form or ignore, asking first with options and one «Rispondi» when a detail is missing («Di cosa si tratta?», «Da quale conto?»). It records transfers between accounts and onto a house, loan instalments split into principal and interest, monthly or yearly series, fees and new categories, remembers how you file things («d'ora in poi la palestra in Salute»), and keeps one conversation a day, so «Nuova conversazione» is off while you are in it.
+- **Assistente — Registra** — Added a «Registra» mode (the pencil «Registra un movimento» in the Assistente's header): write what you spent, earned or moved in your own words — «ho fatto spesa per 100 euro» — and the assistant, which knows your categories, accounts and recent rows, proposes up to five rows as cards you confirm, open in the expense form or ignore, asking first with options and one «Rispondi» when a detail is missing («Di cosa si tratta?», «Da quale conto?»). It records transfers between accounts and onto a house, loan instalments split into principal and interest, monthly or yearly series, fees and new categories, remembers how you file things («d'ora in poi la palestra in Salute»), and keeps one conversation a day, so «Nuova conversazione» is off while you are in it.
 
 - **Cashflow › Tracciamento — «Chiedi all'Assistente»** — A link beside «Nuova Spesa» and «Aggiungi» opens the Assistente ready to record.
 

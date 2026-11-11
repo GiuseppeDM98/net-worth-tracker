@@ -251,7 +251,7 @@ export async function installFakeStream(page: Page, reply: (prompt: string) => s
 }
 
 /** «Registra» in the header: PageHeader draws its actions twice, one of them shown. */
-export const registerAction = (page: Page) => page.getByRole('button', { name: "Registra una spesa o un'entrata" }).filter({ visible: true }).first();
+export const registerAction = (page: Page) => page.getByRole('button', { name: 'Registra un movimento' }).filter({ visible: true }).first();
 export const composer = (page: Page) => page.getByRole('textbox', { name: "Scrivi un messaggio all'assistente" });
 export const card = (page: Page, key: string) => page.locator(`[data-proposal="${key}"]`);
 

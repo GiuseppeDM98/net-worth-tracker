@@ -600,7 +600,7 @@ describe('Registra — the verdict and the panel (2026-11)', () => {
 
   it('says what the mode does before any read', () => {
     const verdict = buildRegisterVerdict(null);
-    expect(verdict.headline).toBe("Registra una spesa o un'entrata.");
+    expect(verdict.headline).toBe('Registra un movimento.');
     expect(verdict.tone).toBe('neutral');
     expect(plain(verdict.sentence)).toBe('Scrivila come la diresti: te la propongo come riga e la scrivi tu con Conferma.');
   });

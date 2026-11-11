@@ -45,11 +45,11 @@ test('«Registra» shows the strip and what the assistant knows; the owner’s s
   await expect(page.getByRole('tablist', { name: 'Periodo di analisi' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: "Torna all'analisi" })).toBeVisible();
   await expect(composer(page)).toBeFocused();
-  await expect(composer(page)).toHaveAttribute('placeholder', 'Scrivi cosa hai speso o incassato…');
+  await expect(composer(page)).toHaveAttribute('placeholder', 'Scrivi cosa hai speso, incassato o spostato…');
 
   // Before any message: the verdict is computed (never the skeleton) and the panel lists the account.
   const verdict = page.getByRole('region', { name: 'Verdetto sul contesto' });
-  await expect(verdict).toContainText("Registra una spesa o un'entrata.");
+  await expect(verdict).toContainText('Registra un movimento.');
   await expect(verdict).toContainText(/Conosco \d+ categorie e \d+ conti/);
   const companion = page.locator('[data-scene="register"]');
   await expect(companion).toContainText("Cosa conosce l'Assistente");

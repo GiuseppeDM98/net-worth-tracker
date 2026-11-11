@@ -147,7 +147,7 @@ describe('assistantPeriodOptions — Registra (2026-11)', () => {
 
   it('names the mode at every label: the period, the placeholder, the question, the badge', () => {
     expect(getActivePeriodLabel('register', month, 2026)).toBe('Registra · senza periodo');
-    expect(buildComposerPlaceholder('register', 'none', month, 2026)).toBe('Scrivi cosa hai speso o incassato…');
+    expect(buildComposerPlaceholder('register', 'none', month, 2026)).toBe('Scrivi cosa hai speso, incassato o spostato…');
     expect(buildEmptyStateQuestion('register', month, 2026)).toBe('Cosa vuoi registrare?');
     expect(getModeBadgeLabel('register')).toBe('Registra');
     expect(getModeBadgeLabel('chat')).toBe('Libera');

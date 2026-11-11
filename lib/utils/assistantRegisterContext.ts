@@ -1,9 +1,10 @@
 /**
  * What the Assistente's Registra mode knows (2026-11), pure and client-safe.
  *
- * A row can only be proposed by id: the model copies the category's, the account's, the centre's
- * and the member's id from this block into its proposal, and the browser checks each against what
- * the page holds (lib/utils/expenseProposal.ts). So the block prints every id the form accepts,
+ * A row is proposed by id: the model copies the category's, the account's, the centre's and the
+ * member's id from this block into its proposal, and the browser checks each against what the page
+ * holds (lib/utils/expenseProposal.ts); only a transfer's two ends and an instalment's loan may carry
+ * a name, which the browser matches among the accounts, the houses and the loans (2026-11-11). So the block prints every id the form accepts,
  * the recent rows (how this user files what they buy) and the month so far.
  *
  * ONE builder runs on both sides. The server hands it the rows of the window and the month's

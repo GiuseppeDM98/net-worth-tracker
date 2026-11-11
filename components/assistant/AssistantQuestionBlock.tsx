@@ -12,7 +12,7 @@
  * - past the per-message cap → nothing;
  * - a block with problems (bad JSON, a refused question, an entity rule broken) → the code block;
  * - answered (`status: 'answered'` on the message) → the read-only card, «Risposta: …»;
- * - not answerable (an older message, a stream running) → the read-only card, «Non risposta qui»;
+ * - not answerable (an older message, one not yet saved, a stream running) → the read-only card, «Non risposta qui»;
  * - otherwise the card, «Altro…» on an entity question a pick among the page's own items.
  *
  * It is what the model wrote: the accent border and eyebrow (The AI-Accent Rule); «Rispondi» asks

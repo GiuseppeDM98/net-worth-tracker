@@ -313,8 +313,8 @@ still, the companion column's content slides with the mode). The code follows it
 
 ## Registra (2026-11)
 
-«Ho fatto spesa per 103 euro» becomes a card; «Conferma» writes ONE row through the expense form's services; a reload
-never writes it twice. Since 2026-11-11 also transfers (onto a house too), instalments, series, fees and new categories,
+«Ho fatto spesa per 103 euro» becomes a card; «Conferma» writes the row through the expense form's services (a series
+or a fee: the form's batch of documents); a reload never writes it twice. Since 2026-11-11 also transfers (onto a house too), instalments, series, fees and new categories,
 and the Assistente asks what it needs with options before proposing.
 
 - **The mode** is `register`, handled EXPLICITLY at every site of the WARNING comment that opens `types/assistant.ts`
@@ -336,14 +336,15 @@ and the Assistente asks what it needs with options before proposing.
   ```expense-proposal blocks a message (`EXPENSE_PROPOSALS_MAX_PER_MESSAGE`; a sixth renders as code), `expenseProposal.ts`
   the ONE schema. A block's key is `expense:N`, N its rank among the message's blocks of that language, DERIVED from the
   markdown (`listFencedBlocks`, matched by the `pre` node's offset) — never counted in render.
-- **The four kinds** (2026-11-11, `expenseProposalSchema` + the § 4 `superRefine`): `kind` expense · income · transfer ·
+- **The four kinds** (2026-11-11, `expenseProposalSchema` and its `superRefine`): `kind` expense · income · transfer ·
   debt, `type` the row type of its kind. A **transfer** names `fromAccount`/`toAccount` (an id first, then the name:
   exact → starts with → contains, the first stage with hits decides; «ambiguo: …» / «conto sconosciuto: …»), searched among
   the cash accounts AND the houses (`isTransferableProperty`); a house sits on one side only, the card says «verso
   l'immobile X: il valore della casa sale di …» or «… scende di …», refused above `propertyValueAvailable`; no category
   needed (the named transfer one, else the first, else «Trasferimenti (nuova)», created on «Conferma»). An **instalment**
-  names `loanName` among the repayable debts (`isRepayableDebt`) and shows the principal / interest split
-  (`splitInstalment`); no `loanName` is «Rata non collegata a un prestito»; `payoff` is all principal, one row. A
+  names `loanName` among the repayable debts (`isRepayableDebt`), matched as an account is («prestito ambiguo: …» /
+  «prestito sconosciuto: …»; two loans a name does not tell apart are asked first, «Quale prestito?», a `loan:`
+  question), and shows the principal / interest split (`splitInstalment`); no `loanName` is «Rata non collegata a un prestito»; `payoff` is all principal, one row. A
   **series** (`recurring`: monthly or yearly, count up to `MAX_RECURRENCE_OCCURRENCES`, `canTypeRecur`: expenses and
   instalments only) reads «12 occorrenze mensili, dal … al …» and writes the dialog's documents of one parent. A **fee**
   (`fee.amount`) goes in the category of Impostazioni › Spese (`resolveExpenseFeeCategory`), never the model's; with none
@@ -368,12 +369,20 @@ and the Assistente asks what it needs with options before proposing.
   predates the answers — the buffer (or the cached thread, when it is empty) is the base; the E2E spec showed the
   answered cards as «Non risposta qui».
 - **When to ask, and the block's three lines** (the contract's «QUANDO CHIEDERE»): the account only if the user named
-  none AND (no default for the type OR the category's most used account covers under 80% of its rows); «fuori budget»
+  none AND (no default for the type OR the category's most used account covers under 80% of its rows); the member only
+  with the Divisione on and at least half the category's rows personal; the cost centre only with the centres on and at
+  least one of the category's rows in a centre over the last 12 months; «fuori budget»
   applied, never asked, when the user says it or half the category's rows are; an amount with no object asks «Di cosa si
   tratta?». The register block feeds it: **PATTERN** per category over the window (the most used account and its share,
   rows in a centre, the personal and out-of-budget shares, each clause only with its feature on; fee rows and transfers
   out), **PRESTITI** (debt, TAN, the median instalment of the recent rows, a series counted once) and **IMMOBILI**
-  (`[id] nome · valore`), after CONTI.
+  (`[id] nome · valore`), after CONTI. **The proposal's rules defer to these thresholds** (2026-11-11, the retirement of
+  the Registra details): the first contract's «the default account, unless the user names another», «a centre or a
+  member only when the user names it» and «fuori budget only when the user says it» contradicted them; the account is
+  now the one named or picked in an answer, else the default when QUANDO CHIEDERE does not ask, the centre and the
+  member the named or picked one, «fuori budget» what QUANDO CHIEDERE applies, and the opening names transfers and
+  instalments — every sentence held whole in `assistantPromptBundle`, each seen red. The way in reads «Registra un
+  movimento» and the composer «Scrivi cosa hai speso, incassato o spostato…» since the same day.
 - **The card** (`ExpenseProposalCard`): `resolveExpenseProposal` checks every id against the browser's own reads
   (`RegisterRefsContext`: categories, assets, settings, centres) and names what it cannot find — a problem closes
   «Conferma», never «Modifica»; a failed read closes all writing. States (`describeExpenseProposalState`): idle ·
@@ -398,7 +407,7 @@ and the Assistente asks what it needs with options before proposing.
   uses the same path (`goal:N`) and, since 2026-11-11, the same two rules: no button on a `local-` message, and a
   toast when the save fails after the write (`GOAL_STATE_NOT_SAVED`, beside `PROPOSAL_STATE_NOT_SAVED`). An outcome
   never scrolls the conversation (`conversationScrollSignal`, held in the browser by the two-card spec).
-- **The way in and out**: the pencil in the header («Registra una spesa o un'entrata», off in demo and while streaming)
+- **The way in and out**: the pencil in the header («Registra un movimento», off in demo and while streaming)
   or `?mode=registra`, once the thread list has resolved; the strip «Registra · l'Assistente conosce categorie, conti e
   le ultime righe» stands where the period axis was (and the header's title reads «Una frase, una riga» instead of «Un periodo, una risposta», 2026-11-11), with «Torna all'analisi» — which leaves the thread FIRST (the mode
   alone would send the next question into it) and drops the param. The thread is one per Italian day, «Registrazioni ·

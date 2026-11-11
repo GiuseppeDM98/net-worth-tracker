@@ -136,7 +136,7 @@ export function AssistantHeader({
               AI_CONTROL_ACCENT_LABEL_CLASS,
             )}
             disabled={isDemo || isStreaming}
-            aria-label="Registra una spesa o un'entrata"
+            aria-label="Registra un movimento"
             onClick={onEnterRegister}
           >
             <PencilLine className="h-4 w-4" aria-hidden="true" />

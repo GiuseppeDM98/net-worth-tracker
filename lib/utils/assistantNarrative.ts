@@ -329,7 +329,7 @@ export function buildNoContextVerdict(overview: OverviewVerdictInput | null): Pa
  * skeleton and never wears the AI accent. Without a summary yet it says what the mode does.
  */
 export function buildRegisterVerdict(summary: AssistantRegisterSummary | null): PageVerdictModel {
-  const headline = "Registra una spesa o un'entrata.";
+  const headline = 'Registra un movimento.';
   if (!summary) {
     return {
       headline,

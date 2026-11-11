@@ -787,14 +787,13 @@ describe('the Registra prompt (2026-11)', () => {
       'Una rata di mutuo o di prestito ha kind "debt" e "loanName" con l\'[id] o il nome del blocco PRESTITI; con due o più prestiti e un nome che non li distingue, chiedi «Quale prestito?» con una domanda "loan:"; una rata che non ripaga un prestito del blocco si propone senza "loanName"; "payoff": true solo per un\'estinzione anticipata.',
       `Le entrate e i trasferimenti non si ripetono: una serie ("recurring") è solo per spese e rate, al più ${MAX_RECURRENCE_OCCURRENCES.monthly} occorrenze mensili o ${MAX_RECURRENCE_OCCURRENCES.yearly} annuali; un'estinzione anticipata è una riga sola.`,
       'Una commissione si scrive "fee": { "amount" } sulla riga che la paga; la sua categoria è quella di Impostazioni: non sceglierla.',
-      'Proponi una categoria nuova SOLO se nessuna esistente si adatta, e preferisci una sottocategoria sotto una categoria esistente;',
+      'Proponi una categoria nuova SOLO se nessuna esistente si adatta, e preferisci una sottocategoria sotto una categoria esistente; segui il modo di categorizzare dell\'utente (le righe recenti, le regole in memoria). Si scrive "newSubCategory": { "categoryId", "name" } con "categoryId" uguale a quello della riga, oppure "newCategory": { "name", "type" } senza "categoryId"; mai una categoria nuova di tipo "transfer".',
       'L\'ordine è: ciò che l\'utente dice in questo messaggio, poi le regole di categorizzazione in memoria, poi lo storico delle righe recenti.',
-      'QUANDO CHIEDERE: chiedi il conto solo se l\'utente non l\'ha nominato E (non c\'è un conto predefinito per quel tipo O il conto più usato della categoria copre meno dell\'80% delle sue righe).',
-      'Applica «fuori budget» se l\'utente lo dice o se almeno il 50% delle righe della categoria lo è: non chiederlo mai.',
-      'Se l\'importo arriva senza oggetto, chiedi «Di cosa si tratta?» con 2-4 categorie probabili e "allowOther": true.',
-      'DOMANDE: una domanda è un blocco ```assistant-question con UN oggetto JSON',
+      'QUANDO CHIEDERE: chiedi il conto solo se l\'utente non l\'ha nominato E (non c\'è un conto predefinito per quel tipo O il conto più usato della categoria copre meno dell\'80% delle sue righe). Chiedi l\'intestatario solo se la Divisione è attiva e almeno il 50% delle righe della categoria è personale. Applica «fuori budget» se l\'utente lo dice o se almeno il 50% delle righe della categoria lo è: non chiederlo mai. Chiedi il centro di costo solo se i centri sono attivi e almeno una riga della categoria negli ultimi 12 mesi sta in un centro. Le percentuali sono quelle del blocco PATTERN.',
+      'Se l\'importo arriva senza oggetto, chiedi «Di cosa si tratta?» con 2-4 categorie probabili e "allowOther": true. Non chiedere mai ciò che il messaggio, la memoria o le righe recenti già dicono.',
+      'DOMANDE: una domanda è un blocco ```assistant-question con UN oggetto JSON { "id", "kind": "single", "text", "options": [{ "value", "label" }], "allowOther" }, alla fine del messaggio. L\'"id" di una domanda su conti, centri, intestatari, prestiti o categorie comincia con "account:", "center:", "member:", "loan:" o "category:" ("account:from" e "account:to" per i due lati di un trasferimento); i "value" sono gli [id] dei blocchi (per una categoria l\'[id] della sottocategoria, o della categoria se non ne ha). Su conti, centri, intestatari e prestiti al più 3 opzioni, le più probabili secondo il blocco PATTERN, e "allowOther": true; non scrivere mai un\'opzione «Altro»: la riga «Altro…» è della card.',
       `Al più ${EXPENSE_PROPOSALS_MAX_PER_MESSAGE} blocchi \`\`\`expense-proposal o al più ${ASSISTANT_QUESTION_MAX_PER_MESSAGE} blocchi \`\`\`assistant-question per messaggio, mai i due tipi nello stesso messaggio, mai un \`\`\`goal-proposal in questa modalità: prima chiedi, poi proponi.`,
-      'La risposta dell\'utente arriva come un messaggio con una riga per domanda, «{domanda} → {scelta} [id]»',
+      'La risposta dell\'utente arriva come un messaggio con una riga per domanda, «{domanda} → {scelta} [id]»: usa l\'[id] fra parentesi quadre e riproponi la riga intera, senza chiedere di nuovo ciò che è stato risposto.',
       'Se il blocco memoria dice «memoria disattivata» e l\'utente detta una regola, rispondi: «non posso ricordarlo: la memoria è spenta ("Apprendimento automatico" nelle Preferenze dell\'Assistente)».',
     ];
     for (const sentence of sentences) expect(REGISTER_CONTRACT).toContain(sentence);
@@ -803,6 +802,16 @@ describe('the Registra prompt (2026-11)', () => {
     expect(REGISTER_CONTRACT).not.toContain('non proponibile');
     // A doubt on the property is a question too: on the owner's tour a deposit «sulla casa» became a spending
     // row with a prose question under it (2026-11-11).
+    // The rules of the first contract defer to QUANDO CHIEDERE and to the answers' [id] (2026-11-11, the retirement of
+    // the Registra details): «fuori budget only when the user says it», «the default account, unless the user names
+    // another» and «a centre or a member only when the user names it» contradicted the thresholds and the questions
+    // printed below them, and the opening still described spending and income alone.
+    expect(REGISTER_CONTRACT).toContain("In questa modalità l'utente ti dice cosa ha speso, incassato, spostato fra i suoi conti o pagato a rata e tu gli proponi la riga da registrare nel Cashflow.");
+    expect(REGISTER_CONTRACT).toContain('- Il conto è quello che l\'utente nomina o sceglie rispondendo a una domanda "account:" (il suo [id]); se non lo nomina e QUANDO CHIEDERE non dice di chiederlo, è il predefinito del tipo (addebito per una spesa e per una rata, accredito per un\'entrata): ometti `accountId`.');
+    expect(REGISTER_CONTRACT).toContain('- `costCenterId` e `memberId` solo se il loro blocco è attivo e l\'utente li nomina o li sceglie rispondendo a una domanda; `excludeFromBudget` su una spesa o una rata quando QUANDO CHIEDERE lo applica.');
+    expect(REGISTER_CONTRACT).not.toContain('solo su una spesa che l\'utente dice fuori dal budget');
+    expect(REGISTER_CONTRACT).not.toContain('salvo che l\'utente ne nomini un altro');
+    expect(REGISTER_CONTRACT).not.toContain('cosa ha speso o incassato');
     expect(REGISTER_CONTRACT).toContain('Un dubbio vero su categoria, conto, immobile, intestatario o prestito si chiede con un blocco ```assistant-question in un messaggio SENZA proposte, mai con una domanda in prosa sotto le card.');
   });
 
@@ -827,6 +836,16 @@ describe('the Registra prompt (2026-11)', () => {
     const full = buildRegisterPrompt('ho speso 5 euro', { ...PREFERENCES, memoryEnabled: true }, [{ ...archived, status: 'active' as const }], REGISTER_BLOCK, null);
     expect(full.userContent).not.toContain(REGISTER_MEMORY_EMPTY_LINE);
     expect(empty.system).toBe(full.system);
+  });
+
+  it('prints a categorisation rule in every analysis mode and in the chat too (2026-11-01: rules in every prompt)', () => {
+    const bundle = makeBundle();
+    const rule = { id: 'm1', userId: 'u1', category: 'preference' as const, text: 'Categorizzazione: palestra → Salute', createdAt: new Date(), updatedAt: new Date(), status: 'active' as const };
+    const on = { ...PREFERENCES, memoryEnabled: true };
+    for (const build of [buildMonthAnalysisPrompt, buildYearAnalysisPrompt, buildYtdAnalysisPrompt, buildHistoryAnalysisPrompt]) {
+      expect(build(bundle, 'Come va?', on, [rule]).userContent).toContain('Categorizzazione: palestra → Salute');
+    }
+    expect(buildChatPrompt('Come va?', on, 'marzo 2025', [rule], bundle).userContent).toContain('Categorizzazione: palestra → Salute');
   });
 
   it('leaves the shared core and every other mode’s system without the protocol', () => {

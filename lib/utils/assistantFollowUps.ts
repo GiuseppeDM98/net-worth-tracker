@@ -160,7 +160,8 @@ function deriveContextualFollowUp(
 /**
  * Builds the follow-up chips for a completed answer in a given mode.
  *
- * The contextual (data-derived) suggestion is placed first when present, so the
+ * «Registra un'altra» leads after a written card (`opts.afterWrittenCard`, 2026-11-11);
+ * otherwise the contextual (data-derived) suggestion is placed first when present, so the
  * most specific question leads; curated continuations fill the rest up to
  * MAX_FOLLOW_UPS. Results are de-duplicated by id.
  *

@@ -128,7 +128,7 @@ function renderPage() {
 }
 
 /** «Registra» in the header — PageHeader draws its actions twice (the sticky bar and the page), one of them shown. */
-const registerAction = () => screen.getAllByRole('button', { name: "Registra una spesa o un'entrata" })[0];
+const registerAction = () => screen.getAllByRole('button', { name: 'Registra un movimento' })[0];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -219,14 +219,14 @@ describe('the Assistente page — in and out of Registra', () => {
     expect(screen.getByText("Registra · l'Assistente conosce categorie, conti e le ultime righe")).not.toBeNull();
     // The verdict is computed, never the skeleton: the two categories and the one account read.
     const verdict = screen.getByRole('region', { name: 'Verdetto sul contesto' });
-    expect(verdict.textContent).toContain("Registra una spesa o un'entrata.");
+    expect(verdict.textContent).toContain('Registra un movimento.');
     expect(verdict.textContent?.replace(/ /g, ' ')).toContain('Conosco 2 categorie e 1 conto');
     expect(verdict.querySelector('[data-generated]')).toBeNull();
     await waitFor(() => expect(screen.getByText("Cosa conosce l'Assistente")).not.toBeNull());
     const scene = document.querySelector('[data-scene="register"]') as HTMLElement;
     expect(scene.textContent).toContain('Conto principale');
     expect(scene.querySelector('[data-generated]')).toBeNull();
-    expect(screen.getByPlaceholderText('Scrivi cosa hai speso o incassato…')).not.toBeNull();
+    expect(screen.getByPlaceholderText('Scrivi cosa hai speso, incassato o spostato…')).not.toBeNull();
     expect(screen.queryByText('Domande suggerite')).toBeNull();
   });
 
