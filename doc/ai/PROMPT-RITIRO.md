@@ -45,7 +45,11 @@ prima di ritirare); AI-02..06 — la suite d'area della guida (la riga «Suites 
 change here» di doc/guide/consulente.md, assistente.md, cashflow-tracciamento.md) e le E2E
 che la spec elenca in § 6 verdi sugli emulatori dal codice mergiato, con la rotta del
 modello sempre finta (`page.route`, decisione 39) e il documento dell'emulatore letto in
-fase D. NON sono segnali: il deploy su `main` o in produzione (arriva dopo l'intera serie),
+fase D; AI-07 (il report come libro) — le suite che la sua § 6 elenca (`allocationAdviceBook`,
+`consulenteBook`, `consulenteRevisionTile`, `useSceneTurn`, `pathRail`) e le sei spec Playwright
+del Consulente verdi sugli emulatori dal codice mergiato, la rotta sempre finta, E la riga
+di `/dashboard/allocation` in `perf:budget` verde sul tetto scritto in `perf/budget.json`.
+NON sono segnali: il deploy su `main` o in produzione (arriva dopo l'intera serie),
 l'uso vero del proprietario (una run reale del Consulente con il colloquio, una spesa
 registrata davvero dalla chat), il giro F sul mirror della sessione di implementazione, una
 preview Vercel che non chiama ciò che spende (la preview non chiama mai
@@ -228,7 +232,9 @@ ORDINE DI LAVORO
    "byte-identical" doc/guide/assistente.md`; «una sonda non apre un controllo che
    spende» è già in WORKFLOW.md § 3, `grep -n "SPENDS" WORKFLOW.md`); § 10 ciò che non si
    fa → i blind spots della guida interessata; `doc/ai/reference/` (i concept HTML e
-   `sample.json` di AI-01) se ne va con la cartella, `git log -- doc/ai/reference/` è il
+   `sample.json` di AI-01) se ne va con la cartella — e con lui la deroga `undersized-ui-text` di
+   `.impeccable/config.json` che nomina i tre `concept-*.html` (2026-11-11: una deroga su file
+   cancellati si toglie nello stesso commit) —, `git log -- doc/ai/reference/` è il
    suo archivio, e fuori da `doc/ai/` nessuno lo cita per percorso (la prova di AI-01, 2026-11-06:
    `grep -rn "doc/ai/reference" DESIGN.md doc/guide` → 0; se una frase lo cita, passa alla
    data e a `git log`). Sostituire, mai accumulare.
@@ -341,7 +347,9 @@ sotto il tetto: una regola nuova della serie entra solo se una vecchia esce o si
 una lezione di dominio NON va lì ma nella sua guida, e uno stub di § 3 che supera i 3–4
 punti è una guida che rientra); WORKFLOW.md solo lo standard e la sua traduzione locale
 (§ 3 in coda: «Do not duplicate project conventions here»); le guide ~500 righe ciascuna
-(AGENTS.md § 0; oltre si divide per sotto-tema in una sessione sua, come
+(AGENTS.md § 0; oltre si divide per sotto-tema in una sessione sua — decisione 103, 2026-11-11:
+il ritiro di AI-07 ritira spec e cartella nella STESSA sessione, e una guida che il travaso
+porta oltre ~500 righe resta così fino a quella sessione, mai tagliata in chiusura —, come
 `prima-schermata.md` uscì da `velocita.md` il 2026-10-10), le più vicine al tetto con `wc
 -l doc/guide/*.md | sort -n | tail -6`: il 2026-11-02 `e2e-emulatori.md` 479, `velocita.md`
 464, `patrimonio.md` 453, `prima-schermata-misure.md` 402, `cashflow.md` 354,
