@@ -44,7 +44,7 @@ import {
   formatPeriodInSentence,
   toNoContextVerdictInput,
 } from '@/lib/utils/assistantNarrative';
-import { buildFollowUpSuggestions } from '@/lib/utils/assistantFollowUps';
+import { buildFollowUpSuggestions, type AssistantFollowUp } from '@/lib/utils/assistantFollowUps';
 import { getAssistantPeriodLabel } from '@/lib/utils/assistantPeriodLabel';
 import {
   buildComposerPlaceholder,
@@ -284,7 +284,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     if (!isComplete || !last || last.role !== 'assistant' || last.content.trim().length === 0) {
       return [];
     }
-    return buildFollowUpSuggestions(last.mode, contextBundle);
+    // A card of the last answer wrote its row: the next one starts from an empty composer.
+    const afterWrittenCard = Object.values(last.proposals ?? {}).some((state) => state.status === 'written');
+    return buildFollowUpSuggestions(last.mode, contextBundle, { afterWrittenCard });
   }, [renderedMessages, isStreaming, streamingMessageId, isInterrupted, contextBundle]);
 
   // Sync mode and period picker to the loaded thread so the UI stays coherent
@@ -476,14 +478,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   };
 
   // A follow-up of Registra is the start of a sentence («Oggi ho speso »): it fills the composer
-  // instead of being sent, since a prompt with no amount would only earn a question back.
-  const handleFollowUpSelect = (prompt: string) => {
-    if (mode === 'register') {
-      setDraft(prompt);
-      composerRef.current?.focus();
+  // instead of being sent, since a prompt with no amount would only earn a question back. A chip
+  // may say otherwise (`action`): «Registra un'altra» empties the composer and sends nothing.
+  const handleFollowUpSelect = (followUp: AssistantFollowUp) => {
+    const action = followUp.action ?? (mode === 'register' ? 'prefill' : 'send');
+    if (action === 'send') {
+      streaming.submit(followUp.prompt);
       return;
     }
-    streaming.submit(prompt);
+    setDraft(action === 'focus-composer' ? '' : followUp.prompt);
+    composerRef.current?.focus();
   };
 
   const handleSelectThread = (thread: AssistantThread) => {

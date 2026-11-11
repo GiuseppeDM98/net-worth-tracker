@@ -14,6 +14,16 @@ import { ExpenseCategory, ExpenseType } from '@/types/expenses';
 
 const normalize = (name: string): string => name.trim().toLowerCase();
 
+/**
+ * The category identity a write resolves against: (normalized name, type). Shared by the import
+ * (plan and commit, so they never disagree on which document a row attaches to) and the
+ * Assistente's card (a `newCategory` that already exists is reused, 2026-11). Here and not in
+ * `expenseImport.ts`, whose CSV parser would follow it into every page that names a category.
+ */
+export function categoryMatchKey(name: string, type: string): string {
+  return `${type}::${normalize(name)}`;
+}
+
 export interface EquivalentCategory {
   categoryId: string;
   /** Empty string when no subcategory matched — the shape ExpenseFormData expects. */

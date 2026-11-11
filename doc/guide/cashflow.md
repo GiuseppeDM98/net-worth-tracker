@@ -7,6 +7,9 @@
 > `lib/services/expenseImportService.ts`, `handleEntitySelect` in `AnalisiTab.tsx` or their
 > consumers. In `AGENTS.md` only the stub with the essentials remains; the full rule is here.
 > Modules and files: § *Files* below.
+>
+> The Assistente's card writes through the same services and the same field rules: every rule here holds there
+> (2026-11, doc/guide/assistente.md § Registra).
 
 ## Files
 
@@ -22,7 +25,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `lib/utils/budgetUtils.ts`, the words `EXPENSE_BUDGET_EXCLUSION_*` in `dialogNarrative.ts`, the chip in
   `CompactExpenseRow` and `ExpenseTable`; the rule in doc/guide/cashflow-budget.md
 - **Expenses by window** (2026-09-30): pure `lib/utils/expenseWindows.ts` (`trackingWindow`, `budgetWindow`, `budgetSuggestionWindow`, `fireWindows`, `listExpenseYears`), hooks `useExpensesInRange` / `useExpenseBounds` / `expensesInRangeQueryOptions` in `lib/hooks/useExpenses.ts`, readers `getExpensesByDateRange` / `getExpenseDateBounds` in `lib/services/expenseService.ts`, keys `queryKeys.expenses.{range,bounds}`; tests `__tests__/expenseWindows.test.ts` (bounds and invariance), `__tests__/persistCache.test.ts` (the two builders), `e2e/cashflow.tracciamento.spec.ts` (the second window)
-- **Tabs on demand** (2026-10-05): the four `lazyComponent`s at the top of `app/dashboard/cashflow/page.tsx`, their
+- **Tabs on demand** (2026-10-05): the four `lazyComponent`s at the top of `components/cashflow/CashflowPageClient.tsx`, their
   skeleton cells `lib/constants/cashflowTabSkeletons.ts`, the fallbacks of Dividendi and Divisione
   `components/cashflow/CashflowTabSkeletons.tsx` (2026-10-06); held by `perf:budget` (Cashflow's ceiling), by every
   `e2e/cashflow.*.spec.ts` that opens a tab, and by `e2e/lazyTabLanding.ts` (the fallback's geometry)
@@ -334,7 +337,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   conto di origine»: `e2e/cashflow.{tracciamento,accounts}.spec.ts` went red until the subscription moved into the
   body). Any new child that reads `formState` from a `form` prop does the same.
 
-## The tabs load their code on demand (`app/dashboard/cashflow/page.tsx`)
+## The tabs load their code on demand (`components/cashflow/CashflowPageClient.tsx`)
 - **Dividendi, Budget, Divisione and Centri di Costo are `lazyComponent`s** (2026-10-05): only Tracciamento's
   code is in Cashflow's initial JavaScript. With the React Compiler on, the five tabs as static imports took the page
   from 736 to 832 KB gz and its first figure from 616 to 730 ms cold on the mirror; lazy, 717 KB and the same 593 ms as

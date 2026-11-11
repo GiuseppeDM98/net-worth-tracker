@@ -81,8 +81,8 @@ rules below name.
 - **A shell component that reads `useSearchParams` puts it in a child rendered inside `<Suspense>`** (`AddExpenseFab` in
   `BottomNavigation`): the layout is a `'use client'` component that is
   still prerendered — the shell is in the HTML since 2026-09-28 — and the hook bails static rendering out without a
-  boundary. **A PAGE under `ProtectedRoute` needs no boundary** (verified 2026-10-08, Impostazioni and Cashflow read
-  `useSearchParams` at their root and `/dashboard/settings` is in the prerender manifest): on the server `loading` is
+  boundary. **A PAGE under `ProtectedRoute` needs no boundary** (verified 2026-10-08, Impostazioni reads
+  `useSearchParams` at its root, Cashflow in `CashflowPageClient` (2026-11-11), under the same `ProtectedRoute`, and `/dashboard/settings` is in the prerender manifest): on the server `loading` is
   always true, so `ProtectedRoute` renders only its fallback and the page function never runs at prerender — the rule
   above is for what sits OUTSIDE it.
 - **The `PageTabBar` pill's tabs are 44×44 since 2026-10-10** (`min-h-11 min-w-11 justify-center`, DESIGN.md →

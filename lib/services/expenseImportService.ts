@@ -31,8 +31,8 @@ import {
 import { db } from '@/lib/firebase/config';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
-import { createCategory, updateCategory } from '@/lib/services/expenseCategoryService';
-import { categoryMatchKey } from '@/lib/utils/expenseImport';
+import { createCategory, newSubCategoryId, updateCategory } from '@/lib/services/expenseCategoryService';
+import { categoryMatchKey } from '@/lib/utils/expenseCategoryMatching';
 import { ImportPlan } from '@/types/expenseImport';
 import { ExpenseCategory, ExpenseSubCategory } from '@/types/expenses';
 
@@ -40,7 +40,6 @@ const EXPENSES_COLLECTION = 'expenses';
 const BATCH_LIMIT = 400; // mirror costCenterService chunking (Firestore hard limit is 500)
 
 const norm = (s: string): string => s.trim().toLowerCase();
-const genSubId = (): string => `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 const genImportBatchId = (): string =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -70,7 +69,7 @@ export async function commitImportPlan(
 
   // 1. Create brand-new categories, capturing their Firestore ID directly from createCategory.
   for (const c of plan.categoriesToCreate) {
-    const subCategories: ExpenseSubCategory[] = c.subCategories.map((name) => ({ id: genSubId(), name }));
+    const subCategories: ExpenseSubCategory[] = c.subCategories.map((name) => ({ id: newSubCategoryId(), name }));
     const categoryId = await createCategory(userId, { name: c.name, type: c.type, subCategories });
     const created: ExpenseCategory = {
       id: categoryId,
@@ -93,7 +92,7 @@ export async function commitImportPlan(
     const existingNames = new Set(category.subCategories.map((sc) => norm(sc.name)));
     const additions: ExpenseSubCategory[] = s.subCategoryNames
       .filter((n) => !existingNames.has(norm(n)))
-      .map((name) => ({ id: genSubId(), name }));
+      .map((name) => ({ id: newSubCategoryId(), name }));
     if (additions.length === 0) continue;
     const mergedSubCategories = [...category.subCategories, ...additions];
     await updateCategory(s.categoryId, { subCategories: mergedSubCategories });

@@ -59,7 +59,8 @@ interface AssistantConversazioneTileProps {
   streamingMessageId: string | undefined;
   followUps: AssistantFollowUp[];
   onRetry: () => void;
-  onFollowUpSelect: (prompt: string) => void;
+  /** The whole chip: the page reads its `action` (send, prefill, focus the composer). */
+  onFollowUpSelect: (followUp: AssistantFollowUp) => void;
   /** Anchor for auto-scroll to the latest message — owned by the page (scroll effect). */
   conversationEndRef: React.RefObject<HTMLDivElement | null>;
   /** The mode the conversation is shown in (an expense proposal is a card in Registra alone). */
@@ -179,7 +180,7 @@ export function AssistantConversazioneTile({
                   rows={followUps.map((followUp) => ({ id: followUp.id, label: followUp.label }))}
                   onSelect={(row) => {
                     const followUp = followUps.find((f) => f.id === row.id);
-                    if (followUp) onFollowUpSelect(followUp.prompt);
+                    if (followUp) onFollowUpSelect(followUp);
                   }}
                   disabled={isStreaming}
                   ariaLabel="Continua con"

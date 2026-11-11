@@ -63,3 +63,13 @@ describe('updateCategory — spendingRole', () => {
     expect('spendingRole' in sub).toBe(false);
   });
 });
+
+import { newSubCategoryId } from '@/lib/services/expenseCategoryService';
+
+describe('newSubCategoryId (2026-11: one rule for the dialog, the import and the Assistente)', () => {
+  it('is the time, a dash and up to nine base-36 characters, and unique call to call', () => {
+    const ids = Array.from({ length: 50 }, () => newSubCategoryId());
+    for (const id of ids) expect(id).toMatch(/^\d+-[a-z0-9]{1,9}$/);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

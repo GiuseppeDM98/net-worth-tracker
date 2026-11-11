@@ -17,7 +17,7 @@
  * 5. A saved expense lands in place (the owner's tour, 2026-09-29): the counter and the table
  *    follow the write with NO page skeleton in between — the save used to reread the dividends
  *    and put the skeleton over Tracciamento for the length of a call it never uses. TWO lines of
- *    `app/dashboard/cashflow/page.tsx` hold it, either alone: the tab's `loading` without
+ *    `components/cashflow/CashflowPageClient.tsx` hold it, either alone: the tab's `loading` without
  *    `otherDataLoading`, and `handleRefresh` rereading the dividends only with their tab mounted.
  *    The falsification that turns this red removes BOTH (seen: «1 before the save, 2 after»).
  * 6. The tab reads a WINDOW of the expenses, and a new period is a new read (2026-09-30,
@@ -344,4 +344,18 @@ test('the feed’s detail arms its delete in the footer: one dialog, the consequ
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(movimenti.getByRole('button', { name: /Alimentari/ }).filter({ visible: true })).toHaveCount(rowsBefore);
+});
+
+/**
+ * «Chiedi all'Assistente» beside «Nuova Spesa» (2026-11, doc/guide/cashflow-tracciamento.md): the
+ * bridge to Registra, shown with the key of `.env.local` on the dev:e2e server. A link, not a modal.
+ */
+test('the header’s «Chiedi all’Assistente» carries the Registra href and lands in Registra', async ({ page }) => {
+  test.setTimeout(90_000);
+  const header = page.getByRole('link', { name: "Chiedi all'Assistente" }).first();
+  await expect(header).toBeVisible();
+  await expect(header).toHaveAttribute('href', '/dashboard/assistant?mode=registra');
+  await header.click();
+  await expect(page).toHaveURL(/\/dashboard\/assistant\?mode=registra/);
+  await expect(page.getByText("Registra · l'Assistente conosce categorie, conti e le ultime righe")).toBeVisible({ timeout: 60_000 });
 });

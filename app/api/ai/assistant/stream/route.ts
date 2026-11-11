@@ -17,6 +17,7 @@ import {
 } from '@/lib/server/assistant/store';
 import {
   dedupeMemoryItems,
+  supersedesCategorizationRule,
   extractMemoryCandidates,
 } from '@/lib/server/assistant/memoryExtraction';
 import {
@@ -127,6 +128,12 @@ async function extractAndSaveMemory(
       updatedAt: now,
       status: 'active' as const,
     }));
+    // A rule that replaces an older one on the same subject archives it, in the same transaction.
+    for (const candidate of newCandidates) {
+      for (const item of memoryDoc.items) {
+        if (supersedesCategorizationRule(candidate, item)) pendingItems.push({ ...item, status: 'archived', updatedAt: now });
+      }
+    }
 
     await evaluateActiveGoals(userId, { pendingItems, now });
   } catch (error) {

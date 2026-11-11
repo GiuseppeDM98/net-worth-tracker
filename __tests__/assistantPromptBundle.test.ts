@@ -13,6 +13,7 @@ import {
   REGISTER_CONTRACT,
   buildChatPrompt,
   buildRegisterPrompt,
+  REGISTER_MEMORY_EMPTY_LINE,
   buildHistoryAnalysisPrompt,
   buildMonthAnalysisPrompt,
   buildYearAnalysisPrompt,
@@ -22,6 +23,9 @@ import {
 } from '@/lib/server/assistant/prompts';
 import { AssistantMonthContextBundle, AssistantPreferences } from '@/types/assistant';
 import { emptyAssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
+import { EXPENSE_PROPOSALS_MAX_PER_MESSAGE } from '@/lib/utils/expenseProposal';
+import { ASSISTANT_QUESTION_MAX_PER_MESSAGE } from '@/lib/utils/questionSet';
+import { MAX_RECURRENCE_OCCURRENCES } from '@/lib/utils/recurrenceDates';
 
 const PREFERENCES: AssistantPreferences = {
   responseStyle: 'balanced',
@@ -774,6 +778,55 @@ describe('the Registra prompt (2026-11)', () => {
     expect(REGISTER_CONTRACT).toContain('qualunque sia lo stile di risposta');
     expect(REGISTER_CONTRACT).toContain('Niente sezioni con titolo');
     expect(REGISTER_CONTRACT).toContain('Non dire quante righe hai letto');
+  });
+
+  it('carries the four kinds, when to ask, the questions and the chain of caps, verbatim (2026-11)', () => {
+    const sentences = [
+      'TIPI DI RIGA: "kind" è "expense" (type "fixed" o "variable"), "income" (type "income"), "transfer" (type "transfer") o "debt" (type "debt").',
+      'Un trasferimento sposta soldi fra due conti, o fra un conto e un immobile: scrivi "fromAccount" e "toAccount" con l\'[id] dei blocchi CONTI o IMMOBILI (o il nome come lo dice l\'utente), mai "accountId"; un immobile sta su un lato solo. Se l\'utente non nomina uno dei due lati, chiedilo.',
+      'Una rata di mutuo o di prestito ha kind "debt" e "loanName" con l\'[id] o il nome del blocco PRESTITI; con due o più prestiti e un nome che non li distingue, chiedi «Quale prestito?» con una domanda "loan:"; una rata che non ripaga un prestito del blocco si propone senza "loanName"; "payoff": true solo per un\'estinzione anticipata.',
+      `Le entrate e i trasferimenti non si ripetono: una serie ("recurring") è solo per spese e rate, al più ${MAX_RECURRENCE_OCCURRENCES.monthly} occorrenze mensili o ${MAX_RECURRENCE_OCCURRENCES.yearly} annuali; un'estinzione anticipata è una riga sola.`,
+      'Una commissione si scrive "fee": { "amount" } sulla riga che la paga; la sua categoria è quella di Impostazioni: non sceglierla.',
+      'Proponi una categoria nuova SOLO se nessuna esistente si adatta, e preferisci una sottocategoria sotto una categoria esistente;',
+      'L\'ordine è: ciò che l\'utente dice in questo messaggio, poi le regole di categorizzazione in memoria, poi lo storico delle righe recenti.',
+      'QUANDO CHIEDERE: chiedi il conto solo se l\'utente non l\'ha nominato E (non c\'è un conto predefinito per quel tipo O il conto più usato della categoria copre meno dell\'80% delle sue righe).',
+      'Applica «fuori budget» se l\'utente lo dice o se almeno il 50% delle righe della categoria lo è: non chiederlo mai.',
+      'Se l\'importo arriva senza oggetto, chiedi «Di cosa si tratta?» con 2-4 categorie probabili e "allowOther": true.',
+      'DOMANDE: una domanda è un blocco ```assistant-question con UN oggetto JSON',
+      `Al più ${EXPENSE_PROPOSALS_MAX_PER_MESSAGE} blocchi \`\`\`expense-proposal o al più ${ASSISTANT_QUESTION_MAX_PER_MESSAGE} blocchi \`\`\`assistant-question per messaggio, mai i due tipi nello stesso messaggio, mai un \`\`\`goal-proposal in questa modalità: prima chiedi, poi proponi.`,
+      'La risposta dell\'utente arriva come un messaggio con una riga per domanda, «{domanda} → {scelta} [id]»',
+      'Se il blocco memoria dice «memoria disattivata» e l\'utente detta una regola, rispondi: «non posso ricordarlo: la memoria è spenta ("Apprendimento automatico" nelle Preferenze dell\'Assistente)».',
+    ];
+    for (const sentence of sentences) expect(REGISTER_CONTRACT).toContain(sentence);
+    // A real doubt is a question block, never a prose question under the cards (the owner’s tour, 2026-11-11).
+    expect(REGISTER_CONTRACT).not.toContain('come domanda breve');
+    expect(REGISTER_CONTRACT).not.toContain('non proponibile');
+    // A doubt on the property is a question too: on the owner's tour a deposit «sulla casa» became a spending
+    // row with a prose question under it (2026-11-11).
+    expect(REGISTER_CONTRACT).toContain('Un dubbio vero su categoria, conto, immobile, intestatario o prestito si chiede con un blocco ```assistant-question in un messaggio SENZA proposte, mai con una domanda in prosa sotto le card.');
+  });
+
+  it('stays byte-identical across users, rows and memory, and says when memory is off', () => {
+    const rule = { id: 'm1', userId: 'u1', category: 'preference' as const, text: 'Categorizzazione: palestra → Salute', createdAt: new Date(), updatedAt: new Date(), status: 'active' as const };
+    const a = buildRegisterPrompt('ho speso 5 euro', { ...PREFERENCES, memoryEnabled: true }, [rule], REGISTER_BLOCK, null);
+    const b = buildRegisterPrompt('stipendio', { ...PREFERENCES, memoryEnabled: false }, [], '--- REGISTRA ---\n[cat-x] X', CASHFLOW_BLOCK);
+    expect(a.system).toBe(b.system);
+    expect(a.userContent).toContain('Categorizzazione:');
+    expect(b.userContent).toContain('Memoria: memoria disattivata.');
+    const off = buildRegisterPrompt('ho speso 5 euro', { ...PREFERENCES, memoryEnabled: false }, [rule], REGISTER_BLOCK, null);
+    expect(off.userContent).toContain('memoria disattivata');
+    expect(off.userContent).not.toContain('Categorizzazione:');
+    expect(off.userContent).not.toContain(REGISTER_MEMORY_EMPTY_LINE);
+  });
+
+  it('says the memory is on when it is on and still empty, and only then (2026-11-11)', () => {
+    const archived = { id: 'm2', userId: 'u1', category: 'preference' as const, text: 'Categorizzazione: palestra → Salute', createdAt: new Date(), updatedAt: new Date(), status: 'archived' as const };
+    const empty = buildRegisterPrompt('la palestra la metto sempre in Salute', { ...PREFERENCES, memoryEnabled: true }, [archived], REGISTER_BLOCK, null);
+    expect(empty.userContent).toContain('Memoria: attiva, nessuna regola salvata.');
+    expect(empty.userContent).not.toContain('memoria disattivata');
+    const full = buildRegisterPrompt('ho speso 5 euro', { ...PREFERENCES, memoryEnabled: true }, [{ ...archived, status: 'active' as const }], REGISTER_BLOCK, null);
+    expect(full.userContent).not.toContain(REGISTER_MEMORY_EMPTY_LINE);
+    expect(empty.system).toBe(full.system);
   });
 
   it('leaves the shared core and every other mode’s system without the protocol', () => {

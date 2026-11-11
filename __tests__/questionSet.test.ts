@@ -153,3 +153,94 @@ describe('formatQuestionAnswersForPrompt', () => {
     expect(text).toContain('→ non risposta');
   });
 });
+
+// ── The Assistente's in-chat questions (2026-11) ──
+
+import {
+  ASSISTANT_QUESTION_MAX_PER_MESSAGE,
+  entityQuestionProblems,
+  formatQuestionAnswerAsMessage,
+  formatQuestionAnswersAsMessage,
+  isEntityQuestion,
+  keepQuestionBlock,
+} from '@/lib/utils/questionSet';
+
+const ACCOUNT_Q: Question = {
+  id: 'account:debit',
+  kind: 'single',
+  text: 'Da quale conto?',
+  options: [
+    { value: 'acc-1', label: 'Conto A' },
+    { value: 'acc-2', label: 'Conto B' },
+  ],
+  allowOther: true,
+};
+
+const TOPIC_Q: Question = {
+  id: 'abitudine',
+  kind: 'multiple',
+  text: 'Cosa compri di solito?',
+  options: [
+    { value: 'pane', label: 'Pane' },
+    { value: 'latte', label: 'Latte' },
+  ],
+  allowOther: true,
+};
+
+describe('isEntityQuestion', () => {
+  it('reads the entity from the segment before the first «:»', () => {
+    expect(isEntityQuestion({ id: 'account:from' })).toBe('account');
+    expect(isEntityQuestion({ id: 'loan:' })).toBe('loan');
+    expect(isEntityQuestion({ id: 'category:x:y' })).toBe('category');
+    expect(isEntityQuestion({ id: 'loan' })).toBeNull();
+    expect(isEntityQuestion({ id: 'budget:x' })).toBeNull();
+  });
+});
+
+describe('entityQuestionProblems', () => {
+  it('wants one answer, «Altro…» and at most three options on an entity question', () => {
+    expect(entityQuestionProblems(ACCOUNT_Q)).toEqual([]);
+    expect(entityQuestionProblems({ ...ACCOUNT_Q, allowOther: false })).toEqual(['domanda su un\'entità: "allowOther" deve essere true']);
+    expect(entityQuestionProblems({ ...ACCOUNT_Q, kind: 'multiple' })).toEqual(["domanda su un'entità: una sola scelta"]);
+    const four = [1, 2, 3, 4].map((n) => ({ value: `acc-${n}`, label: `Conto ${n}` }));
+    expect(entityQuestionProblems({ ...ACCOUNT_Q, options: four })).toEqual(["domanda su un'entità: al più 3 opzioni"]);
+    // A category question may carry four.
+    expect(entityQuestionProblems({ ...ACCOUNT_Q, id: 'category:', options: four })).toEqual([]);
+    // Any other question is not this function's business.
+    expect(entityQuestionProblems({ ...TOPIC_Q, allowOther: false })).toEqual([]);
+  });
+});
+
+describe('keepQuestionBlock', () => {
+  it('keeps the first two blocks of a message', () => {
+    expect(ASSISTANT_QUESTION_MAX_PER_MESSAGE).toBe(2);
+    expect(keepQuestionBlock(0)).toBe(true);
+    expect(keepQuestionBlock(1)).toBe(true);
+    expect(keepQuestionBlock(2)).toBe(false);
+  });
+});
+
+describe('formatQuestionAnswerAsMessage', () => {
+  it('writes the four line shapes', () => {
+    expect(formatQuestionAnswerAsMessage(ACCOUNT_Q, 'acc-2', {})).toBe('Da quale conto? → Conto B [acc-2]');
+    expect(formatQuestionAnswerAsMessage(TOPIC_Q, { other: ' uova ' }, {})).toBe('Cosa compri di solito? → Altro: uova');
+    expect(formatQuestionAnswerAsMessage(TOPIC_Q, ['pane', 'latte'], {})).toBe('Cosa compri di solito? → Pane, Latte');
+    expect(formatQuestionAnswerAsMessage(TOPIC_Q, QUESTION_DECLINE_VALUE, {})).toBe('Cosa compri di solito? → preferisco non dire');
+  });
+
+  it('writes an entity picked from the Select with its id', () => {
+    expect(formatQuestionAnswerAsMessage(ACCOUNT_Q, { entity: 'acc-5' }, { 'acc-5': 'Conto E' })).toBe('Da quale conto? → Conto E [acc-5]');
+    expect(formatQuestionAnswerAsMessage(ACCOUNT_Q, { entity: '' }, {})).toBeNull();
+  });
+
+  it('joins the answers by one line break, and is null while one is missing', () => {
+    expect(formatQuestionAnswersAsMessage([
+      { question: ACCOUNT_Q, answer: 'acc-1', labels: {} },
+      { question: TOPIC_Q, answer: ['pane'], labels: {} },
+    ])).toBe('Da quale conto? → Conto A [acc-1]\nCosa compri di solito? → Pane');
+    expect(formatQuestionAnswersAsMessage([
+      { question: ACCOUNT_Q, answer: 'acc-1', labels: {} },
+      { question: TOPIC_Q, answer: { other: '' }, labels: {} },
+    ])).toBeNull();
+  });
+});

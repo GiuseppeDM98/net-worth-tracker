@@ -41,6 +41,14 @@ import {
 const CATEGORIES_COLLECTION = 'expenseCategories';
 
 /**
+ * The id of a new subcategory: unique inside its category's array, which is all it has to be. ONE
+ * rule for the three writers — the category dialog, the CSV import, the Assistente's card (2026-11).
+ */
+export function newSubCategoryId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+/**
  * Get all categories for a specific user
  */
 export async function getAllCategories(userId: string): Promise<ExpenseCategory[]> {

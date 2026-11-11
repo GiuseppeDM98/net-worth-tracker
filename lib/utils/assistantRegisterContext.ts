@@ -13,6 +13,11 @@
  * arrives.
  *
  * Every window is an Italian calendar window and every cut is printed (the silent-cap rule).
+ *
+ * Since 2026-11 the block also prints what the model needs to decide WHEN to ask: per category,
+ * how its rows of the window were filed (PATTERN: the most-used account and its share, the rows in
+ * a centre, the personal share, the share «fuori budget»), the loans an instalment may repay
+ * (PRESTITI) and the properties a transfer may touch (IMMOBILI).
  */
 import type { Asset, AssetAllocationSettings } from '@/types/assets';
 import type { AssistantRegisterSummary } from '@/types/assistant';
@@ -20,6 +25,9 @@ import type { BudgetConfig, BudgetPeriod } from '@/types/budget';
 import type { CostCenter } from '@/types/costCenters';
 import type { DashboardOverviewExpenseStats } from '@/types/dashboardOverview';
 import { EXPENSE_TYPE_LABELS, type Expense, type ExpenseCategory, type ExpenseType, type RecurrenceFrequency } from '@/types/expenses';
+import { isFeeRow } from '@/lib/utils/expenseFee';
+import { debtBalanceOf, isRepayableDebt } from '@/lib/utils/mortgageRepayment';
+import { isTransferableProperty } from '@/lib/utils/propertyTransfer';
 import { budgetItemLabel, getMonthlyTotalExpenses, getPeriodActual } from '@/lib/utils/budgetUtils';
 import { buildCashAccountLines } from '@/lib/utils/cashflowBlock';
 import { ITALY_TIMEZONE, getItalyDateIso, toDate } from '@/lib/utils/dateHelpers';
@@ -80,13 +88,19 @@ export interface RegisterRecentRow {
 export interface AssistantRegisterContext {
   /** `label`: «domenica 1 novembre 2026». */
   today: { iso: string; label: string };
-  categories: { id: string; name: string; type: ExpenseType; proposable: boolean; subCategories: { id: string; name: string }[] }[];
+  categories: { id: string; name: string; type: ExpenseType; subCategories: { id: string; name: string }[] }[];
   accounts: AssistantRegisterSummary['accounts'];
   /** Null when unset or not a listed account. */
   defaults: { debitId: string | null; creditId: string | null };
   costCenters: { enabled: boolean; items: { id: string; name: string }[] };
   members: { enabled: boolean; items: { id: string; name: string }[] };
   recent: { rows: RegisterRecentRow[]; read: number; cut: number; sinceIso: string } | null;
+  /** One line per category with rows in the window (fee rows apart); null when the rows were not read. */
+  patterns: RegisterCategoryPattern[] | null;
+  /** The loans an instalment may repay, with the median instalment of the recent lines (a series once). */
+  loans: { id: string; name: string; debt: number; ratePct: number | null; medianInstalment: { amount: number; lines: number } | null }[];
+  /** The properties a transfer may land on or leave. */
+  properties: { id: string; name: string; value: number }[];
   month: {
     /** «novembre 2026». */
     label: string;
@@ -101,8 +115,24 @@ export interface AssistantRegisterContext {
   } | null;
 }
 
-/** The types a row can be proposed with: a debt or a transfer needs fields this mode does not ask for. */
-const PROPOSABLE_TYPES: ReadonlySet<ExpenseType> = new Set<ExpenseType>(['fixed', 'variable', 'income']);
+/**
+ * How one category's rows of the window were filed: the base is EVERY windowed row of it (a row
+ * with no account counts in the base), every occurrence of a series counted, fee rows apart.
+ */
+export interface RegisterCategoryPattern {
+  categoryId: string;
+  name: string;
+  type: ExpenseType;
+  rows: number;
+  topAccount: { name: string; share: number } | null;
+  /** Printed only with the centres on. */
+  inCostCenter: number | null;
+  /** Printed only with Divisione on. */
+  personalShare: number | null;
+  /** Printed only on a spending category (fixed, variable, debt). */
+  outOfBudgetShare: number | null;
+}
+
 const SPENDING_TYPES = ['fixed', 'variable', 'debt'] as const;
 const CATEGORY_TYPE_ORDER: ExpenseType[] = ['fixed', 'variable', 'income', 'debt', 'transfer'];
 
@@ -132,7 +162,7 @@ function buildRecent(
   expenses: Expense[],
   todayIso: string,
   names: { accounts: Map<string, string>; members: Map<string, string> },
-): { recent: NonNullable<AssistantRegisterContext['recent']>; windowRows: Expense[] } {
+): { recent: NonNullable<AssistantRegisterContext['recent']>; windowRows: Expense[]; collapsed: RegisterRecentRow[] } {
   const sinceIso = windowStartIso(todayIso);
   // The window is decided here, on the Italian day of each row, whatever the caller read.
   const dated = expenses
@@ -183,7 +213,59 @@ function buildRecent(
       sinceIso,
     },
     windowRows: dated.map(({ row }) => row),
+    collapsed: lines,
   };
+}
+
+/**
+ * The PATTERN lines: computed over ALL the window's rows — before the cut of «ULTIME RIGHE» and
+ * before a series collapses to one line, or the shares would describe what the prompt shows and
+ * not how the user files. Fee rows are the app's, not the user's choice: left out. A transfer
+ * category gets no line (its category is the app's). Most rows first.
+ */
+function buildPatterns(
+  windowRows: Expense[],
+  categories: readonly ExpenseCategory[],
+  accountNames: Map<string, string>,
+  features: { costCentersEnabled: boolean; membersEnabled: boolean },
+): RegisterCategoryPattern[] {
+  const byCategory = new Map<string, Expense[]>();
+  for (const row of windowRows) {
+    if (isFeeRow(row) || row.type === 'transfer') continue;
+    byCategory.set(row.categoryId, [...(byCategory.get(row.categoryId) ?? []), row]);
+  }
+  const patterns: RegisterCategoryPattern[] = [];
+  for (const [categoryId, rows] of byCategory) {
+    const category = categories.find((candidate) => candidate.id === categoryId);
+    const type = category?.type ?? rows[0].type;
+    if (type === 'transfer') continue;
+    const accountCounts = new Map<string, number>();
+    for (const row of rows) {
+      if (row.linkedCashAssetId) accountCounts.set(row.linkedCashAssetId, (accountCounts.get(row.linkedCashAssetId) ?? 0) + 1);
+    }
+    const top = [...accountCounts.entries()].sort((a, b) => b[1] - a[1] || compareNames(a[0], b[0]))[0];
+    const share = (count: number) => count / rows.length;
+    patterns.push({
+      categoryId,
+      name: category?.name ?? rows[0].categoryName,
+      type,
+      rows: rows.length,
+      topAccount: top ? { name: accountNames.get(top[0]) ?? top[0], share: share(top[1]) } : null,
+      inCostCenter: features.costCentersEnabled ? rows.filter((row) => Boolean(row.costCenterId)).length : null,
+      personalShare: features.membersEnabled ? share(rows.filter((row) => Boolean(row.personalMemberId)).length) : null,
+      outOfBudgetShare: (SPENDING_TYPES as readonly ExpenseType[]).includes(type) ? share(rows.filter((row) => row.excludeFromBudget === true).length) : null,
+    });
+  }
+  return patterns.sort((a, b) => b.rows - a.rows || compareNames(a.name, b.name));
+}
+
+/** The median of the instalments of a loan over the recent lines, a series counted once (its newest occurrence). */
+function medianInstalment(lines: readonly RegisterRecentRow[], loanId: string): { amount: number; lines: number } | null {
+  const amounts = lines.filter((line) => line.type === 'debt' && line.debtAssetId === loanId).map((line) => line.amount).sort((a, b) => a - b);
+  if (amounts.length === 0) return null;
+  const middle = Math.floor(amounts.length / 2);
+  const amount = amounts.length % 2 === 1 ? amounts[middle] : (amounts[middle - 1] + amounts[middle]) / 2;
+  return { amount, lines: amounts.length };
 }
 
 function buildMonth(input: RegisterMonthInput, windowRows: Expense[], now: Date, todayIso: string): NonNullable<AssistantRegisterContext['month']> {
@@ -241,7 +323,6 @@ export function buildAssistantRegisterContext(input: AssistantRegisterContextInp
       id: category.id,
       name: category.name,
       type: category.type,
-      proposable: PROPOSABLE_TYPES.has(category.type),
       subCategories: (category.subCategories ?? []).map((sub) => ({ id: sub.id, name: sub.name })),
     }));
 
@@ -252,12 +333,14 @@ export function buildAssistantRegisterContext(input: AssistantRegisterContextInp
   const membersEnabled = settings?.expenseSplitEnabled === true;
   const members = settings?.familyMembers ?? [];
 
+  const accountNames = new Map(input.assets.map((asset) => [asset.id, asset.name?.trim() || asset.id]));
   const built = input.recentExpenses
     ? buildRecent(input.recentExpenses, todayIso, {
-        accounts: new Map(input.assets.map((asset) => [asset.id, asset.name?.trim() || asset.id])),
+        accounts: accountNames,
         members: new Map(members.map((member) => [member.id, member.name])),
       })
     : null;
+  const byName = (a: { name: string }, b: { name: string }) => compareNames(a.name, b.name);
 
   return {
     today: { iso: todayIso, label: formatTodayLabel(now) },
@@ -275,11 +358,48 @@ export function buildAssistantRegisterContext(input: AssistantRegisterContextInp
       items: membersEnabled ? members.map((member) => ({ id: member.id, name: member.name })) : [],
     },
     recent: built?.recent ?? null,
+    patterns: built ? buildPatterns(built.windowRows, input.categories, accountNames, { costCentersEnabled, membersEnabled }) : null,
+    loans: input.assets
+      .filter(isRepayableDebt)
+      .map((loan) => ({
+        id: loan.id,
+        name: loan.name?.trim() || loan.id,
+        debt: debtBalanceOf(loan),
+        ratePct: typeof loan.debtInterestRate === 'number' ? loan.debtInterestRate : null,
+        medianInstalment: built ? medianInstalment(built.collapsed, loan.id) : null,
+      }))
+      .sort(byName),
+    properties: input.assets
+      .filter(isTransferableProperty)
+      .map((property) => ({ id: property.id, name: property.name?.trim() || property.id, value: property.quantity }))
+      .sort(byName),
     month: input.month ? buildMonth(input.month, built?.windowRows ?? [], now, todayIso) : null,
   };
 }
 
 const eur = (value: number) => `${formatNumberIt(value, 2)} €`;
+/** A figure with at most `decimals` decimals and no trailing zero: «96», «99,7», «1,25». */
+const trimmed = (value: number, decimals: number) => new Intl.NumberFormat('it-IT', { maximumFractionDigits: decimals }).format(value);
+const percent = (share: number) => `${trimmed(share * 100, 1)}%`;
+/** «1 riga», «{n} righe»: every count of the block agrees with its number. */
+const rowCount = (count: number) => (count === 1 ? '1 riga' : `${count} righe`);
+
+function formatPattern(pattern: RegisterCategoryPattern): string {
+  const parts = [`[${pattern.categoryId}] ${pattern.name}`, `${rowCount(pattern.rows)} in ${REGISTER_RECENT_MONTHS} mesi`];
+  parts.push(pattern.topAccount ? `conto più usato ${pattern.topAccount.name} ${percent(pattern.topAccount.share)}` : 'nessun conto nelle righe');
+  if (pattern.inCostCenter !== null) parts.push(`in un centro: ${rowCount(pattern.inCostCenter)}`);
+  if (pattern.personalShare !== null) parts.push(`personali ${percent(pattern.personalShare)}`);
+  if (pattern.outOfBudgetShare !== null) parts.push(`fuori budget ${percent(pattern.outOfBudgetShare)}`);
+  return parts.join(' · ');
+}
+
+function formatLoan(loan: AssistantRegisterContext['loans'][number]): string {
+  const rate = loan.ratePct === null ? 'TAN non indicato' : `TAN ${trimmed(loan.ratePct, 2)}%`;
+  const median = loan.medianInstalment
+    ? `rata mediana ${eur(loan.medianInstalment.amount)} su ${rowCount(loan.medianInstalment.lines)} (serie contata una volta)`
+    : 'nessuna rata nelle righe recenti';
+  return [`[${loan.id}] ${loan.name}`, `debito residuo ${eur(loan.debt)}`, rate, median].join(' · ');
+}
 const ROLE_LABELS: Record<'addebito' | 'accredito', string> = { addebito: 'addebito predefinito', accredito: 'accredito predefinito' };
 const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = { monthly: 'mensile', yearly: 'annuale' };
 
@@ -332,8 +452,7 @@ export function formatRegisterContextForPrompt(ctx: AssistantRegisterContext): s
     lines.push('Nessuna categoria configurata');
   } else {
     for (const category of ctx.categories) {
-      const restriction = category.proposable ? '' : ' · non proponibile in questa modalità';
-      lines.push(`[${category.id}] ${category.name} · ${EXPENSE_TYPE_LABELS[category.type]}${restriction}`);
+      lines.push(`[${category.id}] ${category.name} · ${EXPENSE_TYPE_LABELS[category.type]}`);
       for (const sub of category.subCategories) lines.push(`  - [${sub.id}] ${sub.name}`);
     }
   }
@@ -349,6 +468,14 @@ export function formatRegisterContextForPrompt(ctx: AssistantRegisterContext): s
     if (!ctx.defaults.creditId) lines.push('Nessun conto di accredito predefinito.');
   }
 
+  lines.push('', '--- PRESTITI ---');
+  if (ctx.loans.length === 0) lines.push('nessun prestito');
+  else for (const loan of ctx.loans) lines.push(formatLoan(loan));
+
+  lines.push('', '--- IMMOBILI ---');
+  if (ctx.properties.length === 0) lines.push('nessun immobile');
+  else for (const property of ctx.properties) lines.push(`[${property.id}] ${property.name} · valore ${eur(property.value)}`);
+
   lines.push('', '--- CENTRI DI COSTO ---');
   if (!ctx.costCenters.enabled) lines.push('Centri di costo: non attivi');
   else if (ctx.costCenters.items.length === 0) lines.push('Nessun centro di costo attivo');
@@ -358,6 +485,16 @@ export function formatRegisterContextForPrompt(ctx: AssistantRegisterContext): s
   if (!ctx.members.enabled) lines.push('Intestatari: non attivi');
   else if (ctx.members.items.length === 0) lines.push('Nessun componente della famiglia configurato');
   else for (const member of ctx.members.items) lines.push(`[${member.id}] ${member.name}`);
+
+  lines.push('', '--- PATTERN ---');
+  if (!ctx.patterns) {
+    lines.push('Pattern: righe non lette.');
+  } else if (ctx.patterns.length === 0) {
+    lines.push(`Nessuna riga nelle categorie negli ultimi ${REGISTER_RECENT_MONTHS} mesi.`);
+  } else {
+    lines.push(`Per categoria, su tutte le righe degli ultimi ${REGISTER_RECENT_MONTHS} mesi (ogni occorrenza di una serie contata, commissioni escluse):`);
+    for (const pattern of ctx.patterns) lines.push(formatPattern(pattern));
+  }
 
   lines.push('', '--- ULTIME RIGHE ---');
   if (!ctx.recent) {

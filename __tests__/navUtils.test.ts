@@ -33,3 +33,18 @@ describe('isNavItemActive', () => {
     expect(isNavItemActive('/dashboard/cashflow', '/dashboard/cashflows')).toBe(false);
   });
 });
+
+import { isAssistantBridgeShown } from '@/lib/utils/navUtils';
+
+describe('isAssistantBridgeShown (2026-11: «Chiedi all’Assistente» on Cashflow)', () => {
+  it('needs the key, refuses the demo and an off flag', () => {
+    expect(isAssistantBridgeShown({ assistantConfigured: false, isDemo: false, flagValue: undefined })).toBe(false);
+    expect(isAssistantBridgeShown({ assistantConfigured: true, isDemo: true, flagValue: undefined })).toBe(false);
+    expect(isAssistantBridgeShown({ assistantConfigured: true, isDemo: false, flagValue: 'false' })).toBe(false);
+  });
+
+  it('shows with the flag absent (on by default) and with the flag on', () => {
+    expect(isAssistantBridgeShown({ assistantConfigured: true, isDemo: false, flagValue: undefined })).toBe(true);
+    expect(isAssistantBridgeShown({ assistantConfigured: true, isDemo: false, flagValue: 'true' })).toBe(true);
+  });
+});

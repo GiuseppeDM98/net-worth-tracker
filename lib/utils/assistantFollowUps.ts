@@ -13,7 +13,15 @@ export interface AssistantFollowUp {
   id: string;
   label: string;
   prompt: string;
+  /**
+   * What the chip does (2026-11): `send` submits the prompt, `focus-composer` empties and focuses
+   * the composer; absent keeps the mode's behaviour (a Registra chip prefills, the others send).
+   */
+  action?: 'send' | 'focus-composer';
 }
+
+/** After a written card: the next row starts in the composer, nothing is sent. */
+export const REGISTER_ANOTHER_FOLLOW_UP: AssistantFollowUp = { id: 'register-another', label: "Registra un'altra", prompt: '', action: 'focus-composer' };
 
 // Maximum chips surfaced at once — keeps the row scannable and within the
 // working-memory budget (Miller's law: a short list reads as a glance, not a menu).
@@ -95,6 +103,11 @@ const CURATED_FOLLOW_UPS: Record<AssistantMode, AssistantFollowUp[]> = {
       label: 'Registra lo stipendio',
       prompt: 'Ho ricevuto lo stipendio di ',
     },
+    {
+      id: 'register-transfer',
+      label: 'Sposta soldi fra due conti',
+      prompt: 'Ho spostato ',
+    },
   ],
 };
 
@@ -153,15 +166,17 @@ function deriveContextualFollowUp(
  *
  * @param mode   - The mode of the thread the answer belongs to.
  * @param bundle - The period context bundle, when available (null in free chat).
+ * @param opts   - `afterWrittenCard`: the answer's card wrote a row, so «Registra un'altra» leads.
  */
 export function buildFollowUpSuggestions(
   mode: AssistantMode,
-  bundle: AssistantMonthContextBundle | null
+  bundle: AssistantMonthContextBundle | null,
+  opts?: { afterWrittenCard?: boolean }
 ): AssistantFollowUp[] {
   const contextual = deriveContextualFollowUp(bundle);
   const curated = CURATED_FOLLOW_UPS[mode] ?? [];
 
-  const ordered = contextual ? [contextual, ...curated] : curated;
+  const ordered = [...(opts?.afterWrittenCard ? [REGISTER_ANOTHER_FOLLOW_UP] : []), ...(contextual ? [contextual] : []), ...curated];
 
   const seen = new Set<string>();
   const unique: AssistantFollowUp[] = [];

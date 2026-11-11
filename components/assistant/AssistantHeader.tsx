@@ -47,6 +47,13 @@ function CountDot({ count, isFloor = false }: { count: number; isFloor?: boolean
   );
 }
 
+/** «Nuova conversazione» names why it is off: the demo, or Registra's one thread a day. */
+export function newThreadLabel(isDemo: boolean, isRegister: boolean): string {
+  if (isDemo) return 'Nuova conversazione — non disponibile in modalità demo';
+  if (isRegister) return 'Nuova conversazione — Registra tiene un thread al giorno';
+  return 'Nuova conversazione';
+}
+
 /**
  * The compact page header of the Assistente: eyebrow · title · a generated description that
  * carries the counts (conversations, goals, facts), and ONE primary action — «Nuova
@@ -135,12 +142,14 @@ export function AssistantHeader({
             <PencilLine className="h-4 w-4" aria-hidden="true" />
           </Button>
 
-          {/* The ONE primary action. Icon-only below desktop — the sticky navbar has no room for the label. */}
+          {/* The ONE primary action. Icon-only below desktop — the sticky navbar has no room for the label.
+              Off in Registra: its thread is the day's, so a new one would reopen the same (the owner's tour,
+              2026-11-11 — the button seemed to do nothing); «Torna all'analisi» is the way out. */}
           <Button
             onClick={onNewThread}
-            disabled={isDemo || isStreaming}
+            disabled={isDemo || isStreaming || isRegister}
             className="h-11 w-11 p-0 desktop:h-9 desktop:w-auto desktop:px-4"
-            aria-label={isDemo ? 'Nuova conversazione — non disponibile in modalità demo' : 'Nuova conversazione'}
+            aria-label={newThreadLabel(isDemo, isRegister)}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             <span className="hidden desktop:inline">Nuova conversazione</span>

@@ -10,11 +10,15 @@ import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { AssistantMessage, AssistantMode, AssistantProposalState } from '@/types/assistant';
 import { ExpenseProposalCard } from '@/components/assistant/ExpenseProposalCard';
 import { GoalProposalCard } from '@/components/assistant/GoalProposalCard';
+import { AssistantQuestionBlock } from '@/components/assistant/AssistantQuestionBlock';
 import { MessageIdProvider, useMessageBlocks } from '@/components/assistant/MessageIdContext';
+import { MessageQuestionsProvider } from '@/components/assistant/MessageQuestionsContext';
 import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS, AI_GENERATED_EYEBROW_CLASS } from '@/lib/constants/aiAccent';
+import { isAnswerableQuestionMessage, readAssistantQuestionBlocks } from '@/lib/utils/assistantQuestionBlocks';
 import { EXPENSE_PROPOSAL_LANGUAGE, EXPENSE_PROPOSALS_MAX_PER_MESSAGE, parseExpenseProposal } from '@/lib/utils/expenseProposal';
 import { formatDate } from '@/lib/utils/formatters';
 import { GOAL_PROPOSAL_LANGUAGE, parseGoalProposal } from '@/lib/utils/goalProposal';
+import { ASSISTANT_QUESTION_LANGUAGE } from '@/lib/utils/questionSet';
 import { cn } from '@/lib/utils';
 
 interface AssistantStreamingResponseProps {
@@ -58,7 +62,8 @@ function extractCodeText(node: React.ReactNode): string {
  * A fenced block of an assistant message: a proposal card, or code.
  *
  * A ```goal-proposal block renders as a goal card and, in Registra, an ```expense-proposal block
- * as an expense card (the first five of a message). Intercepted at `pre` rather than at `code`
+ * as an expense card (the first five of a message) and an ```assistant-question block as a
+ * question card (the first two; `AssistantQuestionBlock` decides, and falls back to the code). Intercepted at `pre` rather than at `code`
  * because a card is block content and would otherwise be nested inside a <pre>, whose content
  * model does not allow it.
  *
@@ -78,6 +83,14 @@ function MarkdownPre({ children, node }: React.ComponentProps<'pre'> & ExtraProp
   const firstChild = React.Children.toArray(children)[0];
   const offset = node?.position?.start.offset;
   const block = offset === undefined ? undefined : blocks.find((candidate) => candidate.offset === offset);
+  const codeBlock = (
+    <pre className="my-3 overflow-x-auto rounded-xl bg-muted/40 p-3 font-mono text-[12px]">
+      {children}
+    </pre>
+  );
+
+  // The question block reads its own entry (MessageQuestionsContext): no entry outside Registra.
+  if (block?.language === ASSISTANT_QUESTION_LANGUAGE) return <AssistantQuestionBlock index={block.index} codeBlock={codeBlock} />;
 
   if (block && React.isValidElement(firstChild)) {
     const source = extractCodeText((firstChild.props as { children?: React.ReactNode }).children);
@@ -91,11 +104,7 @@ function MarkdownPre({ children, node }: React.ComponentProps<'pre'> & ExtraProp
     }
   }
 
-  return (
-    <pre className="my-3 overflow-x-auto rounded-xl bg-muted/40 p-3 font-mono text-[12px]">
-      {children}
-    </pre>
-  );
+  return codeBlock;
 }
 
 /**
@@ -127,6 +136,8 @@ const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['component
   ),
 };
 
+const NO_QUESTION_BLOCKS: ReturnType<typeof readAssistantQuestionBlocks> = [];
+
 // Shared spring-style easing for all message entrance animations.
 const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
 
@@ -151,6 +162,8 @@ export function AssistantStreamingResponse({
   recordProposal,
 }: AssistantStreamingResponseProps) {
   const prefersReducedMotion = useReducedMotion();
+  // The one message whose questions may still be answered is the thread's last assistant message.
+  const lastAssistantMessageId = messages.findLast((message) => message.role === 'assistant')?.id;
 
   // Entrance variants — subtle lift into view, not a flashy reveal.
   const messageVariants = {
@@ -221,12 +234,18 @@ export function AssistantStreamingResponse({
                           recordProposal(message.id, message.threadId === 'pending' ? (threadId ?? 'pending') : message.threadId, key, state)
                         }
                       >
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={MARKDOWN_COMPONENTS}
+                        <MessageQuestionsProvider
+                          // The PAGE's mode, as the expense card's gate: a question is a card in Registra alone.
+                          blocks={mode === 'register' ? readAssistantQuestionBlocks(message.content) : NO_QUESTION_BLOCKS}
+                          answerable={isAnswerableQuestionMessage(message, lastAssistantMessageId, streamingMessageId)}
                         >
-                          {message.content}
-                        </ReactMarkdown>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={MARKDOWN_COMPONENTS}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </MessageQuestionsProvider>
                       </MessageIdProvider>
                     ) : (
                       <span className="italic text-muted-foreground">…</span>

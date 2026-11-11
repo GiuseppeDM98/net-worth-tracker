@@ -162,3 +162,37 @@ describe('useAssistantStreaming — recordProposal', () => {
     expect(queryClient.getQueryData(queryKeys.assistant.thread('thread-9'))).toBeUndefined();
   });
 });
+
+describe('useAssistantStreaming — a submit from a render older than the last outcome (2026-11)', () => {
+  it('keeps the outcomes recorded after the render that holds the submit: «Rispondi» records, then sends', async () => {
+    const { result } = setup();
+    await act(async () => {
+      await result.current.submit();
+    });
+    // The question cards' «Rispondi»: its handler holds the `submit` of the render it was clicked in.
+    const staleSubmit = result.current.submit;
+    act(() => result.current.recordProposal('msg-1', 'thread-1', 'question:0', { status: 'answered', answer: 'Conto B' }));
+    await act(async () => {
+      await staleSubmit('Da quale conto? → Conto B [acc-b]');
+    });
+    expect(result.current.renderedMessages[1].proposals?.['question:0']).toMatchObject({ status: 'answered', answer: 'Conto B' });
+  });
+});
+
+describe('useAssistantStreaming — a stale submit on a thread opened from the list (2026-11)', () => {
+  it('starts from the cached thread, where the answers were recorded', async () => {
+    const stored: AssistantMessage = { id: 'msg-1', threadId: 'thread-1', userId: 'owner-1', role: 'assistant', content: 'Domanda.', createdAt: new Date('2026-11-01T10:00:00Z'), mode: 'register' };
+    const detail: AssistantThreadDetail = {
+      thread: { id: 'thread-1', userId: 'owner-1', title: 'Registrazioni · 1 nov 2026', mode: 'register', pinnedMonth: null, createdAt: stored.createdAt, updatedAt: stored.createdAt, lastMessagePreview: '', messageCount: 1 },
+      messages: [stored],
+    };
+    const { result, queryClient } = setup({ selectedThreadId: 'thread-1', threadMessages: [stored] });
+    queryClient.setQueryData(queryKeys.assistant.thread('thread-1'), detail);
+    const staleSubmit = result.current.submit;
+    act(() => result.current.recordProposal('msg-1', 'thread-1', 'question:0', { status: 'answered', answer: 'Sì' }));
+    await act(async () => {
+      await staleSubmit('È abituale? → Sì');
+    });
+    expect(result.current.renderedMessages[0].proposals?.['question:0']).toMatchObject({ status: 'answered', answer: 'Sì' });
+  });
+});

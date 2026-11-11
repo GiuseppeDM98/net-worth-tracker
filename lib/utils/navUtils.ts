@@ -21,3 +21,13 @@ export function isAddExpenseFabShown({ pathname, tab, isDemo }: { pathname: stri
   const isOnCashflow = pathname === '/dashboard/cashflow' || pathname.startsWith('/dashboard/cashflow/');
   return isOnCashflow && (tab === null || tab === 'tracking');
 }
+
+/**
+ * Whether Cashflow shows «Chiedi all'Assistente», the link into Registra (2026-11): the Assistente
+ * is configured (the key exists on the server), the visitor is not in the demo (Registra writes
+ * rows), and its flag is not off (`NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, absent means on — as the
+ * sidebar reads it).
+ */
+export function isAssistantBridgeShown({ assistantConfigured, isDemo, flagValue }: { assistantConfigured: boolean; isDemo: boolean; flagValue: string | undefined }): boolean {
+  return assistantConfigured && !isDemo && flagValue !== 'false';
+}

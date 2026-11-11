@@ -21,6 +21,7 @@ import {
 import { isSpendingType } from '@/lib/utils/spendingRoles';
 import {
   createCategory,
+  newSubCategoryId,
   updateCategory,
 } from '@/lib/services/expenseCategoryService';
 import { categoriesQueryOptions } from '@/lib/hooks/useExpenses';
@@ -633,7 +634,7 @@ export function CategoryManagementDialog({
     }
     setSubCategories([
       ...subCategories,
-      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`, name: trimmed, icon: newSubCategoryIcon },
+      { id: newSubCategoryId(), name: trimmed, icon: newSubCategoryIcon },
     ]);
     setNewSubCategoryName('');
     setNewSubCategoryIcon(undefined);

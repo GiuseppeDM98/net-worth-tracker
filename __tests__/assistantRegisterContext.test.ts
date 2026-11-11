@@ -109,12 +109,11 @@ describe('buildAssistantRegisterContext — ids', () => {
     expect(block).toContain('[cat-stipendio] Stipendio · Entrate');
   });
 
-  it('marks a debt and a transfer category as not proposable', () => {
-    const ctx = buildAssistantRegisterContext(input());
-    const block = formatRegisterContextForPrompt(ctx);
-    expect(block).toContain('[cat-mutuo] Mutuo · Debiti · non proponibile in questa modalità');
-    expect(block).toContain('[cat-giro] Giroconto · Trasferimento · non proponibile in questa modalità');
-    expect(ctx.categories.filter((c) => c.proposable).map((c) => c.id).sort()).toEqual(['cat-casa', 'cat-cibo', 'cat-stipendio']);
+  it('lists a debt and a transfer category like any other: every type is proposable since 2026-11', () => {
+    const block = formatRegisterContextForPrompt(buildAssistantRegisterContext(input()));
+    expect(block).toContain('[cat-mutuo] Mutuo · Debiti');
+    expect(block).toContain('[cat-giro] Giroconto · Trasferimento');
+    expect(block).not.toContain('non proponibile');
   });
 
   it('says so when there is no category', () => {
@@ -328,3 +327,108 @@ describe('buildAssistantRegisterContext — IL MESE', () => {
     expect(ctx.month?.budgets).toBe('none');
   });
 });
+
+// ── PATTERN, PRESTITI, IMMOBILI (2026-11) ──
+
+function loanAsset(id: string, name: string, debt: number, rate?: number): Asset {
+  return { id, userId: 'u1', name, type: 'loan', assetClass: 'cash', quantity: debt, currentPrice: 1, currency: 'EUR', ...(rate === undefined ? {} : { debtInterestRate: rate }) } as Asset;
+}
+
+function house(id: string, name: string, value: number): Asset {
+  return { id, userId: 'u1', name, type: 'realestate', assetClass: 'realestate', quantity: value, currentPrice: 1, currency: 'EUR' } as Asset;
+}
+
+/** `count` rows of «Cibo» spread over the window, oldest first; `oldest` overrides the first. */
+function spread(count: number, base: Partial<Expense>, oldest: Partial<Expense> = {}): Expense[] {
+  return Array.from({ length: count }, (_, index) => {
+    const day = new Date(Date.UTC(2025, 11, 1 + Math.floor((index * 330) / count), 12)).toISOString().slice(0, 10);
+    return row({ date: italian(day), linkedCashAssetId: 'acc-main', ...base, ...(index === 0 ? oldest : {}) });
+  });
+}
+
+describe('buildAssistantRegisterContext — PATTERN', () => {
+  it('computes the shares over EVERY row of the window, before the cut and the collapse', () => {
+    const rows = spread(301, {}, { linkedCashAssetId: 'acc-empty' });
+    const ctx = buildAssistantRegisterContext(input({ recentExpenses: rows }));
+    // The cut drops the oldest line — the only one on the other account — and the share still sees it.
+    expect(ctx.recent?.cut).toBe(1);
+    const block = formatRegisterContextForPrompt(ctx);
+    expect(block).toContain('[cat-cibo] Cibo · 301 righe in 12 mesi · conto più usato Conto principale 99,7% · in un centro: 0 righe · personali 0% · fuori budget 0%');
+  });
+
+  it('prints the centre, the member and the «fuori budget» clauses only where they apply', () => {
+    const rows = [
+      ...spread(4, { costCenterId: 'cc-auto', personalMemberId: 'm-anna', excludeFromBudget: true }),
+      row({ date: italian('2026-10-10'), type: 'income', categoryId: 'cat-stipendio', categoryName: 'Stipendio', amount: 2000, linkedCashAssetId: 'acc-main' }),
+    ];
+    const on = formatRegisterContextForPrompt(buildAssistantRegisterContext(input({ recentExpenses: rows })));
+    expect(on).toContain('[cat-cibo] Cibo · 4 righe in 12 mesi · conto più usato Conto principale 100% · in un centro: 4 righe · personali 100% · fuori budget 100%');
+    // An income has no budget clause.
+    expect(on).toContain('[cat-stipendio] Stipendio · 1 riga in 12 mesi · conto più usato Conto principale 100% · in un centro: 0 righe · personali 0%');
+    expect(on).not.toMatch(/Stipendio · .*fuori budget/);
+    const off = formatRegisterContextForPrompt(
+      buildAssistantRegisterContext(input({ recentExpenses: rows, settings: { defaultDebitCashAssetId: 'acc-main', defaultCreditCashAssetId: 'acc-main', costCentersEnabled: false, expenseSplitEnabled: false } })),
+    );
+    expect(off).toContain('[cat-cibo] Cibo · 4 righe in 12 mesi · conto più usato Conto principale 100% · fuori budget 100%');
+  });
+
+  it('leaves the fee rows and the transfers out of the base', () => {
+    const rows = [
+      ...spread(3, {}),
+      row({ date: italian('2026-10-11'), categoryId: 'cat-cibo', amount: -1, linkedCashAssetId: 'acc-empty', feeOfTransferId: 'exp-x' }),
+      row({ date: italian('2026-10-12'), type: 'transfer', categoryId: 'cat-giro', categoryName: 'Giroconto', amount: -100, linkedCashAssetId: 'acc-main' }),
+    ];
+    const block = formatRegisterContextForPrompt(buildAssistantRegisterContext(input({ recentExpenses: rows })));
+    expect(block).toContain('[cat-cibo] Cibo · 3 righe in 12 mesi · conto più usato Conto principale 100%');
+    expect(block).not.toMatch(/\[cat-giro\] Giroconto · \d+ rig/);
+  });
+
+  it('counts a row with no account in the base', () => {
+    const rows = [...spread(3, {}), row({ date: italian('2026-10-11') })];
+    expect(formatRegisterContextForPrompt(buildAssistantRegisterContext(input({ recentExpenses: rows })))).toContain('4 righe in 12 mesi · conto più usato Conto principale 75%');
+  });
+
+  it('stands before «ULTIME RIGHE», and says the rows were not read in the browser', () => {
+    const block = formatRegisterContextForPrompt(buildAssistantRegisterContext(input({ recentExpenses: spread(2, {}) })));
+    expect(block.indexOf('--- PATTERN ---')).toBeLessThan(block.indexOf('--- ULTIME RIGHE ---'));
+    expect(formatRegisterContextForPrompt(buildAssistantRegisterContext(input({ recentExpenses: null })))).toContain('Pattern: righe non lette.');
+  });
+});
+
+describe('buildAssistantRegisterContext — PRESTITI and IMMOBILI', () => {
+  it('prints each loan with its debt, its TAN and the median instalment, a series once', () => {
+    const series = Array.from({ length: 12 }, (_, index) =>
+      row({ date: italian(`2026-${String(index === 0 ? 11 : index).padStart(2, '0')}-01`), type: 'debt', categoryId: 'cat-mutuo', categoryName: 'Mutuo', amount: -500, debtAssetId: 'loan-casa', isRecurring: true, recurringParentId: 'series-mutuo' }),
+    ).filter((expense) => getDay(expense) <= '2026-11-01');
+    const ctx = buildAssistantRegisterContext(input({
+      assets: [cash('acc-main', 'Conto principale', 2500), loanAsset('loan-casa', 'Mutuo casa', 100000, 1.25), loanAsset('loan-auto', 'Prestito auto', 3000)],
+      recentExpenses: series,
+    }));
+    const block = formatRegisterContextForPrompt(ctx);
+    expect(block).toContain('[loan-casa] Mutuo casa · debito residuo 100.000,00 € · TAN 1,25% · rata mediana 500,00 € su 1 riga (serie contata una volta)');
+    expect(block).toContain('[loan-auto] Prestito auto · debito residuo 3000,00 € · TAN non indicato · nessuna rata nelle righe recenti');
+    expect(block.indexOf('--- CONTI ---')).toBeLessThan(block.indexOf('--- PRESTITI ---'));
+    expect(block.indexOf('--- PRESTITI ---')).toBeLessThan(block.indexOf('--- IMMOBILI ---'));
+    expect(block.indexOf('--- IMMOBILI ---')).toBeLessThan(block.indexOf('--- CENTRI DI COSTO ---'));
+  });
+
+  it('takes the median of several instalments', () => {
+    const rows = [300, 100, 200, 400].map((amount, index) =>
+      row({ date: italian(`2026-0${index + 6}-10`), type: 'debt', categoryId: 'cat-mutuo', categoryName: 'Mutuo', amount: -amount, debtAssetId: 'loan-casa' }),
+    );
+    const ctx = buildAssistantRegisterContext(input({ assets: [loanAsset('loan-casa', 'Mutuo casa', 1000, 2)], recentExpenses: rows }));
+    expect(ctx.loans[0].medianInstalment).toEqual({ amount: 250, lines: 4 });
+  });
+
+  it('prints every transferable property with its value, and the absences', () => {
+    const block = formatRegisterContextForPrompt(buildAssistantRegisterContext(input({ assets: [cash('acc-main', 'Conto principale', 2500), house('prop-1', 'Casa ornitorinco', 150000)] })));
+    expect(block).toContain('[prop-1] Casa ornitorinco · valore 150.000,00 €');
+    expect(block).toContain('nessun prestito');
+    const none = formatRegisterContextForPrompt(buildAssistantRegisterContext(input()));
+    expect(none).toContain('nessun immobile');
+  });
+});
+
+function getDay(expense: Expense): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(expense.date as Date);
+}

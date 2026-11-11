@@ -112,10 +112,12 @@ vi.mock('@/lib/server/assistant/anthropicStream', () => ({
 
 // Keeps the fire-and-forget memory extraction off the network, and lets the goal
 // structuring path of PATCH be asserted without a real Haiku call.
-vi.mock('@/lib/server/assistant/memoryExtraction', () => ({
+vi.mock('@/lib/server/assistant/memoryExtraction', async () => ({
   extractMemoryCandidates: extractMemoryCandidatesMock,
   extractStructuredGoalFromText: extractStructuredGoalFromTextMock,
   dedupeMemoryItems: vi.fn((candidates: unknown[]) => candidates),
+  // The real rule: the route archives what it supersedes (2026-11).
+  supersedesCategorizationRule: (await vi.importActual<typeof import('@/lib/server/assistant/memoryExtraction')>('@/lib/server/assistant/memoryExtraction')).supersedesCategorizationRule,
 }));
 
 import { GET as getThreadsRoute } from '@/app/api/ai/assistant/threads/route';
@@ -668,6 +670,32 @@ describe('Assistant private API routes', () => {
 
     expect(response.status).toBe(200);
     expect(updateAssistantMemoryDocumentMock).toHaveBeenCalled();
+  });
+
+  it('archives the categorisation rule a new one supersedes, in the turn’s one write (2026-11)', async () => {
+    const OLD_RULE = { id: 'mem-old', userId: 'user-1', category: 'preference' as const, text: 'Categorizzazione: palestra → Salute › Palestra', createdAt: new Date(2026, 3, 1), updatedAt: new Date(2026, 3, 1), status: 'active' as const };
+    const OTHER = { ...OLD_RULE, id: 'mem-other', text: 'Categorizzazione: cinema → Svago' };
+    getAssistantMemoryDocumentMock.mockResolvedValue({
+      preferences: { responseStyle: 'balanced', includeMacroContext: false, memoryEnabled: true, includeDummySnapshots: false },
+      items: [OLD_RULE, OTHER], suggestions: [], updatedAt: null, hasDummySnapshots: false,
+    });
+    extractMemoryCandidatesMock.mockResolvedValue([{ category: 'preference', text: 'Categorizzazione: palestra → Sport' }]);
+    const response = await streamRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/stream', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid-token' },
+        body: { userId: 'user-1', mode: 'chat', chatContext: 'none', prompt: 'D’ora in poi la palestra la metto in Sport' },
+      })
+    );
+    await response.text();
+    // The extraction runs after the stream has closed.
+    await vi.waitFor(() => expect(applyAssistantMemoryMutationsMock).toHaveBeenCalled());
+    const [userId, mutations] = applyAssistantMemoryMutationsMock.mock.calls.at(-1)!;
+    expect(userId).toBe('user-1');
+    const items = mutations.filter((m: { kind: string }) => m.kind === 'item').map((m: { item: { id: string; text: string; status: string } }) => m.item);
+    expect(items.find((item: { text: string }) => item.text === 'Categorizzazione: palestra → Sport')).toMatchObject({ status: 'active' });
+    expect(items.find((item: { id: string }) => item.id === 'mem-old')).toMatchObject({ status: 'archived', text: OLD_RULE.text });
+    expect(items.some((item: { id: string }) => item.id === 'mem-other')).toBe(false);
   });
 
   it('streams assistant data for the authenticated user', async () => {
