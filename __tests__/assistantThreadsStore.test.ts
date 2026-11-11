@@ -173,14 +173,15 @@ describe('setAssistantMessageProposal — the outcome of a card on its message (
     const at = Timestamp.fromDate(new Date(Date.UTC(2026, 10, 1, 10, 5)));
     messages.set('t000/msg-1', {
       ...messages.get('t000/msg-1'),
-      proposals: { 'expense:0': { status: 'written', writtenIds: ['exp-1'], at }, 'expense:1': { status: 'ignored', at } },
+      proposals: { 'expense:0': { status: 'written', writtenIds: ['exp-1'], month: '2026-09', at }, 'expense:1': { status: 'ignored', at } },
     });
     messages.set('t000/msg-0', { userId: OWNER, role: 'user', content: 'ho speso 5 euro', createdAt: new Date(Date.UTC(2026, 10, 1, 9)), mode: 'register' });
 
     const detail = await getAssistantThreadDetail('t000', OWNER);
     const assistant = detail.messages.find((message) => message.id === 'msg-1');
     expect(assistant?.proposals).toEqual({
-      'expense:0': { status: 'written', writtenIds: ['exp-1'], at: at.toDate() },
+      // `month` (the row «Modifica» saved in another month, 2026-11-11) comes back with the outcome.
+      'expense:0': { status: 'written', writtenIds: ['exp-1'], month: '2026-09', at: at.toDate() },
       'expense:1': { status: 'ignored', at: at.toDate() },
     });
     // A message with no card carries no `proposals` key at all.

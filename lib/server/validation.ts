@@ -192,7 +192,8 @@ export const assistantStreamRequestSchema = z.object({
 /**
  * PATCH /api/ai/assistant/threads/[threadId]/messages/[messageId] — the outcome of a card of the
  * message. The key is `proposalKey(kind, index)` (lib/utils/expenseProposal.ts) and becomes a
- * Firestore field path, so it is a closed shape; `answer` belongs to an answered question only.
+ * Firestore field path, so it is a closed shape; `answer` belongs to an answered question only,
+ * `month` (the Italian month a row was saved in, 2026-11-11) to a written row only.
  */
 export const proposalPatchSchema = z
   .object({
@@ -201,9 +202,13 @@ export const proposalPatchSchema = z
     status: z.enum(['written', 'ignored', 'answered']),
     writtenIds: z.array(z.string().min(1)).max(60).optional(),
     answer: z.string().max(2000).optional(),
+    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Invalid month').optional(),
   })
   .refine((body) => body.answer === undefined || body.status === 'answered', {
     message: 'answer belongs to an answered question',
+  })
+  .refine((body) => body.month === undefined || body.status === 'written', {
+    message: 'month belongs to a written row',
   });
 
 /**

@@ -177,10 +177,12 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Registra has ONE thread per Italian day: with none picked, the day's thread IS the open one,
   // whenever the list comes to hold it — so a sentence can never open a second «Registrazioni» of
   // the same day because the mode was entered before the list had it (the owner's tour, 2026-11-11:
-  // back from Cashflow, the question went into a new thread). «Today» is the mount's: a session
-  // across midnight stays in the thread it entered, and a render never reads the clock.
-  const [todayIso] = useState(() => getItalyDateIso(new Date()));
-  const selectedThreadId = pickedThreadId ?? (mode === 'register' ? findRegisterThread(threads, todayIso)?.id : undefined);
+  // back from Cashflow, the question went into a new thread). «Today» is the day Registra was
+  // last ENTERED (`enterRegister` reads the clock, a render never does): a session across midnight
+  // stays in the thread it entered, and a page left open since yesterday does not reopen
+  // yesterday's thread when the mode is entered after midnight (2026-11-11).
+  const [registerDayIso, setRegisterDayIso] = useState(() => getItalyDateIso(new Date()));
+  const selectedThreadId = pickedThreadId ?? (mode === 'register' ? findRegisterThread(threads, registerDayIso)?.id : undefined);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
     selectedThreadId,
     ownerId
@@ -454,7 +456,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // otherwise), the mode, the focus on the composer.
   const enterRegister = () => {
     if (isStreaming || isDemo) return;
-    setSelectedThreadId(findRegisterThread(threads, getItalyDateIso(new Date()))?.id);
+    const dayIso = getItalyDateIso(new Date());
+    setRegisterDayIso(dayIso);
+    setSelectedThreadId(findRegisterThread(threads, dayIso)?.id);
     streaming.resetStream();
     setContextBundle(null);
     setDraft('');

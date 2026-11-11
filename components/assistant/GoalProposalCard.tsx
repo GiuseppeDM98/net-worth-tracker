@@ -11,7 +11,8 @@ import { TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile
 import { patchMessageProposal, useMessageId } from '@/components/assistant/MessageIdContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { AI_GENERATED_EYEBROW_CLASS, AI_GENERATED_SURFACE_CLASS } from '@/lib/constants/aiAccent';
-import { proposalKey } from '@/lib/utils/expenseProposal';
+import { GOAL_STATE_NOT_SAVED } from '@/lib/utils/dialogNarrative';
+import { PROPOSAL_INTERRUPTED_LINE, proposalKey } from '@/lib/utils/expenseProposal';
 import { cardEnterVariants } from '@/lib/utils/motionVariants';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssets } from '@/lib/hooks/useAssets';
@@ -114,7 +115,9 @@ const NONE = 'Nessuna';
  *
  * The outcome lives on the message (2026-11), like the expense card's: `proposals["goal:N"]`,
  * recorded in the session and saved by the PATCH, so a reload shows «Obiettivo creato» instead
- * of the buttons and the same goal is not written twice. It is what the model wrote, so it wears
+ * of the buttons and the same goal is not written twice; a message with no server id offers no
+ * button, and a save that fails after the write is a toast (2026-11-11, the expense card's two
+ * rules). It is what the model wrote, so it wears
  * the AI accent (DESIGN → The AI-Accent Rule).
  */
 export function GoalProposalCard({ proposal, index }: GoalProposalCardProps) {
@@ -127,7 +130,10 @@ export function GoalProposalCard({ proposal, index }: GoalProposalCardProps) {
   const [saving, setSaving] = useState(false);
   const key = proposalKey('goal', index);
   const persisted = proposals[key]?.status;
-  const state = persisted === 'written' ? 'written' : persisted === 'ignored' ? 'dismissed' : saving ? 'saving' : 'idle';
+  // A message that never received its server id (stopped before the stream's end) has nowhere to
+  // save an outcome, so it offers no button — the expense card's rule (2026-11-11).
+  const interrupted = messageId.startsWith('local-');
+  const state = persisted === 'written' ? 'written' : persisted === 'ignored' ? 'dismissed' : interrupted ? 'interrupted' : saving ? 'saving' : 'idle';
 
   const assets = assetsQuery.data;
   const current: InvestmentGoal | null = useMemo(
@@ -169,7 +175,9 @@ export function GoalProposalCard({ proposal, index }: GoalProposalCardProps) {
       const outcome = { status: 'written' as const, writtenIds };
       recordProposal(key, outcome);
       toast.success(successMessage);
-      await patchMessageProposal({ ownerId, threadId, messageId, key, state: outcome });
+      // The goal IS written by now: a failed save of the outcome is said, never an error state.
+      const saved = await patchMessageProposal({ ownerId, threadId, messageId, key, state: outcome });
+      if (saved === false) toast.error(GOAL_STATE_NOT_SAVED);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impossibile scrivere l'obiettivo");
     }
@@ -292,6 +300,8 @@ export function GoalProposalCard({ proposal, index }: GoalProposalCardProps) {
           </span>
         ) : state === 'dismissed' ? (
           <span className="text-[13px] text-muted-foreground">Proposta ignorata</span>
+        ) : state === 'interrupted' ? (
+          <span className="text-[13px] text-muted-foreground">{PROPOSAL_INTERRUPTED_LINE}</span>
         ) : (
           <>
             <Button

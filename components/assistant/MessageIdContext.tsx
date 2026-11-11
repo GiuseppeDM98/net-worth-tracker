@@ -15,7 +15,8 @@
  */
 import { createContext, useContext, type ReactNode } from 'react';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
-import { listFencedBlocks } from '@/lib/utils/expenseProposal';
+import { listFencedBlocks, listNestedFencedBlocks } from '@/lib/utils/expenseProposal';
+import { GOAL_PROPOSAL_LANGUAGE } from '@/lib/utils/goalProposal';
 import type { AssistantMessage, AssistantMode, AssistantProposalState } from '@/types/assistant';
 
 type ProposalOutcome = Omit<AssistantProposalState, 'at'>;
@@ -56,7 +57,8 @@ export function MessageIdProvider({ message, mode, recordProposal, children }: M
     threadId: message.threadId,
     proposals: message.proposals ?? NO_PROPOSALS,
     recordProposal,
-    blocks: listFencedBlocks(message.content),
+    // The top-level blocks, then the goal blocks the model quoted or listed (keyed after them).
+    blocks: [...listFencedBlocks(message.content), ...listNestedFencedBlocks(message.content, GOAL_PROPOSAL_LANGUAGE)],
     mode,
   };
   return <MessageContext.Provider value={value}>{children}</MessageContext.Provider>;

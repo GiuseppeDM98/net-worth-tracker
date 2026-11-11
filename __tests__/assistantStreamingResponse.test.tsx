@@ -82,6 +82,17 @@ describe('AssistantStreamingResponse — the cards of a message', () => {
     expect(container.querySelector('blockquote pre')?.textContent).toContain('999');
   });
 
+  // Seen red on 2026-11-11: since the keys are derived from the message's list of blocks, a goal
+  // block the list did not hold had become code — until then ANY ```goal-proposal was a card.
+  it('keeps a goal block inside a quote or behind a list marker a card, keyed after the top-level ones', () => {
+    const quoted = GOAL_BLOCK.split('\n').map((line) => `> ${line}`).join('\n');
+    const listed = `- ${GOAL_BLOCK.split('\n').join('\n  ')}`;
+    const { container } = renderMessages([assistant(`${quoted}\n\n${listed}\n\nE infine:\n\n${GOAL_BLOCK}`, { mode: 'chat' })], 'chat');
+    // Document order: the quoted and the listed block first, the top-level one last — which keeps «goal:0».
+    expect(keys(container)).toEqual(['goal:1', 'goal:2', 'goal:0']);
+    expect(container.querySelector('pre')).toBeNull();
+  });
+
   it('leaves a block that does not parse as code, and still counts it', () => {
     const broken = '```expense-proposal\n{ "kind": "expense", "amount": 103,50 }\n```';
     const { container } = renderMessages([assistant(`${broken}\n\n${expenseBlock(20)}`)]);

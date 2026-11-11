@@ -102,6 +102,7 @@ function mapProposals(raw: Record<string, DocumentData>): Record<string, Assista
         status: state.status,
         ...(state.writtenIds ? { writtenIds: state.writtenIds } : {}),
         ...(state.answer !== undefined ? { answer: state.answer } : {}),
+        ...(state.month ? { month: state.month } : {}),
         at: toDate(state.at),
       },
     ])

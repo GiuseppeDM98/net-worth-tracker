@@ -40,6 +40,7 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { applyBalanceEffects } from '@/lib/services/cashBalanceReconciliation';
 import { applyDebtRepayments } from '@/lib/services/debtRepaymentService';
 import { createExpenseSettledOnDate } from '@/lib/services/expenseService';
+import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 import { describeWriteError, PROPOSAL_STATE_NOT_SAVED, ROW_CREATED_TOAST } from '@/lib/utils/dialogNarrative';
 import {
   describeExpenseProposalState,
@@ -156,7 +157,9 @@ export function ExpenseProposalCard({ proposal, index }: ExpenseProposalCardProp
   // The dialog wrote the row itself (and its balances): the card only remembers it.
   const handleEdited = (saved: SavedExpense | null) => {
     if (!ownerId || !saved) return;
-    const state = { status: 'written' as const, writtenIds: [saved.id] };
+    // The form may have moved the date: the outcome keeps the month the row was saved in, or
+    // «apri in Cashflow» would open the proposal's month, where the row is not (2026-11-11).
+    const state = { status: 'written' as const, writtenIds: [saved.id], month: getItalyDateIso(saved.row.date).slice(0, 7) };
     queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
     focusLineRef.current = true;
     recordProposal(key, state);
@@ -169,9 +172,10 @@ export function ExpenseProposalCard({ proposal, index }: ExpenseProposalCardProp
 
   const { labels } = resolved;
   const detail = [labels.costCenter && `Centro ${labels.costCenter}`, labels.member && `Di ${labels.member}`].filter(Boolean);
-  // The row's month and the row itself: Tracciamento opens on it (`?row=`, 2026-11-11).
+  // The row's month and the row itself: Tracciamento opens on it (`?row=`, 2026-11-11). The month
+  // is the one the row was saved in when the outcome carries it («Modifica»), else the proposal's.
   const writtenId = proposals[key]?.writtenIds?.[0];
-  const cashflowHref = `/dashboard/cashflow?tab=tracking&month=${proposal.dateIso.slice(0, 7)}${writtenId ? `&row=${encodeURIComponent(writtenId)}` : ''}`;
+  const cashflowHref = `/dashboard/cashflow?tab=tracking&month=${proposals[key]?.month ?? proposal.dateIso.slice(0, 7)}${writtenId ? `&row=${encodeURIComponent(writtenId)}` : ''}`;
 
   return (
     <motion.div

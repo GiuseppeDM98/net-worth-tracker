@@ -35,11 +35,13 @@ vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch: authenticatedFetch
 vi.mock('sonner', () => ({ toast: { success: toastSuccessMock, error: toastErrorMock } }));
 // The form itself has its own suite: here it is the props «Modifica» hands it.
 vi.mock('@/components/expenses/ExpenseDialog', () => ({
-  ExpenseDialog: (props: { onSuccess: (saved: { id: string } | null) => void; onClose: () => void }) => {
+  ExpenseDialog: (props: { onSuccess: (saved: { id: string; row: { date: Date } } | null) => void; onClose: () => void }) => {
     dialogPropsMock(props);
+    // The form saves the row on 20 September 2026 (noon: the same Italian day in every zone),
+    // whatever date the proposal carried — the user moved it.
     return (
       <div role="dialog" aria-label="Modulo spesa">
-        <button type="button" onClick={() => { props.onSuccess({ id: 'exp-edited' }); props.onClose(); }}>Salva nel modulo</button>
+        <button type="button" onClick={() => { props.onSuccess({ id: 'exp-edited', row: { date: new Date(2026, 8, 20, 12) } }); props.onClose(); }}>Salva nel modulo</button>
       </div>
     );
   },
@@ -209,6 +211,13 @@ describe('ExpenseProposalCard — what closes the buttons', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  // Seen red on 2026-11-11 with the link built from the proposal's date alone: it opened October,
+  // where `?row=` finds nothing.
+  it('links the month the row was SAVED in when «Modifica» moved its date, not the proposal’s', () => {
+    renderCard(proposal({ dateIso: '2026-10-15' }), { proposals: { 'expense:0': { status: 'written', writtenIds: ['exp-1'], month: '2026-09', at: NOW } } });
+    expect(screen.getByRole('link', { name: 'apri in Cashflow' }).getAttribute('href')).toBe('/dashboard/cashflow?tab=tracking&month=2026-09&row=exp-1');
+  });
+
   it('shows «Ignorata» and no button for an ignored proposal, and reads only its own key', () => {
     renderCard(proposal(), { proposals: { 'expense:0': { status: 'ignored', at: NOW } } });
     expect(screen.getByText('Ignorata')).not.toBeNull();
@@ -356,12 +365,14 @@ describe('ExpenseProposalCard — «Ignora» and «Modifica»', () => {
     expect(props.returnFocusTo.current).toBe(screen.getByRole('button', { name: 'Modifica' }));
 
     await user.click(screen.getByRole('button', { name: 'Salva nel modulo' }));
-    expect(recordProposal).toHaveBeenCalledWith('expense:0', { status: 'written', writtenIds: ['exp-edited'] });
+    // The outcome carries the Italian month of the row AS SAVED: the form may have moved the date.
+    expect(recordProposal).toHaveBeenCalledWith('expense:0', { status: 'written', writtenIds: ['exp-edited'], month: '2026-09' });
     expect(invalidate.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([queryKeys.expenses.all('owner-1')]);
     // The form wrote the row and its balances itself: the card's services stay untouched.
     expect(createExpenseSettledOnDateMock).not.toHaveBeenCalled();
     await waitFor(() => expect(authenticatedFetchMock).toHaveBeenCalledTimes(1));
-    expect(JSON.parse(authenticatedFetchMock.mock.calls[0][1].body)).toMatchObject({ key: 'expense:0', status: 'written', writtenIds: ['exp-edited'] });
+    expect(JSON.parse(authenticatedFetchMock.mock.calls[0][1].body)).toMatchObject({ key: 'expense:0', status: 'written', writtenIds: ['exp-edited'], month: '2026-09' });
     expect(screen.getByText('Registrata')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'apri in Cashflow' }).getAttribute('href')).toBe('/dashboard/cashflow?tab=tracking&month=2026-09&row=exp-edited');
   });
 });

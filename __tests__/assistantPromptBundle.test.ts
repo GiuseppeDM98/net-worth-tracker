@@ -791,6 +791,10 @@ describe('the Registra prompt (2026-11)', () => {
     const b = buildRegisterPrompt('stipendio di 2000 ieri', { ...PREFERENCES, responseStyle: 'deep' }, [], '--- REGISTRA ---\nOggi: lunedì 2 novembre 2026 (2026-11-02)\n[cat-altro] Altro', CASHFLOW_BLOCK);
     expect(a.system).toBe(b.system);
     expect(a.system).not.toContain('2026-11-01');
+    // No date at all, in either form: one read off the clock when the module loads would be the
+    // same in `a` and `b`, and would not be the fixture's day (2026-11-11).
+    expect(a.system).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(a.system).not.toMatch(/\d{1,2} (gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre) \d{4}/);
     expect(a.system).not.toContain('cat-cibo');
     expect(a.userContent).toContain(REGISTER_BLOCK);
   });

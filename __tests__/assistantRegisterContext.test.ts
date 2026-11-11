@@ -303,6 +303,16 @@ describe('buildAssistantRegisterContext — IL MESE', () => {
     expect(block.indexOf('- Cibo:')).toBeLessThan(block.indexOf('- Casa:'));
   });
 
+  it('names a budget on a TYPE by the type’s label, never by its id', () => {
+    const ctx = buildAssistantRegisterContext(input({
+      recentExpenses: monthRows,
+      month: { stats: null, budget: budget([budgetItem({ id: 'b-fixed', scope: 'type', expenseType: 'fixed', amount: 1400 })]), budgetFailed: false },
+    }));
+    const block = formatRegisterContextForPrompt(ctx);
+    expect(block).toContain('- Spese Necessarie: 700,00 € / 1400,00 € (50%) · mensile');
+    expect(block).not.toContain('- fixed:');
+  });
+
   it('cuts the budget lines past the cap and prints how many', () => {
     const items = Array.from({ length: REGISTER_MONTH_BUDGET_ROWS_CAP + 3 }, (_, index) =>
       budgetItem({ id: `b-${index}`, categoryId: `cat-${index}`, categoryName: `Voce ${index}`, amount: 100 + index }),

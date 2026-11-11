@@ -14,6 +14,7 @@ import {
   describeExpenseProposalState,
   expenseProposalSchema,
   listFencedBlocks,
+  listNestedFencedBlocks,
   parseExpenseProposal,
   proposalKey,
   resolveExpenseProposal,
@@ -153,6 +154,17 @@ describe('listFencedBlocks', () => {
     expect(blocks[0].index).toBe(0);
   });
 
+  it('lists apart the blocks of ONE language behind a quote or a list marker, ranked after the top-level ones', () => {
+    const content = `> \`\`\`goal-proposal\n> {}\n> \`\`\`\n\n1. \`\`\`goal-proposal\n   {}\n   \`\`\`\n\n> \`\`\`expense-proposal\n> {}\n> \`\`\`\n\n${fence('goal-proposal')}`;
+    const nested = listNestedFencedBlocks(content, 'goal-proposal');
+    expect(nested.map((block) => block.index)).toEqual([1, 2]);
+    for (const block of nested) expect(content.slice(block.offset, block.offset + 16)).toBe('```goal-proposal');
+    // Another language's quoted block is not its business, and the top-level list is unchanged.
+    expect(listFencedBlocks(content).map((block) => `${block.language}:${block.index}`)).toEqual(['goal-proposal:0']);
+    // A fence-looking line INSIDE a top-level block is content, quoted or not.
+    expect(listNestedFencedBlocks('```text\n> ```goal-proposal\n> {}\n```', 'goal-proposal')).toEqual([]);
+  });
+
   it('treats a fence line inside an open block as content', () => {
     const content = '````text\n```expense-proposal\n{}\n```\n````\n\n' + fence('expense-proposal');
     const blocks = listFencedBlocks(content);
@@ -191,6 +203,14 @@ describe('resolveExpenseProposal', () => {
       kind: 'Spesa', category: 'Cibo › Spesa', categoryName: 'Cibo', subCategoryName: 'Spesa', date: 'oggi', account: 'Conto principale',
     });
     expect(resolved.labels.settlement).toBeUndefined();
+  });
+
+  it('gives a future row with NO account no settlement line: no balance will move', () => {
+    const none = resolveExpenseProposal(proposal({ dateIso: '2027-01-15' }), refs({ defaults: { debitId: null, creditId: null } }), NOW);
+    expect(none.labels.account).toBe(PROPOSAL_NO_ACCOUNT_LABEL);
+    expect(none.labels.settlement).toBeUndefined();
+    // The same row with the default account says when it moves it.
+    expect(resolveExpenseProposal(proposal({ dateIso: '2027-01-15' }), refs(), NOW).labels.settlement).toBe('si applica al saldo il 15/01/2027');
   });
 
   it('dates the row on the proposal’s Italian day, in every zone', () => {

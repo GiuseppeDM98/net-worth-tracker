@@ -11,6 +11,7 @@
 //   findThreadForPeriod, getModeBadgeLabel)
 // - AssistantPeriodSelector.tsx (PERIOD_TABS: a mode with no period is NOT a tab)
 // - useAssistantStreaming.ts (buildStreamRequestBody) and useAssistantPeriodContext.ts (the period preview)
+// - AssistantPageClient.tsx (MODE_ORDER, shouldFetchContext) and assistantNarrative.ts (describeConversation)
 export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'chat' | 'register';
 
 /**
@@ -22,6 +23,10 @@ export interface AssistantProposalState {
   status: 'written' | 'ignored' | 'answered';
   // The ids of what «Conferma» wrote (the expense rows, the goal).
   writtenIds?: string[];
+  // The Italian month (YYYY-MM) the written row was SAVED in, when it may differ from the
+  // proposal's: «Modifica» lets the user move the date, and «apri in Cashflow» opens the row's
+  // month (2026-11-11). Absent: the proposal's own month.
+  month?: string;
   // The text a question card was answered with; only with `status: 'answered'`.
   answer?: string;
   at: Date;

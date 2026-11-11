@@ -590,6 +590,8 @@ Implemented on 2026-11-07 (PR #507): `components/ui/path-rail.tsx`, `sceneVarian
 
 **The Assistente page** (AI Surfaces, 2026-11-01). The conversation is the page (The Conversation-Is-Content Rule): the «Conversazione» tile and, from `desktop:`, the companion column at `desktop:grid-cols-[2fr_1fr]`. A change of mode — a period of «Periodo di analisi», Registra — keeps the conversation still and slides the companion column's content as a screen of the Consulente slides; question and proposal cards enter with the question card's motion. In Registra the axis gives way to the strip «Registra · l'Assistente conosce categorie, conti e le ultime righe» with «Torna all'analisi»; before the first message the companion shows the register summary computed in the browser (the cash accounts with their balance and the two defaults, the number of categories, the features on); the thread is «Registrazioni · 1 nov 2026», one per Italian day. The composer holds 4000 characters and shows its counter from 3800. The verdict, the companion, the thread list («Conversazioni») and the composer take no accent beyond the hover of «Invia messaggio», of «Registra», of «Rigenera» and of the suggestion rows.
 
+Implemented on 2026-11-10 (PR #512): Registra's strip and the companion's slide (`AssistantPageClient.tsx`, `sceneVariants`), the register summary (`tiles/RegistraContestoTile.tsx`), the proposal cards' entrance (`ExpenseProposalCard.tsx`, `GoalProposalCard.tsx`, `cardEnterVariants`), the composer's cap and counter (`assistantPeriodOptions.ts`); the Assistente's question card is not built yet.
+
 | Motion | Value | Reduced motion |
 |---|---|---|
 | Screen change, entering | x ±24px → 0 · 0.25 s · ease-out-quart | opacity 0 → 1 · 0.15 s |
