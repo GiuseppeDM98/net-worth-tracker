@@ -665,7 +665,7 @@ export const PROPOSAL_WAITS_FOR_ANSWER_LINE = 'Rispondi prima alla domanda';
 export const PROPOSAL_WRITTEN_BY_EDIT_LINE = 'registrata da Modifica';
 
 /**
- * What a written card says: «Registrata», «12 righe registrate» for a series, «Registrata da
+ * What a written card says: «Registrata», «12 righe registrate» for a series, «registrata da
  * Modifica» when the form wrote it (only that path records the row's `month`), and the fees beside.
  * The counts come from the ids written — the parents first, then the fees, one fee per parent.
  */

@@ -4,7 +4,7 @@
 > `PathRail`, `sceneVariants`, `SCENE_GRID_CLASS` / `SCENE_CARD_CLASS`, `Tile`'s `generated`, the RTL harness) **and
 > AI-04** (retired on 2026-11-08, in develop since 2026-11-08, PR #509: «Il
 > colloquio», `ConsulenteRevisionTile` with its round, the archive of the previous paths); **implemented after AI-06**
-> (order only: nothing of Registra (PR #512) or AI-06 enters here). Written on 2026-11-08, the same day the owner asked for it, from
+> (retired on 2026-11-11, in develop since 2026-11-11, PR #514; order only: nothing of Registra (PR #512, #514) enters here). Written on 2026-11-08, the same day the owner asked for it, from
 > the working tree that became commit 8af05f73 (PR #509) — a line is cited `file:line @ 8af05f73`; the adversarial reading rewrites
 > the hash. Executes decisions 91–96 (README.md § 3). **Not yet read adversarially**: the reading (prompt 07) precedes
 > the implementation, as README.md § 8 requires; the spec is a development instruction only after it.

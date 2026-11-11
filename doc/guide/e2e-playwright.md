@@ -62,7 +62,10 @@
   → `route.fetch()` → `route.fulfill({ response, json: { ...body, stats: null } })` (the pattern of
   `panoramica.snapshot.spec.ts`), because since 2026-10-05 that request carries the registry too and `r.abort()` is the
   failure of the whole TAB. Two boxes compared after a strip cell's tap are read in ONE `Promise.all`, or before the tap:
-  `reveal` scrolls smoothly and two reads taken during it disagree (seen red that day, 222 against 294). A Cashflow
+  `reveal` scrolls smoothly and two reads taken during it disagree (seen red that day, 222 against 294). **A row
+  remembered open answers `aria-expanded="true"` at its first render, BEFORE a deferred landing focuses its trigger**
+  (2026-11-11, Analisi's Scheda: `landOnScheda`'s 50 ms timer): a test that moves the focus after a re-opening waits for
+  the landing first (`toBeFocused()` on the trigger), or the landing takes the focus back. A Cashflow
   phone spec scopes its locators to the tabpanel by name: every visited tab is `forceMount`ed (doc/guide/shell.md). A test
   with TWO cold loads of a tab (a reload after a change) sets its own `test.setTimeout(120_000)` (the 45 s a verdict may
   take do not fit the 30 s default) and, before the reload, **waits for the URL to carry the tab** (`toHaveURL(/tab=budget/)`):
@@ -247,7 +250,7 @@
   - The pill's selector (2026-10-16): the landscape `TabletRail` is the same landmark «Navigazione principale» and comes
     first in the DOM, so every tool that means THE PILL reads `nav[data-nav="pill"]` (the census included).
   - `mobile-composition.analisi.mobile.spec.ts` «a category row opens the Scheda…» (2026-10-15): `#analisi-scheda-trigger`
-    counted 1 where 0 was expected — the row's trigger survived the Escape in that run; cause not traced. Red a SECOND time on 2026-11-11 (the full run of `feat/assistente-registra`, which does not touch Analisi), green ×3 alone right after: a pattern now, to be traced by the next session that opens Analisi.
+    counted 1 where 0 was expected — the row's trigger survived the Escape. Red again on 2026-11-11 (twice in the full runs of two Registra branches, none touching Analisi, and once in three runs alone), then **traced and fixed the same day — NOT a flake of the page but a race of the test**: on the second opening the Scheda row is remembered open, so `aria-expanded` is true at the first render, before `landOnScheda`'s 50 ms timer lands the focus on the trigger (one landing, logged with `focusin`); the test's focus into the panel came first and was taken back, and Escape on the trigger does nothing by design (2 runs in 20, the focus on the trigger after the Escape). The test now waits for the trigger's focus before moving it; seen red 3/3 with the timer at 300 ms and a 400 ms pause, green 10/10 as it is.
   - `mobile-composition.cashflow.mobile.spec.ts` «the «+» saves a row of today…» (2026-11-11): red once in a full run, then in 3 runs of 8
     alone — NOT a flake but a race of the page (the focus stopped `reveal`'s glide, the row left past the window). Fixed in
     `TransactionFeed` (doc/guide/cashflow-tracciamento.md § Files); the test polls the row's place.

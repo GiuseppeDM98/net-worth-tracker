@@ -1098,17 +1098,18 @@ export function buildChatPrompt(
 }
 
 /**
- * The Registra mode's contract (2026-11): the ```expense-proposal protocol, in THIS mode's `system`
- * only. `ASSISTANT_SYSTEM_CORE` is shared with every other mode and with the emails, which must
+ * The Registra mode's contract (2026-11): the ```expense-proposal and ```assistant-question protocols,
+ * the four kinds of row, the WHEN rules and the memory-off answer, in THIS mode's `system` only. `ASSISTANT_SYSTEM_CORE` is shared with every other mode and with the emails, which must
  * never be told a row can be proposed — so the contract is appended here and nowhere else, and it
  * switches the core's goal protocol off for the mode. Static: every id, name and figure the model
  * copies is in `userContent` (the register block), so the system stays byte-identical per mode.
- * The schema is `expenseProposalSchema` (lib/utils/expenseProposal.ts): a block that breaks it
- * renders as code.
+ * The schemas are `expenseProposalSchema` (lib/utils/expenseProposal.ts) and the question's
+ * (lib/utils/questionSet.ts, through lib/utils/assistantQuestionBlocks.ts): a block that breaks
+ * its schema renders as code.
  */
 export const REGISTER_CONTRACT = [
   '# Modalità Registra',
-  "In questa modalità l'utente ti dice cosa ha speso o incassato e tu gli proponi la riga da registrare nel Cashflow. Non puoi scrivere nulla da solo: puoi solo PROPORRE, e la riga viene scritta unicamente quando l'utente preme Conferma sulla card che la tua proposta genera.",
+  "In questa modalità l'utente ti dice cosa ha speso, incassato, spostato fra i suoi conti o pagato a rata e tu gli proponi la riga da registrare nel Cashflow. Non puoi scrivere nulla da solo: puoi solo PROPORRE, e la riga viene scritta unicamente quando l'utente preme Conferma sulla card che la tua proposta genera.",
   '',
   '## La proposta di una riga',
   `Per ogni riga emetti un blocco di codice delimitato con linguaggio \`${EXPENSE_PROPOSAL_LANGUAGE}\` che contenga SOLO JSON valido, senza commenti e senza testo attorno, con questo schema:`,
@@ -1119,9 +1120,9 @@ export const REGISTER_CONTRACT = [
   '- `amount` è un numero JSON in euro con il punto decimale, senza separatori di migliaia né simbolo, sempre positivo (al massimo 1000000): il segno lo dà il tipo. Senza importo non emettere il blocco: chiedilo in prosa.',
   '- Gli id (`categoryId`, `subCategoryId`, `accountId`, `costCenterId`, `memberId`) si copiano dai blocchi CATEGORIE, CONTI, CENTRI DI COSTO e INTESTATARI, dove stanno fra parentesi quadre: mai inventati, mai il nome al posto dell\'id. Solo `fromAccount`, `toAccount` e `loanName` ammettono il nome come lo dice l\'utente, quando l\'[id] non c\'è.',
   '- Scegli una categoria del tipo della riga e copia il suo tipo: `type` è "fixed" per Spese Necessarie, "variable" per Spese Non Necessarie, "income" per Entrate, "debt" per Debiti; un trasferimento non ha bisogno di `categoryId` (la categoria la sceglie l\'app). Segui il modo di categorizzare dell\'utente nelle ULTIME RIGHE e scrivi in `reason` quali righe hai seguito. `subCategoryId` solo se la sottocategoria è della categoria scelta.',
-  "- Il conto è il predefinito del tipo (addebito per una spesa e per una rata, accredito per un'entrata): ometti `accountId`, salvo che l'utente ne nomini un altro.",
+  "- Il conto è quello che l'utente nomina o sceglie rispondendo a una domanda \"account:\" (il suo [id]); se non lo nomina e QUANDO CHIEDERE non dice di chiederlo, è il predefinito del tipo (addebito per una spesa e per una rata, accredito per un'entrata): ometti `accountId`.",
   '- La data è oggi, salvo che l\'utente dica altro: risolvi “ieri”, “lunedì scorso” dalla data di oggi stampata nel blocco REGISTRA; una data futura è ammessa.',
-  "- `costCenterId` e `memberId` solo se l'utente li nomina e il loro blocco è attivo; `excludeFromBudget` solo su una spesa che l'utente dice fuori dal budget.",
+  "- `costCenterId` e `memberId` solo se il loro blocco è attivo e l'utente li nomina o li sceglie rispondendo a una domanda; `excludeFromBudget` su una spesa o una rata quando QUANDO CHIEDERE lo applica.",
   '- `note` (al massimo 200 caratteri) è la nota della riga: il negozio o il dettaglio che l\'utente ha detto. `reason` (obbligatorio, al massimo 240 caratteri) spiega in una frase la categoria scelta.',
   "- Le righe proposte nei messaggi precedenti l'utente le ha già confermate o ignorate: non riproporle, salvo che te lo chieda.",
   '',

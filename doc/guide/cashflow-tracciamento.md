@@ -192,7 +192,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `/dashboard/assistant?mode=registra`) beside «Nuova Spesa» in the page header (`hidden desktop:flex`, on Tracciamento)
   and beside «Aggiungi» in the axis (`max-desktop:portrait:hidden h-11 shrink-0`, so 44px in landscape and absent in
   portrait, where the FAB is alone and the «Altro» sheet does not carry it). Both follow `isAssistantBridgeShown`: hidden
-  without `ANTHROPIC_API_KEY` (read by the server page), in demo, and with `NEXT_PUBLIC_ASSISTANT_AI_ENABLED='false'`.
+  without `ANTHROPIC_API_KEY` (read by the server page at build: a key added on Vercel shows it after the next deploy, doc/guide/assistente.md § Per-page blind spots), in demo, and with `NEXT_PUBLIC_ASSISTANT_AI_ENABLED='false'`.
   A link, not a modal: the chat needs its page.
 - **The Movimenti tile's reading totals each type of the rows it is handed** (a search on a note is its own total).
   (Moved here from the `AGENTS.md` stub on 2026-09-20.)

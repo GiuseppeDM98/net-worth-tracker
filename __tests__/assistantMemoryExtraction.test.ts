@@ -541,9 +541,11 @@ describe('categorisation rules', () => {
     expect(supersedesCategorizationRule({ category: 'fact', text: candidate.text }, rule('Categorizzazione: palestra → Salute'))).toBe(false);
   });
 
+  // The repeat carries the real prefix, so it reaches the rules' exact-text branch: with a lower-case prefix it fell to
+  // isSimilarText, and dropping the branch left this green (2026-11-11, the retirement of the Registra details).
   it('compares a rule by its exact text: a changed rule is no duplicate, a repeat is', () => {
     const existing = [rule('Categorizzazione: palestra → Salute › Palestra')];
     expect(dedupeMemoryItems([{ category: 'preference', text: 'Categorizzazione: palestra → Salute › Benessere' }], existing)).toHaveLength(1);
-    expect(dedupeMemoryItems([{ category: 'preference', text: 'categorizzazione: Palestra → Salute › Palestra.' }], existing)).toHaveLength(0);
+    expect(dedupeMemoryItems([{ category: 'preference', text: 'Categorizzazione: Palestra → Salute › Palestra.' }], existing)).toHaveLength(0);
   });
 });

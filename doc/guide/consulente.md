@@ -349,7 +349,7 @@ on a phone, and from the row under the Assistente's conversation).
   review date and its reason are the footer of «Allocazione proposta», and `proposal.risks` has no surface; the report
   read as a BOOK — one page per section of the review's text with the figures of its tile, the rail as the index, a
   page as an address — is doc/ai/AI-07-report-libro.md (written on 2026-11-08 on the owner's call, implemented after
-  AI-06).
+  the Registra details, PR #514, retired on 2026-11-11).
 - **The review invite** (owner, 2026-10-20, after applying the first production plan: «nei giorni vicino alla data,
   un pulsante "revisione con il Consulente"»): `reviewDueState(document, todayIso)` (lib/utils/allocationAdviceNarrative.ts)
   says `later · soon · due` against the applied plan's `reviewByIso` — `soon` within `REVIEW_SOON_DAYS` (30), `due`

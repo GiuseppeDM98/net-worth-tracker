@@ -63,7 +63,7 @@ una sola riga, nella spec di Registra (ritirata il 2026-11-11; `:335` @ c62847ab
 è DDL. Lo si prova con `git diff <base>..<merge> -- firestore.rules firestore.indexes.json`
 vuoto. Dove una spec scrive CAMPI NUOVI su documenti esistenti — il colloquio (PR #509) `interview` e
 `revisionInterview` su `allocationAdvice/{uid}`, Registra (PR #512) `proposals` sul messaggio del
-thread, AI-06 le regole di categorizzazione come item `preference` della memoria (la
+thread, i dettagli di Registra (PR #514) le regole di categorizzazione come item `preference` della memoria (la
 vecchia `archived`) — il segnale non è un DDL ma il documento scritto dall'emulatore nel
 collaudo (la fase D della spec: il test usa-e-getta `__tests__/zz-emulator-*.test.ts` con
 `FIRESTORE_EMULATOR_HOST`, o la lettura Admin dei documenti dell'E2E), citato nel messaggio

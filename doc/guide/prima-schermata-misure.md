@@ -221,6 +221,16 @@ Coast a 390 e di Impostazioni a 768, e a 390 una tessera intera in più su Alloc
 produzione su :3200, 2,5 minuti, `yahooCalled` falso): `mobile:budget` verde su 57, le stesse sette misure più basse del giorno
 prima, non strette.
 
+**Rimisurata il 2026-11-11 al ritiro dei dettagli di Registra** (il codice mergiato di #514, il ponte «Chiedi
+all'Assistente» nell'asse di Tracciamento; build di produzione su :3200, 1,8 minuti): Tracciamento nel budget a 390, 768 e
+1024; **12 voci rosse, quante la sessione di #514 ne contava su develop prima del ponte** (senza nominarle) e nessuna
+di Tracciamento — Patrimonio 1024
+(`figuresAboveFold` 12 su 11, `figuresOutsideVerdict` 9 su 8), Budget 390 (`screens` 1,86 su 1,83), Centri 1024 (1,07 su
+1,04), Allocazione 390 · 768 · 1024 (1,66 su 1,59 · 1,12 su 1,07 · 1,23 su 1,16), Previdenza 768 (`screens` 1,24 su 1,22,
+`tilesFullyAboveFold` 3 sotto 5), Calcolatore 768 (1,24 su 1,22), Coast 1024 (1,3 su 1,25), What If 1024
+(`figuresOutsideVerdict` 10 su 8). Non allargate: restano l'aperto di CLAUDE.md («`mobile:budget` non rimisurato dopo le
+etichette più lunghe»), da decidere voce per voce in una sessione sua.
+
 ## Registro delle voci allargate (`raisedBy`)
 
 Una voce di `perf/mobile-budget.json` si allarga solo a mano, con l'OK del proprietario, e porta la ragione nel suo
