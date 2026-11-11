@@ -1,9 +1,9 @@
 # AI-06 — Registra: the detail questions, the four kinds, series, new categories, memory rules, the bridge
 
 > Series `doc/ai/` (README.md § 5): **depends on AI-04** (retired on 2026-11-08, in develop since 2026-11-08, PR #509: `questionSet.ts`, `parseQuestionsLenient`, `describeAnswer`,
-> `QuestionCard` with `decline` and `otherSelect`) **and AI-05** (the mode, the proposal protocol, `listFencedBlocks`,
+> `QuestionCard` with `decline` and `otherSelect`) **and AI-05** (retired on 2026-11-11, in develop since 2026-11-11, PR #512: the mode, the proposal protocol, `listFencedBlocks`,
 > `proposalKey`, `resolveExpenseProposal`, `describeExpenseProposalState`, `ExpenseProposalCard`, `MessageIdContext`,
-> `RegisterRefsContext`, the persisted `proposals`); the last spec: **its retirement retires the folder**. Written on
+> `RegisterRefsContext`, the persisted `proposals` with `month?` on a written row, the helper `e2e/assistantRegister.ts`); the last spec: **its retirement retires the folder**. Written on
 > 2026-11-01
 > from `develop` @ b9411a4d. Executes decisions 9, 10, 12, 13, the adopted choices A15–A18 (A15 as amended by decision
 > 64, A16 by decisions 31 and 66) and decisions 21, 29–32, 38, 40, 64–73. § 4 Client is written for a conversation
@@ -20,9 +20,9 @@
 > the decisions 21–73 in README.md § 3 (this spec: decisions 21, 22, 29, 30, 31, 32, 36, 37, 38, 39, 40, 58, 63, 64, 65,
 > 66, 67, 68, 69, 70, 71, 72, 73).
 
-## 1. The problem today (evidence on the code — after AI-05)
+## 1. The problem today (evidence on the code — after PR #512, in develop since 2026-11-11)
 
-- **AI-05's protocol knows `expense` and `income` only.** A transfer is `type: 'transfer'` with `linkedCashAssetId`
+- **PR #512's protocol knows `expense` and `income` only.** A transfer is `type: 'transfer'` with `linkedCashAssetId`
   (origin) and `transferCashAssetId` (destination) (`types/expenses.ts` `ExpenseFormData`); either end may be a
   PROPERTY: the dialog offers the cash accounts and `allAssets.filter(isTransferableProperty)` as endpoints
   (`components/expenses/ExpenseDialog.tsx:1502` @ ce26af4d; `isTransferableProperty` = `realestate` type and class at
@@ -55,7 +55,7 @@
   is written as a whole array, and the subcategory id is generated inline twice
   (`components/expenses/CategoryManagementDialog.tsx:636`, `lib/services/expenseImportService.ts:43` `genSubId` @
   ce26af4d). Every reader shares `queryKeys.expenses.categories(ownerId)` (`lib/query/queryKeys.ts:73` @ ce26af4d).
-- **The model cannot ask with options**: AI-05's contract asks in prose. `components/ui/question-card.tsx` (in develop since 2026-11-08) gives `QuestionCard` (no button inside,
+- **The model cannot ask with options**: PR #512's contract asks in prose. `components/ui/question-card.tsx` (in develop since 2026-11-08) gives `QuestionCard` (no button inside,
   `decline`, `otherSelect` answering `{ entity: id }`) and `parseQuestionsLenient(input: unknown)`, the only parser.
 - **A changed categorisation rule would be dropped**: `dedupeMemoryItems` (`lib/server/assistant/memoryExtraction.ts:280`
   @ ce26af4d) discards a candidate that `isSimilarText` (`:241`, bigram Jaccard ≥ 0.5) finds close to an active item of
@@ -76,7 +76,7 @@
 - **Follow-ups**: `AssistantFollowUp { id; label; prompt }`, `MAX_FOLLOW_UPS = 3`, `buildFollowUpSuggestions(mode,
   bundle)` (`lib/utils/assistantFollowUps.ts:12`, `:20`, `:143` @ ce26af4d); the tile hands `followUp.prompt` to the
   page (`components/assistant/AssistantConversazioneTile.tsx:167` @ ce26af4d). `CURATED_FOLLOW_UPS.register` has
-  AI-05's two chips, which prefill the composer (AI-05's `onFollowUpSelect` = `setDraft(prompt)` and the focus).
+  PR #512's two chips, which prefill the composer (PR #512's `onFollowUpSelect` = `setDraft(prompt)` and the focus).
 
 ## 2. Goal and acceptance criteria
 
@@ -84,7 +84,7 @@
    'expense' | 'income' | 'transfer' | 'debt'` with the type map (expense → `fixed`/`variable`, income → `income`,
    transfer → `transfer`, debt → `debt`), `fromAccount`, `toAccount`, `loanName?`, `payoff?`, `fee: { amount }`,
    `recurring: { frequency; count; day? }`, `newCategory?`, `newSubCategory?`, and the `superRefine` of § 4. Proof:
-   `__tests__/expenseProposal.test.ts` (AI-05's, extended): the kind × type matrix (only the five pairs pass); a
+   `__tests__/expenseProposal.test.ts` (PR #512's, extended): the kind × type matrix (only the five pairs pass); a
    transfer without `toAccount`, a transfer with `accountId`, `fromAccount` on an expense, `loanName` on an expense,
    `payoff` without `loanName`, `recurring` on an income, `recurring` on a transfer, `recurring` with `payoff`, 361
    monthly and 41 yearly occurrences, `newCategory` with `categoryId`, `newCategory.type` ≠ `type`, `newSubCategory`
@@ -127,12 +127,12 @@
    `transfer`-type category, else the first `transfer`-type category of `refs.categories`, else «Categoria:
    Trasferimenti (nuova)» and `ensureTransferCategory(ownerId)` at «Conferma»; any other `categoryId` of a type other
    than the row's → «categoria di un altro tipo: {nome}». `properties`, `loans` and `feeCategory` come from the reads
-   AI-05's `readFailed` already watches (assets, categories, settings): a failed read shows the failed-read
+   PR #512's `readFailed` already watches (assets, categories, settings): a failed read shows the failed-read
    `ErrorNotice` with «Conferma» disabled, never «conto sconosciuto»; an empty category list is «nessuna categoria
    configurata», never the failed read (DESIGN → The Absence-Has-Three-Names Rule). Proof:
    `__tests__/expenseProposal.test.ts` (one test per rule, the fee note on a transfer «Commissione sul trasferimento a
    Conto B», the three transfer-category cases);
-   `__tests__/expenseProposalCard.test.tsx` (AI-05's, extended): the fee problem renders the link and a disabled
+   `__tests__/expenseProposalCard.test.tsx` (PR #512's, extended): the fee problem renders the link and a disabled
    «Conferma»; `readFailed` renders the notice; empty categories render the empty sentence. Mutation: the member kept on
    a transfer → red; `readFailed` read as an empty list → the notice test red.
 5. **A series prints where it really starts** (decision 12, A17). `recurring` → `isRecurring: true`,
@@ -150,7 +150,7 @@
    {Categoria} › {nome}» or «Nuova categoria: {nome} ({EXPENSE_TYPE_LABELS[type]})» (`types/expenses.ts:15` @
    ce26af4d), and «Conferma» writes in this order: the category (§ 4 «Categories written by the card»), the categories
    key invalidated, then the row with the new ids. A category written and a row that fails: the category stays, the
-   card shows AI-05's failure state, and the retry resolves the name to the existing category and writes no second one.
+   card shows PR #512's failure state, and the retry resolves the name to the existing category and writes no second one.
    Proof: `__tests__/expenseProposal.test.ts` (the two reuse rules, the two lines);
    `__tests__/expenseProposalCard.test.tsx`:
    `updateCategory` and `createCategory` run before `createExpenseSettledOnDate` (`mock.invocationCallOrder`),
@@ -160,13 +160,17 @@
    `/^\d+-[a-z0-9]{1,9}$/`; the kinds E2E. Mutation: the row written first → the order assertion red; the append built
    on the page's copy → the fresh-read test red.
 7. **The card writes the four kinds as the dialog does, and counts what it wrote**. `ExpenseProposalCard` renders the
-   lines of criteria 2–6 and writes through AI-05's path: `createExpenseSettledOnDate(ownerId, form, categoryName,
+   lines of criteria 2–6 and writes through PR #512's path: `createExpenseSettledOnDate(ownerId, form, categoryName,
    subCategoryName, now, fee)`, then `applyDebtRepayments(appliedDebtRows)`, then `applyBalanceEffects(appliedEffects)`,
-   then AI-05's invalidations. The written state stores every returned id in `writtenIds` (parents, then fees) and
-   prints «{parents.length} righe registrate» for a series (AI-05's single-row text otherwise) and «+ 1 commissione» /
+   then PR #512's invalidations. The written state stores every returned id in `writtenIds` (parents, then fees) and
+   prints «{parents.length} righe registrate» for a series (PR #512's single-row text otherwise) and «+ 1 commissione» /
    «+ {n} commissioni» when fees were written. «Modifica» on a series, transfer or instalment opens the dialog
-   prefilled (the fee included: `ExpenseDialogInitialValues` becomes `Partial<ExpenseFormData> & { fee?: number }`),
-   records `writtenIds: [saved.id]` and prints «registrata da Modifica». Proof:
+   prefilled (the fee included: `ExpenseDialogInitialValues` becomes `Partial<ExpenseFormData> & { fee?: number }`, and
+   the dialog's create reset — `ExpenseDialog.tsx:1763-1774` @ c62847ab, which today spreads type, category,
+   sub-category, amount, currency, date, notes, link, `linkedCashAssetId` and `excludeFromBudget` alone — is widened to
+   `transferCashAssetId`, `debtAssetId`, `isDebtPayoff`, `isRecurring`, `recurringFrequency`, `recurringCount`,
+   `recurringDay` and `fee`, proved field by field in `__tests__/expenseDialogInitialValues.test.tsx`),
+   records `writtenIds: [saved.id]` with the saved row's `month` as PR #512 does, and prints «registrata da Modifica». Proof:
    `__tests__/expenseProposalCard.test.tsx` per kind (the
    lines, the mocked service arguments, the call order, «12 righe registrate» and «+ 12 commissioni» for a series with a
    fee, «registrata da Modifica» with `[saved.id]`); `e2e/assistant.register.kinds.spec.ts` (new) with the Admin
@@ -216,7 +220,7 @@
     recenti»; the new-category sentence of decision 40; the question block and its entity rules; the chain of caps
     (proposals, questions, never both, never a goal); the memory-off answer. With `memoryEnabled: false`
     `buildRegisterPrompt` prints «Memoria: memoria disattivata.» in place of the memory block. Proof:
-    `__tests__/assistantPromptBundle.test.ts` (the register describe AI-05 adds, extended): `system` contains each
+    `__tests__/assistantPromptBundle.test.ts` (the register describe PR #512 added, extended): `system` contains each
     sentence (`toContain`), the caps interpolated from `EXPENSE_PROPOSALS_MAX_PER_MESSAGE`,
     `ASSISTANT_QUESTION_MAX_PER_MESSAGE` and `MAX_RECURRENCE_OCCURRENCES`; two calls with different users, rows and
     memory give `expect(a.system).toBe(b.system)`; with memory off `userContent` contains «memoria disattivata» and
@@ -229,7 +233,7 @@
     asset with debt, TAN and the median instalment over the collapsed recent lines); an IMMOBILI block (every
     `isTransferableProperty` asset with its value). The centre clause prints only with `costCentersEnabled`, the member
     clause only with `expenseSplitEnabled`, the «fuori budget» clause only on spending categories. Proof:
-    `__tests__/assistantRegisterContext.test.ts` (AI-05's, extended): a fixture of 301 rows of one category, the
+    `__tests__/assistantRegisterContext.test.ts` (PR #512's, extended): a fixture of 301 rows of one category, the
     oldest holding the only other account, prints «301 righe in 12 mesi» and the 99,7% share; the clauses off with the
     features off; a series of 12 instalments counts once in the median «su 1 riga (serie contata una volta)»; a loan with
     no row prints «nessuna rata nelle righe recenti»; fee rows absent from the base. Mutation: the shares computed on the
@@ -266,12 +270,14 @@
     (both orders, the cap); the kinds E2E: after a written card the first row is «Registra un'altra», the click
     focuses an empty composer and the faked route counts no new request. Mutation: the chip appended last → the order
     test red.
-15. **Nothing of AI-05 regresses, and the first screen holds**. AI-05's suites and `e2e/assistant.register.spec.ts`,
+15. **Nothing of Registra (PR #512) regresses, and the first screen holds**. PR #512's suites and `e2e/assistant.register.spec.ts`,
     `e2e/assistant.register.mobile.spec.ts`, the cashflow specs, `reactCompilerCoverage` (it compiles every file under
     app, components, contexts, lib), `npm run perf:budget`, and `npm run mobile:census -- --email=census@example.com` +
     `npm run mobile:budget` on the same :3200 build: the `cashflow-tracciamento` entries at 390, 768 and 1024 green; an
     entry that moves stops the session for the owner's call (a widened entry is recorded with its `raisedBy` in
-    doc/guide/prima-schermata-misure.md § Registro delle voci allargate). Proof: the commands of § 7 A and C. Mutation:
+    doc/guide/prima-schermata-misure.md § Registro delle voci allargate). The same for `perf:budget`: the Assistente
+    (738,1 on a ceiling of 740, raised at the retirement of 2026-11-11) and Cashflow (785,4 on 786) sit just under their ceilings, and a ceiling that must rise is
+    the owner's call (`raisedBy` and a row in doc/guide/velocita.md § Registro), never the session's. Proof: the commands of § 7 A and C. Mutation:
     the axis link shown in portrait → the 768 entry moves → red.
 
 ## 3. Decisions
@@ -283,7 +289,7 @@
   («fuori budget» never asked, «Di cosa si tratta?»), 69 (the WHEN thresholds), 70 (rows with `ownerId`; memory as
   today, keyed by the account), 71 (memory off; the switch the answer names is «Apprendimento automatico» in the
   Assistente's «Preferenze», the one place it is changed, § 1), 72 (rules in every prompt), 73 (the bridge's gate); 58
-  and 63 hold unchanged (AI-05's day thread and future-dated rows).
+  and 63 hold unchanged (PR #512's day thread and future-dated rows).
 - **Lead's resolutions**: T9 (`parseQuestionsLenient` the only parser, `{ entity }`, `otherSelect`, `decline`), T10 =
   decision 38, X-F02 (the derived index, `proposalKey('question', i)`), AI-05-Q9 (the collapsed series feed the loan
   median), AI-06-Q11 («registrata da Modifica»), AI-06-Q12 (failed read vs empty list).
@@ -302,15 +308,15 @@
 
 ## 4. Solution
 
-### Schema extension (`lib/utils/expenseProposal.ts`, AI-05's contract extended in place)
+### Schema extension (`lib/utils/expenseProposal.ts`, PR #512's contract extended in place)
 
 ```ts
 export const expenseProposalSchema = z.object({
   kind: z.enum(['expense', 'income', 'transfer', 'debt']),
   type: z.enum(['fixed', 'variable', 'income', 'transfer', 'debt']),
-  amount: …, dateIso: …,                                   // AI-05
+  amount: …, dateIso: …,                                   // PR #512
   categoryId: z.string().min(1).optional(),                // required by the refine, except on a transfer and with newCategory
-  subCategoryId: …, accountId: …, costCenterId: …, memberId: …, excludeFromBudget: …, note: …, reason: …, // AI-05
+  subCategoryId: …, accountId: …, costCenterId: …, memberId: …, excludeFromBudget: …, note: …, reason: …, // PR #512
   fromAccount: z.string().min(1).max(80).optional(),       // an id, else a name
   toAccount: z.string().min(1).max(80).optional(),
   loanName: z.string().min(1).max(80).optional(),          // an id, else a name
@@ -342,21 +348,21 @@ export const expenseProposalSchema = z.object({
 });
 ```
 
-### The resolver (`resolveExpenseProposal(p, refs, now)`, AI-05's function grown)
+### The resolver (`resolveExpenseProposal(p, refs, now)`, PR #512's function grown)
 
-- `refs` is AI-05's `ExpenseProposalRefs`, with the three fields AI-06 fills on the Assistente page:
+- `refs` is PR #512's `ExpenseProposalRefs`, with the three fields AI-06 fills on the Assistente page:
   `properties = assets.filter(isTransferableProperty)`, `loans = assets.filter(isRepayableDebt)`, `feeCategory =
   resolveExpenseFeeCategory(categories, settings)`.
 - Endpoints and loans: criteria 2 and 3, one private name matcher for both (id first, then the three stages on the
   normalised name: `toLowerCase()`, `normalize('NFD')` with the combining marks removed, `trim()`, runs of whitespace
   to one space).
-- The form: `type`, `linkedCashAssetId`/`transferCashAssetId` for a transfer (AI-05's `accountId` path for the other
+- The form: `type`, `linkedCashAssetId`/`transferCashAssetId` for a transfer (PR #512's `accountId` path for the other
   kinds), `debtAssetId`, `isDebtPayoff`, `isRecurring`, `recurringFrequency`, `recurringCount`, `recurringDay`, the
   dialog's drops of criterion 4. `labels` gains `accounts`, `property`, `debt`, `series`, `fee`, `category` (the new
   category line or «Trasferimenti (nuova)»); `dropped` the «ignorato: …» entries; `problems` the refusals of criteria
   2–6, any of which disables «Conferma».
 - The resolver also returns what «Conferma» must create first: `create: { subCategory?: { categoryId; name } ; category?:
-  { name; type } ; transferCategory?: true } | null` as a field of `ResolvedExpenseProposal` (AI-05's type gains it;
+  { name; type } ; transferCategory?: true } | null` as a field of `ResolvedExpenseProposal` (PR #512's type gains it;
   `null` when nothing is created).
 
 ### Categories written by the card (decision 40)
@@ -403,22 +409,24 @@ export function formatQuestionAnswersAsMessage(entries: ReadonlyArray<{ question
   boolean }`, and `isAnswerableQuestionMessage(message: Pick<AssistantMessage, 'id' | 'mode'>, lastAssistantMessageId:
   string | undefined, streamingMessageId: string | undefined): boolean` (register mode, the thread's last message with
   `role === 'assistant'`, nothing streaming). It walks `listFencedBlocks(content)` for `ASSISTANT_QUESTION_LANGUAGE`,
-  takes each block's body (the
-  lines between its opening fence at `offset` and the next closing fence), `JSON.parse`s it («JSON non valido» on a
+  takes each block's body from the list itself — `listFencedBlocks` grows `{ bodyStart; bodyEnd }` beside `offset`
+  (README § 7; the scanner already knows where a block closes, and a second scan for «the next closing fence» would
+  disagree with it on a longer fence or a tilde one) —, `JSON.parse`s it («JSON non valido» on a
   throw), calls `parseQuestionsLenient([obj])` (question = `questions[0] ?? null`, problems = `refused`) and appends
   `entityQuestionProblems(question)`; `kept = keepQuestionBlock(index)`.
 - `components/assistant/MessageQuestionsContext.tsx` (new): `MessageQuestionsProvider({ blocks, answerable, children })`
   and `useMessageQuestions(): { blocks; hasQuestionBlock; answerable; answers: Record<number, { value:
   QuestionAnswerValue; labels: Record<string, string> }>; setAnswer(index, value, labels): void }`; `hasQuestionBlock`
   = a kept block with a question and no problems; the default value (no provider) is no blocks, not answerable.
-  `AssistantStreamingResponse.tsx` mounts it per message inside AI-05's `MessageIdProvider`, with `blocks =
-  message.mode === 'register' ? readAssistantQuestionBlocks(message.content) : []` and `answerable =
+  `AssistantStreamingResponse.tsx` mounts it per message inside PR #512's `MessageIdProvider`, with `blocks =
+  mode === 'register' ? readAssistantQuestionBlocks(message.content) : []` (the PAGE's mode, the one
+  `useMessageBlocks().mode` carries and the expense card is gated on — never `message.mode`) and `answerable =
   isAnswerableQuestionMessage(message,
   lastAssistantMessageId, streamingMessageId)`, `lastAssistantMessageId` being the id of the thread's last message with
   `role === 'assistant'`.
 - `components/assistant/AssistantQuestionBlock.tsx` (new), rendered by the `pre` interceptor for the third language
-  (`MARKDOWN_COMPONENTS` stays module-level, `AssistantStreamingResponse.tsx:55` @ ce26af4d; the interceptor reads its
-  index from the hast node's `position.start.offset` as AI-05's does). In order: no entry in `blocks` (a message outside
+  (`MARKDOWN_COMPONENTS` stays module-level, `AssistantStreamingResponse.tsx:108` @ c62847ab; the interceptor reads its
+  index from the hast node's `position.start.offset` as the two proposal cards' does). In order: no entry in `blocks` (a message outside
   register) → the plain code block; not kept → nothing; problems → the plain code block; a persisted
   `proposals[proposalKey('question', index)]` with
   `status: 'answered'` → the read-only card (eyebrow, text, «Risposta: {answer}»); not answerable → the read-only card
@@ -433,18 +441,22 @@ export function formatQuestionAnswersAsMessage(entries: ReadonlyArray<{ question
   AI-Accent Rule, decision 36), enabled when `formatQuestionAnswersAsMessage` of every valid kept block is non-null and
   `answerable`. Its handler (a function of its own, awaited: AGENTS.md § React Compiler and the hooks rules) records,
   for each card, `recordProposal(proposalKey('question', index), { status: 'answered', answer: describeAnswer(question,
-  value, labels), at: new Date() })`, then `await submitAnswer(text)`, then moves the focus to the first card's
-  read-only «Risposta: …» line (`tabIndex={-1}`).
+  value, labels) })` (no `at`: the server stamps it) and awaits `patchMessageProposal({ ownerId, threadId, messageId,
+  key, state })` — `false` from any card is ONE toast, `ANSWER_STATE_NOT_SAVED` (new in `dialogNarrative.ts`, beside
+  `PROPOSAL_STATE_NOT_SAVED` and `GOAL_STATE_NOT_SAVED`) —, then moves the focus to the first card's read-only
+  «Risposta: …» line (`tabIndex={-1}`, `focus({ preventScroll: true })`) and only then `await submitAnswer(text)`:
+  the new message scrolls the conversation to its end (`conversationScrollSignal`), and a focus moved after it would
+  pull the page back up.
 - `ExpenseProposalCard.tsx` passes `useMessageQuestions().hasQuestionBlock` into `describeExpenseProposalState`'s
   `local`: true → `canConfirm: false` and the line «Rispondi prima alla domanda» (decision 65).
-- `submitAnswer(text)` is AI-05's (`RegisterRefsContext`: the page's `streaming.submit(text)` in the register thread).
+- `submitAnswer(text)` is PR #512's (`RegisterRefsContext`: the page's `streaming.submit(text)` in the register thread).
 
-### Context (`lib/utils/assistantRegisterContext.ts`, AI-05's builder grown)
+### Context (`lib/utils/assistantRegisterContext.ts`, PR #512's builder grown)
 
-- The sections AI-05 prints stay in their order; AI-06 adds «--- PRESTITI ---» and «--- IMMOBILI ---» after «---
-  CONTI ---», and «--- PATTERN ---» before «--- ULTIME RIGHE ---»; amounts as AI-05 prints them (`formatNumberIt(value,
+- The sections PR #512 prints stay in their order; AI-06 adds «--- PRESTITI ---» and «--- IMMOBILI ---» after «---
+  CONTI ---», and «--- PATTERN ---» before «--- ULTIME RIGHE ---»; amounts as PR #512 prints them (`formatNumberIt(value,
   2) + ' €'`).
-- «--- PATTERN ---», from AI-05's input (`assets`, `recentExpenses` already windowed, `settings`, `categories`), one
+- «--- PATTERN ---», from PR #512's input (`assets`, `recentExpenses` already windowed, `settings`, `categories`), one
   line per category with rows in the window (fee rows excluded with `isFeeRow`, `lib/utils/expenseFee.ts:51` @
   ce26af4d; every occurrence of a series counted):
   `[catId] Cibo · 24 righe in 12 mesi · conto più usato Conto A 96% · in un centro: 2 righe · personali 10% · fuori
@@ -476,12 +488,16 @@ La risposta dell'utente arriva come un messaggio con una riga per domanda, «{do
 Se il blocco memoria dice «memoria disattivata» e l'utente detta una regola, rispondi: «non posso ricordarlo: la memoria è spenta ("Apprendimento automatico" nelle Preferenze dell'Assistente)».
 ```
 
-AI-05's sentence on the five proposals and «Ne restano N: vuoi che continui?» stays; the chain sentence above is the
-one place that states the caps together.
+PR #512's sentence on the five proposals and «Ne restano N: vuoi che continui?» stays; the chain sentence above is the
+one place that states the caps together. The clause «un dubbio vero su categoria, conto o intestatario come domanda
+breve» of `REGISTER_CONTRACT`'s short-answer sentence (`prompts.ts:1127` @ c62847ab, the owner's tour of 2026-11-11)
+becomes the question protocol's: a real doubt is an ```assistant-question block in a message WITHOUT proposals,
+never a prose question under the cards; `__tests__/assistantPromptBundle.test.ts` holds `not.toContain('come domanda
+breve')`.
 
 ### Memory
 
-- `EXTRACTION_SYSTEM_PROMPT` gains, after AI-05's sentences: «Una regola di categorizzazione si estrae solo se l'utente
+- `EXTRACTION_SYSTEM_PROMPT` gains, after PR #512's sentences: «Una regola di categorizzazione si estrae solo se l'utente
   la dice come abitudine ("sempre", "di solito", "d'ora in poi"), come "preference", nel formato "Categorizzazione:
   {cosa, senza articolo} → {Categoria} › {Sottocategoria}" (la sottocategoria solo se nominata); non estrarre mai la
   scelta di una singola riga né la risposta a una domanda (un testo con "[id]").»
@@ -505,8 +521,8 @@ one place that states the caps together.
   writes, decision 65.
 - `components/assistant/RegisterRefsContext.tsx`: `useRegisterReads` fills `properties`, `loans`, `feeCategory`.
 - `components/assistant/AssistantPageClient.tsx`: `afterWrittenCard`; `onFollowUpSelect(followUp)` reads `action`
-  (`focus-composer` = AI-05's `setDraft('')` and the composer's focus; `send` = `streaming.submit(prompt)`; absent =
-  AI-05's behaviour for the mode).
+  (`focus-composer` = PR #512's `setDraft('')` and the composer's focus; `send` = `streaming.submit(prompt)`; absent =
+  PR #512's behaviour for the mode).
 - `components/assistant/AssistantConversazioneTile.tsx`: `onFollowUpSelect(followUp: AssistantFollowUp)` (the whole
   object, not the prompt).
 - `components/expenses/ExpenseDialog.tsx`: `ExpenseDialogInitialValues = Partial<ExpenseFormData> & { fee?: number }`.
@@ -519,7 +535,7 @@ export function isAssistantBridgeShown({ assistantConfigured, isDemo, flagValue 
 }
 ```
 
-- **The split** (decision 73; AI-05 § 10 leaves it to its first reader): today's body of
+- **The split** (decision 73: the server/client split of the Cashflow page belongs to its first reader, the bridge): today's body of
   `app/dashboard/cashflow/page.tsx` moves unchanged into `components/cashflow/CashflowPageClient.tsx` (new, `'use
   client'`, `export function CashflowPageClient({ assistantConfigured }: { assistantConfigured: boolean })`, with the
   module-level `lazyComponent`s and constants), and `page.tsx` becomes the server component `export default function
@@ -539,7 +555,7 @@ export function isAssistantBridgeShown({ assistantConfigured, isDemo, flagValue 
 
 ### Follow-ups (`lib/utils/assistantFollowUps.ts`)
 
-`AssistantFollowUp` gains `action?: 'send' | 'focus-composer'`: absent keeps the mode's behaviour (AI-05: a register
+`AssistantFollowUp` gains `action?: 'send' | 'focus-composer'`: absent keeps the mode's behaviour (PR #512: a register
 chip prefills the composer, the analysis chips send), `'send'` submits at once, `'focus-composer'` empties and focuses
 the composer. `buildFollowUpSuggestions(mode, bundle, opts?: { afterWrittenCard?: boolean })` puts «Registra un'altra»
 first when `opts.afterWrittenCard`, then the contextual and curated chips, deduped, capped at `MAX_FOLLOW_UPS`.
@@ -550,7 +566,7 @@ first when `opts.afterWrittenCard`, then the contextual and curated chips, dedup
   card never makes a second call for it, and a transfer out of a property carries none.
 - **The instalment and the payoff** (doc/guide/cashflow.md): `applyDebtRepayments` before `applyBalanceEffects`, as the
   dialog; a future-dated instalment or series occurrence (decision 63) is born `balancePending` and repays on its date —
-  the service decides per row, the card prints AI-05's date line.
+  the service decides per row, the card prints PR #512's date line.
 - **A transfer can land on a PROPERTY** (doc/guide/cashflow.md § Expense Sign Convention and Type Changes): the property
   on one end only, the sale refused above the value, and the line in the dialog's words.
 - **«Legata all'immobile» is not proposed from the chat**: a row written by the card carries no `propertyAssetId`; an
@@ -560,7 +576,7 @@ first when `opts.afterWrittenCard`, then the contextual and curated chips, dedup
   the same constants, so the `system` stays byte-identical.
 - **The caps are in the text the model reads**: five proposals, two questions, never both, three entity options, the
   occurrences (AGENTS.md § Assistant · Assistente: a silent cap is a hallucination).
-- **Shared account** (decision 70): the rows are written with `ownerId` (AI-05); memory stays keyed as today, by the
+- **Shared account** (decision 70): the rows are written with `ownerId` (PR #512); memory stays keyed as today, by the
   account (`ownerId`, § 1): the owner and a co-owner share the categorisation rules. AI-06 does not re-key memory.
 - **Memory off** (decision 71): nothing is extracted (the route's gate), the register block says «memoria disattivata»
   and the model gives the contract's answer.
@@ -572,13 +588,14 @@ first when `opts.afterWrittenCard`, then the contextual and curated chips, dedup
 - **No category of type `debt`**: the unknown-category problem, unless the proposal carries `newCategory` of type
   `debt` (the contract allows it).
 - **An entity id gone since the question** (an account deleted in another tab): the resolver's «conto sconosciuto».
-- **A failed PATCH on «Rispondi»**: AI-05's toast; the message still leaves; after a reload that card is no longer in
+- **A failed PATCH on «Rispondi»**: the toast `ANSWER_STATE_NOT_SAVED` (§ 4); the message still leaves; after a reload that card is no longer in
   the last message and reads «Non risposta qui».
-- **The streaming message is plain text** (`AssistantStreamingResponse.tsx:173` @ ce26af4d): the question cards appear
+- **The streaming message is plain text** (`AssistantStreamingResponse.tsx:210` @ c62847ab): the question cards appear
   at `done`, never half-parsed.
 - **a11y** (AGENTS.md § Accessibility): the question's text names its `ChoiceList`; the `Select` has its `aria-label`
   and `FIELD_HEIGHT_CLASS` (`components/assets/compravendita/fields.tsx:19` @ ce26af4d); «Rispondi» and the bridge are
-  44px below `desktop:`; the focus after «Rispondi» goes to the first read-only answer.
+  44px below `desktop:`; the focus after «Rispondi» goes to the first read-only answer, without scrolling and before the
+  answer is sent (§ 4).
 - **React Compiler** (AGENTS.md § React Compiler and the hooks rules): no conditional or logical expression inside a `try/catch` in the handlers
   (a function of its own, awaited in the try); the providers compute in render, no manual memo.
 - **The Cashflow page stays prerendered**: its server page reads `ANTHROPIC_API_KEY` when Next renders it, at build,
@@ -589,18 +606,18 @@ first when `opts.afterWrittenCard`, then the contextual and curated chips, dedup
 - **No owner data**: E2E names «Conto A ornitorinco», «Casa ornitorinco», «Mutuo ornitorinco», «Svago ornitorinco»;
   invented amounts.
 - **Cases that do not change**: demo (the Assistente page is blocked in demo, so no card or question renders there;
-  the bridge's gate hides it); the period pill of the mode (AI-05); the day's thread title (decision 58); the memory
+  the bridge's gate hides it); the period pill of the mode (PR #512); the day's thread title (decision 58); the memory
   panel (the rules show under «Preferenze» as today).
 
 ## 6. Tests per level (with the mutation that proves each)
 
-- `__tests__/expenseProposal.test.ts` (AI-05's, extended): criteria 1–6. Mutations: as written there.
+- `__tests__/expenseProposal.test.ts` (PR #512's, extended): criteria 1–6. Mutations: as written there.
 - `__tests__/questionSet.test.ts` (in develop since 2026-11-08, extended): criterion 8's pure functions.
 - `__tests__/assistantQuestionBlocks.test.ts` (new): indexes, bodies, `kept`, problems. Mutation: the body cut at the
   first «```» inside a JSON string → the block with «```» in its text red.
 - `__tests__/assistantQuestionBlock.test.tsx` (new, RTL `render`/`screen`/`userEvent`): criterion 9.
-- `__tests__/expenseProposalCard.test.tsx` (AI-05's, extended): criteria 4, 6, 7, decision 65.
-- `__tests__/assistantRegisterContext.test.ts` (AI-05's, extended): criterion 11.
+- `__tests__/expenseProposalCard.test.tsx` (PR #512's, extended): criteria 4, 6, 7, decision 65.
+- `__tests__/assistantRegisterContext.test.ts` (PR #512's, extended): criterion 11.
 - `__tests__/assistantPromptBundle.test.ts` (the register describe, extended): criterion 10; the rules of a memory item
   printed in a month prompt too (`formatMemoryForPrompt` unchanged, decision 72).
 - `__tests__/assistantMemoryExtraction.test.ts` and `__tests__/assistantRoutes.test.ts` (the memoryExtraction mock gains
@@ -608,10 +625,11 @@ first when `opts.afterWrittenCard`, then the contextual and curated chips, dedup
 - `__tests__/assistantFollowUps.test.ts`: criterion 14. `__tests__/navUtils.test.ts`: criterion 13.
 - `__tests__/expenseCategoryService.test.ts`: `newSubCategoryId`. `__tests__/reactCompilerCoverage.test.ts`: green
   with the new files and `components/cashflow/CashflowPageClient.tsx`.
-- **E2E** (stream ALWAYS faked with `page.route`, decision 39; fixtures planted by Admin with `async function admin()`
-  as `e2e/assets.compravendita.spec.ts:41-45` @ b9411a4d, ids `e2e-reg-kinds-` / `e2e-reg-q-`, removed in `afterAll`; the
-  thread and the assistant message the fake `meta`/`done` events announce are planted in
-  `assistantThreads/{id}/messages/{id}`, so the PATCH finds them):
+- **E2E** (stream ALWAYS faked with `page.route`, decision 39; on the helper `e2e/assistantRegister.ts` of PR #512 —
+  `admin`, `plantExchange`, `installFakeStream`, `storedProposals`, `proposalBlock` —, whose fake writes the thread and
+  the two messages in `assistantThreads/{id}/messages/{id}` so the PATCH finds them; the new fixtures under the ids
+  `e2e-reg-kinds-` / `e2e-reg-q-`, which `removeFixture`'s `e2e-reg-` sweep must not be left to cover by accident: each
+  spec removes its own in `afterAll`):
   - `e2e/assistant.register.kinds.spec.ts` (new, 1440): «Conto A/B ornitorinco», «Casa ornitorinco» (`realestate`,
     150000 at price 1), «Mutuo ornitorinco» (`loan`, `quantity: 1000`, `debtInterestRate: 1.2`), «Svago ornitorinco»
     (variable, subcategory «Cinema»), a fee category set in `assetAllocationTargets` (saved and restored as
@@ -640,7 +658,7 @@ Expected outcome, declared first: the eight sentences of the header each end in 
 land as the dialog writes them, and the bridge appears where «Nuova Spesa» or «Aggiungi» stand.
 
 - **A — Invarianza**: `node -v` (24), `npx tsc --noEmit`, `npm run lint`, Vitest in `Europe/Rome` and under `TZ=UTC`,
-  AI-05's specs and every `e2e/cashflow.*.spec.ts` on the emulators (Java ≥ 21, app on :3100): the page split changes
+  PR #512's specs and every `e2e/cashflow.*.spec.ts` on the emulators (Java ≥ 21, app on :3100): the page split changes
   no behaviour.
 - **B — Cambio di contesto**: the emulators seeded, `dev:e2e` with the key of `.env.local`: the Cashflow page shows the
   bridge and Registra opens from it; a throwaway `__tests__/zz-emulator-register-block.test.ts` (`vi.mock('server-only')`,
@@ -674,14 +692,14 @@ categories, remembers rules; the Cashflow bridge`, PR to `develop`. No flag of i
 
 ## 9. Documentation
 
-- `doc/guide/assistente.md` (296 lines before AI-05, +24 here): § Assistente — a verdict over tiles, AI-05's sentence
-  «… a follow-up submits directly, except in Registra, where it prefills the composer» (`:246-247` @ ce26af4d as AI-05
-  leaves it) becomes «… a follow-up acts by its `action`: absent, the mode's behaviour (it submits, in Registra it
+- `doc/guide/assistente.md` (394 lines @ c62847ab, 406 after the retirement of 2026-11-11; over ~500 the session tells
+  the owner): § Assistente — a verdict over tiles, the sentence
+  «… a follow-up submits directly, except in Registra, where it prefills the composer» (`:260-261` @ c62847ab) becomes «… a follow-up acts by its `action`: absent, the mode's behaviour (it submits, in Registra it
   prefills the composer); `send` submits; `focus-composer` empties and focuses the composer («Registra un'altra», first
   after a written card)». § Files gains `lib/utils/assistantQuestionBlocks.ts` and
   `components/assistant/{AssistantQuestionBlock,MessageQuestionsContext}.tsx`; the E2E line of the header gains
-  `e2e/assistant.register.{kinds,question}.spec.ts` and `e2e/assistant.register.question.mobile.spec.ts`. AI-05's «##
-  Registra (2026-11)» gains: the four kinds and their fields, property transfers, the loan question and the unlinked
+  `e2e/assistant.register.{kinds,question}.spec.ts` and `e2e/assistant.register.question.mobile.spec.ts`. «##
+  Registra (2026-11)» (`:299` @ c62847ab) gains: the four kinds and their fields, property transfers, the loan question and the unlinked
   instalment, series from `canTypeRecur`, the fee from Impostazioni, new categories and their write order,
   the question protocol (one block, two at most, entity ids, one «Rispondi», the answer lines), the WHEN thresholds, the
   PATTERN/PRESTITI/IMMOBILI lines. § Streaming, threads, memory gains: «a categorisation rule is compared by exact text
@@ -707,10 +725,10 @@ categories, remembers rules; the Cashflow bridge`, PR to `develop`. No flag of i
   `e2e/cashflow.tracciamento.spec.ts:20` (all @ ce26af4d; 0 lines added).
 - `doc/guide/cashflow.md` (354 lines, +1): under the title, «the Assistente's card writes through the same services and
   the same field rules: every rule here holds there (2026-11)».
-- AGENTS.md (991 lines, +0): § Assistant · Assistente, AI-05's rewritten proposal-protocol bullet (`:478` @ ce26af4d)
+- AGENTS.md (974 lines @ c62847ab, +0): § Assistant · Assistente, the proposal-protocol bullet (`:480` @ c62847ab)
   gains the clause «; questions travel as ```assistant-question blocks, one per block, at most two, answered by ONE user
   message (2026-11)».
-- CLAUDE.md (+~170 characters, well under 20 000): Key Features › **Assistente AI**, AI-05's «… written by the browser on
+- CLAUDE.md (+~170 characters, well under 20 000): Key Features › **Assistente AI**, the sentence «… written by the browser on
   «Conferma», once.» becomes «… once; it asks the details with options, moves money onto accounts and houses, repays
   loans, repeats rows and proposes new categories.»; **Cashflow › Tracciamento** gains «; the bridge to Registra
   beside «Aggiungi» (2026-11)» before its guide pointer.
@@ -740,7 +758,7 @@ Leggi WORKFLOW.md, AGENTS.md (§ Assistant · Assistente, § Cashflow — expens
 § Commands), DESIGN.md § 5 «AI Surfaces» e The Question-Card Rule, doc/guide/assistente.md, doc/guide/cashflow.md
 (§ Expense Sign Convention and Type Changes: commissione, rata, estinzione, trasferimento su un immobile; § Recurring
 Series), doc/guide/cashflow-tracciamento.md, doc/guide/e2e-playwright.md, doc/guide/prima-schermata.md,
-doc/ai/README.md § 3-4-7-8, doc/ai/AI-06-registra-domande-memoria-ponte.md e i diff del colloquio (PR #509) e di AI-05 (in develop).
+doc/ai/README.md § 3-4-7-8, doc/ai/AI-06-registra-domande-memoria-ponte.md e i diff del colloquio (PR #509) e di Registra (PR #512).
 Implementa AI-06 così com'è scritta: lo schema esteso in expenseProposal.ts con il superRefine della § 4; il resolver
 con i conti per id e poi per nome fra conti e immobili, i prestiti, le regole del dialog e i «ignorato: …»; le
 categorie nuove scritte prima della riga; il protocollo ```assistant-question su questionSet.ts (parseQuestionsLenient
@@ -750,8 +768,8 @@ la frase dell'estrattore e supersedesCategorizationRule; la pagina Cashflow divi
 CashflowPageClient; il ponte in due punti con isAssistantBridgeShown; i follow-up.
 Test: le suite della § 6 in entrambe le zone (i test dei componenti in .test.tsx con React Testing Library), le spec
 Playwright della § 6 con lo stream SEMPRE finto e le asserzioni Admin sui dati, perf:budget, mobile:census e
-mobile:budget. Fermati e chiedimi se un contratto del colloquio (PR #509) o di AI-05 in develop non è quello della README § 7, o se una
-voce di mobile:budget si sposta. Collaudo: § 7, la fase F sul mirror al mio «pronto». Un branch, un commit, solo dopo
+mobile:budget. Fermati e chiedimi se un contratto del colloquio (PR #509) o di Registra (PR #512) non è quello della README § 7, se una
+voce di mobile:budget si sposta o se un tetto di perf:budget deve salire. Collaudo: § 7, la fase F sul mirror al mio «pronto». Un branch, un commit, solo dopo
 il mio OK sul riassunto del diff. SESSION_NOTES.md non si committa.
 ```
 

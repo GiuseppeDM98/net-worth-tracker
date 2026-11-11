@@ -84,48 +84,85 @@ interface FencedBlock {
   index: number;
   /** The offset just past the block's last character (its closing fence line, or the content's end). */
   end: number;
+  /** Behind a quote marker or a list marker: never ranked with the top-level blocks. */
+  nested: boolean;
 }
 
 // Up to three spaces of indentation, then three or more backticks or tildes, then the info string.
 const FENCE_LINE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
+// The same fence behind a quote marker (`> `) or a list marker (`- `, `1. `) on its line.
+const NESTED_FENCE_LINE = /^( {0,3}(?:>[ \t]?|(?:[-*+]|\d{1,9}[.)])[ \t]{1,4}))(`{3,}|~{3,})(.*)$/;
+const QUOTE_PREFIX = /^ {0,3}>[ \t]?/;
+
+interface OpenFence {
+  marker: string;
+  length: number;
+  block: FencedBlock;
+  /** A nested block's container: a quote ends at a line with no `>`, a list item at a line indented less than its content. */
+  container: { kind: 'quote' } | { kind: 'list'; indent: number } | null;
+}
 
 /**
- * The fenced blocks of a message, as CommonMark opens and closes them at the top level: an opening
- * fence is three or more backticks or tildes after at most three spaces, a block closes at a line
- * of the same character at least as long, or at the end of the content, and a fence line inside an
- * open block is content. A fence that follows `>` or a list marker on its line never matches: a
- * quoted or listed block is not a card (the prompt asks for blocks on lines of their own).
+ * The fenced blocks of a message, as CommonMark opens and closes them: an opening fence is three
+ * or more backticks or tildes after at most three spaces, a block closes at a line of the same
+ * character at least as long, or at the end of the content, and a fence line inside an open block
+ * is content. A fence that follows `>` or a list marker on its line opens a NESTED block, which
+ * closes at its fence or where its quote or list item ends: it is scanned so that its closing
+ * fence is never read as a top-level opening one, and it is never ranked with the top-level
+ * blocks (a quoted or listed expense block is not a card: the prompt asks for blocks on lines of
+ * their own).
  */
 function scanFencedBlocks(content: string): FencedBlock[] {
   const blocks: FencedBlock[] = [];
   const ranks = new Map<string, number>();
-  let open: { marker: string; length: number; block: FencedBlock } | null = null;
+  let open: OpenFence | null = null;
   let lineStart = 0;
 
   while (lineStart <= content.length) {
     const newline = content.indexOf('\n', lineStart);
     const lineEnd = newline === -1 ? content.length : newline;
-    const line = content.slice(lineStart, lineEnd).replace(/\r$/, '');
-    const match = FENCE_LINE.exec(line);
+    const raw = content.slice(lineStart, lineEnd).replace(/\r$/, '');
+
+    // A nested block ends, unclosed, where its container does; the line is then read afresh.
+    if (open?.container) {
+      const leaves =
+        open.container.kind === 'quote'
+          ? !QUOTE_PREFIX.test(raw)
+          : raw.trim() !== '' && raw.length - raw.trimStart().length < open.container.indent;
+      if (leaves) {
+        open.block.end = lineStart;
+        open = null;
+      }
+    }
 
     if (open) {
+      // Inside a container the fence is looked for past the container's own prefix.
+      const line =
+        open.container?.kind === 'quote' ? raw.replace(QUOTE_PREFIX, '') : open.container?.kind === 'list' ? raw.slice(open.container.indent) : raw;
+      const match = FENCE_LINE.exec(line);
       // A closing fence carries nothing after its run but spaces.
       const closes = match !== null && match[2][0] === open.marker && match[2].length >= open.length && match[3].trim() === '';
       if (closes) {
         open.block.end = lineEnd;
         open = null;
       }
-    } else if (match) {
-      const marker = match[2][0];
-      const info = match[3].trim();
-      // A backtick fence whose info string holds a backtick is inline code, not a fence.
-      if (marker !== '`' || !info.includes('`')) {
-        const language = info.split(/\s+/)[0] ?? '';
-        const index = ranks.get(language) ?? 0;
-        ranks.set(language, index + 1);
-        const block: FencedBlock = { language, offset: lineStart + match[1].length, index, end: content.length };
-        blocks.push(block);
-        open = { marker, length: match[2].length, block };
+    } else {
+      const top = FENCE_LINE.exec(raw);
+      const match = top ?? NESTED_FENCE_LINE.exec(raw);
+      if (match) {
+        const marker = match[2][0];
+        const info = match[3].trim();
+        // A backtick fence whose info string holds a backtick is inline code, not a fence.
+        if (marker !== '`' || !info.includes('`')) {
+          const language = info.split(/\s+/)[0] ?? '';
+          const nested = top === null;
+          const index = nested ? -1 : (ranks.get(language) ?? 0);
+          if (!nested) ranks.set(language, index + 1);
+          const block: FencedBlock = { language, offset: lineStart + match[1].length, index, end: content.length, nested };
+          blocks.push(block);
+          const container = !nested ? null : match[1].includes('>') ? ({ kind: 'quote' } as const) : ({ kind: 'list', indent: match[1].length } as const);
+          open = { marker, length: match[2].length, block, container };
+        }
       }
     }
 
@@ -136,13 +173,28 @@ function scanFencedBlocks(content: string): FencedBlock[] {
 }
 
 /**
- * Every fenced block of a message: its language, the offset of its opening fence, its rank among
- * its language's blocks. `offset` is the fence's first backtick or tilde — the offset
+ * Every top-level fenced block of a message: its language, the offset of its opening fence, its
+ * rank among its language's blocks. `offset` is the fence's first backtick or tilde — the offset
  * react-markdown's hast `pre` node carries in `position.start.offset` for that block, which is how
  * the renderer finds a block's rank without counting anything while it renders.
  */
 export function listFencedBlocks(content: string): { language: string; offset: number; index: number }[] {
-  return scanFencedBlocks(content).map(({ language, offset, index }) => ({ language, offset, index }));
+  return scanFencedBlocks(content)
+    .filter((block) => !block.nested)
+    .map(({ language, offset, index }) => ({ language, offset, index }));
+}
+
+/**
+ * The blocks of ONE language that sit behind a quote marker or a list marker, ranked AFTER that
+ * language's top-level blocks, in document order — so the top-level keys never move. For a card
+ * that must not turn into code because the model quoted or listed its block: the goal proposal,
+ * whose protocol never asked for a line of its own (2026-11-11). Derived from the text, so the
+ * keys are the same after a reload.
+ */
+export function listNestedFencedBlocks(content: string, language: string): { language: string; offset: number; index: number }[] {
+  const ofLanguage = scanFencedBlocks(content).filter((block) => block.language === language);
+  const topLevel = ofLanguage.filter((block) => !block.nested).length;
+  return ofLanguage.filter((block) => block.nested).map(({ offset }, rank) => ({ language, offset, index: topLevel + rank }));
 }
 
 /** The message without its fenced blocks (the thread list's preview): a JSON block is not a preview. */
@@ -150,6 +202,7 @@ export function stripFencedBlocks(content: string): string {
   let stripped = '';
   let cursor = 0;
   for (const block of scanFencedBlocks(content)) {
+    if (block.nested) continue;
     stripped += content.slice(cursor, block.offset);
     cursor = block.end;
   }

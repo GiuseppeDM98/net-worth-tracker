@@ -1120,6 +1120,9 @@ export const EXPENSE_BUDGET_EXCLUSION_CHIP = 'fuori budget';
 export const ROW_CREATED_TOAST = { expense: 'Spesa creata con successo', income: 'Entrata creata con successo' } as const;
 export const PROPOSAL_STATE_NOT_SAVED =
   'La riga è registrata, ma la card non lo ricorda: dopo un ricaricamento non confermarla di nuovo.';
+/** The goal card's twin (2026-11-11): the goal IS written, the outcome on the message is not. */
+export const GOAL_STATE_NOT_SAVED =
+  "L'obiettivo è scritto, ma la card non lo ricorda: dopo un ricaricamento non confermarla di nuovo.";
 
 /**
  * «Legata all'immobile» (owner, 2026-10-21): the house a row belongs to (`Expense.propertyAssetId`) —

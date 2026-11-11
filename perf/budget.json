@@ -21,8 +21,8 @@
       "raisedBy": "#497: KB gz misurati sulla stessa macchina, 707 → 720,4 (952fe509 +8, b08dff8a +2,8: Intestatari e quote) → 730 con zod 4.6.7 → 732,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assistant": {
-      "initialJsGzKB": 738,
-      "raisedBy": "feat/assistente-registra (2026-11-10): Registra — la card che scrive la riga con i servizi delle spese, il protocollo expense-proposal con zod, il contesto puro e le quattro letture: 712,9 → 737,6 KB gz sulla stessa macchina (perf:build), ExpenseDialog fuori dal primo caricamento; OK del proprietario 2026-11-10 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 740,
+      "raisedBy": "docs/ritiro-ai-05 (2026-11-11): i quattro fix a runtime del ritiro della spec di Registra (lo scanner dei blocchi citati o in elenco per la card obiettivo, il mese della riga salvata, il giorno riletto all'ingresso, l'avviso della card obiettivo): 737,6 → 738,1 KB gz (npm run build), tetto 738 → 740; OK del proprietario 2026-11-11. Prima: feat/assistente-registra (2026-11-10): Registra — la card che scrive la riga con i servizi delle spese, il protocollo expense-proposal con zod, il contesto puro e le quattro letture: 712,9 → 737,6 KB gz sulla stessa macchina (perf:build), ExpenseDialog fuori dal primo caricamento; OK del proprietario 2026-11-10 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/cashflow": {
       "initialJsGzKB": 786,

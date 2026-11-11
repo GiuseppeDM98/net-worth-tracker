@@ -208,10 +208,14 @@ describe('the Assistente page — in and out of Registra', () => {
     const user = userEvent.setup();
     renderPage();
     expect(screen.getByRole('tablist', { name: 'Periodo di analisi' })).not.toBeNull();
+    expect(screen.getAllByRole('heading', { name: 'Un periodo, una risposta' }).length).toBeGreaterThan(0);
 
     await user.click(registerAction());
 
     expect(screen.queryByRole('tablist', { name: 'Periodo di analisi' })).toBeNull();
+    // The header's title follows the mode (the owner's tour, 2026-11-11).
+    expect(screen.getAllByRole('heading', { name: 'Una frase, una riga' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('heading', { name: 'Un periodo, una risposta' })).toBeNull();
     expect(screen.getByText("Registra · l'Assistente conosce categorie, conti e le ultime righe")).not.toBeNull();
     // The verdict is computed, never the skeleton: the two categories and the one account read.
     const verdict = screen.getByRole('region', { name: 'Verdetto sul contesto' });
@@ -268,6 +272,24 @@ describe('the Assistente page — the day’s register thread', () => {
       </QueryClientProvider>,
     );
     expect(openedThreadIds.at(-1)).toBe('thread-today');
+  });
+
+  // Seen red on 2026-11-11 with the day read once, at mount: the page had been open since
+  // yesterday, «Registra» was pressed after midnight, and the sentence went into YESTERDAY's
+  // thread — the day is read again at every entry (one thread per Italian day).
+  it('reads the day when Registra is ENTERED: a page open since yesterday does not reopen yesterday’s thread', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-10T11:00:00Z'));
+      threadsMock.value = [{ ...todayThread(), id: 'thread-yesterday' }];
+      const user = userEvent.setup();
+      renderPage();
+      vi.setSystemTime(new Date('2026-11-11T11:00:00Z'));
+      await user.click(registerAction());
+      expect(openedThreadIds.at(-1)).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('never opens it outside Registra', () => {

@@ -191,7 +191,9 @@ describe('streamAssistantResponse — Registra (2026-11)', () => {
       registerBlock: 'BLOCCO REGISTRA',
       cashflowBlock: 'BLOCCO',
       preferences,
-      enableWebSearch: false,
+      // The flag is ON: Registra sends no tool even so (seen red on 2026-11-11 — until then this case
+      // passed `false`, and the spread alone could not send one in any mode).
+      enableWebSearch: true,
       onStatus: vi.fn(),
       onText: vi.fn(),
     });
@@ -201,7 +203,8 @@ describe('streamAssistantResponse — Registra (2026-11)', () => {
     expect(ASSISTANT_REGISTER_MAX_TOKENS).toBe(16000);
     expect(params.max_tokens).toBe(16000);
     expect(params.tools).toBeUndefined();
-    expect(JSON.stringify(params.system)).toContain(JSON.stringify(expected.system).slice(1, -1));
+    // The builder's `system`, whole: nothing before it, nothing after.
+    expect(params.system).toBe(expected.system);
     expect(JSON.stringify(params.messages)).toContain('BLOCCO REGISTRA');
     expect(JSON.stringify(params.system)).not.toContain('BLOCCO REGISTRA');
   });

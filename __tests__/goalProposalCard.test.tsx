@@ -29,6 +29,8 @@ vi.mock('sonner', () => ({ toast: { success: toastSuccessMock, error: toastError
 import { GoalProposalCard } from '@/components/assistant/GoalProposalCard';
 import { MessageIdProvider } from '@/components/assistant/MessageIdContext';
 import { AI_GENERATED_SURFACE_CLASS } from '@/lib/constants/aiAccent';
+import { GOAL_STATE_NOT_SAVED } from '@/lib/utils/dialogNarrative';
+import { PROPOSAL_INTERRUPTED_LINE } from '@/lib/utils/expenseProposal';
 import type { GoalProposal } from '@/lib/utils/goalProposal';
 import type { AssistantMessage, AssistantProposalState } from '@/types/assistant';
 
@@ -146,15 +148,33 @@ describe('GoalProposalCard — the outcome on the message', () => {
     expect(screen.getByRole('button', { name: 'Conferma' })).not.toBeNull();
   });
 
-  it('still works on a message that never received its server id: the goal is written, the outcome kept in the session', async () => {
-    // The goal card predates the persisted state: an interrupted answer must not take its buttons away.
+  // The two rules below are the expense card's (2026-11-11; until then the goal card kept its
+  // buttons on an interrupted answer and said nothing when the save failed, so a reload offered
+  // «Conferma» again on a goal already written). Each seen red on the code of before.
+  it('offers no button on a message that never received its server id: its outcome could not be saved', () => {
+    renderCard({ messageId: 'local-assistant-1' });
+    expect(screen.getByText(PROPOSAL_INTERRUPTED_LINE)).not.toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('warns when the goal is written but its outcome could not be saved', async () => {
     authenticatedFetchMock.mockImplementation(async (url: string) =>
       url === '/api/goals' ? { ok: true, json: async () => ({ goal: { id: 'goal-1' } }) } : { ok: false, json: async () => ({}) },
     );
     const user = userEvent.setup();
-    renderCard({ messageId: 'local-assistant-1' });
+    renderCard();
     await user.click(screen.getByRole('button', { name: 'Conferma' }));
-    await waitFor(() => expect(screen.getByText('Obiettivo creato')).not.toBeNull());
+    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith(GOAL_STATE_NOT_SAVED));
+    // The session still shows the outcome: the goal IS written.
+    expect(screen.getByText('Obiettivo creato')).not.toBeNull();
+  });
+
+  it('says nothing when an ignored proposal could not be saved: nothing was written', async () => {
+    authenticatedFetchMock.mockResolvedValue({ ok: false, json: async () => ({}) });
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole('button', { name: 'Ignora' }));
+    await waitFor(() => expect(authenticatedFetchMock).toHaveBeenCalledTimes(1));
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 });

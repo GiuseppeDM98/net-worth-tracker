@@ -289,6 +289,11 @@ describe('proposalPatchSchema (2026-11)', () => {
     expect(proposalPatchSchema.safeParse({ ...base, writtenIds: Array.from({ length: 61 }, (_, i) => `e${i}`) }).success).toBe(false);
     expect(proposalPatchSchema.safeParse({ ...base, key: 'question:0', status: 'answered', answer: 'Sì' }).success).toBe(true);
     expect(proposalPatchSchema.safeParse({ ...base, status: 'ignored', answer: 'Sì' }).success).toBe(false);
+    // The month of the row «Modifica» saved (2026-11-11): a real YYYY-MM, on a written row only.
+    expect(proposalPatchSchema.safeParse({ ...base, writtenIds: ['e1'], month: '2026-09' }).data).toMatchObject({ month: '2026-09' });
+    expect(proposalPatchSchema.safeParse({ ...base, month: '2026-13' }).success).toBe(false);
+    expect(proposalPatchSchema.safeParse({ ...base, month: '2026-9' }).success).toBe(false);
+    expect(proposalPatchSchema.safeParse({ ...base, status: 'ignored', month: '2026-09' }).success).toBe(false);
     expect(proposalPatchSchema.safeParse({ ...base, status: 'done' }).success).toBe(false);
   });
 });

@@ -59,10 +59,10 @@ non toccano `firestore.rules` né `firestore.indexes.json` (si deployano a mano,
 deploy --only firestore:rules` / `firestore:indexes`, SETUP.md: `grep -n
 "firestore:rules\|firestore:indexes" SETUP.md`) e non scrivono script di migrazione:
 `grep -n -i -E "firestore\.rules|firestore\.indexes|migrat" doc/ai/*.md` dava il 2026-11-02
-una sola riga, AI-05:335, sulla card degli obiettivi che «migra» al meccanismo nuovo — non
+una sola riga, nella spec di Registra (ritirata il 2026-11-11; `:335` @ c62847ab), sulla card degli obiettivi che «migra» al meccanismo nuovo — non
 è DDL. Lo si prova con `git diff <base>..<merge> -- firestore.rules firestore.indexes.json`
 vuoto. Dove una spec scrive CAMPI NUOVI su documenti esistenti — il colloquio (PR #509) `interview` e
-`revisionInterview` su `allocationAdvice/{uid}`, AI-05 `proposals` sul messaggio del
+`revisionInterview` su `allocationAdvice/{uid}`, Registra (PR #512) `proposals` sul messaggio del
 thread, AI-06 le regole di categorizzazione come item `preference` della memoria (la
 vecchia `archived`) — il segnale non è un DDL ma il documento scritto dall'emulatore nel
 collaudo (la fase D della spec: il test usa-e-getta `__tests__/zz-emulator-*.test.ts` con

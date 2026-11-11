@@ -102,6 +102,9 @@ export type GoalWriteAssignment = z.infer<typeof goalWriteAssignmentSchema>;
  * code in that case: a model that got the format wrong must degrade to showing what it
  * wrote, never to a crashed message thread.
  */
+/** Language of the fenced block that turns into a goal proposal card. */
+export const GOAL_PROPOSAL_LANGUAGE = 'goal-proposal';
+
 export function parseGoalProposal(raw: string): GoalProposal | null {
   let parsed: unknown;
 

@@ -2,7 +2,7 @@
 
 > **When to open this guide** — whoever touches `app/dashboard/assistant/*`, `components/assistant/*`,
 > `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`,
-> `lib/utils/{assistantNarrative,assistantPeriodOptions,cashflowBlock,expenseBreakdown,goalProposal}.ts`,
+> `lib/utils/{assistantNarrative,assistantPeriodOptions,assistantRegisterContext,assistantStreamBuffer,cashflowBlock,expenseBreakdown,expenseProposal,goalProposal}.ts`,
 > `lib/hooks/useAssistantStreaming.ts`, `app/api/ai/assistant/*`, `app/api/goals/route.ts`. In
 > `AGENTS.md` the stub with the essentials stays; here is the full rule. Modules and files: § *Files* below.
 > E2E: `e2e/assistant.register.spec.ts` and `e2e/assistant.register.mobile.spec.ts` (Registra, the stream always
@@ -56,7 +56,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Every builder takes the CASHFLOW 12 MESI block** (2026-11; every surface since decision 81, 2026-11-07): the
   four analyses as their fifth argument, printed after the numeric block and before «Domanda dell'utente»; the chat
   as its seventh, right before «Richiesta utente» with or without a period; `buildEmailAiPrompt` as its sixth, at
-  the end of the user turn; `generateWeeklyBudgetComment` as its second, under the budgets; the Consulente's
+  the end of the user turn; `generateWeeklyBudgetComment` as its second, under the budgets; `buildRegisterPrompt` as its fifth
+  (`string | null`), after the register block and right before «Richiesta utente»; the Consulente's
   strategy after its data block (doc/guide/consulente.md § The run). ONE note over it everywhere
   (`formatCashflowBlockSection`): the block is the whole recorded history whatever the period, a
   period's figures stay its bundle's. `system` is the same with or without it. The route, the periodic comment and
@@ -235,7 +236,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   for both the block and the route body (client-safe, since the card validates before rendering). In zod 4 use
   **`z.partialRecord`** for `recommendedAllocation` — `z.record` with an enum key demands every key.
 - **Intercept the block on `pre`, not on `code`** (a card inside `<pre>` is invalid nesting), and a malformed payload
-  MUST fall through to a normal code block — the user still sees what the model wrote. `GoalProposalCard` reads owner,
+  MUST fall through to a normal code block — the user still sees what the model wrote. A goal block the model put
+  inside a quote or behind a list marker is still a card, keyed AFTER the top-level ones (`listNestedFencedBlocks`,
+  2026-11-11: the keys derived from the message had turned it into code; an expense block there stays code — its
+  prompt asks for lines of its own). `GoalProposalCard` reads owner,
   demo mode and query client itself because `MARKDOWN_COMPONENTS` has to stay module-level.
 
 ## Assistente — a verdict over tiles (`components/assistant/AssistantPageClient.tsx`, `components/assistant/tiles/*`, `lib/utils/assistantNarrative.ts`)
@@ -311,7 +315,8 @@ never writes it twice. Expenses and income only — transfers, instalments and s
   centres and the members — all BY ID, uncapped — and the rows of the window from the first Italian day of the month
   eleven months back to the end of today, newest first, a recurring series as ONE row with its count, cut at 300 with
   the cut printed. **IL MESE** has two sources: the totals are the Panoramica's server summary (`getDashboardOverview`),
-  the spending by type and the budget lines (20 at most, printed) come from the window's rows through the Budget's pure
+  the spending by type and the budget lines (20 at most, printed; a budget on a type under the type's label, «Spese
+  Necessarie») come from the window's rows through the Budget's pure
   level. The two reads of the month are settled apart: a failed one prints its sentence, the core reads failing is a 500
   before any event. The CASHFLOW 12 MESI block follows, as in every mode.
 - **The protocol** lives ONLY in `buildRegisterPrompt` (`REGISTER_CONTRACT`; `ASSISTANT_SYSTEM_CORE` is untouched and the
@@ -324,10 +329,14 @@ never writes it twice. Expenses and income only — transfers, instalments and s
   «Conferma», never «Modifica»; a failed read closes all writing. States (`describeExpenseProposalState`): idle ·
   saving (the first click closes the button: a double click writes one row) · «Registrata · apri in Cashflow»
   (`/dashboard/cashflow?tab=tracking&month=YYYY-MM&row=<id>`: the ROW's month and the row itself, on which Tracciamento
-  lands — doc/guide/cashflow-tracciamento.md § Files) · «Ignorata» · «Risposta interrotta: chiedi di
-  riproporla» on a message whose id is still `local-` (no buttons). The focus moves to the outcome line; no new live region.
+  lands — doc/guide/cashflow-tracciamento.md § Files; the month is the one the row was SAVED in, kept on the outcome
+  as `month` when «Modifica» moved the date out of the proposal's, 2026-11-11) · «Ignorata» · «Risposta interrotta: chiedi di
+  riproporla» on a message whose id is still `local-` (no buttons). The focus moves to the outcome line; no new live region
+  but the write error's (`role="alert"`). The three 44px buttons wrap (`flex-wrap`, held by `expenseProposalCard`'s
+  «offers three 44px buttons that wrap»).
 - **The write** is the expense form's create path, in the browser: `createExpenseSettledOnDate` → `applyDebtRepayments` →
-  `applyBalanceEffects` (a future date is a pending row, the balance moves on its day), then four invalidations
+  `applyBalanceEffects` (a future date is a pending row, the balance moves on its day — the card says
+  when only if the row has an account), then four invalidations
   (`expenses.all`, `assets.all`, `dashboard.overview`, `costCenters.all`). No server route writes a row. «Modifica»
   opens `ExpenseDialog` on the proposal (`initialValues`, lazy — `lazyComponent`, preloaded on hover and focus) and the
   row the form saves is the card's outcome.
@@ -335,12 +344,15 @@ never writes it twice. Expenses and income only — transfers, instalments and s
   `PATCH /api/ai/assistant/threads/[threadId]/messages/[messageId]` (`update` with a `FieldPath`, never a merge), after
   it was written into the stream buffer and the cached thread (`recordProposal`: the buffer wins until a thread switch).
   The stream's `done` carries the assistant message's id, adopted by the buffer (`adoptStreamMessageId`). The goal card
-  uses the same path (`goal:N`).
+  uses the same path (`goal:N`) and, since 2026-11-11, the same two rules: no button on a `local-` message, and a
+  toast when the save fails after the write (`GOAL_STATE_NOT_SAVED`, beside `PROPOSAL_STATE_NOT_SAVED`). An outcome
+  never scrolls the conversation (`conversationScrollSignal`, held in the browser by the two-card spec).
 - **The way in and out**: the pencil in the header («Registra una spesa o un'entrata», off in demo and while streaming)
   or `?mode=registra`, once the thread list has resolved; the strip «Registra · l'Assistente conosce categorie, conti e
   le ultime righe» stands where the period axis was (and the header's title reads «Una frase, una riga» instead of «Un periodo, una risposta», 2026-11-11), with «Torna all'analisi» — which leaves the thread FIRST (the mode
   alone would send the next question into it) and drops the param. The thread is one per Italian day, «Registrazioni ·
-  1 nov 2026» (`buildThreadTitleFromPrompt`, `findRegisterThread`); entering reopens today's. **With no thread picked, the
+  1 nov 2026» (`buildThreadTitleFromPrompt`, `findRegisterThread`); entering reopens today's — the day is read at
+  the ENTRY (`enterRegister`), never once at mount: a page open since yesterday reopened yesterday's thread (2026-11-11). **With no thread picked, the
   day's thread IS the open one, derived in render** (`selectedThreadId = pickedThreadId ?? the day's`, 2026-11-11): on the
   owner's tour a sentence sent after the browser's Back from Cashflow opened a SECOND «Registrazioni» of the same day —
   the mode had been entered while the list did not hold the thread, and a lookup made once at the entry never looked
@@ -387,7 +399,7 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
   apart from the period's own read — a period's rows are read twice, and the read grows with the history. Accepted:
   one Admin query per message, off the browser; the block is never cached across messages, so a row confirmed a
   minute ago is in the next answer.
-- **A card's outcome is saved on its message** (2026-11): a reload shows «Obiettivo creato» / «Registrata». The one window left: a PATCH that fails after a successful write (the toast says so); a reload then shows the card idle. A thread refetch landing between the local record and the PATCH can also drop the outcome from the cache — the stream buffer still shows it for the session.
+- **A card's outcome is saved on its message** (2026-11): a reload shows «Obiettivo creato» / «Registrata». The one window left: a PATCH that fails after a successful write (the toast of either card says so); a reload then shows the card idle. A thread refetch landing between the local record and the PATCH can also drop the outcome from the cache — the stream buffer still shows it for the session.
 - **A Registra day past 100 messages shows its oldest 100** (`getAssistantThreadDetail` reads `orderBy createdAt asc, limit 100`), and the history is cut from those.
 - **A row written from Registra carries no mark**: in Tracciamento it is a row like any other.
 - **IL MESE's totals are as fresh as the Panoramica's summary** (2026-11): the first line is the server summary, the lines under it are computed from the rows read for the message; a row written outside the app's services (an Admin write, a restore) leaves the two apart until the summary is rebuilt — seen on the emulator after a spec's Admin deletes.

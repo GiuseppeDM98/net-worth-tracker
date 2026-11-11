@@ -544,7 +544,7 @@ file used to carry.
 - A new setting lands in all five or it silently disappears: the type (`types/assets.ts`), `getSettings`, BOTH write
   chains in `setSettings`, the wiring where its own Save lives — and `settingsRoundTrip`'s `STORED_SETTINGS` fixture.
 - SIXTH place for anything the SERVER reads (`lib/services/dashboardOverviewService.ts`), SEVENTH for the periodic
-  emails (`getSettingsAdmin`); neither is covered by the round-trip.
+  emails (`getSettingsAdmin`), EIGHTH for the Assistente (`fetchSettings`); none is covered by the round-trip.
 - A user-clearable field is guarded by `'x' in settings`, never `x !== undefined`. Only a hard refresh proves a
   setting was saved; one Save per page; booleans stored, never derived.
 - Il resto — il ramo `targets` senza merge, `deleteField()`, lo snapshot dirty che segue il tab che MODIFICA, i quattro

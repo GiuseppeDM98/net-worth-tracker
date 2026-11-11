@@ -104,6 +104,9 @@ test('two rows in one sentence are two cards with two outcomes, and a reload on 
         'Ti propongo due righe.',
         proposalBlock({ amount: 100, note: 'Coop' }),
         proposalBlock({ amount: 20, type: 'fixed', categoryId: HEALTH_ID, subCategoryId: HEALTH_SUB_ID, reason: 'La farmacia è Salute.' }),
+        // A tail long enough to put the conversation's end below the fold: an outcome that scrolled
+        // to it would move the page (below).
+        ...Array.from({ length: 30 }, (_, index) => `Nota ${index + 1} in coda alla risposta.`),
       ].join('\n\n'),
   );
   await openAssistant(page);
@@ -117,6 +120,15 @@ test('two rows in one sentence are two cards with two outcomes, and a reload on 
   await expect(second).toContainText(/Spesa · 20,00\s€ · Salute › Farmacia · oggi · Conto principale/);
   await expect(page.locator('main [data-generated]')).toHaveCount(3);
 
+  // An outcome never moves the page (seen red on 2026-11-11 with the scroll keyed on the messages
+  // themselves): the cards are brought up, away from the conversation's end, and stay where they are.
+  await expect(page.getByText('Nota 30 in coda alla risposta.')).toBeInViewport({ timeout: 30_000 });
+  await first.scrollIntoViewIfNeeded();
+  await expect(page.getByText('Nota 30 in coda alla risposta.')).not.toBeInViewport();
+  const firstTop = async () => Math.round((await first.boundingBox())!.y);
+  await expect.poll(async () => { const a = await firstTop(); await page.waitForTimeout(250); return (await firstTop()) === a; }).toBe(true);
+  const topBefore = await firstTop();
+
   const confirmed = outcomeSaved(page);
   await first.getByRole('button', { name: 'Conferma' }).click();
   await expect(first.getByText('Registrata')).toBeVisible({ timeout: 30_000 });
@@ -127,6 +139,10 @@ test('two rows in one sentence are two cards with two outcomes, and a reload on 
   await second.getByRole('button', { name: 'Ignora' }).click();
   await expect(second.getByText('Ignorata')).toBeVisible();
   expect((await ignored).status()).toBe(200);
+  // Long enough for a smooth scroll to have started and ended.
+  await page.waitForTimeout(1200);
+  expect(await firstTop()).toBe(topBefore);
+  await expect(page.getByText('Nota 30 in coda alla risposta.')).not.toBeInViewport();
 
   const db = await admin();
   const rows = await writtenRows(db);

@@ -148,7 +148,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `getSettings`. `settingsRoundTrip` does not cover it — check it by hand. **And a SEVENTH for anything the periodic
   emails read**: `getSettingsAdmin` in `lib/server/monthlyEmailService.ts` is a third independent re-listing, narrow by
   default (it used to carry only the email fields). `familyMembers` was missing from BOTH server mappers until
-  2026-08-31 and there is no type error for it — an absent field is simply `undefined` server-side.
+  2026-08-31 and there is no type error for it — an absent field is simply `undefined` server-side. **And an EIGHTH
+  for the Assistente**: `fetchSettings` in `lib/services/assistantMonthContextService.ts`, narrow too (each new reader
+  adds its fields; Registra added its own in 2026-11).
   `pensionReturnStartMonth` joined it on 2026-10-14 (the email names the month's pension contributions only from
   there, doc/guide/email-pdf.md).
 - **Store a boolean explicitly, never derive it** from other fields. All feature toggles live in
@@ -177,8 +179,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   does not read a reorder as an edit); read only by the path (no server mapper). Pinned by `settingsRoundTrip` and
   `settingsDraft` (both fixtures carry it).
 - **«Commissioni bancarie»** (Spese, 2026-09-25 as «Commissioni sui trasferimenti»; the fee of ANY row since 2026-10-10, doc/guide/cashflow.md — the keys keep their name): `transferFeeCategoryId` / `transferFeeSubCategoryId`, both
-  user-clearable (`'x' in settings` in both `setSettings` branches), in the `spese` snapshot, read ONLY by the expense
-  form (no server mapper). The Select lists the spending categories grouped by type — the fee row takes the category's
+  user-clearable (`'x' in settings` in both `setSettings` branches), in the `spese` snapshot, read by the expense
+  form and, since 2026-11, mapped by the Assistente's `fetchSettings` (the eighth place above) for Registra. The Select lists the spending categories grouped by type — the fee row takes the category's
   type. `e2e/cashflow.transfer-fee.spec.ts` is the one spec that WRITES this page's settings: it picks the category,
   presses «Salva», reloads, and restores the WHOLE settings document in `afterAll`: «Salva» rewrites every field the page
   holds, and on the base seed it drops the allocation sub-targets (the seed's shape is not the page's), so restoring the

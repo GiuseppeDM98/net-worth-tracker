@@ -14,7 +14,7 @@ import { MessageIdProvider, useMessageBlocks } from '@/components/assistant/Mess
 import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS, AI_GENERATED_EYEBROW_CLASS } from '@/lib/constants/aiAccent';
 import { EXPENSE_PROPOSAL_LANGUAGE, EXPENSE_PROPOSALS_MAX_PER_MESSAGE, parseExpenseProposal } from '@/lib/utils/expenseProposal';
 import { formatDate } from '@/lib/utils/formatters';
-import { parseGoalProposal } from '@/lib/utils/goalProposal';
+import { GOAL_PROPOSAL_LANGUAGE, parseGoalProposal } from '@/lib/utils/goalProposal';
 import { cn } from '@/lib/utils';
 
 interface AssistantStreamingResponseProps {
@@ -36,9 +36,6 @@ interface AssistantStreamingResponseProps {
   /** Records a card's outcome on its message (`useAssistantStreaming().recordProposal`). */
   recordProposal: (messageId: string, threadId: string, key: string, state: Omit<AssistantProposalState, 'at'>) => void;
 }
-
-/** Language of the fenced block that turns into a goal proposal card. */
-const GOAL_PROPOSAL_LANGUAGE = 'goal-proposal';
 
 /**
  * Flattens the children of a `<code>` node back into its raw source text.
@@ -69,7 +66,9 @@ function extractCodeText(node: React.ReactNode): string {
  * hast node carries the source offset of its fence, and the message's own list of blocks
  * (`useMessageBlocks`, lib/utils/expenseProposal.ts → listFencedBlocks) gives the rank of the
  * block at that offset among its language's — the card's key on the message, the same after a
- * reload. A block the list does not hold (inside a quote or a list item) is code.
+ * reload. A block the list does not hold is code: an expense block inside a quote or a list item
+ * (its prompt asks for lines of its own); a goal block there is still listed, after the top-level
+ * ones — until 2026-11 any ```goal-proposal was a card, and its protocol never asked otherwise.
  *
  * Anything that fails to parse — malformed JSON, a missing field, an allocation that does not
  * total 100 — falls through to the code block: the user still sees exactly what the model wrote.

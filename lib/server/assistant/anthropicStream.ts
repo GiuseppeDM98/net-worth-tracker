@@ -237,7 +237,9 @@ export async function streamAssistantResponse({
       system: system,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'high' },
-      ...(enableWebSearch
+      // Registra never searches the web: the policy already answers false for it, and the request
+      // itself sends no tool whatever flag reaches it (2026-11-11).
+      ...(enableWebSearch && mode !== 'register'
         ? {
             tools: [
               {
