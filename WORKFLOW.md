@@ -312,7 +312,7 @@ The app **is** locally runnable; there is no fallback to declare.
   `storageState` per fixture account (`e2e/.auth/<account>.json`, minted by the six `auth*.setup.ts`
   projects), so a script does not have to reproduce the login: `npx playwright test --project=<name>`,
   one of the fourteen projects of `playwright.config.ts` (SETUP.md § What it covers; the full table in
-  doc/guide/e2e-emulatori.md). A throwaway spec
+  doc/guide/e2e-playwright.md). A throwaway spec
   must match that project's `testMatch` to be collected, and must be deleted at the end.
 - **Automated suites are yours to run, always**: `npx tsc --noEmit`, `TZ=Europe/Rome npx vitest run`
   and `npx playwright test`.
@@ -321,7 +321,7 @@ The app **is** locally runnable; there is no fallback to declare.
   without that header the call is silently filtered to an empty result, which looks exactly like
   "there are no documents" — or from the API route's own response, or from the emulator UI on
   `http://127.0.0.1:4000`. Arithmetic belongs to Vitest; the browser is for what only a browser
-  knows (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+  knows (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
 - **Prove the check can fail.** Break the thing under test on purpose once and watch the assertion
   go red. A green check that has never been seen red is indistinguishable from one asserting
   nothing. **When it stays green, the sentence that motivated the test was wrong, not the test**
@@ -333,7 +333,7 @@ The app **is** locally runnable; there is no fallback to declare.
 - **Phase G**: prefer deleting the few documents you created (`curl -X DELETE` with the same
   `Bearer owner` header) over wiping `.emulator-data/`, which throws away the shared seed. A
   document with side effects — a transaction or trade, whose deletion re-runs the replay — is
-  deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+  deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
 - **A mock page published as an Artifact inherits the host skeleton's `body{color:#000}`** (2026-11-06, the concept
   pages of AI-01): the Artifact host prepends `:root{color-scheme:light} body{background:#fff;color:#000}` and nests the
   page inside its body, so a text colour declared on `html` is overridden for every descendant and a dark page shows

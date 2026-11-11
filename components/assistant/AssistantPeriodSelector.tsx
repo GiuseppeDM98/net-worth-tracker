@@ -24,6 +24,7 @@ interface AssistantPeriodSelectorProps {
 // One axis, one place. The five tabs are periods — "Libera" is the former Chat
 // mode, i.e. a question with no period attached by default. Mode values stay on
 // the backend contract unchanged; only the control is the shared SegmentedPill.
+// Registra is a mode with no period and is NOT a tab: the page swaps this whole axis for its strip.
 const PERIOD_TABS: { value: AssistantMode; label: string }[] = [
   { value: 'month_analysis', label: 'Mese' },
   { value: 'year_analysis', label: 'Anno' },

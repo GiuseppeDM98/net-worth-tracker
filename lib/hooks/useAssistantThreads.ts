@@ -26,6 +26,14 @@ function normalizeThreadDetail(threadResponse: AssistantThreadResponse): Assista
     messages: threadResponse.messages.map((message) => ({
       ...message,
       createdAt: toDate(message.createdAt),
+      // The cards' outcomes cross the wire as JSON: each `at` back to a Date.
+      ...(message.proposals
+        ? {
+            proposals: Object.fromEntries(
+              Object.entries(message.proposals).map(([key, state]) => [key, { ...state, at: toDate(state.at) }]),
+            ),
+          }
+        : {}),
     })),
   };
 }

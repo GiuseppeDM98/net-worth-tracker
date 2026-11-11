@@ -6,6 +6,7 @@ import {
   buildChatPrompt,
   buildHistoryAnalysisPrompt,
   buildMonthAnalysisPrompt,
+  buildRegisterPrompt,
   buildYearAnalysisPrompt,
   buildYtdAnalysisPrompt,
 } from './prompts';
@@ -20,6 +21,9 @@ const anthropic = new Anthropic({
  */
 export const ASSISTANT_CHAT_MAX_TOKENS = 64000;
 export const ASSISTANT_STRUCTURED_MAX_TOKENS = 32000;
+// Registra (2026-11): a sentence and up to five small JSON blocks, with room to reason on the
+// category — far below the chat's budget, so adaptive thinking cannot linger on a receipt.
+export const ASSISTANT_REGISTER_MAX_TOKENS = 16000;
 
 interface StreamAssistantResponseArgs {
   mode: AssistantMode;
@@ -31,6 +35,8 @@ interface StreamAssistantResponseArgs {
   todayContext?: AssistantTodayContext | null;
   // The CASHFLOW 12 MESI block, read by the route for every mode (decision 81, 2026-11-07).
   cashflowBlock?: string | null;
+  // Registra only: the register block (lib/utils/assistantRegisterContext.ts), built by the route.
+  registerBlock?: string | null;
   month?: AssistantMonthSelectorValue | null;
   preferences: AssistantPreferences;
   // Active memory items for this user, injected into the prompt so Claude can
@@ -64,8 +70,14 @@ function buildPrompt(
   preferences: AssistantPreferences,
   memoryItems: AssistantMemoryItem[] = [],
   todayContext: AssistantTodayContext | null = null,
-  cashflowBlock: string | null = null
+  cashflowBlock: string | null = null,
+  registerBlock: string | null = null
 ): AssistantPromptParts {
+  // Registra first: it has no bundle and must never fall through to the chat builder.
+  if (mode === 'register') {
+    return buildRegisterPrompt(prompt, preferences, memoryItems, registerBlock ?? '', cashflowBlock);
+  }
+
   const MONTH_NAMES = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
@@ -115,7 +127,7 @@ function buildMessagesArray(
   history: AssistantMessage[]
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
   const isStructured = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
-  // Structured modes cap at 3 pairs (6 msgs); chat allows 10 pairs (20 msgs).
+  // Structured modes cap at 3 pairs (6 msgs); chat and Registra allow 10 pairs (20 msgs).
   const maxMessages = isStructured ? 6 : 20;
 
   const trimmedHistory = history
@@ -178,6 +190,7 @@ export async function streamAssistantResponse({
   contextBundle,
   todayContext = null,
   cashflowBlock = null,
+  registerBlock = null,
   month,
   preferences,
   memoryItems = [],
@@ -208,8 +221,8 @@ export async function streamAssistantResponse({
     // billed and adds latency. Both values sit inside the model's 128K output limit; the
     // route declares `maxDuration = 300` so a long answer is not cut by the platform.
     const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
-    const chatMaxTokens = ASSISTANT_CHAT_MAX_TOKENS;
-    const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, todayContext, cashflowBlock);
+    const chatMaxTokens = mode === 'register' ? ASSISTANT_REGISTER_MAX_TOKENS : ASSISTANT_CHAT_MAX_TOKENS;
+    const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, todayContext, cashflowBlock, registerBlock);
     const stream = await anthropic.beta.messages.create({
       model: ASSISTANT_MODEL,
       // A policy decline is re-run on the fallback model inside this stream (aiModels.ts). The

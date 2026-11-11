@@ -1673,3 +1673,10 @@ describe('buildExpenseSplitTile', () => {
     expect(plain(gross)).not.toContain('da dividere');
   });
 });
+
+describe('buildEmailAiPrompt — the Registra protocol stays out (2026-11)', () => {
+  it('carries no proposal contract: the email never proposes a row', () => {
+    const { system } = buildEmailAiPrompt(makeMonthlyData(), makeComparison(), makeBundle(), makePreferences(), []);
+    expect(system).not.toContain('expense-proposal');
+  });
+});

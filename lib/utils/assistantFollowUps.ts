@@ -82,6 +82,20 @@ const CURATED_FOLLOW_UPS: Record<AssistantMode, AssistantFollowUp[]> = {
       prompt: 'Sulla base di quanto abbiamo discusso, quali azioni concrete e prioritarie mi consigli?',
     },
   ],
+  // Registra: the row PREFILLS the composer with the start of a sentence instead of sending it —
+  // a prompt with no amount would only make the model ask for one.
+  register: [
+    {
+      id: 'register-expense-today',
+      label: 'Registra una spesa di oggi',
+      prompt: 'Oggi ho speso ',
+    },
+    {
+      id: 'register-salary',
+      label: 'Registra lo stipendio',
+      prompt: 'Ho ricevuto lo stipendio di ',
+    },
+  ],
 };
 
 /**

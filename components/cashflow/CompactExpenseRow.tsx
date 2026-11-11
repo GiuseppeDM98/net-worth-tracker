@@ -26,6 +26,8 @@ export interface CompactExpenseRowProps {
    * a phone (`TransactionFeed.focusRowId`): the modal that saved it hands the focus back here.
    */
   buttonRef?: Ref<HTMLButtonElement>;
+  /** The row a link landed on: it wears the focus ring, since a focus given by code after a click draws none. */
+  marked?: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export function CompactExpenseRow({
   scheduled = false,
   ownerLabel = null,
   buttonRef,
+  marked = false,
 }: Readonly<CompactExpenseRowProps>) {
   const isIncome = expense.type === 'income';
   const isTransfer = expense.type === 'transfer';
@@ -64,7 +67,11 @@ export function CompactExpenseRow({
       ref={buttonRef}
       type="button"
       data-expense-id={expense.id}
-      className="w-full flex items-center gap-3 text-left py-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      data-linked-row={marked ? 'true' : undefined}
+      className={cn(
+        'w-full flex items-center gap-3 text-left py-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        marked && 'ring-2 ring-ring',
+      )}
       onClick={() => onSelect(expense)}
       aria-label={`${title}, ${amountLabel}`}
     >

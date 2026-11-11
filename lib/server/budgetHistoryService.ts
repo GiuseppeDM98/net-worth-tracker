@@ -12,22 +12,12 @@
 import { adminDb } from '@/lib/firebase/admin';
 import type { BudgetItem } from '@/types/budget';
 import { buildBudgetHistoryRecord } from '@/lib/utils/budgetHistory';
+import { normalizeBudgetItem } from '@/lib/utils/budgetUtils';
 
 export interface BudgetHistoryCaptureResult {
   captured: number;
   skipped: number;
   errors: number;
-}
-
-/** Back-fills kind/period/amount for budget items saved before those fields existed (same as the emails). */
-function normalizeItem(raw: BudgetItem & { monthlyAmount?: number }): BudgetItem {
-  const kind =
-    raw.kind === 'expense' || raw.kind === 'income'
-      ? raw.kind
-      : raw.scope === 'type' && raw.expenseType === 'income'
-        ? 'income'
-        : 'expense';
-  return { ...raw, kind, period: raw.period ?? 'monthly', amount: raw.amount ?? raw.monthlyAmount ?? 0 };
 }
 
 /**
@@ -47,7 +37,7 @@ export async function captureBudgetHistory(now: Date, demoUserId?: string): Prom
     }
     try {
       const data = doc.data() ?? {};
-      const items = ((data.items ?? []) as Array<BudgetItem & { monthlyAmount?: number }>).map(normalizeItem);
+      const items = ((data.items ?? []) as Array<BudgetItem & { monthlyAmount?: number }>).map(normalizeBudgetItem);
       const record = buildBudgetHistoryRecord(
         userId,
         {

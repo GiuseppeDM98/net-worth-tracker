@@ -53,6 +53,11 @@ export async function GET(request: NextRequest) {
     // enforcement only ever worked via the throw propagating past this dead wrapper.
     await assertCanAccessAccount(decodedToken, userId);
 
+    // Registra has no period, so no bundle: an explicit 400, never the month fallback below.
+    if (mode === 'register') {
+      return NextResponse.json({ error: 'La modalità Registra non ha un contesto di periodo' }, { status: 400 });
+    }
+
     // includeDummySnapshots (test accounts): from the request when the page sent it, else from
     // the stored preferences. That read is non-fatal — it falls back to the safe defaults.
     const includeDummyParam = searchParams.get('includeDummy');

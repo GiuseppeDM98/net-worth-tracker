@@ -667,7 +667,7 @@ backtick or tilde — the offset react-markdown's hast `pre` node carries in `po
 - **Shared account** — a co-owner writes with `ownerId`, as the dialog does (the rules and `assertCanAccessAccount`
   admit a member); the PATCH sends the `ownerId` the stream sends (`useAssistantStreaming.ts:48` @ ce26af4d) and
   `getAssistantThread` refuses a thread of another account; the memory items land where they land today.
-- **E2E** (decision 39, `doc/guide/e2e-emulatori.md`) — the page needs `ANTHROPIC_API_KEY` from `.env.local` in the
+- **E2E** (decision 39, `doc/guide/e2e-playwright.md`) — the page needs `ANTHROPIC_API_KEY` from `.env.local` in the
   `dev:e2e` server to render the composer; `page.route('**/api/ai/assistant/stream', …)` fulfils every stream with a
   fake SSE body (`meta` with the planted thread id, `register` with a summary of 4 recent rows, one `text` event with
   the planted message's content, `done` with the planted message id), so the key is never spent; the spec plants
@@ -833,7 +833,7 @@ already gates the page; no new flag.
 Leggi WORKFLOW.md, AGENTS.md (§ Assistant · Assistente, § Cashflow — expense mechanics, § React Query and Derived
 State, § React Compiler and the hooks rules, § Accessibility, § Commands, § Dialog Form Reset, § Two-Step Create
 Dialogs), DESIGN.md § 5 «AI Surfaces», doc/guide/assistente.md, doc/guide/cashflow.md,
-doc/guide/cashflow-tracciamento.md, doc/guide/dialog.md, doc/guide/e2e-emulatori.md, doc/ai/README.md § 3-4-7,
+doc/guide/cashflow-tracciamento.md, doc/guide/dialog.md, doc/guide/e2e-playwright.md, doc/ai/README.md § 3-4-7,
 doc/ai/AI-05-assistente-registra.md, le scene dell'Assistente in doc/ai/reference/concept-b.html e il diff di AI-03 (in develop). Node 24
 (`node -v`). Implementa AI-05 così com'è scritta: la modalità `register` in OGNI punto del nuovo commento WARNING di
 types/assistant.ts; lo zod sul body con tutti i campi e il tetto di 4000 caratteri in ogni modalità, il contatore da

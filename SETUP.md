@@ -330,7 +330,7 @@ everywhere else), so the tests can run while your normal dev server stays up on 
 also guarantees they never point at production data.
 
 **What it covers** (`e2e/`), across fourteen projects (the filename picks one; the full table is
-`doc/guide/e2e-emulatori.md`) — on the base account `desktop` (1440px), `mobile` (390px), `tablet`
+`doc/guide/e2e-playwright.md`) — on the base account `desktop` (1440px), `mobile` (390px), `tablet`
 (768×1024) and `tablet-landscape` (1024×768, since 2026-10-16); on accounts of their own `degraded`
 and `degraded-mobile`, `analisi`, `centri`, `split` and `hof` (1440px) with their `-mobile` twins
 (390px):

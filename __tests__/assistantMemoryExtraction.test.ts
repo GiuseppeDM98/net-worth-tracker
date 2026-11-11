@@ -504,3 +504,14 @@ describe('memoryEnabled gating', () => {
     expect(extractionCalled.value).toBe(true);
   });
 });
+
+describe('extractMemoryCandidates — what Registra adds to the rules (2026-11)', () => {
+  it('tells the extractor a categorisation rule is a preference and a registered row is not a fact', async () => {
+    const client = mockClientReturningToolInput({ items: [] });
+    await extractMemoryCandidates('la palestra è Salute', 'Va bene.', client);
+    const request = vi.mocked(client.messages.create).mock.calls[0][0];
+    const system = JSON.stringify(request.system);
+    expect(system).toContain("Una regola di categorizzazione detta dall'utente (“la palestra è Salute”) è una preference.");
+    expect(system).toContain("Una spesa o un'entrata che l'utente registra (importo, negozio, data) non è un fatto da memorizzare.");
+  });
+});

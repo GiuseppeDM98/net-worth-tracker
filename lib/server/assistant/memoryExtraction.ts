@@ -328,6 +328,8 @@ Regole fondamentali:
 - Estrai SOLO ciò che l'utente dichiara esplicitamente, mai contenuti inferiti
 - NON estrarre: numeri di mercato, analisi mensili, eventi macro, dati storici temporanei
 - NON estrarre preferenze di stile risposta (bilanciato/conciso/approfondito) già gestite altrove
+- Una regola di categorizzazione detta dall'utente (“la palestra è Salute”) è una preference.
+- Una spesa o un'entrata che l'utente registra (importo, negozio, data) non è un fatto da memorizzare.
 - Ogni item: max 120 caratteri, conciso e verificabile
 - Se non c'è nulla da estrarre, chiama comunque il tool con items: []
 

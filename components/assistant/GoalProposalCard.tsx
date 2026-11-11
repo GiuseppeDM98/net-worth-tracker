@@ -2,12 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import { Check, Loader2, Target, X } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { Button } from '@/components/ui/button';
 import { TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { patchMessageProposal, useMessageId } from '@/components/assistant/MessageIdContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
+import { AI_GENERATED_EYEBROW_CLASS, AI_GENERATED_SURFACE_CLASS } from '@/lib/constants/aiAccent';
+import { proposalKey } from '@/lib/utils/expenseProposal';
+import { cardEnterVariants } from '@/lib/utils/motionVariants';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useGoalData } from '@/lib/hooks/useGoalData';
@@ -22,16 +27,18 @@ import { cn } from '@/lib/utils';
 
 interface GoalProposalCardProps {
   proposal: GoalProposal;
+  /** The block's rank among the message's ```goal-proposal blocks: the card's key on the message. */
+  index: number;
 }
 
-type SubmitState = 'idle' | 'saving' | 'written' | 'dismissed';
-
 // Module-level so the card's try block holds no `throw`: keeps it compilable by the React Compiler.
-async function assertGoalWritten(response: Response, fallback: string): Promise<void> {
+// Returns the id of the goal the route wrote (`{ goal }`), for the outcome recorded on the message.
+async function readWrittenGoalId(response: Response, fallback: string): Promise<string[]> {
+  const payload = (await response.json().catch(() => null)) as { error?: string; goal?: { id?: string } } | null;
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(payload?.error ?? fallback);
   }
+  return payload?.goal?.id ? [payload.goal.id] : [];
 }
 
 /**
@@ -105,18 +112,22 @@ const NONE = 'Nessuna';
  * card: a card inside the Conversazione tile would be a card inside a card. Its cadence is
  * the tile's — the 10px eyebrow, the name at 15px, flat 13px rows with mono figures.
  *
- * The "written" state lives in component state only. On reload the message is re-parsed
- * from its stored text and the button comes back: pressing it again creates a second,
- * plainly visible goal (or rewrites the same one again) rather than corrupting anything,
- * which is the acceptable failure for v1.
+ * The outcome lives on the message (2026-11), like the expense card's: `proposals["goal:N"]`,
+ * recorded in the session and saved by the PATCH, so a reload shows «Obiettivo creato» instead
+ * of the buttons and the same goal is not written twice. It is what the model wrote, so it wears
+ * the AI accent (DESIGN → The AI-Accent Rule).
  */
-export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
+export function GoalProposalCard({ proposal, index }: GoalProposalCardProps) {
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const assetsQuery = useAssets(ownerId);
   const goalsQuery = useGoalData(ownerId);
-  const [state, setState] = useState<SubmitState>('idle');
+  const { messageId, threadId, proposals, recordProposal } = useMessageId();
+  const [saving, setSaving] = useState(false);
+  const key = proposalKey('goal', index);
+  const persisted = proposals[key]?.status;
+  const state = persisted === 'written' ? 'written' : persisted === 'ignored' ? 'dismissed' : saving ? 'saving' : 'idle';
 
   const assets = assetsQuery.data;
   const current: InvestmentGoal | null = useMemo(
@@ -148,19 +159,27 @@ export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
     const failureMessage = isUpdate ? "Impossibile aggiornare l'obiettivo" : "Impossibile creare l'obiettivo";
     const keepQuotas = isUpdate && quotas.unmatched.length > 0;
     const successMessage = isUpdate ? `Obiettivo "${proposal.name}" aggiornato` : `Obiettivo "${proposal.name}" creato`;
-    setState('saving');
+    setSaving(true);
     try {
       const response = await sendGoalWrite({ ownerId, proposal, isUpdate, quotas: quotas.resolved, keepQuotas });
-      await assertGoalWritten(response, failureMessage);
+      const writtenIds = await readWrittenGoalId(response, failureMessage);
 
       // Same key the FIRE page's goal query uses, so the goal is there when the user navigates over.
       await queryClient.invalidateQueries({ queryKey: queryKeys.goals.all(ownerId) });
-      setState('written');
+      const outcome = { status: 'written' as const, writtenIds };
+      recordProposal(key, outcome);
       toast.success(successMessage);
+      await patchMessageProposal({ ownerId, threadId, messageId, key, state: outcome });
     } catch (error) {
-      setState('idle');
       toast.error(error instanceof Error ? error.message : "Impossibile scrivere l'obiettivo");
     }
+    setSaving(false);
+  };
+
+  const handleIgnore = () => {
+    const outcome = { status: 'ignored' as const };
+    recordProposal(key, outcome);
+    if (ownerId) void patchMessageProposal({ ownerId, threadId, messageId, key, state: outcome });
   };
 
   const allocationEntries = Object.entries(proposal.recommendedAllocation ?? {}).sort(
@@ -176,10 +195,17 @@ export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
     : null;
 
   return (
-    <div className="not-prose my-3 rounded-xl bg-muted/40 p-4">
+    <motion.div
+      variants={cardEnterVariants}
+      initial="enter"
+      animate="center"
+      data-generated
+      data-proposal={key}
+      className={cn('not-prose my-3 rounded-xl border bg-muted/40 p-4', AI_GENERATED_SURFACE_CLASS)}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={cn(TILE_EYEBROW_CLASS, 'inline-flex items-center gap-1.5')}>
+          <p className={cn(TILE_EYEBROW_CLASS, AI_GENERATED_EYEBROW_CLASS, 'inline-flex items-center gap-1.5')}>
             <Target className="h-3 w-3" aria-hidden="true" />
             {isUpdate ? 'Modifica di un obiettivo' : 'Proposta di obiettivo'}
           </p>
@@ -258,7 +284,7 @@ export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
         </p>
       )}
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {state === 'written' ? (
           <span className="flex items-center gap-1.5 text-[13px] font-medium text-positive">
             <Check className="h-4 w-4" aria-hidden="true" />
@@ -270,7 +296,7 @@ export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
           <>
             <Button
               size="sm"
-              className="h-9"
+              className="h-11 desktop:h-9"
               onClick={handleConfirm}
               disabled={state === 'saving' || isDemo || !ownerId || updateTargetMissing}
               aria-label={isDemo ? 'Conferma — non disponibile in modalità demo' : 'Conferma'}
@@ -287,8 +313,8 @@ export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
             <Button
               variant="ghost"
               size="sm"
-              className="h-9"
-              onClick={() => setState('dismissed')}
+              className="h-11 desktop:h-9"
+              onClick={handleIgnore}
               disabled={state === 'saving'}
             >
               <X className="h-4 w-4" aria-hidden="true" />
@@ -297,6 +323,6 @@ export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
           </>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -9,7 +9,7 @@
  * The base seed has no household, so the test plants one on the shared account (two decoy names
  * that appear nowhere in the seed) and attributes ONE current-month row through the Admin SDK,
  * then restores everything in `finally` — data-only per test, never a re-seed
- * (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright): re-seeding logs the account out).
+ * (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright): re-seeding logs the account out).
  */
 
 import { test, expect, type Page } from '@playwright/test';

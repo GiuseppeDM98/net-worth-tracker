@@ -9,7 +9,10 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  ASSISTANT_SYSTEM_CORE,
+  REGISTER_CONTRACT,
   buildChatPrompt,
+  buildRegisterPrompt,
   buildHistoryAnalysisPrompt,
   buildMonthAnalysisPrompt,
   buildYearAnalysisPrompt,
@@ -753,5 +756,61 @@ describe('the CASHFLOW 12 MESI block in every mode of the Assistente (decision 8
     expect(formatCashflowBlockSection(BLOCK)).toEqual([NOTE, BLOCK, '']);
     expect(formatCashflowBlockSection(null)).toEqual([]);
     expect(formatCashflowBlockSection('')).toEqual([]);
+  });
+});
+
+describe('the Registra prompt (2026-11)', () => {
+  const REGISTER_BLOCK = '--- REGISTRA ---\nOggi: domenica 1 novembre 2026 (2026-11-01)\n[cat-cibo] Cibo';
+  const CASHFLOW_BLOCK = '--- CASHFLOW 12 MESI (x) ---\nX';
+  const NOTE_START = 'Il blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi';
+
+  it('puts the proposal contract in the system, after the shared core, and nowhere else', () => {
+    const { system } = buildRegisterPrompt('ho fatto spesa per 103 euro', PREFERENCES, [], REGISTER_BLOCK, null);
+    expect(system).toBe(`${ASSISTANT_SYSTEM_CORE}\n\n${REGISTER_CONTRACT}`);
+    expect(REGISTER_CONTRACT).toContain('```expense-proposal'.slice(3));
+    expect(REGISTER_CONTRACT).toContain('al massimo 5 per messaggio');
+    // The owner's tour, 2026-11-11: the answer stays short whatever the style preference says, with no
+    // titled sections under the cards and no mention of the rows' cut.
+    expect(REGISTER_CONTRACT).toContain('qualunque sia lo stile di risposta');
+    expect(REGISTER_CONTRACT).toContain('Niente sezioni con titolo');
+    expect(REGISTER_CONTRACT).toContain('Non dire quante righe hai letto');
+  });
+
+  it('leaves the shared core and every other mode’s system without the protocol', () => {
+    const bundle = makeBundle();
+    expect(ASSISTANT_SYSTEM_CORE).not.toContain('expense-proposal');
+    expect(buildChatPrompt('Come va?', PREFERENCES, 'marzo 2025', [], bundle).system).not.toContain('expense-proposal');
+    expect(buildChatPrompt('Come va?', PREFERENCES, undefined, []).system).not.toContain('expense-proposal');
+    for (const build of [buildMonthAnalysisPrompt, buildYearAnalysisPrompt, buildYtdAnalysisPrompt, buildHistoryAnalysisPrompt]) {
+      expect(build(bundle, 'Come va?', PREFERENCES, []).system).not.toContain('expense-proposal');
+    }
+  });
+
+  it('keeps the system byte-identical across users, days and blocks: the data is in the user turn', () => {
+    const a = buildRegisterPrompt('ho speso 5 euro', PREFERENCES, [], REGISTER_BLOCK, null);
+    const b = buildRegisterPrompt('stipendio di 2000 ieri', { ...PREFERENCES, responseStyle: 'deep' }, [], '--- REGISTRA ---\nOggi: lunedì 2 novembre 2026 (2026-11-02)\n[cat-altro] Altro', CASHFLOW_BLOCK);
+    expect(a.system).toBe(b.system);
+    expect(a.system).not.toContain('2026-11-01');
+    expect(a.system).not.toContain('cat-cibo');
+    expect(a.userContent).toContain(REGISTER_BLOCK);
+  });
+
+  it('prints the cashflow block under its note, between the register block and the request', () => {
+    const { userContent } = buildRegisterPrompt('ho speso 5 euro', PREFERENCES, [], REGISTER_BLOCK, CASHFLOW_BLOCK);
+    const register = userContent.indexOf(REGISTER_BLOCK);
+    const note = userContent.indexOf(NOTE_START);
+    const block = userContent.indexOf(CASHFLOW_BLOCK);
+    const request = userContent.indexOf('Richiesta utente: ho speso 5 euro');
+    expect(register).toBeGreaterThan(-1);
+    expect(note).toBeGreaterThan(register);
+    expect(block).toBeGreaterThan(note);
+    expect(request).toBeGreaterThan(block);
+    expect(userContent.endsWith('Richiesta utente: ho speso 5 euro')).toBe(true);
+  });
+
+  it('prints neither the note nor the block without one', () => {
+    const { userContent } = buildRegisterPrompt('ho speso 5 euro', PREFERENCES, [], REGISTER_BLOCK, null);
+    expect(userContent).not.toContain('CASHFLOW 12 MESI');
+    expect(userContent).toContain(`${REGISTER_BLOCK}\n\nRichiesta utente: ho speso 5 euro`);
   });
 });

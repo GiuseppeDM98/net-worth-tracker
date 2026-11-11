@@ -29,14 +29,22 @@ import {
   buildAssistantYtdContext,
   buildAssistantHistoryContext,
   buildAssistantTodayContext,
+  fetchRegisterInputs,
 } from '@/lib/services/assistantMonthContextService';
+import {
+  buildAssistantRegisterContext,
+  formatRegisterContextForPrompt,
+  summarizeRegisterContext,
+} from '@/lib/utils/assistantRegisterContext';
+import { stripFencedBlocks } from '@/lib/utils/expenseProposal';
+import { assistantStreamRequestSchema, parseOr400 } from '@/lib/server/validation';
 import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import {
   AssistantMemoryItem,
   AssistantMonthContextBundle,
+  AssistantRegisterSummary,
   AssistantStreamEvent,
   AssistantTodayContext,
-  AssistantStreamRequest,
 } from '@/types/assistant';
 import { evaluateActiveGoals } from '@/lib/server/assistant/goalEvaluationService';
 import { adminDb } from '@/lib/firebase/admin';
@@ -160,7 +168,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as AssistantStreamRequest;
+    // Every field of the request is declared in the schema (zod strips what is not): a mode the
+    // app does not have is a 400 here, never a request that falls through to the chat builder.
+    const parsed = parseOr400(assistantStreamRequestSchema, await request.json());
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     await assertCanAccessAccount(decodedToken, body.userId);
 
     const rateLimitResult = checkRateLimit(
@@ -175,13 +187,6 @@ export async function POST(request: NextRequest) {
           status: 429,
           headers: { 'Retry-After': String(rateLimitResult.retryAfterSeconds) },
         }
-      );
-    }
-
-    if (!body.prompt?.trim() || !body.mode) {
-      return NextResponse.json(
-        { error: 'Sono richiesti userId, mode e prompt' },
-        { status: 400 }
       );
     }
 
@@ -215,7 +220,15 @@ export async function POST(request: NextRequest) {
 
     let contextBundle: AssistantMonthContextBundle | null = null;
     let todayContext: AssistantTodayContext | null = null;
-    if (body.mode === 'year_analysis' && body.year) {
+    // Registra: the register block (ids, recent rows, the month so far) and no period bundle.
+    let registerBlock: string | null = null;
+    let registerSummary: AssistantRegisterSummary | null = null;
+    const now = new Date();
+    if (body.mode === 'register') {
+      const registerContext = buildAssistantRegisterContext(await fetchRegisterInputs(body.userId, now));
+      registerBlock = formatRegisterContextForPrompt(registerContext);
+      registerSummary = summarizeRegisterContext(registerContext);
+    } else if (body.mode === 'year_analysis' && body.year) {
       contextBundle = await buildAssistantYearContext(body.userId, body.year, includeDummy);
     } else if (body.mode === 'ytd_analysis') {
       contextBundle = await buildAssistantYtdContext(body.userId, includeDummy);
@@ -247,7 +260,7 @@ export async function POST(request: NextRequest) {
 
     // The CASHFLOW 12 MESI block in every mode, a chat with no context included (decision 81,
     // 2026-11-07); a rejection reaches the catch below — a 500, never a silent empty block.
-    const cashflowBlock = await readCashflowBlockForPrompt(body.userId, new Date());
+    const cashflowBlock = await readCashflowBlockForPrompt(body.userId, now);
 
     // Load active memory items to inject into the prompt.
     // Errors are non-fatal: if memory fetch fails we proceed without items
@@ -273,7 +286,7 @@ export async function POST(request: NextRequest) {
         mode: body.mode,
         pinnedMonth: body.month ?? null,
         pinnedYear: body.year ?? null,
-        title: buildThreadTitleFromPrompt(body.prompt, body.mode),
+        title: buildThreadTitleFromPrompt(body.prompt, body.mode, now),
       }));
 
     if (!existingThread) {
@@ -313,12 +326,18 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          // Registra: what the server read, for the companion tile — before the first text.
+          if (registerSummary) {
+            controller.enqueue(encodeAssistantEvent({ type: 'register', summary: registerSummary }));
+          }
+
           const result = await streamAssistantResponse({
             mode: body.mode,
             prompt: body.prompt.trim(),
             contextBundle,
             todayContext,
             cashflowBlock,
+            registerBlock,
             month: body.month ?? null,
             preferences,
             memoryItems: activeMemoryItems,
@@ -353,10 +372,12 @@ export async function POST(request: NextRequest) {
           ).catch((err) => console.error('[stream] extractAndSaveMemory uncaught:', err));
 
           await updateAssistantThreadMetadata(thread.id, {
-            title: existingThread?.lastMessagePreview
-              ? existingThread.title
-              : buildThreadTitleFromPrompt(body.prompt, body.mode),
-            lastMessagePreview: assistantText || userMessage.content,
+            // A register thread is the day's («Registrazioni · 1 nov 2026») and is never retitled.
+            title: existingThread?.lastMessagePreview || body.mode === 'register'
+              ? (existingThread?.title ?? thread.title)
+              : buildThreadTitleFromPrompt(body.prompt, body.mode, now),
+            // A JSON block is not a preview: an answer that is only a card shows the user's sentence.
+            lastMessagePreview: stripFencedBlocks(assistantText) || userMessage.content,
             mode: body.mode,
             pinnedMonth: body.month ?? existingThread?.pinnedMonth ?? null,
             pinnedYear: body.year ?? existingThread?.pinnedYear ?? null,

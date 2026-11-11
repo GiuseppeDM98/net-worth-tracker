@@ -5,8 +5,8 @@
 > `lib/utils/{assistantNarrative,assistantPeriodOptions,cashflowBlock,expenseBreakdown,goalProposal}.ts`,
 > `lib/hooks/useAssistantStreaming.ts`, `app/api/ai/assistant/*`, `app/api/goals/route.ts`. In
 > `AGENTS.md` the stub with the essentials stays; here is the full rule. Modules and files: § *Files* below.
-> No permanent E2E spec: both blocks state «no Playwright spec» (the throwaway specs
-> were deleted — see *Per-page blind spots*).
+> E2E: `e2e/assistant.register.spec.ts` and `e2e/assistant.register.mobile.spec.ts` (Registra, the stream always
+> faked with `page.route`, helper `e2e/assistantRegister.ts`); the analysis modes have no Playwright spec.
 
 ## Files
 
@@ -14,6 +14,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `store.ts` → `mergeMemoryItem`), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`) and `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, its rules in doc/guide/consulente.md § The run); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
 - **The portfolio block** (2026-10-20): pure `lib/utils/assistantPortfolioContext.ts` (`buildAssistantPortfolioContext`, `emptyAssistantPortfolioContext` for the fixtures), printed by `formatPortfolioForPrompt` in `prompts.ts`; the Italian month bounds `getItalyMonthBoundsUtc`/`getItalyMonthRangeBoundsUtc` in `lib/utils/dateHelpers.ts`. The Consulente of Allocazione is its own guide: doc/guide/consulente.md.
+- **Registra** (2026-11): pure `lib/utils/{expenseProposal,assistantRegisterContext,assistantStreamBuffer}.ts`, `components/assistant/{ExpenseProposalCard,MessageIdContext,RegisterRefsContext}.tsx`, `components/assistant/tiles/RegistraContestoTile.tsx`, `app/api/ai/assistant/threads/[threadId]/messages/[messageId]/route.ts` (the PATCH of a card's outcome), `fetchRegisterInputs` in `assistantMonthContextService.ts`, `ExpenseDialog`'s `initialValues` (doc/guide/dialog.md), `parseCashflowMonthParam` in `lib/utils/period.ts`. Suites: `expenseProposal`, `assistantRegisterContext`, `assistantStreamBuffer`, `assistantMessageRoute`, `expenseProposalCard`, `goalProposalCard`, `assistantStreamingResponse`, `assistantComposer`, `useAssistantStreaming`, `expenseDialogInitialValues`, `assistantCompanionScene` (the last seven `.test.tsx`), and the two E2E specs with the emulators up.
 - **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `dateHelpers`, `cashflowBlock`, `anthropicStream` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
 
 ## Assistant
@@ -257,15 +258,16 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   «Non tracciato», the percent kind with the comma — the memory rows' `toFixed` retired with it).
 - **Rows, not chips, inside a tile**: `AssistantPromptRows` renders the starter questions (the one whose `chip.mode === mode`
   first and bold) and the follow-ups; a row is `min-h-11` below `desktop:`. A starter still PREFILLS the composer (the period must
-  be confirmed); a follow-up submits directly.
-- **Layout**: `PageContainer` (1920, its only width); verdict + `AssistantPeriodSelector` in `flex desktop:flex-row desktop:justify-between`;
+  be confirmed); a follow-up submits directly, except in Registra, where it prefills the composer.
+- **Layout**: `PageContainer` (1920, its only width); verdict + `AssistantPeriodSelector` (in Registra the strip with «Torna all'analisi» in its place, `RegistraContestoTile` in the companion) in `flex desktop:flex-row desktop:justify-between`;
   the grid is `desktop:grid-cols-[2fr_1fr] desktop:items-start`, the companion `desktop:sticky desktop:top-5 desktop:self-start`
   (sticky needs self-start, AGENTS.md § Tailwind Breakpoints) and it renders AFTER the composer on a phone; the composer stays
   `sticky bottom-0 max-desktop:portrait:bottom-20` inside the left column. The pill's strip bleeds `max-desktop:-mx-4
   max-desktop:px-4` (the page padding) and its tabs are 44px there. `TileGridSkeleton` with `cells={[]}` is the verdict's
   placeholder while a bundle loads.
 - **Messages are flat** (`AssistantStreamingResponse`): the user's in a `bg-muted/40` sub-tile, the assistant's full-width prose;
-  `GoalProposalCard` is a `not-prose` muted sub-tile (never a card in the tile); `MARKDOWN_COMPONENTS` stays module-level. The
+  the proposal cards (`GoalProposalCard`, `ExpenseProposalCard`) are `not-prose` blocks with the AI accent (DESIGN.md → The
+  AI-Accent Rule), never a card in the tile; `MARKDOWN_COMPONENTS` stays module-level. The
   streaming badge lives in the tile's aside (`role="status"`); the interruption notice is a muted row with «Rigenera».
 - **Conversazioni and Memoria are `ResponsiveModal`s** (`AssistantModals.tsx`, 2026-09-18 — two right-side `Sheet`s
   until then): `md` and `lg`, eyebrow «Assistente · …», the title the act («Riprendi una conversazione») or the
@@ -278,7 +280,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   reached» suggestion shows on its goal's row (the durable «Ignora» is `ignoreSuggestion`, the same mutation the tile above the
   conversation uses — two surfaces of ONE suggestion); the item delete is `useArmedDelete` (two clicks, no timer).
   `AssistantMemoryPanel` lost its collapsible variant (only the sheet renders it).
-- **The guide is `AssistantComeFunziona`**, a Collapsible below the grid with three tiles; the header has three icon actions and
+- **The guide is `AssistantComeFunziona`**, a Collapsible below the grid with three tiles; the header has four icon actions (Registra, 2026-11) and
   ONE primary; Conversazioni and Memoria wear their count as a dot AND the description says it in words (the dots were
   dropped once and asked back the same day). Playwright locates: the verdict by `region` «Verdetto sul
   contesto», the tiles by their eyebrow («Conversazione» with `exact: true` — «Conversazione con l'assistente» is the live
@@ -292,7 +294,72 @@ doc/ai/README.md): **The AI-Accent Rule** (the accent on the «Assistente» sub-
 proposal and question cards, and on the hover of «Invia messaggio», «Registra», «Rigenera», «Rispondi» and the suggestion rows;
 never on the verdict, the companion column, the thread list or the user's messages), **The Question-Card Rule** (the
 cards inside a message, ONE «Rispondi» under the last) and the paragraph «The Assistente page» (the conversation stays
-still, the companion column's content slides with the mode). The code follows it from the Registra mode on (AI-05).
+still, the companion column's content slides with the mode). The code follows it from the Registra mode on (2026-11): the companion slides with `sceneVariants`, the cards enter with `cardEnterVariants`.
+
+## Registra (2026-11)
+
+«Ho fatto spesa per 103 euro» becomes a card; «Conferma» writes ONE row through the expense form's services; a reload
+never writes it twice. Expenses and income only — transfers, instalments and series are not proposed.
+
+- **The mode** is `register`, handled EXPLICITLY at every site of the WARNING comment that opens `types/assistant.ts`
+  (the true list; none falls through to chat). It has no period: the stream body carries no month, the context route
+  answers 400, `useAssistantPeriodContext` is never enabled, it is not a tab of `AssistantPeriodSelector`, web search is
+  off whatever the prompt says. The stream body is validated by `assistantStreamRequestSchema` (zod, every field; the
+  prompt stops at 4000 characters in EVERY mode, the composer counts from 3800 by `aria-describedby`).
+- **The register block** (`buildAssistantRegisterContext` → `formatRegisterContextForPrompt`, pure, `userContent`):
+  today's Italian date, the categories and sub-categories, the cash accounts with balance and default roles, the
+  centres and the members — all BY ID, uncapped — and the rows of the window from the first Italian day of the month
+  eleven months back to the end of today, newest first, a recurring series as ONE row with its count, cut at 300 with
+  the cut printed. **IL MESE** has two sources: the totals are the Panoramica's server summary (`getDashboardOverview`),
+  the spending by type and the budget lines (20 at most, printed) come from the window's rows through the Budget's pure
+  level. The two reads of the month are settled apart: a failed one prints its sentence, the core reads failing is a 500
+  before any event. The CASHFLOW 12 MESI block follows, as in every mode.
+- **The protocol** lives ONLY in `buildRegisterPrompt` (`REGISTER_CONTRACT`; `ASSISTANT_SYSTEM_CORE` is untouched and the
+  mode's `system` is byte-identical between users — held by `not.toContain` and `toBe`): up to five
+  ```expense-proposal blocks a message (`EXPENSE_PROPOSALS_MAX_PER_MESSAGE`; a sixth renders as code), `expenseProposal.ts`
+  the ONE schema. A block's key is `expense:N`, N its rank among the message's blocks of that language, DERIVED from the
+  markdown (`listFencedBlocks`, matched by the `pre` node's offset) — never counted in render.
+- **The card** (`ExpenseProposalCard`): `resolveExpenseProposal` checks every id against the browser's own reads
+  (`RegisterRefsContext`: categories, assets, settings, centres) and names what it cannot find — a problem closes
+  «Conferma», never «Modifica»; a failed read closes all writing. States (`describeExpenseProposalState`): idle ·
+  saving (the first click closes the button: a double click writes one row) · «Registrata · apri in Cashflow»
+  (`/dashboard/cashflow?tab=tracking&month=YYYY-MM&row=<id>`: the ROW's month and the row itself, on which Tracciamento
+  lands — doc/guide/cashflow-tracciamento.md § Files) · «Ignorata» · «Risposta interrotta: chiedi di
+  riproporla» on a message whose id is still `local-` (no buttons). The focus moves to the outcome line; no new live region.
+- **The write** is the expense form's create path, in the browser: `createExpenseSettledOnDate` → `applyDebtRepayments` →
+  `applyBalanceEffects` (a future date is a pending row, the balance moves on its day), then four invalidations
+  (`expenses.all`, `assets.all`, `dashboard.overview`, `costCenters.all`). No server route writes a row. «Modifica»
+  opens `ExpenseDialog` on the proposal (`initialValues`, lazy — `lazyComponent`, preloaded on hover and focus) and the
+  row the form saves is the card's outcome.
+- **The outcome is saved on the message**: `proposals["expense:0"] = { status, writtenIds, at }` through
+  `PATCH /api/ai/assistant/threads/[threadId]/messages/[messageId]` (`update` with a `FieldPath`, never a merge), after
+  it was written into the stream buffer and the cached thread (`recordProposal`: the buffer wins until a thread switch).
+  The stream's `done` carries the assistant message's id, adopted by the buffer (`adoptStreamMessageId`). The goal card
+  uses the same path (`goal:N`).
+- **The way in and out**: the pencil in the header («Registra una spesa o un'entrata», off in demo and while streaming)
+  or `?mode=registra`, once the thread list has resolved; the strip «Registra · l'Assistente conosce categorie, conti e
+  le ultime righe» stands where the period axis was (and the header's title reads «Una frase, una riga» instead of «Un periodo, una risposta», 2026-11-11), with «Torna all'analisi» — which leaves the thread FIRST (the mode
+  alone would send the next question into it) and drops the param. The thread is one per Italian day, «Registrazioni ·
+  1 nov 2026» (`buildThreadTitleFromPrompt`, `findRegisterThread`); entering reopens today's. **With no thread picked, the
+  day's thread IS the open one, derived in render** (`selectedThreadId = pickedThreadId ?? the day's`, 2026-11-11): on the
+  owner's tour a sentence sent after the browser's Back from Cashflow opened a SECOND «Registrazioni» of the same day —
+  the mode had been entered while the list did not hold the thread, and a lookup made once at the entry never looked
+  again. So «Nuova conversazione» in Registra shows the day's thread: one a day.
+- **The answer is short, whatever the style preference** (the owner's tour, 2026-11-11): the first real answers carried
+  «Ipotesi che ho fatto», «Cosa dicono i dati del mese» and «Limiti dei dati» under the cards (the «deep» style line of
+  `userContent` asks for hypotheses and limits) and said «vedo solo le 300 righe più recenti su N». `REGISTER_CONTRACT`
+  now says: one sentence, the blocks, then only what the user needs to decide (a row not proposed and why, a real doubt
+  as a short question, one sentence on the category's budget), no titled sections, nothing the card already shows, and
+  never the rows' cut unless the user asks for a row it cannot find. The 300 cap stays (the owner's choice).
+- **A card's outcome never moves the page** (2026-11-11): the conversation follows `conversationScrollSignal` (thread,
+  count, the last message's length — `assistantStreamBuffer.ts`), not the message list's identity, which a recorded
+  outcome renews; «Conferma» or «Ignora» on a card in the middle of an answer used to send the page to its bottom.
+- **The verdict and the panel**: `buildRegisterVerdict(summary)` — computed from the browser's reads before any
+  message, from the stream's `register` event after («le ultime N righe» is the server's alone); `RegistraContestoTile`
+  («Cosa conosce l'Assistente») lists the accounts, their default roles and what was read. Neither wears the accent.
+- **E2E**: the spec fakes the stream and does what the route does around the model (thread and messages written with
+  the Admin SDK, `done` with the planted id), so the PATCH and the reload run on the real routes. The page needs the key
+  in `.env.local` to render the composer; no request reaches a model (doc/guide/e2e-playwright.md).
 
 ## Composizione mobile
 
@@ -300,7 +367,7 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
 
 ## Per-page blind spots
 
-- **Assistente**: no Playwright spec (the throwaway specs were deleted); the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`; «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; starter rows prefill the composer, follow-up rows submit; the thread rows and the memory rows both use `useArmedDelete` (the threads' 3 s auto-disarm went on 2026-09-18, with the sheet); a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
+- **Assistente**: the analysis modes have no Playwright spec; the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`; «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; starter rows prefill the composer, follow-up rows submit (in Registra they prefill); the thread rows and the memory rows both use `useArmedDelete` (the threads' 3 s auto-disarm went on 2026-09-18, with the sheet); a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
 - **The Assistant's cashflow figures changed on 2026-07-29 and again on 2026-10-20** (the Italian month bounds, «Entrate» with the coupons inside); saved threads are prose and are not regenerated (moved here from CLAUDE.md → Known Issues on 2026-09-18: it is this page's blind spot, not a cross-cutting one).
 - **The portfolio block is TODAY's, whatever the period** (2026-10-20): the instruments, the allocation on the base, the ledger and the registers describe the portfolio at the time of the question; only the snapshot blocks and the cashflow are the period's. A question about a past month reads today's holdings beside that month's figures — the system core says so.
 - **A period's own thread older than the pages read is not found** (owner's call, 2026-10-05): switching period
@@ -320,4 +387,8 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
   apart from the period's own read — a period's rows are read twice, and the read grows with the history. Accepted:
   one Admin query per message, off the browser; the block is never cached across messages, so a row confirmed a
   minute ago is in the next answer.
-- **A confirmed goal proposal can be confirmed again after a reload** (accepted for v1): reopening the thread re-parses the fenced block and a second press creates a SECOND goal. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **A card's outcome is saved on its message** (2026-11): a reload shows «Obiettivo creato» / «Registrata». The one window left: a PATCH that fails after a successful write (the toast says so); a reload then shows the card idle. A thread refetch landing between the local record and the PATCH can also drop the outcome from the cache — the stream buffer still shows it for the session.
+- **A Registra day past 100 messages shows its oldest 100** (`getAssistantThreadDetail` reads `orderBy createdAt asc, limit 100`), and the history is cut from those.
+- **A row written from Registra carries no mark**: in Tracciamento it is a row like any other.
+- **IL MESE's totals are as fresh as the Panoramica's summary** (2026-11): the first line is the server summary, the lines under it are computed from the rows read for the message; a row written outside the app's services (an Admin write, a restore) leaves the two apart until the summary is rebuilt — seen on the emulator after a spec's Admin deletes.
+- **Registra adds about 25 KB gz to the page's first load** (2026-11-10, the ceiling raised with the owner's OK: doc/guide/velocita.md § Registro): the card's services, the protocol and the four reads ship with the page; only `ExpenseDialog` is lazy. Loading the three write services on «Conferma» was measured at −0,9 KB and dropped.

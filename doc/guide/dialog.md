@@ -11,7 +11,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   threshold), `app/globals.css` § Popper sheet, `components/ui/{select,dropdown-menu,popover}.tsx` (`data-popper-sheet`;
   `Popover`'s `sheet` prop), `components/ui/searchable-combobox.tsx` (the drawer branch, `label`),
   `components/ui/autofill.ts` + `components/ui/{input,textarea}.tsx`; tests `__tests__/fieldAutocomplete.test.ts`
-- **Two-step create dialogs and the reset rule** (moved here from `AGENTS.md` § 2 on 2026-10-10): `components/assets/AssetDialog.tsx`, `components/expenses/ExpenseDialog.tsx` (the `openSubject` reset during render in both); guard `e2e/assets.rows.spec.ts` «Nuovo after Modifica opens on step 1» (the test «AssetDialog leaves with its exit animation and gives the focus back to «Modifica»; «Aggiungi asset» then opens on step 1»)
+- **Two-step create dialogs and the reset rule** (moved here from `AGENTS.md` § 2 on 2026-10-10): `components/assets/AssetDialog.tsx`, `components/expenses/ExpenseDialog.tsx` (the `openSubject` reset during render in both; `ExpenseDialog`'s `initialValues` — a new row opened on given fields, part of the opening subject, frozen by the host so a refetch never resets the user's edits, 2026-11, `__tests__/expenseDialogInitialValues.test.tsx`); guard `e2e/assets.rows.spec.ts` «Nuovo after Modifica opens on step 1» (the test «AssetDialog leaves with its exit animation and gives the focus back to «Modifica»; «Aggiungi asset» then opens on step 1»)
 
 ## Dialog e form trasversali
 - **A modal is a tile lifted off the page** (DESIGN.md → The Modal-Is-A-Tile Rule): eyebrow · title 20px · reading ·
@@ -150,9 +150,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The picker exists because the type is not one field among many** — it decides which categories/classes exist, which
   accounts are asked for, and how many balances move. Step 1 turns *one form with N conditional shapes* into *N plain
   forms*; a discriminant that only re-labels things does NOT earn a step.
-- **Create opens on step 1, edit skips to step 2** — changing a saved record's type is a different act, with
+- **Create opens on step 1 — on step 2 when `initialValues.categoryId` names a category (`ExpenseDialog`, the Assistente's «Modifica», 2026-11) — edit skips to step 2** — changing a saved record's type is a different act, with
   reconciliation consequences the in-form notice must explain, so the `Select` stays there and only there.
-- **`setStep(record ? 2 : 1)` is settled during render on the `(open, record)` subject**, never in `useState`'s
+- **`setStep(record ? 2 : 1)` is settled during render on the `(open, record, initialValues)` subject**, never in `useState`'s
   initializer (the record prop stays null between opens and the second "new" would reopen on the form) and, since
   2026-09-06, no longer in the `open` effect either (`react-hooks/set-state-in-effect`). **It stays so where the host
   mounts the dialog only while open** (Patrimonio since 2026-10-07 — § Dialog e form trasversali above): there an
@@ -209,6 +209,6 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **`e2e/modal.origin.spec.ts` can fail on a SLOW or cold dev server** (no `data-state="closed"` frame inside the
   sampler's 2,6 s window — the dialog opened more than ~1,5 s after the click; 2026-09-29 on the Windows machine, 2026-10-04
   on macOS with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. An
-  origin off the button's centre is NOT this flake: the spec reads the box after the entrance (doc/guide/e2e-emulatori.md).
+  origin off the button's centre is NOT this flake: the spec reads the box after the entrance (doc/guide/e2e-playwright.md).
   (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
 - **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per 40 mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

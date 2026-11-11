@@ -10,7 +10,7 @@
  * its stages, the failed one and «Riprova».
  *
  * It presses «Salta il colloquio e avvia la ricerca» only on a route faked with `page.route`: the
- * `.env.local` key enables the button, no request reaches the server (doc/guide/e2e-emulatori.md
+ * `.env.local` key enables the button, no request reaches the server (doc/guide/e2e-playwright.md
  * § Browser-Driven E2E). A real run is covered by `allocationAdviceRun` (the SDK simulated) and,
  * on 2026-10-20, by a real run on the mirror. The interview that precedes the run (2026-11-08) has
  * its own specs, `allocation.consulente.interview*.spec.ts`.

@@ -85,6 +85,10 @@ export function resolveAssistantWebSearchPolicy(
   prompt: string,
   preferences: AssistantPreferences
 ): boolean {
+  // Registra never searches, whatever the prompt says: «benzina 60 euro» is a row to file, and a
+  // keyword in it («petrolio») must not buy a web-search turn.
+  if (mode === 'register') return false;
+
   if (STRUCTURED_ANALYSIS_MODES.includes(mode)) {
     return preferences.includeMacroContext;
   }

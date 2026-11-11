@@ -81,7 +81,7 @@ The open rows of the audit of 2026-11-03. Compared at every session start; a row
   `npm run build && npm run perf:budget`; `npm run build-storybook -- --quiet -o <scratchpad>/storybook-static`; the
   emulators restarted and seeded, :3100 free, `npx playwright test --project=desktop`. After the last group, the whole
   `npm run test:e2e`, and on the PR's Vercel preview an Admin route with no token answers 401, never 500. A red
-  test among the known flakes of `doc/guide/e2e-emulatori.md` (§ Browser-Driven E2E) is re-run alone with
+  test among the known flakes of `doc/guide/e2e-playwright.md` (§ Browser-Driven E2E) is re-run alone with
   `--repeat-each=3` and must be green there; a second red of the same test stops the session.
 - **The acceptance filter**: walk `npm audit --json`'s `.vulnerabilities`; a row passes only when its `fixAvailable` is
   a major of `firebase`, `firebase-tools`, `eslint`, `eslint-config-next`, `@storybook/react-vite`,

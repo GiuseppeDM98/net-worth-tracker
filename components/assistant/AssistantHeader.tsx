@@ -1,9 +1,11 @@
 'use client';
 
-import { Brain, MessagesSquare, Plus } from 'lucide-react';
+import { Brain, MessagesSquare, PencilLine, Plus } from 'lucide-react';
 import { AssistantPreferencesPopover } from '@/components/assistant/AssistantPreferencesPopover';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
+import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS } from '@/lib/constants/aiAccent';
+import { cn } from '@/lib/utils';
 import { AssistantMemoryDocument, AssistantPreferences } from '@/types/assistant';
 
 interface AssistantHeaderProps {
@@ -22,6 +24,10 @@ interface AssistantHeaderProps {
   onNewThread: () => void;
   onOpenThreads: () => void;
   onOpenMemory: () => void;
+  /** «Registra»: enters the mode that proposes rows (the day's register thread, the composer focused). */
+  onEnterRegister: () => void;
+  /** Registra is the open mode: the title names what it does — «Un periodo» is not its promise (2026-11-11). */
+  isRegister?: boolean;
 }
 
 /**
@@ -45,7 +51,10 @@ function CountDot({ count, isFloor = false }: { count: number; isFloor?: boolean
  * The compact page header of the Assistente: eyebrow · title · a generated description that
  * carries the counts (conversations, goals, facts), and ONE primary action — «Nuova
  * conversazione». Conversazioni and Memoria are icon actions wearing their count as a dot (the
- * description says the same in words, the dot is what the eye finds); Preferenze is the third.
+ * description says the same in words, the dot is what the eye finds); Preferenze is the third and
+ * «Registra» the fourth — the way into the mode that proposes rows, a control that calls the
+ * model and so the one that turns the AI accent on hover and keyboard focus. Every action is
+ * 44px below `desktop:`.
  * The guide that used to open from a «?» here is the «Come funziona» disclosure below the grid.
  */
 export function AssistantHeader({
@@ -62,18 +71,20 @@ export function AssistantHeader({
   onNewThread,
   onOpenThreads,
   onOpenMemory,
+  onEnterRegister,
+  isRegister = false,
 }: AssistantHeaderProps) {
   return (
     <PageHeader
       label="Assistente AI"
-      title="Un periodo, una risposta"
+      title={isRegister ? 'Una frase, una riga' : 'Un periodo, una risposta'}
       description={description}
       actions={
         <>
           <Button
             variant="ghost"
             size="icon"
-            className="relative h-9 w-9"
+            className="relative h-11 w-11 desktop:h-9 desktop:w-9"
             disabled={isDemo}
             aria-label={
               isDemo
@@ -91,7 +102,7 @@ export function AssistantHeader({
           <Button
             variant="ghost"
             size="icon"
-            className="relative h-9 w-9"
+            className="relative h-11 w-11 desktop:h-9 desktop:w-9"
             aria-label={activeMemoryCount > 0 ? `Memoria (${activeMemoryCount})` : 'Memoria'}
             onClick={onOpenMemory}
           >
@@ -109,11 +120,26 @@ export function AssistantHeader({
             disabled={isDemo}
           />
 
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'h-11 w-11 border border-transparent text-muted-foreground desktop:h-9 desktop:w-9',
+              AI_CONTROL_ACCENT_CLASS,
+              AI_CONTROL_ACCENT_LABEL_CLASS,
+            )}
+            disabled={isDemo || isStreaming}
+            aria-label="Registra una spesa o un'entrata"
+            onClick={onEnterRegister}
+          >
+            <PencilLine className="h-4 w-4" aria-hidden="true" />
+          </Button>
+
           {/* The ONE primary action. Icon-only below desktop — the sticky navbar has no room for the label. */}
           <Button
             onClick={onNewThread}
             disabled={isDemo || isStreaming}
-            className="h-9 w-9 p-0 desktop:w-auto desktop:px-4"
+            className="h-11 w-11 p-0 desktop:h-9 desktop:w-auto desktop:px-4"
             aria-label={isDemo ? 'Nuova conversazione — non disponibile in modalità demo' : 'Nuova conversazione'}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />

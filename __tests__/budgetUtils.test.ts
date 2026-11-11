@@ -36,6 +36,7 @@ import {
   evaluateBudgetAlerts,
   countsTowardBudget,
   OVERALL_BUDGET_KEY,
+  normalizeBudgetItem,
 } from '@/lib/utils/budgetUtils';
 import type { Expense, ExpenseCategory } from '@/types/expenses';
 import type { BudgetItem } from '@/types/budget';
@@ -694,5 +695,23 @@ describe('evaluateBudgetAlerts — a threshold is a fact of what is BOOKED, read
     expect(alert.threshold).toBe(50);
     expect(alert.calendarPct).toBeCloseTo((257 / 365) * 100);
     expect(alert.aheadOfCalendar).toBe(false); // 54% with the year at 70%
+  });
+});
+
+describe('normalizeBudgetItem — the one reading of a stored item', () => {
+  it('back-fills a legacy item: `monthlyAmount` becomes `amount`, monthly, an expense', () => {
+    const legacy = { id: 'b1', scope: 'category', categoryId: 'cibo', monthlyAmount: 600, order: 0 } as unknown as BudgetItem & { monthlyAmount?: number };
+    expect(normalizeBudgetItem(legacy)).toMatchObject({ id: 'b1', amount: 600, period: 'monthly', kind: 'expense' });
+  });
+
+  it('reads a legacy type-scope income item as income', () => {
+    const legacy = { id: 'b2', scope: 'type', expenseType: 'income', monthlyAmount: 2000, order: 1 } as unknown as BudgetItem & { monthlyAmount?: number };
+    expect(normalizeBudgetItem(legacy).kind).toBe('income');
+  });
+
+  it('leaves a current item as it is, and an item with no amount at zero', () => {
+    const current = { id: 'b3', kind: 'expense', scope: 'category', categoryId: 'casa', period: 'annual', amount: 7000, order: 2 } as BudgetItem;
+    expect(normalizeBudgetItem(current)).toEqual(current);
+    expect(normalizeBudgetItem({ id: 'b4', scope: 'category', order: 3 } as unknown as BudgetItem).amount).toBe(0);
   });
 });

@@ -284,7 +284,12 @@ test.describe('Cashflow › Tracciamento, composed for a phone', () => {
     const focused = page.locator(':focus');
     await expect(focused).toHaveAttribute('data-expense-id', /.+/);
     await expect(focused).toHaveAccessibleName(new RegExp(`^${SAVED_DECOY_NOTE}, `));
-    expect(await focused.evaluate((el) => el.getBoundingClientRect().top >= 0 && el.getBoundingClientRect().bottom <= window.innerHeight)).toBe(true);
+    // Polled, not read once: the focus is given at the second, the smooth scroll that brings the row
+    // up may still be running then (2026-11-11: red once in a full run and once in three alone, the
+    // screenshot mid-scroll with the row under the fold).
+    await expect
+      .poll(() => focused.evaluate((el) => el.getBoundingClientRect().top >= 0 && el.getBoundingClientRect().bottom <= window.innerHeight))
+      .toBe(true);
     await expect.poll(decoyExpenseIds).toHaveLength(1);
   });
 

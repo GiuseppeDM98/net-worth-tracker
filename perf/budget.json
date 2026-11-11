@@ -21,8 +21,8 @@
       "raisedBy": "#497: KB gz misurati sulla stessa macchina, 707 → 720,4 (952fe509 +8, b08dff8a +2,8: Intestatari e quote) → 730 con zod 4.6.7 → 732,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assistant": {
-      "initialJsGzKB": 713,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 692,2 → 699,5 (406049b7, tutto il portafoglio nel contesto, +5,2) → 709,1 con zod 4.6.7 → 711,2 con re2js 2.9.1 → 712,9 (#509, 2026-11-08: z.union e z.coerce.date() nel chunk di zod, +1,5; doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 738,
+      "raisedBy": "feat/assistente-registra (2026-11-10): Registra — la card che scrive la riga con i servizi delle spese, il protocollo expense-proposal con zod, il contesto puro e le quattro letture: 712,9 → 737,6 KB gz sulla stessa macchina (perf:build), ExpenseDialog fuori dal primo caricamento; OK del proprietario 2026-11-10 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/cashflow": {
       "initialJsGzKB": 786,

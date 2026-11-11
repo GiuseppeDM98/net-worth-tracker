@@ -2,6 +2,8 @@
 
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
@@ -18,6 +20,9 @@ import { AssistantSuggestionsBanner } from '@/components/assistant/AssistantSugg
 import { CashflowContestoTile } from '@/components/assistant/tiles/CashflowContestoTile';
 import { MemoriaTile } from '@/components/assistant/tiles/MemoriaTile';
 import { PatrimonioContestoTile } from '@/components/assistant/tiles/PatrimonioContestoTile';
+import { RegistraContestoTile } from '@/components/assistant/tiles/RegistraContestoTile';
+import { RegisterRefsProvider, useRegisterReads } from '@/components/assistant/RegisterRefsContext';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -33,6 +38,7 @@ import { assistantPromptChips } from '@/lib/constants/assistantPrompts';
 import {
   buildAssistantPeriodVerdict,
   buildNoContextVerdict,
+  buildRegisterVerdict,
   describeAssistantHeader,
   describeConversation,
   formatPeriodInSentence,
@@ -45,12 +51,15 @@ import {
   buildEmptyStateQuestion,
   buildMonthOptions,
   buildYearOptions,
+  findRegisterThread,
   findThreadForPeriod,
   getActivePeriodLabel,
   getPreviousCompletedMonth,
   resolveAssistantPreviewMode,
 } from '@/lib/utils/assistantPeriodOptions';
-import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { conversationScrollSignal } from '@/lib/utils/assistantStreamBuffer';
+import { getItalyDateIso, getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { sceneVariants, sceneVariantsReduced } from '@/lib/utils/motionVariants';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import {
@@ -84,6 +93,12 @@ interface AssistantPageClientProps {
  *   Desktop:  [Conversazione · composer]  |  [Patrimonio · Cashflow · Cosa sa di te] (sticky)
  *   Mobile:   verdict → axis → conversation → composer → the three tiles → Come funziona
  *
+ * Registra (2026-11) is a mode with no period: «Registra» in the header (or `?mode=registra`)
+ * opens the day's register thread, the axis gives way to a one-line strip with «Torna
+ * all'analisi», the verdict says what the assistant knows and the companion shows it — the
+ * accounts, the categories' count — from the reads the page already holds. A change of mode keeps
+ * the conversation still and slides the companion's content, as a screen of the Consulente.
+ *
  * Streaming state and the SSE lifecycle live in useAssistantStreaming; every visual block is
  * an extracted module-level component, and no component computes a figure.
  */
@@ -95,10 +110,19 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
   { span: 4, lines: 4 },
 ];
 
+/** The modes in the order the axis shows them, Registra last: the companion slides forward to a later one. */
+const MODE_ORDER: AssistantMode[] = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'chat', 'register'];
+
 export function AssistantPageClient({ assistantConfigured }: AssistantPageClientProps) {
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const conversationEndRef = useRef<HTMLDivElement>(null);
+  // The composer's textarea: entering Registra and a prefilled follow-up move the focus here.
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const prefersReducedMotion = useReducedMotion();
 
   // Italy current month/year — stable for the session
   const today = useMemo(() => getItalyMonthYear(new Date()), []);
@@ -107,7 +131,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const monthOptions = useMemo(() => buildMonthOptions(), []);
   const yearOptions = useMemo(() => buildYearOptions(), []);
 
-  const [selectedThreadId, setSelectedThreadId] = useState<string>();
+  // The thread the user (or a stream) picked; in Registra the day's thread stands in when none is — see `selectedThreadId` below.
+  const [pickedThreadId, setSelectedThreadId] = useState<string>();
   const [draft, setDraft] = useState('');
   const [mode, setMode] = useState<AssistantMode>('month_analysis');
   const [selectedMonth, setSelectedMonth] = useState<AssistantMonthSelectorValue>(
@@ -119,6 +144,15 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Optional period attached to a free (Libera) question — drives both the verdict
   // and what numeric bundle the server builds for the chat answer.
   const [chatContextType, setChatContextType] = useState<AssistantChatContextType>('none');
+  const isRegister = mode === 'register';
+
+  // The companion's scene: which way its content slides at a change of mode. Settled during
+  // render from the mode it was last drawn for, so every path that changes the mode — the axis,
+  // «Registra», a thread opened from the list — gets its direction without setting one.
+  const [scene, setScene] = useState<{ mode: AssistantMode; direction: 1 | -1 }>({ mode, direction: 1 });
+  if (scene.mode !== mode) {
+    setScene({ mode, direction: MODE_ORDER.indexOf(mode) >= MODE_ORDER.indexOf(scene.mode) ? 1 : -1 });
+  }
 
   // The two modals are controlled here because more than one surface opens them: the
   // header icons and the companion memory tile.
@@ -140,6 +174,13 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     isFetchingNextPage: loadingMoreThreads,
     fetchNextPage: fetchMoreThreads,
   } = useAssistantThreads(ownerId);
+  // Registra has ONE thread per Italian day: with none picked, the day's thread IS the open one,
+  // whenever the list comes to hold it — so a sentence can never open a second «Registrazioni» of
+  // the same day because the mode was entered before the list had it (the owner's tour, 2026-11-11:
+  // back from Cashflow, the question went into a new thread). «Today» is the mount's: a session
+  // across midnight stays in the thread it entered, and a render never reads the clock.
+  const [todayIso] = useState(() => getItalyDateIso(new Date()));
+  const selectedThreadId = pickedThreadId ?? (mode === 'register' ? findRegisterThread(threads, todayIso)?.id : undefined);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
     selectedThreadId,
     ownerId
@@ -162,6 +203,10 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     chatContextType,
     preferences: memory?.preferences,
   });
+
+  // What a proposed row is read against, and the companion's summary before any message: the
+  // expense form's four reads, enabled in Registra alone (the one mode that renders an expense card).
+  const registerReads = useRegisterReads(ownerId, isRegister && !isDemo);
 
   const {
     streamingMessages,
@@ -268,8 +313,10 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // is still loading — scrolling to an empty area before content arrives feels jarring.
   // During streaming use instant scroll so new tokens stay visible without jank:
   // smooth scroll on every token triggers continuous CSS animation on slow devices.
+  // The signal leaves out a card's outcome: «Conferma» and «Ignora» never move the page.
+  const scrollSignal = conversationScrollSignal(renderedMessages);
   useEffect(() => {
-    if (renderedMessages.length === 0) return;
+    if (scrollSignal === '') return;
     if (loadingThreadDetail && !isStreaming) return;
     const el = conversationEndRef.current;
     if (!el) return;
@@ -278,7 +325,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     } else {
       el.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [renderedMessages, loadingThreadDetail, isStreaming]);
+  }, [scrollSignal, loadingThreadDetail, isStreaming]);
 
   // CTA is disabled when month_analysis mode has no data available to analyse.
   const isAnalysisBlocked = useMemo(
@@ -293,13 +340,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const canSubmit = draft.trim().length > 0 && !isStreaming && !isAnalysisBlocked;
 
   // ── The words (pure layer) ──
+  const registerSummary = streaming.registerSummary ?? registerReads.summary;
   const verdict = useMemo(() => {
+    // Registra has no period: the verdict is what the assistant knows, never the skeleton.
+    if (isRegister) return buildRegisterVerdict(registerSummary);
     if (isNoContext) {
       if (overviewData === undefined && !overviewError) return null;
       return buildNoContextVerdict(overviewData ? toNoContextVerdictInput(overviewData, today.month) : null);
     }
     return contextBundle ? buildAssistantPeriodVerdict(contextBundle, today) : null;
-  }, [isNoContext, overviewData, overviewError, contextBundle, today]);
+  }, [isRegister, registerSummary, isNoContext, overviewData, overviewError, contextBundle, today]);
 
   const activeItems = useMemo(() => (memory?.items ?? []).filter((item) => item.status === 'active'), [memory]);
   const activeGoalsCount = activeItems.filter((item) => item.category === 'goal').length;
@@ -319,12 +369,15 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         question: emptyStateQuestion,
         periodLabel: isNoContext || !contextBundle ? null : formatPeriodInSentence(contextBundle.selector),
         webSearchUsed: renderedMessages.some((message) => message.role === 'assistant' && message.webSearchUsed === true),
+        mode,
       }),
-    [renderedMessages, emptyStateQuestion, isNoContext, contextBundle]
+    [renderedMessages, emptyStateQuestion, isNoContext, contextBundle, mode]
   );
 
   // The starter questions as rows: the one targeting the active period leads.
   const promptRows = useMemo<PromptRow[]>(() => {
+    // Registra shows none: an analysis chip would leave the mode.
+    if (mode === 'register') return [];
     const rows = assistantPromptChips.map<PromptRow>((chip) => ({
       id: chip.id,
       label: chip.label,
@@ -397,6 +450,38 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     setDraft('');
   };
 
+  // «Registra»: the day's register thread when there is one (the next message creates it
+  // otherwise), the mode, the focus on the composer.
+  const enterRegister = () => {
+    if (isStreaming || isDemo) return;
+    setSelectedThreadId(findRegisterThread(threads, getItalyDateIso(new Date()))?.id);
+    streaming.resetStream();
+    setContextBundle(null);
+    setDraft('');
+    setMode('register');
+    composerRef.current?.focus();
+  };
+
+  // «Torna all'analisi»: out of the register thread first — the mode alone would leave it open
+  // and the next question would be sent into it — then the default analysis mode.
+  const leaveRegister = () => {
+    if (isStreaming) return;
+    handleNewThread();
+    handleModeChange('month_analysis');
+    if (searchParams.get('mode')) router.replace(pathname);
+  };
+
+  // A follow-up of Registra is the start of a sentence («Oggi ho speso »): it fills the composer
+  // instead of being sent, since a prompt with no amount would only earn a question back.
+  const handleFollowUpSelect = (prompt: string) => {
+    if (mode === 'register') {
+      setDraft(prompt);
+      composerRef.current?.focus();
+      return;
+    }
+    streaming.submit(prompt);
+  };
+
   const handleSelectThread = (thread: AssistantThread) => {
     setSelectedThreadId(thread.id);
     streaming.resetStream();
@@ -429,6 +514,21 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
   const queryError = threadsError || threadError || memoryError;
 
+  // `?mode=registra` does what the header action does, ONCE, when the thread list has answered
+  // (the day's thread is looked up in it). Deferred like the thread sync above: the mode is
+  // user-editable state that must also follow the URL, so it is set outside the effect body.
+  const wantsRegister = searchParams.get('mode') === 'registra';
+  const [registerParamHandled, setRegisterParamHandled] = useState(false);
+  const enterRegisterFromParam = useEffectEvent(() => {
+    setRegisterParamHandled(true);
+    enterRegister();
+  });
+  useEffect(() => {
+    if (!wantsRegister || registerParamHandled || loadingThreads || isDemo || !assistantConfigured) return;
+    const timer = setTimeout(() => enterRegisterFromParam(), 0);
+    return () => clearTimeout(timer);
+  }, [wantsRegister, registerParamHandled, loadingThreads, isDemo, assistantConfigured]);
+
   // Show skeleton while threads resolve on first load
   if (loadingThreads) {
     return (
@@ -447,6 +547,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             onNewThread={handleNewThread}
             onOpenThreads={() => setIsThreadsOpen(true)}
             onOpenMemory={() => setIsMemoryOpen(true)}
+            onEnterRegister={enterRegister}
+            isRegister={mode === 'register'}
           />
           <TileGridSkeleton cells={SKELETON_CELLS} />
         </PageContainer>
@@ -457,7 +559,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // The companion column: the numbers the assistant reasons on, then what it knows of the user.
   const companionTiles = (
     <>
-      {isNoContext ? (
+      {isRegister ? (
+        <RegistraContestoTile summary={registerSummary} readFailed={registerReads.readFailed} />
+      ) : isNoContext ? (
         <PatrimonioContestoTile mode="today" overview={overviewError ? null : overviewData} />
       ) : contextBundle ? (
         <>
@@ -496,6 +600,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           onNewThread={handleNewThread}
           onOpenThreads={() => setIsThreadsOpen(true)}
           onOpenMemory={() => setIsMemoryOpen(true)}
+          onEnterRegister={enterRegister}
+            isRegister={mode === 'register'}
         />
 
         <AssistantModals
@@ -529,7 +635,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             message="La pagina resta accessibile, ma per usare l'assistente serve la chiave ANTHROPIC_API_KEY nell'ambiente."
           />
         ) : (
-          <>
+          <RegisterRefsProvider refs={registerReads.refs} readFailed={registerReads.readFailed} submitAnswer={(text) => streaming.submit(text)}>
             {/* The verdict is the context; the page's one axis sits beside it from desktop. */}
             <div className="flex flex-col gap-4 pt-1 desktop:flex-row desktop:items-start desktop:justify-between desktop:gap-6">
               {verdict ? (
@@ -537,6 +643,20 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               ) : (
                 <TileGridSkeleton cells={[]} className="max-w-[920px] flex-1" />
               )}
+              {isRegister ? (
+                // Registra has no period: the axis gives way to one line and the way back.
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 desktop:max-w-[360px] desktop:shrink-0 desktop:justify-end">
+                  <p className={TILE_SUB_EYEBROW_CLASS}>Registra · l&apos;Assistente conosce categorie, conti e le ultime righe</p>
+                  <button
+                    type="button"
+                    onClick={leaveRegister}
+                    disabled={isStreaming}
+                    className="inline-flex min-h-11 items-center rounded-md text-[13px] font-medium text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 desktop:min-h-0"
+                  >
+                    Torna all&apos;analisi
+                  </button>
+                </div>
+              ) : (
               <div className="min-w-0 desktop:shrink-0">
                 <AssistantPeriodSelector
                   mode={mode}
@@ -552,6 +672,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   disabled={isStreaming}
                 />
               </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-3 desktop:grid-cols-[2fr_1fr] desktop:items-start">
@@ -576,8 +697,11 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   streamingMessageId={streamingMessageId}
                   followUps={followUps}
                   onRetry={streaming.retry}
-                  onFollowUpSelect={(prompt) => streaming.submit(prompt)}
+                  onFollowUpSelect={handleFollowUpSelect}
                   conversationEndRef={conversationEndRef}
+                  mode={mode}
+                  threadId={selectedThreadId}
+                  recordProposal={streaming.recordProposal}
                 />
 
                 {/* Sticky composer — stays at the bottom of the viewport as the conversation grows. */}
@@ -591,13 +715,29 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                     canSubmit={canSubmit}
                     placeholder={composerPlaceholder}
                     errorHint={composerErrorHint}
+                    inputRef={composerRef}
                   />
                 </div>
               </div>
 
               {/* ── Hero right: the companion, sticky and self-start so it can travel ── */}
-              <div className="flex min-w-0 flex-col gap-3 desktop:sticky desktop:top-5 desktop:self-start">
-                {companionTiles}
+              <div className="min-w-0 desktop:sticky desktop:top-5 desktop:self-start">
+                {/* A change of mode slides the companion's content and nothing else: the conversation
+                    stays still (DESIGN.md § 5, «The Assistente page»). The first render does not move. */}
+                <AnimatePresence mode="wait" initial={false} custom={scene.direction}>
+                  <motion.div
+                    key={scene.mode}
+                    data-scene={scene.mode}
+                    custom={scene.direction}
+                    variants={prefersReducedMotion ? sceneVariantsReduced : sceneVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    className="flex min-w-0 flex-col gap-3"
+                  >
+                    {companionTiles}
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
 
@@ -608,7 +748,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               description="Un percorso guidato: le tue risposte, due agenti, una proposta da applicare con un tasto."
             />
             <AssistantComeFunziona />
-          </>
+          </RegisterRefsProvider>
         )}
       </PageContainer>
     </ProtectedRoute>

@@ -23,7 +23,7 @@ Companion documents — do not duplicate their content into this file:
 UI patterns, testing, workflow. **A rule about one area's behaviour lives in `doc/guide/<tema>.md`**, one file per
 page, tab, integration or subsystem, read only by whoever touches that area: the pages (`panoramica`, `patrimonio`,
 `cashflow*`, `rendimenti`, …), the cross-cutting subsystems since 2026-09-06 (`stati`, `dialog`, `temi`,
-`account-condiviso-demo`, Settings inside `impostazioni`), the test harness since 2026-09-20 (`e2e-emulatori`), the
+`account-condiviso-demo`, Settings inside `impostazioni`), the test harness since 2026-09-20 (`e2e-emulatori`; its Playwright half since 2026-11-11, `e2e-playwright`), the
 shell and the persisted cache since 2026-09-30 (`shell`, `cache-persistita`), the first-screen census since 2026-10-10
 (`prima-schermata`; its record — baselines, fixture table, widened entries — since 2026-10-17, `prima-schermata-misure`), and since 2026-10-10 the charts (`grafici`) and the server layer (`server`), which left this file
 whole, the two-step dialogs and the form reset joining `dialog` the same day, and since 2026-11-06 the motion (`motion`:
@@ -454,7 +454,7 @@ file used to carry.
 - STRUCTURE IS NEVER PARSED FROM PROSE: the strategy and the review answer as a structured output, `{ markdown, proposal }` (`allocationAdviceAnswerSchema`, 2026-10-23 — the API guarantees the shape, not the sums: classes without a fixed amount sum to 100, sleeves sum to 100 or are empty, names copied EXACTLY from the STRUMENTI block, all checked by `parseAllocationAnswer`; a goal's mix travels as `{ assetClass, percentage }` pairs, because the API writes an object's keys in schema order and a mix written out of order fell short of 100); a strategy that breaks them fails the run, a review that does keeps the strategy's proposal. The instrument search keeps ONE fenced ```instrument-candidates block: web search answers with citations, which structured outputs refuse (400).
 - «Applica» shows its plans before writing, one checkbox each (`allocationAdviceApply.ts`): the targets through `setSettings`, a role through `updateAssetAllocationRole` (the ONE field; the other asset writers delete absent fields), the goals as a whole document through `saveGoalData` with over-100% quotas reduced and SAID; the «applied» route records it; the review date lives in the document and reaches the Allocazione header through `describeReviewBy`.
 - «Chiedi una modifica» on the report is a `revise` request (`runRevise`, `buildRevisionPrompt`): the review again with the previous report and every request so far, `document.revisions` appended, the status back to `ready`; never a new strategy or search.
-- A probe never runs the Consulente's model (2026-11-01): the E2E specs fake `/api/allocation-advice/run` with `page.route` (one handler per spec: `e2e/consulenteInterview.ts` scripts the interview's rounds and records the strategy and revise bodies — a strategy answers with an error, a revise completes —, the run spec scripts its three stages and the retry) — the `.env.local` key only enables the controls on :3100 (doc/guide/e2e-emulatori.md § Browser-Driven E2E); the real run is made once, on the mirror.
+- A probe never runs the Consulente's model (2026-11-01): the E2E specs fake `/api/allocation-advice/run` with `page.route` (one handler per spec: `e2e/consulenteInterview.ts` scripts the interview's rounds and records the strategy and revise bodies — a strategy answers with an error, a revise completes —, the run spec scripts its three stages and the retry) — the `.env.local` key only enables the controls on :3100 (doc/guide/e2e-playwright.md § Browser-Driven E2E); the real run is made once, on the mirror.
 - Il resto — the reducer and its sub-screens, the stale run, the demo gate, the prompts' contract — in `doc/guide/consulente.md`.
 
 ### Previdenza · Fondo Pensione → `doc/guide/previdenza.md`
@@ -477,7 +477,7 @@ file used to carry.
 - ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 5 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's interview and strategy and of the emails' AI comments, always under the same note (decision 81, 2026-11-07). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
 - A silent cap in a context builder becomes a hallucinated "N/D": a cap either does not exist or is stated in the text the model reads. `ASSISTANT_SYSTEM_CORE` is shared with `buildEmailAiPrompt`.
 - A free question with NO context still gets the portfolio of today (`buildAssistantTodayContext` → `AssistantTodayContext`, the sixth argument of `buildChatPrompt`, 2026-10-20): the period bundle is a chosen period's, never a substitute for the portfolio.
-- THE PROPOSAL PROTOCOL: the AI never writes — it emits ONE fenced ```goal-proposal block, the write happens on the user's Conferma via `POST /api/goals` (a new goal) or `PATCH /api/goals` (`goalId`, a rewrite in place, 2026-10-20); `goalProposal.ts` owns the ONE zod schema, quotas travel by instrument NAME and the card resolves them to ids.
+- THE PROPOSAL PROTOCOL: the AI never writes — it emits fenced blocks that a card turns into a write on the user's Conferma: ONE ```goal-proposal (`POST`/`PATCH /api/goals`, `goalProposal.ts` the ONE schema, quotas by instrument NAME) and, in Registra (2026-11), up to five ```expense-proposal (`expenseProposal.ts`; the browser writes through `createExpenseSettledOnDate`, never a server route); a card's outcome is saved on its message (`proposals["kind:N"]`, N the block's rank among its language's blocks, derived from the markdown, never counted in render) through `PATCH …/messages/[messageId]`, so a reload never writes twice.
 - **The portfolio block is REQUIRED and the allocation it reads is the Allocazione PAGE's base** (2026-10-20, `lib/utils/assistantPortfolioContext.ts`): every instrument with its role, the ledger, the registers, the household — printed whole or with the cut declared; never the snapshot's whole patrimony against the targets. **Every expense window is an Italian calendar window** (`getItalyMonthBoundsUtc`): the rows sit at Italian midnight and Vercel runs in UTC.
 - Il resto — memory merge rules, `deleteAssistantThread` batching, the verdict-is-the-context rules, streaming traps, the 64 000-token chat budget — in `doc/guide/assistente.md`.
 
@@ -682,7 +682,7 @@ file used to carry.
   DESIGN.md → The First-Screen Rule; Hall of Fame lost its `order-1…5` on 2026-10-10,
   `e2e/mobile-composition.hof.mobile.spec.ts` holds the DOM-equals-vertical order at 390 and 1440 and the `order-*`
   utilities in `main` at 0 — read from `classList` with `/^(?:[a-z-]+:)*order-/`, since `[class*="order-"]` matches
-  every `border-*`, doc/guide/e2e-emulatori.md). The Panoramica lost its `order-1…8` on 2026-10-11
+  every `border-*`, doc/guide/e2e-playwright.md). The Panoramica lost its `order-1…8` on 2026-10-11
   (`e2e/overview.{mobile.,}spec.ts`), the five Cashflow tabs theirs on 2026-10-12 (Budget, Centri, the centre's detail,
   Dividendi; `e2e/mobile-composition.cashflow.mobile.spec.ts`), Rendimenti its `order-1…8` on 2026-10-14
   (`e2e/mobile-composition.performance.degraded.mobile.spec.ts`), Analisi its `order-1…7` and Storico its `order-*` on
@@ -869,7 +869,7 @@ file used to carry.
   two-process anatomy of the mirror, the Windows `_admin/export` call and its slash trap, a port 3000 or 3100 held by
   another app — in `doc/guide/e2e-emulatori.md`.
 
-### Browser-Driven E2E (Playwright) → `doc/guide/e2e-emulatori.md`
+### Browser-Driven E2E (Playwright) → `doc/guide/e2e-playwright.md`
 - **What belongs in a browser test**: only what needs a real layout (the `desktop:` switch at 1440px, a collapsible, a
   state flash, computed sizes, bounding boxes, overflow); the arithmetic stays with Vitest. A query race and an error
   branch reached by cutting the network are NOT reproducible locally.
@@ -887,16 +887,16 @@ file used to carry.
 - **Prove the test can fail before trusting it**, breaking ONE behaviour at a time (2026-09-18). **Assert on Firestore,
   not on pixels**: plant a decoy word absent from the seed, and remove the fixture BY THE APP, not by `curl -X DELETE`
   (2026-08-31). On the BASE account FIRE figures depend on the run month: assert STRUCTURE and FORMAT, never amounts.
-- **Proving a refactor changed no number**: measure the noise floor first (two dumps of unchanged code), compare
+- **Proving a refactor changed no number** (doc/guide/e2e-emulatori.md, its own section): measure the noise floor first (two dumps of unchanged code), compare
   old-vs-new MINUTES apart, and compare the SET of rendered values, not the page text.
 - **In the cloud container** (2026-09-25) the pinned Chromium is missing (a throwaway `playwright.local.config.ts` sets
   `executablePath`), its own Chromium groups «1.100 €» (four base specs read red there only), and no spec can import
-  `lib/` (no `@/` alias): doc/guide/e2e-emulatori.md.
+  `lib/` (no `@/` alias): doc/guide/e2e-playwright.md.
 - Il resto — the page-reading traps (`addInitScript`, `innerText`, `boundingBox`, hidden mobile duplicates, hydration
   wiping a `fill()`), the vaul drawer after Escape, locators that are not buttons and substring matching (`exact: true`),
   the euro regex and U+202F, forcing a server flag on the response, the settings reload rule, the armed two-click
   confirm, the three tour-spec traps, the frozen clock and the empty closed row of a phone spec, Java ≥ 21 and foreign
-  emulators on 8080/9099 — in `doc/guide/e2e-emulatori.md`.
+  emulators on 8080/9099 — in `doc/guide/e2e-playwright.md`.
 
 ### Performance tooling → `doc/guide/velocita.md`
 - **Three tools, one port**: `npm run perf:budget` (JS per route against `perf/budget.json`, two seconds, no server),
@@ -952,7 +952,7 @@ file used to carry.
 - **A spec that edits a document another fixture writes RESTORES what it read, never deletes** (2026-09-11,
   `cashflow.owner.spec.ts`) — the WHOLE document when a page save rewrites it (2026-09-25,
   `e2e/cashflow.transfer-fee.spec.ts` with `set()`); a fixture ISIN is one the account never held; a fixture date is UTC
-  midnight like the form's — doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright).
+  midnight like the form's — doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright).
 - **An assertion of ABSENCE needs a positive anchor first**: `toHaveCount(0)` passes against a page that has not
   rendered — wait for something expected in both states, then assert the absence; a chunk held from the first
   navigation keeps an absence at mount green whatever the page mounts (2026-10-07, `e2e/assets.rows.mobile.spec.ts`).
