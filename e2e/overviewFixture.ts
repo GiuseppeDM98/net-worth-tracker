@@ -8,7 +8,7 @@
  * a curve with last December, January and the running month, so the YTD window exists;
  * `hasTERTracking` on, so the Costi row renders (seven rows; `overview.tablet.spec.ts` reuses it). The tax
  * scenarios pass a tax of ≥ 10.000 €: the container's Chromium groups «1.100 €» where the pinned
- * one does not (doc/guide/e2e-emulatori.md § Browser-Driven E2E).
+ * one does not (doc/guide/e2e-playwright.md § Browser-Driven E2E).
  *
  * A helper, not a spec: no project collects it (`testMatch`), it only exports.
  */

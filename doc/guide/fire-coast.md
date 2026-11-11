@@ -87,7 +87,7 @@
   «Scenari Coast FIRE»), the verdict by «Verdetto sul Coast FIRE», the disclosures by their VISIBLE text (`/^Ipotesi/`,
   `/^Dettaglio/` — the Ipotesi trigger carries the basis line, so it can be asserted closed), the hero as
   `p:has-text("numero Coast FIRE") + span`, the scenario list by `role=list` «Numero Coast FIRE per scenario». The
-  fixture fixes expenses but not the clock: structure and format only (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+  fixture fixes expenses but not the clock: structure and format only (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
   The base seed records little income, so on the fixture the pace clause reads «non lo raggiungi prima dei 60 anni»
   and the chart draws no marker — the spec accepts both phrasings.
 

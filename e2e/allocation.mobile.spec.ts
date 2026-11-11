@@ -18,7 +18,7 @@
  * (`scripts/instrumentProfileFixtures.ts`), quindi nessuna chiamata alla rete. Si asserisce la
  * STRUTTURA, mai una cifra: gli importi dipendono dai prezzi del seed e dal mese in cui gira la suite.
  * Ogni caso che legge dentro l'Esposizione la APRE prima: sotto `desktop:` una riga mai aperta ha
- * il pannello vuoto (doc/guide/e2e-emulatori.md).
+ * il pannello vuoto (doc/guide/e2e-playwright.md).
  *
  * Visti rossi il 2026-10-15, una cosa alla volta: (1) il valore del KPI nascosto a prescindere dalla
  * striscia (sul fixture base la cella è «nulla» e il KPI resta intero); (2) `reveal` senza il `focus()`; (3) `enabled` sempre vero nel

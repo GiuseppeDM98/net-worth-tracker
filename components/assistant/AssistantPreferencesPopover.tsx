@@ -41,7 +41,7 @@ export function AssistantPreferencesPopover({
           size="icon"
           disabled={disabled}
           title={disabled ? 'Non disponibile in modalità demo' : undefined}
-          className="h-8 w-8"
+          className="h-11 w-11 desktop:h-9 desktop:w-9"
           aria-label="Preferenze assistente"
         >
           <Settings2 className="h-4 w-4 text-muted-foreground" />

@@ -17,7 +17,11 @@ const {
   assetsGetMock,
   goalDocGetMock,
   expenseWhereCalls,
+  budgetDocGetMock,
+  getDashboardOverviewMock,
 } = vi.hoisted(() => ({
+  budgetDocGetMock: vi.fn(),
+  getDashboardOverviewMock: vi.fn(),
   snapshotsGetMock: vi.fn(),
   expensesGetMock: vi.fn(),
   settingsDocGetMock: vi.fn(),
@@ -61,6 +65,9 @@ vi.mock('@/lib/firebase/admin', () => ({
           get: assetsGetMock,
         };
       }
+      if (name === 'budgets') {
+        return { doc: vi.fn(() => ({ get: budgetDocGetMock })) };
+      }
       if (name === 'goalBasedInvesting') {
         return {
           doc: vi.fn(() => ({ get: goalDocGetMock })),
@@ -75,6 +82,8 @@ vi.mock('@/lib/firebase/admin', () => ({
 // assetService) — mock to avoid real init.
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
 vi.mock('server-only', () => ({}));
+// The Panoramica's summary, read by the Registra inputs alone: its own suite covers it.
+vi.mock('@/lib/services/dashboardOverviewService', () => ({ getDashboardOverview: getDashboardOverviewMock }));
 
 import {
   buildAssistantMonthContext,
@@ -82,9 +91,10 @@ import {
   buildAssistantTodayContext,
   buildAssistantYearContext,
   fetchCashflowBlockInputs,
+  fetchRegisterInputs,
 } from '@/lib/services/assistantMonthContextService';
 import { calculateAssetValue } from '@/lib/services/assetService';
-import { getItalyMonthBoundsUtc } from '@/lib/utils/dateHelpers';
+import { getItalyDateIso, getItalyMonthBoundsUtc } from '@/lib/utils/dateHelpers';
 import { MonthlySnapshot } from '@/types/assets';
 import { Expense } from '@/types/expenses';
 
@@ -974,5 +984,77 @@ describe('fetchCashflowBlockInputs', () => {
       defaultCreditCashAssetId: 'acc-credit',
     });
     expect(result.assetValueOf).toBe(calculateAssetValue);
+  });
+});
+
+// ─── The Registra mode's inputs (2026-11) ──────────────────────────────────────────────
+
+describe('fetchRegisterInputs', () => {
+  const STATS = { currentMonth: { income: 2000, expenses: 1500, net: 500 }, previousMonth: { income: 0, expenses: 0, net: 0 } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSettings(undefined, { defaultDebitCashAssetId: 'acc-debit', costCentersEnabled: true, expenseSplitEnabled: false });
+    mockAssets([makeAssetDoc('acc-debit', 'cash', 1000)]);
+    mockExpenses([makeExpenseDoc(-50, 'svago', new Date('2026-10-10T10:00:00Z'), { type: 'variable' })]);
+    expenseWhereCalls.length = 0;
+    getDashboardOverviewMock.mockResolvedValue({ expenseStats: STATS });
+    budgetDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
+  });
+
+  it.each([
+    // now, the window's first Italian month, the Italian day it ends on
+    ['2026-11-01T10:00:00Z', [2025, 12], '2026-11-01'],
+    ['2026-01-15T10:00:00Z', [2025, 2], '2026-01-15'],
+    // 23:30 UTC on 31 October is already 1 November in Rome.
+    ['2026-10-31T23:30:00Z', [2025, 12], '2026-11-01'],
+  ] as const)('at %s reads ONE window of expenses: eleven Italian months back to the end of the Italian today', async (nowIso, [fy, fm], todayIso) => {
+    const now = new Date(nowIso);
+    const result = await fetchRegisterInputs('user1', now);
+
+    expect(expensesGetMock).toHaveBeenCalledTimes(1);
+    const [start, end] = queriedExpenseBounds();
+    expect(start.toISOString()).toBe(getItalyMonthBoundsUtc(fy, fm).start.toISOString());
+    expect(getItalyDateIso(end)).toBe(todayIso);
+    expect(getItalyDateIso(new Date(end.getTime() + 1))).not.toBe(todayIso);
+    expect(expenseWhereCalls.find((call) => call.field === 'userId')?.value).toBe('user1');
+    expect(result.now).toBe(now);
+    expect(result.recentExpenses).toHaveLength(1);
+    expect(result.settings).toMatchObject({ defaultDebitCashAssetId: 'acc-debit', costCentersEnabled: true, expenseSplitEnabled: false });
+    expect(result.assetValueOf).toBe(calculateAssetValue);
+  });
+
+  it('hands the month the Panoramica’s summary of the same instant, and «no budget» for a missing document', async () => {
+    const now = new Date('2026-11-01T10:00:00Z');
+    const result = await fetchRegisterInputs('user1', now);
+    expect(getDashboardOverviewMock).toHaveBeenCalledWith('user1', { now });
+    expect(result.month).toEqual({ stats: STATS, budget: null, budgetFailed: false });
+  });
+
+  it('back-fills a legacy budget item as the Budget tab reads it', async () => {
+    budgetDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ items: [{ id: 'b1', scope: 'category', categoryId: 'cibo', monthlyAmount: 600, order: 0 }], updatedAt: new Date('2026-10-01T10:00:00Z') }),
+    });
+    const result = await fetchRegisterInputs('user1', new Date('2026-11-01T10:00:00Z'));
+    expect(result.month?.budget?.items[0]).toMatchObject({ id: 'b1', amount: 600, period: 'monthly', kind: 'expense' });
+  });
+
+  it('still resolves when the summary read rejects: stats null, never a failed stream', async () => {
+    getDashboardOverviewMock.mockRejectedValue(new Error('overview failed'));
+    const result = await fetchRegisterInputs('user1', new Date('2026-11-01T10:00:00Z'));
+    expect(result.month).toEqual({ stats: null, budget: null, budgetFailed: false });
+    expect(result.categories).toBeDefined();
+  });
+
+  it('still resolves when the budget read rejects, and says so', async () => {
+    budgetDocGetMock.mockRejectedValue(new Error('budget failed'));
+    const result = await fetchRegisterInputs('user1', new Date('2026-11-01T10:00:00Z'));
+    expect(result.month).toMatchObject({ stats: STATS, budget: null, budgetFailed: true });
+  });
+
+  it('rejects when a core read does: without the rows no proposal can be made', async () => {
+    expensesGetMock.mockRejectedValue(new Error('expenses failed'));
+    await expect(fetchRegisterInputs('user1', new Date('2026-11-01T10:00:00Z'))).rejects.toThrow('expenses failed');
   });
 });

@@ -38,7 +38,7 @@ export function AssistantPromptRows({ rows, onSelect, disabled, ariaLabel }: Ass
             onClick={() => onSelect(row)}
             disabled={disabled}
             className={cn(
-              'flex min-h-11 w-full items-center gap-2.5 py-[9px] text-left text-[13px] text-foreground transition-colors',
+              'group flex min-h-11 w-full items-center gap-2.5 py-[9px] text-left text-[13px] text-foreground transition-colors',
               'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
               'disabled:pointer-events-none disabled:opacity-50',
               'desktop:-mx-2 desktop:min-h-0 desktop:w-[calc(100%+16px)] desktop:rounded-md desktop:px-2',
@@ -46,7 +46,11 @@ export function AssistantPromptRows({ rows, onSelect, disabled, ariaLabel }: Ass
             )}
           >
             {row.primary ? (
-              <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              // The row asks the model: its spark turns the AI accent on hover and keyboard focus, never at rest.
+              <Sparkles
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors duration-200 group-hover:text-[color:var(--ai-accent)] group-focus-visible:text-[color:var(--ai-accent)]"
+                aria-hidden="true"
+              />
             ) : row.webSearch ? (
               <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             ) : (

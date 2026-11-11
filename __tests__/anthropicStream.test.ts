@@ -19,7 +19,8 @@ vi.mock('@/lib/server/assistant/prompts', async (importOriginal) => {
   };
 });
 
-import { streamAssistantResponse } from '@/lib/server/assistant/anthropicStream';
+import { ASSISTANT_REGISTER_MAX_TOKENS, streamAssistantResponse } from '@/lib/server/assistant/anthropicStream';
+import { buildRegisterPrompt } from '@/lib/server/assistant/prompts';
 import { ASSISTANT_MODEL, SERVER_SIDE_FALLBACK_BETA } from '@/lib/constants/aiModels';
 
 const OVERLOADED_MESSAGE = 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.';
@@ -170,5 +171,38 @@ describe('streamAssistantResponse — the CASHFLOW 12 MESI block (2026-11)', () 
     const params = create.mock.calls[0][0] as unknown as { system: string; messages: { content: string }[] };
     expect(JSON.stringify(params.messages)).toContain('BLOCCO');
     expect(JSON.stringify(params.system)).not.toContain('BLOCCO');
+  });
+});
+
+describe('streamAssistantResponse — Registra (2026-11)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function* empty() {}
+
+  it('sends the register prompt with its own token ceiling and no tool, whatever the web-search flag', async () => {
+    const create = vi.spyOn(Anthropic.Beta.Messages.prototype, 'create').mockResolvedValue(empty() as never);
+
+    await streamAssistantResponse({
+      mode: 'register',
+      prompt: 'ho fatto spesa per 103 euro',
+      contextBundle: null,
+      registerBlock: 'BLOCCO REGISTRA',
+      cashflowBlock: 'BLOCCO',
+      preferences,
+      enableWebSearch: false,
+      onStatus: vi.fn(),
+      onText: vi.fn(),
+    });
+
+    const expected = buildRegisterPrompt('ho fatto spesa per 103 euro', preferences, [], 'BLOCCO REGISTRA', 'BLOCCO');
+    const params = create.mock.calls[0][0] as unknown as { system: unknown; max_tokens: number; tools?: unknown; messages: { content: unknown }[] };
+    expect(ASSISTANT_REGISTER_MAX_TOKENS).toBe(16000);
+    expect(params.max_tokens).toBe(16000);
+    expect(params.tools).toBeUndefined();
+    expect(JSON.stringify(params.system)).toContain(JSON.stringify(expected.system).slice(1, -1));
+    expect(JSON.stringify(params.messages)).toContain('BLOCCO REGISTRA');
+    expect(JSON.stringify(params.system)).not.toContain('BLOCCO REGISTRA');
   });
 });

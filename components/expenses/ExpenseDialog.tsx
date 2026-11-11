@@ -288,7 +288,7 @@ const RECURRENCE_FREQUENCY_OPTIONS = [
   { value: 'yearly' as const, label: RECURRENCE_FREQUENCY_LABELS.yearly },
 ];
 
-function isAdvancedPrePopulated(expense: Expense | null | undefined): boolean {
+function isAdvancedPrePopulated(expense: Pick<Expense, 'costCenterId' | 'propertyAssetId' | 'link' | 'isInstallment' | 'isRecurring'> | null | undefined): boolean {
   if (!expense) return false;
   return !!(expense.costCenterId || expense.propertyAssetId || expense.link || expense.isInstallment || expense.isRecurring);
 }
@@ -398,10 +398,19 @@ export interface SavedExpense {
   row: Expense;
 }
 
+/**
+ * A NEW row opened already filled (2026-11): the row the Assistente proposed, handed over by
+ * «Modifica» on its card. Part of the opening subject, like `expense` — the host passes a value
+ * frozen at the click, or a refetch that rebuilt the object would reset what the user typed.
+ */
+export type ExpenseDialogInitialValues = Partial<ExpenseFormData>;
+
 interface ExpenseDialogProps {
   open: boolean;
   onClose: () => void;
   expense?: Expense | null;
+  /** Create mode only: the values the form opens on (step 2 when they name a category). Ignored with `expense`. */
+  initialValues?: ExpenseDialogInitialValues | null;
   /** After the write and its balances, before the close; `saved` is the row (never `null` today — the type leaves room for a save that writes none). */
   onSuccess?: (saved: SavedExpense | null) => void;
   /**
@@ -1483,7 +1492,7 @@ const EMPTY_ASSETS: Asset[] = [];
 const EMPTY_COST_CENTERS: CostCenter[] = [];
 const EMPTY_FAMILY_MEMBERS: FamilyMember[] = [];
 
-export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo }: Readonly<ExpenseDialogProps>) {
+export function ExpenseDialog({ open, onClose, expense, initialValues, onSuccess, returnFocusTo }: Readonly<ExpenseDialogProps>) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
@@ -1639,19 +1648,25 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
   // (`react-hooks/set-state-in-effect`). Re-running on every open is what makes a second
   // "nuova voce" start from the picker again — `expense` stays null between opens. The form
   // itself is reset in the effect further down: `reset` is not a state setter.
+  // `initialValues` (a new row opened already filled) is part of the subject: the same dialog
+  // opened on another proposal starts from that proposal.
   const [openSubject, setOpenSubject] = useState<{
     open: boolean;
     expense: Expense | null | undefined;
+    initialValues: ExpenseDialogInitialValues | null | undefined;
   } | null>(null);
-  if (!openSubject || openSubject.open !== open || openSubject.expense !== expense) {
-    setOpenSubject({ open, expense });
+  if (!openSubject || openSubject.open !== open || openSubject.expense !== expense || openSubject.initialValues !== initialValues) {
+    setOpenSubject({ open, expense, initialValues });
     if (open) {
+      // What fills the non-form fields: the edited row, else the values a new row opens on.
+      const source = expense ?? initialValues;
       setStatus({ phase: 'idle' });
-      setStep(expense ? 2 : 1);
-      setAdvancedOpen(isAdvancedPrePopulated(expense));
-      setSelectedCostCenterId(expense?.costCenterId || '__none__');
-      setSelectedPropertyId(expense?.propertyAssetId || '__none__');
-      setPersonalMemberId(expense?.personalMemberId || '');
+      // A prefilled row has its type and category already: it opens on the form, not on the picker.
+      setStep(expense || initialValues?.categoryId ? 2 : 1);
+      setAdvancedOpen(isAdvancedPrePopulated(source));
+      setSelectedCostCenterId(source?.costCenterId || '__none__');
+      setSelectedPropertyId(source?.propertyAssetId || '__none__');
+      setPersonalMemberId(source?.personalMemberId || '');
     }
   }
 
@@ -1661,10 +1676,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
   }, [open, expense]);
 
   useEffect(() => {
+    // A prefilled row keeps its subcategory while its category is the one it opened on.
+    if (initialValues?.categoryId && selectedCategoryId === initialValues.categoryId) return;
     if (!expense) {
       setValue('subCategoryId', '');
     }
-  }, [selectedCategoryId, expense, setValue]);
+  }, [selectedCategoryId, expense, initialValues, setValue]);
 
   // Auto-set transfer category when type changes to 'transfer'.
   // Guard with a ref to avoid re-fetching if the user toggles type back and forth.
@@ -1744,19 +1761,33 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
         debtAssetId: '__none__',
         isDebtPayoff: false,
         excludeFromBudget: false,
+        // A new row opened already filled: its values over the blank ones, field by field (the
+        // cost centre, the property and the member are not form fields — the opening subject
+        // above takes them).
+        ...(initialValues?.type !== undefined ? { type: initialValues.type } : {}),
+        ...(initialValues?.categoryId !== undefined ? { categoryId: initialValues.categoryId } : {}),
+        ...(initialValues?.subCategoryId !== undefined ? { subCategoryId: initialValues.subCategoryId } : {}),
+        ...(initialValues?.amount !== undefined ? { amount: initialValues.amount } : {}),
+        ...(initialValues?.currency !== undefined ? { currency: initialValues.currency } : {}),
+        ...(initialValues?.date !== undefined ? { date: initialValues.date, recurringDay: initialValues.date.getDate() } : {}),
+        ...(initialValues?.notes !== undefined ? { notes: initialValues.notes } : {}),
+        ...(initialValues?.link !== undefined ? { link: initialValues.link } : {}),
+        ...(initialValues?.linkedCashAssetId !== undefined ? { linkedCashAssetId: initialValues.linkedCashAssetId } : {}),
+        ...(initialValues?.excludeFromBudget !== undefined ? { excludeFromBudget: initialValues.excludeFromBudget } : {}),
       });
     }
-  }, [expense, reset, open]);
+  }, [expense, initialValues, reset, open]);
 
   // A NEW row opens on the default account of its type (Impostazioni › Spese) once the settings
   // have answered. Declared AFTER the reset effect above, so in the commit that opens the dialog
   // the reset clears the field first and this fills it — the order the old async loader had.
   useEffect(() => {
-    if (!open || expense || !settings) return;
+    // A prefilled row names its account: the default must not replace it.
+    if (!open || expense || !settings || initialValues?.linkedCashAssetId) return;
     const currentType = getValues('type');
     const defaultId = currentType === 'income' ? defaultCreditCashAssetId : defaultDebitCashAssetId;
     if (defaultId !== '__none__') setValue('linkedCashAssetId', defaultId);
-  }, [open, expense, settings, defaultCreditCashAssetId, defaultDebitCashAssetId, getValues, setValue]);
+  }, [open, expense, initialValues, settings, defaultCreditCashAssetId, defaultDebitCashAssetId, getValues, setValue]);
 
   // The fee row of an edited row is read at each opening and its amount put in the field:
   // the fee is edited FROM its parent (lib/utils/expenseFee.ts). Promise-style, so the setters
@@ -1780,14 +1811,14 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
   }, [open, expense, setValue]);
 
   useEffect(() => {
-    if (!expense && open) {
+    if (!expense && open && !initialValues?.linkedCashAssetId) {
       const defaultId =
         selectedType === 'income' ? defaultCreditCashAssetId : defaultDebitCashAssetId;
       if (defaultId !== '__none__') {
         setValue('linkedCashAssetId', defaultId);
       }
     }
-  }, [defaultDebitCashAssetId, defaultCreditCashAssetId, selectedType, expense, open, setValue]);
+  }, [defaultDebitCashAssetId, defaultCreditCashAssetId, selectedType, expense, initialValues, open, setValue]);
 
   useEffect(() => {
     if (selectedDate && selectedIsRecurring && !expense) {

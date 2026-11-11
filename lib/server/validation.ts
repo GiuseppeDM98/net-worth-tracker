@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
+import { ASSISTANT_PROMPT_MAX_LENGTH } from '@/lib/utils/assistantPeriodOptions';
 
 /**
  * Server-side input validation schemas (SEC-3).
@@ -162,6 +163,48 @@ export const assistantThreadCursorSchema = z
   .min(1)
   .max(1500)
   .regex(/^[^/]+$/, 'Invalid thread cursor');
+
+/**
+ * POST /api/ai/assistant/stream — EVERY field of `AssistantStreamRequest` (types/assistant.ts) is
+ * declared: zod strips an undeclared key, so a field left out here would silently stop reaching
+ * the route. The mode is the app's six and nothing else — an unknown one used to fall through to
+ * the chat builder — and the prompt is capped in every mode (2026-11).
+ */
+export const assistantStreamRequestSchema = z.object({
+  userId: z.string().min(1),
+  mode: z.enum(['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'chat', 'register']),
+  prompt: z.string().trim().min(1).max(ASSISTANT_PROMPT_MAX_LENGTH),
+  threadId: assistantThreadCursorSchema.optional(),
+  month: z.object({ year: z.number().int(), month: z.number().int().min(1).max(12) }).optional(),
+  year: z.number().int().optional(),
+  chatContext: z.enum(['none', 'month', 'year', 'ytd', 'history']).optional(),
+  preferences: z
+    .object({
+      responseStyle: z.enum(['balanced', 'concise', 'deep']),
+      includeMacroContext: z.boolean(),
+      memoryEnabled: z.boolean(),
+      includeDummySnapshots: z.boolean(),
+    })
+    .partial()
+    .optional(),
+});
+
+/**
+ * PATCH /api/ai/assistant/threads/[threadId]/messages/[messageId] — the outcome of a card of the
+ * message. The key is `proposalKey(kind, index)` (lib/utils/expenseProposal.ts) and becomes a
+ * Firestore field path, so it is a closed shape; `answer` belongs to an answered question only.
+ */
+export const proposalPatchSchema = z
+  .object({
+    userId: z.string().min(1),
+    key: z.string().regex(/^(expense|goal|question):\d+$/, 'Invalid proposal key'),
+    status: z.enum(['written', 'ignored', 'answered']),
+    writtenIds: z.array(z.string().min(1)).max(60).optional(),
+    answer: z.string().max(2000).optional(),
+  })
+  .refine((body) => body.answer === undefined || body.status === 'answered', {
+    message: 'answer belongs to an answered question',
+  });
 
 /**
  * GET /api/ai/assistant/context?includeDummy= — the test-snapshot preference the page already

@@ -86,6 +86,11 @@ interface ExpenseTableProps {
    * is off, so no row is labelled by a feature the account does not use.
    */
   memberNames?: Map<string, string> | null;
+  /**
+   * The row a link asked for (`?row=`, 2026-11-11): the table turns to its page under the current
+   * sort, brings it into view once and marks it. Cleared by the host on the next gesture.
+   */
+  focusRowId?: string | null;
 }
 
 // ─── The row ──────────────────────────────────────────────────────────────────
@@ -105,6 +110,8 @@ interface ExpenseTableRowProps {
   onDelete: (expense: Expense) => void;
   /** The table's one live region: arm and disarm are sentences, spoken there. */
   announce: (text: string) => void;
+  /** The row a link landed on (`?row=`): marked until the host forgets it. */
+  linked: boolean;
 }
 
 /**
@@ -113,7 +120,7 @@ interface ExpenseTableRowProps {
  * Accessibility, the Versamenti precedent). A row of a series does not arm — its first click
  * opens the question the series adds — and says so in its name.
  */
-function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryMeta, isDemo, busy, onEdit, onDelete, announce }: ExpenseTableRowProps) {
+function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryMeta, isDemo, busy, onEdit, onDelete, announce, linked }: ExpenseTableRowProps) {
   const rowName = expense.notes?.trim() || expense.categoryName;
   const isSeries = resolveSeriesDeleteMode(expense) !== null;
   const deleteRef = useRef<HTMLButtonElement | null>(null);
@@ -138,7 +145,11 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
   const CatIcon = categoryMeta?.icon ? LAZY_CATEGORY_ICONS[categoryMeta.icon] : undefined;
 
   return (
-    <TableRow className={cn(armed && 'bg-destructive/5')}>
+    <TableRow
+      data-expense-id={expense.id}
+      data-linked-row={linked ? 'true' : undefined}
+      className={cn(armed && 'bg-destructive/5', linked && 'bg-muted/60 outline outline-2 -outline-offset-2 outline-ring')}
+    >
       <TableCell className={cn(FIGURE_CLASS, 'text-foreground')}>
         <div className="flex items-center gap-1.5">
           {format(getExpenseDate(expense.date), 'dd/MM/yyyy', { locale: it })}
@@ -272,7 +283,7 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
 
 // ─── The table ────────────────────────────────────────────────────────────────
 
-export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasActiveFilters = false, categories = [], now, memberNames = null }: ExpenseTableProps) {
+export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasActiveFilters = false, categories = [], now, memberNames = null, focusRowId = null }: ExpenseTableProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
@@ -452,6 +463,24 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
     setCurrentPage(1);
   }
 
+  // The linked row's page, once per row and only on a settled view (a reset above wins this
+  // render and the landing comes with the next): the same «adjust during render» as the resets.
+  const [landedRowId, setLandedRowId] = useState<string | null>(null);
+  const linkedIndex = focusRowId && landedRowId !== focusRowId ? sortedExpenses.findIndex((expense) => expense.id === focusRowId) : -1;
+  if (linkedIndex >= 0 && prevView.length === expenses.length && prevView.sortCol === sortCol && prevView.sortDir === sortDir && prevView.pageSize === pageSize) {
+    setLandedRowId(focusRowId);
+    setCurrentPage(Math.floor(linkedIndex / pageSize) + 1);
+  }
+  // Into view once it is drawn: a ref, the effect only scrolls.
+  const scrolledRowId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusRowId || landedRowId !== focusRowId || scrolledRowId.current === focusRowId) return;
+    const row = document.querySelector(`tr[data-expense-id="${CSS.escape(focusRowId)}"]`);
+    if (!row) return;
+    scrolledRowId.current = focusRowId;
+    row.scrollIntoView({ block: 'center' });
+  }, [focusRowId, landedRowId, currentPage]);
+
   const handlePreviousPage = () => {
     setCurrentPage((prev: number) => Math.max(1, prev - 1));
   };
@@ -570,6 +599,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
                   onEdit={onEdit}
                   onDelete={handleDelete}
                   announce={announce}
+                  linked={expense.id === focusRowId}
                 />
               ))}
             </TableBody>

@@ -27,6 +27,9 @@ vi.mock('firebase/firestore', () => ({
 import {
   buildAssistantPeriodVerdict,
   buildNoContextVerdict,
+  buildRegisterVerdict,
+  describeRegisterContext,
+  describeRegisterFacts,
   describeAssistantCashflow,
   describeAssistantHeader,
   describeThreadsReading,
@@ -43,6 +46,7 @@ import {
   type AssistantPeriodInput,
 } from '@/lib/utils/assistantNarrative';
 import type { DashboardOverviewPayload } from '@/types/dashboardOverview';
+import type { AssistantRegisterSummary } from '@/types/assistant';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
 
 /**
@@ -582,5 +586,66 @@ describe('describeThreadsReading — the Conversazioni modal', () => {
       'Le 50 conversazioni più recenti: premine una per riprenderla; «Mostra altre» legge le precedenti.'
     );
     expect(text({ count: 100, loading: false, hasMore: true })).toMatch(/^Le 100 conversazioni più recenti/);
+  });
+});
+
+describe('Registra — the verdict and the panel (2026-11)', () => {
+  const account = (id: string): AssistantRegisterSummary['accounts'][number] => ({ id, name: id, balance: 100, roles: [] });
+  function summary(overrides: Partial<AssistantRegisterSummary> = {}): AssistantRegisterSummary {
+    return {
+      accounts: [account('a'), account('b'), account('c')], categories: 12, costCentersEnabled: true, membersEnabled: false, recent: null,
+      ...overrides,
+    };
+  }
+
+  it('says what the mode does before any read', () => {
+    const verdict = buildRegisterVerdict(null);
+    expect(verdict.headline).toBe("Registra una spesa o un'entrata.");
+    expect(verdict.tone).toBe('neutral');
+    expect(plain(verdict.sentence)).toBe('Scrivila come la diresti: te la propongo come riga e la scrivi tu con Conferma.');
+  });
+
+  it('says what the browser knows, then what the server read', () => {
+    expect(plain(buildRegisterVerdict(summary()).sentence)).toBe("Conosco 12 categorie e 3 conti: scrivi la spesa o l'entrata come la diresti.");
+    expect(plain(buildRegisterVerdict(summary({ recent: { rows: 300, cut: 10 } })).sentence)).toBe(
+      "Conosco 12 categorie, 3 conti e le ultime 300 righe: scrivi la spesa o l'entrata come la diresti.",
+    );
+  });
+
+  it('agrees in number and names an absence', () => {
+    expect(plain(buildRegisterVerdict(summary({ categories: 1, accounts: [account('a')] })).sentence)).toBe(
+      "Conosco 1 categoria e 1 conto: scrivi la spesa o l'entrata come la diresti.",
+    );
+    expect(plain(buildRegisterVerdict(summary({ categories: 0, accounts: [] })).sentence)).toBe(
+      "Conosco nessuna categoria e nessun conto: scrivi la spesa o l'entrata come la diresti.",
+    );
+    // No row read is not «le ultime 0 righe».
+    expect(plain(buildRegisterVerdict(summary({ recent: { rows: 0, cut: 0 } })).sentence)).toBe(
+      "Conosco 12 categorie e 3 conti: scrivi la spesa o l'entrata come la diresti.",
+    );
+  });
+
+  it('lists the panel’s facts, the rows only once the server has read them', () => {
+    expect(describeRegisterFacts(summary())).toEqual(['12 categorie', 'centri di costo attivi', 'Divisione non attiva']);
+    expect(describeRegisterFacts(summary({ categories: 0 }))[0]).toBe('nessuna categoria configurata');
+    expect(describeRegisterFacts(summary({ recent: { rows: 4, cut: 0 } })).at(-1)).toBe('ultime 4 righe lette');
+    expect(describeRegisterFacts(summary({ recent: { rows: 1, cut: 0 } })).at(-1)).toBe('ultima 1 riga letta');
+    expect(describeRegisterFacts(summary({ recent: { rows: 300, cut: 10 } })).at(-1)).toBe('ultime 300 righe lette (10 più vecchie omesse)');
+    expect(describeRegisterFacts(summary({ recent: { rows: 0, cut: 0 } })).at(-1)).toBe('nessuna riga negli ultimi dodici mesi');
+  });
+
+  it('reads the panel: loading, no account, the accounts', () => {
+    expect(plain(describeRegisterContext(null))).toBe('Sto leggendo conti e categorie.');
+    expect(plain(describeRegisterContext(summary({ accounts: [] })))).toBe('Nessun conto configurato: una riga registrata da qui non muove alcun saldo.');
+    expect(plain(describeRegisterContext(summary()))).toContain('il predefinito è quello usato se non ne nomini uno');
+  });
+
+  it('reads the conversation in register: where to write, then what Conferma does', () => {
+    expect(plain(describeConversation({ messageCount: 0, question: 'Cosa vuoi registrare?', periodLabel: null, webSearchUsed: false, mode: 'register' }))).toBe(
+      "Cosa vuoi registrare? Scrivi qui sotto la spesa o l'entrata.",
+    );
+    expect(plain(describeConversation({ messageCount: 4, question: '', periodLabel: null, webSearchUsed: false, mode: 'register' }))).toBe(
+      '4 messaggi; le righe proposte si scrivono solo su Conferma.',
+    );
   });
 });

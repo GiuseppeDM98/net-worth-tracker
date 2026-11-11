@@ -1,12 +1,44 @@
-// WARNING: If you add a mode here, also update:
-// - AssistantComposer.tsx (mode selector options) — skip for email-only modes
-// - anthropicStream.ts (buildPrompt routing, isStructured/isStructuredAnalysis arrays)
-// - prompts.ts (add prompt builder, getPeriodLabel)
-// - assistantMonthContextService.ts (context builder)
-// - webSearchPolicy.ts (STRUCTURED_ANALYSIS_MODES)
-// - store.ts (getDefaultThreadTitle)
-// - assistantFollowUps.ts (CURATED_FOLLOW_UPS, a Record<AssistantMode, ...>)
-export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'chat';
+// WARNING: a new mode is handled EXPLICITLY at each of these (none may fall through to chat):
+// - lib/server/validation.ts (assistantStreamRequestSchema's mode enum)
+// - stream/route.ts (the context branch) and context/route.ts (a mode with no period: 400)
+// - lib/services/assistantMonthContextService.ts (its context builder)
+// - prompts.ts (its prompt builder) and anthropicStream.ts (buildPrompt, max_tokens, isStructuredAnalysis,
+//   buildMessagesArray's history cap)
+// - webSearchPolicy.ts (STRUCTURED_ANALYSIS_MODES, resolveAssistantWebSearchPolicy)
+// - store.ts (getDefaultThreadTitle, buildThreadTitleFromPrompt)
+// - assistantFollowUps.ts (CURATED_FOLLOW_UPS, a Record<AssistantMode, …>)
+// - assistantPeriodOptions.ts (getActivePeriodLabel, buildComposerPlaceholder, buildEmptyStateQuestion,
+//   findThreadForPeriod, getModeBadgeLabel)
+// - AssistantPeriodSelector.tsx (PERIOD_TABS: a mode with no period is NOT a tab)
+// - useAssistantStreaming.ts (buildStreamRequestBody) and useAssistantPeriodContext.ts (the period preview)
+export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'chat' | 'register';
+
+/**
+ * The outcome of a card inside a message (2026-11): written on «Conferma», ignored, or — a question
+ * card — answered. Stored on the message document under `proposals["kind:N"]`, so a reload shows
+ * the outcome instead of the buttons and a row is never written twice.
+ */
+export interface AssistantProposalState {
+  status: 'written' | 'ignored' | 'answered';
+  // The ids of what «Conferma» wrote (the expense rows, the goal).
+  writtenIds?: string[];
+  // The text a question card was answered with; only with `status: 'answered'`.
+  answer?: string;
+  at: Date;
+}
+
+/**
+ * What the Registra mode knows, as the companion tile prints it. Computed in the browser from the
+ * hooks already loaded (`recent: null`) and again on the server, where the count of the rows read
+ * is known: that one arrives with the `register` SSE event.
+ */
+export interface AssistantRegisterSummary {
+  accounts: { id: string; name: string; balance: number; roles: ('addebito' | 'accredito')[] }[];
+  categories: number;
+  costCentersEnabled: boolean;
+  membersEnabled: boolean;
+  recent: { rows: number; cut: number } | null; // null: computed in the browser, before the server answered
+}
 
 export interface AssistantPromptChip {
   id: string;
@@ -56,6 +88,9 @@ export interface AssistantMessage {
   mode: AssistantMode;
   monthContext?: AssistantMonthSelectorValue | null;
   webSearchUsed?: boolean;
+  // The outcome of each card of this message, keyed `proposalKey(kind, index)` — «expense:0»,
+  // «goal:0» (lib/utils/expenseProposal.ts). Absent until a card is confirmed or ignored.
+  proposals?: Record<string, AssistantProposalState>;
 }
 
 export interface AssistantMemoryItem {
@@ -340,6 +375,8 @@ export type AssistantStreamEvent =
   // Sent once before text streaming starts, carrying the server-built context bundle.
   // Client uses this to render the numeric panel without a separate fetch.
   | { type: 'context'; bundle: AssistantMonthContextBundle }
+  // Registra only, after `meta` and before the text: what the server read for the register block.
+  | { type: 'register'; summary: AssistantRegisterSummary }
   | { type: 'text'; text: string }
   | { type: 'status'; status: 'searching' | 'writing' | 'saving' }
   | { type: 'done'; threadId?: string; messageId?: string; webSearchUsed: boolean }

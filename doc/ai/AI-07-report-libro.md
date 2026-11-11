@@ -477,7 +477,7 @@ rail as the index, a page as an address`, PR to `develop`. No flag: the column i
 ```
 Leggi WORKFLOW.md, AGENTS.md (§ Allocazione › Consulente, § React Compiler and the hooks rules, § Accessibility,
 § Commands), DESIGN.md § 5 «AI Surfaces» (The Path-Scene Rule, The AI-Accent Rule) e «Modal (a Tile lifted off the
-page)», doc/guide/consulente.md, doc/guide/dialog.md, doc/guide/e2e-emulatori.md, doc/ai/README.md § 3-4-7-8,
+page)», doc/guide/consulente.md, doc/guide/dialog.md, doc/guide/e2e-playwright.md, doc/ai/README.md § 3-4-7-8,
 doc/ai/AI-07-report-libro.md. Node 24 (`node -v`). PRIMA del codice il mock della § 4.0 (skill impeccable, DESIGN.md
 normativo, cifre inventate): me lo mostri e aspetti il mio OK; una modifica che chiedo diventa una decisione in README
 § 3 e una riga riscritta della spec, poi il codice segue la spec. Implementa AI-07 così com'è scritta:

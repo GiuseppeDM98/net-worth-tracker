@@ -1113,6 +1113,15 @@ export const EXPENSE_BUDGET_EXCLUSION_SERIES_HINT =
 export const EXPENSE_BUDGET_EXCLUSION_CHIP = 'fuori budget';
 
 /**
+ * A row written from a card of the Assistente's Registra mode (2026-11): the toast of the write,
+ * by kind, and the one a failed save of the card's outcome earns — the row IS written by then,
+ * so the sentence says what a reload will show and what not to do about it.
+ */
+export const ROW_CREATED_TOAST = { expense: 'Spesa creata con successo', income: 'Entrata creata con successo' } as const;
+export const PROPOSAL_STATE_NOT_SAVED =
+  'La riga è registrata, ma la card non lo ricorda: dopo un ricaricamento non confermarla di nuovo.';
+
+/**
  * «Legata all'immobile» (owner, 2026-10-21): the house a row belongs to (`Expense.propertyAssetId`) —
  * a mortgage instalment, a home or CPI policy — so a sale proposes to stop its series.
  */

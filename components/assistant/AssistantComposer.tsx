@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef, type RefObject } from 'react';
 import { NO_AUTOFILL_ATTRIBUTES } from '@/components/ui/autofill';
 import { Square, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
+import { ASSISTANT_PROMPT_MAX_LENGTH, describePromptLength } from '@/lib/utils/assistantPeriodOptions';
 import { cn } from '@/lib/utils';
 
 interface AssistantComposerProps {
@@ -19,6 +21,8 @@ interface AssistantComposerProps {
   placeholder?: string;
   /** Error message shown inline above the keyboard hint (e.g. no data for selected period). */
   errorHint?: string;
+  /** The page's ref to the textarea, when it moves the focus here (entering Registra, a prefilled row). */
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
 }
 
 /**
@@ -28,6 +32,10 @@ interface AssistantComposerProps {
  * AssistantPeriodSelector at the top of the column, next to the data they drive.
  * Keeping the composer to a single job (compose + send) frees the thumb zone on
  * mobile and removes the top/bottom split of the "what + when" decision.
+ *
+ * The message is capped at `ASSISTANT_PROMPT_MAX_LENGTH` characters, the cap the stream route
+ * enforces, and a counter appears when the cap is in sight — tied to the textarea by
+ * `aria-describedby`, not a live region: it is read with the field, never over the typing.
  */
 export function AssistantComposer({
   draft,
@@ -38,8 +46,12 @@ export function AssistantComposer({
   canSubmit,
   placeholder,
   errorHint,
+  inputRef,
 }: AssistantComposerProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const ownRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = inputRef ?? ownRef;
+  const counterId = useId();
+  const lengthLabel = describePromptLength(draft.length);
 
   // Adjust textarea height to content — resets to auto first to shrink on deletion.
   useEffect(() => {
@@ -47,7 +59,7 @@ export function AssistantComposer({
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-  }, [draft]);
+  }, [draft, textareaRef]);
 
   return (
     // safe-area-inset-bottom: on iOS the home indicator sits below the viewport; pb accounts for it.
@@ -69,6 +81,8 @@ export function AssistantComposer({
           placeholder={placeholder ?? 'Scrivi una domanda sul tuo portafoglio…'}
           aria-label="Scrivi un messaggio all'assistente"
           disabled={isStreaming}
+          maxLength={ASSISTANT_PROMPT_MAX_LENGTH}
+          aria-describedby={lengthLabel ? counterId : undefined}
           rows={1}
           className={cn(
             'flex-1 resize-none rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-foreground',
@@ -98,13 +112,21 @@ export function AssistantComposer({
             onClick={() => onSubmit()}
             disabled={!canSubmit}
             size="icon"
-            className="h-[44px] w-[44px] shrink-0 rounded-xl"
+            // It calls the model: the accent on hover and keyboard focus, never at rest. A filled
+            // button has no border of its own, hence the transparent one the accent colours.
+            className={cn('h-[44px] w-[44px] shrink-0 rounded-xl border border-transparent', AI_CONTROL_ACCENT_CLASS)}
             aria-label="Invia messaggio"
           >
             <Send className="h-4 w-4" />
           </Button>
         )}
       </div>
+
+      {lengthLabel && (
+        <p id={counterId} className="mt-2 font-mono text-[11px] tabular-nums text-muted-foreground">
+          {lengthLabel}
+        </p>
+      )}
 
       {/* Error hint — shown on both mobile and desktop. */}
       {errorHint && <p className="mt-2 text-xs text-destructive">{errorHint}</p>}

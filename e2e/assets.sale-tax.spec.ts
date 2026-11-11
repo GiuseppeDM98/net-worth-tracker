@@ -16,7 +16,7 @@
  *
  * The test plants its own instrument and account (decoy names absent from the seed) and removes
  * what it and the app created in `finally` — data-only, never a re-seed
- * (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+ * (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
  */
 
 import { test, expect, type Page } from '@playwright/test';

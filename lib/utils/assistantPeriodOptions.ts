@@ -6,7 +6,7 @@
  * an orchestrator and these date-window rules become unit-testable. All "now"
  * reads go through the Italy-timezone helpers — never Date.getMonth().
  */
-import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { getItalyDateIso, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import {
   AssistantChatContextType,
@@ -75,7 +75,43 @@ export function getActivePeriodLabel(
   if (mode === 'year_analysis') return `Analisi annuale · ${selectedYear}`;
   if (mode === 'ytd_analysis') return `YTD · ${selectedMonth.year}`;
   if (mode === 'history_analysis') return 'Storico totale';
+  if (mode === 'register') return 'Registra · senza periodo';
   return 'Domanda libera';
+}
+
+/**
+ * The badge of a thread's mode in the thread list. «chat» reads «Libera» — the period axis
+ * renamed the former Chat mode.
+ */
+export function getModeBadgeLabel(mode: AssistantMode): string {
+  if (mode === 'month_analysis') return 'Mese';
+  if (mode === 'year_analysis') return 'Anno';
+  if (mode === 'ytd_analysis') return 'YTD';
+  if (mode === 'history_analysis') return 'Storico';
+  if (mode === 'register') return 'Registra';
+  return 'Libera';
+}
+
+/** The longest message the composer sends and the stream route accepts, in every mode (2026-11). */
+export const ASSISTANT_PROMPT_MAX_LENGTH = 4000;
+/** From this length the composer prints its counter: silent until the cap is in sight. */
+const PROMPT_COUNTER_FROM = 3800;
+
+/** «3.812 / 4.000 caratteri» from 3800 characters, null below: the counter under the composer. */
+export function describePromptLength(length: number): string | null {
+  if (length < PROMPT_COUNTER_FROM) return null;
+  // `useGrouping: 'always'`: it-IT leaves a four-digit number ungrouped («3812») by default.
+  const format = (value: number) => new Intl.NumberFormat('it-IT', { useGrouping: 'always' }).format(value);
+  return `${format(length)} / ${format(ASSISTANT_PROMPT_MAX_LENGTH)} caratteri`;
+}
+
+/**
+ * Today's register thread: Registra keeps ONE thread per Italian day («Registrazioni · 1 nov
+ * 2026»), so entering the mode resumes it and the day's rows stay in one conversation. A thread
+ * created at 23:30 Italian time yesterday is yesterday's, whatever the process zone.
+ */
+export function findRegisterThread(threads: AssistantThread[], todayIso: string): AssistantThread | undefined {
+  return threads.find((thread) => thread.mode === 'register' && getItalyDateIso(thread.createdAt) === todayIso);
 }
 
 /**
@@ -107,6 +143,8 @@ export function findThreadForPeriod(
   if (mode === 'history_analysis') {
     return threads.find((t) => t.mode === 'history_analysis');
   }
+  // Registra has no period: its thread is the day's (`findRegisterThread`).
+  if (mode === 'register') return undefined;
   return undefined;
 }
 
@@ -140,6 +178,7 @@ export function buildComposerPlaceholder(
   selectedYear: number
 ): string {
   const monthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
+  if (mode === 'register') return 'Scrivi cosa hai speso o incassato…';
   if (mode === 'month_analysis') return `Scrivi la tua domanda su ${monthLabel}…`;
   if (mode === 'year_analysis') return `Scrivi la tua domanda sull'anno ${selectedYear}…`;
   if (mode === 'ytd_analysis') return "Scrivi la tua domanda sull'andamento da inizio anno…";
@@ -162,6 +201,7 @@ export function buildEmptyStateQuestion(
 ): string {
   const monthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
   if (mode === 'chat') return 'Cosa vuoi chiedere?';
+  if (mode === 'register') return 'Cosa vuoi registrare?';
   if (mode === 'month_analysis') return `Cosa vuoi sapere su ${monthLabel}?`;
   if (mode === 'year_analysis') return `Cosa vuoi sapere sul ${selectedYear}?`;
   if (mode === 'ytd_analysis') return "Cosa vuoi sapere sull'andamento da inizio anno?";

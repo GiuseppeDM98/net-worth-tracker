@@ -175,3 +175,29 @@ describe('buildThreadTitleFromPrompt (real implementation)', () => {
     expect(buildThreadTitleFromPrompt(emptyPrompt)).toBe('Nuova conversazione');
   });
 });
+
+// ── The register thread's title (2026-11) ────────────────────────────────────
+
+describe('the register thread’s title (the store’s real functions)', () => {
+  // The store is mocked for the routes above: these read the real module.
+  const realStore = () => vi.importActual<typeof import('@/lib/server/assistant/store')>('@/lib/server/assistant/store');
+
+  it('defaults to «Registrazioni» in register and to «Nuova conversazione» elsewhere', async () => {
+    const { getDefaultThreadTitle } = await realStore();
+    expect(getDefaultThreadTitle('register')).toBe('Registrazioni');
+    expect(getDefaultThreadTitle('chat')).toBe('Nuova conversazione');
+  });
+
+  it('is the ITALIAN day of the first message, whatever the prompt and the process zone', async () => {
+    const { buildThreadTitleFromPrompt } = await realStore();
+    // 23:30 in Italy on 1 November; one hour later it is the 2nd there, still the 1st in UTC.
+    expect(buildThreadTitleFromPrompt('ho speso 5 euro', 'register', new Date('2026-11-01T22:30:00Z'))).toBe('Registrazioni · 1 nov 2026');
+    expect(buildThreadTitleFromPrompt('ho speso 5 euro', 'register', new Date('2026-11-01T23:30:00Z'))).toBe('Registrazioni · 2 nov 2026');
+    expect(buildThreadTitleFromPrompt('', 'register', new Date('2026-11-01T10:00:00Z'))).toBe('Registrazioni · 1 nov 2026');
+  });
+
+  it('still titles a free question from its prompt', async () => {
+    const { buildThreadTitleFromPrompt } = await realStore();
+    expect(buildThreadTitleFromPrompt('Come va il mese?', 'chat')).toBe('Come va il mese?');
+  });
+});

@@ -739,7 +739,7 @@ Leggi WORKFLOW.md, AGENTS.md (§ Assistant · Assistente, § Cashflow — expens
 § React Query and Derived State, § React Compiler and the hooks rules, § Accessibility, § Tailwind Breakpoints,
 § Commands), DESIGN.md § 5 «AI Surfaces» e The Question-Card Rule, doc/guide/assistente.md, doc/guide/cashflow.md
 (§ Expense Sign Convention and Type Changes: commissione, rata, estinzione, trasferimento su un immobile; § Recurring
-Series), doc/guide/cashflow-tracciamento.md, doc/guide/e2e-emulatori.md, doc/guide/prima-schermata.md,
+Series), doc/guide/cashflow-tracciamento.md, doc/guide/e2e-playwright.md, doc/guide/prima-schermata.md,
 doc/ai/README.md § 3-4-7-8, doc/ai/AI-06-registra-domande-memoria-ponte.md e i diff del colloquio (PR #509) e di AI-05 (in develop).
 Implementa AI-06 così com'è scritta: lo schema esteso in expenseProposal.ts con il superRefine della § 4; il resolver
 con i conti per id e poi per nome fra conti e immobili, i prestiti, le regole del dialog e i «ignorato: …»; le

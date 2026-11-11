@@ -46,6 +46,7 @@ import {
   getPeriodExpensesForItem,
   buildSpendingForecast,
   forecastMonthlyItem,
+  normalizeBudgetItem,
   splitMonthlyTotalExpenses,
   type CategoryTypeRef,
 } from '@/lib/utils/budgetUtils';
@@ -114,17 +115,6 @@ function rowStatus(ratio: number, projectedRatio: number | null, isIncome: boole
 
 // ─── Data builder ─────────────────────────────────────────────────────────────
 
-/** Back-fills kind/period/amount for budget items saved before those fields existed. */
-function normalizeItem(raw: BudgetItem & { monthlyAmount?: number }): BudgetItem {
-  const kind =
-    raw.kind === 'expense' || raw.kind === 'income'
-      ? raw.kind
-      : raw.scope === 'type' && raw.expenseType === 'income'
-        ? 'income'
-        : 'expense';
-  return { ...raw, kind, period: raw.period ?? 'monthly', amount: raw.amount ?? raw.monthlyAmount ?? 0 };
-}
-
 function itemLabel(item: BudgetItem): string {
   if (item.scope === 'subcategory') return `${item.categoryName ?? ''} › ${item.subCategoryName ?? ''}`;
   return item.categoryName ?? item.expenseType ?? '';
@@ -143,7 +133,7 @@ export async function buildWeeklyBudgetData(userId: string, now: Date): Promise<
   if (!budgetSnap.exists) return null;
   const data = budgetSnap.data() ?? {};
 
-  const items = ((data.items ?? []) as Array<BudgetItem & { monthlyAmount?: number }>).map(normalizeItem);
+  const items = ((data.items ?? []) as Array<BudgetItem & { monthlyAmount?: number }>).map(normalizeBudgetItem);
   const overallMonthlyAmount: number | undefined = data.overallMonthlyAmount;
   if (items.length === 0 && !overallMonthlyAmount) return null;
 

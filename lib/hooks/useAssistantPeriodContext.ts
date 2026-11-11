@@ -221,6 +221,8 @@ export function useAssistantPeriodContext(
   if (mode === 'ytd_analysis') return ytdResult;
   if (mode === 'history_analysis') return historyResult;
 
-  // chat mode: falls back to month result (may be disabled)
+  // chat falls back to the month result (may be disabled); Registra has no period and is never
+  // enabled (the page's `shouldFetchContext` lists the four analysis modes), so it reads the same
+  // disabled result.
   return monthResult;
 }

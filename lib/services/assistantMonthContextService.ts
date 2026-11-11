@@ -39,7 +39,12 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { MONTH_NAMES } from '@/lib/constants/months';
-import { getItalyDateIso, getItalyMonthBoundsUtc, getItalyMonthRangeBoundsUtc, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDateIso, getItalyDayBoundsUtc, getItalyMonthBoundsUtc, getItalyMonthRangeBoundsUtc, getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
+import { REGISTER_RECENT_MONTHS, type AssistantRegisterContextInput } from '@/lib/utils/assistantRegisterContext';
+import { normalizeBudgetItem } from '@/lib/utils/budgetUtils';
+import { getDashboardOverview } from '@/lib/services/dashboardOverviewService';
+import type { BudgetConfig, BudgetItem } from '@/types/budget';
+import type { CostCenter } from '@/types/costCenters';
 import { AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantTodayContext } from '@/types/assistant';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import { CashflowBreakdown, Expense, ExpenseCategory } from '@/types/expenses';
@@ -195,7 +200,85 @@ async function fetchSettings(userId: string): Promise<AssetAllocationSettings | 
     // The two default accounts, for the CASHFLOW 12 MESI block's account roles (2026-11).
     defaultDebitCashAssetId: data.defaultDebitCashAssetId,
     defaultCreditCashAssetId: data.defaultCreditCashAssetId,
+    // Registra (2026-11): which optional fields a row may carry, where a fee lands, the memory switch.
+    costCentersEnabled: data.costCentersEnabled,
+    expenseSplitEnabled: data.expenseSplitEnabled,
+    transferFeeCategoryId: data.transferFeeCategoryId,
+    transferFeeSubCategoryId: data.transferFeeSubCategoryId,
+    assistantMemoryEnabled: data.assistantMemoryEnabled,
   } as AssetAllocationSettings;
+}
+
+/** Every cost centre of the user; the register context keeps those not archived. */
+async function fetchCostCenters(userId: string): Promise<CostCenter[]> {
+  const snap = await adminDb.collection('costCenters').where('userId', '==', userId).get();
+  return snap.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      archivedAt: data.archivedAt ? toDate(data.archivedAt) : null,
+      createdAt: toDate(data.createdAt),
+      updatedAt: toDate(data.updatedAt),
+    } as CostCenter;
+  });
+}
+
+/** `budgets/{uid}`, its items back-filled as the Budget tab reads them; null when the user has none. */
+async function fetchBudgetConfig(userId: string): Promise<BudgetConfig | null> {
+  const doc = await adminDb.collection('budgets').doc(userId).get();
+  const data = doc.data();
+  if (!doc.exists || !data) return null;
+  return {
+    ...data,
+    userId,
+    items: ((data.items ?? []) as BudgetItem[]).map(normalizeBudgetItem),
+    updatedAt: toDate(data.updatedAt),
+  } as BudgetConfig;
+}
+
+/**
+ * The inputs of the Registra mode's block (lib/utils/assistantRegisterContext.ts).
+ *
+ * The core reads — categories, accounts, settings, centres and the rows of the window — reject
+ * together: without them no row can be proposed, and the route answers its 500 before any event.
+ * The window is Italian on both ends: from the first day of the month eleven months back to the
+ * end of today (a row in calendar later is not «recent»). The two reads of the month — the
+ * Panoramica's summary and the budget — are settled apart, because neither may fail the stream:
+ * a rejected one prints its own sentence in the block, never a zero.
+ */
+export async function fetchRegisterInputs(userId: string, now: Date): Promise<AssistantRegisterContextInput> {
+  const { year, month } = getItalyMonthYear(now);
+  const first = year * 12 + (month - 1) - (REGISTER_RECENT_MONTHS - 1);
+  const start = getItalyMonthBoundsUtc(Math.floor(first / 12), (first % 12) + 1).start;
+  const end = getItalyDayBoundsUtc(now).end;
+
+  const [categories, assets, settings, costCenters, recentExpenses] = await Promise.all([
+    fetchExpenseCategories(userId),
+    fetchAssets(userId),
+    fetchSettings(userId),
+    fetchCostCenters(userId),
+    fetchExpenses(userId, start, end),
+  ]);
+  const [overview, budget] = await Promise.allSettled([
+    getDashboardOverview(userId, { now }),
+    fetchBudgetConfig(userId),
+  ]);
+
+  return {
+    now,
+    categories,
+    assets,
+    settings,
+    costCenters,
+    recentExpenses,
+    month: {
+      stats: overview.status === 'fulfilled' ? overview.value.expenseStats : null,
+      budget: budget.status === 'fulfilled' ? budget.value : null,
+      budgetFailed: budget.status === 'rejected',
+    },
+    assetValueOf: calculateAssetValue,
+  };
 }
 
 /** The three registers the portfolio block reads beside the assets (2026-10-20). */

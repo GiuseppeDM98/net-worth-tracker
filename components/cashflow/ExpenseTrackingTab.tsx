@@ -36,7 +36,7 @@
  */
 'use client';
 
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useEffectEvent, useState, useMemo, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
@@ -216,6 +216,12 @@ interface ExpenseTrackingTabProps {
    */
   initialOwnerId?: string | null;
   /**
+   * The row this tab should open ON, from `?row=` — how «apri in Cashflow» on a card of the
+   * Assistente lands on the row it wrote (2026-11-11): Movimenti opens, the list reaches the row,
+   * the row is brought into view and marked. Read once at mount, forgotten by the next gesture.
+   */
+  linkedRowId?: string | null;
+  /**
    * The tab is the one on screen. Every Cashflow tab stays mounted (`forceMount`), and a
    * `role="alert"` under `display: none` is never heard: `PageRest` remounts on activation
    * (`key`), so the failed-reads announcement — were there one — speaks for the tab that shows.
@@ -328,6 +334,7 @@ export function ExpenseTrackingTab({
   splitEnabled,
   familyMembers,
   initialOwnerId = null,
+  linkedRowId = null,
   active,
 }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
@@ -351,7 +358,13 @@ export function ExpenseTrackingTab({
   // gesture — a period, a filter, «Carica altri», another save — never by an effect (2026-10-12).
   const [savedRowId, setSavedRowId] = useState<string | null>(null);
   const savedRowRef = useRef<HTMLButtonElement | null>(null);
-  const forgetSavedRow = () => setSavedRowId(null);
+  // The row a link asked for (`?row=`): the same landing, on every width and in both list views,
+  // plus a mark — a programmatic focus after a click draws no ring. Forgotten with the saved row.
+  const [linkedRow, setLinkedRow] = useState<string | null>(() => linkedRowId);
+  const forgetSavedRow = () => {
+    setSavedRowId(null);
+    setLinkedRow(null);
+  };
 
   // Opens the add-expense dialog when the bottom-nav "+" button fires the custom event — never
   // in demo (2026-10-12): the FAB is not drawn there (`isAddExpenseFabShown`), and a stray event
@@ -779,6 +792,22 @@ export function ExpenseTrackingTab({
   // themselves derived) and the skip would have un-memoized the whole component.
   const filteredExpenses = applyListFilters(expenses, listFilters);
 
+  // A linked row (`?row=`) on a composed width: Movimenti is a closed row there, so it opens on
+  // the row once — when the row is in the list, which is after the first read. A timer, as every
+  // state change an effect asks for (AGENTS.md § React Compiler and the hooks rules).
+  const linkedRowListed = linkedRow !== null && filteredExpenses.some((expense) => expense.id === linkedRow);
+  const linkedRowRevealed = useRef(false);
+  const revealLinkedRow = useEffectEvent(() => {
+    linkedRowRevealed.current = true;
+    sections.reveal(TRACKING_SECTION_IDS.movimenti);
+    // The feed centres the row once the panel has settled (`TransactionFeed`'s focus effect).
+  });
+  useEffect(() => {
+    if (!linkedRowListed || !sections.compact || linkedRowRevealed.current) return;
+    const timer = setTimeout(() => revealLinkedRow(), 0);
+    return () => clearTimeout(timer);
+  }, [linkedRowListed, sections.compact]);
+
   // The feed shows the first page again whenever the filters change (the stored window
   // belongs to the filters it was opened under).
   const filterKey = JSON.stringify([period, selectedTypes, selectedCatIds, selectedSubCategoryId, searchQuery, effectiveAccountId, effectiveOwnerId]);
@@ -1038,7 +1067,8 @@ export function ExpenseTrackingTab({
       categoryMetaMap={categoryMetaMap}
       memberNames={memberNames}
       emptyHint="Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare."
-      focusRowId={savedRowId}
+      focusRowId={savedRowId ?? linkedRow}
+      markedRowId={linkedRow}
       focusRowRef={savedRowRef}
       surface="flat"
     />
@@ -1354,6 +1384,7 @@ export function ExpenseTrackingTab({
                     hasActiveFilters={hasActiveFilters}
                     categories={categories}
                     memberNames={memberNames}
+                    focusRowId={linkedRow}
                   />
                 </div>
                 <div className="desktop:hidden">{feed}</div>

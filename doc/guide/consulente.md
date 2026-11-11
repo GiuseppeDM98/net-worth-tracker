@@ -392,7 +392,7 @@ on a phone, and from the row under the Assistente's conversation).
   the page does not read the document (permission-denied → the read fails and the page says so).
 - **The run's E2E specs fake the route**: one `page.route` handler per spec — `e2e/consulenteInterview.ts` scripts the
   interview's rounds and records the strategy and revise bodies (a strategy answers with an error so the chain stops, a revise completes), `allocation.consulente.spec.ts` scripts its three stages and the retry
-  (`doc/guide/e2e-emulatori.md` § Browser-Driven E2E); no test spends, and the real run is made once per change on
+  (`doc/guide/e2e-playwright.md` § Browser-Driven E2E); no test spends, and the real run is made once per change on
   the mirror (2026-10-20 with the owner's key; the outcomes in that session's SESSION_NOTES and in the commit).
 - **The interview writes nothing**: its rounds live in the draft until the strategy, and a cleared storage loses them.
 - **A round abandoned** («Salta il colloquio» while it is asked, or leaving the page) **still costs its slot**; its

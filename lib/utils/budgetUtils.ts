@@ -51,6 +51,27 @@ export function categoryKind(category: Pick<ExpenseCategory, 'type'>): 'expense'
   return category.type === 'income' ? 'income' : 'expense';
 }
 
+// ==================== Legacy back-fill ====================
+
+/**
+ * Back-fills the fields added after the first budget release, so older documents keep working —
+ * the ONE reading of a stored item, on the client (the Budget tab) and on the server (the emails,
+ * the history capture, the assistant's Registra block):
+ *   - `kind`: a 'type'-scope item is income only when expenseType==='income';
+ *     category/subcategory items default to 'expense' (reconciled later).
+ *   - `period`: defaults to 'monthly'.
+ *   - `amount`: falls back to the legacy `monthlyAmount` field.
+ */
+export function normalizeBudgetItem(raw: BudgetItem & { monthlyAmount?: number }): BudgetItem {
+  const kind =
+    raw.kind === 'expense' || raw.kind === 'income'
+      ? raw.kind
+      : raw.scope === 'type' && raw.expenseType === 'income'
+        ? 'income'
+        : 'expense';
+  return { ...raw, kind, period: raw.period ?? 'monthly', amount: raw.amount ?? raw.monthlyAmount ?? 0 };
+}
+
 // ==================== Core Matching ====================
 
 /**

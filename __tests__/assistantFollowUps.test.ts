@@ -132,3 +132,16 @@ describe('buildFollowUpSuggestions', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
+
+describe('buildFollowUpSuggestions — Registra (2026-11)', () => {
+  it('offers the two register rows, each the START of a sentence to complete', () => {
+    const result = buildFollowUpSuggestions('register', null);
+    expect(result.map((row) => row.label)).toEqual(['Registra una spesa di oggi', 'Registra lo stipendio']);
+    expect(result.map((row) => row.prompt)).toEqual(['Oggi ho speso ', 'Ho ricevuto lo stipendio di ']);
+  });
+
+  it('offers no analysis row in register, with or without a bundle', () => {
+    const result = buildFollowUpSuggestions('register', makeBundle());
+    expect(result.every((row) => row.id.startsWith('register-'))).toBe(true);
+  });
+});

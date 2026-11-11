@@ -26,6 +26,7 @@ const {
   extractStructuredGoalFromTextMock,
   accountAccessDocGetMock,
   fetchCashflowBlockInputsMock,
+  fetchRegisterInputsMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   buildAssistantMonthContextMock: vi.fn(),
@@ -49,6 +50,7 @@ const {
   extractStructuredGoalFromTextMock: vi.fn(),
   accountAccessDocGetMock: vi.fn(),
   fetchCashflowBlockInputsMock: vi.fn(),
+  fetchRegisterInputsMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -85,6 +87,7 @@ vi.mock('@/lib/services/assistantMonthContextService', () => ({
   buildAssistantHistoryContext: buildAssistantHistoryContextMock,
   buildAssistantTodayContext: buildAssistantTodayContextMock,
   fetchCashflowBlockInputs: fetchCashflowBlockInputsMock,
+  fetchRegisterInputs: fetchRegisterInputsMock,
 }));
 
 vi.mock('@/lib/server/assistant/store', () => ({
@@ -159,6 +162,14 @@ describe('Assistant private API routes', () => {
     fetchCashflowBlockInputsMock.mockResolvedValue({
       expenses: [], todayIso: '2026-10-20', categories: [], assets: [], settings: null, assetValueOf: () => 0,
     });
+    // What Registra reads: one category, no account, no row, the month unread.
+    fetchRegisterInputsMock.mockImplementation(async (_userId: string, now: Date) => ({
+      now,
+      categories: [{ id: 'cat-cibo', userId: 'user-1', name: 'Cibo', type: 'variable', subCategories: [], createdAt: now, updatedAt: now }],
+      assets: [], settings: null, costCenters: [], recentExpenses: [],
+      month: { stats: null, budget: null, budgetFailed: false },
+      assetValueOf: () => 0,
+    }));
     // `satisfies` is load-bearing: the mock is an untyped vi.fn(), so without it a
     // renamed or dropped bundle field leaves this fixture green while it no longer
     // resembles what the route actually receives.
@@ -807,5 +818,145 @@ describe('Assistant private API routes', () => {
       await expect(response.json()).resolves.toEqual({ error: "Impossibile avviare lo stream dell'assistente" });
       expect(streamAssistantResponseMock).not.toHaveBeenCalled();
     });
+  });
+
+  // ── The body is validated before anything is read (2026-11) ──────────────────────────────
+
+  describe('POST /api/ai/assistant/stream — the body', () => {
+    function streamRequest(body: Record<string, unknown>) {
+      return streamRoute(
+        createJsonRequest('http://localhost/api/ai/assistant/stream', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid-token' },
+          body: { userId: 'user-1', prompt: 'Come va?', ...body },
+        })
+      );
+    }
+
+    it('refuses a mode the app does not have with 400, reading and streaming nothing', async () => {
+      const response = await streamRequest({ mode: 'weekly' });
+      expect(response.status).toBe(400);
+      expect(fetchCashflowBlockInputsMock).not.toHaveBeenCalled();
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a 4001-character prompt in an analysis mode, and an empty one', async () => {
+      expect((await streamRequest({ mode: 'month_analysis', month: { year: 2026, month: 3 }, prompt: 'a'.repeat(4001) })).status).toBe(400);
+      expect((await streamRequest({ mode: 'chat', prompt: '   ' })).status).toBe(400);
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
+
+      const atTheCap = await streamRequest({ mode: 'month_analysis', month: { year: 2026, month: 3 }, prompt: 'a'.repeat(4000) });
+      expect(atTheCap.status).toBe(200);
+      await atTheCap.text();
+    });
+
+    it('keeps every declared field: a year analysis reaches its builder with the year', async () => {
+      buildAssistantYearContextMock.mockResolvedValue({ selector: { year: 2025, month: -1 } });
+      const response = await streamRequest({ mode: 'year_analysis', year: 2025, preferences: { includeDummySnapshots: true } });
+      expect(response.status).toBe(200);
+      await response.text();
+      expect(buildAssistantYearContextMock).toHaveBeenCalledWith('user-1', 2025, true);
+    });
+  });
+
+  // ── Registra: the register block, no period bundle (2026-11) ─────────────────────────────
+
+  describe('POST /api/ai/assistant/stream — Registra', () => {
+    function registerRequest(body: Record<string, unknown> = {}) {
+      return streamRoute(
+        createJsonRequest('http://localhost/api/ai/assistant/stream', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid-token' },
+          body: { userId: 'user-1', mode: 'register', prompt: 'ho fatto spesa per 103 euro', ...body },
+        })
+      );
+    }
+
+    it('reads the register inputs once and builds no period bundle and no portfolio of today', async () => {
+      const response = await registerRequest();
+      expect(response.status).toBe(200);
+      const streamText = await response.text();
+
+      expect(fetchRegisterInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchRegisterInputsMock.mock.calls[0][0]).toBe('user-1');
+      expect(fetchRegisterInputsMock.mock.calls[0][1]).toBeInstanceOf(Date);
+      expect(buildAssistantMonthContextMock).not.toHaveBeenCalled();
+      expect(buildAssistantTodayContextMock).not.toHaveBeenCalled();
+
+      const args = streamAssistantResponseMock.mock.calls[0][0] as { registerBlock: string | null; contextBundle: unknown; mode: string };
+      expect(args.mode).toBe('register');
+      expect(args.contextBundle).toBeNull();
+      expect(args.registerBlock).toContain('--- REGISTRA ---');
+      expect(args.registerBlock).toContain('[cat-cibo] Cibo');
+      // The page's companion gets the summary, never the block.
+      expect(streamText).toContain('"type":"register"');
+      expect(streamText).toContain('"categories":1');
+      expect(streamText).not.toContain('--- REGISTRA ---');
+      expect(streamText).not.toContain('"type":"context"');
+    });
+
+    it('reads the CASHFLOW 12 MESI block once, for the owner, and hands it to the stream', async () => {
+      const response = await registerRequest();
+      await response.text();
+      expect(fetchCashflowBlockInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchCashflowBlockInputsMock.mock.calls[0][0]).toBe('user-1');
+      const args = streamAssistantResponseMock.mock.calls[0][0] as { cashflowBlock: string | null };
+      expect(args.cashflowBlock).toContain('--- CASHFLOW 12 MESI');
+    });
+
+    it('titles a new thread by the mode, and never retitles the day’s thread', async () => {
+      const first = await registerRequest();
+      await first.text();
+      expect(createAssistantThreadMock).toHaveBeenCalledWith(expect.objectContaining({ mode: 'register', title: 'Titolo server' }));
+
+      // An existing register thread with no preview yet: any other mode would retitle it from the prompt.
+      vi.mocked(updateAssistantThreadMetadataMock).mockClear();
+      getAssistantThreadMock.mockResolvedValue({
+        id: 'thread-1', userId: 'user-1', title: 'Registrazioni · 1 nov 2026', createdAt: new Date(2026, 10, 1), updatedAt: new Date(2026, 10, 1),
+        lastMessagePreview: '', mode: 'register', pinnedMonth: null,
+      });
+      appendAssistantMessageMock.mockResolvedValue({ id: 'msg-x', threadId: 'thread-1', userId: 'user-1', role: 'assistant', content: 'x', createdAt: new Date(2026, 10, 1), mode: 'register' });
+      const second = await registerRequest({ threadId: 'thread-1' });
+      await second.text();
+      expect(updateAssistantThreadMetadataMock).toHaveBeenCalledWith('thread-1', expect.objectContaining({ title: 'Registrazioni · 1 nov 2026', mode: 'register' }));
+    });
+
+    it('stores the prose as preview, and the user’s sentence when the answer is only a block', async () => {
+      const block = '```expense-proposal\n{"kind":"expense"}\n```';
+      streamAssistantResponseMock.mockImplementationOnce(async ({ onText }: Parameters<typeof streamAssistantResponse>[0]) => {
+        onText(`Ti propongo questa riga.\n\n${block}`);
+        return { text: `Ti propongo questa riga.\n\n${block}`, webSearchUsed: false };
+      });
+      await (await registerRequest()).text();
+      expect(updateAssistantThreadMetadataMock).toHaveBeenLastCalledWith('thread-1', expect.objectContaining({ lastMessagePreview: 'Ti propongo questa riga.' }));
+
+      // Reset, not only cleared: the queue of one-shot answers of `beforeEach` outlives a test that never streams.
+      appendAssistantMessageMock.mockReset().mockResolvedValue({ id: 'm', threadId: 'thread-1', userId: 'user-1', role: 'user', content: 'ho fatto spesa per 103 euro', createdAt: new Date(2026, 10, 1), mode: 'register' });
+      streamAssistantResponseMock.mockImplementationOnce(async ({ onText }: Parameters<typeof streamAssistantResponse>[0]) => {
+        onText(block);
+        return { text: block, webSearchUsed: false };
+      });
+      await (await registerRequest()).text();
+      expect(updateAssistantThreadMetadataMock).toHaveBeenLastCalledWith('thread-1', expect.objectContaining({ lastMessagePreview: 'ho fatto spesa per 103 euro' }));
+    });
+
+    it('a failed read of the register inputs answers the 500 before any event', async () => {
+      fetchRegisterInputsMock.mockRejectedValue(new Error('read failed'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const response = await registerRequest();
+      expect(response.status).toBe(500);
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('the context route refuses Registra with 400: the mode has no period', async () => {
+    const response = await getContextRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/context?userId=user-1&mode=register', {
+        headers: { Authorization: 'Bearer valid-token' },
+      })
+    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'La modalità Registra non ha un contesto di periodo' });
+    expect(buildAssistantMonthContextMock).not.toHaveBeenCalled();
   });
 });

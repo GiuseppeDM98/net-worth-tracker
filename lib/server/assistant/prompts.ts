@@ -16,6 +16,7 @@
 
 import { AssistantMemoryItem, AssistantMonthContextBundle, AssistantPreferences, AssistantTodayContext } from '@/types/assistant';
 import { getAssistantPeriodLabel } from '@/lib/utils/assistantPeriodLabel';
+import { EXPENSE_PROPOSAL_LANGUAGE, EXPENSE_PROPOSALS_MAX_PER_MESSAGE } from '@/lib/utils/expenseProposal';
 import { GoalVerdict } from '@/lib/utils/goalTrajectory';
 import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import {
@@ -1090,6 +1091,72 @@ export function buildChatPrompt(
 
   return {
     system: `${ASSISTANT_SYSTEM_CORE}\n\n${CHAT_FORMAT_CONTRACT}`,
+    userContent: userSections.join('\n'),
+  };
+}
+
+/**
+ * The Registra mode's contract (2026-11): the ```expense-proposal protocol, in THIS mode's `system`
+ * only. `ASSISTANT_SYSTEM_CORE` is shared with every other mode and with the emails, which must
+ * never be told a row can be proposed — so the contract is appended here and nowhere else, and it
+ * switches the core's goal protocol off for the mode. Static: every id, name and figure the model
+ * copies is in `userContent` (the register block), so the system stays byte-identical per mode.
+ * The schema is `expenseProposalSchema` (lib/utils/expenseProposal.ts): a block that breaks it
+ * renders as code.
+ */
+export const REGISTER_CONTRACT = [
+  '# Modalità Registra',
+  "In questa modalità l'utente ti dice cosa ha speso o incassato e tu gli proponi la riga da registrare nel Cashflow. Non puoi scrivere nulla da solo: puoi solo PROPORRE, e la riga viene scritta unicamente quando l'utente preme Conferma sulla card che la tua proposta genera.",
+  '',
+  '## La proposta di una riga',
+  `Per ogni riga emetti un blocco di codice delimitato con linguaggio \`${EXPENSE_PROPOSAL_LANGUAGE}\` che contenga SOLO JSON valido, senza commenti e senza testo attorno, con questo schema:`,
+  '{ "kind": "expense" | "income", "type": "fixed" | "variable" | "income", "amount": number, "dateIso": "YYYY-MM-DD", "categoryId": string, "subCategoryId"?: string, "accountId"?: string, "costCenterId"?: string, "memberId"?: string, "excludeFromBudget"?: boolean, "note"?: string, "reason": string }',
+  'Vincoli:',
+  `- Un blocco per ogni riga che l'utente nomina, al massimo ${EXPENSE_PROPOSALS_MAX_PER_MESSAGE} per messaggio: se ne nomina di più, proponi le prime ${EXPENSE_PROPOSALS_MAX_PER_MESSAGE} e scrivi “Ne restano N: vuoi che continui?”.`,
+  '- Ogni blocco sta su righe sue, fuori da elenchi e citazioni.',
+  '- `amount` è un numero JSON in euro con il punto decimale, senza separatori di migliaia né simbolo, sempre positivo (al massimo 1000000): il segno lo dà il tipo. Senza importo non emettere il blocco: chiedilo in prosa.',
+  '- Gli id (`categoryId`, `subCategoryId`, `accountId`, `costCenterId`, `memberId`) si copiano dai blocchi CATEGORIE, CONTI, CENTRI DI COSTO e INTESTATARI, dove stanno fra parentesi quadre: mai inventati, mai il nome al posto dell\'id.',
+  '- Scegli la categoria fra quelle di tipo Spese Necessarie, Spese Non Necessarie o Entrate e copia il suo tipo: `type` è "fixed" per Spese Necessarie, "variable" per Spese Non Necessarie, "income" per Entrate; `kind` è "income" per un\'entrata, "expense" altrimenti. Una categoria segnata «non proponibile in questa modalità» non si propone: spiega che quella riga si registra dal Cashflow. Segui il modo di categorizzare dell\'utente nelle ULTIME RIGHE e scrivi in `reason` quali righe hai seguito. `subCategoryId` solo se la sottocategoria è della categoria scelta.',
+  "- Il conto è il predefinito del tipo (addebito per una spesa, accredito per un'entrata): ometti `accountId`, salvo che l'utente ne nomini un altro.",
+  '- La data è oggi, salvo che l\'utente dica altro: risolvi “ieri”, “lunedì scorso” dalla data di oggi stampata nel blocco REGISTRA; una data futura è ammessa.',
+  "- `costCenterId` e `memberId` solo se l'utente li nomina e il loro blocco è attivo; `excludeFromBudget` solo su una spesa che l'utente dice fuori dal budget.",
+  '- `note` (al massimo 200 caratteri) è la nota della riga: il negozio o il dettaglio che l\'utente ha detto. `reason` (obbligatorio, al massimo 240 caratteri) spiega in una frase la categoria scelta.',
+  "- Le righe proposte nei messaggi precedenti l'utente le ha già confermate o ignorate: non riproporle, salvo che te lo chieda.",
+  '',
+  '## Attorno alle proposte',
+  'Scrivi poco, qualunque sia lo stile di risposta indicato nel messaggio: una frase prima dei blocchi, poi i blocchi. Dopo i blocchi scrivi solo ciò che serve all\'utente per decidere: una riga che non hai proposto e perché, un dubbio vero su categoria, conto o intestatario come domanda breve, e al massimo una frase sul budget della categoria presa da IL MESE, senza inventare cifre.',
+  'Niente sezioni con titolo (ipotesi, dati del mese, limiti dei dati) e nessun elenco di ciò che hai dato per scontato: ciò che la card già mostra (data, conto, categoria) non si ripete in prosa.',
+  'Non dire quante righe hai letto né che le ULTIME RIGHE sono tagliate, salvo che l\'utente chieda di una riga che non trovi.',
+  'Se non c\'è alcuna categoria adatta, dillo e indica che si crea in Impostazioni › Spese: non proporre una riga con una categoria sbagliata.',
+  'In questa modalità non proporre obiettivi.',
+].join('\n');
+
+/**
+ * Builds the prompt of the Registra mode: the register block (ids, recent rows, the month so far)
+ * and the CASHFLOW 12 MESI block under its note, both in `userContent`.
+ */
+export function buildRegisterPrompt(
+  prompt: string,
+  preferences: AssistantPreferences,
+  memoryItems: AssistantMemoryItem[],
+  registerBlock: string,
+  cashflowBlock: string | null
+): AssistantPromptParts {
+  const memoryBlock = preferences.memoryEnabled
+    ? formatMemoryForPrompt(memoryItems)
+    : 'Non fare affidamento su memoria persistente; usa solo il contesto esplicito del messaggio.';
+
+  const userSections: string[] = [
+    buildResponseStyleInstruction(preferences.responseStyle),
+    memoryBlock,
+    '',
+    registerBlock,
+  ];
+  if (cashflowBlock) userSections.push('', ...formatCashflowBlockSection(cashflowBlock).slice(0, 2));
+  userSections.push('', `Richiesta utente: ${prompt.trim()}`);
+
+  return {
+    system: `${ASSISTANT_SYSTEM_CORE}\n\n${REGISTER_CONTRACT}`,
     userContent: userSections.join('\n'),
   };
 }

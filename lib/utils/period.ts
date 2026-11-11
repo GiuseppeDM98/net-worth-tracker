@@ -62,6 +62,20 @@ export function periodToRange(period: Period): { from: Date; to: Date } {
   return { from: startOfDay(period.from), to: endOfDay(period.to) };
 }
 
+/**
+ * `?month=YYYY-MM` on Cashflow (2026-11): the month a link opens Tracciamento on — «apri in
+ * Cashflow» on a row the Assistente registered, which may be dated in another month. Null for
+ * anything that is not a real month of a plausible year, so the page falls back to today's.
+ */
+export function parseCashflowMonthParam(param: string | null | undefined): Extract<Period, { kind: 'month' }> | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(param ?? '');
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (year < 2000 || year > 2100 || month < 1 || month > 12) return null;
+  return { kind: 'month', year, month };
+}
+
 /** Default period: current calendar month. */
 export function currentMonthPeriod(): Period {
   return { kind: 'month', year: getItalyYear(), month: getItalyMonth() };

@@ -52,7 +52,7 @@ import { useFreshness } from '@/lib/hooks/useFreshness';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { dividendStatsQueryKey, useDividendRegistry } from '@/lib/hooks/useDividendStats';
 import { listExpenseYears, trackingWindow } from '@/lib/utils/expenseWindows';
-import { type Period, currentMonthPeriod } from '@/lib/utils/period';
+import { type Period, currentMonthPeriod, parseCashflowMonthParam } from '@/lib/utils/period';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -116,7 +116,8 @@ export default function CashflowPage() {
   // account's history, so a new period is a new key, and a period already visited opens from the
   // cache. Budget and Divisione mount later and read their own windows when they do; Centri di
   // Costo reads the whole collection, a centre being lifetime.
-  const [trackingPeriod, setTrackingPeriod] = useState<Period>(() => currentMonthPeriod());
+  // `?month=YYYY-MM` picks the month the tab opens on (a row registered from the Assistente links here).
+  const [trackingPeriod, setTrackingPeriod] = useState<Period>(() => parseCashflowMonthParam(searchParams.get('month')) ?? currentMonthPeriod());
   const trackingExpensesWindow = useMemo(() => trackingWindow(trackingPeriod), [trackingPeriod]);
   const expensesQuery = useExpensesInRange(ownerId, trackingExpensesWindow);
   // What a window cannot say about the rest of the collection: the years the pickers offer.
@@ -396,6 +397,7 @@ export default function CashflowPage() {
               availableYears={availableYears}
               categories={categories}
               initialOwnerId={ownerParam}
+              linkedRowId={searchParams.get('row')}
               loading={loading}
                 loadFailed={loadFailed}
               onRefresh={handleRefresh}

@@ -80,7 +80,7 @@ test('an opened row holds the sparkline 32px before its code arrives: the line l
   await row.click();
   await expect(row).toHaveAttribute('aria-expanded', 'true');
   // The panel's height settles after its 200 ms `grid-template-rows` transition: two readings 250 ms
-  // apart that agree (doc/guide/e2e-emulatori.md — never a first reading beside the previous one).
+  // apart that agree (doc/guide/e2e-playwright.md — never a first reading beside the previous one).
   const settledHeight = async () => {
     let previous = -1;
     for (;;) {

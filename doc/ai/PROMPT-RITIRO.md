@@ -198,7 +198,7 @@ ORDINE DI LAVORO
    meccaniche condivise di una riga; `dipendenze.md` per l'audit e il registro; `temi.md`
    per l'accento sotto AA) e, per ciò che sembra un bug e non lo è, nei suoi § Per-page
    blind spots (`grep -ln "Per-page blind spots" doc/guide/*.md | wc -l`: 37 guide su 40 il
-   2026-11-02); gli account, i fixture e le trappole del collaudo → doc/guide/e2e-emulatori.md
+   2026-11-02); gli account, i fixture e le trappole del collaudo → doc/guide/e2e-emulatori.md e doc/guide/e2e-playwright.md
    (la rotta finta e la chiave reale di `.env.local`, decisione 39, scritta lì il 2026-11-07) e
    la tabella dei fixture di WORKFLOW.md § 3; le invarianti → il test che le pinna
    (`__tests__/<modulo>.test.ts`; i componenti e gli hook in `.test.tsx` sul progetto `dom`,
@@ -222,7 +222,7 @@ ORDINE DI LAVORO
    dell'area, e ogni «decision N» o «A-N» citata in codice, test e guide riscritta come
    regola datata; § 7 i contratti condivisi → le guide delle aree che li usano, per nome
    (`consulente.md`, `assistente.md`, `cashflow-tracciamento.md`, `dialog.md` per
-   `ChoiceList` e `QuestionCard`, `e2e-emulatori.md` per il harness `dom`); § 8 le regole
+   `ChoiceList` e `QuestionCard`, `e2e-playwright.md` per il harness `dom`); § 8 le regole
    della serie che valgono oltre la serie → AGENTS.md o la guida se non vi sono già (il
    system prompt identico per ogni utente è già in `assistente.md`, `grep -n
    "byte-identical" doc/guide/assistente.md`; «una sonda non apre un controllo che
