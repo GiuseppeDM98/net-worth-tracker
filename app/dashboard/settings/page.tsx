@@ -406,6 +406,7 @@ export default function SettingsPage() {
           onClassChange={setAllocationClass}
           pendingFocus={draft.pendingFocus}
           onFocusConsumed={consumeFocus}
+          idealAllocation={declarations.idealAllocation}
         />
 
         {mountedTabs.has('spese') && (

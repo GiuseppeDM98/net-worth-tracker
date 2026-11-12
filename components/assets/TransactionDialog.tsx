@@ -25,6 +25,7 @@
  *     past month turns the settlement clause into a warning — the balance moves today, not then.
  */
 
+import type { AssetTransactionMutationResult } from '@/lib/services/assetTransactionService';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -119,6 +120,10 @@ interface TransactionDialogProps {
   asset: Asset;
   /** Present = edit mode (same field-visibility logic as create). */
   transaction?: AssetTransaction | null;
+  /** Opens a new trade already filled in (the PAC's «Registra»). Ignored in edit mode. */
+  prefill?: { type: 'buy' | 'sell'; quantity: number; linkedCashAssetId?: string; note?: string };
+  /** Called once a NEW trade is saved: the server's result, the form data and the estimated EUR unit price (the PAC links its line with them). */
+  onCreated?: (result: AssetTransactionMutationResult, data: AssetTransactionFormData, priceEur: number) => void;
 }
 
 /**
@@ -155,12 +160,14 @@ function previewSaleEffect(
   return { value: replayed.state.realizedPnlEur - without, taxableGain };
 }
 
-export function TransactionDialog({ open, onClose, asset, transaction }: TransactionDialogProps) {
+export function TransactionDialog({ open, onClose, asset, transaction, prefill, onCreated }: TransactionDialogProps) {
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const reducedMotion = useReducedMotion();
   const layoutId = useId();
   const isEdit = !!transaction;
+  // Primitives, not the `prefill` object: a parent re-render must never re-reset a form the reader is typing in.
+  const { type: prefillType, quantity: prefillQuantity, linkedCashAssetId: prefillCash, note: prefillNote } = prefill ?? {};
   const isBaseline = transaction?.isBaseline === true;
 
   const { data: allAssets = [] } = useAssets(ownerId);
@@ -297,18 +304,18 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       });
     } else {
       reset({
-        type: 'buy',
+        type: prefillType ?? 'buy',
         date: todayIso,
-        quantity: undefined,
+        quantity: prefillQuantity,
         pricePerUnit: undefined,
         fees: undefined,
-        linkedCashAssetId: NO_SETTLEMENT,
+        linkedCashAssetId: prefillCash ?? NO_SETTLEMENT,
         withheldTaxEur: undefined,
         indexationCoefficient: knownCoefficient,
-        note: '',
+        note: prefillNote ?? '',
       });
     }
-  }, [open, transaction, reset, todayIso, isBondPctMode, bondNominal, knownCoefficient]);
+  }, [open, transaction, prefillType, prefillQuantity, prefillCash, prefillNote, reset, todayIso, isBondPctMode, bondNominal, knownCoefficient]);
 
   const isAdjustment = type === 'adjustment';
   const heldQuantity = asset.quantity;
@@ -471,6 +478,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
           note: noteValue,
         };
         const result = await createMutation.mutateAsync(formData);
+        onCreated?.(result, formData, estimateTradePriceEur(asset, formData.pricePerUnit));
         toast.success(
           result.realizedPnlEur !== undefined
             ? `Operazione registrata · P&L realizzato ${formatSignedEur(result.realizedPnlEur)}`

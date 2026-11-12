@@ -14,6 +14,12 @@
  * the score it qualifies (Alt A of the canvas, chosen on 2026-08-25). The balance score itself is
  * band-INDEPENDENT (`computeBalanceScore`) and never moves with the band.
  *
+ * TWO TABS (doc/guide/accumulo.md): «Bilanciamento» (the page below, the default) and «Accumulo»
+ * (`?tab=accumulo`, `AccumuloTab`: the monthly accumulation plan). The band is page state shared by
+ * both. With an active plan, Bilanciamento's verdict names the plan's installment in place of Versa
+ * (`pac` in `buildAllocazioneVerdict`) and the Piano says that it does not count the plan.
+ *
+ * Bilanciamento:
  *   Desktop (12 col): Bilanciamento(5) | Piano(7)
  *                     Per classe(5)    |
  *                     Esposizione(12)
@@ -47,7 +53,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { SlidersHorizontal, Sparkles } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Scale, SlidersHorizontal, Sparkles, TrendingUp } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
@@ -104,6 +111,8 @@ import {
   buildCompositionPair,
   buildPensionLookThrough,
   buildPlanView,
+  findPacSubstitutions,
+  listPlanBuyAssetIds,
   activeClassGaps,
   estimatePlanSaleTax,
   offTargetGaps,
@@ -130,12 +139,16 @@ import {
   describePensionAside,
   describePlan,
   describePlanFooter,
+  describePacOverlap,
 } from '@/lib/utils/allocazioneNarrative';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
+import { PageTabs, type TabDef } from '@/components/layout/PageTabs';
+import { pageTabPanelId } from '@/components/layout/PageTabBar';
+import { TabsContent } from '@/components/ui/tabs';
 import { VerdictStrip } from '@/components/ui/verdict-strip';
 import { PageRest } from '@/components/ui/page-rest';
 import { RowAnswers } from '@/components/ui/row-answers';
@@ -146,10 +159,15 @@ import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { BilanciamentoTile, isBilanciamentoLiftedBlock } from '@/components/allocation/tiles/BilanciamentoTile';
 import { PianoTile } from '@/components/allocation/tiles/PianoTile';
+import { AccumuloTab } from '@/components/allocation/AccumuloTab';
+import { useModelPortfolio } from '@/lib/hooks/useModelPortfolio';
 import { PerClasseTile } from '@/components/allocation/tiles/PerClasseTile';
 import { EsposizioneTile } from '@/components/allocation/tiles/EsposizioneTile';
 import { PrevidenzaTile } from '@/components/allocation/tiles/PrevidenzaTile';
 import { AllocazioneDettaglio } from '@/components/allocation/AllocazioneDettaglio';
+import { useOpenAccumuloPlan } from '@/lib/hooks/useOpenAccumuloPlan';
+import { summarizePacMonth } from '@/lib/utils/accumuloSummary';
+import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 
 /** The grid's geometry, for the skeleton: the same spans as the tiles below. */
 const SKELETON_CELLS: TileSkeletonCell[] = [
@@ -160,6 +178,16 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
   { span: 12, lines: 4 },
 ];
 
+const ALLOCATION_TABS: TabDef[] = [
+  { value: 'bilanciamento', label: 'Bilanciamento', icon: Scale },
+  { value: 'accumulo', label: 'Accumulo', icon: TrendingUp },
+];
+type AllocationTabId = 'bilanciamento' | 'accumulo';
+
+function getInitialTab(param: string | null): AllocationTabId {
+  return param === 'accumulo' ? 'accumulo' : 'bilanciamento';
+}
+
 /** The Versa/Preleva amount the page opens with: the verdict needs one to name the next money. */
 const DEFAULT_PLAN_AMOUNT_INPUT = '1000';
 
@@ -169,6 +197,13 @@ const EMPTY_ASSETS: Asset[] = [];
 export default function AllocationPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<AllocationTabId>(() => getInitialTab(searchParams.get('tab')));
+  // The accumulation plan the Bilanciamento verdict names in place of Versa.
+  const { plan: openPlan, currentIndex: pacMonthIndex } = useOpenAccumuloPlan(ownerId ?? undefined);
+  const pac = useMemo(() => summarizePacMonth(openPlan, pacMonthIndex), [openPlan, pacMonthIndex]);
   const queryClient = useQueryClient();
 
   // ─── The reads: three keys, shared with every other page (2026-09-29) ──────────
@@ -199,12 +234,18 @@ export default function AllocationPage() {
   const loadFailed = assetsError || settingsError || goalsError;
   // Full, unfiltered asset list — the Previdenza tile's «tutto il patrimonio» needs every role.
   const allAssets = useMemo(() => assetsData ?? [], [assetsData]);
+  const modelQuery = useModelPortfolio(ownerId);
 
   // The page's one control: the drift tolerance that decides COMPRA/VENDI/OK. Session-only; the
   // default matches the server's ±2 p.p. so the first render equals the persisted classification.
   const [band, setBand] = useState<RebalanceBand>(DEFAULT_REBALANCE_BAND);
   const [planMode, setPlanMode] = useState<PlanMode>('rebalance');
   const [amountInput, setAmountInput] = useState(DEFAULT_PLAN_AMOUNT_INPUT);
+  const handleTabChange = (value: string) => {
+    const next = getInitialTab(value);
+    setActiveTab(next);
+    router.replace(`${pathname}?tab=${next}`, { scroll: false });
+  };
 
   // What the old `Promise.all` loader composed, now derived once the three reads have answered
   // (`undefined` = not read yet; a settings or goal document that does not exist is `null`).
@@ -238,6 +279,9 @@ export default function AllocationPage() {
     return {
       targets: effectiveTargets,
       usingGoalTargets: fromGoals,
+      // The owner's model-portfolio criteria (Allocazione › Accumulo) — the PAC editor's Ottimizzato view
+      // reads it; `null` before the first load, same as `targets`.
+      idealAllocation: settings?.idealAllocation ?? null,
       allocation: compareAllocations(inAllocation, effectiveTargets),
       // Per-instrument rows of everything IN the allocation — tradable and frozen alike. Each
       // carries its own `tradable` flag: the frozen ones count in every total and percentage but
@@ -256,6 +300,7 @@ export default function AllocationPage() {
   const targets = composed?.targets ?? null;
   const allocation = composed?.allocation ?? null;
   const usingGoalTargets = composed?.usingGoalTargets ?? false;
+  const idealAllocation = composed?.idealAllocation ?? null;
   const holdings = composed?.holdings ?? EMPTY_HOLDINGS;
   const reportedHoldings = composed?.reportedHoldings ?? EMPTY_HOLDINGS;
   const tradableAssets = composed?.tradableAssets ?? EMPTY_ASSETS;
@@ -366,6 +411,20 @@ export default function AllocationPage() {
     () => (planInputs ? buildPlanView(planMode, planAmount, planInputs) : null),
     [planInputs, planMode, planAmount],
   );
+  // With an active plan the Piano says what the PAC buys this month, and which instrument the plan
+  // bought in place of one this Piano proposes. The three engines are untouched.
+  const pacNote = useMemo(() => {
+    if (!pac || !planView) return null;
+    const labelOfAsset = (assetId: string): string => {
+      const asset = allAssets.find((candidate) => candidate.id === assetId);
+      return asset ? getAssetDisplayTicker(asset) : (holdings.find((holding) => (holding.assetId ?? holding.id) === assetId)?.label ?? assetId);
+    };
+    const substitutions = findPacSubstitutions(openPlan?.positions ?? [], listPlanBuyAssetIds(planView, holdings)).map((item) => ({
+      replaced: labelOfAsset(item.replacedAssetId),
+      buying: labelOfAsset(item.buyAssetId),
+    }));
+    return describePacOverlap(pac, substitutions);
+  }, [pac, planView, openPlan, holdings, allAssets]);
   const nextMoney = useMemo(
     () => (planInputs ? summarizeNextMoney(planInputs, planAmount) : null),
     [planInputs, planAmount],
@@ -408,7 +467,7 @@ export default function AllocationPage() {
   const hasPension = pension !== null;
   // The rows exist only with the composed grid below: the empty branch renders none, so the
   // controller knows none (`resolveAllocazioneSections`, lib/utils/allocazioneSummary.ts).
-  const hasRows = hasAssets && !!bandedAllocation && !!balanceSummary && !!balanceScore && !!planView;
+  const hasRows = activeTab === 'bilanciamento' && hasAssets && !!bandedAllocation && !!balanceSummary && !!balanceScore && !!planView;
   const sectionSpecs = useMemo(() => resolveAllocazioneSections({ hasRows, hasPension, exposureFailed }), [hasRows, hasPension, exposureFailed]);
   const sections = useMobileSections({ route: 'allocation', sections: sectionSpecs });
   // At 768 the same rows on two columns; on a tablet in landscape the index beside the verdict and
@@ -444,14 +503,15 @@ export default function AllocationPage() {
         leverage: leverageReading,
         nextMoney,
         orphans: orphanedTargets,
+        pac,
       }),
-    [hasAssets, excludedGroup.total, balanceScore, balanceSummary, band, offTarget, leverageReading, nextMoney, orphanedTargets],
+    [hasAssets, excludedGroup.total, balanceScore, balanceSummary, band, offTarget, leverageReading, nextMoney, orphanedTargets, pac],
   );
 
   const headerDescription = describeAllocazioneHeader({
     marketValue: bandedAllocation?.marketValue ?? 0,
     classCount,
-    targetSource: usingGoalTargets ? 'goals' : 'settings',
+    targetSource: activeTab === 'accumulo' ? (modelQuery.data ? 'model' : 'plan') : usingGoalTargets ? 'goals' : 'settings',
     // The Consulente's «rivedi entro» once its plan was applied (2026-10-20); a failed read of
     // that document drops the clause, never the header.
     reviewBy: describeReviewBy(adviceQuery.data),
@@ -552,6 +612,26 @@ export default function AllocationPage() {
     <PageContainer>
       {header}
 
+      <PageTabs
+        tabs={ALLOCATION_TABS}
+        value={activeTab}
+        onValueChange={handleTabChange}
+        layoutId="allocation-tab"
+        ariaLabel="Sezioni di Allocazione"
+        renderedPanels={new Set([activeTab])}
+      >
+        {/* Only the active panel is mounted: each carries its own verdict, and two sections with the
+            page-verdict view-transition name would break the page scene. */}
+        {activeTab === 'bilanciamento' && (
+          <TabsContent
+            value="bilanciamento"
+            id={pageTabPanelId('allocation-tab', 'bilanciamento')}
+            aria-label="Bilanciamento"
+            // Radix names a Content after ITS trigger; these triggers are plain buttons, so the
+            // generated reference points at nothing. The name is the label above.
+            aria-labelledby={undefined}
+            className="mt-4 flex flex-col gap-3"
+          >
       {/* The stage: the verdict over the grid; on a tablet in landscape the answer on the left
           (verdict and THE tile) and the index on the right (lib/utils/tabletComposition.ts). */}
       <RowAnswers value={rowAnswers}>
@@ -650,6 +730,7 @@ export default function AllocationPage() {
             reading={describePlan(planView, band, saleTax)}
             view={planView}
             footer={describePlanFooter(planMode, !!leverageInputs, saleTax?.tax !== null && saleTax?.tax !== undefined)}
+            pacNote={pacNote ? { reading: pacNote, onOpenAccumulo: () => handleTabChange('accumulo') } : null}
           />
         </div>
 
@@ -702,9 +783,33 @@ export default function AllocationPage() {
       </div>
       </RowAnswers>
 
-      {mobileAction}
+          {mobileAction}
 
-      <AllocazioneDettaglio frozen={frozenGroup} excluded={excludedGroup} />
+          <AllocazioneDettaglio frozen={frozenGroup} excluded={excludedGroup} />
+          </TabsContent>
+        )}
+
+        {activeTab === 'accumulo' && (
+          <TabsContent
+            value="accumulo"
+            id={pageTabPanelId('allocation-tab', 'accumulo')}
+            aria-label="Accumulo"
+            aria-labelledby={undefined}
+          >
+            {ownerId && (
+              <AccumuloTab
+                ownerId={ownerId}
+                allAssets={allAssets}
+                targets={targets}
+                band={band}
+                targetLeverageRatio={targetLeverageRatio}
+                idealAllocation={idealAllocation}
+                onAssetsChanged={retryLoad}
+              />
+            )}
+          </TabsContent>
+        )}
+      </PageTabs>
     </PageContainer>
   );
 }
