@@ -92,6 +92,25 @@ export const REVISION_COPY = {
   running: 'Rivedo il report con la tua richiesta…',
 } as const;
 
+// ─── The book (2026-11-08) ────────────────────────────────────────────────────
+
+/**
+ * The words of the report read as a book: the page's eyebrow, the pager, the «Indice» modal, the
+ * risks page's aside, the instruments page's reading without candidates. Strings only: the
+ * Allocazione page loads this module (`describeReviewBy`), and it stays zod-free.
+ */
+export const BOOK_COPY = {
+  eyebrow: (n: number, total: number, title: string) => `Pagina ${n} di ${total} · ${title}`,
+  back: 'Indietro',
+  next: 'Avanti',
+  index: 'Indice',
+  indexEyebrow: (total: number) => `Il report · ${total === 1 ? '1 pagina' : `${total} pagine`}`,
+  indexTitle: 'Vai a una pagina',
+  indexReading: "Ogni pagina si legge da sola; «Applica» è l'ultima.",
+  reviewAside: (date: string) => `rivedi entro il ${date}`,
+  instrumentsTextOnly: 'La ricerca ha scritto solo testo: è quello di questa pagina.',
+} as const;
+
 // ─── The interview (2026-11-08) ───────────────────────────────────────────────
 
 /** Every label of the interview: the summary's footer, the scene, the report's tile and the revision tile (2026-11-08). */
@@ -188,7 +207,7 @@ export function buildConsulenteVerdict(document: AllocationAdviceDocument, today
       sentence: [
         prose(`Scritta il ${formatDate(document.applied.at)}`),
         ...(proposal ? [prose('; da rivedere entro il '), figure(formatDate(new Date(proposal.reviewByIso))), prose('.')] : [prose('.')]),
-        ...(invite ? [prose(` ${invite} «Rifai il percorso», in fondo, riparte dal piano in vigore e dal suo perché.`)] : []),
+        ...(invite ? [prose(` ${invite} «Rifai il percorso», nell'ultima pagina, riparte dal piano in vigore e dal suo perché.`)] : []),
       ],
     };
   }
@@ -196,7 +215,7 @@ export function buildConsulenteVerdict(document: AllocationAdviceDocument, today
     return {
       headline: 'Il Consulente ha scritto il report, senza una proposta leggibile.',
       tone: 'warning',
-      sentence: [prose("Leggi il testo qui sotto; «Applica» non è disponibile perché il blocco strutturato non è valido. Rifai il percorso per ottenerne uno.")],
+      sentence: [prose("Leggi il testo nelle pagine che seguono; «Applica» non è disponibile perché il blocco strutturato non è valido. Rifai il percorso per ottenerne uno.")],
     };
   }
   return {

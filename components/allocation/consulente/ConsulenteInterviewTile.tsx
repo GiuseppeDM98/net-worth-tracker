@@ -1,11 +1,12 @@
 /**
- * «Il colloquio» on the report (2026-11-08, decision 53): the rounds the Consulente asked before
- * the strategy, each with its note and its questions, and what the user answered — the user's own
- * words recapped, so the tile does NOT wear `generated` (the third exception of DESIGN.md → The
- * AI-Accent Rule, decision 79). No hooks; nothing with zero rounds or without an interview.
+ * «Il colloquio» on the report (2026-11-08; a page of the book since 2026-11-11): the rounds the
+ * Consulente asked before the strategy, each with its note and its questions, and what the user
+ * answered — the user's own words recapped, so the page does NOT wear `generated` (DESIGN.md → The
+ * AI-Accent Rule). No hooks; nothing with zero rounds or without an interview. The page's aside is
+ * `describeInterviewAside`.
  */
 
-import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import type { AllocationAdviceInterview } from '@/types/allocationAdvice';
 import { describeInterviewAside, INTERVIEW_COPY } from '@/lib/utils/allocationAdviceNarrative';
 import { answerOf, describeAnswer, type Question, type QuestionAnswer } from '@/lib/utils/questionSet';
@@ -30,20 +31,18 @@ export function InterviewRoundRows({ questions, answers, className }: { question
   );
 }
 
-export function ConsulenteInterviewTile({ interview }: { interview: AllocationAdviceInterview | null | undefined }) {
-  const aside = describeInterviewAside(interview);
-  if (!interview || aside === null) return null;
+/** The page «Il colloquio»: every round's sub-eyebrow, note and rows; nothing without an interview or with zero rounds. */
+export function InterviewBody({ interview }: { interview: AllocationAdviceInterview | null | undefined }) {
+  if (!interview || describeInterviewAside(interview) === null) return null;
   return (
-    <Tile eyebrow={INTERVIEW_COPY.tileTitle} aside={aside}>
-      <div className="mt-3 flex flex-col gap-4">
-        {interview.rounds.map((round, index) => (
-          <div key={index}>
-            <p className={TILE_SUB_EYEBROW_CLASS}>{INTERVIEW_COPY.roundEyebrow(index + 1)}</p>
-            <p className="mt-1 text-[13px] leading-[1.5] text-foreground">{round.note}</p>
-            <InterviewRoundRows questions={round.questions} answers={round.answers} className="mt-1" />
-          </div>
-        ))}
-      </div>
-    </Tile>
+    <div className="mt-3 flex flex-col gap-4">
+      {interview.rounds.map((round, index) => (
+        <div key={index}>
+          <p className={TILE_SUB_EYEBROW_CLASS}>{INTERVIEW_COPY.roundEyebrow(index + 1)}</p>
+          <p className="mt-1 text-[13px] leading-[1.5] text-foreground">{round.note}</p>
+          <InterviewRoundRows questions={round.questions} answers={round.answers} className="mt-1" />
+        </div>
+      ))}
+    </div>
   );
 }

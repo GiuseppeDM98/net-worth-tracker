@@ -9,6 +9,7 @@ import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import { narrativeToText } from '@/lib/utils/narrative';
 import {
+  BOOK_COPY,
   buildConsulenteVerdict,
   buildProposalRows,
   describeApplySummary,
@@ -78,6 +79,18 @@ describe('buildConsulenteVerdict', () => {
     const noBlock = buildConsulenteVerdict(document({ report: { markdown: 'Testo', proposal: null, model: 'm', finishedAt: NOW } }));
     expect(noBlock.tone).toBe('warning');
     expect(noBlock.headline).toMatch(/senza una proposta leggibile/);
+    // The book (2026-11-11): the text is in the pages that follow, not «qui sotto».
+    expect(plain(noBlock.sentence)).toBe('Leggi il testo nelle pagine che seguono; «Applica» non è disponibile perché il blocco strutturato non è valido. Rifai il percorso per ottenerne uno.');
+  });
+});
+
+describe('the book’s words (2026-11-11)', () => {
+  it('the page’s eyebrow and the index’s, singular and plural', () => {
+    expect(BOOK_COPY.eyebrow(3, 10, 'Gli strumenti')).toBe('Pagina 3 di 10 · Gli strumenti');
+    expect(BOOK_COPY.indexEyebrow(1)).toBe('Il report · 1 pagina');
+    expect(BOOK_COPY.indexEyebrow(10)).toBe('Il report · 10 pagine');
+    expect(BOOK_COPY.indexTitle).toBe('Vai a una pagina');
+    expect(BOOK_COPY.reviewAside('20/10/2028')).toBe('rivedi entro il 20/10/2028');
   });
 });
 
@@ -121,7 +134,7 @@ describe('the small sentences', () => {
 
     const verdict = buildConsulenteVerdict(applied, '2028-11-03');
     expect(verdict.tone).toBe('warning');
-    expect(plain(verdict.sentence)).toContain('è passata da 14 giorni. «Rifai il percorso», in fondo, riparte dal piano in vigore');
+    expect(plain(verdict.sentence)).toContain('è passata da 14 giorni. «Rifai il percorso», nell\'ultima pagina, riparte dal piano in vigore e dal suo perché.');
     expect(buildConsulenteVerdict(applied, '2027-01-01').tone).toBe('positive');
     expect(plain(buildConsulenteVerdict(applied).sentence)).toBe('Scritta il 20/10/2026; da rivedere entro il 20/10/2028.');
   });

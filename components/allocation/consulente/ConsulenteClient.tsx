@@ -6,9 +6,9 @@
  * Three views on one page, by what the account holds: the PATH (one question per screen,
  * «Indietro» always available, the draft kept on this browser, then the interview's rounds in the
  * same card, 2026-11-08), the RUN (the three stages of
- * the two agents, persisted after each so a reload shows where it is), the REPORT (the verdict,
- * the proposal against today, the instruments, the goals, the roles, the text, and «Applica»
- * with one checkbox per thing it writes). Not a tile grid: like the Assistente, the content is
+ * the two agents, persisted after each so a reload shows where it is), the REPORT read as a book
+ * (the verdict on the cover, one page per section of the text and tile of figures, «Applica» last
+ * with one checkbox per thing it writes; a page is an address, `?pagina=`, 2026-11-08). Not a tile grid: like the Assistente, the content is
  * a conversation — here a form — so the page is one column at 720px (900px at 1440, the path's rail beside the card) and nothing is composed,
  * lifted or remembered below `desktop:` (DESIGN.md → The Conversation-Is-Content Rule).
  *
@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { pageShowsReport } from '@/lib/utils/allocationAdviceDocument';
 import { clearStoredDraft } from '@/lib/utils/allocationAdviceDraft';
+import { bookPageUrl } from '@/lib/utils/allocationAdviceBook';
 import { ConsulenteWizard } from './ConsulenteWizard';
 import { useConsulenteRun } from './useConsulenteRun';
 import { ConsulenteReport } from './ConsulenteReport';
@@ -45,12 +46,14 @@ interface ConsulenteClientProps {
   configured: boolean;
   /** Open on the screens over the last document, as «Rifai il percorso» would (`?rivedi=1`). */
   startFresh?: boolean;
+  /** The book's page asked by the address (`?pagina=`), read on the server: the first render never reads `window.location`. */
+  initialPage?: string | null;
 }
 
 /** One tall cell: the path's card. */
 const SKELETON_CELLS: TileSkeletonCell[] = [{ span: 12, rows: 2 }];
 
-export function ConsulenteClient({ configured, startFresh = false }: ConsulenteClientProps) {
+export function ConsulenteClient({ configured, startFresh = false, initialPage = null }: ConsulenteClientProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
@@ -64,6 +67,9 @@ export function ConsulenteClient({ configured, startFresh = false }: ConsulenteC
   const [redo, setRedo] = useState<{ documentUpdatedAt: number } | null>(null);
   // The clock is read once, when the page opens: a render must not read it (react-hooks/purity).
   const [openedAt] = useState(() => Date.now());
+  // The book's page, by id and for ONE document (2026-11-08): it survives the running view and a
+  // revision (same `createdAt`); a document newer than the page's opening opens on its cover.
+  const [bookPage, setBookPage] = useState<{ id: string; createdAt: number } | null>(null);
   // The run's state lives HERE, not in the wizard: while a run started on this page is going
   // (or failed), the page keeps the run's screen even though the document is already `running`
   // and the query rereads it after every stage (pageShowsReport). A finished run clears the draft.
@@ -145,6 +151,7 @@ export function ConsulenteClient({ configured, startFresh = false }: ConsulenteC
     openedAt,
     runActive: run.state.kind === 'running' || run.state.kind === 'failed',
   });
+  const created = advice?.createdAt.getTime() ?? 0;
 
   return (
     <PageContainer>
@@ -155,7 +162,13 @@ export function ConsulenteClient({ configured, startFresh = false }: ConsulenteC
           document={advice}
           assets={assets}
           goalData={goalData}
-          onRedo={() => setRedo({ documentUpdatedAt: advice.updatedAt.getTime() })}
+          pageId={bookPage?.createdAt === created ? bookPage.id : created <= openedAt && !startFresh ? initialPage : null}
+          onPageChange={(id) => setBookPage({ id, createdAt: created })}
+          onRedo={() => {
+            setRedo({ documentUpdatedAt: advice.updatedAt.getTime() });
+            setBookPage(null);
+            window.history.replaceState(null, '', bookPageUrl(window.location.pathname, window.location.search, null));
+          }}
         />
       ) : (
         <ConsulenteWizard ownerId={ownerId} configured={configured} settings={settings} goalData={goalData} assets={assets} lastDocument={advice} run={run} />

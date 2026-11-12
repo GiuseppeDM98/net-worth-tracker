@@ -17,11 +17,15 @@ export async function openConsulente(page: Page) {
   await button.click();
   await page.waitForURL(/\/dashboard\/allocation\/consulente/);
   // A finished report on this account (a real run left one on 2026-10-20) opens the page on the
-  // report: «Rifai il percorso» brings the screens back. The emulators keep the document between runs.
+  // book, whose «Rifai il percorso» sits on its last page (2026-11-08): `?rivedi=1` opens the screens
+  // over it, as the Allocazione's review invite does. A run still going shows «Ricomincia il percorso».
+  // The emulators keep the document between runs.
   const step1 = page.getByRole('heading', { name: /Passo 1 di 8/ });
-  const redo = page.getByRole('button', { name: /Rifai il percorso|Ricomincia il percorso/ });
-  await expect(step1.or(redo)).toBeVisible({ timeout: 60_000 });
-  if (await redo.isVisible()) await redo.click();
+  const book = page.locator('[data-consulente-report]');
+  const redo = page.getByRole('button', { name: 'Ricomincia il percorso' });
+  await expect(step1.or(book).or(redo)).toBeVisible({ timeout: 60_000 });
+  if (await book.isVisible()) await page.goto('/dashboard/allocation/consulente?rivedi=1', { waitUntil: 'load' });
+  else if (await redo.isVisible()) await redo.click();
   await expect(step1).toBeVisible({ timeout: 60_000 });
 }
 

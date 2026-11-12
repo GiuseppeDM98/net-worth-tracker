@@ -1,143 +1,45 @@
 /**
- * Allocazione › Consulente, the REPORT at 1440px (2026-11-07): every tile the model wrote
- * wears the accent and «Applica» / «Chiedi una modifica» do not; the column cascades in once per
- * JS session and the proposed percentages count up with it; a failed run marks its strategy; a run
- * still going shows its stage rows with the typical duration and no clock; reduced motion plays
- * nothing.
+ * Allocazione › Consulente, the REPORT read as a BOOK at 1440px (2026-11-08): one page per section
+ * and tile, turned from the footer and jumped to from the rail's labels; each page an address
+ * (`?pagina=`, `replaceState`); the accent on the pages the model wrote and never on «Il colloquio»,
+ * «Chiedi una modifica», «Applica»; the first page cascades once per JS session and the proposal
+ * page counts up on its first mount; «Chiedi una modifica» asks its round and keeps its draft across
+ * a turn; a failed run is a book too; a run still going shows its stage rows; a printer gets every
+ * page; reduced motion plays nothing.
  *
- * Each test plants its own document in `allocationAdvice/test-user-1` through firebase-admin on the
- * emulator (two classes at 70 and 30, the goal «Fondo fenicottero» on «ETF ornitorinco»; since
- * 2026-11-08 an `interview` of two rounds with one decline and a `revisionInterview` of one round
- * under the request «meno cripto»); `afterAll` puts back what the account held, or deletes the
- * document when it held none. No run is started: «Chiedi una modifica» is exercised on a faked
- * route (`e2e/consulenteInterview.ts`), the round before the revision included.
+ * Each test plants its own document (`e2e/consulenteReport.ts`); `afterAll` puts back what the
+ * account held. The run route is ALWAYS faked (`installFakeRun`): no model is called.
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { REVISION_ROUND, installFakeRun } from './consulenteInterview';
-
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
-
-const UID = 'test-user-1';
+import { REVISION_ROUND, installFakeRun, type FakeRunRecorder } from './consulenteInterview';
+import { PRINTABLE_TITLES, bookCard, expectPage, openReport, plant, rememberHeld, restoreHeld } from './consulenteReport';
 
 declare global {
   interface Window {
-    __report?: { minOpacity: number; pcts: string[] };
+    __report?: { minOpacity: number; pcts: string[]; transforms: string[] };
   }
 }
 
 test.describe.configure({ mode: 'serial' });
 
-async function admin() {
-  const { initializeApp, getApps } = await import('firebase-admin/app');
-  const { getFirestore, Timestamp } = await import('firebase-admin/firestore');
-  const app = getApps()[0] ?? initializeApp({ projectId: process.env.GCLOUD_PROJECT });
-  return { db: getFirestore(app), Timestamp };
-}
+test.beforeAll(rememberHeld);
+test.afterAll(restoreHeld);
 
-type Status = 'ready' | 'failed' | 'running';
-
-/** A literal document, every date a Timestamp; the answers and the proposal shaped by the schemas of lib/utils/allocationAdviceProposal.ts. */
-async function plant(status: Status) {
-  const { db, Timestamp } = await admin();
-  const now = Timestamp.fromDate(new Date());
-  const answers = {
-    age: 35,
-    horizonYears: 20,
-    lossTolerance: 'media',
-    exchange: 'Borsa Italiana (Milano, XMIL)',
-    broker: '',
-    distributionPolicy: 'accumulazione',
-    goals: [],
-    goalsReflectReality: true,
-    newGoalsNote: '',
-    homeRole: 'excluded',
-    pensionRole: 'frozen',
-    privateEquityRole: 'frozen',
-    keepAssets: [],
-    avoid: '',
-    esg: false,
-    notes: '',
-  };
-  const proposal = {
-    summary: 'Più azioni, meno liquidità: un portafoglio finto per la spec.',
-    classes: [
-      { assetClass: 'equity', targetPercentage: 70, rationale: 'Orizzonte lungo.', subTargets: [] },
-      { assetClass: 'bonds', targetPercentage: 30, rationale: 'La parte che frena.', subTargets: [] },
-    ],
-    assetRoles: [],
-    goals: [{ name: 'Fondo fenicottero', priority: 'media', assignments: [{ assetName: 'ETF ornitorinco', percentage: 50 }], rationale: 'Un obiettivo finto.' }],
-    reviewByIso: '2027-06-15',
-    reviewReason: 'Fra un anno.',
-    risks: [],
-  };
-  const strategy = { markdown: '# Strategia finta\n\nTesto della strategia.', proposal, model: 'opus-finto', finishedAt: now };
-  const instruments = {
-    markdown: 'Strumenti finti.',
-    candidates: {
-      sleeves: [
-        { assetClass: 'equity', subTarget: 'Azioni mondo', candidates: [{ name: 'ETF ornitorinco', exchange: 'Borsa Italiana', note: 'Finto.' }] },
-        // A bond sleeve with the duration the agent verified (2026-11-08): the report prints it.
-        { assetClass: 'bonds', subTarget: 'Euro 1-3 anni', candidates: [{ name: 'ETF fenicottero breve', exchange: 'Borsa Italiana', note: 'Finto.', duration: 1.9 }] },
-      ],
-    },
-    model: 'sonnet-finto',
-    webSearchUsed: true,
-    finishedAt: now,
-  };
-  const report = { markdown: '# Report finto\n\nIl report del Consulente, finto.', proposal, model: 'opus-finto', finishedAt: now };
-  // The interview before the strategy: two rounds, invented figures, one decline (2026-11-08).
-  const reddito = { id: 'reddito', kind: 'single', text: 'Quanto dipendi da quella fonte?', why: "l'86% delle entrate", options: [{ value: 'tutto', label: 'Interamente' }, { value: 'meta', label: 'Circa metà' }], allowOther: true };
-  const riserva = { id: 'riserva', kind: 'multiple', text: 'Cosa conta come riserva di emergenza?', why: '2 mesi di spesa', options: [{ value: 'conti', label: 'I conti correnti' }, { value: 'btp', label: 'I BTP a breve' }], allowOther: true };
-  const casa = { id: 'casa', kind: 'single', text: 'La casa resta fuori dal piano?', why: 'il 40% del patrimonio', options: [{ value: 'fuori', label: 'Sì, resta fuori' }, { value: 'dentro', label: 'No, potrei venderla' }], allowOther: true };
-  const interview = {
-    rounds: [
-      { note: "Vedo un reddito concentrato: l'86% delle entrate da una fonte sola.", satisfied: false, questions: [reddito, riserva], answers: [{ questionId: 'reddito', value: 'meta' }, { questionId: 'riserva', value: '__decline__' }], model: 'opus-finto', askedAt: now },
-      { note: 'Resta da capire la casa.', satisfied: true, questions: [casa], answers: [{ questionId: 'casa', value: 'fuori' }], model: 'opus-finto', askedAt: now },
-    ],
-    skipped: false,
-  };
-  const cedere = { id: 'cedere', kind: 'single', text: 'Cosa accetti di cedere per avere meno cripto?', why: 'il 5% del portafoglio', options: [{ value: 'rendimento', label: "Un po' di rendimento atteso" }, { value: 'niente', label: 'Niente: solo spostare' }], allowOther: true };
-  const revisionInterview = { rounds: [{ note: 'Prima di togliere le cripto, una domanda.', satisfied: true, questions: [cedere], answers: [{ questionId: 'cedere', value: 'rendimento' }], model: 'opus-finto', askedAt: now }], skipped: false };
-  const base = { answers, createdAt: now, updatedAt: now, startedAt: now, applied: null, revisions: [{ request: 'meno cripto', at: now }], interview, revisionInterview };
-  const document =
-    status === 'ready'
-      ? { ...base, status, stage: 'review', strategy, instruments, report, error: null }
-      : status === 'failed'
-        ? { ...base, status, stage: 'instruments', strategy, instruments: null, report: null, error: 'Ricerca finta interrotta: ornitorinco.' }
-        : { ...base, status, stage: 'instruments', strategy, instruments: null, report: null, error: null };
-  await db.collection('allocationAdvice').doc(UID).set(document);
-}
-
-let held: FirebaseFirestore.DocumentData | null = null;
-
-test.beforeAll(async () => {
-  const { db } = await admin();
-  const snap = await db.collection('allocationAdvice').doc(UID).get();
-  held = snap.exists ? (snap.data() ?? null) : null;
-});
-
-test.afterAll(async () => {
-  const { db } = await admin();
-  const ref = db.collection('allocationAdvice').doc(UID);
-  if (held) await ref.set(held);
-  else await ref.delete();
-});
-
+/** Frame by frame: the lowest opacity of the page's blocks, the proposal's first figure as it changes, the scene's transform. */
 async function installProbe(page: Page) {
   await page.addInitScript(() => {
-    window.__report = { minOpacity: 1, pcts: [] };
+    window.__report = { minOpacity: 1, pcts: [], transforms: [] };
     const tick = () => {
       const probe = window.__report!;
-      const column = document.querySelector('[data-consulente-report]');
-      if (column) {
-        for (const child of Array.from(column.children)) {
-          const opacity = Number.parseFloat(getComputedStyle(child).opacity);
+      const scene = document.querySelector<HTMLElement>('[data-scene]');
+      if (scene) {
+        probe.transforms.push(getComputedStyle(scene).transform);
+        for (const block of Array.from(scene.querySelectorAll(':scope > div > *'))) {
+          const opacity = Number.parseFloat(getComputedStyle(block).opacity);
           if (opacity < probe.minOpacity) probe.minOpacity = opacity;
         }
-        const pct = document.querySelector('[data-proposed-pct]');
-        const text = pct?.textContent ?? null;
+        const text = scene.querySelector('[data-proposed-pct]')?.textContent ?? null;
         if (text !== null && probe.pcts[probe.pcts.length - 1] !== text) probe.pcts.push(text);
       }
       requestAnimationFrame(tick);
@@ -149,118 +51,198 @@ async function installProbe(page: Page) {
 const readProbe = (page: Page) => page.evaluate(() => window.__report!);
 const resetProbe = (page: Page) =>
   page.evaluate(() => {
-    window.__report = { minOpacity: 1, pcts: [] };
+    window.__report = { minOpacity: 1, pcts: [], transforms: [] };
   });
 
-async function openReport(page: Page) {
-  await page.goto('/dashboard/allocation/consulente', { waitUntil: 'load' });
-  await expect(page.getByRole('region', { name: 'Applica' }).or(page.getByRole('region', { name: 'Le fasi' }))).toBeVisible({ timeout: 60_000 });
-}
+const forward = (page: Page) => bookCard(page).getByRole('button', { name: 'Avanti' }).click();
+const back = (page: Page) => bookCard(page).getByRole('button', { name: 'Indietro' }).click();
+const rail = (page: Page) => page.getByRole('list', { name: 'Le pagine' });
+
+let recorder: FakeRunRecorder;
 
 test.beforeEach(async ({ page }) => {
   await installProbe(page);
+  recorder = await installFakeRun(page, { delayRoundMs: () => 1_000 });
 });
 
-test('a ready report marks what the model wrote, cascades once and counts the proposal up', async ({ page }) => {
+test('the cover cascades once, does not slide, and the proposal page counts up on its first mount only', async ({ page }) => {
   await plant('ready');
   await openReport(page);
-  await expect(page.locator('[data-generated]')).toHaveCount(4);
-  for (const name of ['Allocazione proposta', 'Strumenti', 'Obiettivi', 'Il report']) {
-    await expect(page.getByRole('region', { name })).toHaveAttribute('data-generated', '');
-  }
-  await expect(page.getByRole('region', { name: 'Applica' })).not.toHaveAttribute('data-generated');
-  await expect(page.getByRole('region', { name: 'Chiedi una modifica' })).not.toHaveAttribute('data-generated');
-  await expect(page.getByRole('button', { name: 'Rivedi il report' })).toHaveClass(/var\(--ai-glow\)/);
-  // The bond candidate's verified duration (2026-11-08).
-  await expect(page.getByRole('region', { name: 'Strumenti' })).toContainText('ETF fenicottero breve · duration 1,9 anni · Borsa Italiana');
-  await expect(page.locator('[data-proposed-pct]').first()).toHaveText('70,0%');
+  await expectPage(page, 'Pagina 1 di 10 · In una frase', 'copertina');
+  await expect(page.locator('[data-generated]')).toHaveCount(1);
   await page.waitForTimeout(800);
-  const first = await readProbe(page);
-  expect(first.minOpacity).toBeLessThan(0.5);
-  expect(first.pcts.length).toBeGreaterThan(1);
-  expect(first.pcts[first.pcts.length - 1]).toBe('70,0%');
+  const opened = await readProbe(page);
+  expect(opened.minOpacity).toBeLessThan(0.5);
+  expect(opened.transforms.every((transform) => transform === 'none')).toBe(true);
+  const settled = await page.evaluate(() => Array.from(document.querySelectorAll('[data-scene] > div > *')).every((block) => getComputedStyle(block).opacity === '1'));
+  expect(settled).toBe(true);
 
-  // Back to the Allocazione and in again, the same JS session: no cascade, the figure at once.
+  await resetProbe(page);
+  await forward(page);
+  await expectPage(page, "Pagina 2 di 10 · L'allocazione proposta", 'allocazione');
+  await expect(bookCard(page).locator('[data-proposed-pct]').first()).toHaveText('70,0%');
+  await page.waitForTimeout(800);
+  const counted = await readProbe(page);
+  expect(counted.pcts.length).toBeGreaterThan(1);
+  expect(counted.pcts[counted.pcts.length - 1]).toBe('70,0%');
+
+  await forward(page);
+  await expectPage(page, 'Pagina 3 di 10 · Gli strumenti', 'strumenti');
+  await resetProbe(page);
+  await back(page);
+  await expectPage(page, "Pagina 2 di 10 · L'allocazione proposta", 'allocazione');
+  await page.waitForTimeout(800);
+  const again = await readProbe(page);
+  expect(again.pcts).toEqual(['70,0%']);
+  expect(again.minOpacity).toBe(1);
+
+  // Back to the Allocazione and in again, the same JS session: no cascade, no count.
   await page.getByRole('link', { name: "Torna all'Allocazione" }).click();
   await expect(page.getByRole('region', { name: "Verdetto sull'allocazione" })).toBeVisible({ timeout: 60_000 });
-  await resetProbe(page);
   await page.getByRole('link', { name: 'Consulente' }).filter({ visible: true }).first().click();
-  await expect(page.getByRole('region', { name: 'Applica' })).toBeVisible({ timeout: 60_000 });
+  await expectPage(page, /^Pagina 1 di 10/, 'copertina');
+  await resetProbe(page);
+  await forward(page);
+  await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
   await page.waitForTimeout(800);
-  const second = await readProbe(page);
-  expect(second.minOpacity).toBe(1);
-  expect(second.pcts).toEqual(['70,0%']);
+  const returned = await readProbe(page);
+  expect(returned.pcts).toEqual(['70,0%']);
+  expect(returned.minOpacity).toBe(1);
 });
 
-test('the report shows «Il colloquio» with its two rounds, and the round asked before the last request', async ({ page }) => {
+test('a session opened on «Gli strumenti» still counts up when it turns back to the proposal', async ({ page }) => {
+  await plant('ready');
+  await openReport(page, '?pagina=strumenti');
+  await expectPage(page, 'Pagina 3 di 10 · Gli strumenti', 'strumenti');
+  await resetProbe(page);
+  await back(page);
+  await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
+  await page.waitForTimeout(800);
+  const probe = await readProbe(page);
+  expect(probe.pcts.length).toBeGreaterThan(1);
+  expect(probe.pcts[probe.pcts.length - 1]).toBe('70,0%');
+});
+
+test('the rail is the index: its label turns the page, one Tab stop between the header and the card', async ({ page }) => {
   await plant('ready');
   await openReport(page);
-  // The tile recaps the user's own words: not a generated surface (decision 79); it sits between the report and the revision.
-  const tile = page.getByRole('region', { name: 'Il colloquio' });
-  await expect(tile).toBeVisible();
-  await expect(tile).not.toHaveAttribute('data-generated');
-  await expect(tile).toContainText('2 tornate');
-  await expect(tile).toContainText('Tornata 1');
-  await expect(tile).toContainText("Vedo un reddito concentrato: l'86% delle entrate da una fonte sola.");
-  await expect(tile).toContainText('Quanto dipendi da quella fonte?');
-  await expect(tile).toContainText('Circa metà');
-  await expect(tile).toContainText('Preferisco non dire');
-  await expect(tile).toContainText('Tornata 2');
-  await expect(tile).toContainText('Sì, resta fuori');
-  await expect(tile.getByRole('button')).toHaveCount(0);
-  const reportBox = (await page.getByRole('region', { name: 'Il report' }).boundingBox())!;
-  const tileBox = (await tile.boundingBox())!;
-  const revisionBox = (await page.getByRole('region', { name: 'Chiedi una modifica' }).boundingBox())!;
-  expect(tileBox.y).toBeGreaterThan(reportBox.y);
-  expect(revisionBox.y).toBeGreaterThan(tileBox.y);
-  // Under the last request, the round the Consulente asked before applying it.
-  const revision = page.getByRole('region', { name: 'Chiedi una modifica' });
-  await expect(revision).toContainText('1 richiesta');
-  await expect(revision).toContainText('meno cripto');
-  const asked = revision.locator('[data-revision-interview]');
-  await expect(asked).toBeVisible();
+  await expectPage(page, /^Pagina 1 di 10/, 'copertina');
+  await rail(page).getByRole('button', { name: 'Gli strumenti' }).click();
+  await expectPage(page, 'Pagina 3 di 10 · Gli strumenti', 'strumenti');
+  await expect(bookCard(page)).toContainText('ETF fenicottero breve · duration 1,9 anni · Borsa Italiana');
+  await expect(bookCard(page)).toContainText("L'ETF ornitorinco copre le azioni.");
+
+  // From the header's last control: one Tab lands on the rail's current page, the next one in the card.
+  await page.getByRole('link', { name: "Torna all'Allocazione" }).focus();
+  await page.keyboard.press('Tab');
+  await expect(rail(page).getByRole('button', { name: 'Gli strumenti' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  const inCard = await page.evaluate(() => Boolean(document.activeElement?.closest('section[aria-label^="Pagina "]')));
+  expect(inCard).toBe(true);
+});
+
+test('a page is an address: replaceState on every turn, the history never grows, «Rifai il percorso» cleans it', async ({ page }) => {
+  await plant('ready');
+  await openReport(page, '?pagina=strumenti');
+  await expectPage(page, /^Pagina 3 di 10/, 'strumenti');
+  const length = await page.evaluate(() => history.length);
+  await back(page);
+  await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
+  expect(page.url()).toContain('pagina=allocazione');
+  await forward(page);
+  await expectPage(page, /^Pagina 3 di 10/, 'strumenti');
+  await forward(page);
+  await expectPage(page, /^Pagina 4 di 10/, 'obiettivi');
+  expect(page.url()).toContain('pagina=obiettivi');
+  expect(await page.evaluate(() => history.length)).toBe(length);
+  await rail(page).getByRole('button', { name: 'In una frase' }).click();
+  await expectPage(page, /^Pagina 1 di 10/, 'copertina');
+  expect(page.url()).not.toContain('pagina=');
+
+  await rail(page).getByRole('button', { name: 'Applica' }).click();
+  await expectPage(page, 'Pagina 10 di 10 · Applica', 'applica');
+  expect(page.url()).toContain('pagina=applica');
+  await bookCard(page).getByRole('button', { name: 'Rifai il percorso' }).click();
+  await expect(page.getByRole('heading', { name: /Passo 1 di 8/ })).toBeVisible({ timeout: 30_000 });
+  expect(page.url()).not.toContain('pagina=');
+});
+
+test('the accent follows the author: «Il colloquio», «Chiedi una modifica» and «Applica» are not the model’s', async ({ page }) => {
+  await plant('ready');
+  await openReport(page, '?pagina=colloquio');
+  await expectPage(page, 'Pagina 8 di 10 · Il colloquio', 'colloquio');
+  await expect(page.locator('[data-generated]')).toHaveCount(0);
+  const card = bookCard(page);
+  await expect(card).toContainText('2 tornate');
+  await expect(card).toContainText('Tornata 1');
+  await expect(card).toContainText("Vedo un reddito concentrato: l'86% delle entrate da una fonte sola.");
+  await expect(card).toContainText('Circa metà');
+  await expect(card).toContainText('Preferisco non dire');
+  await expect(card).toContainText('Sì, resta fuori');
+
+  await forward(page);
+  await expectPage(page, 'Pagina 9 di 10 · Chiedi una modifica', 'modifica');
+  await expect(page.locator('[data-generated]')).toHaveCount(0);
+  await expect(card).toContainText('1 richiesta');
+  await expect(card).toContainText('meno cripto');
+  const asked = card.locator('[data-revision-interview]');
   await expect(asked).toContainText('Il Consulente ha chiesto');
-  await expect(asked).toContainText('Cosa accetti di cedere per avere meno cripto?');
   await expect(asked).toContainText("Un po' di rendimento atteso");
-  await expect(page.locator('[data-generated]')).toHaveCount(4);
+  await expect(card.getByRole('button', { name: 'Rivedi il report' })).toHaveClass(/var\(--ai-glow\)/);
+
+  await forward(page);
+  await expectPage(page, 'Pagina 10 di 10 · Applica', 'applica');
+  await expect(page.locator('[data-generated]')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Avanti' })).toHaveCount(0);
 });
 
-test('«Rivedi il report» asks one round first, then sends the revision with the answered round (decision 24)', async ({ page }) => {
-  await plant('ready');
-  const recorder = await installFakeRun(page, { delayRoundMs: () => 1_000 });
+test('a text without headings is one page «Il report» after a plain cover', async ({ page }) => {
+  await plant('ready', 'plain');
   await openReport(page);
-  const revision = page.getByRole('region', { name: 'Chiedi una modifica' });
-  const primary = revision.getByRole('button', { name: 'Rivedi il report' });
-  await expect(primary).toBeDisabled();
-  await expect(revision.getByRole('button', { name: 'Salta le domande' })).toHaveCount(0);
-  await page.locator('#consulente-revision').fill('niente ornitorinchi');
-  await expect(primary).toBeEnabled();
-  await primary.click();
+  await expectPage(page, /^Pagina 1 di 9 · In una frase/, 'copertina');
+  await expect(page.locator('[data-generated]')).toHaveCount(0);
+  await forward(page);
+  await expectPage(page, 'Pagina 2 di 9 · Il report', 'report');
+  await expect(page.locator('[data-generated]')).toHaveCount(1);
+  await expect(bookCard(page)).toContainText('Il report del Consulente, finto, senza titoli.');
+});
 
-  // The wait: the skeleton, the textarea read-only, «Salta le domande» offered, the primary held.
-  await expect(revision.locator('[aria-busy="true"]')).toBeVisible();
-  await expect(page.locator('#consulente-revision')).toHaveAttribute('readonly', '');
-  await expect(revision.getByRole('button', { name: 'Salta le domande' })).toBeVisible();
+test('«Rivedi il report» asks one round first, keeps the draft across a turn, then sends the answered round', async ({ page }) => {
+  await plant('ready');
+  await openReport(page, '?pagina=modifica');
+  await expectPage(page, /^Pagina 9 di 10/, 'modifica');
+  const card = bookCard(page);
+  const primary = card.getByRole('button', { name: 'Rivedi il report' });
   await expect(primary).toBeDisabled();
+  await expect(card.getByRole('button', { name: 'Salta le domande' })).toHaveCount(0);
+  await page.locator('#consulente-revision').fill('niente ornitorinchi');
+  await primary.click();
+  await expect(card.locator('[aria-busy="true"]')).toBeVisible();
+  await expect(page.locator('#consulente-revision')).toHaveAttribute('readonly', '');
   expect(recorder.interview).toHaveLength(1);
   expect(recorder.interview[0]).toMatchObject({ stage: 'interview', interview: { rounds: [], skipped: false }, revision: { requests: 'niente ornitorinchi' } });
+  await expect(card.locator('[data-revision-round]')).toBeVisible();
 
-  // The round: its note, one card, the status naming the question; answered, the primary sends the revision.
-  const round = revision.locator('[data-revision-round]');
-  await expect(round).toBeVisible();
+  // The draft lives in the book: a turn away and back finds the request and the round.
+  await back(page);
+  await expectPage(page, /^Pagina 8 di 10/, 'colloquio');
+  await forward(page);
+  await expectPage(page, /^Pagina 9 di 10/, 'modifica');
+  await expect(page.locator('#consulente-revision')).toHaveValue('niente ornitorinchi');
+  const round = card.locator('[data-revision-round]');
   await expect(round).toContainText(REVISION_ROUND.note);
   await expect(round.locator('[data-question-card]')).toHaveCount(1);
-  await expect(revision.getByRole('status').last()).toHaveText('Rispondi a «Cosa accetti di cedere per avere meno cripto?», o scegli «Preferisco non dire».');
-  await expect(primary).toBeDisabled();
+  await expect(card.getByRole('status').last()).toHaveText('Rispondi a «Cosa accetti di cedere per avere meno cripto?», o scegli «Preferisco non dire».');
   await round.getByRole('radio', { name: 'Niente: solo spostare' }).click();
   await expect(primary).toBeEnabled();
   await primary.click();
 
   await expect(round).toHaveCount(0, { timeout: 15_000 });
   await expect(page.locator('#consulente-revision')).toHaveValue('');
+  // The revision keeps the reader on the page where the request was made.
+  await expectPage(page, /Chiedi una modifica$/);
   expect(recorder.revise).toHaveLength(1);
   expect(recorder.revise[0].request).toBe('niente ornitorinchi');
-  expect(recorder.revise[0].interview?.skipped).toBe(false);
   expect(recorder.revise[0].interview?.rounds).toHaveLength(1);
   expect((recorder.revise[0].interview?.rounds[0] as { answers: unknown[] }).answers).toEqual([{ questionId: 'cedere', value: 'niente' }]);
   expect(recorder.strategy).toHaveLength(0);
@@ -268,35 +250,35 @@ test('«Rivedi il report» asks one round first, then sends the revision with th
 
 test('«Salta le domande» while the round is still asked sends the revision with no round, skipped', async ({ page }) => {
   await plant('ready');
-  const recorder = await installFakeRun(page, { delayRoundMs: () => 3_000 });
-  await openReport(page);
-  const revision = page.getByRole('region', { name: 'Chiedi una modifica' });
+  await openReport(page, '?pagina=modifica');
+  await expectPage(page, /^Pagina 9 di 10/, 'modifica');
+  const card = bookCard(page);
   await page.locator('#consulente-revision').fill('niente ornitorinchi');
-  await revision.getByRole('button', { name: 'Rivedi il report' }).click();
-  await expect(revision.locator('[aria-busy="true"]')).toBeVisible();
-  const skip = revision.getByRole('button', { name: 'Salta le domande' });
+  await card.getByRole('button', { name: 'Rivedi il report' }).click();
+  await expect(card.locator('[aria-busy="true"]')).toBeVisible();
+  const skip = card.getByRole('button', { name: 'Salta le domande' });
   await expect(skip).not.toHaveClass(/ai-glow/);
   await skip.click();
-
   await expect(page.locator('#consulente-revision')).toHaveValue('', { timeout: 15_000 });
   expect(recorder.revise).toHaveLength(1);
   expect(recorder.revise[0]).toMatchObject({ stage: 'revise', request: 'niente ornitorinchi', interview: { rounds: [], skipped: true } });
-  // The late round lands on nothing.
-  await page.waitForTimeout(3_500);
-  await expect(revision.locator('[data-revision-round]')).toHaveCount(0);
+  await page.waitForTimeout(1_500);
+  await expect(card.locator('[data-revision-round]')).toHaveCount(0);
   expect(recorder.revise).toHaveLength(1);
 });
 
-test('a failed run marks its strategy and not «Applica»', async ({ page }) => {
+test('a failed run is a book over its strategy: the negative verdict on the cover, «Rifai il percorso» alone at the end', async ({ page }) => {
   await plant('failed');
   await openReport(page);
-  // The strategy's proposal stands in for the report's: its tiles are the model's too.
-  await expect(page.getByRole('region', { name: 'La strategia' })).toHaveAttribute('data-generated', '');
-  await expect(page.getByRole('region', { name: 'Allocazione proposta' })).toHaveAttribute('data-generated', '');
-  await expect(page.getByRole('region', { name: 'Obiettivi' })).toHaveAttribute('data-generated', '');
-  await expect(page.getByRole('region', { name: 'Applica' })).not.toHaveAttribute('data-generated');
-  await expect(page.getByRole('region', { name: 'Chiedi una modifica' })).toHaveCount(0);
-  await expect(page.locator('[data-generated]')).toHaveCount(3);
+  await expectPage(page, /^Pagina 1 di \d+ · La situazione/, 'copertina');
+  await expect(bookCard(page).getByRole('heading', { level: 2 })).toContainText('Il percorso non si è concluso');
+  await expect(page.locator('[data-generated]')).toHaveCount(1);
+  await rail(page).getByRole('button', { name: 'Applica' }).click();
+  await expectPage(page, /· Applica$/, 'applica');
+  await expect(bookCard(page).getByRole('checkbox')).toHaveCount(0);
+  await expect(bookCard(page).getByRole('button', { name: 'Applica alle impostazioni' })).toHaveCount(0);
+  await expect(bookCard(page).getByRole('button', { name: 'Rifai il percorso' })).toBeVisible();
+  await expect(rail(page).getByRole('button', { name: 'Chiedi una modifica' })).toHaveCount(0);
 });
 
 test('a run still going shows its stage rows with the typical duration and no clock', async ({ page }) => {
@@ -309,18 +291,47 @@ test('a run still going shows its stage rows with the typical duration and no cl
   await expect(active).toContainText('Cerco gli strumenti');
   await expect(active).toContainText('di solito ~2 min');
   await expect(active).not.toContainText(/\d+:\d\d/);
+  await expect(bookCard(page)).toHaveCount(0);
+});
+
+test('a printer gets every page but the two that act; the shell opens for it on this page only', async ({ page }) => {
+  await plant('ready');
+  await openReport(page);
+  await expectPage(page, /^Pagina 1 di 10/, 'copertina');
+  await page.emulateMedia({ media: 'print' });
+  const sheet = page.locator('[data-book-print]');
+  await expect(sheet).toBeVisible();
+  // The pages' titles (`section > div > h2`), not the verdict's own heading (`section > h2`).
+  expect(await sheet.locator(':scope > section > div > h2').allTextContents()).toEqual(PRINTABLE_TITLES);
+  await expect(sheet).not.toContainText('Chiedi una modifica');
+  await expect(page.locator('[data-consulente-report]')).toBeHidden();
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('page-main')!).overflowY)).toBe('visible');
+  await expect(page.locator('[role="navigation"][aria-label="Navigazione principale"]')).toBeHidden();
+  await page.emulateMedia({ media: 'screen' });
+  await expect(sheet).toBeHidden();
+
+  await page.goto('/dashboard/allocation', { waitUntil: 'load' });
+  await expect(page.getByRole('region', { name: "Verdetto sull'allocazione" })).toBeVisible({ timeout: 60_000 });
+  await page.emulateMedia({ media: 'print' });
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('page-main')!).overflowY)).toBe('auto');
+  await page.emulateMedia({ media: 'screen' });
 });
 
 test.describe('under reduced motion', () => {
   test.use({ contextOptions: { reducedMotion: 'reduce' } });
 
-  test('a ready report neither cascades nor counts', async ({ page }) => {
+  test('the book neither cascades nor counts', async ({ page }) => {
     await plant('ready');
     await openReport(page);
-    await expect(page.locator('[data-proposed-pct]').first()).toHaveText('70,0%');
+    await expectPage(page, /^Pagina 1 di 10/, 'copertina');
+    await page.waitForTimeout(800);
+    expect((await readProbe(page)).minOpacity).toBe(1);
+    await resetProbe(page);
+    await forward(page);
+    await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
+    await expect(bookCard(page).locator('[data-proposed-pct]').first()).toHaveText('70,0%');
     await page.waitForTimeout(800);
     const probe = await readProbe(page);
-    expect(probe.minOpacity).toBe(1);
     expect(probe.pcts).toEqual(['70,0%']);
   });
 });

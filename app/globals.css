@@ -845,3 +845,14 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   from { opacity: 1; }
   to { opacity: 0; }
 }
+
+/* The printer's shell, scoped to a page that carries a print sheet (the Consulente's book,
+   2026-11-08): `#page-main` is an `overflow-y-auto` box inside a screen-high flex column, which a
+   printer clips to one screen. Every ancestor of `#page-main` becomes a plain block, every sibling
+   of those ancestors (the sidebar, the bottom navigation, the demo banner) is removed. Without a
+   `[data-book-print]` in the page nothing here applies, so no other page's print changes. */
+@media print {
+  html:has([data-book-print]) :is(body, body *):has(#page-main) { display: block; height: auto; min-height: 0; overflow: visible; }
+  html:has([data-book-print]) :is(body, body *):has(#page-main) > :not(:has(#page-main)):not(#page-main) { display: none; }
+  html:has([data-book-print]) #page-main { overflow: visible; height: auto; padding: 0; }
+}

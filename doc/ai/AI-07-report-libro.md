@@ -8,6 +8,7 @@
 > Written on 2026-11-08, the same day the owner asked for it; every `file:line` is cited on `develop` @ d818ba1d.
 > Executes decisions 91–96 and 100–117 (README.md § 3). **Read adversarially on 2026-11-11** (prompt 07: six Opus
 > readers, 50 distinct findings verified on the code, decisions 100–117): the spec is a development instruction.
+> **Implemented on 2026-11-12**, PR #517 (decision 118: the `/dashboard/cashflow` ceiling 786 → 787; README.md § 6).
 
 ## 1. The problem today (evidence on the code)
 
@@ -299,7 +300,8 @@ mutation that turns the proof red.
     the Allocazione page imports: `npm run perf:budget` is run before and after, and when the key
     `/dashboard/allocation` (ceiling 604, measured 603,8 on 2026-11-11) passes its ceiling the session STOPS and asks
     the owner with AskUserQuestion to raise it to the measured value rounded up, with `raisedBy` in `perf/budget.json`
-    and a row in doc/guide/velocita.md § Registro dei tetti alzati; every other ceiling stays as it is. The Consulente
+    and a row in doc/guide/velocita.md § Registro dei tetti alzati; every other ceiling stays as it is — except
+    `/dashboard/cashflow`, 786 → 787 (decision 118: 786,0 → 786,2 with the raw KB unchanged, the module ids renumbered). The Consulente
     route's initial JS is measured before and after with the method of doc/guide/velocita.md (the gzip sum of the
     `<script src>` of the built route's HTML — `next build` prints no First Load JS since Next 16) and written in
     SESSION_NOTES: `ResponsiveModal` — the Drawer and the Dialog — enters the route for «Indice», the first modal on
