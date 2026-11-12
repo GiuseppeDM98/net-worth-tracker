@@ -1,8 +1,9 @@
 # Series `doc/nove/` — nine points of November 2026, and the contributor's allocation PRs
 
 > The index of the series: the owner's points, the decisions, the order, the shared contracts and the rules every
-> spec obeys. Written on 2026-11-12 on `develop` @ b841cbd7 by the planning session; **the adversarial reading of all
-> the specs together is the NEXT session** (prompt 07), before the first implementation. One spec = one
+> spec obeys. Written on 2026-11-12 on `develop` @ b841cbd7 by the planning session; **read adversarially, all
+> the specs together, on 2026-11-12** (decisions 33–63 in § 3); a spec in service is retired with
+> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). No spec is implemented yet: the next is NOVE-01. One spec = one
 > implementation session = one branch. A spec's NUMBER is its identity; the ORDER is § 5.
 
 ## 1. The owner's points (their words, 2026-11-12)
@@ -458,8 +459,10 @@ A spec that needs one of these differently changes it HERE first, then in every 
 
 `SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
 
-Prompt 08 (`08_CREA_RITIRO_SPEC`) runs after the adversarial reading, in a session of its own, with the same line
-plus `DOVE = doc/nove/PROMPT-RITIRO.md`.
+Prompt 08 (`08_CREA_RITIRO_SPEC`) was run on 2026-11-12, after the adversarial reading, in a session of its own:
+`doc/nove/PROMPT-RITIRO.md` is the prompt the owner pastes to retire ONE spec. A retirement updates its precedents
+and measures in place and removes the retired number from the line above; the last retirement deletes it with the
+folder.
 
 ## 10. What NOT to do (decided on 2026-11-12)
 
