@@ -89,3 +89,43 @@ describe('PathRail, run mode', () => {
     expect(fillOf(items[2])).toContain('bg-destructive');
   });
 });
+
+describe('PathRail, book mode (2026-11-08)', () => {
+  const PAGES = [
+    { id: 'copertina', title: 'In una frase' },
+    { id: 'allocazione', title: "L'allocazione proposta" },
+    { id: 'strumenti', title: 'Gli strumenti' },
+    { id: 'applica', title: 'Applica' },
+  ];
+
+  it('from desktop the labels are buttons, the current one aria-current, ONE Tab stop, the arrows move, a click selects', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const selected: number[] = [];
+    render(<PathRail mode="book" pages={PAGES} current={2} interactive onSelect={(index) => selected.push(index)} />);
+    expect(screen.getAllByRole('navigation', { name: 'Dove sei' })).toHaveLength(1);
+    const list = screen.getByRole('list', { name: 'Le pagine' });
+    const buttons = within(list).getAllByRole('button');
+    expect(buttons).toHaveLength(4);
+    buttons.forEach((button) => expect(button.parentElement?.tagName).toBe('LI'));
+    expect(buttons.filter((button) => button.getAttribute('aria-current') === 'page')).toEqual([buttons[2]]);
+    expect(buttons.filter((button) => button.tabIndex === 0)).toEqual([buttons[2]]);
+    expect(buttons[0].className).toContain('min-h-8');
+    expect(buttons[0].className).toContain('[@media(pointer:coarse)]:min-h-11');
+    buttons[2].focus();
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement).toBe(buttons[3]);
+    await user.click(buttons[1]);
+    expect(selected).toEqual([1]);
+  });
+
+  it('without interactive: plain items, no button, no handler', () => {
+    const { container } = render(<PathRail mode="book" pages={PAGES} current={1} interactive={false} onSelect={() => {}} />);
+    expect(screen.getAllByRole('navigation', { name: 'Dove sei' })).toHaveLength(1);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    const current = container.querySelectorAll('[aria-current="page"]');
+    expect(current).toHaveLength(1);
+    expect(current[0].tagName).toBe('LI');
+    expect(current[0].textContent).toBe("L'allocazione proposta");
+  });
+});

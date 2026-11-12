@@ -15,13 +15,14 @@
   (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens and the interview's scene),
   `ConsulenteInterviewScene.tsx` (the rounds' cards, the skeleton, the scene's footer; 2026-11-08),
   `useConsulenteInterview.ts` (one round per gesture, aborted by «Salta il colloquio»), `ConsulenteRun.tsx` (the
-  run's screen and `StageRows`, which the report's running view shares), `ConsulenteReport.tsx` (verdict, tiles,
-  markdown, «Applica»), `ConsulenteInterviewTile.tsx` («Il colloquio»), `ConsulenteRevisionTile.tsx` («Chiedi una
-  modifica» with its round).
+  run's screen and `StageRows`, which the report's running view shares), `ConsulenteReport.tsx` (the running view,
+  the data, «Applica»'s writes; the book is `ConsulenteBook.tsx`, its page bodies `ConsulenteBookPages.tsx`, the turn
+  `useSceneTurn.ts`), `ConsulenteInterviewTile.tsx` (`InterviewBody`), `ConsulenteRevisionTile.tsx`
+  (`useRevisionDraft`, `RevisionBody`).
 - **Primitives**: `components/ui/choice-list.tsx` (`ChoiceList`, every choice of the path and of the Compravendita),
   `components/ui/question-card.tsx` (`QuestionCard`: ONE question a model asks, shared with the Assistente's in-chat
   questions), `components/ui/path-rail.tsx` (`PathRail`: the path's eight ticks, the interview's three, the run's
-  four segments), `Tile`'s `generated`
+  four segments, the book's pages (buttons from `desktop:`)), `Tile`'s `generated`
   and the classes of `lib/constants/aiAccent.ts`, `sceneVariants` in `lib/utils/motionVariants.ts`.
 - **Pure**: `lib/utils/questionSet.ts` (the one question schema — kinds, options, the reserved rows «Altro…» and
   «Preferisco non dire», the lenient parser, the describer of an answer, the prompt lines — shared with the
@@ -29,7 +30,8 @@
   through `questionSet`, so nothing the Allocazione page loads may import it — «1 tornata» / «N tornate» is
   `describeRoundCount` in the narrative for that reason), `lib/utils/allocationAdviceProposal.ts` (the zod schemas of the answers, the proposal and the
   candidates; the fenced block; the interview round's wire and stored shapes, `parseInterviewRound`),
-  `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage with its `phase` and `interview`,
+  `allocationAdviceBook.ts` (the book: the page table, the heading reader, the address; pure, imported by the book
+  alone), `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage with its `phase` and `interview`,
   `reopenStoredDraft`, the prefilled answers), `allocationAdviceApply.ts` (the plans of «Applica»: targets, roles, goals; today's base; the loss
   scenarios), `allocationAdviceNarrative.ts` (every sentence), `allocationAdviceDocument.ts` (the document mapper
   for both SDKs), `lib/utils/sseReader.ts`, `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, shared with
@@ -46,15 +48,17 @@
   «Applica» touches on an asset), `firestore.rules` (`read: canAccess`, `write: false`).
 - **Models**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5: the interview, the
   strategy, the review) and `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
-- **Suites to run after a change here**: `questionSet`, `allocationAdviceInterview`, `allocationAdviceProposal`,
+- **Suites to run after a change here**: `questionSet`, `allocationAdviceInterview`, `allocationAdviceProposal`, `allocationAdviceBook`,
   `allocationAdviceDraft`, `allocationAdviceDocument`, `allocationAdviceBonds`, `allocationAdviceApply`, `allocationAdviceNarrative`,
   `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes`, `cashflowBlock`,
   `assistantMonthContextService`, `motionVariants` and the Testing Library suites `choiceList`, `pathRail`, `tile`,
-  `questionCard`, `consulenteInterviewTile`, `consulenteRun`, `useConsulenteRun`, `useConsulenteInterview`; for the bond block `instrumentProfileService`, `exposureYahooSource`, `assistantPortfolioContext` ·
+  `questionCard`, `consulenteInterviewTile`, `consulenteRevisionTile`, `consulenteBook`, `useSceneTurn`, `consulenteRun`, `useConsulenteRun`, `useConsulenteInterview`; for the bond block `instrumentProfileService`, `exposureYahooSource`, `assistantPortfolioContext` ·
   `reactCompilerCoverage` (a ternary inside a `||` in the Wizard was skipped on the first day) · **Browser**
   `e2e/allocation.consulente.spec.ts` (the eight screens), `allocation.consulente.interview.spec.ts` and
   `.interview.mobile.spec.ts` (the interview), `allocation.consulente.mobile.spec.ts` (390: the strip, 44px, the
-  overflow, reduced motion), `allocation.consulente.report.spec.ts` (the report, the revision's round):
+  overflow, reduced motion), `allocation.consulente.report.spec.ts` (the book at 1440: the pages, the rail, the address, the accent, the
+  revision's round, the print sheet), `allocation.consulente.book.mobile.spec.ts` (the book at 390: the slide, the
+  scroll to the card, «Indice», the footer), both on the documents planted by `e2e/consulenteReport.ts`:
   `/api/allocation-advice/run` is always faked with `page.route` (`e2e/consulenteInterview.ts` scripts the rounds and
   records the bodies), no test spends.
 
@@ -252,8 +256,61 @@
   same block; a skip with zero rounds is the one sentence «L'utente ha saltato il colloquio.». `system` never changes.
   The route refuses a skipped interview, a fourth round and a revision round after one (400, no slot).
 
-## The report and «Applica»
+## The report as a book
 
+- **The report is read as a book** (owner, 2026-11-08: «una specie di libro, dove ogni pagina ha un senso logico da
+  sola e quelle dopo continuano il racconto»): `ConsulenteBook` shows ONE page at a time on the path's scene card, the
+  rail beside it (DESIGN.md → The Path-Scene Rule). The pages, in order, are `buildBookPages`
+  (lib/utils/allocationAdviceBook.ts): «In una frase» (the cover: the verdict, then the text's first section;
+  «La situazione» when the text is the strategy alone) · «L'allocazione proposta» · «Gli strumenti» · «Gli obiettivi» ·
+  «Casa, fondi pensione e illiquidi» · «Cosa fare adesso» · «Rischi e revisione» · «Il colloquio» · «Chiedi una
+  modifica» · «Applica». A page exists when it has text or figures: the proposal's two with a proposal (the review
+  date is required, so «Rischi e revisione» always follows a proposal), «Gli strumenti» with the instruments,
+  «Gli obiettivi» with the proposal's goals, the roles' page with a change or a name not found, «Il colloquio» with a
+  round, «Chiedi una modifica» with a report, «Cosa fare adesso» only with its section; the cover and «Applica» always.
+- **The text splits by its sections onto the page of the tile it explains** (`splitReportSections`,
+  `assignSections`): three heading shapes open a section — an ATX heading (`#`–`####`), a line that is only bold
+  («**Gli strumenti**», «2. **…**»), and the contracts' own list shape «1. **In una frase** — testo» when the bold IS a
+  page's alias —, never inside a fenced block. When an ATX heading names a page the ATX headings of its level open the
+  sections and the bold shapes are text; otherwise the bold shapes do. The aliases are the contracts' titles
+  (normalised: no accents, numbers, bold, colons): the review's seven, the strategy's «La situazione», «Obiettivi»,
+  «Cosa cambia rispetto a oggi», «Rispetto al piano precedente», the revision's «La tua richiesta». A heading the reader
+  does not know lands on the page before, under its own `##` line; the heading line is dropped only when it is the
+  page's printed title. When the known headings land on fewer than two pages the book is DEGENERATE: the cover holds
+  the verdict alone and ONE page «Il report» (or «La strategia») holds the whole text. The reader decides only where
+  the prose is shown: no figure and no decision is taken from it. On the first real path read as a book (the mirror,
+  2026-11-12) the review wrote its seven sections as `##` headings, each its page's own title, and bold-only lines inside
+  them (a class in «Gli strumenti», a step in «Cosa fare adesso») stayed text on that page: ten pages, none on «Il
+  report».
+- **The pager** is the card's footer on every width: «Indietro» (disabled on the first page) and, below `desktop:`,
+  «Indice»; the page's own buttons — «Avanti» (absent on «Applica»), on «Chiedi una modifica» «Rivedi il report» and
+  «Salta le domande» with «Avanti» as an outline, on «Applica» «Applica alle impostazioni» and «Rifai il percorso».
+  Below `tablet:` a column, the page's buttons full width on top. From `desktop:` the rail's labels are buttons, ONE
+  Tab stop (the arrows move along the rail); below it «Indice» opens «Vai a una pagina», a `ResponsiveModal` of 44px
+  rows — the route's one modal. The WHOLE page slides along the turn, the leaving page `inert`; after a turn the
+  headline takes the focus (`useSceneTurn`, shared with the Wizard) and the card's top scrolls into view when it is
+  above the page's scroll box. From `desktop:` the book's grid is `items-start`: a short page's card hugs its text
+  instead of stretching to the ten-row rail, where its footer floated mid-card (seen at 1440 in phase E, 2026-11-11);
+  the path's grid keeps the stretch.
+- **A page is an address**: `?pagina=<id>` opens it (`page.tsx` reads it on the server); every turn writes it with
+  `replaceState` from the gesture (`bookPageUrl`: `pagina` set, removed on the cover; `rivedi` removed), so the history
+  never grows; «Rifai il percorso» removes it. The page id lives in `ConsulenteClient`, BY ID and for one document
+  (`createdAt`): a revision that rewrites the report leaves the reader on «Chiedi una modifica»; a page that no longer
+  exists is the cover; a document newer than the page's opening opens on its cover whatever the address says.
+- **The accent follows the author**: a page is `generated` when its body is the model's — the proposal's pages, the
+  instruments, the goals, the roles, «Cosa fare adesso», «Rischi e revisione», «Il report»; the cover only when it
+  carries model text (the verdict it opens with is never accented). «Il colloquio», «Chiedi una modifica» and
+  «Applica» never are. «{model} · {date}» of the text's source is the cover's aside (the `report` page's in the
+  degenerate book).
+- **The motion**: the page shown at open cascades its blocks once per JS session (`consulenteReportEntrance.cascade`)
+  and does not slide; the proposed percentages count up the first time «L'allocazione proposta» mounts in the session
+  (`consulenteReportEntrance.countUp`, 620 ms), whichever page was opened; under reduced motion the turn fades and
+  nothing cascades or counts.
+- **A printer gets the whole book** (`ConsulenteBookPrint`): the verdict, then every page but «Chiedi una modifica»
+  and «Applica», its title, aside, reading, text and figures, no accent and no button; the grid is `print:hidden`, and
+  `app/globals.css` opens the shell for the printer only while `[data-book-print]` is in the page.
+- **The running view is unchanged**: the verdict, «Le fasi» and «Ricomincia il percorso». A failed document is a book
+  over the text it has, the negative verdict on the cover and «Rifai il percorso» alone on «Applica».
 - **The verdict is `buildConsulenteVerdict`**: «La proposta è pronta.» with the `summary` and the review date;
   «Allocazione applicata.» with the date; «Il percorso non si è concluso.» with the error's sentence; and, with the
   report but without a valid block, a `warning` that says why «Applica» is not there.
@@ -267,7 +324,7 @@
   report lives in the prompt, not in the document.
 - **«Chiedi una modifica» relaunches ONLY the review** (owner, 2026-10-20, during the tour: «vorrei liberarmi degli
   ETF obbligazionari per i bond singoli… meglio dirlo all'inizio?»): a request born AFTER reading the report does not
-  cost a «Rifai il percorso». The tile under «Il report» (`useConsulenteRevision`, `REVISION_COPY`) sends the route
+  cost a «Rifai il percorso». The page before «Applica» (`useConsulenteRevision`, `REVISION_COPY`) sends the route
   `stage: 'revise'` with `request` (1–1000 characters; one round of questions about it first, «Salta le domande»
   available; the round and the revise each take a slot; the round stored as `revisionInterview`, printed by
   `buildRevisionPrompt` after the requests and shown under the last request — decision 24); `runRevise` requires a
@@ -276,23 +333,22 @@
   contract plus the section «La tua richiesta» where the request is not sensible or has a cost — and replaces
   `report` (revised proposal, or the previous one if the block is malformed), appends to `document.revisions`
   (`{ request, at }`, always an array from the mapper) and brings the state back to `ready` (a plan already applied
-  is to be applied again). The tile lists the requests made; «Applica» is disabled while the review is running. A
+  is to be applied again). The page lists the requests made; «Applica» is disabled while the review is running. A
   request worth knowing BEFORE (a constraint, a class to avoid) still goes in the «Vincoli» screen. The revision's
-  round lives in the tile's memory (`ConsulenteRevisionTile`), not in the draft: a round with no question sends the
+  round lives in the book's memory (`useRevisionDraft`): it survives a turn, not a reload: a round with no question sends the
   revision at once, «Salta le domande» while the round is asked aborts it and sends `{ rounds: [], skipped: true }`.
-- **«Il colloquio»** (`ConsulenteInterviewTile`, between «Il report» — or «La strategia» — and «Chiedi una modifica»):
+- **«Il colloquio»** (`InterviewBody`, its page between «Rischi e revisione» and «Chiedi una modifica»):
   the rounds the Consulente asked before the strategy, each with its note, its questions and what the user answered
   («non risposta» for what was skipped), the aside «1 tornata» / «N tornate» (« · saltato» when skipped); nothing
   with zero rounds (decision 53). It recaps the user's own words, so it does NOT wear `generated` (decision 79).
-- **The tiles**: Allocazione proposta (today → proposal per class, `buildProposalRows` on `currentAllocationOnBase`,
-  the held classes the proposal drops appended at the end at 0), Strumenti (the candidates per sub-target,
-  «in portafoglio» when already held, the `caveat` in amber), Obiettivi, Ruoli degli asset (only the changes that
-  change something, `planRoleChanges`; a name not found is listed and ignored), Il report (markdown) or, without
-  one, La strategia, Chiedi una modifica, Applica. **Every tile the model wrote carries `generated`** (since
-  2026-11-07) — the 1px `--ai-accent` border, the accented eyebrow, the glow on hover and focus — and the two action
-  tiles («Applica», «Chiedi una modifica») never do; «Le fasi» of the running view does. The column cascades once
-  per JS session (`consulenteReportEntrance`, its own flag; never under reduced motion), and the proposed
-  percentages count up with it (620 ms).
+- **The pages' figures** are the former tiles' bodies, moved (`ConsulenteBookPages.tsx`): «L'allocazione proposta»
+  (today → proposal per class, `buildProposalRows` on `currentAllocationOnBase`, the held classes the proposal drops
+  appended at the end at 0; the footnote the base sentence alone), «Gli strumenti» (the candidates per sub-target,
+  «in portafoglio» when already held, the `caveat` in amber), «Gli obiettivi», «Casa, fondi pensione e illiquidi»
+  (only the changes that change something, `planRoleChanges`; a name not found is listed and ignored), «Rischi e
+  revisione» (the aside «rivedi entro il …», the reason, `proposal.risks` as rows), «Chiedi una modifica», «Applica».
+  The generated card — the 1px `--ai-accent` border, the accented eyebrow — follows § The report as a book above;
+  «Le fasi» of the running view wears it.
 - **«Applica» shows the plans BEFORE writing, one tick per item** (owner, 2026-10-20): the targets
   (`buildTargetsFromProposal` → `setSettings({ targets })`, which REPLACES the targets document as Impostazioni does;
   a class absent from the proposal disappears from the targets), the roles (`updateAssetAllocationRole`, an `updateDoc`
@@ -315,11 +371,11 @@
 
 The Consulente follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen on 2026-11-06, decision 74 of
 doc/ai/README.md): **The Path-Scene Rule** (one stage, the rail that says where the path is and fills with the run's
-stages, the slide forward and back, the report's cascade), **The Question-Card Rule** (the interview's cards; the
+stages, the slide forward and back, the first page's cascade), **The Question-Card Rule** (the interview's cards; the
 scene's footer owns «Continua» and «Avvia la ricerca») and **The AI-Accent Rule** (the accent on what the model wrote
 and, on hover and focus only, on «Avvia il colloquio», «Continua», «Avvia la ricerca», «Riprova», «Rivedi il report»).
 The code follows it since the redesign of the path, the run and the report (2026-11-07, PR #507): § The path, § The run
-and § The report and «Applica» describe what renders; `app/globals.css` serves `oklch(0.56 0.2 305)` in `:root`,
+and § The report as a book describe what renders; `app/globals.css` serves `oklch(0.56 0.2 305)` in `:root`,
 `oklch(0.65 0.2 305)` in `.dark` and `--ai-glow` once. The interview's scene followed on 2026-11-08 (PR #509).
 
 ## Composizione mobile
@@ -327,11 +383,16 @@ and § The report and «Applica» describe what renders; `app/globals.css` serve
 No composition, by choice: like the Assistente (DESIGN.md → The Conversation-Is-Content Rule) the content is
 a path — one column at 720px (900px at 1440, the rail's 160px column beside the card), one card per screen, buttons
 at 44px below `desktop:`; no `VerdictStrip` — the rail's ticks above the card are not one: the page is still not a
-composed page —, no closed rows, no `mobile-sections:` memory. It is not among the surfaces of `mobile:census` (the route is not in
+composed page —, no closed rows, no `mobile-sections:` memory. The book is not a composed page either: one card,
+one page at a time; «Indice» is the one `ResponsiveModal` of the route. It is not among the surfaces of `mobile:census` (the route is not in
 `navigation.ts`: it is reached from Allocazione's «Consulente» button, on desktop in the header and below the tiles
 on a phone, and from the row under the Assistente's conversation).
 
 ## Per-page blind spots
+- **jsdom ignores `inert`** (2026-11-11): during a turn the leaving page is still in the DOM with the same buttons, so a
+  DOM test of the book waits until `[data-scene]` is the new page before it clicks (`landed(id)` in
+  `__tests__/consulenteBook.test.tsx`); that the leaving page IS inert is proven in the browser, frame by frame
+  (`e2e/allocation.consulente.book.mobile.spec.ts`, red without it).
 - **The strategy reads this year's rows twice** (2026-11): the YTD bundle and the cashflow block query them apart —
   accepted, the bundle stays the Assistente's, and the block is read once per strategy and once per interview round (`buildConsulenteContext`), never by the instruments or
   the review.
@@ -345,11 +406,8 @@ on a phone, and from the row under the Assistente's conversation).
   one would have listed the same words twice. The one exception the model sees: the live document without a report
   is listed as nothing, not as «fallito».
 - **The report reaches neither the PDF nor the emails** (checked on 2026-11-08: no reader of `allocationAdvice` under
-  `lib/server/`, `lib/services/` or `app/api/` other than the Consulente's own routes): it lives on its page alone. The
-  review date and its reason are the footer of «Allocazione proposta», and `proposal.risks` has no surface; the report
-  read as a BOOK — one page per section of the review's text with the figures of its tile, the rail as the index, a
-  page as an address — is doc/ai/AI-07-report-libro.md (written on 2026-11-08 on the owner's call, implemented after
-  the Registra details, PR #514, retired on 2026-11-11).
+  `lib/server/`, `lib/services/` or `app/api/` other than the Consulente's own routes): it lives on its page alone, and
+  it prints from the browser, every page but the two that act.
 - **The review invite** (owner, 2026-10-20, after applying the first production plan: «nei giorni vicino alla data,
   un pulsante "revisione con il Consulente"»): `reviewDueState(document, todayIso)` (lib/utils/allocationAdviceNarrative.ts)
   says `later · soon · due` against the applied plan's `reviewByIso` — `soon` within `REVIEW_SOON_DAYS` (30), `due`
@@ -357,7 +415,7 @@ on a phone, and from the row under the Assistente's conversation).
   «Rivedi con il Consulente» (`REVIEW_INVITE_LABEL`) linking to `/consulente?rivedi=1`, which the page reads on the
   server (`searchParams`) and hands to the client as `startFresh`: the screens open over the applied plan as «Rifai il
   percorso» would, and the new run starts from the plan in force. The report's applied verdict carries
-  `describeReviewInvite` (tone `warning` once due). Before the date, «Rifai il percorso» at the bottom anticipates it.
+  `describeReviewInvite` (tone `warning` once due). Before the date, «Rifai il percorso» on the last page anticipates it.
 - **The run's state lives on the page, not in the wizard** (owner's first production run, 2026-10-20): the document
   becomes `running` at the first stage and the query rereads it after every stage, so a `showReport` that looked only
   at the document flipped the page to the report's «in corso» view after the strategy — spinners gone, «Ricomincia il
@@ -366,11 +424,12 @@ on a phone, and from the row under the Assistente's conversation).
   allocationAdviceDocument.ts, with `isRunStale`) keeps the run's screen while the run is `running` or `failed`.
 - **The E2E spec opens over a finished report** (2026-10-20: two real runs on the E2E account at :3100 left a `ready`
   document in the emulators, and the full Playwright run went red twice on «Passo 1 di 8»): `openConsulente` waits for
-  step 1 OR «Rifai il percorso» and clicks the latter. The emulators keep `allocationAdvice/test-user-1` between runs;
+  step 1, the book or «Ricomincia il percorso»: over the book it goes to `?rivedi=1` (since 2026-11-08 «Rifai il
+  percorso» is on the book's last page), over a run still going it presses «Ricomincia il percorso». The emulators keep `allocationAdvice/test-user-1` between runs;
   a real run on that account is never cleaned by the suite. `allocation.consulente.report.spec.ts` plants its
   documents on that account and puts back the one it found, or deletes its own when there was none.
-- **The ticks are not buttons**: the path is linear (`describeStepBlock` holds «Avanti»); the Summary's rows are the
-  only jumps.
+- **The path's ticks are not buttons**: the path is linear (`describeStepBlock` holds «Avanti»); the Summary's rows
+  are the only jumps; the book's labels are, from `desktop:`.
 - **The elapsed time is `aria-hidden`**, and the report's running view has none: the headline is the one live region,
   and a reload does not know when the stage began.
 - **The exchange is a closed list, with «Altra…» opening a free field** (owner, 2026-10-20: the first version was an
@@ -397,7 +456,14 @@ on a phone, and from the row under the Assistente's conversation).
 - **The interview writes nothing**: its rounds live in the draft until the strategy, and a cleared storage loses them.
 - **A round abandoned** («Salta il colloquio» while it is asked, or leaving the page) **still costs its slot**; its
   late answer is ignored.
-- **The revision's round lives in the tile's memory**: a reload before «Rivedi il report» loses it, and its slot.
+- **The revision's round lives in the book's memory**: a turn keeps it, a reload before «Rivedi il report» loses it,
+  and its slot.
+- **A heading the model invents lands on the previous page**, never lost, never its own page.
+- **A report the reader cannot split onto two pages is one page «Il report»** after a cover with the verdict alone.
+- **`?pagina=` is ignored with `rivedi=1`**, and a turn removes `rivedi`.
+- **A new report opens on its cover** whatever `?pagina=` says.
+- **The count-up plays on the proposal page's first mount in the session**, not on the cover.
+- **Copy and the browser's find see the open page only**; the print sheet holds every page.
 - **Twelve requests an hour**: a run with three rounds is four, a revision with its round two.
 - **«Rifai il percorso» drops an interview the document on screen already used** (`reopenStoredDraft`): only rounds
   asked after that document's `updatedAt` survive.

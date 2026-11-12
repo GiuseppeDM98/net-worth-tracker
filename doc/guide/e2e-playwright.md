@@ -292,7 +292,10 @@
   refuses a button — use `input[type=password]` (2026-09-19). **A box read for a geometry assertion is taken AFTER the entrance** (2026-10-04, `e2e/modal.origin.spec.ts`): a
   header button is enabled from the page's first frame and glides 4px for ~250 ms with the page scene, so a
   `boundingBox()` right after `toBeEnabled` was up to 4px off — wait for the page's verdict, then for a box two reads
-  100 ms apart agree on. **Renaming an `aria-label` breaks every spec that matched its old substring** («Modifica asset» →
+  100 ms apart agree on. **A box's content width is `clientWidth` minus the padding** (2026-11-11,
+  `e2e/allocation.consulente.book.mobile.spec.ts`): `getBoundingClientRect().width` carries the border, and a «full
+  width» button read against it is 2px short; a height of 44px read on a drawer's row while it rises can be 43,9999
+  — round it, or read it after the rise. **Renaming an `aria-label` breaks every spec that matched its old substring** («Modifica asset» →
   «Modifica {name}», `assets.bond.spec.ts` on 2026-09-14): grep `e2e/` for the old name in the same commit.
 - **After Escape a vaul drawer is still in the DOM for ~1,5 s, and `main` sits under an `aria-hidden` ancestor all
   that time** (2026-09-18, at 390): `getByRole(…)` on anything in the page counts 0, so a step that comes right after

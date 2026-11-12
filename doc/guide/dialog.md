@@ -7,6 +7,10 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dialog e form trasversali**: `components/ui/{responsive-modal,modal-status-line}.tsx` (`ModalWidth` sm/md/lg/xl), `lib/utils/modalOrigin.ts` (`resolveCenteredModalOrigin`), `lib/utils/dialogNarrative.ts` (`describeFormRefusal`, `describeExpenseDeleteConsequence`, `describeSeriesDeleteReading`, `describeMovementDetailReading`, `describeMovementsFilterReading`, `describeSnapshotOverwrite`), `lib/hooks/useArmedDelete.ts`, `components/expenses/SeriesDeleteDialog.tsx` (`resolveSeriesDeleteMode` = the ONE rule for «solo questa o tutte?»), `lib/constants/aiModels.ts`; `components/layout/LogoutDialog.tsx` stays an `AlertDialog` — doc/guide/dialog.md
+- **The mounts**: 42 in 41 files (`grep -rnw '<ResponsiveModal' components app`, 2026-11-11 — the word match, or
+  the props type in `responsive-modal.tsx` counts too); the latest is «Vai a una pagina», the index of the
+  Consulente's book (`components/allocation/consulente/ConsulenteBook.tsx`: rows of 44px, no footer, `returnFocusTo`
+  the new page's headline, because the opener slides away with its page).
 - **Dropdowns as sheets, fields without autofill** (2026-11-06): `components/ui/popper-sheet.ts` (`usePopperSheet`, the
   threshold), `app/globals.css` § Popper sheet, `components/ui/{select,dropdown-menu,popover}.tsx` (`data-popper-sheet`;
   `Popover`'s `sheet` prop), `components/ui/searchable-combobox.tsx` (the drawer branch, `label`),
@@ -174,7 +178,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   focus stays on the opener behind the sheet, and after a hand-over between two drawers (a detail → its edit form)
   it lands on `body` because the opener has unmounted. A dialog above 768 focuses itself as Radix does. Not
   changed: `autoFocus` on a phone opens the keyboard on every form's first field, which is why vaul ships it off —
-  it is a decision for all 40 mounts at once, not a polish.
+  it is a decision for all 42 mounts at once, not a polish.
   NO two-click confirm auto-disarms on a timer any more — that was not true until 2026-09-22, when Impostazioni's two
   (the category delete and the dividend sync, 3 s each) went to `useArmedDelete` with its revoke of an access. Before
   them the last one (`AssistantThreadList`, kept BY DESIGN while
@@ -196,7 +200,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   replaces it. **Since 2026-10-08 `ResponsiveModal` keeps its own fallback**: a layout effect on `open` records
   `document.activeElement` (before Radix's FocusScope moves it into the content from a passive effect) and
   `onCloseAutoFocus` restores it — skipped when it is `body` or has since unmounted — so every keyboard opener and
-  every Chrome click gets its focus back on all 40 modals without a prop (pinned by `e2e/pension.spec.ts`, seen red with
+  every Chrome click gets its focus back on all 42 modals without a prop (pinned by `e2e/pension.spec.ts`, seen red with
   the fallback removed). `returnFocusTo` still wins and is still needed where the opener NEVER held the focus: Safari
   does not focus a clicked button, and a row opened from a window event or a non-focusable cell leaves `body` focused at
   open. Fed from `event.currentTarget` at the click (a `PageHeader` action is mounted twice; only `currentTarget` is the
@@ -211,4 +215,4 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   on macOS with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. An
   origin off the button's centre is NOT this flake: the spec reads the box after the entrance (doc/guide/e2e-playwright.md).
   (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
-- **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per 40 mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per 42 mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

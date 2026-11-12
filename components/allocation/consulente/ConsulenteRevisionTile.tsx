@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * «Chiedi una modifica» on a finished report (2026-10-20; its own file since 2026-11-08): the
- * requests made so far, the textarea, and — before the revision — ONE round of the Consulente's
- * questions about the written request (decision 24, 2026-11-08). «Rivedi il report»
+ * «Chiedi una modifica» on a finished report (2026-10-20; its own file since 2026-11-08; a page of
+ * the book since 2026-11-11): the requests made so far, the textarea, and — before the revision —
+ * ONE round of the Consulente's questions about the written request (2026-11-08). «Rivedi il report»
  * first asks the round (`useConsulenteInterview`, the textarea read-only, the skeleton); the round's
  * `QuestionCard`s appear under its note and «Rivedi il report» sends the revision once every
  * question is answered or declined; «Salta le domande» sends it at once with what is there —
@@ -11,9 +11,12 @@
  * question sends the revision at once. Under the last request, the round asked before it
  * (`document.revisionInterview`).
  *
- * The tile asks the model and does not wear `generated`; «Rivedi il report» and «Riprova» take the
- * accent on hover and focus (decision 36), «Salta le domande» never (decision 78). The report keeps
- * `useConsulenteRevision`, whose `revising` disables «Applica» there.
+ * Split in two for the book: `useRevisionDraft` holds the draft — the request, the round and its
+ * answers, the round in flight — and is called ONCE by the book, so leaving the page and coming
+ * back finds them; `RevisionBody` draws it, and the page's footer draws the two buttons from the
+ * draft's `primary` and `showSkip`. The page asks the model and does not wear `generated`;
+ * «Rivedi il report» takes the accent on hover and focus, «Salta le domande» never. The report
+ * keeps `useConsulenteRevision`, whose `revising` disables «Applica».
  */
 
 import { useState } from 'react';
@@ -22,9 +25,8 @@ import { interviewReducer, describeInterviewBlock } from '@/lib/utils/allocation
 import { INTERVIEW_COPY, REVISION_COPY } from '@/lib/utils/allocationAdviceNarrative';
 import { answerOf, type QuestionAnswerValue } from '@/lib/utils/questionSet';
 import { formatDate } from '@/lib/utils/formatters';
-import { AI_CONTROL_ACCENT_CLASS, AI_GENERATED_EYEBROW_CLASS } from '@/lib/constants/aiAccent';
-import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
-import { Button } from '@/components/ui/button';
+import { AI_GENERATED_EYEBROW_CLASS } from '@/lib/constants/aiAccent';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { QuestionCard } from '@/components/ui/question-card';
@@ -34,16 +36,8 @@ import { InterviewRoundRows } from './ConsulenteInterviewTile';
 import { useConsulenteInterview } from './useConsulenteInterview';
 import type { useConsulenteRevision } from './useConsulenteRevision';
 
-const BUTTON_CLASS = 'h-11 desktop:h-9';
-const PRIMARY_CLASS = cn(BUTTON_CLASS, 'border border-transparent', AI_CONTROL_ACCENT_CLASS);
-
-export interface ConsulenteRevisionTileProps {
-  ownerId: string;
-  document: AllocationAdviceDocument;
-  revision: ReturnType<typeof useConsulenteRevision>;
-}
-
-export function ConsulenteRevisionTile({ ownerId, document, revision }: ConsulenteRevisionTileProps) {
+/** The draft of «Chiedi una modifica»: its state, its round, its handlers and what the page draws from them. */
+export function useRevisionDraft(ownerId: string, document: AllocationAdviceDocument, revision: ReturnType<typeof useConsulenteRevision>) {
   const [request, setRequest] = useState('');
   // The round asked about THIS request, with the answers so far; null before «Rivedi il report».
   const [round, setRound] = useState<AllocationAdviceInterview | null>(null);
@@ -99,8 +93,22 @@ export function ConsulenteRevisionTile({ ownerId, document, revision }: Consulen
   const showSkip = asking || round !== null || interview.state.kind === 'failed';
   const lastRevisionRound = document.revisionInterview?.rounds[0] ?? null;
 
+  return { request, setRequest, round, last, answer, asking, revising, status, primary, showSkip, skipQuestions, requests, lastRevisionRound };
+}
+
+export type RevisionDraft = ReturnType<typeof useRevisionDraft>;
+
+/** The page's aside: «in corso» while the revision runs, else how many requests were made. */
+export function describeRevisionAside(draft: RevisionDraft): string {
+  if (draft.revising) return 'in corso';
+  return `${draft.requests.length} ${draft.requests.length === 1 ? 'richiesta' : 'richieste'}`;
+}
+
+/** The page's body: the requests so far, the textarea, the skeleton or the round, the status line. */
+export function RevisionBody({ draft }: { draft: RevisionDraft }) {
+  const { request, setRequest, round, last, answer, asking, revising, status, requests, lastRevisionRound } = draft;
   return (
-    <Tile eyebrow="Chiedi una modifica" aside={revising ? 'in corso' : `${requests.length} ${requests.length === 1 ? 'richiesta' : 'richieste'}`} reading={[{ text: REVISION_COPY.reading }]}>
+    <>
       {requests.length > 0 && (
         <ol className="mt-3 list-decimal space-y-1 pl-5 text-[13px] leading-[1.45] text-foreground" aria-label="Le richieste fatte">
           {requests.map((row, index) => (
@@ -132,16 +140,6 @@ export function ConsulenteRevisionTile({ ownerId, document, revision }: Consulen
       <p role="status" className={cn('mt-2 min-h-[1.25rem] text-[12px]', status.tone)}>
         {status.text}
       </p>
-      <div className="mt-3 flex flex-col-reverse gap-2 tablet:flex-row tablet:justify-end">
-        {showSkip && (
-          <Button type="button" variant="outline" className={BUTTON_CLASS} onClick={skipQuestions} disabled={revising}>
-            {INTERVIEW_COPY.skipQuestions}
-          </Button>
-        )}
-        <Button type="button" className={PRIMARY_CLASS} onClick={primary.onClick} disabled={primary.disabled}>
-          {primary.label}
-        </Button>
-      </div>
-    </Tile>
+    </>
   );
 }

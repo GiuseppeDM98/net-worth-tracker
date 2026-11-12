@@ -1,28 +1,20 @@
 'use client';
 
 /**
- * The REPORT: the verdict on the run, then one column of tiles — the proposal against today,
- * the instruments the search found, the goals, the roles, the agents' text — and the «Applica»
- * tile, one checkbox per thing it writes, the plans shown before anything moves. A failed run
- * shows its sentence and the way back; a run still going shows its stage and rereads.
+ * The REPORT: while a run is still going, its stage and a reread; once it ends, the BOOK
+ * (`ConsulenteBook`, 2026-11-08) — the verdict on the cover, one page per section of the model's
+ * text and tile of figures, «Applica» as the last page, one checkbox per thing it writes, the
+ * plans shown before anything moves. A failed run is a book over the text it has, its sentence on
+ * the cover and the way back on the last page.
  *
- * The writes go through the app's own services (`setSettings`, `updateAssetAllocationRole`,
- * `saveGoalData`) and then the «applied» route records them; every reader's key is invalidated.
- *
- * What the model wrote wears the AI accent (`generated`, DESIGN.md → The AI-Accent Rule,
- * 2026-11-07); «Applica», «Chiedi una modifica» (`ConsulenteRevisionTile`, 2026-11-08) and «Il
- * colloquio» (`ConsulenteInterviewTile`: the user's own answers recapped, decision 79) do not:
- * they ask, or they quote the user, they do not say. The column cascades in ONCE per JS session
- * (a reload plays it again, a client navigation back does not, reduced motion never) and the
- * proposed percentages count up with it.
+ * This file owns the data and the writes: the plans (`buildProposalRows`, `planRoleChanges`,
+ * `planGoalDocument`), `useConsulenteRevision`, the apply state. The writes go through the app's own
+ * services (`setSettings`, `updateAssetAllocationRole`, `saveGoalData`) and then the «applied» route
+ * records them; every reader's key is invalidated.
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Globe } from 'lucide-react';
 import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { Asset } from '@/types/assets';
 import type { GoalBasedInvestingData } from '@/types/goals';
@@ -34,68 +26,30 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { useAllocationAdvice } from '@/lib/hooks/useAllocationAdvice';
 import { useConsulenteRevision } from './useConsulenteRevision';
 import { StageRows } from './ConsulenteRun';
-import { ConsulenteInterviewTile } from './ConsulenteInterviewTile';
-import { ConsulenteRevisionTile } from './ConsulenteRevisionTile';
+import { ConsulenteBook } from './ConsulenteBook';
+import type { ApplyState } from './ConsulenteBookPages';
+import type { BookPageId } from '@/lib/utils/allocationAdviceBook';
 import { buildTargetsFromProposal, currentAllocationOnBase, planGoalDocument, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
 import { runStageStates } from '@/lib/utils/allocationAdviceDocument';
 import { removedGoalIds } from '@/lib/utils/allocationAdviceDraft';
-import { buildConsulenteVerdict, buildProposalRows, describeApplySummary, describeProposalReading, describeRunHeadline } from '@/lib/utils/allocationAdviceNarrative';
+import { buildConsulenteVerdict, buildProposalRows, describeApplySummary, describeRunHeadline } from '@/lib/utils/allocationAdviceNarrative';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
-import { formatDate, formatNumberIt, formatPercentageIt, formatSignedPoints, formatCurrency } from '@/lib/utils/formatters';
+import { formatDate } from '@/lib/utils/formatters';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
-import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
-import { useCountUp } from '@/lib/utils/useCountUp';
 import { PageVerdict } from '@/components/ui/page-verdict';
-import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { Tile } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
-
-/** Once per JS session: its own flag (the Panoramica's stays page-local). */
-const consulenteReportEntrance = { played: false };
-
-/** The proposed percentage of a class: counts up with the cascade, prints at once otherwise. */
-function ProposedPct({ value, animate }: { value: number; animate: boolean }) {
-  const counted = useCountUp(animate ? value : null, { once: true, duration: 620 });
-  return <span data-proposed-pct="">{formatPercentageIt(animate && counted !== null ? counted : value, 1)}</span>;
-}
 
 interface ConsulenteReportProps {
   ownerId: string;
   document: AllocationAdviceDocument;
   assets: Asset[];
   goalData: GoalBasedInvestingData | null;
+  /** The book's page by id, kept by the host across the running view and a revision. */
+  pageId: string | null;
+  onPageChange: (id: BookPageId) => void;
   onRedo: () => void;
 }
-
-const ROLE_LABEL = { tradable: 'negoziabile', frozen: 'non negoziabile', excluded: 'escluso' } as const;
-
-/** Module-level, as ReactMarkdown wants: a stable map keeps the tree mounted across renders. */
-const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['components'] = {
-  h1: ({ children }) => <h3 className="mt-5 text-[15px] font-semibold text-foreground first:mt-0">{children}</h3>,
-  h2: ({ children }) => <h3 className="mt-5 text-[15px] font-semibold text-foreground first:mt-0">{children}</h3>,
-  h3: ({ children }) => <h4 className="mt-4 text-[14px] font-semibold text-foreground">{children}</h4>,
-  p: ({ children }) => <p className="mt-2 text-[14px] leading-[1.6] text-foreground">{children}</p>,
-  ul: ({ children }) => <ul className="mt-2 list-disc space-y-1 pl-5 text-[14px] leading-[1.6] text-foreground">{children}</ul>,
-  ol: ({ children }) => <ol className="mt-2 list-decimal space-y-1 pl-5 text-[14px] leading-[1.6] text-foreground">{children}</ol>,
-  strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-  a: ({ children, href }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-      {children}
-    </a>
-  ),
-  code: ({ children }) => <code className="rounded bg-muted px-1 font-mono text-[12px]">{children}</code>,
-  table: ({ children }) => (
-    <div className="mt-2 overflow-x-auto">
-      <table className="w-full text-[13px]">{children}</table>
-    </div>
-  ),
-  th: ({ children }) => <th className="border-b border-border px-2 py-1 text-left font-semibold">{children}</th>,
-  td: ({ children }) => <td className="border-b border-border px-2 py-1 align-top">{children}</td>,
-};
-
-type ApplyState = { phase: 'idle' } | { phase: 'writing' } | { phase: 'error'; message: string } | { phase: 'done' };
 
 /** The report's «applied» record, or the route's refusal as a failure. */
 async function markApplied(ownerId: string, applied: { targetsWritten: boolean; rolesChanged: number; goalsWritten: number }): Promise<void> {
@@ -110,7 +64,7 @@ async function markApplied(ownerId: string, applied: { targetsWritten: boolean; 
   }
 }
 
-export function ConsulenteReport({ ownerId, document, assets, goalData, onRedo }: ConsulenteReportProps) {
+export function ConsulenteReport({ ownerId, document, assets, goalData, pageId, onPageChange, onRedo }: ConsulenteReportProps) {
   const queryClient = useQueryClient();
   // A run still going rereads the document while it lasts.
   useAllocationAdvice(ownerId, { enabled: document.status === 'running' });
@@ -132,14 +86,6 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, onRedo }
   const [applyRoles, setApplyRoles] = useState(true);
   const [applyGoals, setApplyGoals] = useState(true);
   const [applyState, setApplyState] = useState<ApplyState>({ phase: 'idle' });
-
-  // The cascade, decided at mount: not yet played this session, and no reduced motion
-  // (`MotionConfig` would keep an opacity stagger). A column that showed marks it played.
-  const reduced = useReducedMotion();
-  const [playsEntrance] = useState(() => !consulenteReportEntrance.played && reduced !== true);
-  useEffect(() => {
-    if (document.status !== 'running') consulenteReportEntrance.played = true;
-  }, [document.status]);
 
   const goalsCount = goalPlan ? goalPlan.created.length + goalPlan.updated.length + goalPlan.removed.length : 0;
   const rolesCount = applyRoles ? roles.changes.length : 0;
@@ -197,229 +143,36 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, onRedo }
   }
 
   return (
-    <motion.div data-consulente-report="" className="flex flex-col gap-3" variants={staggerContainer} initial={playsEntrance ? 'hidden' : false} animate="visible">
-      <motion.div variants={cardItem}>
-          <PageVerdict verdict={verdict} ariaLabel="Verdetto del Consulente" />
-      </motion.div>
-
-      {proposal && (
-        <motion.div variants={cardItem}>
-          <Tile eyebrow="Allocazione proposta" generated aside="oggi → proposta" reading={describeProposalReading(rows)}>
-            <ul className="mt-3 divide-y divide-border" aria-label="Classi">
-              {rows.map((row) => (
-                <li key={row.assetClass} className="py-2.5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-[13px] text-foreground">{row.label}</span>
-                    <span className="shrink-0 font-mono text-[13px] tabular-nums text-foreground">
-                      {formatPercentageIt(row.currentPct, 1)} → {row.fixedAmount !== undefined ? `${formatCurrency(row.fixedAmount)} fissi` : <ProposedPct value={row.proposedPct} animate={playsEntrance} />}
-                      {row.fixedAmount === undefined && <span className="ml-2 text-muted-foreground">{formatSignedPoints(row.deltaPp)}</span>}
-                    </span>
-                  </div>
-                  {row.subTargets.length > 0 && (
-                    <ul className="mt-1 flex flex-col gap-0.5 pl-3">
-                      {row.subTargets.map((sub) => (
-                        <li key={sub.name} className="flex items-baseline justify-between gap-3 text-[12px] text-muted-foreground">
-                          <span className="min-w-0 truncate">
-                            {sub.name}
-                            {sub.instrument ? ` · ${sub.instrument}` : ''}
-                          </span>
-                          <span className="shrink-0 font-mono tabular-nums">{formatPercentageIt(sub.pct, 0)} della classe</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-auto border-t border-border pt-3.5 text-[11px] text-muted-foreground">
-              Percentuali sulla base della pagina Allocazione (negoziabile e non negoziabile, al netto dei debiti). Rivedi entro il {formatDate(new Date(proposal.reviewByIso))}: {proposal.reviewReason}
-            </p>
-          </Tile>
-        </motion.div>
-      )}
-
-      {document.instruments && (
-        <motion.div variants={cardItem}>
-          <Tile
-            eyebrow="Strumenti"
-            generated
-            aside={
-              document.instruments.webSearchUsed ? (
-                <span className="inline-flex items-center gap-1">
-                  <Globe className="h-3 w-3" aria-hidden="true" />
-                  verificati sul web
-                </span>
-              ) : (
-                'senza ricerca web'
-              )
-            }
-            reading={[{ text: document.instruments.candidates ? `${document.instruments.candidates.sleeves.length} sotto-target coperti; lo strumento già in portafoglio, quando c'è, viene prima.` : 'La ricerca ha scritto solo testo: leggilo nel report qui sotto.' }]}
-          >
-            {document.instruments.candidates && (
-              <ul className="mt-3 divide-y divide-border" aria-label="Strumenti per sotto-target">
-                {document.instruments.candidates.sleeves.map((sleeve) => (
-                  <li key={`${sleeve.assetClass}-${sleeve.subTarget}`} className="py-2.5">
-                    <p className={TILE_SUB_EYEBROW_CLASS}>{sleeve.subTarget}</p>
-                    <ul className="mt-1 flex flex-col gap-1">
-                      {sleeve.candidates.map((candidate) => (
-                        <li key={`${candidate.name}-${candidate.isin ?? ''}`} className="text-[13px] leading-[1.45] text-foreground">
-                          <span className="font-medium">{candidate.name}</span>
-                          {candidate.alreadyHeld && <span className="ml-1.5 rounded-md border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground">in portafoglio</span>}
-                          <span className="text-muted-foreground">
-                            {candidate.isin ? ` · ${candidate.isin}` : ''}
-                            {candidate.ticker ? ` · ${candidate.ticker}` : ''}
-                            {candidate.ter !== undefined ? ` · TER ${formatPercentageIt(candidate.ter, 2)}` : ''}
-                            {candidate.duration !== undefined ? ` · duration ${formatNumberIt(candidate.duration, 1)} anni` : ''}
-                            {candidate.policy ? ` · ${candidate.policy}` : ''}
-                            {` · ${candidate.exchange}`}
-                          </span>
-                          {candidate.note && <p className="text-[12px] text-muted-foreground">{candidate.note}</p>}
-                        </li>
-                      ))}
-                    </ul>
-                    {sleeve.caveat && <p className="mt-1 text-[12px] text-warning-foreground">{sleeve.caveat}</p>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Tile>
-        </motion.div>
-      )}
-
-      {proposal && proposal.goals.length > 0 && (
-        <motion.div variants={cardItem}>
-          <Tile eyebrow="Obiettivi" generated aside={`${proposal.goals.length} nel piano`} reading={[{ text: 'Ogni obiettivo con gli strumenti posseduti che lo coprono e la quota di ciascuno.' }]}>
-            <ul className="mt-3 divide-y divide-border">
-              {proposal.goals.map((goal) => (
-                <li key={`${goal.goalId ?? 'new'}-${goal.name}`} className="py-2.5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-[13px] font-medium text-foreground">
-                      {goal.name}
-                      {!goal.goalId && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">nuovo</span>}
-                    </span>
-                    <span className="shrink-0 font-mono text-[12px] tabular-nums text-muted-foreground">
-                      {goal.targetAmount !== undefined ? formatCurrency(goal.targetAmount) : 'senza target'}
-                      {goal.targetDateIso ? ` · ${formatDate(new Date(goal.targetDateIso))}` : ''}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-[12px] text-muted-foreground">
-                    {goal.assignments.length === 0 ? 'Nessuno strumento assegnato.' : goal.assignments.map((row) => `${row.assetName} ${formatPercentageIt(row.percentage, 0)}`).join(' · ')}
-                  </p>
-                  {goal.rationale && <p className="mt-0.5 text-[12px] leading-[1.45] text-foreground">{goal.rationale}</p>}
-                </li>
-              ))}
-            </ul>
-          </Tile>
-        </motion.div>
-      )}
-
-      {proposal && (roles.changes.length > 0 || roles.unmatched.length > 0) && (
-        <motion.div variants={cardItem}>
-          <Tile eyebrow="Ruoli degli asset" generated aside={`${roles.changes.length} ${roles.changes.length === 1 ? 'cambio' : 'cambi'}`} reading={[{ text: 'Cosa entra nella base dei target e cosa resta fuori, rispetto a oggi.' }]}>
-            <ul className="mt-3 divide-y divide-border">
-              {roles.changes.map((change) => (
-                <li key={change.assetId} className="py-2.5">
-                  <div className="flex items-baseline justify-between gap-3 text-[13px]">
-                    <span className="min-w-0 truncate text-foreground">{change.assetName}</span>
-                    <span className="shrink-0 text-muted-foreground">
-                      {ROLE_LABEL[change.from]} → <span className="text-foreground">{ROLE_LABEL[change.to]}</span>
-                    </span>
-                  </div>
-                  {change.reason && <p className="text-[12px] leading-[1.45] text-muted-foreground">{change.reason}</p>}
-                </li>
-              ))}
-            </ul>
-            {roles.unmatched.length > 0 && <p className="mt-3 text-[12px] text-warning-foreground">Non trovati fra i tuoi strumenti, ignorati: {roles.unmatched.join(', ')}.</p>}
-          </Tile>
-        </motion.div>
-      )}
-
-      {document.report && (
-        <motion.div variants={cardItem}>
-          <Tile eyebrow="Il report" generated aside={`${document.report.model} · ${formatDate(document.report.finishedAt)}`}>
-            <div className="mt-2">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-                {document.report.markdown}
-              </ReactMarkdown>
-            </div>
-          </Tile>
-        </motion.div>
-      )}
-
-      {!document.report && document.strategy && (
-        <motion.div variants={cardItem}>
-          <Tile eyebrow="La strategia" generated aside={`${document.strategy.model} · ${formatDate(document.strategy.finishedAt)}`}>
-            <div className="mt-2">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-                {document.strategy.markdown}
-              </ReactMarkdown>
-            </div>
-          </Tile>
-        </motion.div>
-      )}
-
-      {/* After the text, before «Chiedi una modifica» (2026-11-08); nothing with zero rounds. */}
-      {document.interview && document.interview.rounds.length > 0 && (
-        <motion.div variants={cardItem}>
-          <ConsulenteInterviewTile interview={document.interview} />
-        </motion.div>
-      )}
-
-      {document.report && (
-        <motion.div variants={cardItem}>
-          <ConsulenteRevisionTile ownerId={ownerId} document={document} revision={revision} />
-        </motion.div>
-      )}
-
-      <motion.div variants={cardItem}>
-        <Tile
-          eyebrow="Applica"
-          aside={document.status === 'applied' && document.applied ? `applicato il ${formatDate(document.applied.at)}` : 'niente è scritto finché non confermi'}
-          reading={[{ text: document.status === 'applied' ? 'Il piano è già nelle impostazioni: rifai il percorso per cambiarlo.' : applySummary }]}
-        >
-          {document.status === 'ready' && proposal && (
-            <div className="mt-3 flex flex-col gap-3">
-              <div className="flex items-start gap-3">
-                <Checkbox id="apply-targets" checked={applyTargets} onCheckedChange={(checked) => setApplyTargets(checked === true)} className="mt-0.5" disabled={applyState.phase === 'writing'} />
-                <Label htmlFor="apply-targets" className="min-h-11 cursor-pointer leading-[1.45] desktop:min-h-0">
-                  I target e i sotto-target in Impostazioni → Allocazione ({rows.filter((row) => row.proposedPct > 0 || row.fixedAmount !== undefined).length} classi). Sostituiscono quelli di oggi.
-                </Label>
-              </div>
-              <div className="flex items-start gap-3">
-                <Checkbox id="apply-roles" checked={applyRoles} onCheckedChange={(checked) => setApplyRoles(checked === true)} className="mt-0.5" disabled={applyState.phase === 'writing' || roles.changes.length === 0} />
-                <Label htmlFor="apply-roles" className="min-h-11 cursor-pointer leading-[1.45] desktop:min-h-0">
-                  I ruoli degli asset ({roles.changes.length} {roles.changes.length === 1 ? 'cambio' : 'cambi'}).
-                </Label>
-              </div>
-              <div className="flex items-start gap-3">
-                <Checkbox id="apply-goals" checked={applyGoals} onCheckedChange={(checked) => setApplyGoals(checked === true)} className="mt-0.5" disabled={applyState.phase === 'writing' || goalsCount === 0} />
-                <Label htmlFor="apply-goals" className="min-h-11 cursor-pointer leading-[1.45] desktop:min-h-0">
-                  Gli obiettivi e le quote
-                  {goalPlan && goalsCount > 0
-                    ? ` (${[goalPlan.created.length > 0 ? `${goalPlan.created.length} nuovi` : null, goalPlan.updated.length > 0 ? `${goalPlan.updated.length} aggiornati` : null, goalPlan.removed.length > 0 ? `${goalPlan.removed.length} eliminati` : null].filter(Boolean).join(', ')})`
-                    : ' (nessuna modifica)'}
-                  .
-                </Label>
-              </div>
-              {goalPlan && goalPlan.unmatched.length > 0 && <p className="text-[12px] text-warning-foreground">Quote su strumenti non trovati, ignorate: {goalPlan.unmatched.join(', ')}.</p>}
-              {goalPlan && goalPlan.rescaled.length > 0 && <p className="text-[12px] text-warning-foreground">Quote ridotte perché superavano il 100% dello strumento: {goalPlan.rescaled.join(', ')}.</p>}
-              <p role="status" className={cn('min-h-[1.25rem] text-[12px]', applyState.phase === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
-                {applyState.phase === 'error' ? applyState.message : applyState.phase === 'writing' ? 'Scrivo…' : applyState.phase === 'done' ? 'Applicato.' : ''}
-              </p>
-            </div>
-          )}
-          <div className="mt-auto flex flex-col-reverse gap-2 border-t border-border pt-3.5 tablet:flex-row tablet:items-center tablet:justify-between">
-            <Button type="button" variant="outline" className="h-11 desktop:h-9" onClick={onRedo}>
-              Rifai il percorso
-            </Button>
-            {document.status === 'ready' && (
-              <Button type="button" className="h-11 desktop:h-9" disabled={!canApply || applyState.phase === 'writing' || applyState.phase === 'done'} onClick={() => void apply()}>
-                Applica alle impostazioni
-              </Button>
-            )}
-          </div>
-        </Tile>
-      </motion.div>
-    </motion.div>
+    <ConsulenteBook
+      ownerId={ownerId}
+      document={document}
+      verdict={verdict}
+      proposal={proposal}
+      rows={rows}
+      roles={roles}
+      goalPlan={goalPlan}
+      revision={revision}
+      apply={{
+        document,
+        proposal,
+        rows,
+        roles,
+        goalPlan,
+        goalsCount,
+        applySummary,
+        applyTargets,
+        setApplyTargets,
+        applyRoles,
+        setApplyRoles,
+        applyGoals,
+        setApplyGoals,
+        applyState,
+      }}
+      canApply={canApply}
+      onApply={() => void apply()}
+      pageId={pageId}
+      onPageChange={onPageChange}
+      onRedo={onRedo}
+    />
   );
 }

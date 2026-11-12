@@ -74,6 +74,7 @@ import { cn } from '@/lib/utils';
 import { ConsulenteRun, SCENE_CARD_CLASS, SCENE_GRID_CLASS } from './ConsulenteRun';
 import { ConsulenteInterviewScene } from './ConsulenteInterviewScene';
 import { useConsulenteInterview } from './useConsulenteInterview';
+import { useSceneTurn } from './useSceneTurn';
 import type { useConsulenteRun } from './useConsulenteRun';
 
 interface ConsulenteWizardProps {
@@ -87,7 +88,7 @@ interface ConsulenteWizardProps {
   run: ReturnType<typeof useConsulenteRun>;
 }
 
-const HEADLINE_CLASS = 'text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]';
+export const HEADLINE_CLASS = 'text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]';
 const HELP_CLASS = 'text-[14px] leading-[1.6] text-muted-foreground desktop:text-[15px]';
 const BUTTON_CLASS = 'h-11 desktop:h-9';
 /** A control that asks the model: the hover accent on a filled button (decisions 36 and 85). */
@@ -186,24 +187,13 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
   const { answers } = draft;
   const patch = (next: Partial<AllocationAdviceAnswers>) => dispatch({ type: 'patch', patch: next });
 
-  // The scene: where the next screen comes from (+1 forward, −1 back), the element focused at
-  // the gesture, the headline to focus once the slide has landed. All before the early return.
-  const [direction, setDirection] = useState<1 | -1>(1);
-  const pendingFocus = useRef<Element | null>(null);
+  // The scene: where the next screen comes from (+1 forward, −1 back) and the headline to focus
+  // once the slide has landed (`useSceneTurn`, shared with the report's book). All before the early return.
   const headlineRef = useRef<HTMLParagraphElement>(null);
+  const turn = useSceneTurn(headlineRef);
+  const { direction, focusTarget } = turn;
   const reduced = useReducedMotion();
-  const move = (toward: 1 | -1, action: Parameters<typeof dispatch>[0]) => {
-    pendingFocus.current = document.activeElement;
-    setDirection(toward);
-    dispatch(action);
-  };
-  const focusHeadline = () => {
-    const pending = pendingFocus.current;
-    if (pending === null) return;
-    pendingFocus.current = null;
-    const active = document.activeElement;
-    if (active === pending || active === document.body) headlineRef.current?.focus({ preventScroll: true });
-  };
+  const move = (toward: 1 | -1, action: Parameters<typeof dispatch>[0]) => turn.move(toward, () => dispatch(action));
 
   // The interview's gestures. A round is requested from a click, never from an effect; the received
   // round enters the draft at once with no answers, so a reload shows it without a request (2026-11-08).
@@ -255,7 +245,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
               initial="enter"
               animate="center"
               exit="exit"
-              onAnimationComplete={(definition) => definition === 'center' && focusHeadline()}
+              onAnimationComplete={(definition) => definition === 'center' && focusTarget()}
             >
               <ConsulenteInterviewScene
                 interview={interview}
@@ -271,7 +261,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
               />
             </motion.div>
           ) : (
-            <motion.div key="path" custom={direction} variants={variants} initial="enter" animate="center" exit="exit" onAnimationComplete={(definition) => definition === 'center' && focusHeadline()}>
+            <motion.div key="path" custom={direction} variants={variants} initial="enter" animate="center" exit="exit" onAnimationComplete={(definition) => definition === 'center' && focusTarget()}>
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className={TILE_EYEBROW_CLASS}>
                   Passo {stepNumber} di {ALLOCATION_ADVICE_STEPS.length} · {copy.eyebrow}
@@ -287,7 +277,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  onAnimationComplete={(definition) => definition === 'center' && focusHeadline()}
+                  onAnimationComplete={(definition) => definition === 'center' && focusTarget()}
                 >
                   <p ref={headlineRef} tabIndex={-1} className={cn(HEADLINE_CLASS, 'mt-3 outline-none')}>{currentGoal ? (currentGoal.goalId ? `«${currentGoal.name}» è ancora un tuo obiettivo?` : 'Un nuovo obiettivo.') : copy.question}</p>
                   <p className={cn(HELP_CLASS, 'mt-2 max-w-[600px]')}>{copy.help}</p>

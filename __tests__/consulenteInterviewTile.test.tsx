@@ -1,13 +1,15 @@
 /**
  * «Il colloquio» on the report (components/allocation/consulente/ConsulenteInterviewTile.tsx,
- * 2026-11-08, decision 53 and 79): nothing without rounds; the aside «1 tornata» / «N tornate ·
+ * 2026-11-08; a page of the book since 2026-11-11, `InterviewBody` under the page's aside
+ * `describeInterviewAside`, as the book draws it): nothing without rounds; the aside «1 tornata» / «N tornate ·
  * saltato»; one sub-eyebrow per round with the note, the questions and the answers in words,
  * «non risposta» for what was skipped; NOT a generated tile. Invented rounds.
  */
 
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ConsulenteInterviewTile, InterviewRoundRows } from '@/components/allocation/consulente/ConsulenteInterviewTile';
+import { InterviewBody, InterviewRoundRows } from '@/components/allocation/consulente/ConsulenteInterviewTile';
+import { describeInterviewAside } from '@/lib/utils/allocationAdviceNarrative';
 import { QUESTION_DECLINE_VALUE, type Question } from '@/lib/utils/questionSet';
 import type { AllocationAdviceInterview, AllocationAdviceInterviewRound } from '@/types/allocationAdvice';
 
@@ -30,7 +32,24 @@ const SECOND: AllocationAdviceInterviewRound = {
   askedAt: new Date('2026-11-08T12:05:00'),
 };
 
-describe('ConsulenteInterviewTile', () => {
+/** The page as the book draws it: the card named by its title, the aside, the body; nothing when there is no body. */
+function ConsulenteInterviewTile({ interview }: { interview: AllocationAdviceInterview | null }) {
+  const aside = describeInterviewAside(interview);
+  if (aside === null) return null;
+  return (
+    <section aria-label="Il colloquio">
+      <span>{aside}</span>
+      <InterviewBody interview={interview} />
+    </section>
+  );
+}
+
+describe('InterviewBody', () => {
+  it('draws nothing by itself without rounds', () => {
+    const { container } = render(<InterviewBody interview={{ rounds: [], skipped: true }} />);
+    expect(container.innerHTML).toBe('');
+  });
+
   it('renders nothing without an interview or with zero rounds, skipped or not', () => {
     const { container, rerender } = render(<ConsulenteInterviewTile interview={null} />);
     expect(container.innerHTML).toBe('');
