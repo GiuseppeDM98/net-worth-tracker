@@ -28,6 +28,7 @@ import {
   describeClasses,
   describeExcluded,
   describeExposure,
+  describePacOverlap,
   describeExposureBase,
   describeExposureCoverage,
   describeExposureEmpty,
@@ -122,6 +123,24 @@ describe('buildAllocazioneVerdict', () => {
     expect(verdict.tone).toBe('warning');
     expect(plain(verdict.sentence)).toBe(
       'Le azioni pesano 3,3 pp più del target e le obbligazioni 3,3 pp meno. Con 1000 € in più compreresti 940 € di obbligazioni e 60 € di liquidità.',
+    );
+  });
+
+  it('names the PAC installment in place of Versa when a plan is active (PT2)', () => {
+    const verdict = buildAllocazioneVerdict(
+      verdictInput({ pac: { monthTotalEur: 3134, instrumentCount: 4, monthLabel: 'ottobre', allClosed: false } }),
+    );
+    expect(plain(verdict.sentence)).toBe(
+      'Le azioni pesano 3,3 pp più del target e le obbligazioni 3,3 pp meno. Il piano di accumulo compra questo mese 3134 € in 4 strumenti.',
+    );
+  });
+
+  it('says the installment is closed when every line is (PT3)', () => {
+    const verdict = buildAllocazioneVerdict(
+      verdictInput({ pac: { monthTotalEur: 3134, instrumentCount: 4, monthLabel: 'ottobre', allClosed: true } }),
+    );
+    expect(plain(verdict.sentence)).toBe(
+      'Le azioni pesano 3,3 pp più del target e le obbligazioni 3,3 pp meno. La rata di ottobre del piano di accumulo è chiusa.',
     );
   });
 
@@ -932,5 +951,26 @@ describe('describeAllocazioneClosedAnswers', () => {
     expect(answerText(describeAllocazioneClosedAnswers({ ...input, pension: mixed })[ALLOCAZIONE_SECTION_IDS.previdenza])).toBe('Obbligazioni 70%');
     expect(describeAllocazioneClosedAnswers({ ...input, pension: { ...pension, fundSlices: [] } })[ALLOCAZIONE_SECTION_IDS.previdenza]).toBeNull();
     expect(describeAllocazioneClosedAnswers({ ...input, pension: null })[ALLOCAZIONE_SECTION_IDS.previdenza]).toBeNull();
+  });
+});
+
+// The line above the Piano's moves while an accumulation plan is active.
+describe('describePacOverlap', () => {
+  const pac = { monthTotalEur: 4207, instrumentCount: 7, monthLabel: 'ottobre', allClosed: false };
+
+  it('says what the plan buys this month and that this plan does not count it', () => {
+    expect(plain(describePacOverlap(pac))).toBe('Il piano di accumulo compra questo mese 4207 € in 7 strumenti; questo piano non ne tiene conto.');
+    expect(plain(describePacOverlap({ ...pac, instrumentCount: 1 }))).toBe('Il piano di accumulo compra questo mese 4207 € in 1 strumento; questo piano non ne tiene conto.');
+  });
+
+  it('names the instrument the plan buys in place of one this Piano proposes', () => {
+    expect(plain(describePacOverlap(pac, [{ replaced: 'DBMFE', buying: 'MFEH' }]))).toBe(
+      'Il piano di accumulo compra questo mese 4207 € in 7 strumenti; questo piano non ne tiene conto. Il piano di accumulo compra MFEH al posto di DBMFE.',
+    );
+    expect(plain(describePacOverlap(pac, [{ replaced: 'DBMFE', buying: 'MFEH' }, { replaced: 'AAA', buying: 'BBB' }]))).toContain('compra MFEH al posto di DBMFE e BBB al posto di AAA.');
+  });
+
+  it('still says it when the month\'s installment is closed', () => {
+    expect(plain(describePacOverlap({ ...pac, allClosed: true }))).toBe('La rata di ottobre del piano di accumulo è chiusa, ma questo piano non ne tiene conto.');
   });
 });

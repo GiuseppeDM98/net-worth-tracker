@@ -37,6 +37,7 @@ import {
 } from '@/lib/utils/leverageAwareAllocationUtils';
 import { assetClassLegs } from '@/lib/utils/assetDisplayClass';
 import { estimateSaleTax } from '@/lib/utils/saleTax';
+import type { PlanPosition } from '@/types/accumulationPlan';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
 import type { SectionSpec } from '@/lib/hooks/useMobileSections';
 
@@ -1055,4 +1056,58 @@ export function buildPensionLookThrough(
     hasExcluded: assets.some((asset) => resolveAllocationRole(asset) === 'excluded' && valueOf(asset) > 0),
     allFrozen: funds.every((fund) => resolveAllocationRole(fund) === 'frozen'),
   };
+}
+
+
+// ─── Con un PAC attivo (AL17, D-AL4) ──────────────────────────────────────────
+
+/** Whether a node (or any descendant) is an instrument; collects the instrument ids it buys. */
+function collectInstrumentKeys(nodes: PlanNode[], out: Set<string>): void {
+  for (const node of nodes) {
+    if (node.isInstrument) out.add(node.key);
+    collectInstrumentKeys(node.children, out);
+  }
+}
+
+/**
+ * The assets the Piano BUYS in the mode on screen, by asset id: Ribilancia's COMPRA legs, Versa's
+ * nodes (under leverage, the engine's trades with a positive amount). Preleva buys nothing. A
+ * sleeve of a composite instrument maps back to its asset. The plan engines are not touched: this
+ * only reads what they already returned.
+ */
+export function listPlanBuyAssetIds(view: PlanView, holdings: AllocatableHolding[]): string[] {
+  const assetIdOfHolding = new Map(holdings.map((holding) => [holding.id, holding.assetId ?? holding.id]));
+  const ids = new Set<string>();
+  if (view.mode === 'withdraw') return [];
+  if (view.trades) {
+    for (const trade of view.trades) if (trade.amount > 0) ids.add(trade.assetId);
+    return Array.from(ids);
+  }
+  const keys = new Set<string>();
+  if (view.mode === 'rebalance') {
+    for (const move of view.moves) if (move.action === 'COMPRA') collectInstrumentKeys(move.children, keys);
+  } else {
+    collectInstrumentKeys(view.nodes, keys);
+  }
+  for (const key of keys) ids.add(assetIdOfHolding.get(key) ?? key);
+  return Array.from(ids);
+}
+
+export interface PacSubstitution {
+  /** The group member the Piano buys although the plan does not: the plan buys `buyAssetId` instead. */
+  replacedAssetId: string;
+  buyAssetId: string;
+}
+
+/** The instruments the Piano buys that the open plan replaced with another member of their group. */
+export function findPacSubstitutions(positions: PlanPosition[], boughtAssetIds: Iterable<string>): PacSubstitution[] {
+  const bought = new Set(boughtAssetIds);
+  const out: PacSubstitution[] = [];
+  for (const position of positions) {
+    if (position.memberAssetIds.length < 2) continue;
+    for (const memberId of position.memberAssetIds) {
+      if (memberId !== position.buyAssetId && bought.has(memberId)) out.push({ replacedAssetId: memberId, buyAssetId: position.buyAssetId });
+    }
+  }
+  return out;
 }
