@@ -149,6 +149,17 @@ service cloud.firestore {
       allow delete: if canAccess(resource.data.userId);
     }
 
+    // Collezione accumulationPlans - piani di accumulo (PAC) della scheda Accumulo
+    // Scritta dal client SDK: un documento per piano, nessun replay multi-doc.
+    match /accumulationPlans/{planId} {
+      allow read: if canAccess(resource.data.userId);
+      allow create: if canAccess(request.resource.data.userId);
+      allow update: if canAccess(resource.data.userId) &&
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
+      allow delete: if canAccess(resource.data.userId);
+    }
+
     // Collezione hall-of-fame - ranking dell'account (doc id = ownerUid)
     match /hall-of-fame/{userId} {
       // Lettura: proprietario o membro delegato
