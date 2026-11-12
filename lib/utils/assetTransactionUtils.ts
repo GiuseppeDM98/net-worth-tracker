@@ -120,7 +120,7 @@ export function sortTransactionsForReplay(transactions: AssetTransaction[]): Ass
 export interface LedgerPositionState {
   quantity: number;
   averageCost: number | undefined;      // native PMC; undefined only before any transaction
-  costBasisEur: number;                 // EUR cost of the OPEN position, buy fees included
+  costBasisEur: number;                 // EUR cost of the OPEN position, buy fees EXCLUDED
   averageCostEur: number | undefined;   // costBasisEur / quantity; undefined when quantity === 0
   realizedPnlEur: number;               // cumulative since baseline
   realizedByYear: Record<number, number>; // fiscal year (getItalyYear of sell date) → EUR
@@ -232,11 +232,13 @@ export function replayTransactionsWithEffects(
             : prevAverageCost;
         state.quantity = newQuantity;
 
-        // Fees and FX enter only the EUR side.
-        const addedCostEur = t.quantity * t.priceEur + (t.fees ?? 0);
+        // The EUR PMC stands on price × quantity alone (owner, 2026-10-21): a purchase fee is a
+        // cost of its own, written to the cashflow as a row (lib/utils/tradeFeeExpense.ts), so it
+        // no longer rides on the cost basis. Invested capital still counts it: the cash left.
+        const addedCostEur = t.quantity * t.priceEur;
         state.costBasisEur += addedCostEur;
-        state.investedEur += addedCostEur;
-        feeFreeCostBasisEur += t.quantity * t.priceEur;
+        state.investedEur += addedCostEur + (t.fees ?? 0);
+        feeFreeCostBasisEur += addedCostEur;
         break;
       }
 

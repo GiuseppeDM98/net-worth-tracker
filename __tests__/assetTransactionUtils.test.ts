@@ -86,16 +86,16 @@ function localNpv(flows: XirrFlow[], r: number): number {
 
 describe('replayTransactions — position replay and PMC', () => {
   // Case 1
-  it('replays a single buy with fees in the EUR basis but NOT in the native PMC', () => {
+  it('replays a single buy with its fee in neither PMC, but in the invested capital', () => {
     const state = replayTransactions([
       tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 50, fees: 5 }),
     ]);
 
     expect(state.quantity).toBe(10);
     expect(state.averageCost).toBeCloseTo(50, 6); // native PMC excludes fees
-    expect(state.costBasisEur).toBeCloseTo(505, 6); // 10·50 + 5 fee
-    expect(state.investedEur).toBeCloseTo(505, 6);
-    expect(state.averageCostEur).toBeCloseTo(50.5, 6);
+    expect(state.costBasisEur).toBeCloseTo(500, 6); // the fee is a cashflow row of its own
+    expect(state.investedEur).toBeCloseTo(505, 6); // the cash that left still counts it
+    expect(state.averageCostEur).toBeCloseTo(50, 6);
   });
 
   // Case 2
@@ -347,7 +347,7 @@ describe('taxableGainEur — the gain the broker taxes', () => {
     const { effects } = replayTransactionsWithEffects([buy, sell]);
     const effect = effects.find((e) => e.transactionId === sell.id)!;
 
-    expect(effect.realizedPnlEur).toBeCloseTo(302.96, 9); // 6240 − 5 − 5932,04
+    expect(effect.realizedPnlEur).toBeCloseTo(307.96, 9); // 6240 − 5 − 5927,04
     expect(effect.taxableGainEur).toBeCloseTo(312.96, 9); // 48 × (130 − 123,48)
   });
 

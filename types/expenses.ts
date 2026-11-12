@@ -141,6 +141,10 @@ export interface Expense {
   // series carries its own.
   transferFeeExpenseId?: string; // On any row: the fee row it created
   feeOfTransferId?: string; // On a fee row: the row it was charged for
+  // On the fee row of an asset trade (lib/utils/tradeFeeExpense.ts): the trade it was charged for.
+  // The trade names the row back (`AssetTransaction.feeExpenseId`). It moves no account — the
+  // trade's own settlement already debits the fee — and the trade use case owns its lifecycle.
+  feeOfTradeId?: string;
   // A `debt` row may repay a loan (lib/utils/mortgageRepayment.ts; a property's own debt until
   // 2026-10-10): on the row's date — `balancePending` until then, like its account — the loan's
   // principal falls by the instalment's PRINCIPAL (instalment − debt × TAN / 12), which is then

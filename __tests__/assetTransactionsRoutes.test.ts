@@ -548,7 +548,7 @@ describe('Asset trade-ledger routes', () => {
       const first = await backfill('user-1', AUTH);
       expect(first.status).toBe(200);
       await expect(first.json()).resolves.toEqual({ recomputedAssetCount: 1, skippedAssetCount: 0 });
-      expect(store.get(docKey('assets', 'asset-1'))).toMatchObject({ averageCost: 100, averageCostEur: 90.5, quantity: 10 });
+      expect(store.get(docKey('assets', 'asset-1'))).toMatchObject({ averageCost: 100, averageCostEur: 90, quantity: 10 });
 
       const second = await backfill('user-1', AUTH);
       expect(second.status).toBe(200);

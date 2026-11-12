@@ -5,8 +5,8 @@
  * cost or the PMC cell must stand against a EUR cost too. The ledger keeps two PMCs on purpose
  * (`assetTransactionUtils`, invariant #2): the NATIVE one is the weighted average of trade prices,
  * fees excluded — the figure a broker statement shows — and the EUR one is the position's cost in
- * euro at trade-date rates, purchase fees INCLUDED: the fiscal cost, the number a capital gain is
- * taxed on. Until 2026-09-07 every consumer read the native one, so a USD position's G/P compared
+ * euro at trade-date rates, purchase fees EXCLUDED since 2026-10-21 (they are a cashflow row of
+ * their own): the number a capital gain is taxed on. Until 2026-09-07 every consumer read the native one, so a USD position's G/P compared
  * dollars with euros (PR #326), and on a EUR position the tax estimate ignored the fees the fiscal
  * cost counts. The owner's call (2026-09-07): ONE number, the fiscal one, on the table, the
  * Sintesi, the estimated taxes, the PDF and the sale simulation; the native PMC stays visible
@@ -27,7 +27,7 @@ export function isEurNative(asset: { currency?: string }): boolean {
 }
 
 /**
- * The EUR PMC, purchase fees included — the cost per unit every EUR figure is measured against.
+ * The EUR PMC, purchase fees excluded — the cost per unit every EUR figure is measured against.
  *
  * `averageCostEur` when the ledger has projected it. For a EUR-native asset the native PMC is in
  * the same currency and stands in until the backfill has run (fees excluded — a slightly lower

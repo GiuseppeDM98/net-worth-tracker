@@ -61,6 +61,8 @@ function invalidateTradeCaches(queryClient: QueryClient, ownerId: string): void 
   // assetTransactions.all is a prefix of byAsset → this also refreshes any open movements list.
   queryClient.invalidateQueries({ queryKey: queryKeys.assetTransactions.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+  // A trade's fee is a cashflow row the server writes with it.
+  queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
 }
 
