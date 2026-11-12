@@ -1,8 +1,8 @@
 # NOVE-15 — The Assistente as only a chat: write, the router reads, «Ho letto: … · cambia»
 
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-14** (the router: `AssistantRouteReading`, the `route` event,
-> the `route` override, `mode: 'auto'`; README.md § 7); **NOVE-16 is implemented after it**, and the page-by-page pass
-> (NOVE-11 → 12, 13) dresses the page this spec leaves. Written on 2026-11-12; every `file:line` is cited on
+> the `route` override, `mode: 'auto'`; README.md § 7); **NOVE-16 is implemented after it**, and the costume pass
+> (NOVE-19 → NOVE-20, the Assistente in NOVE-20) dresses the page this spec leaves. Written on 2026-11-12; every `file:line` is cited on
 > `develop` @ b841cbd7 and moves with NOVE-14's diff. Executes the owner's point 6 and decisions 11, 12, 15
 > (README.md § 3).
 
@@ -42,7 +42,8 @@ each answer one line says how it was read, with «cambia» to read it again. The
 
 1. Controls at rest on an empty chat at 1440: **11** — «Nuova conversazione», «⋯», four suggestions, the textarea,
    «Invia messaggio», «Apri memoria», the Consulente link, «Come funziona» (from 24). **Proof**: E1.
-2. No period axis, no Registra strip, no «Torna all'analisi», no «Registra un movimento» anywhere on the page.
+2. No period axis, no Registra strip, no «Torna all'analisi», no control named «Registra un movimento» (the register
+   verdict's headline «Registra un movimento.», `buildRegisterVerdict`, stays after a registration).
    **Proof**: E1, P1.
 3. Every send (composer, suggestion, follow-up, question answer, Rigenera, «Rileggi») is `mode: 'auto'` with no
    `month`, `year`, `chatContext`. **Proof**: U1.
@@ -52,11 +53,12 @@ each answer one line says how it was read, with «cambia» to read it again. The
    keep «Ricerca web usata». **Proof**: N1, S2.
 5. «cambia» opens the chooser; «Rileggi» re-sends the last user prompt as a new turn with `route` = the chosen
    reading; the previous answer stays. **Proof**: S3, E2.
-6. An empty chat shows four suggestions built from what the account holds (§ 4 table); pressing one writes it in
-   the composer, moves the focus there with the caret at the end, and sends nothing. **Proof**: N2, P2, E3.
+6. An empty chat shows four suggestions built from what the account holds (§ 4 table) — four skeleton rows while
+   the overview is loading, so no row changes under the pointer; pressing one writes it in the composer, moves the
+   focus there with the caret at the end, and sends nothing. **Proof**: N2, P2, E3.
 7. The header: «Nuova conversazione» (off only in demo and while streaming) and the «⋯» menu with «Conversazioni
-   (N)», «Memoria (N)», «Preferenze»; each opens its modal and the focus comes back to «⋯» at close. **Proof**: H1,
-   H2, E4.
+   (N)», «Memoria (N)», «Preferenze»; each opens its modal and the focus comes back to «⋯» at close (to «Apri memoria» when the
+   tile's button opened Memoria). **Proof**: H1, H2, E4.
 8. An ```expense-proposal or ```assistant-question block is a card when ITS message has `mode: 'register'`, on any
    page state; a block on a chat message is code. **Proof**: S1, Q1.
 9. `?mode=registra` opens an empty chat with the register suggestions first and the composer focused, and drops the
@@ -74,12 +76,35 @@ each answer one line says how it was read, with «cambia» to read it again. The
   «Registra» button goes; the router recognises a written expense.
 - **Adopted, reversible**:
   - Preferenze becomes a modal (`ResponsiveModal` sm) opened from «⋯»: a `DropdownMenu` cannot hold its `Select`
-    and `Switch` (`doc/guide/assistente.md:179-180`); the controls and labels are today's popover's;
+    and `Switch` (`doc/guide/assistente.md:179-180`); the controls and labels are today's popover's, except the «Contesto macro» hint
+    («Abilita ricerca web nelle analisi e in chat.», false for the chat), which says what the code does: «Cerca sul
+    web in ogni analisi di periodo.»; the popover's own heading «Preferenze» goes (the modal's title replaces it);
   - «cambia» only on the last assistant message; «Rileggi» adds a new turn, it never rewrites history;
   - the chooser asks two things — what («Una domanda», «Un'analisi», «Un movimento da registrare») and on which
     period — plus «Cerca anche sul web»; an analysis has no «Oggi»;
+- **Owner 52 (2026-11-12)**: a «Continua con» row is a NEW question: it is sent as `'auto'` with no `route` and the
+  router reads it — it does not inherit the answer's reading. Declared (assistente.md § Per-page blind spots): «una
+  riga di «Continua con» è letta da capo: «e questo mese?» sotto un'analisi di ottobre può essere letta come una
+  domanda sui dati di oggi; «cambia» la corregge».
+- **Owner 53 (2026-11-12)**: the two turns that DO inherit a reading — an answer to a question card and «Rigenera» —
+  send it with `routeCarried: true` (NOVE-14's contract): their line reads «Ho letto: …»; «Hai scelto: …» is
+  written only after «cambia» → «Rileggi».
+- **Owner 36 (2026-11-12)**: the old words «Fisse/Variabili/Debiti» leave the AI prompts here (§ 4 › Sentences
+  outside the page).
+- **Adopted, reversible (continued)**:
   - an answer to an ```assistant-question card and «Rigenera» re-send the asking/interrupted turn's reading as
-    `route`: a registration in progress never depends on a second reading;
+    `route` with `routeCarried: true`: a registration in progress never depends on a second reading. «Rigenera» carries the reading the
+    interrupted turn's `route` event brought, unless it was a fallback (the router then reads again); an answer on a
+    thread saved before this spec (a `register` message with no reading) is sent as Registra;
+  - while the router reads, the turn keeps the mode of the answer before it (or of the route passed): the companion
+    never slides to a free question and back;
+  - after «Rileggi» the focus goes to the composer's «Interrompi risposta» (the textarea is disabled while the turn
+    streams and «cambia» is unmounted): the one action that turn offers, where the composer is;
+  - the «Conversazione» tile's aside is the last answer's reading (`describeRoute`, capitalised: «Analisi di ottobre
+    2026»); on an answer without a reading, today's `getActivePeriodLabel` fed by the thread's pins; none on an
+    empty chat;
+  - the today block of the chat's user content stops telling the model to ask for a period «selected in the
+    context» — there is none: it says to name it in the question or to use «cambia»;
   - the open thread is in the URL (`?thread=<id>`, written with `window.history.replaceState` as
     `ConsulenteBook.tsx:205` does): it replaces the day's register thread as what survives a Back;
   - the header title is «Una frase, una risposta»; the composer's placeholder «Chiedi del tuo patrimonio o scrivi
@@ -129,7 +154,7 @@ export function describeRoute({ intent, period }: AssistantRouteOverride): strin
 export function describeReadingLine(reading: AssistantRouteReading, webSearchUsed: boolean | undefined): string {
   const what = describeRoute(reading.route);
   const head = reading.source === 'fallback' ? `Non ne sono sicuro: l'ho letta come ${what}`
-    : reading.source === 'override' ? `Hai scelto: ${what}` : `Ho letto: ${what}`;
+    : reading.source === 'override' ? `Hai scelto: ${what}` : `Ho letto: ${what}`; // 'router' and 'carried'
   return (webSearchUsed ?? reading.route.webSearch) ? `${head} · con ricerca web` : head;
 }
 
@@ -218,11 +243,14 @@ export function chooserDraftToOverride(draft: RouteChooserDraft): AssistantRoute
 - The args lose `mode`, `selectedMonth`, `selectedYear`, `chatContextType`; `buildStreamRequestBody` (:40-69) sends
   `{ userId, mode: 'auto', prompt, threadId, preferences, ...(route ? { route } : {}) }`.
 - `submit(prompt?: string, options?: { route?: AssistantRouteOverride })`; the two placeholders (:228-279) are born
-  with `mode: 'chat'`, `monthContext: null`.
+  with `monthContext: null` and `mode` = `routeToSelection(options.route).mode` with a route, else the mode of the last
+  assistant message of the list they are appended to (`'chat'` when it has none): the display mode never passes
+  through `'chat'` while the router reads (up to 4 s).
 - A `route` event (in `forEachSseEvent`'s handler, :307-363): the user placeholder takes `mode:
   routeToSelection(reading.route).mode`, the assistant slot the same `mode` and `routeReading: reading`.
-- `lastSentPromptRef` (:182) becomes `lastSentRef: { prompt: string; route?: AssistantRouteOverride }`; `retry`
-  (:389-393) re-sends both.
+- `lastSentPromptRef` (:182) becomes `lastSentRef: { prompt: string; route?: AssistantRouteOverride }`, set at
+  submit with the route passed; the `route` event sets `lastSentRef.current.route` to `reading.route` without
+  `confidence` when `reading.source !== 'fallback'`. `retry` (:389-393) re-sends `submit(prompt, { route })`.
 
 ### Components
 
@@ -268,8 +296,12 @@ export function chooserDraftToOverride(draft: RouteChooserDraft): AssistantRoute
 - **`AssistantPreferencesPopover.tsx` → `AssistantPreferencesFields.tsx`**: the `PopoverContent` body (:50-121)
   without the `Popover`, trigger or width; `AssistantModals.tsx` adds a third modal: `width="sm"`, eyebrow
   «Assistente · Preferenze», title «Come risponde l'Assistente», reading «Le scelte valgono per ogni conversazione e
-  si salvano da sole.», body `AssistantPreferencesFields`. All three modals get `returnFocusTo={moreTriggerRef}`
-  (`responsive-modal.tsx:106-120`); «Apri memoria» in the tile keeps today's restore (it held the focus).
+  si salvano da sole.», body `AssistantPreferencesFields`. All three modals get `returnFocusTo={modalReturnRef}`, a
+  page ref (`useRef<HTMLElement | null>(null)`): each «⋯» item's handler sets `modalReturnRef.current =
+  moreTriggerRef.current` before opening its modal; «Apri memoria» in the tile sets it to `null`, so the modal's own
+  restore (`responsive-modal.tsx:178`: `returnFocusTo?.current ?? openerRef.current`) brings the focus back to «Apri
+  memoria». `AssistantModals` gains `isPreferencesOpen`, `onPreferencesOpenChange`, `onPreferencesChange`,
+  `isPreferencesPending`, `returnFocusTo`.
 - **`AssistantStreamingResponse.tsx`**: the `mode` prop (:36-37, :160) goes. `MessageIdProvider mode={message.mode}`
   (:232); `MessageQuestionsProvider blocks={message.mode === 'register' ? readAssistantQuestionBlocks(message.content)
   : NO_QUESTION_BLOCKS}` (:237-241, its comment «The PAGE's mode» rewritten «the MESSAGE's mode»). New props
@@ -296,23 +328,33 @@ export function chooserDraftToOverride(draft: RouteChooserDraft): AssistantRoute
 ```
 
   A message without `routeReading` keeps the badge as today.
-- **`AssistantRouteChooser.tsx`** (new): `ResponsiveModal` `width="sm"`, eyebrow «Assistente · Lettura», title «Come
+- **`AssistantRouteChooser.tsx`** (new; props `{ open: boolean; reading: AssistantRouteReading | null; today: {
+  year: number; month: number }; onReread: (route: AssistantRouteOverride) => void; onClose: () => void;
+  returnFocusTo: React.RefObject<HTMLElement | null> }`): `ResponsiveModal` `width="sm"`, eyebrow «Assistente · Lettura», title «Come
   devo leggerla?», reading «La rileggo come scegli qui: la risposta nuova arriva sotto, quella di prima resta.». Body,
-  a draft from `routeToChooserDraft(message.routeReading.route, today)`:
+  a draft from `routeToChooserDraft(reading.route, today)`:
   - `ChoiceList` single, label «Cosa mi chiedi»: «Una domanda» («Rispondo a quello che chiedi»), «Un'analisi» («Il
     giudizio su tutto il periodo»), «Un movimento da registrare» («Te lo propongo come riga: la scrivi tu con
     Conferma»);
   - unless register, `ChoiceList` single, label «Su quale periodo»: «Oggi» («Il patrimonio di oggi, senza un
     periodo»; absent for an analysis — choosing «Un'analisi» on «Oggi» moves the period to «Un mese»), «Un mese» (and
-    under the group `AssistantMonthPicker`, «Mese di riferimento»), «Un anno» (a `Select` «Anno di riferimento» on
-    `buildYearOptions()`), «Da inizio anno», «Tutto lo storico»;
+    under the group `AssistantMonthPicker`, «Mese di riferimento», on `buildMonthOptions()` plus the draft's month
+    appended when it is older than the options), «Un anno» (a `Select` «Anno di riferimento» on `buildYearOptions()`
+    plus the draft's year appended when it is older) — the router reads any month from 2000-01, the options go three
+    and four years back —, «Da inizio anno», «Tutto lo storico»;
   - unless register, a `Switch` «Cerca anche sul web», hint «Per mercati, tassi e notizie».
   Footer: «Annulla» (outline) and «Rileggi» (primary, `AI_CONTROL_ACCENT_CLASS`: it asks a model; disabled when
-  `chooserDraftToOverride` is null). «Rileggi» → `streaming.submit(lastUserPrompt, { route })`, the modal closed with
-  the focus sent to the composer; «Annulla»/Esc → the focus back to the «cambia» that opened it (`returnFocusTo` a ref
-  the page sets from `opener`).
-- **`AssistantConversazioneTile.tsx`**: `periodLabel: string | null` (none on an empty chat); `promptRows` are the
-  suggestions (`{ id, label, primary: index === 0 }`), `ariaLabel` «Domande suggerite» kept (Playwright locates it,
+  `chooserDraftToOverride` is null). «Rileggi» → `onReread(route)` — the page's is `(route) =>
+  streaming.submit(lastUserPrompt, { route })`, `lastUserPrompt` the content of the last `user` message of
+  `renderedMessages` —, the modal closed with the focus sent to the composer's «Interrompi risposta» button (a ref on
+  it, focused in a `requestAnimationFrame` after the submit; the textarea is disabled while streaming);
+  «Annulla»/Esc → the focus back to the «cambia» that opened it (`returnFocusTo` a ref the page sets from `opener`).
+- **`AssistantConversazioneTile.tsx`**: loses `mode`; `periodLabel: string | null` — null on an empty chat; the
+  last assistant message's `describeRoute(routeReading.route)` with its first letter capitalised; on a last
+  assistant message without a reading `getActivePeriodLabel(displayMode, pinnedMonth, pinnedYear)` with the thread's
+  pins (the function stays, its tests too). `promptRows` are the suggestions (`{ id, label, primary: index === 0 }`);
+  while the overview is loading (`overviewData === undefined && !overviewError`) the list is four `Skeleton` rows
+  (`h-11 rounded-xl`, `aria-hidden`) in its place, `ariaLabel` «Domande suggerite» kept (Playwright locates it,
   `doc/guide/assistente.md:298-303`); the «Registra» comment at :146 goes; it forwards the two new props.
 - **`AssistantComposer.tsx`**: the placeholder is `CHAT_COMPOSER_PLACEHOLDER`; `errorHint` is no longer passed.
 - **`AssistantComeFunziona.tsx`**: `PERIODS` (:9-15) → `READINGS`, tile eyebrow «Come ti leggo», reading «Scrivi come
@@ -344,9 +386,17 @@ export function chooserDraftToOverride(draft: RouteChooserDraft): AssistantRoute
   })`; `handleSuggestionSelect(row)` → `setDraft(row.text)`, focus the composer and put the caret at the end
   (`setSelectionRange(len, len)` in a `requestAnimationFrame`), `setRegisterPrefetch(row.register || prev)`.
 - **`?mode=registra`** (`CashflowPageClient.tsx:271`, `ExpenseTrackingTab.tsx:974` keep linking it): read once at
-  mount into `registerFirst`; an effect drops the param (`replaceState`) and focuses the composer.
-- **Answers and follow-ups**: `submitAnswer={(text) => streaming.submit(text, { route: askingRoute })}`, `askingRoute`
-  the last assistant message's `routeReading.route` without `confidence`; `handleFollowUpSelect`'s default action
+  mount into `registerFirst` and `registerPrefetch` (`useState(() => searchParams.get('mode') === 'registra')`); one
+  effect, under today's gates (`!loadingThreads && !isDemo && assistantConfigured`, :535 — before them the composer
+  is not mounted) and a handled ref, drops the param with `window.history.replaceState` and focuses the composer,
+  deferred with `setTimeout(…, 0)`.
+- **Answers and follow-ups**: `submitAnswer={(text) => streaming.submit(text, { route: askingRoute, routeCarried: true })}`
+  (`useAssistantStreaming`'s `submit` options gain `routeCarried?: boolean`, posted beside `route`; `retry`
+  posts `routeCarried: true` with the reading it re-sends; «Rileggi» posts the chooser's route WITHOUT it); a
+  «Continua con» row is `streaming.submit(text)`, no route (decision 52); `askingRoute`
+  the last assistant message's `routeReading.route` without `confidence`, and on a message with no reading whose
+  `mode === 'register'` (a thread saved before this spec) `{ intent: 'register', period: { kind: 'none' }, webSearch:
+  false }` — a question card renders only on a register message; `handleFollowUpSelect`'s default action
   (:484) reads `last.mode === 'register'` instead of the page's.
 - **`changeableMessageId`**: the last assistant message's id when `!isStreaming && !isDemo` and it has a
   `routeReading`.
@@ -354,10 +404,29 @@ export function chooserDraftToOverride(draft: RouteChooserDraft): AssistantRoute
 ### Deleted (dead after the page)
 
 `AssistantPeriodSelector.tsx`; `lib/constants/assistantPrompts.ts` and `AssistantPromptChip` (`types/assistant.ts:48-
-55`); from `assistantPeriodOptions.ts`: `getPreviousCompletedMonth` stays, `resolveAssistantPreviewMode`,
+55`); from `assistantPeriodOptions.ts`: `getPreviousCompletedMonth`, `resolveAssistantPreviewMode`,
 `buildComposerPlaceholder`, `buildEmptyStateQuestion`, `findRegisterThread`, `findThreadForPeriod` go with their
-tests in `__tests__/assistantPeriodOptions.test.ts`; the WARNING checklist (`types/assistant.ts:10-12`) drops them and
-`AssistantPeriodSelector.tsx`.
+tests in `__tests__/assistantPeriodOptions.test.ts`; `buildMonthOptions` and `buildYearOptions` (the chooser reads
+them), `getActivePeriodLabel` (the tile's aside on an answer without a reading), `getModeBadgeLabel`,
+`ASSISTANT_PROMPT_MAX_LENGTH` and `describePromptLength` stay. The WARNING checklist (`types/assistant.ts:1-14`) drops
+the deleted names and `AssistantPeriodSelector.tsx`, and gains «`lib/utils/assistantChatNarrative.ts`
+(`describeRoute`) and `lib/utils/assistantRoute.ts` (`routeToChooserDraft`, `chooserDraftToOverride`)».
+
+### Sentences outside the page
+
+- `lib/server/assistant/prompts.ts:844` (`buildEmailPeriodicFormatContract`, the periodic email's comment — not
+  a chat mode): «commenta il mix per tipo (Fisse/Variabili/Debiti)» becomes «commenta il mix per tipo (Spese
+  Necessarie/Spese Non Necessarie/Debiti)», the labels the data block already prints (`EXPENSE_TYPE_LABELS`); the
+  comment at `:515` reads «the Necessarie/Non necessarie/Debiti mix» (decision 36). No test pins the old words
+  (`grep -rn "Fisse/Variabili" __tests__` is empty today); the chat modes' `system` stays byte-identical.
+- `lib/server/assistant/prompts.ts`, `formatTodayContextForPrompt` (:460; the chat's USER content, never `system`):
+  «Non c'è un periodo: niente entrate, uscite, snapshot o confronto tra date. Se la domanda riguarda un periodo, di'
+  all'utente di nominarlo nella domanda (per esempio «a ottobre») o di usare «cambia» sotto la risposta; non stimare
+  quelle cifre.» The per-mode `system` is untouched: `__tests__/assistantPromptBundle.test.ts` (:680, :737, :756,
+  :773, :822, :838, :864) and `__tests__/anthropicStream.test.ts:207` green unedited.
+- `components/settings/tabs/GeneraleTab.tsx:797-802`: «Si modificano dall'Assistente, nel menu «⋯» → Preferenze.»;
+  `lib/utils/settingsNarrative.ts:249`: «Preferenze non ancora sincronizzate: si leggono e modificano
+  dall'Assistente, nel menu «⋯» → Preferenze.» (`__tests__/settingsNarrative.test.ts:289` follows).
 
 ### Persisted conversations and the URL
 
@@ -371,11 +440,11 @@ dropped; `?thread=<id>` new; an unknown or foreign id is the thread read's faile
 
 - Tab at rest: «⋯», «Nuova conversazione», the four rows, the textarea, «Invia messaggio», then the companion.
 - «⋯»: Enter, Space or ArrowDown opens; arrows move; Enter picks; Esc closes back on «⋯» (Radix). A picked item
-  opens its modal (focus inside, `ResponsiveModal`); its close returns to «⋯» through `moreTriggerRef` — a menu item
+  opens its modal (focus inside, `ResponsiveModal`); its close returns to «⋯» through `modalReturnRef` — a menu item
   is unmounted when the modal opens, so the default restore would land on `body` (CLAUDE.md § Known Issues).
 - A suggestion: the composer gets the focus with the caret at the end; Enter sends it.
-- «cambia»: a button in the line; the chooser's first radio takes the focus; «Rileggi» → the composer; «Annulla» or
-  Esc → back on «cambia».
+- «cambia»: a button in the line; the chooser's first radio takes the focus; «Rileggi» → «Interrompi risposta» in
+  the composer; «Annulla» or Esc → back on «cambia».
 
 ### The phone (390) and the budgets
 
@@ -393,6 +462,9 @@ already in it); `DropdownMenu` is the shell's. The ceiling (754) is not raised.
 - **Line 579**, BEFORE: «… «Salta le domande», «Torna all'analisi», a link that only opens the Assistente («Chiedi
   all'Assistente»); …» — AFTER: «… «Salta le domande», «cambia» (it only opens the choice), a link that only opens
   the Assistente («Chiedi all'Assistente»); …».
+- **Line 1048**, BEFORE: «… Analisi's `AnalisiPeriodControls`, the Assistente's `AssistantPeriodSelector`,
+  Previdenza's fiscal year (`PensionOverview`), …» — AFTER: «… Analisi's `AnalisiPeriodControls`, Previdenza's fiscal
+  year (`PensionOverview`), …».
 - **Line 593**, BEFORE (the whole paragraph): «**The Assistente page** (AI Surfaces, 2026-11-01). The conversation is
   the page (The Conversation-Is-Content Rule): the «Conversazione» tile and, from `desktop:`, the companion column at
   `desktop:grid-cols-[2fr_1fr]`. A change of mode — a period of «Periodo di analisi», Registra — keeps the
@@ -445,21 +517,24 @@ already in it); `DropdownMenu` is the shell's. The ceiling (754) is not raised.
 
 | # | Test | Mutation that turns it red |
 | --- | --- | --- |
-| N1 | `assistantChatNarrative.test.ts`: `describeRoute` for the eleven readings (exact strings); `describeReadingLine` for router, override, fallback, web from `webSearchUsed` over the reading | `toLowerCase()` dropped |
-| N2 | `buildEmptyChatSuggestions`: the four states' exact labels; `registerFirst` order; a 41-character category → «Dove sono andati i soldi questo mese?»; January → «dicembre» | `slice(0, 4)` removed |
-| N3 | `assistantRoute.test.ts`: `chooserDraftToOverride(routeToChooserDraft(r))` equals `r` for the eleven readings; analysis + `none` → null | `none: null` → `'chat'` |
-| U1 | `useAssistantStreaming.test.tsx`: the body is `mode: 'auto'` without period fields; `route` when passed; a `route` event sets the slot's `mode` and `routeReading`; `retry` re-sends the route | keep `chatContext` in the body |
-| H1 | `assistantHeader.test.tsx` (rewritten): two buttons; the menu's three items with counts; «Nuova conversazione» off in demo and while streaming only; no «Registra un movimento» | `disabled={isRegister}` back |
-| H2 | the «⋯» → «Memoria» modal; Esc → focus on «⋯» | drop `returnFocusTo` |
+| N1 | `assistantChatNarrative.test.ts`: `describeRoute` for the ten readings (the four analyses on their period, register, chat on each of the five periods; exact strings); `describeReadingLine` for router, carried («Ho letto: …»), override («Hai scelto: …»), fallback, web from `webSearchUsed` over the reading | `toLowerCase()` dropped |
+| N2 | `buildEmptyChatSuggestions`: the four states' exact labels; `registerFirst` order; a 40-character category → «Quanto ho speso in <it> questo mese?», a 41-character one → «Dove sono andati i soldi questo mese?»; January → «dicembre» | the `top.length <= CATEGORY_IN_SENTENCE_MAX` guard dropped |
+| N3 | `assistantRoute.test.ts`: `chooserDraftToOverride(routeToChooserDraft(r))` equals `r` for the ten readings, each with `webSearch` true and false (register always false); analysis + `none` → null | `none: null` → `'chat'` |
+| N4 | `assistantNarrative.test.ts:317-325` rewritten: `buildNoContextVerdict(null)` reads «L'assistente risponde sui dati di oggi; nomina un periodo nella domanda per ragionare sui suoi numeri.»; `:488-493` rewritten: the empty branch with `EMPTY_CHAT_QUESTION` reads «Cosa vuoi sapere, o cosa vuoi registrare? Scegli un suggerimento o scrivi qui sotto.» | the old sentence back |
+| N5 | `assistantPromptBundle.test.ts`: the today block `toContain('nominarlo nella domanda')` and not «selezionarlo» | the old sentence |
+| U1 | `useAssistantStreaming.test.tsx`: the body is `mode: 'auto'` without period fields; `route` when passed; a `route` event sets the slot's `mode` and `routeReading`; `retry` re-sends a route passed; an `'auto'` send whose stream emits a `router` reading then an `error` → `retry` posts that reading as `route`, with a `fallback` reading it posts none; after a `register` answer the next placeholders are born `register` | keep `chatContext` in the body; the `route` handler leaves the ref alone; born `'chat'` |
+| H1 | `assistantHeader.test.tsx` (rewritten): two buttons per header copy; the menu's three items with counts; «Nuova conversazione» off in demo and while streaming only; no «Registra un movimento» | `disabled={isDemo \|\| isStreaming}` → `disabled={isDemo}` |
+| H2 | `assistantCompanionScene.test.tsx`: the «⋯» → «Memoria» modal, Esc → focus on «⋯»; «⋯» focused once, then «Apri memoria» → Esc → focus on «Apri memoria» | drop `returnFocusTo`; `returnFocusTo={moreTriggerRef}` |
 | S1 | `assistantStreamingResponse.test.tsx:104` rewritten: an expense block on a `register` message is a card, on a `chat` message code, in one list | gate on a constant `'chat'` |
-| S2 | the line: «Ho letto: analisi di ottobre 2026 · cambia» on the last; no «cambia» on the earlier one, while streaming, in demo; no line on a message without reading, which keeps «Ricerca web usata» | `changeableMessageId` ignored |
-| S3 | `assistantRouteChooser.test.tsx`: from «domanda su ottobre 2026», pick «Un movimento da registrare» → the period group and the switch disappear; «Rileggi» calls `onReread` with the register override; «Un'analisi» hides «Oggi» | keep «Oggi» for an analysis |
+| S2 | the line: «Ho letto: analisi di ottobre 2026 · cambia» on the last; no «cambia» on the earlier one nor with `changeableMessageId` undefined; no line on a message without reading, which keeps «Ricerca web usata» | `changeableMessageId` ignored |
+| S3 | `assistantRouteChooser.test.tsx`: from «domanda su ottobre 2026», pick «Un movimento da registrare» → the period group and the switch disappear; «Rileggi» calls `onReread` with the register override; «Un'analisi» hides «Oggi»; a reading of 2020-03 shows «Marzo 2020» in the month picker | keep «Oggi» for an analysis; the options without the draft's month |
 | Q1 | `assistantQuestionBlock.test.tsx:197` rewritten: gated by the message's mode | read the page's |
-| P1 | `assistantCompanionScene.test.tsx` rewritten: the scene slides when a faked `route` event turns the last message to `register`; no `tablist`, no «Torna all'analisi» | settle the scene on a constant |
-| P2 | a suggestion fills the composer, focuses it, no `fetch` | call `submit` |
-| P3 | `?mode=registra` → register rows first, composer focused, `replaceState` without the param | keep the param |
-| P4 | `?thread=t1` opens t1; a `meta` of a new thread writes `?thread=`; «Nuova conversazione» removes it | never write the param |
-| Q2 | an answer to a question card is sent with the asking message's route | send without `route` |
+| P1 | `assistantCompanionScene.test.tsx` rewritten (the page test: its mock of `AssistantPreferencesPopover` becomes one of `AssistantPreferencesFields`; P2-P5 and Q2 are in it): the scene slides when a faked `route` event turns the last message to `register`; in a conversation whose last answer is `register` a second send keeps `[data-scene="register"]` mounted until its `route` event; no `tablist`, no «Torna all'analisi» | settle the scene on a constant; placeholders born `'chat'` |
+| P2 | a suggestion fills the composer, focuses it, no `fetch`; with the overview pending the list is four skeletons and no button | call `submit`; render the `unknown` rows while loading |
+| P3 | `?mode=registra`, rendered with `loadingThreads` true then false → register rows first, composer focused, `replaceState` without the param | keep the param; run the effect at mount |
+| P4 | `?thread=t1` opens t1; a `meta` of a new thread writes `?thread=`; «Nuova conversazione» removes it; no «cambia» while a faked stream is open | never write the param; `changeableMessageId` without `!isStreaming` |
+| P5 | the tile's aside: «Analisi di ottobre 2026» after that reading; «Registra · senza periodo» on a planted `register` answer without a reading; none on an empty chat; «Rileggi» → the focus on «Interrompi risposta» | the aside from a constant; focus the textarea |
+| Q2 | an answer to a question card is sent with the asking message's route and `routeCarried: true`; a «Continua con» row with neither; «Rileggi» with `route` and no `routeCarried`; on a `register` message without a reading, with the register route | send without `route`; `askingRoute` from `routeReading` only |
 
 **Playwright** (all faked; data-only planting, `doc/guide/e2e-playwright.md`):
 
@@ -480,7 +555,10 @@ already in it); `DropdownMenu` is the shell's. The ceiling (754) is not raised.
   card.
 - New `e2e/assistant.chat.mobile.spec.ts`: **E6** at 390 — two header targets ≥ 44px, «⋯» opens a bottom sheet,
   «cambia» ≥ 44px tall, no horizontal overflow.
-- Unchanged: `e2e/cashflow.tracciamento.spec.ts:357` (the link's `href`), `e2e/allocation.consulente.spec.ts:200-205`.
+- `e2e/cashflow.tracciamento.spec.ts:353-361` rewritten: the href stays `/dashboard/assistant?mode=registra`; after
+  the click the URL settles without the param (`toHaveURL(/\/dashboard\/assistant$/, { timeout: 60_000 })`), the first
+  row of the list «Domande suggerite» reads «Oggi ho speso…» and the composer is focused (today it asserts the
+  Registra strip, which goes). Unchanged: `e2e/allocation.consulente.spec.ts:200-205`.
 
 ## 7. Guided verification (WORKFLOW.md § 2)
 
@@ -496,12 +574,13 @@ entered. On the owner's account after the deploy, real sentences are read right:
 - **C (browser, the session)**: at 1440 and 390, with `page.route` faking the stream (no key): the count, the
   suggestions, the line, the chooser, the menu and the focus returns, screenshots for the owner.
 - **D (data)**: the faked request bodies (`recorder.requests`) — `mode: 'auto'`, no period fields, the override.
-- **E**: demo account → the locked state as today, no «⋯» items reachable; a `?thread=` of another user → the
-  failed-read alert, nothing else.
+- **E**: demo account → the locked state as today; in «⋯» Conversazioni and Preferenze are off, Memoria opens its
+  modal as today (the header's Memoria was never off in demo); a `?thread=` of another user → the failed-read
+  alert, nothing else.
 - **F (owner, at his «pronto»)**: after the deploy, on his account, five real sentences — one expense, one income,
   «com'è andato ottobre?», «e a settembre?», one about inflation — each line read aloud, one «cambia» → «Rileggi»; the
   router's first real calls (NOVE-14 § 7 F).
-- **G**: fixtures and decoys removed, scripts deleted, emulators stopped.
+- **G** (the two budgets close by README.md § 8's ONE rule, decisions 33 and 34): fixtures and decoys removed, scripts deleted, emulators stopped.
 
 ## 8. Putting it into service
 
@@ -510,6 +589,10 @@ sending explicit modes, which NOVE-14 still serves. The two Cashflow links keep 
 
 ## 9. Documentation
 
+- `doc/guide/assistente.md` § Per-page blind spots: «una riga di «Continua con» è letta da capo: «e questo
+  mese?» sotto un'analisi di ottobre può essere letta come una domanda sui dati di oggi; «cambia» la corregge»
+  (decision 52); § the router: `source: 'carried'` and `routeCarried` (decision 53). `doc/guide/email-pdf.md`:
+  the periodic comment's contract names the types «Spese Necessarie/Spese Non Necessarie/Debiti» (decision 36).
 - `doc/guide/assistente.md`: § Assistente — a verdict over tiles (:277-303) rewritten for the two header controls,
   the «⋯» menu and the locators (`button` «Altre azioni dell'assistente», `list` «Domande suggerite», the line by its
   text, no `tablist`); § Registra's way in and out (:410-422) replaced by «a written sentence read as a registration;
@@ -517,13 +600,21 @@ sending explicit modes, which NOVE-14 still serves. The two Cashflow links keep 
   rule (:179-180) gains «Preferenze is a modal since 2026-11-12».
 - `AGENTS.md` § Assistant: «the cards follow the MESSAGE's `mode`, never the page's (2026-11-12; pinned by
   `assistantStreamingResponse.test.tsx`)».
-- `DESIGN.md`: § 4's three amendments. `doc/guide/e2e-playwright.md`: `assistantRegister.ts`'s helpers renamed.
+- `doc/guide/assistente.md` also: :272-276 (the suggestions are `buildEmptyChatSuggestions`, the first bold), :322
+  (no axis), :446 (blind spots: a suggestion writes the composer). The guide stays under 500 lines after NOVE-14's
+  section: the rewritten passages replace, they do not add.
+- `README.md` § AI Assistant (:63): the period axis, the pencil and the day thread replaced by «a chat: write, the
+  assistant reads whether it is a question, an analysis or a movement and on which period; under each answer «Ho
+  letto: … · cambia»; «⋯» holds Conversazioni, Memoria, Preferenze»; :67 «opens the Assistente with the register
+  suggestions first». `doc/guide/cashflow-tracciamento.md:190`: «the bridge to the Assistente (`?mode=registra`: the
+  register suggestions first)». `doc/guide/impostazioni.md`: the Assistente preferences' sentence.
+- `DESIGN.md`: § 4's four amendments. `doc/guide/e2e-playwright.md`: `assistantRegister.ts`'s helpers renamed.
 - `CLAUDE.md` › Assistente AI line («only a chat; the router reads every message, 2026-11») and › «Latest»;
   `Draft Release Temp.md` (Assistente: the chat, the line, «cambia», the menu); `doc/nove/README.md` § 6.
 
 ## 10. Declared out of scope
 
-- **The page's costume in the themes**: heir NOVE-11 → 12, 13.
+- **The page's costume in the themes**: heir NOVE-20 (on NOVE-11's mechanisms).
 - **A thread title from the sentence for registrations**: none, declared (the title rule is the server's, unchanged).
 - **A «cambia» on older answers**: none, declared (history is not rewritten).
 - **The router itself**: NOVE-14.
@@ -541,7 +632,8 @@ Contesto, prima di toccare qualsiasi file (le regole del repo cambiano il modo d
   contesto: usalo per trovare la guida giusta
 - Leggi la spec doc/nove/NOVE-15-assistente-solo-chat.md e l'indice della serie
   doc/nove/README.md (§ 3 decisioni, § 4 scelte adottate, § 7 contratti condivisi, § 8 regole)
-- Leggi doc/guide/assistente.md, dialog.md, e2e-playwright.md, velocita.md PRIMA di scrivere codice
+- Leggi doc/guide/assistente.md, cashflow-tracciamento.md, impostazioni.md, email-pdf.md, dialog.md,
+  e2e-playwright.md, velocita.md PRIMA di scrivere codice
 - Leggi DESIGN.md (The Assistente page, The AI-Accent Rule, The Conversation-Is-Content Rule,
   The Modal-Is-A-Tile Rule, The Question-Card Rule) e PRODUCT.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md: il codice che scrivi li segue
@@ -563,11 +655,13 @@ interattivo), dammelo una riga alla volta con l'esito atteso.
 
 Implementa la spec così com'è scritta, nell'ordine: assistantChatNarrative.ts e le due
 funzioni del selettore con i loro test; l'hook di streaming; i messaggi (la riga, le card
-per messaggio); il selettore «cambia»; l'intestazione e le tre modali; la pagina; «Come
-funziona»; il codice morto; gli E2E. I test PRIMA del codice, ciascuno visto rosso con la
+per messaggio); il selettore «cambia»; l'intestazione e le tre modali (nuova è solo
+Preferenze); la pagina; «Come funziona»; le frasi fuori pagina (il blocco di oggi nel
+prompt, Impostazioni); il codice morto; gli E2E (anche cashflow.tracciamento); gli
+emendamenti di DESIGN.md alla lettera e i documenti del § 9. I test PRIMA del codice, ciascuno visto rosso con la
 sua mutazione; cifre e categorie inventate. Nessun controllo che spende: lo stream è sempre
 finto, la chiamata vera è solo la mia F dopo il deploy. Fermati e chiedimi se: il conteggio
-a riposo non fa 11; perf:budget supera il tetto; un E2E di Registra non si riscrive senza
+a riposo non fa 11; perf:budget, misurato prima e dopo sulla stessa macchina, supera un tetto di più di 1 KB gz (fino a 1 KB lo alzi tu, con raisedBy e una riga in velocita.md § Registro); un E2E di Registra non si riscrive senza
 cambiare ciò che prova. Collaudo: § 7, la F al mio «pronto». Un branch, un commit, solo
 dopo il mio OK con il riassunto del diff. SESSION_NOTES.md non si committa.
 ```

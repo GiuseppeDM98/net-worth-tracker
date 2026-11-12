@@ -42,38 +42,48 @@ Each of the five tiles draws its parts as NOVE-08's ring when they are one posit
 keeps today's form otherwise.
 
 1. **Divisione**: `splitRingSegments(basis)` → one part per person in settings order, colours `RING_CATEGORY_COLORS`
-   by that order; `null` when the basis is `unavailable`. The tile draws the ring (centre `totalIncome` «entrate»)
+   by that order (six slots, decision 45: six people wear six colours; the sixth, `--chart-4`, is also «Spese Non
+   Necessarie» on Cashflow — declared in cashflow-divisione.md § Per-page blind spots); `null` when the basis is
+   `unavailable`. The tile draws the ring (centre `totalIncome` «entrate», decision 46: the income the shares are
+   measured on — the reading under it names the income left in comune)
    beside the person blocks, each name led by its swatch. **Proof**: `expenseSplitSummary.test.ts` D1,
-   `__tests__/SplitQuotaBody.test.tsx` D2.
+   `__tests__/splitQuotaBody.test.tsx` D2.
 2. **Mutuo**: `mortgageRingSegments(summary)` → «Interessi {Y}» `var(--chart-8)` and «Capitale {Y}» `var(--chart-7)`;
    `null` with no settled instalment in the year or with one of the two at zero. The ring (size 96, centre
-   interest + principal «pagati») stands before the KPI grid; the two KPIs' labels are led by their swatch. **Proof**:
-   `mortgageSummary.test.ts` M1, `__tests__/MutuoTile.test.tsx` M2.
+   `mortgageYearPaid(summary)` «pagati») stands before the KPI grid; the two KPIs' labels are led by their swatch. **Proof**:
+   `mortgageSummary.test.ts` M1, `__tests__/mutuoTile.test.tsx` M2.
 3. **Intestatari**: on «Valore» `ownershipRingSegments(summary)` → the rows in order, coloured by rank, «Senza
    intestatario» in `RING_REST_COLOR`; `null` when a row prints below zero. On «Carico» no ring, today's bars. Centre
-   `total` «patrimonio». **Proof**: `ownershipBasis.test.ts` I1, `__tests__/IntestatariTile.test.tsx` I2.
+   `total` «patrimonio»; from `desktop:` the legend rows are capped at 560px. **Proof**: `ownershipRing.test.ts`
+   (new) I1, `__tests__/intestatariTile.test.tsx` I2.
 4. **Centri di Costo**: `costCenterRingSegments(summary)` → «Fisso» `var(--chart-7)` (caption «ricorrenti e rate»)
    and «Una tantum» `var(--chart-3)`; `null` when either is zero. With it the footer is the ring (size 96, centre
    `summary.total` «in tutto») and two legend rows; without it, today's sentence («Tutto una tantum: …»).
-   **Proof**: `costCenterSummary.test.ts` K1, `__tests__/CostoTile.test.tsx` K2; `costCenterNarrative.test.ts:441`
+   **Proof**: `costCenterSummary.test.ts` K1, `__tests__/costoTile.test.tsx` K2; `costCenterNarrative.test.ts:441`
    stays green (the sentence is unchanged).
-5. **Dividendi**: `payerRingSegments(ranking)` → the rows by rank, then the remainder in `RING_REST_COLOR`; `null` with
-   one payer or a payer below zero. Centre `total` «netti». **Proof**: `dividendAnalytics.test.ts` V1,
-   `__tests__/PagatoriTile.test.tsx` V2.
+5. **Dividendi**: `payerRingSegments(ranking)` → the rows by rank, then the remainder in `RING_REST_COLOR`; `null` when
+   fewer than two parts are above zero (one held payer and no remainder, or only sold instruments) or a part — a
+   row or the remainder — prints below zero; one held payer beside a sold one's remainder is a ring of two. Centre
+   `total` «netti». **Proof**: `dividendAnalytics.test.ts` V1,
+   `__tests__/pagatoriTile.test.tsx` V2.
 6. In ring mode every host's rows are the legend (`bars={false}`, a `swatch` per row and remainder); the colour of a
    swatch is its arc's. Past six parts (seven people, seven owners) the ring folds and the rows from the sixth on wear
    `RING_REST_COLOR`. **Proof**: D2, I2 (seven members).
-7. **The figure stays INSIDE its hole** at 390 and 1440 on Divisione, Centri and Intestatari, and at 1440 on Mutuo.
-   **Proof**: `e2e/ring-chart.split.spec.ts`, `e2e/ring-chart.split.mobile.spec.ts`, `e2e/ring-chart.centri.spec.ts`,
+7. **The figure stays INSIDE its hole** at 390 and 1440 on Divisione, Centri and Intestatari, and at 1440 on Mutuo
+   and Dividendi. **Proof**: `e2e/ring-chart.dividendi.spec.ts`, `e2e/ring-chart.split.spec.ts`, `e2e/ring-chart.split.mobile.spec.ts`, `e2e/ring-chart.centri.spec.ts`,
    `e2e/ring-chart.centri.mobile.spec.ts`, `e2e/ring-chart.owners.spec.ts`, `e2e/ring-chart.owners.mobile.spec.ts`
    (all through NOVE-08's `expectRingFiguresInside`), one assertion added to `e2e/cashflow.mortgage.spec.ts:211-226`.
-8. Every existing spec of the five tiles stays green: `e2e/cashflow.split.spec.ts:121-137` (the Quota's text),
-   `e2e/cashflow.mortgage.spec.ts:211-260`, `e2e/mobile-composition.patrimonio.spec.ts` (the switch), `e2e/cashflow.
-   centri*.spec.ts`, `e2e/cashflow.dividendi*.spec.ts`. **Proof**: the run.
+8. Every existing spec of the five tiles stays green: `e2e/cashflow.split{,.mobile}.spec.ts` (the Quota's text;
+   «nothing runs off the side»), `e2e/cashflow.mortgage.spec.ts`, `e2e/mobile-composition.patrimonio{,.mobile}.spec.ts`
+   (the switch, the overflow guard), `e2e/overview.mobile.spec.ts`, `e2e/overview.tablet.spec.ts`,
+   `e2e/mobile-composition.cashflow.mobile.spec.ts`, `e2e/cashflow.centri*.spec.ts`,
+   `e2e/cashflow.dividendi*.spec.ts`. **Proof**: the run.
 9. `mobile:census` + `mobile:budget` unchanged for `cashflow-divisione`, `patrimonio`, `panoramica`,
    `cashflow-dividendi` (the four tiles are closed rows on a first visit) and `cashflow-centri` (the census measures the
    tab's overview, `/dashboard/cashflow?tab=cost-centers`, never a centre's detail). **Proof**: the runs.
 10. DESIGN.md's Ring Chart section names the five homes (§ 4). **Proof**: the diff.
+11. `npm run perf:budget`: only `/dashboard`, `/dashboard/assets` and `/dashboard/cashflow` may grow; a growth on
+    any other route is the trap of § 5 (a builder dragged into a shared narrative). **Proof**: the run.
 
 ## 3. Decisions
 
@@ -94,15 +104,25 @@ keeps today's form otherwise.
   - **Intestatari's ring only on «Valore»** (the owner's words): «Carico» keeps today's bars, so the switch also
     switches the form;
   - Centri: in ring mode the two rows replace the footer sentence (they say the same, with figures and shares);
-  - the centre repeats a figure the tile prints elsewhere on Centri (the hero) — decision 5's «total in the centre»
-    wins, declared.
+  - the centre repeats a figure the tile prints elsewhere on Centri (the hero) and on Dividendi (the aside's
+    `ranking.total`, `PagatoriTile.tsx:34`) — decision 5's «total in the centre» wins, declared;
+  - on Panoramica and Patrimonio every chart slot is also a class's: Intestatari colours by rank, as NOVE-08's
+    Entrate, and shares hues with the classes' ring on the same page — declared;
+  - from `desktop:` Intestatari's legend rows are capped at 560px (the tile is twelve columns wide; without the
+    bars a label and its figure would stand a thousand pixels apart — the cap `MutuoTile`'s «Per anno» already has);
+  - a row worth exactly 0 € beside six positive ones leaves `ringSwatchAt` one row ahead of the arcs (it counts
+    every segment, the fold only the positive ones): accepted, a blind spot of doc/guide/patrimonio.md;
+  - Dividendi has its own browser proof (§ 6); the tablet widths of the five tiles are phase C's look, not a spec:
+    the split and centri accounts have no tablet project.
 - **Not overturned**: every reading, aside and closed-row answer of the five tiles stays as it is.
 
 ## 4. Solution
 
-All builders import from `@/lib/utils/ringChart` (`RingSegment`, `isRingWhole`, `ringSwatchAt`,
-`RING_CATEGORY_COLORS`, `RING_REST_COLOR`, `RING_REST_KEY`); every tile imports `RingChart`, `RING_LAYOUT_CLASS`,
-`RING_ROWS_CLASS` from `@/components/ui/ring-chart`. A swatch is NOVE-08's: `<span className="h-2 w-2 shrink-0
+Each builder imports from `@/lib/utils/ringChart` what it uses (`RingSegment`, `isRingWhole`; the three that
+colour by rank `RING_CATEGORY_COLORS`; Intestatari and Dividendi also `RING_REST_COLOR`, Dividendi `RING_REST_KEY`);
+every tile imports `RingChart` from `@/components/ui/ring-chart`, the four whose rows stand beside the ring also
+`RING_LAYOUT_CLASS` and `RING_ROWS_CLASS` (Mutuo lays its ring beside the KPI grid with its own classes);
+`SplitQuotaBody` and `IntestatariTile` import `ringSwatchAt`. A swatch is NOVE-08's: `<span className="h-2 w-2 shrink-0
 self-center rounded-[2px]" style={{ background }} aria-hidden="true" />`.
 
 ### Divisione — `lib/utils/expenseSplitSummary.ts`, `components/cashflow/tiles/SplitQuotaBody.tsx` (new)
@@ -145,13 +165,28 @@ export function mortgageRingSegments(summary: MortgageSummary): RingSegment[] | 
 `MutuoTile`: `Kpi` gains `swatch?: string` (before the label, the label `<p>` gaining `flex items-center gap-1.5`
 when present). `const ring = mortgageRingSegments(summary)`. Inside the existing `@container mt-3.5` (`:69`) the grid
 is wrapped: `<div className="flex flex-col items-center gap-4 @[560px]:flex-row @[560px]:items-start">{ring &&
-<RingChart segments={ring} centerValue={toCents(summary.yearInterest + summary.yearPrincipal)} centerLabel="pagati"
-ariaLabel={`Rate pagate nel ${summary.year}`} size={96} />}<div className="w-full min-w-0 @[560px]:flex-1">` +
-today's grid + `</div></div>`; the interest and principal `Kpi`s receive `swatch={ring ? MORTGAGE_RING_COLORS.… :
-undefined}`. (`toCents` is exported from `mortgageSummary.ts`, where it is a private `const` at `:86` today.) The «Per
-anno» table is unchanged.
+<RingChart segments={ring} centerValue={mortgageYearPaid(summary)} centerLabel="pagati"
+ariaLabel={`Rate pagate nel ${summary.year}`} size={96} />}<div className="@container w-full min-w-0
+@[560px]:flex-1">` + today's grid + `</div></div>` — the inner wrapper is a container of its own, so the four KPIs go
+across from 560px of the GRID's width beside the ring, not of the tile's; the interest and principal `Kpi`s receive
+`swatch={ring ? MORTGAGE_RING_COLORS.interest : undefined}` and `…principal…`. `mortgageSummary.ts` gains, beside the
+builder (`toCents` stays its private `const`):
 
-### Intestatari — `lib/utils/ownershipBasis.ts`, `IntestatariTile.tsx`
+```ts
+/** What the year's settled instalments paid, interest and principal together — the ring's centre. */
+export function mortgageYearPaid(summary: MortgageSummary): number {
+  return toCents(summary.yearInterest + summary.yearPrincipal);
+}
+```
+
+The «Per anno» table is unchanged.
+
+### Intestatari — `lib/utils/ownershipRing.ts` (new), `IntestatariTile.tsx`
+
+The builder lives in a module of its own (imports `@/lib/utils/ringChart` and `import type { OwnershipSummary }
+from '@/lib/utils/assetOwnership'`), imported only by `IntestatariTile`: `ownershipBasis.ts` is value-imported by
+`patrimonioNarrative`, which every page's narrative imports, and a value import there would carry `ringChart.ts`
+into every route's first load (the trap of 2026-11-03, doc/guide/velocita.md § Registro dei tetti alzati).
 
 ```ts
 /** The owners on their VALUE as ring parts: rows in order, by rank, the orphaned group in the neutral ink. */
@@ -165,8 +200,9 @@ export function ownershipRingSegments(summary: OwnershipSummary): RingSegment[] 
 
 `IntestatariTile`: `const ring = basis === 'value' ? ownershipRingSegments(summary) : null`. With it, the list
 (`:108-110`) sits in `@container mt-2` › `RING_LAYOUT_CLASS` beside `<RingChart segments={ring}
-centerValue={summary.total} centerLabel="patrimonio" ariaLabel="Patrimonio per intestatario" />`, the rows with
-`bars={false}` and `swatch: ringSwatchAt(ring, index)`; on «Carico», or a row below zero, today's list. The footer,
+centerValue={summary.total} centerLabel="patrimonio" ariaLabel="Patrimonio per intestatario" />`, the rows — in
+`cn(RING_ROWS_CLASS, 'desktop:max-w-[560px]')`, ring and rows left-aligned — with `bars={false}` and `swatch:
+ringSwatchAt(ring, index)`; on «Carico», or a row below zero, today's list. The footer,
 the switch and its memory are unchanged.
 
 ### Centri di Costo — `lib/utils/costCenterSummary.ts`, `CostoTile.tsx`, `CostCenterDetail.tsx`
@@ -191,7 +227,9 @@ e una tantum`} size={96} />` and, in `RING_ROWS_CLASS`, `<RankedRows bars={false
 ariaLabel="Fisso e una tantum" rows={ring.map((part) => ({ key: part.key, label: part.label, caption: part.key ===
 'recurring' ? 'ricorrenti e rate' : undefined, amount: part.value, percentage: (part.value / summary.total) * 100,
 swatch: part.color }))} />`; without it, today's `NarrativeText`. `CostCenterDetail.tsx:400-411` passes
-`ring={costCenterRingSegments(summary)}`. (`color` is required by `RankedRows` and unread with `bars={false}`.)
+`ring={costCenterRingSegments(summary)}`. (`color` is required by `RankedRows` and unread with `bars={false}`.) The tile's header sentence «Every figure is
+the `CenterSummary`'s; the tile computes nothing.» becomes «Every figure is the `CenterSummary`'s; the tile only
+turns the ring's two parts into shares for their rows.»
 
 ### Dividendi — `lib/utils/dividendAnalytics.ts`, `PagatoriTile.tsx`, `DividendTrackingTab.tsx`
 
@@ -200,7 +238,7 @@ swatch: part.color }))} />`; without it, today's `NarrativeText`. `CostCenterDet
 export function payerRingSegments(ranking: PayerRanking): RingSegment[] | null {
   const segments: RingSegment[] = ranking.rows.map((row, index) => ({ key: row.key, label: row.label,
     value: row.amount, color: RING_CATEGORY_COLORS[index % RING_CATEGORY_COLORS.length] }));
-  if (ranking.remainder && ranking.remainder.amount > 0) {
+  if (ranking.remainder && ranking.remainder.amount !== 0) {
     segments.push({ key: RING_REST_KEY, label: ranking.remainder.label, value: ranking.remainder.amount,
       color: RING_REST_COLOR });
   }
@@ -208,7 +246,9 @@ export function payerRingSegments(ranking: PayerRanking): RingSegment[] | null {
 }
 ```
 
-(`> 0`, not `≥ 1`: `RankedRows` prints a remainder above zero, `ranked-rows.tsx:131`, and the legend must match.)
+(`!== 0`: a remainder below zero enters the segments so that `isRingWhole` refuses the whole — the centre prints
+`ranking.total`, which counts it — and the tile keeps its bars; a remainder at zero is left out, as `RankedRows`
+leaves it out, `ranked-rows.tsx:131`.)
 `PagatoriTileProps` gains `ring: RingSegment[] | null`. With it, the list (`:44-47`) sits in `@container mt-3.5` ›
 `RING_LAYOUT_CLASS` beside `<RingChart segments={ring} centerValue={ranking.total} centerLabel="netti"
 ariaLabel="Chi paga di più" />`, the rows with `bars={false}` and the swatch of their key, the remainder's
@@ -217,7 +257,7 @@ beside `:266`).
 
 ### DESIGN.md
 
-The Ring Chart section NOVE-08 adds, its last sentence. BEFORE (NOVE-08 § 4, item 6): «Homes: Previdenza «Versato»,
+The Ring Chart section NOVE-08 adds, its last sentence. BEFORE (NOVE-08 § 4, item 10): «Homes: Previdenza «Versato»,
 Tracciamento «Entrate per categoria», Panoramica «Composizione», Patrimonio «Classi» (a class below zero keeps the
 `CompositionBar`).» AFTER: «Homes: Previdenza «Versato», Tracciamento «Entrate per categoria», Panoramica
 «Composizione», Patrimonio «Classi» (a class below zero keeps the `CompositionBar`); and in the minor tiles (also
@@ -231,8 +271,10 @@ di più» — each keeping today's form when its parts are not one positive whol
   past the fold take `ringSwatchAt` (NOVE-08 § 4), the one rule for a row beside a folded ring.
 - **«Never a signed quantity»** (The Ring Rule): Intestatari and Dividendi can hold a part below zero — `isRingWhole`
   decides, and the tile keeps its bars then; Mutuo and Centri sum magnitudes, so they are wholes by construction.
-- **The tile computes nothing** (the tiles' headers, e.g. `VersatoTile.tsx:15-16`): every segment comes from a pure
-  builder in the area's module; the tiles only map keys to swatches.
+- **The tile computes no figure** (the tiles' headers, e.g. `VersatoTile.tsx:15-16`): every segment and every
+  centre comes from a pure builder in the area's module; the tiles map keys to swatches, and `CostoTile` divides a
+  part by `summary.total` for its legend's share — the one division `RankedRows` needs.
+- **A builder never lands in a module a shared narrative imports** (`ownershipBasis.ts`'s own header; criterion 11).
 - **THE tile of Centri never closes** (`CostoTile.tsx:17`; doc/guide/centri-di-costo.md:148): the ring sits in its
   footer, at the bottom, so the first screen of a detail at 390 changes only below the KPIs and the bars.
 - **`e2e/cashflow.split.spec.ts:42-77` holds the people side by side at equal height** (the per-person tiles, not
@@ -242,22 +284,23 @@ di più» — each keeping today's form when its parts are not one positive whol
 - **Sentences live in narrative modules**: the five centre labels and the ring names are one-word labels of the
   tiles, as `ROWS_ARIA_LABEL` is; no sentence is added.
 - **Fixtures are invented and round**: the E2E reads the fixture accounts as they are (`seedSplitE2E.mts`,
-  `seedCostCentersE2E.mts`, the base account) and plants nothing new but Mutuo's loan, which its spec already plants.
+  `seedCostCentersE2E.mts`, the base account) and plants nothing new but Mutuo's loan, which its spec already plants,
+  and the two dividends of `ring-chart.dividendi.spec.ts`.
 
 ## 6. Tests per level (with the mutation that proves each)
 
 | # | Test | Mutation that turns it red |
 | --- | --- | --- |
-| D1 | `expenseSplitSummary.test.ts`: 900/600 → two parts, settings order; `unavailable` → null | sort by income |
-| D2 | `SplitQuotaBody.test.tsx` (RTL): ring's name, a swatch per block; 7 people → 6th, 7th grey | no `ringSwatchAt` |
-| M1 | `mortgageSummary.test.ts`: 1.200 interest + 3.000 principal → two parts; 0 interest → null | skip `isRingWhole` |
-| M2 | `MutuoTile.test.tsx` (RTL): ring «4200 €» «pagati», two KPI swatches; none without rows | always the ring |
-| I1 | `ownershipBasis.test.ts`: members, «In comune», «Senza intestatario» grey; −5.000 € → null | keep the negative |
-| I2 | `IntestatariTile.test.tsx` (RTL): ring on «Valore», none after «Carico» is pressed | ignore `basis` |
+| D1 | `expenseSplitSummary.test.ts`: members in settings order with 600 € then 900 € → two parts, 600 first, colours `--chart-2` then `--chart-7`; `unavailable` (one member, or `missing-income`) → null | sort by income |
+| D2 | `splitQuotaBody.test.tsx` (RTL): ring's name, a swatch per block; 7 people → 6th, 7th grey | no `ringSwatchAt` |
+| M1 | `mortgageSummary.test.ts`: 1.200 interest + 3.000 principal → two parts, `mortgageYearPaid` 4200; 0 interest → null | skip `isRingWhole` |
+| M2 | `mutuoTile.test.tsx` (RTL): ring «4200 €» «pagati», two KPI swatches; without settled rows neither ring nor swatch | pass the swatches whatever `ring` |
+| I1 | `ownershipRing.test.ts` (new): members, «In comune», «Senza intestatario» grey; −5.000 € → null | return the segments without `isRingWhole` |
+| I2 | `intestatariTile.test.tsx` (RTL): ring on «Valore», none after «Carico» is pressed; seven owner rows → the 6th and 7th swatches in `RING_REST_COLOR` | ignore `basis` (first case); `ring[index].color` instead of `ringSwatchAt` (second) |
 | K1 | `costCenterSummary.test.ts`: 30 fixed + 240 one-off → two parts; all one-off → null | `>= 0` for a part |
-| K2 | `CostoTile.test.tsx` (RTL): the ring and «ricorrenti e rate»; the sentence without a ring | render both |
-| V1 | `dividendAnalytics.test.ts`: five payers + «Altri 2 strumenti» → six parts; one → null | drop the remainder |
-| V2 | `PagatoriTile.test.tsx` (RTL): the remainder's grey swatch | colour the remainder by rank |
+| K2 | `costoTile.test.tsx` (RTL): the ring and «ricorrenti e rate»; the sentence without a ring | render both |
+| V1 | `dividendAnalytics.test.ts`: five payers + «Altri 2 strumenti» → six parts; one → null; a sold remainder of −50 € → null | drop the remainder |
+| V2 | `pagatoriTile.test.tsx` (RTL): the remainder's grey swatch | colour the remainder by rank |
 
 **Playwright** (each file's project picked by its name, doc/guide/e2e-playwright.md):
 
@@ -266,15 +309,20 @@ di più» — each keeping today's form when its parts are not one positive whol
 - `ring-chart.centri{,.mobile}.spec.ts` (centri account): the «Ornitorinco» detail opened as `e2e/cashflow.centri.spec
   .ts:58-78` opens a centre → a ring in «Costo di Ornitorinco» (30 € fixed, 240 € one-off: «270 €»), containment; the
   «Fenicottero» detail → `[data-ring]` count 0 beside the visible «Tutto una tantum: nessuna spesa ricorrente o a
-  rate.» (its instalment is dated 31 December, not booked).
-- `ring-chart.owners{,.mobile}.spec.ts` (base account; the fund's member and «In comune», doc/guide/patrimonio.md:444):
+  rate.» (its instalment is dated 31 December, not booked). The «Fenicottero» test is skipped on December 31st
+  (`test.skip(isLastDayOfYear, 'On December 31st the instalment is booked: fixed and one-off, a ring.')`, the guard
+  of `e2e/cashflow.centri.spec.ts:30,81`).
+- `ring-chart.owners{,.mobile}.spec.ts` (base account; the fund's member and «In comune», doc/guide/patrimonio.md:444;
+  at 390 `#patrimonio-intestatari-trigger` first, the «Valore | Carico» switch then inside the open panel):
   the Patrimonio «Intestatari» on «Valore» → containment; «Carico» pressed → count 0; «Valore» pressed back (the
   memory restored for the next spec).
 - `e2e/cashflow.mortgage.spec.ts:211-226`: after the existing reads, `expectRingFiguresInside(tile)`.
 
-Dividendi has no browser proof: the base account has no dividends (`e2e/cashflow.dividendi.spec.ts:21`) and planting
-held payers is a fixture of its own; the containment is the primitive's at size 120, proven by NOVE-08's three specs
-— declared.
+- `ring-chart.dividendi.spec.ts` (base account, `desktop` project; the base account has no dividends): two
+  dividends created through the app's own form, as `e2e/cashflow.dividendi.spec.ts` creates its coupon, on two held
+  instruments of the base seed, invented round nets of 300 € and 200 €, note «dividendo ornitorinco»; containment
+  in the region «Chi paga di più» (a `desktop:col-span-4` cell: the ring stacked above its rows); both removed in
+  `afterAll` through the app's two-click delete, the emulator polled until no document carries the note.
 
 ## 7. Guided verification (WORKFLOW.md § 2)
 
@@ -284,17 +332,17 @@ incomes' sum in the hole and a swatch before each name; the «Ornitorinco» cent
 ring on «Valore», bars on «Carico»; a loan with settled instalments a 96px ring «pagati» before its KPIs.
 
 - **A**: `tsc`, lint, Vitest (three zones), the Playwright files of § 6 and the existing specs of criterion 8.
-- **B**: emulators + seed (split, centri, base); Mutuo's loan planted by its spec; two dividends planted for phase C
-  on two held assets of the base account (decoy note «fenicottero»), removed at G.
+- **B**: emulators + seed (split, centri, base); Mutuo's loan planted by its spec; for phase C two dividends created
+  in the app on two held assets of the base account (decoy note «fenicottero»), deleted at G.
 - **C (browser, the session)**: the five tiles at 390, 768, 1024 landscape and 1440, light and dark; Divisione's
   period changed (the arcs glide); Intestatari's switch both ways.
 - **D (data)**: each ring's `aria-label` shares against the tile's own shares (the Quota's aside «60% · 40%», the
   Centri sentence's «il N%» before the change, the rows' figures).
 - **E**: a split period where one person has no income → the remedy reading, no ring; a centre with only recurring
-  spending → the sentence form; Dividendi with one payer → today's bars.
+  spending → the sentence form; Dividendi with one payer and nothing sold → today's bars.
 - **F (owner, at his «pronto»)**: the mirror — his Divisione, Mutuo, Intestatari, a centre and Dividendi;
   `npm run mirror:remove`.
-- **G**: `mobile:census` + `mobile:budget`, `perf:budget`; remove the planted rows, mirror and scripts.
+- **G** (the two budgets close by README.md § 8's ONE rule, decisions 33 and 34): `mobile:census` + `mobile:budget`, `perf:budget`; remove the planted rows, mirror and scripts.
 
 ## 8. Putting it into service
 
@@ -303,17 +351,23 @@ the pages already hold).
 
 ## 9. Documentation
 
+- `doc/guide/cashflow-divisione.md` § Per-page blind spots: «the ring's sixth colour is `--chart-4`, the slot of
+  «Spese Non Necessarie» on Cashflow: on a household of six the sixth person shares a hue with a spending type»
+  (decision 45).
 - `DESIGN.md`: the Ring Chart section's last sentence (§ 4), to the letter.
 - `doc/guide/cashflow-divisione.md` (Quota), `patrimonio.md` (Mutuo; Intestatari: «the ring only on Valore»),
   `panoramica.md` (Intestatari), `centri-di-costo.md` (THE tile's footer), `cashflow-dividendi.md` («Chi paga di
-  più»; the blind spot «no browser proof of the ring»): one bullet each, with the date.
-- `doc/guide/grafici.md` § The ring: the five homes and `ringSwatchAt`.
+  più»): one bullet each, with the date; `patrimonio.md` § Per-page blind spots: «a row worth exactly 0 € beside six
+  positive ones greys the sixth row's swatch while its arc keeps its colour».
+- `doc/guide/grafici.md` § The ring: the five homes, `ringSwatchAt`, and «a ring builder never lives in a module a
+  shared narrative imports (`ownershipRing.ts`)».
+- `doc/guide/e2e-playwright.md`: the seven new files.
 - `CLAUDE.md` › «Latest»; `README.md` (one sentence per tile); `Draft Release Temp.md`; `doc/nove/README.md` § 6.
 
 ## 10. Declared out of scope
 
 - **A ring for the «Carico» view of Intestatari**: heir none, declared (the owner named «Valore»).
-- **A browser proof for Dividendi**: heir none, declared (§ 6).
+- **A browser proof at the tablet widths** for the five tiles: heir none, declared (phase C looks at 768 and 1024).
 - **The ring inside Analisi**: heir NOVE-10. **The themes' costume of the ring**: heirs NOVE-19, NOVE-20.
 - **A largest-part sentence for Mutuo and Centri** (their readings name no largest part): heir none, declared — the
   ring shows it, the sentences stay.
@@ -357,11 +411,11 @@ contratto: i cinque costruttori puri con i loro test, poi
 Divisione, Mutuo, Intestatari, Centri di Costo, Dividendi; gli spec Playwright del § 6; la
 frase di DESIGN.md alla lettera. I test PRIMA del codice, ciascuno visto rosso con la sua
 mutazione; cifre inventate e tonde. Fermati e chiedimi se: una cifra esce dal suo foro;
-un test esistente delle cinque tessere diventa rosso; mobile:budget si muove su una
-superficie. Collaudo: § 7, la F sul mirror al mio «pronto». Un branch, un commit, solo dopo
+un test esistente delle cinque tessere diventa rosso; nel confronto con develop dello stesso giorno, stessa build, si muove una voce di mobile:budget che la spec non nomina;
+perf:budget, misurato prima e dopo sulla stessa macchina, supera un tetto di più di 1 KB gz (fino a 1 KB lo alzi tu, con raisedBy e una riga in velocita.md § Registro), o perf:budget cresce su una route diversa da /dashboard, /dashboard/assets e /dashboard/cashflow. Collaudo: § 7, la F sul mirror al mio «pronto». Un branch, un commit, solo dopo
 il mio OK con il riassunto del diff. SESSION_NOTES.md non si committa.
 ```
 
 Model: **Opus 5.5**, effort **medium** — an M spec, but across five areas (Divisione, Patrimonio, Panoramica, Centri
 di Costo, Dividendi) on a shared contract: five pure builders and five tile changes, no schema, no payload change. Estimated size: 1 session, ~3,5 h; ~70
-lines pure, ~150 across the tiles, ~300 of tests, six small E2E files.
+lines pure, ~150 across the tiles, ~300 of tests, seven small E2E files.

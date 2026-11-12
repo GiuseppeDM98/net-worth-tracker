@@ -16,7 +16,7 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
 | 2 | `components/ui/responsive-modal.tsx:201`, `:234` (NOVE-11 § 4.4) | the only portalled surface NOVE-11 puts in scope. Drawers mounted directly — `period-picker.tsx:283`, `multi-select.tsx:1142`, `searchable-combobox.tsx:268` — and every `AlertDialog` stay outside |
 | 3 | `components/ui/sidebar.tsx:189-211` | the phone-landscape sidebar is a `SheetContent` (portalled): its group labels lose the costume face the desktop sidebar has |
 | 4 | `components/layout/Sidebar.tsx:170`, `:177`; `SecondaryMenuDrawer.tsx:129` | group labels `cn(TILE_EYEBROW_CLASS, '… text-sidebar-foreground/60')`: the caller's colour wins (NOVE-11 § 4.3), so the costume face is printed at 60 % of the sidebar's ink: **3,93:1** Egeo light, **4,12:1** Orbita light on `--sidebar` |
-| 5 | `components/layout/BottomNavigation.tsx:130`, `:156`; `Sidebar.tsx:223`; `SecondaryMenuDrawer.tsx:263` | inactive pill labels `text-sidebar-foreground/55`: **3,41:1** Egeo light, **3,56:1** Orbita light; the account e-mail at `/50` lower still |
+| 5 | `components/layout/BottomNavigation.tsx:130`, `:156`; `Sidebar.tsx:223`; `SecondaryMenuDrawer.tsx:263` | inactive pill labels `text-sidebar-foreground/55`: **3,41:1** Egeo light, **3,56:1** Orbita light; the account e-mail at `/50` lower still; the sidebar's two quiet icons — the collapse toggle `Sidebar.tsx:137` at `/40` (**2,32:1** Egeo light, **2,38:1** Orbita light) and the account chevron `:240` at `/50` (**2,98:1** Egeo light) — under the 3:1 a control's only glyph needs |
 | 6 | `components/layout/Sidebar.tsx:128`; `app/dashboard/layout.tsx:56` | the wordmark, 13px Geist semibold: the one piece of chrome type the costume does not reach |
 | 7 | `components/layout/BottomNavigation.tsx:62`, `:114`, `:127`, `:136`, `:153`, `:162` | the nav pill, its items, the active indicator and the «+» button `rounded-full`: under Orbita the only round shapes of a frame whose tiles are square |
 | 8 | `components/layout/PageTabBar.tsx:96`, `:106` | the phone tab and its indicator `rounded-[6px]`: a literal, 6px under Orbita |
@@ -24,15 +24,14 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
 | 10 | `components/ui/sidebar.tsx:493`; `components/ui/multi-select.tsx:318` | `hsl(var(--sidebar-border))`, `hsl(var(--ring))` of `oklch` tokens: invalid in every theme. No caller reaches either (the only `SidebarMenuButton`s, `Sidebar.tsx:70`, `:202`, pass no `variant`; no `MultiSelect` receives a `ref`): no visual effect |
 | 11 | `components/ui/switch.tsx:14`, `:26` | `dark:data-[state=checked]:bg-blue-600` (the debt of `DESIGN.md:405-407`): a blue ON track inside Egeo's navy-and-gold dark and Orbita's cyan dark; track and thumb `rounded-full` under Orbita |
 | 12 | `components/ui/segmented-pill.tsx:104`, `:130`, `:141` | `rounded-full` container, options, indicator: the axis of Panoramica and Patrimonio (`components/dashboard/PeriodSelector.tsx`) and of Dividendi, round under Orbita |
-| 13 | `components/ui/popover.tsx:48`; `app/globals.css:785` | the popover `rounded-xl` = `--radius` + 4px: 9px Egeo, 4px Orbita beside 4px / 0px tiles; the phone popper sheet `10px 10px 0 0`, fixed |
+| 13 | `components/ui/popover.tsx:48`; `app/globals.css:785` | the popover `rounded-xl` = `--radius` + 4px: 9px Egeo, 8px Orbita today (out of scope: the palette block's `--radius`), 4px once in scope, beside 4px / 0px tiles; the phone popper sheet `10px 10px 0 0`, fixed |
 | 14 | `components/ui/choice-list.tsx:34` | `GROUP_CLASS … rounded-xl`: the same 9px / 4px (its pages, Compravendita and Consulente, are NOVE-20's; the primitive is here) |
 | 15 | `components/dividends/DividendiDettaglio.tsx:68`; `ProvisionalCouponBanner.tsx:31` | two card-like boxes `rounded-xl` beside the tiles: 9px / 4px |
 | 16 | `components/ui/composition-list.tsx:83`, `:85`; `composition-bar.tsx:85`, `:92`; `ranked-rows.tsx:86`, `:88`; `components/dashboard/overview/ObiettivoTile.tsx:40`, `:47`; `components/cashflow/budget/BudgetTrack.tsx:45`, `:47`, `:48`; `cost-centers/tiles/CentriTile.tsx:64`, `:65`, `:82`, `:83`; `SottocategorieTile.tsx:86`, `:87` | bar tracks and fills `rounded-full` (`rounded-l-full`/`rounded-r-full` at `composition-bar.tsx:92`, `BudgetTrack.tsx:48`): round ends under Orbita |
 | 17 | `components/assets/AssetRow.tsx:78`, `:125`, `:138`, `:341`; `StrumentiTile.tsx:490`; `ExpenseTable.tsx:168`; `budget/BudgetImpostazioni.tsx:141` | pill chips (the class chip, the composite chip and its ring overlay, «Azzerato»/«Estinto», the type badge, the mono ceiling chips) `rounded-full` |
 | 18 | `components/dashboard/overview/PatrimonioTile.tsx:116`, `:197`; `components/dividends/tiles/IncassoNettoTile.tsx:105`, `:126` (9px); `components/assets/tiles/MovimentiTile.tsx:95` (7px); `components/dividends/CalendarDayCell.tsx:81` (4px); `tiles/AffidabilitaTile.tsx:94` (3px) | literal chip radii: they follow neither theme |
 | 19 | `app/dashboard/page.tsx:397`, `:510`; `app/dashboard/assets/page.tsx:606`, `:615`, `:665`; `components/cashflow/CashflowPageClient.tsx:261` | `PageHeader` without `emblem`: `resolveEmblem` falls back, so Egeo draws the temple on every page although decision 3 names «emblemi» |
-| 20 | `app/globals.css:95` (inherited by Egeo light) | `--positive` `oklch(0.482 0.194 149.214)` on Egeo's darkest stripe `oklch(0.915 0.038 82)`: **4,38:1**. It is printed there: the verdict strip's sign-toned figures (`components/ui/verdict-strip.tsx`) sit on the ground. NOVE-12's K1 measures no sign token |
-| 21 | `components/ui/tile-grid-skeleton.tsx:31` | the loading tile has `rounded-2xl` but no `data-tile`: no cap line (Egeo) or corner marks (Orbita) until the data arrives, then they pop in |
+| 20 | `components/ui/tile-grid-skeleton.tsx:31` | the loading tile has `rounded-2xl` but no `data-tile`: no cap line (Egeo) or corner marks (Orbita) until the data arrives, then they pop in |
 
 **Checked, no finding** (each looked at under both themes and both modes):
 
@@ -66,7 +65,7 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
   `rounded-[2px]`: it needs nothing. Its homes on these pages (Composizione, Classi, Entrate; NOVE-09's Quota,
   Mutuo, Intestatari, Costo, Pagatori) add no other surface. NOVE-05 and NOVE-07 add sentences and rows only;
   NOVE-10, 15, 16 touch none of these pages.
-- `SavingsRateBadge.tsx:119` `text-positive` on `bg-positive/10`: 6,18:1 after row 20's fix. `CalendarDayCell.tsx:68-69`
+- `SavingsRateBadge.tsx:119` `text-positive` on `bg-positive/10`: 6,18:1 with NOVE-12's `--positive`. `CalendarDayCell.tsx:68-69`
   insets on tokens. `TransactionFeed.tsx:553` (card branch) has no caller: `ExpenseTrackingTab.tsx:1086` passes
   `surface="flat"`. `TILE_SUB_EYEBROW_CLASS` (`tile.tsx:73-74`) carries digits («Ultimi {n} mesi»,
   `TettoTile.tsx:169`): it stays Geist (§ 3).
@@ -79,22 +78,26 @@ the DOM included — with each figure in Geist Mono, every label ≥ 4,5:1, and 
 1. In the dashboard the content of every `Popover`, `Select`, `DropdownMenu`, `Tooltip`, `Sheet`, `Drawer`, `Dialog`
    and `AlertDialog` carries `data-costume-scope`; on `/` and `/login` none does. **Proof**: R5; E1, E2.
 2. Orbita light at 1440 on `/dashboard`: the account menu's `border-top-left-radius` is `0px`, the axis pill's
-   container and indicator `0px`, the first `PatrimonioTile` chip `0px`, a «Come si calcola» popover `0px`. Egeo
-   light: `3px`, a value > 1000px, `9px`, `4px`. **Proof**: E1.
+   container and indicator `0px`, the first `PatrimonioTile` chip `0px`; on `/dashboard/cashflow?tab=tracking` the category
+   filter's popover (`MultiSelect` → `PopoverContent`) `0px` — no tile of these pages has a «Come si calcola» on the
+   seed (`MutuoTile` needs a loan). Egeo light: `3px`, a value > 1000px, `9px`, `4px`. **Proof**: E1.
 3. Egeo light at 1440: the sidebar's «Analisi» label has a `font-family` starting with `Marcellus` and the same
    `color` as the first tile's `.tile-eyebrow`; the wordmark's `font-family` starts with `Marcellus`. Orbita: the
    wordmark's `text-transform` is `uppercase`. **Proof**: E1.
 4. At 390: an inactive bottom-pill label has the computed colour of `--muted-foreground`; under Orbita the pill and
-   the «+» are `0px`; the «Altro» section label is in the costume face; a «Come si calcola» popper sheet carries
-   `data-costume-scope` and has `border-top-left-radius` `4px` (Egeo) / `0px` (Orbita). **Proof**: E2.
+   the «+» are `0px`; the «Altro» section label is in the costume face; the account menu opened from «Altro» (a
+   `DropdownMenu`: a popper sheet below 769px, `data-popper-sheet` — an informing popover stays a floating card
+   everywhere, `popover.tsx:17-18`) carries `data-costume-scope` and has `border-top-left-radius` `4px` (Egeo) /
+   `0px` (Orbita). At 844×390 the top bar's wordmark and the sheet sidebar's labels wear the costume.
+   **Proof**: E2.
 5. At 1024×768 a rail target is `5px` (Egeo) / `0px` (Orbita); at 768×1024 the Cashflow tab is `6px` / `0px`; no
    horizontal overflow at either. **Proof**: E3.
 6. Egeo draws an amphora on Patrimonio, two waves on Cashflow (every tab), the temple on Panoramica; Orbita the
    planet on all three. **Proof**: R6; E1.
 7. Every costume theme: the sign tokens ≥ 4,5:1 on every ground, card and muted surface; the eyebrow colour and
    `--muted-foreground` ≥ 4,5:1 on `--sidebar`; the dark ON track ≥ 3:1 on the card and under the thumb. **Proof**:
-   K3, K4, K5 with § 4.6's numbers.
-8. The twelve palette blocks render as their baseline, with five more probes recorded BEFORE any change. **Proof**:
+   K3 (NOVE-12's, on Orbita since NOVE-13: green before this spec), K4, K5 with § 4.6's numbers.
+8. The twelve palette blocks render as their baseline, with six more probes recorded BEFORE any change. **Proof**:
    `e2e/theme.neutral{,.mobile}.spec.ts` (NOVE-11 E1), extended (§ 6).
 9. No `hsl(var(--` remains in `components/`. **Proof**: T8.
 10. `perf:budget` and `mobile:budget` do not move. **Proof**: the two runs.
@@ -110,7 +113,10 @@ the DOM included — with each figure in Geist Mono, every label ≥ 4,5:1, and 
     a *pill* (a pill control, a bar) and a *chip* (a literal-radius chip) keep today's shape in Egeo and are square
     in Orbita; dots, avatars, radios, grips and the ring stay round everywhere;
   - floating surfaces keep their Float shadow in both themes;
-  - the shell's labels take the eyebrow's colour, its quiet text `--muted-foreground` (§ 4.3);
+  - the shell's labels take the eyebrow's colour, its quiet text and its two quiet icons `--muted-foreground`
+    (§ 4.3);
+  - the drawer's own frame (`drawer.tsx:74`) stays NOVE-20's: between the two PRs, on develop only, a select sheet
+    opened inside a drawer has the costume's top corners inside a 10px drawer (§ 10);
   - the wordmark wears the heading face at its own 13px;
   - `TILE_SUB_EYEBROW_CLASS` (9px) stays Geist: it carries digits and table heads;
   - the phone header stays opaque `bg-background` over the ground;
@@ -118,9 +124,6 @@ the DOM included — with each figure in Geist Mono, every label ≥ 4,5:1, and 
     waves; Orbita keeps the planet everywhere (decision 4 says «emblema»);
   - in a dark costume theme the switch's ON track is `--primary`;
   - the toaster (`app/layout.tsx:116`, outside the dashboard layout) stays in the palette.
-- **Overturned**: NOVE-12 § 3 «`--positive` is not declared» (2026-11-12): Egeo light declares
-  `--positive: oklch(0.43 0.11 145)`, the mock's own green (row 20; 6,00:1 on the stripe). Egeo dark keeps the
-  inherited value (8,50:1).
 
 ## 4. Solution
 
@@ -137,7 +140,8 @@ export function useCostumeScopeProps(): Readonly<{ 'data-costume-scope'?: '' }> 
 }
 ```
 
-Each content element spreads it right after its `data-slot` (before `{...props}`): `const scopeProps =
+Each content element spreads it right after its `data-slot` — in `popover.tsx`, which has none, right after
+`data-popper-sheet` — and before `{...props}`: `const scopeProps =
 useCostumeScopeProps();` then `{...scopeProps}` on `popover.tsx:42`, `select.tsx:88`, `dropdown-menu.tsx:54`,
 `tooltip.tsx:41`, `sheet.tsx:60`, `drawer.tsx:69`, `dialog.tsx:61`, `alert-dialog.tsx:57`. `DropdownMenuSubContent`
 (`:265`) is not portalled (it renders inside its parent's content) and has no caller: unchanged. A new portalled
@@ -156,12 +160,22 @@ site's value of today, so «off» is `initial` (guaranteed-invalid: the fallback
 | `--costume-control-chip-radius` | chips with a literal radius | `initial` | `initial` | inherits | `0px` | inherits |
 | `--costume-control-switch-on` | the switch's ON track in dark | `initial` | `var(--primary)` | inherits | `var(--primary)` | inherits |
 
-The four lines close the light scope blocks of NOVE-12 § 4.3 and NOVE-13 § 4.3, after `--costume-primary-glow`:
+Four lines close each light scope block (NOVE-12 § 4.3, NOVE-13 § 4.3), after `--costume-primary-glow`, one
+property per line, no comment. Egeo's:
 
 ```css
   --costume-control-frame-radius: var(--radius-2xl);
-  --costume-control-pill-radius: initial;   /* Orbita: 0px */
-  --costume-control-chip-radius: initial;   /* Orbita: 0px */
+  --costume-control-pill-radius: initial;
+  --costume-control-chip-radius: initial;
+  --costume-control-switch-on: var(--primary);
+```
+
+Orbita's:
+
+```css
+  --costume-control-frame-radius: var(--radius-2xl);
+  --costume-control-pill-radius: 0px;
+  --costume-control-chip-radius: 0px;
   --costume-control-switch-on: var(--primary);
 ```
 
@@ -177,13 +191,14 @@ export const COSTUME_FRAME_RADIUS_CLASS = 'rounded-[var(--costume-control-frame-
 `calc(infinity*1px)` is Tailwind 4.3's `rounded-full`; `calc(var(--radius) + 4px)` is `--radius-xl`
 (`app/globals.css:60`, inlined by `@theme inline`): a palette theme computes the same string as today.
 
-### 4.3 Three hook rules — `app/globals.css`, «Theme costume» section, after NOVE-11's rules
+### 4.3 Three hook rules — `app/globals.css`, «Theme costume» section, after NOVE-11's rules and before its closing banner
 
 ```css
 /* The shell's labels: the eyebrow's colour, not 60 % of the sidebar's ink (DESIGN.md → The Costume Rule). */
 [data-costume] [data-costume-scope] .costume-shell-eyebrow { color: var(--costume-eyebrow-color); }
-/* The shell's quiet text — inactive pill labels, the account e-mail — on the muted token; a hover keeps its ink. */
-[data-costume] [data-costume-scope] .costume-shell-quiet:not(:hover) { color: var(--muted-foreground); }
+/* The shell's quiet text and icons — inactive pill labels, the account e-mail, the collapse toggle, the account
+   chevron — on the muted token; a hovered link or button keeps its ink. */
+[data-costume] [data-costume-scope] .costume-shell-quiet:not(a:hover):not(button:hover) { color: var(--muted-foreground); }
 /* The wordmark wears the heading face at its own size. */
 [data-costume] [data-costume-scope] .costume-wordmark {
   font-family: var(--costume-heading-font); font-weight: var(--costume-heading-weight);
@@ -201,11 +216,12 @@ fixes are colours of existing tokens, and the charts of these pages read tokens 
 | `Sidebar.tsx:170`, `:177`; `SecondaryMenuDrawer.tsx:129` | `cn(TILE_EYEBROW_CLASS, '… text-sidebar-foreground/60')` | add `'costume-shell-eyebrow'` |
 | `BottomNavigation.tsx:130`, `:156` | `'text-sidebar-foreground/55 hover:text-sidebar-foreground'` | add `costume-shell-quiet` to that branch |
 | `Sidebar.tsx:223`; `SecondaryMenuDrawer.tsx:263` | `text-sidebar-foreground/50` | add `costume-shell-quiet` |
+| `Sidebar.tsx:137` (the collapse toggle); `:240` (`ChevronsUpDown`) | `text-sidebar-foreground/40`; `/50` | add `costume-shell-quiet` (7,18 / 6,52:1) |
 | `Sidebar.tsx:128`; `app/dashboard/layout.tsx:56` | the wordmark `<span>` | add `costume-wordmark` |
 | `BottomNavigation.tsx:62`, `:114`, `:127`, `:136`, `:153`, `:162` | `rounded-full` | `COSTUME_PILL_RADIUS_CLASS` |
 | `segmented-pill.tsx:104`, `:130`, `:141`; `switch.tsx:14`, `:26` | `rounded-full` | `COSTUME_PILL_RADIUS_CLASS` |
 | §1 row 16 bars (all lines), §1 row 17 chips (all lines) | `rounded-full` | `COSTUME_PILL_RADIUS_CLASS` |
-| `composition-bar.tsx:92` | `first:rounded-l-full last:rounded-r-full` | `first:rounded-l-[var(--costume-control-pill-radius,calc(infinity*1px))] last:rounded-r-[…same…]` |
+| `composition-bar.tsx:92` | `first:rounded-l-full last:rounded-r-full` | `first:rounded-l-[var(--costume-control-pill-radius,calc(infinity*1px))] last:rounded-r-[var(--costume-control-pill-radius,calc(infinity*1px))]` |
 | `BudgetTrack.tsx:48` | `rounded-r-full` | `rounded-r-[var(--costume-control-pill-radius,calc(infinity*1px))]` |
 | `PatrimonioTile.tsx:116`, `:197`; `IncassoNettoTile.tsx:105`, `:126` | `rounded-[9px]` | `rounded-[var(--costume-control-chip-radius,9px)]` |
 | `MovimentiTile.tsx:95` · `PageTabBar.tsx:96`, `:106` | `rounded-[7px]` · `rounded-[6px]` | `…chip-radius,7px)]` · `…chip-radius,6px)]` |
@@ -252,13 +268,12 @@ five tabs). Panoramica's id is passed although it resolves to the fallback: a la
 | after: `--costume-eyebrow-color` on `--sidebar` | 5,95 | 9,82 | 5,46 | 10,57 |
 | inactive pill label today: 55 % | 3,41 | 5,45 | 3,56 | 5,43 |
 | after: `--muted-foreground` on `--sidebar` | 7,18 | 8,64 | 6,52 | 9,11 |
-| `--positive` (inherited) on the darkest ground | **4,38** | 8,50 | 4,96 | 7,95 (nebula) |
-| `--positive` (inherited) on `--muted` | 4,46 | 6,49 | 4,54 | 7,38 |
+| `--positive` on the darkest ground (Egeo's own, NOVE-12; Orbita inherits) | 6,00 | 8,50 | 4,96 | 7,95 (nebula) |
+| `--positive` on `--muted` | 6,10 | 6,49 | 4,54 | 7,38 |
 | `--destructive` on the darkest ground | 5,78 | 6,96 | 5,34 | 6,48 (nebula) |
 | dark ON track `--primary` on `--card` · thumb `--background` on it | — | 8,75 · 9,83 | — | 9,58 · 10,44 |
 
-Egeo light with `--positive: oklch(0.43 0.11 145)`: 6,00 on the stripe, 6,19 on `--background`, 7,19 on `--card`,
-6,10 on `--muted`, 6,58 on `--sidebar`, 6,18 on its own 10 % chip over the card.
+Egeo's `--positive` is its own (NOVE-12, decision 61): 6,58 on `--sidebar`, 6,18 on its own 10 % chip over the card.
 
 ### 4.7 Strings
 
@@ -275,7 +290,11 @@ No new UI string.
 - **`initial` is not «zero»**: a custom property set to `initial` is guaranteed-invalid — a `var()` with a fallback
   takes the fallback, a bare `var()` makes its declaration invalid (radius 0). So the four properties are read ONLY
   through the classes and the popper-sheet line of § 4.4, never bare in a gated rule.
-- **An unlayered rule beats every utility**: `.costume-shell-quiet` excludes `:hover`, or the hover ink is lost.
+- **An unlayered rule beats every utility**: `.costume-shell-quiet` excludes a hovered `a` / `button` (`:not(a:hover):not(button:hover)`, no comma: NOVE-11's
+  T2 reads one selector item), or the hover
+  ink is lost; the e-mail, a span, stays muted under the pointer (with a bare `:not(:hover)` it would drop back to
+  `/50`, 2,98:1).
+- **A light-block token reaches dark mode**: a theme that overrides a sign token writes it in BOTH blocks.
 - **tailwind-merge**: a caller's later `rounded-*` would replace the costume class; no caller at b841cbd7 passes one
   to `SegmentedPill`, `Switch`, `CompositionBar`, `CompositionList`, `RankedRows`, `BudgetTrack`, `PopoverContent` or
   `ChoiceList`.
@@ -288,19 +307,20 @@ No new UI string.
 
 | # | Test | Mutation that turns it red |
 | --- | --- | --- |
-| T3 | `themeCostume.test.ts` (NOVE-11): each costume theme's light scope block declares the 22 properties | delete `--costume-control-chip-radius` from Orbita's block |
+| T3 | `themeCostume.test.ts` (NOVE-11): `toHaveLength(18)` → `toHaveLength(22)`; the expected order gains `'--costume-control-frame-radius'`, `'--costume-control-pill-radius'`, `'--costume-control-chip-radius'`, `'--costume-control-switch-on'` after `'--costume-primary-glow'`; each costume theme's light scope block declares all 22 | delete `--costume-control-chip-radius` from Orbita's block; a 23rd string in the list (red on the count) |
+| T2b | `themeCostume.test.ts` (NOVE-11's T2) amended: outside the two banners the ONE rule that paints with a scope property is `[data-popper-sheet]`, whose `border-radius` reads `var(--costume-control-frame-radius, 10px)` with its fallback; any other `var(--costume-` outside a scope block's own declarations is red | a bare `var(--costume-control-frame-radius)` (no fallback) in the popper-sheet rule |
 | T6 | same file: `COSTUME_PILL_RADIUS_CLASS` and `COSTUME_FRAME_RADIUS_CLASS` equal § 4.2's strings; `cn(COSTUME_PILL_RADIUS_CLASS, 'px-3')` keeps the class | fallback `9999px` |
-| T7 | same file: in the nineteen files of § 4.4's pill and chip rows except `PageTabBar.tsx` and `ExpenseTable.tsx` (they keep a dot), no `rounded-full`, `rounded-l-full`, `rounded-r-full`, nor `rounded-[Npx]` with N ≠ 2 (at b841cbd7 the scan hits exactly the 41 lines § 4.4 changes) | `segmented-pill.tsx:141` back to `rounded-full` |
+| T7 | same file: in the nineteen files of § 4.4's pill and chip rows except `PageTabBar.tsx` and `ExpenseTable.tsx` (they keep a dot), no `rounded-full`, `rounded-l-full`, `rounded-r-full`, nor `rounded-[Npx]` with N ≠ 2 (at b841cbd7 the scan hits exactly the 41 lines § 4.4 changes); `popover.tsx`, `choice-list.tsx`, `DividendiDettaglio.tsx`, `ProvisionalCouponBanner.tsx` contain `COSTUME_FRAME_RADIUS_CLASS` and no `rounded-xl`; `ThemePicker.tsx` and `ExpenseTable.tsx` contain `rounded-[var(--costume-control-chip-radius,0.25rem)]`; `app/globals.css`'s `[data-popper-sheet]` rule contains `border-radius: var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0` | `segmented-pill.tsx:141` back to `rounded-full`; `choice-list.tsx:34` back to `rounded-xl` |
+| T10 | `__tests__/compositionBar.test.ts` (existing, `:35-37`, `toBe`): in `LEGACY_MARKUP` the track's `rounded-full` becomes `rounded-[var(--costume-control-pill-radius,calc(infinity*1px))]` and the segments' `first:rounded-l-full last:rounded-r-full` the two classes of § 4.4 — the only edits to the pinned string (same computed value in a palette theme). `__tests__/productName.test.ts` (NOVE-01's): the `components/layout/Sidebar.tsx` row of `NEW_NAME_SITES` becomes `'<span className="truncate costume-wordmark">Net Worth Tracker</span>'` | — (the pins are the proof); the class dropped from the span |
 | T8 | same file: no file under `components/` contains `hsl(var(--` | restore `sidebar.tsx:493` |
 | T9 | same file: `switch.tsx` contains `bg-[var(--costume-control-switch-on,oklch(54.6%_0.245_262.881))]` and no `blue-600` | `bg-[var(--costume-control-switch-on)]` |
-| K3 | `themeCostumeContrast.test.ts` (NOVE-12, 13): `--positive` and `--destructive` ≥ 4,5 on K1's surfaces (each opaque ground colour, `--background`, `--card`, `--muted`) and on K2's composited nebula; the block's own value, else the inherited `:root` / `.dark` one | delete Egeo light's `--positive` (4,38) |
 | K4 | same file: `--costume-eyebrow-color` and `--muted-foreground` ≥ 4,5 on `--sidebar`, light and dark | Egeo light `--sidebar` set to `oklch(0.62 0.05 87)` |
 | K5 | same file, dark blocks: `--primary` ≥ 3 on `--card`; `--background` ≥ 3 on `--primary` | Orbita dark `--primary` set to its `--card` |
-| R5 | `__tests__/costumePortals.test.tsx` (new): inside `<CostumeScope>`, an open `Popover`, `DropdownMenu`, `Tooltip` (in its provider), `Sheet`, `Dialog`, `AlertDialog`: each `[data-slot$="-content"]` has `data-costume-scope`; the same tree without `CostumeScope`: none. `Select` and `Drawer` are proved by E1/E2 (jsdom lacks their pointer and transform APIs) | drop the spread in `popover.tsx` |
-| R6 | `CostumeScope.test.tsx` (NOVE-11/12): with `egeo` stored, `PageHeader emblem="patrimonio"` renders the amphora's `d`, `"cashflow"` the waves', `"panoramica"` the temple's; with `orbita`, `"patrimonio"` the planet's circle | `pages: {}` for Egeo |
-| N1 | `e2e/themeNeutral.ts` (NOVE-11 E1) gains five probes: the sidebar label «Analisi» and the account menu's content after a click (desktop); an inactive bottom-pill label and the Cashflow phone tab (390); the axis pill's container and indicator and the first `PatrimonioTile` chip (both). The baseline is RE-RECORDED (`THEME_NEUTRAL_RECORD=1`) on the untouched code, then compared | `PageTabBar.tsx:96` fallback `8px` |
-| E1 | `e2e/theme.costume.spec.ts` (new, desktop; theme by `addInitScript`): criteria 1-3 and 6 on `/dashboard`, `/dashboard/assets`, `/dashboard/cashflow?tab=tracking` (a filter `Select` opened) in Egeo and Orbita, light and dark; on `/` and `/login` no `[data-costume-scope]` | drop the spread in `select.tsx` |
-| E2 | `e2e/theme.costume.mobile.spec.ts` (390): criterion 4; the period picker's drawer carries `data-costume-scope`; `scrollWidth ≤ innerWidth` | drop the spread in `drawer.tsx` |
+| R5 | `__tests__/costumePortals.test.tsx` (new): inside `<CostumeScope>`, an open `Popover`, `DropdownMenu`, `Tooltip` (in its provider), `Sheet`, `Dialog`, `AlertDialog`: each primitive rendered open in its own case; the content is `[data-slot$="-content"]` for those that carry one and, for `Popover` (no `data-slot`), `document.querySelector('[data-radix-popper-content-wrapper] > [role="dialog"]')`; each has `data-costume-scope`; the same tree without `CostumeScope`: none. `Select` and `Drawer` are proved by E1/E2 (jsdom lacks their pointer and transform APIs) | drop the spread in `popover.tsx` |
+| R6 | `costumeScope.test.tsx` (NOVE-11, 12, 13; new cases beside NOVE-13's own R6): with `egeo` stored, `PageHeader emblem="patrimonio"` renders the amphora's `d`, `"cashflow"` the waves', `"panoramica"` the temple's; with `orbita`, `"patrimonio"` the planet's circle | `pages: {}` for Egeo |
+| N1 | `e2e/themeNeutral.ts` (NOVE-11 E1) gains six probes: the sidebar label «Analisi» and the account menu's content after a click on `/dashboard` (desktop); an inactive bottom-pill label and the Cashflow phone tab (390); the axis pill (its container, and its indicator as a second element) and the first `PatrimonioTile` chip on `/dashboard` (both widths). The baseline is RE-RECORDED (`THEME_NEUTRAL_RECORD=1`) on the untouched code, then compared | `PageTabBar.tsx:96` fallback `8px` |
+| E1 | `e2e/theme.costume.spec.ts` (new, desktop; the `colorTheme` preference written and restored as NOVE-12's E1, the mode by `addInitScript`; `/` and `/login` signed out): criteria 1-3 and 6 on `/dashboard`, `/dashboard/assets`, `/dashboard/cashflow?tab=tracking` (a filter `Select` opened) in Egeo and Orbita, light and dark; on `/` and `/login` no `[data-costume-scope]` | drop the spread in `select.tsx` |
+| E2 | `e2e/theme.costume.mobile.spec.ts` (390): criterion 4; the period picker's drawer carries `data-costume-scope`; `scrollWidth ≤ innerWidth`; one case with `page.setViewportSize({ width: 844, height: 390 })` on `/dashboard` (no Playwright project has that size): the top bar's wordmark `font-family` starts with `Marcellus` (Egeo) / its `text-transform` is `uppercase` (Orbita); «Apri il menu» opens the sheet, whose `[data-sidebar="sidebar"]` carries `data-costume-scope` and whose «Analisi» label has the costume face and the eyebrow's colour | drop the spread in `drawer.tsx`; in `sheet.tsx` |
 | E3 | `e2e/theme.costume.tablet.spec.ts` (both tablet viewports): criterion 5 | `TabletRail` out of `CostumeScope` |
 
 ## 7. Guided verification (WORKFLOW.md § 2)
@@ -315,14 +335,15 @@ shows an amphora and Cashflow two waves in Egeo; the six palette themes look exa
 - **B**: emulators + seed, the decoys «ornitorinco» (an asset) and «fenicottero» (a category): their names never
   enter an eyebrow face where a table cell prints them; the «ornitorinco» class chip squares under Orbita.
 - **C (browser, the session)**: Panoramica, Patrimonio (Strumenti, Intestatari, a loan tile), the five Cashflow tabs,
-  the account menu, a «Come si calcola» popover, a filter select, the period picker; Egeo and Orbita × light and dark
-  × 1440, 1024×768, 768×1024, 390; screenshots in the scratchpad.
+  the account menu, a «Come si calcola» popover (the loan tile's), a filter select, the period picker; Egeo and
+  Orbita × light and dark × 1440, 1024×768, 768×1024, 390, 844×390 (the sheet sidebar); one look at Allocazione and
+  Impostazioni › Generale in Orbita (pills and switches square, nothing clipped); screenshots in the scratchpad.
 - **D (data)**: `document.querySelectorAll('[data-costume-scope]').length` is 1 on a page, 2 with a menu open;
   `getComputedStyle` of a sidebar label, the pill, a chip, the open menu under each theme.
 - **E**: hover an inactive pill label (the ink returns); switch Orbita → Default from Aspetto with the menu open:
   the radii return without a reload; a dark Budget › Impostazioni switch turned on shows `--primary`, Default blue.
 - **F (owner, at his «pronto»)**: the mirror in Egeo and Orbita, light and dark, on his own screens.
-- **G**: `perf:budget`, `mobile:census` + `mobile:budget` (expected unchanged); remove decoys, fixtures, the mirror.
+- **G** (the two budgets close by README.md § 8's ONE rule, decisions 33 and 34): `perf:budget`, `mobile:census` + `mobile:budget` (expected unchanged); remove decoys, fixtures, the mirror.
 
 ## 8. Putting it into service
 
@@ -334,7 +355,11 @@ properties and the classes go together; a palette theme never depended on them.
 - `doc/guide/temi.md` § Il costume, three paragraphs: **Portals** («a portalled primitive spreads
   `useCostumeScopeProps()` on its content; a new one does the same, or the costume stops at `<body>`»); **Three
   radii** (frame, pill, chip, § 4.2's table, the sites of § 4.4, what stays round); **The shell**
-  (`.costume-shell-eyebrow`, `.costume-shell-quiet`, `.costume-wordmark`). § Per-theme measures: § 4.6's rows.
+  (`.costume-shell-eyebrow`, `.costume-shell-quiet`, `.costume-wordmark`); «the layered consumers are
+  `TILE_EYEBROW_CLASS`, `COSTUME_PILL_RADIUS_CLASS`, `COSTUME_FRAME_RADIUS_CLASS` and the
+  `rounded-[var(--costume-control-*,…)]` sites; one unlayered rule outside the section reads a scope property,
+  `[data-popper-sheet]`, always with today's fallback». § Per-theme measures: § 4.6's rows; `:193` gains «a costume theme paints it `--primary`
+  (`--costume-control-switch-on`)».
 - `doc/guide/shell.md`: «in a costume theme the shell's labels take the eyebrow's colour and its quiet text
   `--muted-foreground` (temi.md § Il costume)». `doc/guide/dialog.md`: «the dialog, alert, drawer and sheet
   primitives carry `data-costume-scope` themselves».
@@ -351,13 +376,27 @@ properties and the classes go together; a palette theme never depended on them.
   - `:1257` BEFORE: «Bar height is exactly `3px` — an accent shape, not the primary data carrier.» AFTER: «Bar
     height is exactly `3px` — an accent shape, not the primary data carrier; its ends are round, square in a
     costume theme that squares its pills.»
+  - The Heading Font line NOVE-11 § 4.8 writes, BEFORE: «the verdict's headline and the eyebrows inside the dashboard
+    take the theme's face» AFTER: «the verdict's headline, the eyebrows and the wordmark inside the dashboard take
+    the theme's face».
+  - `:450` (as NOVE-11 left it) BEFORE: «on the verdict's headline and the eyebrows only» AFTER: «on the verdict's
+    headline, the eyebrows and the wordmark only».
+  - The Costume Rule (as NOVE-11 left it) BEFORE: «a heading font for the verdict's headline and the eyebrows»
+    AFTER: «a heading font for the verdict's headline, the eyebrows and the wordmark».
+  - The Costume Rule (as NOVE-13 left it), BEFORE: «a glow on the primary action, an emblem beside the page's name»
+    AFTER: «a glow on the primary action, the radius of its pills, chips and card-like boxes, the dark switch's ON
+    track, the shell labels' colour, an emblem beside the page's name».
+  - `:440` BEFORE: «on the sidebar surface its colour is `text-sidebar-foreground/60`» AFTER: «on the sidebar
+    surface its colour is `text-sidebar-foreground/60`, in a costume theme the eyebrow's own
+    (`.costume-shell-eyebrow`)».
   - The Costume Rule paragraph (added by NOVE-11 § 4.8 after `:359`), BEFORE: «The contract is in doc/guide/temi.md
     § Il costume.» AFTER: «A surface portalled out of the page (a menu, a popover, a sheet) wears it too. The
     contract is in doc/guide/temi.md § Il costume.»
 - `doc/nove/README.md` § 7 «The costume»: `COSTUME_SCOPE_PROPS`, `useCostumeScopeProps()`, the 22 properties,
   `COSTUME_PILL_RADIUS_CLASS`, `COSTUME_FRAME_RADIUS_CLASS`, the three hook classes; § 6 status. `Draft Release
-  Temp.md`: «Egeo e Orbita vestono anche la barra laterale, i menu, i selettori e i fumetti di Panoramica, Patrimonio
-  e Cashflow».
+  Temp.md`: «**Temi — Egeo e Orbita** — The two costume themes now also dress the sidebar, the menus, the selects
+  and the tooltips, and on Panoramica, Patrimonio and Cashflow their pills, chips and bars; Egeo draws an amphora on
+  Patrimonio and two waves on Cashflow.»
 
 ## 10. Declared out of scope
 
@@ -368,6 +407,13 @@ properties and the classes go together; a palette theme never depended on them.
   `emblem` of the other pages' headers (Compravendita's `CompravenditaClient.tsx:68` passes `"patrimonio"`) and
   Egeo's art for them; every surface of Analisi, Rendimenti, Storico, Allocazione, Previdenza, FIRE, Hall of Fame,
   Assistente, Impostazioni. `ChoiceList`'s frame is done here; its pages are NOVE-20's.
+- **The primitives of § 4.4 on the other pages**: `SegmentedPill`, `Switch`, `CompositionBar`, `CompositionList`,
+  `RankedRows`, `PopoverContent`, `ChoiceList` also render on Analisi, Allocazione, Previdenza, Rendimenti, Storico,
+  FIRE, Hall of Fame, Assistente, Impostazioni and in the dialogs: from this PR their pills, bars and frames are
+  square under Orbita there too; NOVE-20's tour verifies those pages. The landing renders `PatrimonioTile` and
+  `ThemePicker` out of scope: fallback, unchanged.
+- **A select sheet inside a drawer, between this PR and NOVE-20's** (develop only): the sheet's top corners follow
+  the costume, the drawer's stay 10px until NOVE-20 moves `drawer.tsx:74`; declared.
 - **The default theme's quiet labels** (`text-sidebar-foreground/55` reads 4,35:1 in default light): none, declared
   — a palette theme renders as today by contract; a palette contrast fix is not a costume spec.
 - **The toaster, the landing's `ThemePicker`**: outside the scope, palette only (decision 17); none, declared.
@@ -407,14 +453,14 @@ per domanda, a gruppi di quattro: mai un «da decidere» lasciato nel codice, ne
 nel riassunto. Se serve un comando che solo io posso lanciare (produzione, un login
 interattivo), dammelo una riga alla volta con l'esito atteso.
 
-Implementa la spec così com'è scritta, nell'ordine: le cinque sonde nuove della neutralità
-e la linea di base RIREGISTRATA sul codice intatto; i test (T3, T6-T9, K3-K5, R5, R6) visti
-rossi con la loro mutazione; il meccanismo dei portali nelle otto primitive; le quattro
+Implementa la spec così com'è scritta, nell'ordine: le sei sonde nuove della neutralità
+e la linea di base RIREGISTRATA sul codice intatto; i test (T2b, T3, T6-T9, K4, K5, R5, R6) visti
+rossi con la loro mutazione, e i due test esistenti di T10 aggiornati; il meccanismo dei portali nelle otto primitive; le quattro
 proprietà e le due classi; le tre regole della shell; i siti di § 4.4, alla lettera; il
---positive di Egeo chiaro; gli emblemi e le pagine; le tre spec e2e. Nessun valore diverso
+gli emblemi e le pagine; le tre spec e2e. Nessun valore diverso
 da quelli scritti. Fermati e chiedimi se: la linea di base dei dodici blocchi cambia dopo
-le modifiche; un contrasto misura sotto § 4.6 oltre il secondo decimale; perf:budget o
-mobile:budget si muovono (con la misura: nessun tetto si alza). Collaudo: § 7, la F al mio
+le modifiche; un contrasto misura sotto § 4.6 oltre il secondo decimale; perf:budget, misurato prima e dopo sulla stessa macchina, supera un tetto di più di 1 KB gz (fino a 1 KB lo alzi tu, con raisedBy e una riga in velocita.md § Registro);
+nel confronto con develop dello stesso giorno, stessa build, si muove una voce di mobile:budget che la spec non nomina. Collaudo: § 7, la F al mio
 «pronto». Un branch, un commit, solo dopo il mio OK con il riassunto del diff.
 SESSION_NOTES.md non si committa.
 ```

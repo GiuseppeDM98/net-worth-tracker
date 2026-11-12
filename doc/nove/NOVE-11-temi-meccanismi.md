@@ -15,7 +15,7 @@ A theme today is a palette and a radius. Directions C «Polis» and «Impero» n
 | 2 | `app/globals.css:57-60` | `sm`–`xl` derive from `--radius`; `rounded-2xl` is Tailwind's own `--radius-2xl: 1rem` (built CSS `.rounded-2xl{border-radius:var(--radius-2xl)}`, read in `.next-perf` today) — the tile (`components/ui/tile.tsx:102`), the modal (`components/ui/dialog.tsx:69`) |
 | 3 | `app/dashboard/layout.tsx:91`; `tile.tsx:69-70`, `:102`; `components/ui/page-verdict.tsx:105`; `components/layout/PageHeader.tsx:53-84` | no ground (the scroller is `bg-background`), no frame, no heading font, no ornament, no emblem slot |
 | 4 | `app/layout.tsx:102-104`, `app/globals.css:16` | **Geist Sans is never applied**: the variables sit on `<body>`, `--font-sans` resolves on `<html>`; the built preflight `html{font-family:var(--default-font-family,ui-sans-serif, system-ui,…)}` falls back (CLAUDE.md § Known Issues, 2026-10-17) |
-| 5 | `__tests__/chartPaletteDistinctness.test.ts:143`, `actionColorContrast.test.ts:109`, `chartColorsContext.test.ts:133`; `mutedForegroundContrast.test.ts:73` (`toHaveLength(12)`) | the four gates list the themes by hand: a seventh theme is measured by none of them |
+| 5 | `__tests__/chartPaletteDistinctness.test.ts:143`, `actionColorContrast.test.ts:109`, `chartColorsContext.test.ts:133`; `mutedForegroundContrast.test.ts:73` (`toHaveLength(12)`) | three gates list the themes by hand and the fourth pins their count at 12: a seventh theme is measured by none of the three and turns the fourth red |
 | 6 | `components/settings/tabs/AspettoTab.tsx:33-94` | swatches as literals, drifted: dark grounds of solar-dusk (`:49` chroma 0.0061 vs `globals.css:530` 0.020), elegant-luxury (`:59` vs `:614`, another hue), midnight-bloom (`:69` 0.0125 vs `:700` 0.030); two «accents» are `--secondary` (`:72` = `globals.css:665`, `:92` = `:312`); grid `desktop:grid-cols-6` (`:139`) |
 | 7 | `lib/constants/colorTheme.ts:8-9`, `doc/guide/temi.md:127`; `.storybook/mocks/ColorThemeContext.tsx:6-12` | the recipe names `app/dashboard/settings/page.tsx`, where the swatches no longer are; Storybook's union is typed by hand |
 | 8 | `DESIGN.md:143-147`, `:284`, `:902` | the rule itself: the tile radius «fixed on every theme», «never overridden» |
@@ -29,29 +29,32 @@ forbids.
 A theme may carry a ground, a frame, a heading font, ornaments and emblems inside the dashboard and its dialogs;
 every mechanism has a neutral default, so the twelve existing blocks render exactly as today.
 
-1. Geist Sans is applied: `getComputedStyle(body).fontFamily` names Geist first and `document.fonts` holds a loaded
-   Geist (not Mono) face, at 1440 and 390. **Proof**: `e2e/shell.boot{,.mobile}.spec.ts` new case; seen red with
+1. Geist Sans is applied: `getComputedStyle(body).fontFamily` starts with `Geist` and not with `Geist Mono`, and
+   `document.fonts` holds a loaded face whose family is exactly `Geist` (never next/font's «Geist Fallback»), at 1440
+   and 390. **Proof**: `e2e/shell.boot{,.mobile}.spec.ts` new case; seen red with
    the variables back on `<body>`.
 2. The font change is measured: `mobile:census` + `mobile:budget` before and after on the same build day; every entry
    it moves is recorded. **Proof**: the two runs and the register entry (§ 8).
 3. `COLOR_THEME_META` (a `Record<ColorTheme, …>`) is the one source of names, descriptions and costumes; a theme in
-   `COLOR_THEMES` without an entry fails `tsc`; Storybook's union imports the type. **Proof**: `tsc`.
+   `COLOR_THEMES` without an entry fails `tsc`; Storybook's union imports the type, and `tsconfig.json`'s `include`
+   gains `".storybook/mocks/**/*.tsx"` (the `**/*.tsx` wildcard skips a dot-directory: today no file under
+   `.storybook/` is type-checked; the mock compiles as it is). **Proof**: `tsc`.
 4. The four gate tests read their themes from `COLOR_THEMES`; a name added to the list with no CSS turns all four red.
    **Proof**: the mutation, seen red on each.
 5. The swatches carry no colour literal: each half is a `data-theme` scope painted with `bg-background` /
-   `bg-primary` / `bg-accent`. **Proof**: `__tests__/AspettoTab.test.tsx` (RTL, new); no `oklch(` in the file.
+   `bg-primary` / `bg-accent`. **Proof**: `__tests__/aspettoTab.test.tsx` (RTL, new) R1, which also reads the file for `oklch(`.
 6. **The twelve existing blocks render byte-for-byte as today**: a computed-style signature of eight probes on three
    pages (and one dialog), six themes × two modes, at 1440 and 390, equals the baseline recorded on the same tree
    with only the Geist fix applied. **Proof**: `e2e/theme.neutral{,.mobile}.spec.ts` against
    `e2e/themeNeutral.baseline.json`; seen red with the gate stripped from the tile-shadow rule.
-7. Statically: no palette theme declares a `--costume-*` property or a scope block; every rule reading one is gated by
-   `[data-costume] [data-costume-scope]`; the one layered consumer keeps today's value as its fallback.
+7. Statically: no palette theme declares a `--costume-*` property or a scope block; every rule reading one sits between the section's two banners and is
+   gated by `[data-costume] [data-costume-scope]`; the one layered consumer keeps today's value as its fallback.
    **Proof**: `__tests__/themeCostume.test.ts` T1-T4.
 8. The costume is worn only in scope: the dashboard shell and `ResponsiveModal`'s content carry `data-costume-scope`;
-   the landing never does; `resolveEmblem` answers `null` out of scope. **Proof**: `CostumeScope.test.tsx`,
-   `ResponsiveModal.costume.test.tsx` (RTL, new), `themeCostume.test.ts` T5.
-9. A figure in a heading stays Geist Mono: `splitHeadingFigures` isolates «+2.150 €», «31%», «2026» and leaves
-   «Q3-x» alone. **Proof**: `__tests__/headingFigures.test.ts`.
+   the landing and the access pages never do; `resolveEmblem` answers `null` out of scope. **Proof**:
+   `costumeScope.test.tsx`, `responsiveModalCostume.test.tsx` (RTL, new), `themeCostume.test.ts` T5, E2.
+9. A figure in a heading stays Geist Mono: `splitHeadingFigures` isolates «+2.150 €», «31%», «2026», a date
+   «08/11/2027» and a time «18:42» as ONE figure each, and leaves «Q3-x» alone. **Proof**: `__tests__/headingFigures.test.ts`.
 10. `<html data-costume>` is set before the first paint for a costume theme and never for a palette theme.
     **Proof**: `colorTheme.test.ts` C1-C2 (the script run in a VM).
 11. DESIGN.md carries the amendment of § 4.8 to the letter. **Proof**: the diff, approved by the owner.
@@ -62,6 +65,11 @@ every mechanism has a neutral default, so the twelve existing blocks render exac
 - **Owner (2026-11-12)**: 3 and 4 (the two directions C, which need exactly the mechanisms below), 16 (DESIGN.md
   amended as BEFORE / AFTER sentences, approved in the diff), 17 (the costume everywhere in the dashboard and its
   dialogs, never outside: email, PDF, landing, access stay default), (a) (names ours, no game asset).
+- **Owner 60 (2026-11-12)**: three sentences of DESIGN.md state a law the costume themes break — the Two-Font
+  Rule's opening, «the one ornament in the system», The Unifying Law's «never a costume» — and each takes the
+  costume's clause (§ 9); the summary bullet «inevitability over ornament» (`:281`) stays as it is.
+- **Owner 62 (2026-11-12)**: `develop` goes to `main` only when the whole series is retired: what a theme spec
+  declares «until NOVE-19» or «until NOVE-20» is seen on `develop` only.
 - **Adopted, reversible**:
   - two attributes: `data-costume` on `<html>` (the theme has a costume) gates the rules; `data-costume-scope` (the
     dashboard shell, a modal's content) bounds them. Costume tokens are declared ONLY in scope blocks.
@@ -69,9 +77,20 @@ every mechanism has a neutral default, so the twelve existing blocks render exac
     landing and the access pages as every theme's does today (decision 17 read as the costume, not the palette);
   - the swatch's bar is `--accent` for every theme (midnight-bloom and retro-arcade showed `--secondary`);
   - an emblem per theme with an optional one per page; the pages pass their id in NOVE-19/20;
-  - the band under the header shows at every width;
+  - the band under the header shows at every width; it is CSS alone — the `div` is in every theme's DOM, in the
+    header and in its skeleton, and only a costume's `--costume-header-band-height` gives it a height — so the
+    prerendered first paint already holds it and the page replaces the skeleton without moving; below `desktop:`,
+    where the header is sticky, the band sits on an opaque `--background` strip (rows never show through it);
+  - a control that asks a model takes no costume glow: `AI_CONTROL_ACCENT_CLASS` carries the marker class
+    `ai-control` and the glow rule excludes it, so the AI accent's own hover and focus glow stay (The AI-Accent Rule);
   - the twelve-theme identity is a computed-style signature, not pixels: the DOM gains one `display: contents`
-    wrapper and attributes, nothing visible;
+    wrapper, two attributes, the `tile-eyebrow` / `costume-heading` classes and, in every eyebrow, headline and
+    header label holding a digit, a `<span class="costume-figure">` around each figure — all inert outside a
+    costume theme, on the landing too;
+  - a date and a time in a heading are one figure (The Mono Mandate: «structured date»); a currency other than €
+    stays prose (the app prints euros);
+  - E1 is a recorded baseline of computed styles, not a `toMatchSnapshot`: the one recorded comparison of the
+    series (README.md § 8), re-recorded only on untouched code;
   - more than six themes → the swatch grid takes four columns at `desktop:`.
 - **Overturned**: DESIGN.md's «only `2xl` … is fixed … never overridden» (2026-09-06), for costume themes.
 
@@ -83,16 +102,17 @@ Order of work: 4.1 (Geist) → record the baseline (§ 6, E1) → 4.2-4.7 → co
 
 `<html lang="it" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>`; `<body
 className="antialiased">`. The header comment (`:13-16`) says «Applied to `<html>`: Tailwind resolves
-`--font-sans` there (the preflight's `html` rule); on `<body>` the sans fell back to `system-ui` until 2026-11-12».
+`--font-sans` there (the preflight's `html` rule); on `<body>` the sans fell back to `system-ui` until <the implementing session's date>».
 
 ### 4.2 The registry — `lib/constants/colorTheme.ts`
 
 ```ts
 export const COSTUME_ATTRIBUTE = 'data-costume';
-/** What a costume theme draws with React; its CSS mechanisms are the tokens of its scope blocks. */
-export type CostumeOrnament = 'header-band';
-/** `resourceBar`: the Panoramica's four-figure bar at ≥ 1440 (owner, 2026-11-12, decision 14). */
-export interface ThemeCostume { ornaments: readonly CostumeOrnament[]; resourceBar: boolean }
+/**
+ * What a costume theme draws with React; every other mechanism — the header band too — is a token of its scope
+ * blocks. `resourceBar`: the Panoramica's four-figure bar, at ≥ 1440 only (owner, 2026-11-12).
+ */
+export interface ThemeCostume { resourceBar: boolean }
 /** `costume: null` = a palette theme: colours and radius only (DESIGN.md → The Costume Rule). */
 export interface ColorThemeMeta { name: string; description: string; costume: ThemeCostume | null }
 
@@ -124,7 +144,11 @@ export const COLOR_THEME_INIT_SCRIPT = buildColorThemeInitScript(ATTRIBUTE_THEME
 The WARNING (`:8-9`) becomes «adding a theme means its CSS blocks in `app/globals.css` and its `COLOR_THEME_META`
 entry; the gate tests and the swatches derive from here (doc/guide/temi.md § Adding a theme)».
 `contexts/ColorThemeContext.tsx:30-36` `applyThemeAttribute` also sets/removes `COSTUME_ATTRIBUTE` from
-`COLOR_THEME_META[theme].costume`. `.storybook/mocks/ColorThemeContext.tsx:6-12` imports `type ColorTheme`.
+`COLOR_THEME_META[theme].costume`; the Firestore sync (`:93-95`) becomes `if (isColorTheme(prefs.colorTheme))
+writeStoredTheme(prefs.colorTheme);` — a synced name the registry does not know (a theme chosen on a newer client,
+a theme rolled back) stays the default, the acceptance `readStoredTheme` already has; without it
+`COLOR_THEME_META[theme]` is `undefined` and the sync throws. `.storybook/mocks/ColorThemeContext.tsx:6-12` imports
+`type ColorTheme`.
 
 ### 4.3 The costume contract (NOVE-12, 13, 19, 20 use these names)
 
@@ -170,8 +194,12 @@ string per property (`'--radius'`, `'--radius-2xl'`, `'--costume-ground'`, … `
 | `--costume-header-band` · `--costume-header-band-height` | the band under the header | `none` · `0px` |
 | `--costume-primary-glow` | a primary button at rest | `none` |
 
-**The gated rule set** — `app/globals.css`, unlayered, after the last theme block, under the banner
-`/* ─── Theme costume (DESIGN.md → The Costume Rule) ── */`; every selector starts with the gate:
+**The gated rule set** — `app/globals.css`, unlayered, right after the last theme block (today after `:739`,
+before the reduced-motion rule), between the banners `/* ─── Theme costume (DESIGN.md → The Costume Rule) ── */`
+and `/* ─── End of theme costume ── */` (NOVE-19 and NOVE-20 add their rules before the closing one); every
+selector starts with the gate, and outside the two banners a `--costume-*` property is read only by another `--costume-*` declaration of a
+theme's own scope block (`--costume-tile-image: linear-gradient(var(--costume-ornament), …)`), never by a rule that
+paints:
 
 ```css
 [data-costume] [data-costume-scope] #page-main { background: var(--costume-ground); }
@@ -196,19 +224,31 @@ string per property (`'--radius'`, `'--radius-2xl'`, `'--costume-ground'`, … `
   font-family: var(--font-geist-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums;
   text-transform: none;
 }
+/* 16px above a band, nothing above a 0px one: a costume without a band adds no height. */
 [data-costume] [data-costume-scope] .costume-header-band {
-  height: var(--costume-header-band-height); margin-top: 16px; background: var(--costume-header-band);
+  height: var(--costume-header-band-height);
+  margin-top: min(16px, calc(var(--costume-header-band-height) * 1000));
+  background: var(--costume-header-band);
 }
-/* Not on focus: the focus ring is a box-shadow too. */
-[data-costume] [data-costume-scope] [data-slot="button"][data-variant="default"]:not(:focus-visible) {
+/* Below desktop the header is sticky: the band keeps an opaque strip, so no row shows through it. */
+@media (width < 1440px) {
+  [data-costume] [data-costume-scope] .costume-header-band {
+    box-sizing: content-box; margin-top: 0; background-color: var(--background);
+    border-top: min(16px, calc(var(--costume-header-band-height) * 1000)) solid var(--background);
+  }
+}
+/* Not on focus (the ring is a box-shadow too), never on a control that asks a model (The AI-Accent Rule). */
+[data-costume] [data-costume-scope] [data-slot="button"][data-variant="default"]:not(.ai-control):not(:focus-visible) {
   box-shadow: var(--costume-primary-glow);
 }
 ```
 
 **The one layered consumer.** `TILE_EYEBROW_CLASS` (`tile.tsx:69-70`) becomes `'tile-eyebrow text-[10px]
 font-semibold uppercase tracking-[0.1em] text-[color:var(--costume-eyebrow-color,var(--muted-foreground))]'`: a
-caller's colour (`text-destructive`, the AI accent, `text-warning-foreground`) still wins through `cn()` — all 84
-uses at b841cbd7 go through `cn()` or stand alone.
+caller's colour (`text-destructive`, the AI accent, `text-warning-foreground`) still wins through `cn()` — at b841cbd7
+the 44 uses do (13 inside `cn()`, 31 standalone; 84 lines name the constant, imports and comments included). At
+implementation `git grep -n TILE_EYEBROW_CLASS -- '*.tsx' | grep -v "cn(\|className={TILE_EYEBROW_CLASS}\|import"`
+lists only the definition and comments; a site it lists besides moves to `cn()` first.
 
 **Emblems** — `lib/constants/themeCostume.ts`:
 
@@ -242,12 +282,13 @@ export function resolveEmblem(theme: ColorTheme, page: EmblemPage | undefined, i
 
 - `EmblemSvg({ art, size })`: `<svg width height viewBox aria-hidden="true" focusable="false" fill="none"
   strokeLinecap="round" strokeLinejoin="round" className="shrink-0 self-center">`, one element per shape with
-  `style={{ stroke: EMBLEM_TONE_COLOR[tone], strokeWidth }}`, an ellipse with `transform="rotate(r cx cy)"`.
+  `style={{ stroke: EMBLEM_TONE_COLOR[tone], strokeWidth }}`, an ellipse with
+  `transform={`rotate(${shape.rotate} ${shape.cx} ${shape.cy})`}`.
 - `ThemeEmblem({ page, size })`: `resolveEmblem(colorTheme, page, useThemeCostume() !== null)`; `null` or the svg.
 - `ThemeEmblemLead({ page, size, children })`: `children` alone without an emblem (the DOM of today), else
-  `<span className="flex min-w-0 items-center gap-2">` around the svg and `children`.
-- `ThemeHeaderBand()`: `<div aria-hidden="true" className="costume-header-band" />` when the costume's
-  `ornaments` include `'header-band'`, else `null`.
+  `<div className="flex min-w-0 items-center gap-2">` around the svg and `children` (a `div`: it wraps an `h1`).
+- `ThemeHeaderBand()`: `<div aria-hidden="true" className="costume-header-band" />`, always (no hook: outside a
+  costume no rule names the class and the `div` has no height).
 - `HeadingText({ text })`: `splitHeadingFigures(text)`, a figure as `<span className="costume-figure">`.
 
 `lib/utils/headingFigures.ts` (new, no imports):
@@ -255,8 +296,9 @@ export function resolveEmblem(theme: ColorTheme, page: EmblemPage | undefined, i
 ```ts
 export interface HeadingPart { text: string; figure: boolean }
 
-// A figure starts where no letter or digit precedes it and ends on a digit, «%» or «€» (a full stop stays prose).
-const FIGURE = /(?<![\p{L}\p{N}])[+\-−]?\d(?:[\d.,]*\d)?(?:\s?[%€])?/gu;
+// A figure starts where no letter or digit precedes it and ends on a digit, «%» or «€» (a full stop stays prose);
+// «/» and «:» inside it keep a date and a time whole (The Mono Mandate: a structured date is a figure).
+const FIGURE = /(?<![\p{L}\p{N}])[+\-−]?\d(?:[\d.,/:]*\d)?(?:\s?[%€])?/gu;
 
 export function splitHeadingFigures(text: string): HeadingPart[] {
   const parts: HeadingPart[] = [];
@@ -290,9 +332,13 @@ token a palette theme declares, `--radius` included), then `[data-theme="<id>"] 
   `<HeadingText text={headline} />`.
 - `components/layout/PageHeader.tsx`: prop `emblem?: EmblemPage`; `:55` the mobile `h1` wrapped in
   `<ThemeEmblemLead page={emblem} size={18}>`; `:72` `<ThemeEmblem page={emblem} size={22} />` before the label,
-  whose text is `<HeadingText text={label} />`; `<ThemeHeaderBand />` as the wrapper's last child.
-- `components/ui/responsive-modal.tsx:201`, `:234`: `{...(useCostumeScope() ? { 'data-costume-scope': '' } : {})}`
-  on `DrawerContent` and `DialogContent` (both spread props, `components/ui/dialog.tsx:72`).
+  whose text is `<HeadingText text={label} />`; `<ThemeHeaderBand />` as the wrapper's last child, and as
+  `PageHeaderSkeleton`'s last child (`:98-115`: the skeleton exists so the grid does not move at mount).
+- `lib/constants/aiAccent.ts:20-21`: `AI_CONTROL_ACCENT_CLASS` gains the marker class `ai-control` as its first token.
+- `components/ui/responsive-modal.tsx`: `const inCostumeScope = useCostumeScope();` beside `const isMobile =
+  useMediaQuery(…)` (`:61`), before any return — the two contents sit in two return branches, a hook called there
+  is conditional —; `{...(inCostumeScope ? { 'data-costume-scope': '' } : {})}` on `DrawerContent` (`:201`) and
+  `DialogContent` (`:234`) (both spread props, `components/ui/dialog.tsx:72`).
 
 ### 4.5 The gate tests derived — `__tests__/themeBlocks.ts` (new helper, not a test)
 
@@ -326,7 +372,9 @@ registry entry is red too), replacing `toHaveLength(12)`.
 
 ### 4.6 The swatches — `AspettoTab.tsx`
 
-`COLOR_THEME_SWATCHES` (`:31-94`) is deleted; the grid maps `COLOR_THEMES` with `COLOR_THEME_META[id]`. Each preview
+`COLOR_THEME_SWATCHES` (`:31-94`) is deleted; the grid maps `COLOR_THEMES` with `COLOR_THEME_META[id]`; the
+reading (`:102`, `:138`) is `describeColorTheme(COLOR_THEME_META[colorTheme].name)`; the comments `:4` and `:136` say
+«the colour themes» instead of «six». Each preview
 row is a scope: `<div data-theme={id} className="flex h-7 … bg-background">` with `bg-primary` and `bg-accent`
 children, and `<div data-theme={id} className="dark flex h-7 … bg-background">` with `bg-primary` and
 `bg-primary opacity-30`. The comment `:31-32` says «each half is the theme's own block applied to a `div`
@@ -342,8 +390,26 @@ No new UI string in this spec (the names and descriptions move unchanged).
 - **`:143-147`** BEFORE: «Only `2xl` — the tile, the modal, the email card — is fixed: Tailwind's 16px, never
   overridden. Stated 2026-09-06; the file used to say themes leave the radius alone.» AFTER: «Only `2xl` — the tile,
   the modal, the email card — is fixed at Tailwind's 16px by the palette themes; a costume theme may set it inside
-  the dashboard and its dialogs (The Costume Rule), never on the email card. Stated 2026-09-06, amended 2026-11-12.»
-  (same comment lines, `#`-prefixed, wrapped at the block's width).
+  the dashboard and its dialogs (The Costume Rule), never on the email card. Stated 2026-09-06, amended <the implementing session's date>.»
+  (only `:146-147` are re-wrapped, `#`-prefixed at the block's width; `:143-145` are untouched).
+- **`:256`** BEFORE: «without touching the type scale, the component API, or the tile's fixed 16px `2xl`
+  (corrected 2026-09-06; see the `rounded` comment in the frontmatter).» AFTER: «without touching the type scale,
+  the component API, or the tile's fixed 16px `2xl` (corrected 2026-09-06; see the `rounded` comment in the
+  frontmatter) — a costume theme may, inside the dashboard and its dialogs, within The Costume Rule.»
+- **`:450`** (decision 60) BEFORE: «The system uses exactly two fonts. No display serif, no decorative typeface, no
+  icon font treated as type.» AFTER: «The system uses exactly two fonts; a costume theme adds ONE heading face,
+  inside the dashboard and its dialogs (The Costume Rule). No other display serif, no decorative typeface, no icon
+  font treated as type.»
+- **`:703`** (decision 60) BEFORE: «The `✦` is the one ornament in the system: typographic, not an emoji, and in
+  one place only.» AFTER: «The `✦` is the one ornament of the palette themes: typographic, not an emoji, and in
+  one place only; a costume theme draws its own, inside the dashboard (The Costume Rule).»
+- **`:252`** (decision 60) BEFORE: «never a costume applied to it afterward.» AFTER: «never a costume applied to it
+  afterward — a costume THEME (The Costume Rule) is the one declared exception: a dress the owner picks in Aspetto,
+  bounded to the dashboard and its dialogs, that changes no element's job, size or place.»
+- **`:450`** BEFORE: «Hierarchy is expressed through scale and weight within the same two families.» AFTER:
+  «Hierarchy is expressed through scale and weight within the same two families. A costume theme adds ONE heading
+  face, inside the dashboard and its dialogs, on the verdict's headline and the eyebrows only; every figure keeps
+  Geist Mono (The Costume Rule).»
 - **`:284`** BEFORE: «16px (tiles, modals, the email card; fixed on every theme)». AFTER: «16px (tiles, modals, the
   email card; fixed on every palette theme, set by a costume theme inside the dashboard — The Costume Rule)».
 - **`:359`** BEFORE: «Chart palettes, performance indicators, and the five named themes are the only sanctioned
@@ -372,7 +438,8 @@ No new UI string in this spec (the names and descriptions move unchanged).
 - **The token you author is not the token the browser returns** (doc/guide/temi.md): the neutrality proof compares
   computed strings recorded by the same browser, never an authored `oklch(`.
 - **An unlayered rule beats every utility**: here it means every gated selector excludes what a utility must keep —
-  `[data-generated]` for the shadow, `:focus-visible` for the glow — and the eyebrow's colour is layered.
+  `[data-generated]` for the shadow, `.ai-control` and `:focus-visible` for the glow (a filled AI button wears
+  `AI_CONTROL_ACCENT_CLASS`'s hover glow) — and the eyebrow's colour is layered.
 - **The census reads `section.rounded-2xl[id]`** (`scripts/mobileCensus.mjs`, `isClosedRow`): the tile keeps its
   classes; the frame comes through `--radius-2xl` and `data-tile`, never a new radius class.
 - **`e2e/shellBoot.ts:99-106` observes `data-theme` on the whole document**: the swatches' `data-theme` divs live only
@@ -391,46 +458,59 @@ No new UI string in this spec (the names and descriptions move unchanged).
 | C1-C2 | `colorTheme.test.ts`: `buildColorThemeInitScript(['a','b'], ['b'])` sets `data-costume` for `b`, not for `a`; the shipped script never sets it | drop the second `indexOf` |
 | D1 | the four gate tests on `THEME_MODES` | add `'sepia'` to `COLOR_THEMES` with a `META` entry: four files red |
 | T1 | `themeCostume.test.ts`: no palette theme's header followed by ` [data-costume-scope] {` exists, no palette block declares `--costume-` | declare `--costume-ground` in `:root` |
-| T2 | every rule of the «Theme costume» section starts with `[data-costume] [data-costume-scope]` | strip the gate off one selector |
-| T3 | every costume theme's light scope block declares all `COSTUME_SCOPE_PROPERTIES` (vacuous today, binding in 12/13) | — (seen red in NOVE-12) |
+| T2 | between the two banners, comments stripped, every rule — one level inside each `@media` block too — has every item of its selector list starting with `[data-costume] [data-costume-scope]`; the glow rule's selector ends with `:not(.ai-control):not(:focus-visible)` and `AI_CONTROL_ACCENT_CLASS` starts with `ai-control`; outside the two banners every `var(--costume-` sits in the value of a `--costume-*` declaration inside a `[data-theme="<id>"] [data-costume-scope]` or `.dark[data-theme="<id>"] [data-costume-scope]` block (a scope block composes its own properties; nothing outside the section paints with one) | strip the gate off one selector; drop `:not(.ai-control)`; a `box-shadow: var(--costume-tile-shadow)` in a rule outside the banners |
+| T3 | `expect(COSTUME_SCOPE_PROPERTIES).toHaveLength(18)` and the list equals the table's order; then ONE `it` looping over `COSTUME_THEMES`: each light scope block declares every property (the loop is empty today, binding in 12/13) | a 19th string in the list (red on the count); the per-theme half seen red in NOVE-12 |
 | T4 | `TILE_EYEBROW_CLASS` contains `var(--costume-eyebrow-color,var(--muted-foreground))`; `cn(TILE_EYEBROW_CLASS,'text-destructive')` keeps `text-destructive` only | `text-[color:var(--costume-eyebrow-color)]` |
 | T5 | `resolveEmblem` with an injected map: out of scope `null`; page art over fallback | ignore `inScope` |
-| H1 | `headingFigures.test.ts`: «Novembre è in crescita» one part; «+2.150 € nel mese», «il 31%.», «Rendimento 2026», «Q3-x» | `[\d.,]*` without the closing digit |
-| R1 | `AspettoTab.test.tsx`: one button per theme named «Colore N di M: {name}»; two rows per swatch with `data-theme`, the second `.dark` | reintroduce a `style={{ background }}` |
-| R2 | `CostumeScope.test.tsx`: `useThemeCostume` is `null` outside, the costume inside (registry stubbed); `ThemeEmblemLead` returns only its child out of scope | render the svg unconditionally |
-| R3 | `ResponsiveModal.costume.test.tsx`: content has `data-costume-scope` inside `CostumeScope`, not outside | drop the spread |
-| E1 | `e2e/theme.neutral.spec.ts` (desktop) + `theme.neutral.mobile.spec.ts` (390) on `e2e/themeNeutral.ts`: probes `html`, `body`, `#page-main`, the header label, the verdict `h2`, the first `main section.rounded-2xl` and its `h3`, the first primary button; on Cashflow also `[role=dialog]` after «Nuova Spesa»; properties `font-family`, `font-weight`, `font-size`, `letter-spacing`, `text-transform`, `color`, `background-color`, `background-image`, `border-top-color`, `border-top-left-radius`, `box-shadow`; pages `/dashboard`, `/dashboard/history`, `/dashboard/cashflow?tab=tracking`; `THEME_NEUTRAL_RECORD=1` writes the baseline, otherwise `toEqual` | strip the gate from the tile-shadow rule: every tile loses `shadow-sm` |
-| E2 | `shell.boot{,.mobile}.spec.ts`: body font names Geist; a loaded non-Mono Geist face | variables back on `<body>` |
+| H1 | `headingFigures.test.ts`: «Novembre è in crescita» one part; «+2.150 € nel mese», «il 31%.», «Rendimento 2026», «Chiude il 2026.» (figure «2026», prose «.»), «Rivedi entro il 08/11/2027» and «alle 18:42» one figure each, «Q3-x» one prose part | `[\d.,/:]*` without the closing digit: «Chiude il 2026.» yields «2026.»; «/» dropped from the class |
+| R1 | `aspettoTab.test.tsx`: one button per theme named «Colore N di M: {name}» (M = `COLOR_THEMES.length`); two rows per swatch, both `[data-theme="{id}"]`, the second with class `dark`; no element inside a swatch carries a `style` attribute; the source of `AspettoTab.tsx` (`readFileSync`) holds no `oklch(` | reintroduce a `style={{ background }}` on one row |
+| R2 | `costumeScope.test.tsx`: `useThemeCostume` is `null` outside, the costume inside (registry stubbed); `ThemeEmblemLead` returns only its child out of scope; with `COLOR_THEME_META` stubbed to give `cyberpunk` a costume, `setColorTheme('cyberpunk')` puts `data-costume` on `<html>` and `setColorTheme('default')` removes it | render the svg unconditionally; drop the removal branch of `applyThemeAttribute` |
+| R3 | `responsiveModalCostume.test.tsx`: content has `data-costume-scope` inside `CostumeScope`, not outside | drop the spread |
+| R3b | `costumeScope.test.tsx`: `PageHeader` and `PageHeaderSkeleton` each render exactly one `.costume-header-band[aria-hidden="true"]`, as their wrapper's last child; with `getUserPreferences` mocked to `{ colorTheme: 'sepia' }` the provider writes no `data-theme` and nothing to `localStorage` | drop the band from the skeleton; drop the `isColorTheme` guard |
+| E1 | `e2e/theme.neutral.spec.ts` (desktop) + `theme.neutral.mobile.spec.ts` (390) on `e2e/themeNeutral.ts`: probes `html`, `body`, `#page-main`, the header label, the verdict `h2`, the first `main section.rounded-2xl` and its `h3`, the first primary button; on Cashflow at 1440 only, also `[role=dialog]` after a click on «Nuova Spesa» (hidden below `desktop:`; closed with «Annulla», nothing submitted — the 390 drawer is probed from NOVE-20 on); properties `font-family`, `font-weight`, `font-size`, `letter-spacing`, `text-transform`, `color`, `background-color`, `background-image`, `border-top-color`, `border-top-left-radius`, `box-shadow`; pages `/dashboard`, `/dashboard/history`, `/dashboard/cashflow?tab=tracking`; the themes are `COLOR_THEMES.filter((t) => COLOR_THEME_META[t].costume === null)` (the palette themes: six, today and after NOVE-12/13), each in `light` and `dark`, set before navigation by `addInitScript` on `localStorage['color-theme']` and next-themes' `localStorage['theme']`; the baseline is keyed viewport (`'1440'` \| `'390'`) → path → `theme·mode` → probe → properties (`null` for a probe absent from the page); `THEME_NEUTRAL_RECORD=1`: each spec file reads the JSON, replaces only its own viewport key and writes it back; otherwise `toEqual` | strip the gate from the tile-shadow rule: every tile loses `shadow-sm` |
+| E2 | `shell.boot{,.mobile}.spec.ts`: `getComputedStyle(document.body).fontFamily` starts with `Geist`, not `Geist Mono`; `[...document.fonts].some((f) => f.family.replace(/['"]/g, '') === 'Geist' && f.status === 'loaded')`; `[data-costume-scope]` counts 0 on `/` and `/login`, 1 on `/dashboard` | variables back on `<body>`; `CostumeScope` around the root layout's children |
+
+R1-R3 run in the `dom` project with `vi.mock('@/contexts/AuthContext')`, `vi.mock('@/lib/services/userPreferencesService')`
+and next-themes' `useTheme` mocked; R1 renders `<Tabs value="aspetto"><AspettoTab /></Tabs>` (`SettingsTabPanel` is a
+Radix `TabsContent`); R3 runs twice, `matchMedia` answering `matches: true` (the Drawer) and `false` (the Dialog).
 
 ## 7. Guided verification (WORKFLOW.md § 2)
 
 Expected outcome, declared first: on the emulators the app reads in Geist Sans everywhere; Panoramica, Storico,
 Cashflow and a dialog look the same as before in each of the six themes and both modes; the swatches show each
-theme's real colours; nothing in the DOM of the landing mentions a costume.
+theme's real colours; nothing on the landing carries `data-costume` or `data-costume-scope`.
 
-- **A**: `tsc`, lint, Vitest (three zones), E1 in compare mode, `npx playwright test e2e/shell.boot`.
+- **A**: `tsc`, lint, Vitest (three zones), E1 in compare mode, and the full `npm run test:e2e` once after 4.1 and
+  once at the end (known flakes: doc/guide/e2e-playwright.md) — the font moves every page's text metrics; a spec
+  turned red by the font is a stop-and-ask; a `mobile:budget` entry moved by the font is re-recorded (§ 8). A Vitest or Playwright test that
+  queried an eyebrow or a headline holding a digit by its exact text node moves to `getByRole('heading', { name })`.
 - **B**: emulators + seed; the baseline recorded right after 4.1 (`THEME_NEUTRAL_RECORD=1`), committed.
 - **C (browser, the session)**: the six themes × two modes at 1440 and 390 on Panoramica and Impostazioni › Aspetto;
   a screenshot pair per theme before/after 4.2-4.7 in the scratchpad, compared by eye; `/` and `/login` unchanged.
 - **D (data)**: `document.querySelector('[data-costume]')` is `null` on every page for the six themes.
 - **E**: `localStorage['color-theme'] = 'sepia'` → the default, no attribute (the guard of today).
 - **F (owner, at his «pronto»)**: the mirror in his own theme and mode; Geist read on his screens.
-- **G**: `mobile:census` + `mobile:budget`, `perf:budget`; remove fixtures and mirror.
+- **G** (the two budgets close by README.md § 8's ONE rule, decisions 33 and 34): `mobile:census` + `mobile:budget`, `perf:budget`; remove fixtures and mirror.
 
 ## 8. Putting it into service
 
-One PR to `develop`. No data change. The Geist fix moves line breaks: `mobile:budget` entries moved by it are
-re-recorded with the owner's OK in `doc/guide/prima-schermata-misure.md` § register («Geist Sans applied», per entry
-before → after); the twelve entries red since 2026-11-11 keep their own open decision. A `perf:budget` ceiling is
-raised only with its `raisedBy` and the owner's OK (`/dashboard` has ~0,7 KB of headroom today).
+One PR to `develop`. No data change. The Geist fix moves line breaks: the font is this spec's NAMED cause, so every `mobile:budget`
+entry it moves is re-recorded with `raisedBy` «Geist Sans applied» in `doc/guide/prima-schermata-misure.md` § register
+(per entry before → after), without asking (decision 33); an entry already red before 4.1, measured on `develop`
+the same day, keeps its own decision; an entry that moves for another cause stops the session. `perf:budget`
+follows README.md § 8 (decision 34); each route's headroom (ceiling − measure on the untouched branch) is read
+before 4.2.
 
 ## 9. Documentation
 
 - `doc/guide/temi.md`: new § «Il costume» (the two attributes, the scope properties, the gated rule set, the layered
   eyebrow, emblems, the font loading rule, the four-block recipe); «Adding a theme» rewritten (CSS +
-  `COLOR_THEME_META`; tests and swatches derive); the Files line gains the new modules; `:127`'s stale path fixed.
+  `COLOR_THEME_META`; tests and swatches derive); the Files line gains the new modules; the two stale paths (`:3`, `:127`) name
+  `COLOR_THEME_META` in `lib/constants/colorTheme.ts` and the swatches in `components/settings/tabs/AspettoTab.tsx`.
+- `.impeccable/design.json`: the three strings that copy DESIGN.md `:284`, `:359` and `:1409` (`:906`, `:976`, `:1198`)
+  take § 4.8's AFTER text — a scripted replacement of those strings only, checked with `JSON.parse` after.
 - `AGENTS.md` § Color Theme System: «a mechanism beyond palette and radius goes through the costume contract
-  (`data-costume`, `data-costume-scope`, the scope properties) — doc/guide/temi.md § Il costume (2026-11-12)».
+  (`data-costume`, `data-costume-scope`, the scope properties) — doc/guide/temi.md § Il costume (<the implementing session's date>)».
 - `CLAUDE.md`: the Geist Known Issue removed; «Themes» line names the costume; «Latest».
 - `DESIGN.md` § 4.8; `doc/guide/velocita.md` § Registro if a ceiling moves; `Draft Release Temp.md`;
   `doc/nove/README.md` § 6.
@@ -439,8 +519,9 @@ raised only with its `raisedBy` and the owner's OK (`/dashboard` has ~0,7 KB of 
 
 - **The two costume themes** (palettes, scope blocks, fonts, emblems): heirs NOVE-12 (Egeo), NOVE-13 (Orbita, with
   the resource bar that `ThemeCostume.resourceBar` already names).
-- **Every page and dialog beyond the primitives** — per-page emblem ids, the modal's own frame and title, popovers,
-  selects, sheets and the sidebar inside scope, the Consulente's and the Compravendita's own cards, the Sankey's
+- **Every page and dialog beyond the primitives** — per-page emblem ids, the modal's own frame and title, every portalled primitive other than
+  `ResponsiveModal`'s content (popover, select, dropdown menu, tooltip, sheet, alert dialog, a raw `DialogContent`:
+  until NOVE-19 they render with the palette and the default costume even when opened from a dialog), the sidebar, the Consulente's and the Compravendita's own cards, the Sankey's
   hexes (`lib/utils/cashflowSankey.ts`), `components/ui/switch.tsx:14`,
   `components/performance/UnderwaterDrawdownChart.tsx:102-109`, `components/ui/sidebar.tsx:493`: heirs NOVE-19 (Panoramica,
   Patrimonio, Cashflow) and NOVE-20 (the rest and the dialogs).
@@ -487,8 +568,9 @@ le misure di mobile:census/mobile:budget prima e dopo; la registrazione della li
 swatch; il contratto del costume (attributi, CostumeScope, proprietà, regole, componenti) e
 i primitivi; il confronto con la linea di base; l'emendamento a DESIGN.md alla lettera. I
 test PRIMA del codice, ciascuno visto rosso con la sua mutazione. Fermati e chiedimi se: una
-voce di mobile:budget si muove per il font (la registro con il mio OK); perf:budget supera
-un tetto; il confronto con la linea di base trova una differenza su uno dei dodici blocchi.
+voce di mobile:budget si muove per una causa diversa dal font nel confronto con develop dello stesso giorno, stessa build
+(quelle mosse dal font le riregistri tu con raisedBy, voce per voce prima → dopo); uno spec E2E
+diventa rosso per il font; perf:budget, misurato prima e dopo sulla stessa macchina, supera un tetto di più di 1 KB gz (fino a 1 KB lo alzi tu, con raisedBy e una riga in velocita.md § Registro); il confronto con la linea di base trova una differenza su uno dei dodici blocchi.
 Collaudo: § 7, la F al mio «pronto». Un branch, un commit, solo dopo il mio OK con il
 riassunto del diff. SESSION_NOTES.md non si committa.
 ```

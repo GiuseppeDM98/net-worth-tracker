@@ -39,13 +39,16 @@ behaves byte for byte as today. No surface sends `'auto'` in this spec (NOVE-15 
 
 1. `'auto'` without override → the router is called once, before any builder, and the builder that runs is the
    reading's (month → `buildAssistantMonthContext` with its month; year, ytd, history, chat with each period,
-   register → the register block). **Proof**: R7.
+   register → the register block). **Proof**: R7, R7b.
 2. An explicit mode never calls the router; its events are today's, in today's order. **Proof**: R8; the describes
    of `__tests__/assistantRoutes.test.ts` (:791, :853, :892) green unedited.
 3. The `route` event is emitted once, right after `meta`, before `context`, `register`, `status`, `text`; its
    `reading.route.webSearch` is the EFFECTIVE decision (criterion 9). **Proof**: R7.
-4. An override (`'auto'` + `route`) skips the router: `source: 'override'`, `confidence: 1`. A `route` with an
-   explicit mode, `month`/`year`/`chatContext` with `'auto'`, an inconsistent or future override → 400. **Proof**:
+4. An override (`'auto'` + `route`) skips the router: `source: 'override'`, `confidence: 1`; with
+   `routeCarried: true` beside it the same route is `source: 'carried'` (decision 53: a reading the turn inherited
+   from the one before it, never one the owner picked); `routeCarried` without `route` → 400. A `route` with an
+   explicit mode, `month`/`year`/`chatContext` with `'auto'`, an override `checkRouteConsistency` refuses (an
+   analysis on another period, a month or a year after today, Registra with `webSearch: true`) → 400. **Proof**:
    R5, R9.
 5. An SDK error, a timeout, no tool block, an invalid input or a confidence below 0.6 → the fallback reading (chat, no
    period: today's portfolio), `source: 'fallback'` with its `reason`; the answer still streams; the router never
@@ -55,16 +58,20 @@ behaves byte for byte as today. No surface sends `'auto'` in this spec (NOVE-15 
    }`, through `client.messages.create`. **Proof**: R2.
 7. The router's `system` is byte-identical for every user and holds none of the request's data. **Proof**: R1.
 8. The per-mode system prompts do not change: `__tests__/assistantPromptBundle.test.ts` (:680, :737, :756, :773, :822,
-   :838, :864) and `__tests__/anthropicStream.test.ts:207` green; the diff touches neither nor `prompts.ts`.
-   **Proof**: `git diff --stat develop`.
+   :838, :864), `__tests__/anthropicStream.test.ts:207` and `__tests__/monthlyEmailService.test.ts:401` (the shared
+   core in the emails) green; the diff touches none of them nor `prompts.ts`. The router's own `system` is pinned by
+   R1. **Proof**: `git diff --stat develop`.
 9. Effective web search: register → `false`; override → its `webSearch`; router → `route.webSearch ||
-   resolveAssistantWebSearchPolicy(intent, prompt, preferences)`. **Proof**: R10.
+   resolveAssistantWebSearchPolicy(intent, prompt, preferences)`. An analysis's prompt sentence on the macro context
+   follows that decision, never the preference alone (§ 4 step 4b). **Proof**: R10.
 10. The assistant message stores `routeReading` (no `elapsedMs`); the thread's `mode` and pins are the reading's;
-    `mapMessage` reads it back and drops a malformed one. **Proof**: R11, R12.
+    `mapMessage` reads it back and drops a malformed one; the thread's detail is its LAST 100 messages. **Proof**:
+    R11, R11b, R12, R12b.
 11. Unchanged: the 503 without key (`route.ts:165-176`), the 30/h limit (:185-198, the router inside the request's
     one slot), `assertCanAccessAccount` before the router (:183), the demo block (the page), the flag
     `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`. **Proof**: R13; existing tests green.
-12. The log adds `routeSource` and `routerMs`, never the prompt. **Proof**: R7 reads the `console.info` call.
+12. The log adds `routeSource`, `routeReason` and `routerMs`; a failed router call logs its error class and status;
+    never the prompt. **Proof**: R7 reads the `console.info` call, R3 the `console.warn`.
 13. No test calls Anthropic. **Proof**: R1-R4 take a fake client, the route tests mock the router module;
     `grep -rn "new Anthropic" __tests__` gains no hit.
 
@@ -72,18 +79,32 @@ behaves byte for byte as today. No surface sends `'auto'` in this spec (NOVE-15 
 
 - **Owner 11 (2026-11-12)**: a router on Haiku 5.5 (intent, period, web search) in front of today's pipeline; the
   line «Ho letto: … · cambia» under the answer (NOVE-15).
+- **Owner 53 (2026-11-12)**: a route the client re-sends because the turn CONTINUES the one before (an answer to a
+  question card, «Rigenera») is told apart from one the owner chose with «cambia»: the request carries
+  `routeCarried: true` and the reading is `source: 'carried'`, so NOVE-15 can write «Ho letto: …» and keep «Hai
+  scelto: …» for a choice.
 - **Adopted, reversible**:
   - the router speaks only on `mode: 'auto'`; the six explicit modes stay valid (today's page, the E2E fakes, a tab
     left open across the deploy); NOVE-15 makes the page send `'auto'`;
-  - the override is the request field `route` (intent, period, webSearch), only with `'auto'`, taken as is (register
-    forces web off), stamped `confidence: 1`;
+  - the override is the request field `route` (intent, period, webSearch), only with `'auto'`, taken as is and
+    stamped `confidence: 1`; one `checkRouteConsistency` refuses is a 400;
+  - an answer to an `assistant-question` card never reaches the router: the page sends it with the asking turn's
+    reading as `route` (NOVE-15), so the router's prompt does not speak of it;
+  - a model reading that is Registra with a period keeps Registra and drops the period (a date in the sentence is
+    the row's, not the reading's), as its web flag is forced off; every other inconsistent reading is `invalid`;
+  - an analysis read by the router or chosen by an override tells the model about the macro context what the
+    EFFECTIVE web decision says: the route hands the prompt builders `includeMacroContext: enableWebSearch`
+    (`prompts.ts` is not edited; for an explicit analysis the two are equal by construction);
+  - the thread's detail reads the LAST 100 messages (today the first 100, `store.ts:327-333`): the router's
+    previous turn, the history replayed to the model and the page all read the thread's end;
   - threshold `ASSISTANT_ROUTER_MIN_CONFIDENCE = 0.6`; the fallback is a free question with no period, never a
     guessed analysis, and the reading says so (NOVE-15 prints «Non ne sono sicuro»);
   - the router can only ADD a web search to today's policy, never remove one («Contesto macro» on keeps searching);
   - timeout 4,000 ms, no retry, `max_tokens: 256`; no `cache_control` (the main route's rule,
     `doc/guide/assistente.md:44-45`; the prefix is below Haiku's cacheable minimum anyway);
   - the router reads today's Italian date, the previous reading and the previous user message (≤ 300 characters):
-    «e a settembre?» keeps the intent of the turn before;
+    «e a settembre?» keeps the intent of the turn before — the previous turn is the thread's LAST assistant message
+    and the user message right before it; a last assistant message without a reading gives no previous turn;
   - the reading is persisted on the ASSISTANT message only (`routeReading`);
   - a month is valid from 2000-01 to the current Italian month, a year from 2000 to the current year.
 - **Not overturned**: `system` byte-identical per mode and no `cache_control` on the main call
@@ -100,14 +121,16 @@ export type AssistantRoutePeriod = { kind: 'none' } | { kind: 'month'; year: num
 export interface AssistantRoute { intent: AssistantMode; period: AssistantRoutePeriod; webSearch: boolean;
   /** 0..1; 1 for an override. */ confidence: number }
 export type AssistantRouteOverride = Omit<AssistantRoute, 'confidence'>;
-export type AssistantRouteSource = 'router' | 'override' | 'fallback';
+/** 'carried': a route the client re-sent from the previous turn's reading (the request's `routeCarried`). */
+export type AssistantRouteSource = 'router' | 'override' | 'carried' | 'fallback';
 export type AssistantRouteFallbackReason = 'error' | 'timeout' | 'invalid' | 'low-confidence';
 export interface AssistantRouteReading { route: AssistantRoute; source: AssistantRouteSource;
   /** Only with `source: 'fallback'`. */ reason?: AssistantRouteFallbackReason }
 ```
 
 - `AssistantMessage` gains `routeReading?: AssistantRouteReading;` (absent on every older message).
-- `AssistantStreamRequest['mode']` becomes `AssistantMode | 'auto'`, plus `route?: AssistantRouteOverride`.
+- `AssistantStreamRequest['mode']` becomes `AssistantMode | 'auto'`, plus `route?: AssistantRouteOverride` and
+  `routeCarried?: boolean`.
 - `AssistantStreamEvent` gains `| { type: 'route'; reading: AssistantRouteReading }`.
 - The WARNING checklist (:1-14) gains: «`lib/utils/assistantRoute.ts` (`ASSISTANT_MODES`, `checkRouteConsistency`,
   `routeToSelection`) and `lib/server/assistant/router.ts` (the intents of its system prompt)».
@@ -135,7 +158,7 @@ export const assistantRouteOverrideSchema = z.object({ intent: z.enum(ASSISTANT_
   period: assistantRoutePeriodSchema, webSearch: z.boolean() });
 export const assistantRouteReadingSchema = z.object({
   route: assistantRouteOverrideSchema.extend({ confidence: z.number().min(0).max(1) }),
-  source: z.enum(['router', 'override', 'fallback']),
+  source: z.enum(['router', 'override', 'carried', 'fallback']),
   reason: z.enum(['error', 'timeout', 'invalid', 'low-confidence']).optional(),
 });
 /** The tool's input as the model writes it: flat, the period's fields optional. */
@@ -175,6 +198,8 @@ export function parseRouterToolInput(raw: unknown, today: Today): AssistantRoute
   } else {
     period = { kind: periodKind };
   }
+  // Registra has no period: a date the model read in the sentence belongs to the row, not to the reading.
+  if (intent === 'register') period = { kind: 'none' };
   // Registra never searches, whatever the model says (the rule of webSearchPolicy.ts).
   const route: AssistantRoute = { intent, period, webSearch: intent !== 'register' && parsed.data.webSearch,
     confidence };
@@ -233,7 +258,7 @@ Non rispondi mai all'utente: leggi il suo ultimo messaggio e chiami lo strumento
 Gli intenti:
 - register: racconta un movimento da registrare — una spesa, un'entrata, uno spostamento tra conti, una rata pagata.
   «oggi ho speso 40 euro al supermercato», «benzina 60», «è arrivato lo stipendio», «ho spostato 500 euro sul
-  deposito». Anche la risposta a una domanda dell'assistente su un movimento appena proposto.
+  deposito».
 - month_analysis: chiede il giudizio su un mese intero. «com'è andato ottobre?», «analizza il mese scorso».
 - year_analysis: il giudizio su un anno solare intero. «com'è andato il 2025?», «il bilancio dell'anno scorso».
 - ytd_analysis: l'andamento da inizio anno a oggi. «come sto andando quest'anno?», «da gennaio a oggi».
@@ -302,6 +327,9 @@ async function readRoute(input: AssistantRouterInput, client: RouterClient): Pro
     // No retry: a late reading is one the user waits for; the fallback answers instead.
     response = await client.messages.create(buildRouterRequest(input), { timeout: ROUTER_TIMEOUT_MS, maxRetries: 0 });
   } catch (error) {
+    // A broken router (a refused schema, a wrong model id, a revoked key) must be visible: never the prompt.
+    console.warn('[assistant/router] call failed', {
+      name: error instanceof Error ? error.name : 'unknown', status: (error as { status?: number }).status });
     return { route: FALLBACK_ROUTE, source: 'fallback',
       reason: error instanceof APIConnectionTimeoutError ? 'timeout' : 'error' };
   }
@@ -323,23 +351,27 @@ export async function routeAssistantMessage(input: AssistantRouterInput, client:
   return { ...reading, elapsedMs: Date.now() - started };
 }
 
-/** Built lazily, as the memory extraction's (`route.ts:108-112`): a module-level client needs the key at import. */
-export async function createRouterClient(): Promise<RouterClient> {
-  const SDK = (await import('@anthropic-ai/sdk')).default;
-  return new SDK({ apiKey: process.env.ANTHROPIC_API_KEY! });
+/** Built per request, never at module level: a module-level client needs the key at import (`route.ts:108-112`). */
+export function createRouterClient(): RouterClient {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 }
 ```
 
 `lib/constants/aiModels.ts` gains after `MEMORY_EXTRACTION_MODEL` (:55): `/** The Assistente's router (2026-11): one
 forced tool call per message — Haiku 5.5 accepts it, Sonnet and Opus 5.5 refuse it. */` `export const
-ASSISTANT_ROUTER_MODEL = 'claude-haiku-5-5';`
+ASSISTANT_ROUTER_MODEL = 'claude-haiku-5-5';` The file's WARNING sentence «the memory extraction sends neither and forces
+`tool_choice`» becomes «the memory extraction and the Assistente's router (`lib/server/assistant/router.ts`) send
+neither and force `tool_choice`».
 
 ### `lib/server/validation.ts` — the request (:173-190)
 
-`mode` becomes `z.enum([...ASSISTANT_MODES, 'auto'])`; `route: assistantRouteOverrideSchema.optional()` is added; the
+`mode` becomes `z.enum([...ASSISTANT_MODES, 'auto'])`; `route: assistantRouteOverrideSchema.optional()` and
+`routeCarried: z.boolean().optional()` are added; the
 object takes a `superRefine`: `route` with a mode other than `'auto'` → «Una lettura scelta vale solo con mode
-auto.»; `'auto'` with `month`, `year` or `chatContext` → «Con mode auto il periodo lo legge il server.». Both are
-today's 400 (`parseOr400`, :254-262).
+auto.»; `routeCarried` without `route` → «Una lettura ereditata richiede la lettura.»; `'auto'` with `month`, `year` or `chatContext` → «Con mode auto il periodo lo legge il server.». Both are
+today's 400 (`parseOr400`, :254-262). The schema's doc comment (:170-171) becomes «The mode is the app's six, or
+`'auto'` (the server reads it, `lib/server/assistant/router.ts`) — an unknown one used to fall through to the chat
+builder».
 
 ### `app/api/ai/assistant/stream/route.ts`
 
@@ -350,20 +382,24 @@ today's 400 (`parseOr400`, :254-262).
 
 ```ts
 if (body.mode === 'auto' && body.route && !checkRouteConsistency(body.route, today)) {
-  return NextResponse.json({ error: 'Lettura non valida per la data di oggi.' }, { status: 400 });
+  return NextResponse.json({ error: 'Lettura non valida.' }, { status: 400 });
 }
 let reading: AssistantRouteReading | null = null;
 let routerMs: number | null = null;
 if (body.mode === 'auto' && body.route) {
-  reading = { route: { ...body.route, confidence: 1 }, source: 'override' };
+  reading = { route: { ...body.route, confidence: 1 }, source: body.routeCarried ? 'carried' : 'override' };
 } else if (body.mode === 'auto') {
-  const lastAssistant = conversationHistory.findLast((m) => m.role === 'assistant' && m.routeReading);
-  const lastUser = conversationHistory.findLast((m) => m.role === 'user');
+  // The previous turn: the thread's LAST assistant message and the user message right before it. A failed
+  // stream leaves a user message with no answer after it, and an explicit-mode answer carries no reading.
+  const lastAssistantIndex = conversationHistory.findLastIndex((m) => m.role === 'assistant');
+  const lastAssistant = lastAssistantIndex >= 0 ? conversationHistory[lastAssistantIndex] : undefined;
+  const askedBy = lastAssistant?.routeReading
+    ? conversationHistory.slice(0, lastAssistantIndex).findLast((m) => m.role === 'user') : undefined;
   const { elapsedMs, ...outcome } = await routeAssistantMessage({
     prompt: body.prompt.trim(), today, todayIso,
-    previous: lastAssistant?.routeReading && lastUser
-      ? { reading: lastAssistant.routeReading, userMessage: lastUser.content } : null,
-  }, await createRouterClient());
+    previous: lastAssistant?.routeReading && askedBy
+      ? { reading: lastAssistant.routeReading, userMessage: askedBy.content } : null,
+  }, createRouterClient());
   reading = outcome;
   routerMs = elapsedMs;
 }
@@ -375,9 +411,15 @@ const selection: AssistantRouteSelection = reading ? routeToSelection(reading.ro
    const enableWebSearch = selection.mode === 'register' ? false : reading?.source === 'override' ?
    reading.route.webSearch : (reading?.route.webSearch ?? false) || policy;` then, with a reading,
    `reading = { ...reading, route: { ...reading.route, webSearch: enableWebSearch } }`.
+   4b. The four analysis builders write their macro sentence from `preferences.includeMacroContext`
+   (`prompts.ts:872, :928, :973, :1014`, in the user content): with a reading whose `selection.mode` is one of the
+   four analyses, `streamAssistantResponse` receives `preferences: { ...preferences, includeMacroContext:
+   enableWebSearch }`, so the sentence and the tool always agree; without a reading, and for chat and Registra,
+   `preferences` as today.
 5. Every later read of `body.mode`, `body.month`, `body.year`, `body.chatContext` becomes `selection.*` (:214-217,
    :234-265, :293-296, :307-308, :342, :348, :366-367, :383-390); `body.prompt`, `body.userId`, `body.threadId` stay.
-6. The log (:212-219) logs `mode: selection.mode` and adds `routeSource: reading?.source ?? null`, `routerMs`.
+6. The log (:212-219) logs `mode: selection.mode` and adds `routeSource: reading?.source ?? null`, `routeReason:
+   reading?.reason ?? null`, `routerMs`.
 7. In the stream, right after `meta` (:317-323): `if (reading) controller.enqueue(encodeAssistantEvent({ type:
    'route', reading }));`.
 8. The assistant message (:362-369) adds `...(reading ? { routeReading: reading } : {})`.
@@ -387,7 +429,9 @@ const selection: AssistantRouteSelection = reading ? routeToSelection(reading.ro
 `appendAssistantMessage` (:341-372) writes `routeReading` when present, through `removeUndefinedDeep`
 (`lib/utils/firestoreData.ts`: an absent `reason` is not an `undefined` field); `mapMessage` (:81-94) adds it only
 when `assistantRouteReadingSchema.safeParse(data.routeReading)` succeeds — a malformed document loses the line, never
-the message. The client hook (`lib/hooks/useAssistantStreaming.ts:307-363`) ignores an event it does not handle:
+the message. `getAssistantThreadDetail` (:327-333) reads `.orderBy('createdAt', 'desc').limit(100)` and reverses the
+page: the thread's LAST 100 messages in ascending order (today the first 100 — in a longer thread the router's
+previous turn, the replayed history and the page would all stop at message 100). The client hook (`lib/hooks/useAssistantStreaming.ts:307-363`) ignores an event it does not handle:
 nothing visible changes; NOVE-15 consumes `route`.
 
 ### Cost and latency budget
@@ -428,17 +472,26 @@ rejecting `new APIConnectionTimeoutError()`; the route tests `vi.mock('@/lib/ser
 | R2 | the request: model, `max_tokens: 256`, forced `tool_choice`, no `thinking`/`fallbacks`/`cache_control`/`output_config`; `create`'s second argument `{ timeout: 4000, maxRetries: 0 }` | `maxRetries: 2` |
 | R3 | fake client: month 2026-10 → `router`; confidence 0.4 → `low-confidence`; text only → `invalid`; `new APIConnectionTimeoutError()` → `timeout`; `new Error()` → `error`; never rejects | drop the confidence check |
 | R4 | `buildRouterUserContent`: the prompt only inside `<messaggio>`; the previous message cut at 300; `nessuna` without history | drop the slice |
-| R5 | `assistantRoute.test.ts`: `checkRouteConsistency` — each intent with its period true, each wrong pairing false, 2026-12 with today 2026-11 false, year 1999 false, register + web false, chat with any period true | `intent === 'chat' \|\|` removed |
-| R6 | `parseRouterToolInput`: a month; `year: null` for ytd; month without `month` → null; confidence 1.2 → null; register with web → web false. `routeToSelection` of the eleven readings | `chatContext: 'none'` hard-coded |
-| R7 | `assistantRoutes.test.ts`, router mocked: `'auto'` → router once; events `meta`, `route`, `context`, `text`, `done` in order; month builder with the reading's month; thread created `month_analysis`; the log has `routeSource`, `routerMs`, no prompt | emit `route` after `text` |
+| R5 | `assistantRoute.test.ts`: `checkRouteConsistency` — each intent with its period true, each wrong pairing false, 2026-12 with today 2026-11 false, year 1999 false, register + web false, chat with any period true | `intent === 'chat' \|\|` replaced by `intent === 'register' \|\|` (it type-checks) |
+| R6 | `parseRouterToolInput`: a month; `year: null` for ytd; month without `month` → null; confidence 1.2 → null; register with web → web false; register with `periodKind: 'month'` 2026-10 → register, period none. `routeToSelection` of the ten consistent readings (the four analyses each on its period, register·none, chat on each of none, month, year, ytd, history), each against its exact `AssistantRouteSelection` | `chatContext: 'none'` hard-coded; drop the register coercion |
+| R7 | `assistantRoutes.test.ts`, router mocked: `'auto'` → router once; events `meta`, `route`, `context`, `text`, `done` in order; month builder with the reading's month; thread created `month_analysis`; the log has `routeSource`, `routeReason`, `routerMs`, no prompt; history [user A, assistant with reading R, user B with no answer] → the router receives R with A; a history ending on an assistant message without a reading → `previous: null` | emit `route` after `text`; `findLast` on the user messages |
+| R7b | `assistantRoutes.test.ts`, `it.each` over the ten readings with the router mocked: the builder called is the reading's (`buildAssistantMonthContext` with its month, `buildAssistantYearContext` with its year, `buildAssistantYtdContext`, `buildAssistantHistoryContext`, `buildAssistantTodayContext` for chat·none, `fetchRegisterInputs` for register) and no other | drop `chatContext` from `routeToSelection` |
 | R7c | a fallback reading → `buildAssistantTodayContext` called; the `route` event carries `reason` | build the month context on fallback |
 | R8 | explicit `month_analysis` → router never called, no `route` event | call the router for every mode |
-| R9 | 400s: `route` + `chat`; `'auto'` + `month`; override `month_analysis` with a year; override month after today | drop the `superRefine` |
-| R10 | web: register override + «petrolio» → false; router chat web false + «inflazione» → true; override chat web false + «inflazione» → false; analysis + «Contesto macro» → true | `\|\| policy` removed |
-| R11 | the assistant message appended with `routeReading` (no `elapsedMs`); the user message without | spread the outcome whole |
-| R12 | `mapMessage`: a valid `routeReading` back; a malformed one dropped, the message kept | return the raw field |
-| R13 | 403 for a viewer without grant, 429 past the limit: the router never called | router above `assertCanAccessAccount` |
-| V1 | `serverValidation.test.ts`: `'auto'` accepted; an unknown mode still a 400 | `z.string()` for mode |
+| R8b | `'auto'` + `route` + `routeCarried: true` → router never called, the `route` event and the stored `routeReading` carry `source: 'carried'`; without the flag `'override'` | always `'override'` |
+| R9 | 400s: `routeCarried: true` without `route`; `route` + `chat`; `'auto'` + `month`; override `month_analysis` with a year; override month after today; override register + `webSearch: true` | drop the `superRefine` |
+| R10 | web: register override + «petrolio» → false; router chat web false + «inflazione» → true; override chat web false + «inflazione» → false; analysis + «Contesto macro» → true; router `month_analysis` web true with «Contesto macro» off → `streamAssistantResponse` receives `enableWebSearch: true` and `preferences.includeMacroContext: true`; explicit `month_analysis` with it off → both false | `\|\| policy` removed; pass `preferences` untouched |
+| R11 | `assistantRoutes.test.ts`: the second `appendAssistantMessage` call carries `routeReading` equal to the `route` event's reading and no `elapsedMs`; the first (user) call carries none | spread the outcome whole |
+| R11b | `assistantThreadsStore.test.ts`: `appendAssistantMessage` with a router reading → `messageSetMock` receives `routeReading` with no `reason` key; without a reading → no `routeReading` key | write `routeReading: message.routeReading` unconditionally |
+| R12 | `assistantThreadsStore.test.ts`, through `getAssistantThreadDetail` on the in-memory mock (`mapMessage` is not exported): a valid `routeReading` comes back; `routeReading: { route: 'x' }` is dropped and the message kept | return the raw field |
+| R12b | `assistantThreadsStore.test.ts`: a thread of 101 messages → the detail holds messages 2-101 in ascending order (the mock's `orderBy` honours the direction) | `'asc'` |
+| R13 | 403 for a viewer without grant on `'auto'`, and on an override on a month after today for `userId: 'user-2'` (403, not 400); 429 past the limit (`checkRateLimit` mocked once `{ allowed: false, retryAfterSeconds: 60 }`): the router never called | the router or the date check above `assertCanAccessAccount` |
+| V1 | `serverValidation.test.ts`: `'auto'` accepted; an unknown mode still a 400; the describe's first test is renamed «accepts the six modes and 'auto', and nothing else» | `z.string()` for mode |
+
+Every route test that crosses today computes it, never hard-codes it: `const now = getItalyMonthYear(new Date())`;
+R9's future override is the month after `now` (`now.month === 12 ? { year: now.year + 1, month: 1 } : { year:
+now.year, month: now.month + 1 }`); R7's month reading is the month before `now`. The pure tests (R3, R5, R6) pass
+`today` explicitly as `{ year: 2026, month: 11 }`.
 
 Playwright: nothing new — the five `e2e/assistant.register*.spec.ts` fake the stream in the browser and stay green.
 
@@ -447,17 +500,15 @@ Playwright: nothing new — the five `e2e/assistant.register*.spec.ts` fake the 
 Expected outcome, declared first: nothing changes for the user — the page still sends explicit modes; the router's
 contract is proven by Vitest on fakes; the route answers the new 400s without calling any model.
 
-- **A**: `tsc`, lint, Vitest in `Europe/Rome`, the machine's zone and `TZ=UTC`; the five `assistant.register*`
-  specs; criterion 8's diff and § 5's grep.
+- **A**: `tsc`, lint, Vitest in `Europe/Rome`, the machine's zone and `TZ=UTC`; criterion 8's diff and § 5's grep.
 - **B**: `npm run emulators` + `emulators:seed` + `dev:emulator` started with `ANTHROPIC_API_KEY=dummy-for-400` (no
-  real key in that shell).
+  real key in that shell); then the five `assistant.register*` specs (`npm run test:e2e -- e2e/assistant.register`).
 - **C**: R1-R13 and V1, each seen red with its mutation.
 - **D (under the UI)**: a scratchpad script POSTs with the seeded user's token `mode: 'chat'` + `route` and `'auto'` +
-  `month` → two 400 with the zod issues; an override on a month after today → 400 «Lettura non valida per la data
-  di oggi.». No request reaches the router: none of them is a valid `'auto'`.
+  `month` → two 400 with the zod issues; an override on a month after today → 400 «Lettura non valida.». No request reaches the router: none of them is a valid `'auto'`.
 - **E**: the same valid-shaped override sent for another user's `userId` → 403 before the date check (R13 pins it).
 - **F (owner)**: none for this spec — no surface sends `'auto'`; the first real router call is NOVE-15's phase F.
-- **G**: the dummy key gone, the script deleted, emulators stopped.
+- **G** (the two budgets close by README.md § 8's ONE rule, decisions 33 and 34): the dummy key gone, the script deleted, emulators stopped.
 
 ## 8. Putting it into service
 
@@ -466,9 +517,13 @@ Vercel setting (`maxDuration = 300`, `route.ts:60`, absorbs the 4 s ceiling). No
 
 ## 9. Documentation
 
-- `doc/guide/assistente.md`: a § «Lo smistatore (2026-11)» after § Streaming, threads, memory — the contract, the
-  `route` event after `meta`, the override, the threshold and the four reasons, the web rule (only adds), the cost
-  table, the fakes; § Files gains `router.ts` and `assistantRoute.ts`.
+- `doc/guide/assistente.md`: a `### The router (2026-11)` after `### Streaming, threads, memory`, at most 15 lines —
+  the contract in one sentence, the `route` event right after `meta`, the override (only with `'auto'`, stamped 1),
+  the 0.6 threshold and the four reasons, the web rule (only adds; an analysis's macro sentence follows it), the cost
+  in one sentence (≤ $0.00047 a message, ≤ 4 s, one call per `'auto'` message, none for an override), the fakes
+  (`RouterClient`, `vi.mock` of the router module), «the thread's detail is its last 100 messages»; the guide stays
+  under 500 lines (480 today). § Files gains `router.ts` and `assistantRoute.ts`; the «Suites to run» line gains
+  `assistantRouter`, `assistantRoute`.
 - `AGENTS.md` § Assistant: «`mode: 'auto'` is read by ONE forced-tool Haiku 5.5 call (`lib/server/assistant/
   router.ts`) before any builder; it never throws, below 0.6 it is a free question with no period, its `system` is a
   constant (2026-11-12; pinned by `assistantRouter.test.ts`)».
@@ -516,11 +571,12 @@ interattivo), dammelo una riga alla volta con l'esito atteso.
 
 Implementa la spec così com'è scritta, nell'ordine: i tipi; assistantRoute.ts con i suoi
 test; router.ts con il client finto; lo schema della richiesta; la route (prima lo
-spostamento del thread, poi la selezione, poi le letture di body sostituite); lo store. I
+spostamento del thread, poi la selezione, poi le letture di body sostituite); lo store (anche
+la lettura degli ultimi 100 messaggi). I
 test PRIMA del codice, ciascuno visto rosso con la sua mutazione. Nessuna chiamata vera al
 modello: né nei test né nel collaudo. Fermati e chiedimi se: un test dei prompt per modo
 diventa rosso; il grep del § 5 trova una lettura di body dopo la selezione che la spec non
-elenca; l'SDK installato non accetta le opzioni { timeout, maxRetries } per richiesta.
+elenca; l'SDK installato non accetta le opzioni { timeout, maxRetries } per richiesta; perf:budget, misurato prima e dopo sulla stessa macchina, supera un tetto di più di 1 KB gz (fino a 1 KB lo alzi tu, con raisedBy e una riga in velocita.md § Registro).
 Collaudo: § 7 (la F non c'è: nessuna superficie manda ancora 'auto'). Un branch, un commit,
 solo dopo il mio OK con il riassunto del diff. SESSION_NOTES.md non si committa.
 ```
