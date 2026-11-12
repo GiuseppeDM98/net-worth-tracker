@@ -1113,6 +1113,39 @@ export const EXPENSE_BUDGET_EXCLUSION_SERIES_HINT =
 export const EXPENSE_BUDGET_EXCLUSION_CHIP = 'fuori budget';
 
 /**
+ * A row written from a card of the Assistente's Registra mode (2026-11): the toast of the write,
+ * by kind, and the one a failed save of the card's outcome earns — the row IS written by then,
+ * so the sentence says what a reload will show and what not to do about it.
+ */
+export const ROW_CREATED_TOAST = {
+  expense: 'Spesa creata con successo',
+  income: 'Entrata creata con successo',
+  transfer: 'Trasferimento creato con successo',
+  debt: 'Rata creata con successo',
+} as const;
+
+/**
+ * The toast of a card's write in the expense form's words (2026-11): a series is «{n} voci
+ * ricorrenti create con successo», a fee joins the row («Trasferimento e commissione creati…»).
+ */
+export function describeRowCreatedToast(kind: keyof typeof ROW_CREATED_TOAST, parents: number, withFee: boolean): string {
+  if (parents > 1) return `${parents} voci ricorrenti${withFee ? ' con commissione' : ''} create con successo`;
+  if (!withFee) return ROW_CREATED_TOAST[kind];
+  if (kind === 'transfer') return 'Trasferimento e commissione creati con successo';
+  if (kind === 'income') return 'Entrata e commissione create con successo';
+  if (kind === 'debt') return 'Rata e commissione create con successo';
+  return 'Spesa e commissione create con successo';
+}
+export const PROPOSAL_STATE_NOT_SAVED =
+  'La riga è registrata, ma la card non lo ricorda: dopo un ricaricamento non confermarla di nuovo.';
+/** The goal card's twin (2026-11-11): the goal IS written, the outcome on the message is not. */
+export const GOAL_STATE_NOT_SAVED =
+  "L'obiettivo è scritto, ma la card non lo ricorda: dopo un ricaricamento non confermarla di nuovo.";
+/** The question cards' twin (2026-11): the answer IS sent, the cards on the message do not remember it. */
+export const ANSWER_STATE_NOT_SAVED =
+  'La risposta è inviata, ma le domande non la ricordano: dopo un ricaricamento risultano non risposte.';
+
+/**
  * «Legata all'immobile» (owner, 2026-10-21): the house a row belongs to (`Expense.propertyAssetId`) —
  * a mortgage instalment, a home or CPI policy — so a sale proposes to stop its series.
  */

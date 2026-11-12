@@ -45,7 +45,7 @@ async function open(page: Page): Promise<void> {
   await expect(page.getByRole('region', { name: 'Verdetto del periodo' })).toBeVisible({ timeout: 45_000 });
   await expect(lead(page)).toBeVisible();
   // The tab bar paints after the verdict and THE tile: without this wait «the tabs are 44×44» read 0
-  // visible tabs 1,3 s after the verdict, once on 2026-10-16 and again on 2026-10-20 (e2e-emulatori.md).
+  // visible tabs 1,3 s after the verdict, once on 2026-10-16 and again on 2026-10-20 (e2e-playwright.md).
   await expect(page.getByRole('tablist').first()).toBeVisible();
   await expect(page.getByRole('tab').filter({ visible: true }).first()).toBeVisible();
 }
@@ -115,14 +115,21 @@ test.describe('Cashflow › Tracciamento, composed for a tablet', () => {
 
     const fab = page.getByRole('button', { name: 'Aggiungi nuova voce' });
     const add = page.getByRole('button', { name: 'Aggiungi voce', exact: true });
+    // «Chiedi all'Assistente» stands beside «Aggiungi» and follows it (2026-11): the FAB alone in portrait.
+    const bridge = page.getByRole('tabpanel', { name: 'Tracciamento' }).getByRole('link', { name: "Chiedi all'Assistente" });
     if (isLandscape(page)) {
       await expect(add).toBeVisible();
       expect((await add.boundingBox())!.height).toBeGreaterThanOrEqual(TOUCH_FLOOR);
       await expect(fab).toBeHidden();
+      await expect(bridge).toBeVisible();
+      expect((await bridge.boundingBox())!.height).toBeGreaterThanOrEqual(TOUCH_FLOOR);
     } else {
       await expect(fab).toBeVisible();
       await expect(add).toBeHidden();
+      await expect(bridge).toBeHidden();
     }
+    // The header's link is the desktop's.
+    await expect(page.getByRole('link', { name: "Chiedi all'Assistente" }).filter({ visible: true })).toHaveCount(isLandscape(page) ? 1 : 0);
   });
 
   test('at 1440 the grid is the one of a page opened at 1440: twelve tracks, no row', async ({ page }) => {

@@ -25,6 +25,8 @@ const {
   extractMemoryCandidatesMock,
   extractStructuredGoalFromTextMock,
   accountAccessDocGetMock,
+  fetchCashflowBlockInputsMock,
+  fetchRegisterInputsMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   buildAssistantMonthContextMock: vi.fn(),
@@ -47,6 +49,8 @@ const {
   extractMemoryCandidatesMock: vi.fn(),
   extractStructuredGoalFromTextMock: vi.fn(),
   accountAccessDocGetMock: vi.fn(),
+  fetchCashflowBlockInputsMock: vi.fn(),
+  fetchRegisterInputsMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -67,6 +71,10 @@ vi.mock('@/lib/firebase/admin', () => ({
       if (name === 'account-access') {
         return { doc: vi.fn(() => ({ get: accountAccessDocGetMock })) };
       }
+      // The history analysis reads its start year from the settings (fetchHistoryStartYear).
+      if (name === 'assetAllocationTargets') {
+        return { doc: vi.fn(() => ({ get: vi.fn(async () => ({ data: () => ({ cashflowHistoryStartYear: 2025 }) })) })) };
+      }
       throw new Error(`Unexpected collection: ${name}`);
     }),
   },
@@ -78,6 +86,8 @@ vi.mock('@/lib/services/assistantMonthContextService', () => ({
   buildAssistantYtdContext: buildAssistantYtdContextMock,
   buildAssistantHistoryContext: buildAssistantHistoryContextMock,
   buildAssistantTodayContext: buildAssistantTodayContextMock,
+  fetchCashflowBlockInputs: fetchCashflowBlockInputsMock,
+  fetchRegisterInputs: fetchRegisterInputsMock,
 }));
 
 vi.mock('@/lib/server/assistant/store', () => ({
@@ -102,10 +112,12 @@ vi.mock('@/lib/server/assistant/anthropicStream', () => ({
 
 // Keeps the fire-and-forget memory extraction off the network, and lets the goal
 // structuring path of PATCH be asserted without a real Haiku call.
-vi.mock('@/lib/server/assistant/memoryExtraction', () => ({
+vi.mock('@/lib/server/assistant/memoryExtraction', async () => ({
   extractMemoryCandidates: extractMemoryCandidatesMock,
   extractStructuredGoalFromText: extractStructuredGoalFromTextMock,
   dedupeMemoryItems: vi.fn((candidates: unknown[]) => candidates),
+  // The real rule: the route archives what it supersedes (2026-11).
+  supersedesCategorizationRule: (await vi.importActual<typeof import('@/lib/server/assistant/memoryExtraction')>('@/lib/server/assistant/memoryExtraction')).supersedesCategorizationRule,
 }));
 
 import { GET as getThreadsRoute } from '@/app/api/ai/assistant/threads/route';
@@ -149,6 +161,17 @@ describe('Assistant private API routes', () => {
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
     // Default: no delegated-access grant, so cross-account calls are denied (403).
     accountAccessDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
+    fetchCashflowBlockInputsMock.mockResolvedValue({
+      expenses: [], todayIso: '2026-10-20', categories: [], assets: [], settings: null, assetValueOf: () => 0,
+    });
+    // What Registra reads: one category, no account, no row, the month unread.
+    fetchRegisterInputsMock.mockImplementation(async (_userId: string, now: Date) => ({
+      now,
+      categories: [{ id: 'cat-cibo', userId: 'user-1', name: 'Cibo', type: 'variable', subCategories: [], createdAt: now, updatedAt: now }],
+      assets: [], settings: null, costCenters: [], recentExpenses: [],
+      month: { stats: null, budget: null, budgetFailed: false },
+      assetValueOf: () => 0,
+    }));
     // `satisfies` is load-bearing: the mock is an untyped vi.fn(), so without it a
     // renamed or dropped bundle field leaves this fixture green while it no longer
     // resembles what the route actually receives.
@@ -649,6 +672,32 @@ describe('Assistant private API routes', () => {
     expect(updateAssistantMemoryDocumentMock).toHaveBeenCalled();
   });
 
+  it('archives the categorisation rule a new one supersedes, in the turn’s one write (2026-11)', async () => {
+    const OLD_RULE = { id: 'mem-old', userId: 'user-1', category: 'preference' as const, text: 'Categorizzazione: palestra → Salute › Palestra', createdAt: new Date(2026, 3, 1), updatedAt: new Date(2026, 3, 1), status: 'active' as const };
+    const OTHER = { ...OLD_RULE, id: 'mem-other', text: 'Categorizzazione: cinema → Svago' };
+    getAssistantMemoryDocumentMock.mockResolvedValue({
+      preferences: { responseStyle: 'balanced', includeMacroContext: false, memoryEnabled: true, includeDummySnapshots: false },
+      items: [OLD_RULE, OTHER], suggestions: [], updatedAt: null, hasDummySnapshots: false,
+    });
+    extractMemoryCandidatesMock.mockResolvedValue([{ category: 'preference', text: 'Categorizzazione: palestra → Sport' }]);
+    const response = await streamRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/stream', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid-token' },
+        body: { userId: 'user-1', mode: 'chat', chatContext: 'none', prompt: 'D’ora in poi la palestra la metto in Sport' },
+      })
+    );
+    await response.text();
+    // The extraction runs after the stream has closed.
+    await vi.waitFor(() => expect(applyAssistantMemoryMutationsMock).toHaveBeenCalled());
+    const [userId, mutations] = applyAssistantMemoryMutationsMock.mock.calls.at(-1)!;
+    expect(userId).toBe('user-1');
+    const items = mutations.filter((m: { kind: string }) => m.kind === 'item').map((m: { item: { id: string; text: string; status: string } }) => m.item);
+    expect(items.find((item: { text: string }) => item.text === 'Categorizzazione: palestra → Sport')).toMatchObject({ status: 'active' });
+    expect(items.find((item: { id: string }) => item.id === 'mem-old')).toMatchObject({ status: 'archived', text: OLD_RULE.text });
+    expect(items.some((item: { id: string }) => item.id === 'mem-other')).toBe(false);
+  });
+
   it('streams assistant data for the authenticated user', async () => {
     const response = await streamRoute(
       createJsonRequest('http://localhost/api/ai/assistant/stream', {
@@ -737,5 +786,205 @@ describe('Assistant private API routes', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Authenticated user does not have access to requested account',
     });
+  });
+
+  describe('POST /api/ai/assistant/stream — the CASHFLOW 12 MESI block (2026-11)', () => {
+    const PERIOD_BUNDLE = { selector: { year: 2026, month: -1 } };
+
+    function streamRequest(body: Record<string, unknown>) {
+      return streamRoute(
+        createJsonRequest('http://localhost/api/ai/assistant/stream', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid-token' },
+          body: { userId: 'user-1', prompt: 'Come va?', ...body },
+        })
+      );
+    }
+
+    beforeEach(() => {
+      buildAssistantYearContextMock.mockResolvedValue(PERIOD_BUNDLE);
+      buildAssistantYtdContextMock.mockResolvedValue(PERIOD_BUNDLE);
+      buildAssistantHistoryContextMock.mockResolvedValue(PERIOD_BUNDLE);
+    });
+
+    it.each([
+      ['year_analysis', { year: 2025 }],
+      ['ytd_analysis', {}],
+      ['history_analysis', {}],
+      ['month_analysis', { month: { year: 2026, month: 3 } }],
+      ['chat', { chatContext: 'month', month: { year: 2026, month: 3 } }],
+      ['chat', { chatContext: 'ytd' }],
+      ['chat', { chatContext: 'history' }],
+      ['chat', { chatContext: 'none' }],
+    ])('%s %o reads the block once, for the owner, and hands it to the stream — never on the SSE (since 2026-11-07)', async (mode, extra) => {
+      const response = await streamRequest({ mode, ...extra });
+      expect(response.status).toBe(200);
+      const streamText = await response.text();
+      expect(fetchCashflowBlockInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchCashflowBlockInputsMock.mock.calls[0][0]).toBe('user-1');
+      expect(fetchCashflowBlockInputsMock.mock.calls[0][1]).toBeInstanceOf(Date);
+      const args = streamAssistantResponseMock.mock.calls[0][0] as { cashflowBlock: string | null };
+      expect(args.cashflowBlock).toContain('--- CASHFLOW 12 MESI');
+      expect(streamText).not.toContain('CASHFLOW 12 MESI');
+    });
+
+    it('a co-owner reads the OWNER\'s block, never their own (2026-11-07)', async () => {
+      verifyIdTokenMock.mockResolvedValue({ uid: 'co-owner' });
+      accountAccessDocGetMock.mockResolvedValue({ exists: true, data: () => ({ memberUids: ['co-owner'] }) });
+      const response = await streamRequest({ mode: 'ytd_analysis' });
+      expect(response.status).toBe(200);
+      await response.text();
+      expect(fetchCashflowBlockInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchCashflowBlockInputsMock.mock.calls[0][0]).toBe('user-1');
+    });
+
+    it.each(['ytd_analysis', 'chat'])('%s: a failed read answers the 500, never a silent empty block', async (mode) => {
+      fetchCashflowBlockInputsMock.mockRejectedValue(new Error('read failed'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const response = await streamRequest({ mode, chatContext: 'none' });
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({ error: "Impossibile avviare lo stream dell'assistente" });
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── The body is validated before anything is read (2026-11) ──────────────────────────────
+
+  describe('POST /api/ai/assistant/stream — the body', () => {
+    function streamRequest(body: Record<string, unknown>) {
+      return streamRoute(
+        createJsonRequest('http://localhost/api/ai/assistant/stream', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid-token' },
+          body: { userId: 'user-1', prompt: 'Come va?', ...body },
+        })
+      );
+    }
+
+    it('refuses a mode the app does not have with 400, reading and streaming nothing', async () => {
+      const response = await streamRequest({ mode: 'weekly' });
+      expect(response.status).toBe(400);
+      expect(fetchCashflowBlockInputsMock).not.toHaveBeenCalled();
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a 4001-character prompt in an analysis mode, and an empty one', async () => {
+      expect((await streamRequest({ mode: 'month_analysis', month: { year: 2026, month: 3 }, prompt: 'a'.repeat(4001) })).status).toBe(400);
+      expect((await streamRequest({ mode: 'chat', prompt: '   ' })).status).toBe(400);
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
+
+      const atTheCap = await streamRequest({ mode: 'month_analysis', month: { year: 2026, month: 3 }, prompt: 'a'.repeat(4000) });
+      expect(atTheCap.status).toBe(200);
+      await atTheCap.text();
+    });
+
+    it('keeps every declared field: a year analysis reaches its builder with the year', async () => {
+      buildAssistantYearContextMock.mockResolvedValue({ selector: { year: 2025, month: -1 } });
+      const response = await streamRequest({ mode: 'year_analysis', year: 2025, preferences: { includeDummySnapshots: true } });
+      expect(response.status).toBe(200);
+      await response.text();
+      expect(buildAssistantYearContextMock).toHaveBeenCalledWith('user-1', 2025, true);
+    });
+  });
+
+  // ── Registra: the register block, no period bundle (2026-11) ─────────────────────────────
+
+  describe('POST /api/ai/assistant/stream — Registra', () => {
+    function registerRequest(body: Record<string, unknown> = {}) {
+      return streamRoute(
+        createJsonRequest('http://localhost/api/ai/assistant/stream', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid-token' },
+          body: { userId: 'user-1', mode: 'register', prompt: 'ho fatto spesa per 103 euro', ...body },
+        })
+      );
+    }
+
+    it('reads the register inputs once and builds no period bundle and no portfolio of today', async () => {
+      const response = await registerRequest();
+      expect(response.status).toBe(200);
+      const streamText = await response.text();
+
+      expect(fetchRegisterInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchRegisterInputsMock.mock.calls[0][0]).toBe('user-1');
+      expect(fetchRegisterInputsMock.mock.calls[0][1]).toBeInstanceOf(Date);
+      expect(buildAssistantMonthContextMock).not.toHaveBeenCalled();
+      expect(buildAssistantTodayContextMock).not.toHaveBeenCalled();
+
+      const args = streamAssistantResponseMock.mock.calls[0][0] as { registerBlock: string | null; contextBundle: unknown; mode: string };
+      expect(args.mode).toBe('register');
+      expect(args.contextBundle).toBeNull();
+      expect(args.registerBlock).toContain('--- REGISTRA ---');
+      expect(args.registerBlock).toContain('[cat-cibo] Cibo');
+      // The page's companion gets the summary, never the block.
+      expect(streamText).toContain('"type":"register"');
+      expect(streamText).toContain('"categories":1');
+      expect(streamText).not.toContain('--- REGISTRA ---');
+      expect(streamText).not.toContain('"type":"context"');
+    });
+
+    it('reads the CASHFLOW 12 MESI block once, for the owner, and hands it to the stream', async () => {
+      const response = await registerRequest();
+      await response.text();
+      expect(fetchCashflowBlockInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchCashflowBlockInputsMock.mock.calls[0][0]).toBe('user-1');
+      const args = streamAssistantResponseMock.mock.calls[0][0] as { cashflowBlock: string | null };
+      expect(args.cashflowBlock).toContain('--- CASHFLOW 12 MESI');
+    });
+
+    it('titles a new thread by the mode, and never retitles the day’s thread', async () => {
+      const first = await registerRequest();
+      await first.text();
+      expect(createAssistantThreadMock).toHaveBeenCalledWith(expect.objectContaining({ mode: 'register', title: 'Titolo server' }));
+
+      // An existing register thread with no preview yet: any other mode would retitle it from the prompt.
+      vi.mocked(updateAssistantThreadMetadataMock).mockClear();
+      getAssistantThreadMock.mockResolvedValue({
+        id: 'thread-1', userId: 'user-1', title: 'Registrazioni · 1 nov 2026', createdAt: new Date(2026, 10, 1), updatedAt: new Date(2026, 10, 1),
+        lastMessagePreview: '', mode: 'register', pinnedMonth: null,
+      });
+      appendAssistantMessageMock.mockResolvedValue({ id: 'msg-x', threadId: 'thread-1', userId: 'user-1', role: 'assistant', content: 'x', createdAt: new Date(2026, 10, 1), mode: 'register' });
+      const second = await registerRequest({ threadId: 'thread-1' });
+      await second.text();
+      expect(updateAssistantThreadMetadataMock).toHaveBeenCalledWith('thread-1', expect.objectContaining({ title: 'Registrazioni · 1 nov 2026', mode: 'register' }));
+    });
+
+    it('stores the prose as preview, and the user’s sentence when the answer is only a block', async () => {
+      const block = '```expense-proposal\n{"kind":"expense"}\n```';
+      streamAssistantResponseMock.mockImplementationOnce(async ({ onText }: Parameters<typeof streamAssistantResponse>[0]) => {
+        onText(`Ti propongo questa riga.\n\n${block}`);
+        return { text: `Ti propongo questa riga.\n\n${block}`, webSearchUsed: false };
+      });
+      await (await registerRequest()).text();
+      expect(updateAssistantThreadMetadataMock).toHaveBeenLastCalledWith('thread-1', expect.objectContaining({ lastMessagePreview: 'Ti propongo questa riga.' }));
+
+      // Reset, not only cleared: the queue of one-shot answers of `beforeEach` outlives a test that never streams.
+      appendAssistantMessageMock.mockReset().mockResolvedValue({ id: 'm', threadId: 'thread-1', userId: 'user-1', role: 'user', content: 'ho fatto spesa per 103 euro', createdAt: new Date(2026, 10, 1), mode: 'register' });
+      streamAssistantResponseMock.mockImplementationOnce(async ({ onText }: Parameters<typeof streamAssistantResponse>[0]) => {
+        onText(block);
+        return { text: block, webSearchUsed: false };
+      });
+      await (await registerRequest()).text();
+      expect(updateAssistantThreadMetadataMock).toHaveBeenLastCalledWith('thread-1', expect.objectContaining({ lastMessagePreview: 'ho fatto spesa per 103 euro' }));
+    });
+
+    it('a failed read of the register inputs answers the 500 before any event', async () => {
+      fetchRegisterInputsMock.mockRejectedValue(new Error('read failed'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const response = await registerRequest();
+      expect(response.status).toBe(500);
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('the context route refuses Registra with 400: the mode has no period', async () => {
+    const response = await getContextRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/context?userId=user-1&mode=register', {
+        headers: { Authorization: 'Bearer valid-token' },
+      })
+    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'La modalità Registra non ha un contesto di periodo' });
+    expect(buildAssistantMonthContextMock).not.toHaveBeenCalled();
   });
 });

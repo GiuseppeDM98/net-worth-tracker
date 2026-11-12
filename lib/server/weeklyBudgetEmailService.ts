@@ -38,12 +38,15 @@ import {
 } from '@/lib/utils/emailNarrative';
 import { PRINT_COLORS, EMAIL_MONO_STACK } from '@/lib/constants/printTokens';
 import { cachedFormatCurrencyEUR, formatPercentageIt } from '@/lib/utils/formatters';
+import { formatCashflowBlockSection } from '@/lib/server/assistant/prompts';
+import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import { getItalyDate, getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
 import {
   getPeriodActual,
   getPeriodExpensesForItem,
   buildSpendingForecast,
   forecastMonthlyItem,
+  normalizeBudgetItem,
   splitMonthlyTotalExpenses,
   type CategoryTypeRef,
 } from '@/lib/utils/budgetUtils';
@@ -112,17 +115,6 @@ function rowStatus(ratio: number, projectedRatio: number | null, isIncome: boole
 
 // ─── Data builder ─────────────────────────────────────────────────────────────
 
-/** Back-fills kind/period/amount for budget items saved before those fields existed. */
-function normalizeItem(raw: BudgetItem & { monthlyAmount?: number }): BudgetItem {
-  const kind =
-    raw.kind === 'expense' || raw.kind === 'income'
-      ? raw.kind
-      : raw.scope === 'type' && raw.expenseType === 'income'
-        ? 'income'
-        : 'expense';
-  return { ...raw, kind, period: raw.period ?? 'monthly', amount: raw.amount ?? raw.monthlyAmount ?? 0 };
-}
-
 function itemLabel(item: BudgetItem): string {
   if (item.scope === 'subcategory') return `${item.categoryName ?? ''} › ${item.subCategoryName ?? ''}`;
   return item.categoryName ?? item.expenseType ?? '';
@@ -141,7 +133,7 @@ export async function buildWeeklyBudgetData(userId: string, now: Date): Promise<
   if (!budgetSnap.exists) return null;
   const data = budgetSnap.data() ?? {};
 
-  const items = ((data.items ?? []) as Array<BudgetItem & { monthlyAmount?: number }>).map(normalizeItem);
+  const items = ((data.items ?? []) as Array<BudgetItem & { monthlyAmount?: number }>).map(normalizeBudgetItem);
   const overallMonthlyAmount: number | undefined = data.overallMonthlyAmount;
   if (items.length === 0 && !overallMonthlyAmount) return null;
 
@@ -293,12 +285,17 @@ export function buildCommentContext(data: WeeklyBudgetData): string {
  * API key is set, or when the reply did not end on `end_turn` (a refusal, a cut).
  * Exported for testing.
  */
-export async function generateWeeklyBudgetComment(data: WeeklyBudgetData): Promise<string | null> {
+export async function generateWeeklyBudgetComment(
+  data: WeeklyBudgetData,
+  cashflowBlock: string | null = null
+): Promise<string | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   try {
+    // The CASHFLOW 12 MESI block under the budgets (since 2026-11-07).
+    const cashflowSection = cashflowBlock ? `\n\n${formatCashflowBlockSection(cashflowBlock).slice(0, 2).join('\n')}` : '';
     const prompt = `Sei un assistente finanziario personale italiano. Questo è lo stato dei budget dell'utente:
 
-${buildCommentContext(data)}
+${buildCommentContext(data)}${cashflowSection}
 
 REGOLE
 - Usa SOLO i numeri e gli orizzonti temporali indicati sopra: non inventare cifre né ricavarne di nuove.
@@ -561,7 +558,16 @@ export async function buildAndSendWeeklyBudget(
   const data = await buildWeeklyBudgetData(userId, now);
   if (!data) return false;
 
-  const aiComment = await generateWeeklyBudgetComment(data);
+  // A failed read of the cashflow block sends the email without the comment (owner, 2026-11-07); with
+  // no key there is no comment to write, so the whole-history read is skipped too.
+  const aiComment = process.env.ANTHROPIC_API_KEY
+    ? await readCashflowBlockForPrompt(userId, now)
+        .then((cashflowBlock) => generateWeeklyBudgetComment(data, cashflowBlock))
+        .catch((error) => {
+          console.error('[weeklyBudgetEmail] cashflow block read failed:', error);
+          return null;
+        })
+    : null;
   if (aiComment) data.aiComment = aiComment;
 
   const resend = new Resend(process.env.RESEND_API_KEY);

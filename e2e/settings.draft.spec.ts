@@ -12,7 +12,7 @@
  *
  * The second test WRITES: the settings document is read in `beforeAll` and `set()` back WHOLE in
  * `afterAll` (a page «Salva» rewrites every field and normalises the seed's sub-targets, which
- * settings.spec.ts and allocation.spec.ts read — doc/guide/e2e-emulatori.md).
+ * settings.spec.ts and allocation.spec.ts read — doc/guide/e2e-playwright.md).
  *
  * REGRESSION GUARD, seen red (2026-10-08): the Preferenze view given a `useState` copy of its
  * slice (test 1: the year is back to the saved one after the round trip); `dividendCashAssetId`

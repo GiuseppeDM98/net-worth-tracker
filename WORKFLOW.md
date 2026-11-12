@@ -142,6 +142,15 @@ headless screenshot of the same page. The message says «Comparison N of M», wh
 side is which; the window rules of obligation 5 apply (one item per message, closed and counted before
 the next).
 
+**A window ends by itself, and is closed by its tree** (2026-11-09, after sixteen collaudo scripts of two
+closed sessions were found alive hours later, about a hundred Chromium). The script that opens a visible
+browser for the owner exits when the owner closes the **page** — closing a driven window closes the page,
+not the browser, so `browser.on("disconnected")` alone never fires —, when the browser goes, or after a
+time limit; never an endless wait. The repo writes that wait **once**, in a helper the throwaway scripts
+import, never again in each script. And stopping the background task kills the shell, not the tree
+beneath it (`npx → tsx → node → Chromium`): a window is closed by its root with the whole tree, then the
+count says zero.
+
 ### Standard phases, when they make sense
 
 | | Phase | What it establishes |
@@ -163,6 +172,13 @@ resource** (the test — must fail), with the same identical file or record.
 
 Restore any configuration that was changed, remove fixtures and test attachments, delete the script,
 and **record the outcome somewhere that survives the session** (`CLAUDE.md` or equivalent).
+
+**No collaudo script outlives its session** (2026-11-09). `node ~/.claude/processi-collaudo.mjs` counts the
+trees of `scripts/collaudo-*` alive in the repo and says whose they are: this session's (closed with
+`--chiudi`), another open session's (never touched), or nobody's known (named to the owner, closed with
+`--chiudi --anche-ignote` only on their yes). The count is the **first gate** of every repo's gate list:
+zero, or the gates do not start. The standard `settings.json` runs it with `--hook` at `SessionEnd`, so a
+session that ends closes its own windows; one that dies without ending is caught by the next gate.
 *A verification that was not recorded counts as not done.*
 
 **The outcome is one line, the signals are not** (2026-10-19). In `CLAUDE.md` the session's status
@@ -259,7 +275,10 @@ The app **is** locally runnable; there is no fallback to declare.
   do not ask the owner to reason about what a guest "would" see.
 - Two areas are deliberately out of reach of a tour: the **assistant** needs
   `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` and a live Anthropic key, and **email/PDF** have no DOM — they
-  are verified by rendering them from a throwaway spec (doc/guide/email-pdf.md).
+  are verified by rendering them from a throwaway spec (doc/guide/email-pdf.md). **The PR's Vercel preview is no
+  tour for an AI surface** (owner, 2026-11-07, the Consulente's scene): the preview holds the demo account alone, and
+  the demo blocks every AI feature (`useDemoMode()`), so a phase F planned there is skipped — it runs on the MIRROR
+  (below) with the `.env.local` key, or, by the owner's choice, in production after the deploy.
 
 ### Obligation 4 — automate it here
 
@@ -293,7 +312,7 @@ The app **is** locally runnable; there is no fallback to declare.
   `storageState` per fixture account (`e2e/.auth/<account>.json`, minted by the six `auth*.setup.ts`
   projects), so a script does not have to reproduce the login: `npx playwright test --project=<name>`,
   one of the fourteen projects of `playwright.config.ts` (SETUP.md § What it covers; the full table in
-  doc/guide/e2e-emulatori.md). A throwaway spec
+  doc/guide/e2e-playwright.md). A throwaway spec
   must match that project's `testMatch` to be collected, and must be deleted at the end.
 - **Automated suites are yours to run, always**: `npx tsc --noEmit`, `TZ=Europe/Rome npx vitest run`
   and `npx playwright test`.
@@ -302,7 +321,7 @@ The app **is** locally runnable; there is no fallback to declare.
   without that header the call is silently filtered to an empty result, which looks exactly like
   "there are no documents" — or from the API route's own response, or from the emulator UI on
   `http://127.0.0.1:4000`. Arithmetic belongs to Vitest; the browser is for what only a browser
-  knows (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+  knows (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
 - **Prove the check can fail.** Break the thing under test on purpose once and watch the assertion
   go red. A green check that has never been seen red is indistinguishable from one asserting
   nothing. **When it stays green, the sentence that motivated the test was wrong, not the test**
@@ -314,7 +333,15 @@ The app **is** locally runnable; there is no fallback to declare.
 - **Phase G**: prefer deleting the few documents you created (`curl -X DELETE` with the same
   `Bearer owner` header) over wiping `.emulator-data/`, which throws away the shared seed. A
   document with side effects — a transaction or trade, whose deletion re-runs the replay — is
-  deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+  deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
+- **A mock page published as an Artifact inherits the host skeleton's `body{color:#000}`** (2026-11-06, the concept
+  pages of the AI surfaces' visual direction): the Artifact host prepends `:root{color-scheme:light} body{background:#fff;color:#000}` and nests the
+  page inside its body, so a text colour declared on `html` is overridden for every descendant and a dark page shows
+  black on black — Playwright on `file://` never shows it. A page meant for an Artifact sets `background` AND `color`
+  on `body` (the page contract asks for the background alone).
+- **`impeccable detect` runs its `design-system-*` checks only on a file inside the repo root** (2026-11-06, the
+  check of those concept pages): a copy in the scratchpad reports 0 for that family while `low-contrast` still fires, so a
+  probe page (a light copy, a themes sheet) goes in the repo root as `.tmp-*.html` and is deleted before the commit.
 
 ### Where things are recorded
 

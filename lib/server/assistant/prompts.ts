@@ -16,6 +16,9 @@
 
 import { AssistantMemoryItem, AssistantMonthContextBundle, AssistantPreferences, AssistantTodayContext } from '@/types/assistant';
 import { getAssistantPeriodLabel } from '@/lib/utils/assistantPeriodLabel';
+import { EXPENSE_PROPOSAL_LANGUAGE, EXPENSE_PROPOSALS_MAX_PER_MESSAGE } from '@/lib/utils/expenseProposal';
+import { ASSISTANT_QUESTION_MAX_PER_MESSAGE } from '@/lib/utils/questionSet';
+import { MAX_RECURRENCE_OCCURRENCES } from '@/lib/utils/recurrenceDates';
 import { GoalVerdict } from '@/lib/utils/goalTrajectory';
 import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import {
@@ -860,7 +863,8 @@ export function buildMonthAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  cashflowBlock?: string
 ): AssistantPromptParts {
   const monthLabel = getAssistantPeriodLabel(bundle.selector);
   const numericBlock = formatBundleForPrompt(bundle);
@@ -882,10 +886,24 @@ export function buildMonthAnalysisPrompt(
     'Di seguito trovi i dati finanziari del mese, estratti in modo affidabile dal sistema:',
     '',
     numericBlock,
+    ...formatCashflowBlockSection(cashflowBlock),
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ].join('\n');
 
   return { system: `${ASSISTANT_SYSTEM_CORE}\n\n${MONTH_FORMAT_CONTRACT}`, userContent };
+}
+
+/**
+ * The note over the CASHFLOW 12 MESI block (lib/utils/cashflowBlock.ts), the same on every surface that
+ * carries it — every mode of the Assistente and the emails' AI comments (since 2026-11-07): the
+ * block is the whole recorded history whatever the period in question, so a period's figures stay its
+ * bundle's. In `userContent`, never in `system`.
+ */
+const CASHFLOW_BLOCK_NOTE = "Il blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi, qualunque sia il periodo in esame: le cifre di un periodo vengono dai blocchi del periodo; usalo per l'andamento recente, la capacità di risparmio e la sua stabilità, gli impegni ricorrenti e i conti.";
+
+/** The note, the block and a blank line — or nothing without a block. */
+export function formatCashflowBlockSection(cashflowBlock?: string | null): string[] {
+  return cashflowBlock ? [CASHFLOW_BLOCK_NOTE, cashflowBlock, ''] : [];
 }
 
 /**
@@ -900,7 +918,8 @@ export function buildYearAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  cashflowBlock?: string
 ): AssistantPromptParts {
   const yearLabel = `Anno ${bundle.selector.year}`;
   const isCurrentYear = bundle.dataQuality.isPartialMonth;
@@ -928,6 +947,7 @@ export function buildYearAnalysisPrompt(
     'Di seguito trovi i dati finanziari aggregati per l\'anno, estratti in modo affidabile dal sistema:',
     '',
     numericBlock,
+    ...formatCashflowBlockSection(cashflowBlock),
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ].join('\n');
 
@@ -944,7 +964,8 @@ export function buildYtdAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  cashflowBlock?: string
 ): AssistantPromptParts {
   const yearLabel = `${bundle.selector.year}`;
   const numericBlock = formatBundleForPrompt(bundle);
@@ -967,6 +988,7 @@ export function buildYtdAnalysisPrompt(
     'Di seguito trovi i dati finanziari YTD, estratti in modo affidabile dal sistema:',
     '',
     numericBlock,
+    ...formatCashflowBlockSection(cashflowBlock),
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ].join('\n');
 
@@ -983,7 +1005,8 @@ export function buildHistoryAnalysisPrompt(
   bundle: AssistantMonthContextBundle,
   userPrompt: string,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
+  memoryItems: AssistantMemoryItem[] = [],
+  cashflowBlock?: string
 ): AssistantPromptParts {
   const startYear = bundle.selector.year;
   const numericBlock = formatBundleForPrompt(bundle);
@@ -1005,6 +1028,7 @@ export function buildHistoryAnalysisPrompt(
     'Di seguito trovi i dati finanziari aggregati sull\'intero periodo storico:',
     '',
     numericBlock,
+    ...formatCashflowBlockSection(cashflowBlock),
     `Domanda dell'utente: ${userPrompt.trim()}`,
   ].join('\n');
 
@@ -1027,7 +1051,8 @@ export function buildChatPrompt(
   monthLabel: string | undefined,
   memoryItems: AssistantMemoryItem[] = [],
   contextBundle?: AssistantMonthContextBundle | null,
-  todayContext?: AssistantTodayContext | null
+  todayContext?: AssistantTodayContext | null,
+  cashflowBlock?: string | null
 ): AssistantPromptParts {
   const memoryBlock = preferences.memoryEnabled
     ? formatMemoryForPrompt(memoryItems)
@@ -1062,10 +1087,101 @@ export function buildChatPrompt(
     userSections.push(noDataNote);
   }
 
+  // The CASHFLOW 12 MESI block, with or without a period (2026-11-07).
+  if (cashflowBlock) userSections.push('', ...formatCashflowBlockSection(cashflowBlock).slice(0, 2));
   userSections.push('', `Richiesta utente: ${prompt.trim()}`);
 
   return {
     system: `${ASSISTANT_SYSTEM_CORE}\n\n${CHAT_FORMAT_CONTRACT}`,
+    userContent: userSections.join('\n'),
+  };
+}
+
+/**
+ * The Registra mode's contract (2026-11): the ```expense-proposal and ```assistant-question protocols,
+ * the four kinds of row, the WHEN rules and the memory-off answer, in THIS mode's `system` only. `ASSISTANT_SYSTEM_CORE` is shared with every other mode and with the emails, which must
+ * never be told a row can be proposed — so the contract is appended here and nowhere else, and it
+ * switches the core's goal protocol off for the mode. Static: every id, name and figure the model
+ * copies is in `userContent` (the register block), so the system stays byte-identical per mode.
+ * The schemas are `expenseProposalSchema` (lib/utils/expenseProposal.ts) and the question's
+ * (lib/utils/questionSet.ts, through lib/utils/assistantQuestionBlocks.ts): a block that breaks
+ * its schema renders as code.
+ */
+export const REGISTER_CONTRACT = [
+  '# Modalità Registra',
+  "In questa modalità l'utente ti dice cosa ha speso, incassato, spostato fra i suoi conti o pagato a rata e tu gli proponi la riga da registrare nel Cashflow. Non puoi scrivere nulla da solo: puoi solo PROPORRE, e la riga viene scritta unicamente quando l'utente preme Conferma sulla card che la tua proposta genera.",
+  '',
+  '## La proposta di una riga',
+  `Per ogni riga emetti un blocco di codice delimitato con linguaggio \`${EXPENSE_PROPOSAL_LANGUAGE}\` che contenga SOLO JSON valido, senza commenti e senza testo attorno, con questo schema:`,
+  '{ "kind": "expense" | "income" | "transfer" | "debt", "type": "fixed" | "variable" | "income" | "transfer" | "debt", "amount": number, "dateIso": "YYYY-MM-DD", "categoryId"?: string, "subCategoryId"?: string, "accountId"?: string, "fromAccount"?: string, "toAccount"?: string, "loanName"?: string, "payoff"?: boolean, "fee"?: { "amount": number }, "recurring"?: { "frequency": "monthly" | "yearly", "count": number, "day"?: number }, "newCategory"?: { "name": string, "type": "fixed" | "variable" | "income" | "debt" }, "newSubCategory"?: { "categoryId": string, "name": string }, "costCenterId"?: string, "memberId"?: string, "excludeFromBudget"?: boolean, "note"?: string, "reason": string }',
+  'Vincoli:',
+  `- Un blocco per ogni riga che l'utente nomina, al massimo ${EXPENSE_PROPOSALS_MAX_PER_MESSAGE} per messaggio: se ne nomina di più, proponi le prime ${EXPENSE_PROPOSALS_MAX_PER_MESSAGE} e scrivi “Ne restano N: vuoi che continui?”.`,
+  '- Ogni blocco sta su righe sue, fuori da elenchi e citazioni.',
+  '- `amount` è un numero JSON in euro con il punto decimale, senza separatori di migliaia né simbolo, sempre positivo (al massimo 1000000): il segno lo dà il tipo. Senza importo non emettere il blocco: chiedilo in prosa.',
+  '- Gli id (`categoryId`, `subCategoryId`, `accountId`, `costCenterId`, `memberId`) si copiano dai blocchi CATEGORIE, CONTI, CENTRI DI COSTO e INTESTATARI, dove stanno fra parentesi quadre: mai inventati, mai il nome al posto dell\'id. Solo `fromAccount`, `toAccount` e `loanName` ammettono il nome come lo dice l\'utente, quando l\'[id] non c\'è.',
+  '- Scegli una categoria del tipo della riga e copia il suo tipo: `type` è "fixed" per Spese Necessarie, "variable" per Spese Non Necessarie, "income" per Entrate, "debt" per Debiti; un trasferimento non ha bisogno di `categoryId` (la categoria la sceglie l\'app). Segui il modo di categorizzare dell\'utente nelle ULTIME RIGHE e scrivi in `reason` quali righe hai seguito. `subCategoryId` solo se la sottocategoria è della categoria scelta.',
+  "- Il conto è quello che l'utente nomina o sceglie rispondendo a una domanda \"account:\" (il suo [id]); se non lo nomina e QUANDO CHIEDERE non dice di chiederlo, è il predefinito del tipo (addebito per una spesa e per una rata, accredito per un'entrata): ometti `accountId`.",
+  '- La data è oggi, salvo che l\'utente dica altro: risolvi “ieri”, “lunedì scorso” dalla data di oggi stampata nel blocco REGISTRA; una data futura è ammessa.',
+  "- `costCenterId` e `memberId` solo se il loro blocco è attivo e l'utente li nomina o li sceglie rispondendo a una domanda; `excludeFromBudget` su una spesa o una rata quando QUANDO CHIEDERE lo applica.",
+  '- `note` (al massimo 200 caratteri) è la nota della riga: il negozio o il dettaglio che l\'utente ha detto. `reason` (obbligatorio, al massimo 240 caratteri) spiega in una frase la categoria scelta.',
+  "- Le righe proposte nei messaggi precedenti l'utente le ha già confermate o ignorate: non riproporle, salvo che te lo chieda.",
+  '',
+  '## Attorno alle proposte',
+  'Scrivi poco, qualunque sia lo stile di risposta indicato nel messaggio: una frase prima dei blocchi, poi i blocchi. Dopo i blocchi scrivi solo ciò che serve all\'utente per decidere: una riga che non hai proposto e perché, e al massimo una frase sul budget della categoria presa da IL MESE, senza inventare cifre.',
+  'Niente sezioni con titolo (ipotesi, dati del mese, limiti dei dati) e nessun elenco di ciò che hai dato per scontato: ciò che la card già mostra (data, conto, categoria) non si ripete in prosa.',
+  'Non dire quante righe hai letto né che le ULTIME RIGHE sono tagliate, salvo che l\'utente chieda di una riga che non trovi.',
+  'Un dubbio vero su categoria, conto, immobile, intestatario o prestito si chiede con un blocco \`\`\`assistant-question in un messaggio SENZA proposte, mai con una domanda in prosa sotto le card.',
+  'Non proporre mai una riga con una categoria sbagliata.',
+  'In questa modalità non proporre obiettivi.',
+  '',
+  '## Tipi di riga, domande e memoria',
+  'TIPI DI RIGA: "kind" è "expense" (type "fixed" o "variable"), "income" (type "income"), "transfer" (type "transfer") o "debt" (type "debt").',
+  'Un trasferimento sposta soldi fra due conti, o fra un conto e un immobile: scrivi "fromAccount" e "toAccount" con l\'[id] dei blocchi CONTI o IMMOBILI (o il nome come lo dice l\'utente), mai "accountId"; un immobile sta su un lato solo. Se l\'utente non nomina uno dei due lati, chiedilo.',
+  'Una rata di mutuo o di prestito ha kind "debt" e "loanName" con l\'[id] o il nome del blocco PRESTITI; con due o più prestiti e un nome che non li distingue, chiedi «Quale prestito?» con una domanda "loan:"; una rata che non ripaga un prestito del blocco si propone senza "loanName"; "payoff": true solo per un\'estinzione anticipata.',
+  `Le entrate e i trasferimenti non si ripetono: una serie ("recurring") è solo per spese e rate, al più ${MAX_RECURRENCE_OCCURRENCES.monthly} occorrenze mensili o ${MAX_RECURRENCE_OCCURRENCES.yearly} annuali; un'estinzione anticipata è una riga sola.`,
+  'Una commissione si scrive "fee": { "amount" } sulla riga che la paga; la sua categoria è quella di Impostazioni: non sceglierla.',
+  'Proponi una categoria nuova SOLO se nessuna esistente si adatta, e preferisci una sottocategoria sotto una categoria esistente; segui il modo di categorizzare dell\'utente (le righe recenti, le regole in memoria). Si scrive "newSubCategory": { "categoryId", "name" } con "categoryId" uguale a quello della riga, oppure "newCategory": { "name", "type" } senza "categoryId"; mai una categoria nuova di tipo "transfer".',
+  'L\'ordine è: ciò che l\'utente dice in questo messaggio, poi le regole di categorizzazione in memoria, poi lo storico delle righe recenti.',
+  'QUANDO CHIEDERE: chiedi il conto solo se l\'utente non l\'ha nominato E (non c\'è un conto predefinito per quel tipo O il conto più usato della categoria copre meno dell\'80% delle sue righe). Chiedi l\'intestatario solo se la Divisione è attiva e almeno il 50% delle righe della categoria è personale. Applica «fuori budget» se l\'utente lo dice o se almeno il 50% delle righe della categoria lo è: non chiederlo mai. Chiedi il centro di costo solo se i centri sono attivi e almeno una riga della categoria negli ultimi 12 mesi sta in un centro. Le percentuali sono quelle del blocco PATTERN.',
+  'Se l\'importo arriva senza oggetto, chiedi «Di cosa si tratta?» con 2-4 categorie probabili e "allowOther": true. Non chiedere mai ciò che il messaggio, la memoria o le righe recenti già dicono.',
+  'DOMANDE: una domanda è un blocco \`\`\`assistant-question con UN oggetto JSON { "id", "kind": "single", "text", "options": [{ "value", "label" }], "allowOther" }, alla fine del messaggio. L\'"id" di una domanda su conti, centri, intestatari, prestiti o categorie comincia con "account:", "center:", "member:", "loan:" o "category:" ("account:from" e "account:to" per i due lati di un trasferimento); i "value" sono gli [id] dei blocchi (per una categoria l\'[id] della sottocategoria, o della categoria se non ne ha). Su conti, centri, intestatari e prestiti al più 3 opzioni, le più probabili secondo il blocco PATTERN, e "allowOther": true; non scrivere mai un\'opzione «Altro»: la riga «Altro…» è della card.',
+  `Al più ${EXPENSE_PROPOSALS_MAX_PER_MESSAGE} blocchi \`\`\`expense-proposal o al più ${ASSISTANT_QUESTION_MAX_PER_MESSAGE} blocchi \`\`\`assistant-question per messaggio, mai i due tipi nello stesso messaggio, mai un \`\`\`goal-proposal in questa modalità: prima chiedi, poi proponi.`,
+  'La risposta dell\'utente arriva come un messaggio con una riga per domanda, «{domanda} → {scelta} [id]»: usa l\'[id] fra parentesi quadre e riproponi la riga intera, senza chiedere di nuovo ciò che è stato risposto.',
+  'Se il blocco memoria dice «memoria disattivata» e l\'utente detta una regola, rispondi: «non posso ricordarlo: la memoria è spenta ("Apprendimento automatico" nelle Preferenze dell\'Assistente)».',
+].join('\n');
+
+/** Registra's memory line when the memory is on and holds nothing active yet. */
+export const REGISTER_MEMORY_EMPTY_LINE = 'Memoria: attiva, nessuna regola salvata.';
+
+/**
+ * Builds the prompt of the Registra mode: the register block (ids, recent rows, the month so far)
+ * and the CASHFLOW 12 MESI block under its note, both in `userContent`.
+ */
+export function buildRegisterPrompt(
+  prompt: string,
+  preferences: AssistantPreferences,
+  memoryItems: AssistantMemoryItem[],
+  registerBlock: string,
+  cashflowBlock: string | null
+): AssistantPromptParts {
+  // Memory on and still empty says so: with no line at all the model could not tell it from memory
+  // off, and answered a first rule «non posso confermarti che resti salvata» (the owner's tour, 2026-11-11).
+  const memoryBlock = preferences.memoryEnabled
+    ? formatMemoryForPrompt(memoryItems) || REGISTER_MEMORY_EMPTY_LINE
+    : // The contract names this sentence: the model answers a rule it cannot keep (2026-11).
+      'Memoria: memoria disattivata.';
+
+  const userSections: string[] = [
+    buildResponseStyleInstruction(preferences.responseStyle),
+    memoryBlock,
+    '',
+    registerBlock,
+  ];
+  if (cashflowBlock) userSections.push('', ...formatCashflowBlockSection(cashflowBlock).slice(0, 2));
+  userSections.push('', `Richiesta utente: ${prompt.trim()}`);
+
+  return {
+    system: `${ASSISTANT_SYSTEM_CORE}\n\n${REGISTER_CONTRACT}`,
     userContent: userSections.join('\n'),
   };
 }

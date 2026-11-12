@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { NarrativeSegments, NarrativeText } from '@/components/ui/narrative-text';
 import { useRowAnswer } from '@/components/ui/row-answers';
 import { CLOSED_ANSWER_CLASS, ASIDE_YIELDS_TO_ANSWER_CLASS } from '@/lib/utils/tabletComposition';
+import { AI_GENERATED_EYEBROW_CLASS, AI_GENERATED_SURFACE_CLASS } from '@/lib/constants/aiAccent';
 
 /**
  * A row of the small-screen composition, as `useMobileSections().collapse(id)` hands it to a
@@ -38,6 +39,12 @@ interface TileBaseProps {
   reading?: Narrative | null;
   /** Optional accessible label for the section; defaults to the eyebrow. */
   ariaLabel?: string;
+  /**
+   * What the model wrote (DESIGN.md → The AI-Accent Rule, 2026-11-07): the 1px accent border at rest,
+   * the glow on hover, the eyebrow in the accent — the words unchanged, so the accessible name is.
+   * Never on a tile that only ASKS the model («Applica», «Chiedi una modifica»).
+   */
+  generated?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -142,6 +149,8 @@ interface TileRowShellProps {
   asideWhenOpen?: string;
   /** `alert` on an error notice that is the page's live node; absent = a region named by `ariaLabel`. */
   role?: 'alert';
+  /** The row's surface wears the AI accent (`Tile`'s `generated`). */
+  generated?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -158,7 +167,7 @@ interface TileRowShellProps {
  * Panoramica). `aria-controls` is written on the button AFTER Radix's spread, which would
  * otherwise name its own `contentId`.
  */
-export function TileRowShell({ collapse, eyebrow, ariaLabel, asideWhenClosed, asideWhenOpen, role, className, children }: TileRowShellProps) {
+export function TileRowShell({ collapse, eyebrow, ariaLabel, asideWhenClosed, asideWhenOpen, role, generated, className, children }: TileRowShellProps) {
   const { id, open } = collapse;
   const asideText = open ? asideWhenOpen : asideWhenClosed;
   // The landscape index's answer (`RowAnswers`, components/ui/row-answers.tsx): closed rows only, and
@@ -167,7 +176,7 @@ export function TileRowShell({ collapse, eyebrow, ariaLabel, asideWhenClosed, as
   const answer = open || collapse.failed ? null : pageAnswer;
   return (
     <Collapsible open={open} onOpenChange={collapse.onOpenChange} asChild>
-      <section id={id} role={role} aria-label={ariaLabel} className={cn(TILE_SURFACE_CLASS, 'scroll-mt-24', className)}>
+      <section id={id} role={role} aria-label={ariaLabel} data-generated={generated ? '' : undefined} className={cn(TILE_SURFACE_CLASS, 'scroll-mt-24', generated && AI_GENERATED_SURFACE_CLASS, className)}>
         <h3 className="m-0">
           <CollapsibleTrigger asChild>
             <button
@@ -223,15 +232,16 @@ export function TileRowShell({ collapse, eyebrow, ariaLabel, asideWhenClosed, as
  * width — nothing changes at 1440.
  */
 export function Tile(props: TileProps) {
-  const { eyebrow, aside, asideWhenClosed, reading, ariaLabel, className, children, collapse } = props;
+  const { eyebrow, aside, asideWhenClosed, reading, ariaLabel, generated, className, children, collapse } = props;
 
   if (collapse) {
     // A text aside keeps its place beside the eyebrow, open or closed; a control (NoteTile's
     // «Aggiungi») cannot nest in the trigger and opens the panel instead.
     const asideText = typeof aside === 'string' ? aside : undefined;
     const asideControl = asideText === undefined ? aside : undefined;
+    // The red of a failed read wins over the accent of a generated row.
     const label = (
-      <span className={cn(TILE_EYEBROW_CLASS, 'flex min-w-0 items-center gap-1.5', collapse.failed && 'text-destructive')}>
+      <span className={cn(TILE_EYEBROW_CLASS, 'flex min-w-0 items-center gap-1.5', generated && !collapse.failed && AI_GENERATED_EYEBROW_CLASS, collapse.failed && 'text-destructive')}>
         {collapse.failed && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
         <span className="min-w-0">{eyebrow}</span>
         {collapse.failed && <span className="sr-only">, lettura fallita</span>}
@@ -244,6 +254,7 @@ export function Tile(props: TileProps) {
         ariaLabel={ariaLabel ?? eyebrow}
         asideWhenClosed={asideWhenClosed}
         asideWhenOpen={asideText}
+        generated={generated}
         className={className}
       >
         {asideControl && <div className="mb-1 flex justify-end text-[10px] text-muted-foreground">{asideControl}</div>}
@@ -254,14 +265,14 @@ export function Tile(props: TileProps) {
   }
 
   return (
-    <section id={props.id} aria-label={ariaLabel ?? eyebrow} className={cn(TILE_SURFACE_CLASS, 'p-5', className)}>
+    <section id={props.id} aria-label={ariaLabel ?? eyebrow} data-generated={generated ? '' : undefined} className={cn(TILE_SURFACE_CLASS, 'p-5', generated && AI_GENERATED_SURFACE_CLASS, className)}>
       {/* The head wraps: an aside that carries controls (a pill, a select, two actions) drops under the
           eyebrow on a phone instead of pushing the tile past the viewport. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
         {/* A heading, not a paragraph: a page of nine tiles listed two headings (the title and the
             verdict) to a screen reader, which navigates a long page by them. `h3` under the verdict's
             `h2`; the class carries every metric, so nothing changes on screen. */}
-        <h3 className={TILE_EYEBROW_CLASS}>{eyebrow}</h3>
+        <h3 className={cn(TILE_EYEBROW_CLASS, generated && AI_GENERATED_EYEBROW_CLASS)}>{eyebrow}</h3>
         {aside && <div className="min-w-0 max-w-full shrink-0 text-[10px] text-muted-foreground">{aside}</div>}
       </div>
       {reading && (

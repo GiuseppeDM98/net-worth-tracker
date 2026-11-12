@@ -6,6 +6,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { describeWriteError, userFacingError } from '@/lib/utils/dialogNarrative';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { adoptStreamMessageId, applyProposalToMessages } from '@/lib/utils/assistantStreamBuffer';
 import {
   AssistantChatContextType,
   AssistantMessage,
@@ -13,7 +14,10 @@ import {
   AssistantMonthContextBundle,
   AssistantMonthSelectorValue,
   AssistantPreferences,
+  AssistantProposalState,
+  AssistantRegisterSummary,
   AssistantStreamEvent,
+  AssistantThreadDetail,
 } from '@/types/assistant';
 
 function parseSseEvent(rawChunk: string): AssistantStreamEvent | null {
@@ -169,6 +173,9 @@ export function useAssistantStreaming({
   // Context bundle is populated from the SSE 'context' event sent before text streaming,
   // or (when idle) from the period-preview fetch the page performs.
   const [contextBundle, setContextBundle] = useState<AssistantMonthContextBundle | null>(null);
+  // Registra: what the server read for the register block (the SSE 'register' event), shown by the
+  // companion tile in place of the browser's own summary. Cleared at each submit and thread switch.
+  const [registerSummary, setRegisterSummary] = useState<AssistantRegisterSummary | null>(null);
 
   // Stores the last successfully submitted prompt so retry can re-send it
   // after draft is cleared. Using a ref avoids stale closure issues.
@@ -242,12 +249,21 @@ export function useAssistantStreaming({
     setIsSlowResponse(false);
     setStreamStatus(null);
     setContextBundle(null);
+    setRegisterSummary(null);
     setStreamingMessageId(assistantMessageId);
     // Use renderedMessages (not the thread detail) as the base so that
     // messages from the previous stream are preserved even if React Query hasn't
-    // yet reloaded the thread after the last invalidation.
-    setStreamingMessages([
-      ...renderedMessages,
+    // yet reloaded the thread after the last invalidation. The buffer itself when it holds
+    // messages: a submit from an older render — the question cards' «Rispondi» records the
+    // answers, then sends (2026-11) — would otherwise drop the outcomes recorded since.
+    // With an empty buffer, the cached thread: where `recordProposal` writes for a thread opened
+    // from the list.
+    setStreamingMessages((current) => [
+      ...(current.length > 0
+        ? current
+        : selectedThreadId
+          ? (queryClient.getQueryData<AssistantThreadDetail>(queryKeys.assistant.thread(selectedThreadId))?.messages ?? renderedMessages)
+          : renderedMessages),
       userMessage,
       {
         id: assistantMessageId,
@@ -300,6 +316,10 @@ export function useAssistantStreaming({
           setContextBundle(event.bundle);
         }
 
+        if (event.type === 'register') {
+          setRegisterSummary(event.summary);
+        }
+
         // Surface the server's progress phase (e.g. web search) in the header badge.
         if (event.type === 'status') {
           setStreamStatus(event.status);
@@ -321,11 +341,17 @@ export function useAssistantStreaming({
           // Mark stream complete: clears streamingMessageId so the message
           // transitions from plain-text to ReactMarkdown rendering.
           setStreamingMessageId(undefined);
+          // The message takes the id of the document the server wrote: a card's outcome is saved
+          // on that document (lib/utils/assistantStreamBuffer.ts).
           setStreamingMessages((current) =>
-            current.map((message) =>
-              message.id === assistantMessageId
-                ? { ...message, webSearchUsed: event.webSearchUsed }
-                : message
+            adoptStreamMessageId(
+              current.map((message) =>
+                message.id === assistantMessageId
+                  ? { ...message, webSearchUsed: event.webSearchUsed }
+                  : message
+              ),
+              assistantMessageId,
+              event,
             )
           );
         }
@@ -374,6 +400,21 @@ export function useAssistantStreaming({
     setStreamingMessages([]);
     setStreamingMessageId(undefined);
     setIsInterrupted(false);
+    setRegisterSummary(null);
+  };
+
+  /**
+   * Records the outcome of a card (a row written, a proposal ignored) where the session reads the
+   * message from: the stream buffer, which wins until a thread switch, AND the cached thread
+   * detail, which is what a thread opened from the list shows. Done before the PATCH that saves
+   * it, so the buttons never come back in this session whatever the request does.
+   */
+  const recordProposal = (messageId: string, threadId: string, key: string, state: Omit<AssistantProposalState, 'at'>) => {
+    const stamped: AssistantProposalState = { ...state, at: new Date() };
+    setStreamingMessages((current) => applyProposalToMessages(current, messageId, key, stamped));
+    queryClient.setQueryData<AssistantThreadDetail>(queryKeys.assistant.thread(threadId), (detail) =>
+      detail ? { ...detail, messages: applyProposalToMessages(detail.messages, messageId, key, stamped) } : detail,
+    );
   };
 
   return {
@@ -386,6 +427,8 @@ export function useAssistantStreaming({
     streamStatus,
     contextBundle,
     setContextBundle,
+    registerSummary,
+    recordProposal,
     submit,
     stop,
     retry,

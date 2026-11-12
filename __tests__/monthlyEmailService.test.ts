@@ -67,6 +67,9 @@ vi.mock('@/lib/server/assistant/store', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/server/assistant/store')>();
   return { ...actual, getAssistantMemoryDocument: vi.fn(actual.getAssistantMemoryDocument) };
 });
+// The CASHFLOW 12 MESI block the AI comment reads (2026-11-07).
+const { readCashflowBlockMock } = vi.hoisted(() => ({ readCashflowBlockMock: vi.fn() }));
+vi.mock('@/lib/server/assistant/cashflowBlockPrompt', () => ({ readCashflowBlockForPrompt: readCashflowBlockMock }));
 vi.mock('@/lib/services/assistantMonthContextService', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/services/assistantMonthContextService')>();
   return { ...actual, buildAssistantPeriodRangeContext: vi.fn(actual.buildAssistantPeriodRangeContext) };
@@ -288,6 +291,27 @@ describe('generateEmailAiComment', () => {
     anthropicCreateMock.mockReset();
     vi.mocked(getAssistantMemoryDocument).mockRejectedValueOnce(new Error('no memory'));
     vi.mocked(buildAssistantPeriodRangeContext).mockResolvedValueOnce(makeBundle());
+    readCashflowBlockMock.mockReset().mockResolvedValue('--- CASHFLOW 12 MESI (x) ---\nX');
+  });
+
+  it('reads the cashflow block once for the user and puts it in the user turn, never in system (2026-11-07)', async () => {
+    anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
+
+    await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
+
+    expect(readCashflowBlockMock).toHaveBeenCalledTimes(1);
+    expect(readCashflowBlockMock.mock.calls[0][0]).toBe('user-1');
+    const params = anthropicCreateMock.mock.calls[0][0] as { system: string; messages: { content: string }[] };
+    expect(params.messages[0].content).toContain('--- CASHFLOW 12 MESI (x) ---\nX');
+    expect(params.system).not.toContain('CASHFLOW 12 MESI');
+  });
+
+  it('a failed read of the block sends no comment and spends no call', async () => {
+    readCashflowBlockMock.mockRejectedValue(new Error('read failed'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison())).toBeNull();
+    expect(anthropicCreateMock).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
@@ -359,6 +383,22 @@ describe('buildEmailAiPrompt', () => {
     expect(userContent).toContain('--- NOTE QUALITÀ DATI ---');
     // Sub-category rows travel with their parent category.
     expect(userContent).toContain('Affitto');
+    // Without a block the user turn carries none (2026-11-07: the comment's caller reads it).
+    expect(userContent).not.toContain('CASHFLOW 12 MESI');
+  });
+
+  it('closes the user turn with the note and the cashflow block, and leaves system alone (2026-11-07)', () => {
+    const data = makeMonthlyData();
+    const comparison = makeComparison();
+    const bundle = makeBundle();
+    const preferences = makePreferences();
+    const without = buildEmailAiPrompt(data, comparison, bundle, preferences, []);
+    const withBlock = buildEmailAiPrompt(data, comparison, bundle, preferences, [], '--- CASHFLOW 12 MESI (x) ---\nX');
+    expect(withBlock.userContent.startsWith(without.userContent)).toBe(true);
+    expect(withBlock.userContent.slice(without.userContent.length)).toMatch(
+      /^\n\nIl blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi[^\n]*\n--- CASHFLOW 12 MESI \(x\) ---\nX\n$/,
+    );
+    expect(withBlock.system).toBe(without.system);
   });
 
   it('labels the data block with the email period, not with the closing month', () => {
@@ -1631,5 +1671,12 @@ describe('buildExpenseSplitTile', () => {
 
     const gross = buildExpenseSplitTile(dataWith([member('Ghiandaia', 1400, 1400), member('Nibbio', 100, 100)]));
     expect(plain(gross)).not.toContain('da dividere');
+  });
+});
+
+describe('buildEmailAiPrompt — the Registra protocol stays out (2026-11)', () => {
+  it('carries no proposal contract: the email never proposes a row', () => {
+    const { system } = buildEmailAiPrompt(makeMonthlyData(), makeComparison(), makeBundle(), makePreferences(), []);
+    expect(system).not.toContain('expense-proposal');
   });
 });

@@ -8,7 +8,7 @@
  * service dependency, and it is the single definition of an asset's EUR value.
  */
 
-import type { Asset } from '@/types/assets';
+import { isCashAccount, type Asset } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
 import type { DashboardOverviewTopAsset } from '@/types/dashboardOverview';
 import { calculateAssetValue } from '@/lib/services/assetService';
@@ -51,14 +51,8 @@ export function resolveBondRowFacts(asset: Asset): BondRowFacts | null {
 
 // ─── Cash accounts ────────────────────────────────────────────────────────────
 
-/**
- * A cash ACCOUNT is `type === 'cash' && assetClass === 'cash'` — the cash-picker rule
- * (doc/guide/patrimonio.md § Asset Pricing, FX and Assets): a money-market ETF carries `assetClass: 'cash'`
- * but is an instrument, and belongs in the table.
- */
-export function isCashAccount(asset: Pick<Asset, 'type' | 'assetClass'>): boolean {
-  return asset.type === 'cash' && asset.assetClass === 'cash';
-}
+// The cash-ACCOUNT rule lives in types/assets.ts since 2026-11; re-exported so its callers stay as they are.
+export { isCashAccount };
 
 /**
  * A row of the Liquidità tile: a cash account, or a loan that finances no property (owner,

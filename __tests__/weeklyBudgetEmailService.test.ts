@@ -11,7 +11,11 @@ let mockBudgetDoc: { exists: boolean; data?: () => unknown } = { exists: false }
 let mockExpenseDocs: Array<{ data: () => unknown }> = [];
 let mockCategoryDocs: Array<{ id: string; data: () => unknown }> = [];
 
+vi.mock('server-only', () => ({}));
 vi.mock('firebase-admin/firestore', () => ({ Timestamp: { fromDate: (d: Date) => d } }));
+// The CASHFLOW 12 MESI block the AI comment reads (2026-11-07).
+const { readCashflowBlockMock } = vi.hoisted(() => ({ readCashflowBlockMock: vi.fn() }));
+vi.mock('@/lib/server/assistant/cashflowBlockPrompt', () => ({ readCashflowBlockForPrompt: readCashflowBlockMock }));
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: async () => ({ error: null }) };
@@ -46,6 +50,7 @@ import {
   buildWeeklyBudgetData,
   buildWeeklyBudgetEmailHtml,
   buildCommentContext,
+  buildAndSendWeeklyBudget,
   generateWeeklyBudgetComment,
   type WeeklyBudgetData,
 } from '@/lib/server/weeklyBudgetEmailService';
@@ -342,5 +347,68 @@ describe('generateWeeklyBudgetComment', () => {
     anthropicCreateMock.mockResolvedValue(answer('Spesa al 50% del tetto. Rimanda', 'max_tokens'));
 
     expect(await generateWeeklyBudgetComment(data)).toBeNull();
+  });
+
+  it('prints the note and the cashflow block under the budgets, and nothing without one (2026-11-07)', async () => {
+    anthropicCreateMock.mockResolvedValue(answer('Spesa al 50% del tetto.', 'end_turn'));
+    await generateWeeklyBudgetComment(data, '--- CASHFLOW 12 MESI (x) ---\nX');
+    await generateWeeklyBudgetComment(data);
+    const withBlock = (anthropicCreateMock.mock.calls[0][0] as { messages: { content: string }[] }).messages[0].content;
+    const without = (anthropicCreateMock.mock.calls[1][0] as { messages: { content: string }[] }).messages[0].content;
+    const context = buildCommentContext(data);
+    expect(withBlock).toContain(`${context}\n\nIl blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi`);
+    expect(withBlock).toContain("i conti.\n--- CASHFLOW 12 MESI (x) ---\nX\n\nREGOLE");
+    expect(without).not.toContain('CASHFLOW 12 MESI');
+    expect(without).toContain(`${context}\n\nREGOLE`);
+  });
+});
+
+describe('buildAndSendWeeklyBudget — the cashflow block (2026-11-07)', () => {
+  const now = new Date(2026, 5, 15, 12);
+  const previousKey = process.env.ANTHROPIC_API_KEY;
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    anthropicCreateMock.mockReset();
+    readCashflowBlockMock.mockReset();
+    mockBudgetDoc = {
+      exists: true,
+      data: () => ({
+        items: [{ id: 'g', kind: 'expense', scope: 'category', period: 'monthly', categoryId: 'c1', categoryName: 'Spesa', amount: 400, order: 0 }],
+        overallMonthlyAmount: 1000,
+      }),
+    };
+    mockExpenseDocs = [expenseDoc(-360, new Date(2026, 5, 10))];
+    mockCategoryDocs = [];
+  });
+
+  afterEach(() => {
+    if (previousKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = previousKey;
+  });
+
+  it('reads the block once for the user, at the send instant, and hands it to the comment', async () => {
+    readCashflowBlockMock.mockResolvedValue('--- CASHFLOW 12 MESI (x) ---\nX');
+    anthropicCreateMock.mockResolvedValue({
+      model: 'claude-sonnet-5-5', content: [{ type: 'text', text: 'Ok.' }], stop_reason: 'end_turn',
+    });
+    expect(await buildAndSendWeeklyBudget('u1', ['a@example.com'], now)).toBe(true);
+    expect(readCashflowBlockMock).toHaveBeenCalledWith('u1', now);
+    const prompt = (anthropicCreateMock.mock.calls[0][0] as { messages: { content: string }[] }).messages[0].content;
+    expect(prompt).toContain('--- CASHFLOW 12 MESI (x) ---\nX');
+  });
+
+  it('with no API key reads no block and spends no call (2026-11-07)', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    expect(await buildAndSendWeeklyBudget('u1', ['a@example.com'], now)).toBe(true);
+    expect(readCashflowBlockMock).not.toHaveBeenCalled();
+    expect(anthropicCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('a failed read sends the email without the comment and spends no call', async () => {
+    readCashflowBlockMock.mockRejectedValue(new Error('read failed'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(await buildAndSendWeeklyBudget('u1', ['a@example.com'], now)).toBe(true);
+    expect(anthropicCreateMock).not.toHaveBeenCalled();
   });
 });

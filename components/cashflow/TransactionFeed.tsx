@@ -364,6 +364,9 @@ function TransactionDetailModal({
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
+/** After a closed row has opened: `Tile`'s row motion is 300 ms. */
+const ROW_SETTLE_DELAY_MS = 350;
+
 export interface TransactionFeedProps {
   /** Full sorted list (not yet sliced). The feed slices to `showCount` internally. */
   transactions: Expense[];
@@ -415,6 +418,8 @@ export interface TransactionFeedProps {
    */
   focusRowId?: string | null;
   focusRowRef?: RefObject<HTMLButtonElement | null>;
+  /** The row a link landed on (`?row=`, 2026-11-11): drawn with the focus ring until the next gesture. */
+  markedRowId?: string | null;
   /**
    * How each day-group is framed:
    *   - `'card'` (default): a standalone rounded card per day. Use on mobile, where the
@@ -449,6 +454,7 @@ export function TransactionFeed({
   emptyHint = 'Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare.',
   focusRowId = null,
   focusRowRef,
+  markedRowId = null,
   surface = 'card',
   className,
 }: Readonly<TransactionFeedProps>) {
@@ -472,7 +478,17 @@ export function TransactionFeed({
     const button = focusRowRef?.current ?? document.querySelector<HTMLButtonElement>(`[data-expense-id="${CSS.escape(focusRowId)}"]`);
     if (!button) return;
     focusedRowId.current = focusRowId;
-    button.focus();
+    // The focus does not scroll: on a composed width `reveal` is still gliding to the section and
+    // its panel still opening (`Tile`'s row motion, 300 ms), and a focus that scrolls stops that
+    // glide where it is — the row then sat at the scrollport's last pixels, under the bottom pill and
+    // past the window (2026-11-11: the row saved from the «+», 3 runs of 8 at 390, whenever the
+    // refresh beat the glide). The row is centred once the panel has settled, at every width.
+    button.focus({ preventScroll: true });
+    window.setTimeout(() => {
+      if (!button.isConnected) return;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      button.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+    }, ROW_SETTLE_DELAY_MS);
   }, [focusRowId, focusRowRef, sliced]);
 
   // Bucket by day with Oggi / Ieri / "EEE d MMM" labels; flat when not grouped.
@@ -549,6 +565,7 @@ export function TransactionFeed({
                     scheduled={isScheduledRow(expense, now)}
                     ownerLabel={memberNames ? resolveOwnerLabel(expense, memberNames) : null}
                     buttonRef={expense.id === focusRowId ? focusRowRef : undefined}
+                    marked={expense.id === markedRowId}
                   />
                 </div>
               );

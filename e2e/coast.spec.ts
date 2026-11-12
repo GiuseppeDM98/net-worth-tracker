@@ -7,7 +7,7 @@
  *
  * The fixture fixes the expenses but NOT the clock: each pension's deflation is computed from an
  * absolute start date, so the figures move between runs. These tests therefore assert STRUCTURE
- * and FORMAT (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)); the arithmetic lives in `__tests__/fireService.test.ts`
+ * and FORMAT (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)); the arithmetic lives in `__tests__/fireService.test.ts`
  * and the words in `__tests__/coastFireView.test.ts`.
  *
  * Since 2026-08-25 the tab is a verdict over tiles: the tiles are located by `role=region` +

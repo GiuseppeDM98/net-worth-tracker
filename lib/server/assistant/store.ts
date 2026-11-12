@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { DocumentData, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { DocumentData, FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
   AssistantGoalEvaluationResult,
   AssistantCreateThreadInput,
@@ -9,11 +9,12 @@ import {
   AssistantMessage,
   AssistantMode,
   AssistantPreferences,
+  AssistantProposalState,
   AssistantThread,
   AssistantThreadDetail,
   AssistantThreadsResponse,
 } from '@/types/assistant';
-import { toDate } from '@/lib/utils/dateHelpers';
+import { ITALY_TIMEZONE, toDate } from '@/lib/utils/dateHelpers';
 import { getDefaultAssistantPreferences } from './webSearchPolicy';
 
 const THREADS_COLLECTION = 'assistantThreads';
@@ -34,15 +35,26 @@ function sanitizePreview(content: string): string {
   return content.replace(/\s+/g, ' ').trim().slice(0, 140);
 }
 
-function getDefaultThreadTitle(mode: AssistantMode): string {
+export function getDefaultThreadTitle(mode: AssistantMode): string {
   if (mode === 'month_analysis') return 'Nuova analisi mensile';
   if (mode === 'year_analysis') return 'Nuova analisi annuale';
   if (mode === 'ytd_analysis') return 'Nuova analisi YTD';
   if (mode === 'history_analysis') return 'Nuova analisi storico';
+  if (mode === 'register') return 'Registrazioni';
   return 'Nuova conversazione';
 }
 
-function buildThreadTitleFromPrompt(prompt: string, mode: AssistantMode): string {
+/** «1 nov 2026», on the Italian calendar whatever the process zone (Vercel runs in UTC). */
+function formatRegisterTitleDate(now: Date): string {
+  return new Intl.DateTimeFormat('it-IT', { timeZone: ITALY_TIMEZONE, day: 'numeric', month: 'short', year: 'numeric' }).format(now);
+}
+
+function buildThreadTitleFromPrompt(prompt: string, mode: AssistantMode, now: Date = new Date()): string {
+  // Registra keeps one thread per Italian day, named by the day and never by a row's sentence.
+  if (mode === 'register') {
+    return `${getDefaultThreadTitle(mode)} · ${formatRegisterTitleDate(now)}`;
+  }
+
   const collapsedPrompt = sanitizePreview(prompt);
   if (!collapsedPrompt) {
     return getDefaultThreadTitle(mode);
@@ -77,7 +89,24 @@ function mapMessage(threadId: string, docId: string, data: DocumentData): Assist
     mode: data.mode,
     monthContext: data.monthContext ?? null,
     webSearchUsed: data.webSearchUsed,
+    ...(data.proposals ? { proposals: mapProposals(data.proposals) } : {}),
   };
+}
+
+/** The cards' outcomes as stored on the message: each `at` a Timestamp turned back into a Date. */
+function mapProposals(raw: Record<string, DocumentData>): Record<string, AssistantProposalState> {
+  return Object.fromEntries(
+    Object.entries(raw).map(([key, state]) => [
+      key,
+      {
+        status: state.status,
+        ...(state.writtenIds ? { writtenIds: state.writtenIds } : {}),
+        ...(state.answer !== undefined ? { answer: state.answer } : {}),
+        ...(state.month ? { month: state.month } : {}),
+        at: toDate(state.at),
+      },
+    ])
+  );
 }
 
 function mapMemoryItem(doc: DocumentData, userId: string): AssistantMemoryItem {
@@ -261,6 +290,33 @@ export async function getAssistantThread(threadId: string, userId: string): Prom
   }
 
   return thread;
+}
+
+/**
+ * Records the outcome of a card on its message (`proposals["expense:0"]`), so a reload shows
+ * «Registrata» instead of the buttons and a row is never written twice.
+ *
+ * `update()` on the field path, never `set(…, { merge: true })`: an update of a missing document
+ * fails instead of creating a stub message, and the path touches one key without rewriting the
+ * map. The thread is read first, so another account's thread is a 403 before anything is written.
+ */
+export async function setAssistantMessageProposal(
+  userId: string,
+  threadId: string,
+  messageId: string,
+  key: string,
+  state: Omit<AssistantProposalState, 'at'>
+): Promise<AssistantProposalState> {
+  await getAssistantThread(threadId, userId);
+  const messageRef = adminDb.collection(THREADS_COLLECTION).doc(threadId).collection('messages').doc(messageId);
+  const messageSnapshot = await messageRef.get();
+  if (!messageSnapshot.exists) {
+    throw new AssistantStoreError(404, 'Messaggio non trovato');
+  }
+
+  const at = Timestamp.now();
+  await messageRef.update(new FieldPath('proposals', key), { ...state, at });
+  return { ...state, at: at.toDate() };
 }
 
 export async function getAssistantThreadDetail(

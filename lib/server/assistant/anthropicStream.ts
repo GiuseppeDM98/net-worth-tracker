@@ -6,6 +6,7 @@ import {
   buildChatPrompt,
   buildHistoryAnalysisPrompt,
   buildMonthAnalysisPrompt,
+  buildRegisterPrompt,
   buildYearAnalysisPrompt,
   buildYtdAnalysisPrompt,
 } from './prompts';
@@ -20,6 +21,9 @@ const anthropic = new Anthropic({
  */
 export const ASSISTANT_CHAT_MAX_TOKENS = 64000;
 export const ASSISTANT_STRUCTURED_MAX_TOKENS = 32000;
+// Registra (2026-11): a sentence and up to five small JSON blocks, with room to reason on the
+// category — far below the chat's budget, so adaptive thinking cannot linger on a receipt.
+export const ASSISTANT_REGISTER_MAX_TOKENS = 16000;
 
 interface StreamAssistantResponseArgs {
   mode: AssistantMode;
@@ -29,6 +33,10 @@ interface StreamAssistantResponseArgs {
   contextBundle: AssistantMonthContextBundle | null;
   // A free question with no period: the portfolio of today (2026-10-20). Null elsewhere.
   todayContext?: AssistantTodayContext | null;
+  // The CASHFLOW 12 MESI block, read by the route for every mode (2026-11-07).
+  cashflowBlock?: string | null;
+  // Registra only: the register block (lib/utils/assistantRegisterContext.ts), built by the route.
+  registerBlock?: string | null;
   month?: AssistantMonthSelectorValue | null;
   preferences: AssistantPreferences;
   // Active memory items for this user, injected into the prompt so Claude can
@@ -45,9 +53,10 @@ interface StreamAssistantResponseArgs {
 /**
  * Selects the appropriate prompt builder based on the assistant mode.
  *
- * For month_analysis: uses the full structured bundle so Claude has reliable
- * numbers and knows exactly what data is/isn't available.
- * For chat: uses a lighter prompt without numeric context.
+ * Each analysis mode uses its structured bundle builder, so Claude has reliable numbers and
+ * knows exactly what data is/isn't available; the chat uses the free prompt, with the period
+ * bundle when a context is attached and today's portfolio otherwise. Every mode also carries the
+ * CASHFLOW 12 MESI block (2026-11-07).
  *
  * Returns { system, userContent } — system is the cacheable static block
  * (role, domain, guardrails, this mode's output contract); userContent is
@@ -60,8 +69,15 @@ function buildPrompt(
   month: AssistantMonthSelectorValue | null | undefined,
   preferences: AssistantPreferences,
   memoryItems: AssistantMemoryItem[] = [],
-  todayContext: AssistantTodayContext | null = null
+  todayContext: AssistantTodayContext | null = null,
+  cashflowBlock: string | null = null,
+  registerBlock: string | null = null
 ): AssistantPromptParts {
+  // Registra first: it has no bundle and must never fall through to the chat builder.
+  if (mode === 'register') {
+    return buildRegisterPrompt(prompt, preferences, memoryItems, registerBlock ?? '', cashflowBlock);
+  }
+
   const MONTH_NAMES = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
@@ -70,27 +86,28 @@ function buildPrompt(
     ? `${MONTH_NAMES[month.month - 1]} ${month.year}`
     : undefined;
 
+  // Every mode receives the cashflow block (since 2026-11-07).
   if (mode === 'month_analysis' && contextBundle) {
-    return buildMonthAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+    return buildMonthAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }
 
   // Year, YTD, and history modes all use their own structured prompt builder with context.
   // Falls through to chat if context is somehow unavailable.
   if (mode === 'year_analysis' && contextBundle) {
-    return buildYearAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+    return buildYearAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }
 
   if (mode === 'ytd_analysis' && contextBundle) {
-    return buildYtdAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+    return buildYtdAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }
 
   if (mode === 'history_analysis' && contextBundle) {
-    return buildHistoryAnalysisPrompt(contextBundle, prompt, preferences, memoryItems);
+    return buildHistoryAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }
 
   // Chat mode: pass the bundle when available so Claude has real numbers.
   // The prompt builder uses it without forcing a fixed response structure.
-  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, todayContext);
+  return buildChatPrompt(prompt, preferences, monthLabel, memoryItems, contextBundle, todayContext, cashflowBlock);
 }
 
 /**
@@ -110,7 +127,7 @@ function buildMessagesArray(
   history: AssistantMessage[]
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
   const isStructured = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
-  // Structured modes cap at 3 pairs (6 msgs); chat allows 10 pairs (20 msgs).
+  // Structured modes cap at 3 pairs (6 msgs); chat and Registra allow 10 pairs (20 msgs).
   const maxMessages = isStructured ? 6 : 20;
 
   const trimmedHistory = history
@@ -172,6 +189,8 @@ export async function streamAssistantResponse({
   prompt,
   contextBundle,
   todayContext = null,
+  cashflowBlock = null,
+  registerBlock = null,
   month,
   preferences,
   memoryItems = [],
@@ -202,8 +221,8 @@ export async function streamAssistantResponse({
     // billed and adds latency. Both values sit inside the model's 128K output limit; the
     // route declares `maxDuration = 300` so a long answer is not cut by the platform.
     const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
-    const chatMaxTokens = ASSISTANT_CHAT_MAX_TOKENS;
-    const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, todayContext);
+    const chatMaxTokens = mode === 'register' ? ASSISTANT_REGISTER_MAX_TOKENS : ASSISTANT_CHAT_MAX_TOKENS;
+    const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, todayContext, cashflowBlock, registerBlock);
     const stream = await anthropic.beta.messages.create({
       model: ASSISTANT_MODEL,
       // A policy decline is re-run on the fallback model inside this stream (aiModels.ts). The
@@ -218,7 +237,9 @@ export async function streamAssistantResponse({
       system: system,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'high' },
-      ...(enableWebSearch
+      // Registra never searches the web: the policy already answers false for it, and the request
+      // itself sends no tool whatever flag reaches it (2026-11-11).
+      ...(enableWebSearch && mode !== 'register'
         ? {
             tools: [
               {

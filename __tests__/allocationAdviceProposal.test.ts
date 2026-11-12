@@ -16,8 +16,12 @@ import {
   parseInstrumentCandidates,
   parseInstrumentCandidatesLenient,
   stripFencedBlocks,
+  interviewRoundSchema,
+  interviewSchema,
+  parseInterviewRound,
 } from '@/lib/utils/allocationAdviceProposal';
 import { z } from 'zod';
+import { QUESTION_DECLINE_VALUE } from '@/lib/utils/questionSet';
 
 const ANSWERS = {
   age: 35,
@@ -107,6 +111,13 @@ describe('instrumentCandidatesSchema', () => {
       ],
     };
     expect(instrumentCandidatesSchema.safeParse(candidates).success).toBe(true);
+  });
+
+  it("takes a bond ETF's duration in years, 0–40, and refuses one beyond (2026-11-08)", () => {
+    const sleeve = (duration: number) => ({ sleeves: [{ assetClass: 'bonds', subTarget: 'Euro 1-3 anni', candidates: [{ name: 'ETF Bond Breve', exchange: 'Borsa Italiana', note: 'ok', duration }] }] });
+    expect(instrumentCandidatesSchema.safeParse(sleeve(1.9)).success).toBe(true);
+    expect(instrumentCandidatesSchema.safeParse(sleeve(0)).success).toBe(true);
+    expect(instrumentCandidatesSchema.safeParse(sleeve(41)).success).toBe(false);
   });
 });
 
@@ -208,5 +219,70 @@ describe('parseInstrumentCandidatesLenient (2026-10-20)', () => {
     expect(parseInstrumentCandidatesLenient('```instrument-candidates\n' + JSON.stringify({ sleeves: [good] }) + '\n```')).toEqual({ candidates: { sleeves: [good] }, refused: [] });
     expect(parseInstrumentCandidatesLenient('nessun blocco')).toEqual({ candidates: null, refused: [] });
     expect(parseInstrumentCandidatesLenient('```instrument-candidates\n{"sleeves": 3}\n```').candidates).toBeNull();
+  });
+});
+
+// ── The interview round (2026-11-08) ──────────────────────────────────────────────────
+describe('parseInterviewRound (lenient: the API keeps only part of the schema, 2026-11-08)', () => {
+  const Q = (id: string) => ({ id, kind: 'single', text: `Domanda ${id}?`, why: "l'86% delle entrate", options: [{ value: 'si', label: 'Sì' }, { value: 'no', label: 'No' }], allowOther: true });
+  const roundText = (questions: unknown[], extra: Record<string, unknown> = {}) => JSON.stringify({ note: 'Vedo un reddito concentrato.', satisfied: false, questions, ...extra });
+
+  it('reads the note, satisfied and the questions, forcing allowOther', () => {
+    const { round, refused } = parseInterviewRound(roundText([{ ...Q('a'), allowOther: false }]));
+    expect(round).toMatchObject({ note: 'Vedo un reddito concentrato.', satisfied: false });
+    expect(round?.questions[0].allowOther).toBe(true);
+    expect(refused).toEqual([]);
+  });
+
+  it('keeps four of five questions, refuses a one-option question and a repeated id, leniently', () => {
+    const five = parseInterviewRound(roundText([Q('a'), Q('b'), Q('c'), Q('d'), Q('e')]));
+    expect(five.round?.questions.map((q) => q.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(five.refused).toHaveLength(1);
+    const oneOption = parseInterviewRound(roundText([{ ...Q('a'), options: [{ value: 'si', label: 'Sì' }] }, Q('b')]));
+    expect(oneOption.round?.questions.map((q) => q.id)).toEqual(['b']);
+    const twice = parseInterviewRound(roundText([Q('a'), Q('a')]));
+    expect(twice.round?.questions).toHaveLength(1);
+    expect(twice.refused[0]).toMatch(/id già usato/);
+    const reserved = parseInterviewRound(roundText([{ ...Q('a'), options: [...Q('a').options, { value: QUESTION_DECLINE_VALUE, label: 'Non dico' }] }]));
+    expect(reserved.round?.questions[0].options.map((o) => o.value)).toEqual(['si', 'no']);
+  });
+
+  it('cuts a note over 600 characters at 600 and says so; a round with no questions key is a round with none', () => {
+    const long = parseInterviewRound(JSON.stringify({ note: 'x'.repeat(700), satisfied: true, questions: [] }));
+    expect(long.round?.note).toHaveLength(600);
+    expect(long.refused[0]).toMatch(/^note: 700 caratteri, tagliata a 600/);
+    expect(parseInterviewRound(JSON.stringify({ note: 'n', satisfied: true })).round?.questions).toEqual([]);
+  });
+
+  it('is null when the text is not JSON, not an object, or note / satisfied are missing', () => {
+    expect(parseInterviewRound('Solo testo.').round).toBeNull();
+    expect(parseInterviewRound('[1]').round).toBeNull();
+    expect(parseInterviewRound(JSON.stringify({ satisfied: true, questions: [] })).round).toBeNull();
+    expect(parseInterviewRound(JSON.stringify({ note: '  ', satisfied: true, questions: [] })).round).toBeNull();
+    expect(parseInterviewRound(JSON.stringify({ note: 'n', satisfied: 'yes', questions: [] })).round).toBeNull();
+  });
+
+  it('the wire schema lists note, satisfied and questions in that order, why required', () => {
+    expect(Object.keys(interviewRoundSchema.shape)).toEqual(['note', 'satisfied', 'questions']);
+    expect(interviewRoundSchema.safeParse({ note: 'n', satisfied: false, questions: [{ ...Q('a'), why: undefined }] }).success).toBe(false);
+    expect(interviewRoundSchema.safeParse({ note: 'n', satisfied: false, questions: [Q('a')] }).success).toBe(true);
+  });
+});
+
+describe('interviewSchema (the body, the draft and the document)', () => {
+  const stored = (askedAt: unknown) => ({ note: 'n', satisfied: false, questions: [], answers: [], model: 'opus-finto', askedAt });
+
+  it('reads an ISO askedAt as a Date and refuses four rounds', () => {
+    const parsed = interviewSchema.safeParse({ rounds: [stored('2026-11-08T11:00:00.000Z')], skipped: false });
+    expect(parsed.success && parsed.data.rounds[0].askedAt).toBeInstanceOf(Date);
+    expect(interviewSchema.safeParse({ rounds: [stored(new Date()), stored(new Date()), stored(new Date()), stored(new Date())], skipped: false }).success).toBe(false);
+    expect(interviewSchema.safeParse({ rounds: [], skipped: true }).success).toBe(true);
+  });
+
+  it('refuses an «Altro…» of 501 characters in an answer', () => {
+    const round = { ...stored(new Date()), answers: [{ questionId: 'a', value: { other: 'x'.repeat(501) } }] };
+    expect(interviewSchema.safeParse({ rounds: [round], skipped: false }).success).toBe(false);
+    const fine = { ...stored(new Date()), answers: [{ questionId: 'a', value: { other: 'fenicottero' } }] };
+    expect(interviewSchema.safeParse({ rounds: [fine], skipped: false }).success).toBe(true);
   });
 });

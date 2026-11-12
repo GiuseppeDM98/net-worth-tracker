@@ -12,6 +12,10 @@ import {
   buildEmptyStateQuestion,
   buildMonthOptions,
   buildYearOptions,
+  describePromptLength,
+  findRegisterThread,
+  getModeBadgeLabel,
+  ASSISTANT_PROMPT_MAX_LENGTH,
   findThreadForPeriod,
   getActivePeriodLabel,
   getPreviousCompletedMonth,
@@ -131,5 +135,50 @@ describe('assistantPeriodOptions', () => {
     it('should never auto-select for chat (Libera) mode', () => {
       expect(findThreadForPeriod(threads, 'chat', { year: 2026, month: 3 }, 2025)).toBeUndefined();
     });
+  });
+});
+
+describe('assistantPeriodOptions — Registra (2026-11)', () => {
+  const month = { year: 2026, month: 11 };
+
+  function registerThread(id: string, createdAt: Date, mode: AssistantThread['mode'] = 'register'): AssistantThread {
+    return { id, userId: 'u1', title: 'Registrazioni', mode, pinnedMonth: null, createdAt, updatedAt: createdAt, lastMessagePreview: '', messageCount: 0 };
+  }
+
+  it('names the mode at every label: the period, the placeholder, the question, the badge', () => {
+    expect(getActivePeriodLabel('register', month, 2026)).toBe('Registra · senza periodo');
+    expect(buildComposerPlaceholder('register', 'none', month, 2026)).toBe('Scrivi cosa hai speso, incassato o spostato…');
+    expect(buildEmptyStateQuestion('register', month, 2026)).toBe('Cosa vuoi registrare?');
+    expect(getModeBadgeLabel('register')).toBe('Registra');
+    expect(getModeBadgeLabel('chat')).toBe('Libera');
+    expect(getModeBadgeLabel('month_analysis')).toBe('Mese');
+  });
+
+  it('has no period thread and no preview mode of its own', () => {
+    const threads = [registerThread('r1', new Date('2026-11-01T10:00:00Z'))];
+    expect(findThreadForPeriod(threads, 'register', month, 2026)).toBeUndefined();
+    expect(resolveAssistantPreviewMode('register', 'month')).toBe('register');
+  });
+
+  it('finds the register thread of the ITALIAN day, in every zone', () => {
+    const threads = [
+      registerThread('analysis', new Date('2026-11-01T10:00:00Z'), 'chat'),
+      // 23:30 in Italy on 31 October: yesterday's, though it is already the 31st at 22:30 UTC.
+      registerThread('yesterday', new Date('2026-10-31T22:30:00Z')),
+      // 00:30 in Italy on 1 November, still 31 October in UTC.
+      registerThread('today', new Date('2026-10-31T23:30:00Z')),
+    ];
+    expect(findRegisterThread(threads, '2026-11-01')?.id).toBe('today');
+    expect(findRegisterThread(threads, '2026-10-31')?.id).toBe('yesterday');
+    expect(findRegisterThread(threads, '2026-11-02')).toBeUndefined();
+  });
+
+  it('counts the prompt from 3800 characters, silent below', () => {
+    expect(ASSISTANT_PROMPT_MAX_LENGTH).toBe(4000);
+    expect(describePromptLength(0)).toBeNull();
+    expect(describePromptLength(3799)).toBeNull();
+    expect(describePromptLength(3800)).toBe('3.800 / 4.000 caratteri');
+    expect(describePromptLength(3812)).toBe('3.812 / 4.000 caratteri');
+    expect(describePromptLength(4000)).toBe('4.000 / 4.000 caratteri');
   });
 });

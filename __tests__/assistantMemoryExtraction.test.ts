@@ -504,3 +504,48 @@ describe('memoryEnabled gating', () => {
     expect(extractionCalled.value).toBe(true);
   });
 });
+
+describe('extractMemoryCandidates — what Registra adds to the rules (2026-11)', () => {
+  it('tells the extractor a categorisation rule is a preference and a registered row is not a fact', async () => {
+    const client = mockClientReturningToolInput({ items: [] });
+    await extractMemoryCandidates('la palestra è Salute', 'Va bene.', client);
+    const request = vi.mocked(client.messages.create).mock.calls[0][0];
+    const system = JSON.stringify(request.system);
+    expect(system).toContain("Una regola di categorizzazione detta dall'utente (“la palestra è Salute”) è una preference.");
+    expect(system).toContain("Una spesa o un'entrata che l'utente registra (importo, negozio, data) non è un fatto da memorizzare.");
+  });
+});
+
+// ── Categorisation rules (2026-11) ──
+
+import { supersedesCategorizationRule } from '@/lib/server/assistant/memoryExtraction';
+
+describe('categorisation rules', () => {
+  const rule = (text: string, overrides: Partial<AssistantMemoryItem> = {}) => makeItem({ category: 'preference', text, ...overrides });
+
+  it('tells the extractor a rule is a habit, in one format, never a single row or an answer', async () => {
+    const client = mockClientReturningToolInput({ items: [{ category: 'preference', text: 'Categorizzazione: palestra → Salute › Palestra' }] });
+    const result = await extractMemoryCandidates('D’ora in poi la palestra la metto in Salute › Palestra', 'Va bene.', client);
+    const request = vi.mocked(client.messages.create).mock.calls[0][0];
+    const system = Array.isArray(request.system) ? request.system[0].text : request.system;
+    expect(system).toContain('Una regola di categorizzazione si estrae solo se l\'utente la dice come abitudine ("sempre", "di solito", "d\'ora in poi"), come "preference", nel formato "Categorizzazione: {cosa, senza articolo} → {Categoria} › {Sottocategoria}" (la sottocategoria solo se nominata); non estrarre mai la scelta di una singola riga né la risposta a una domanda (un testo con "[id]").');
+    expect(result).toEqual([{ category: 'preference', text: 'Categorizzazione: palestra → Salute › Palestra' }]);
+  });
+
+  it('supersedes an active rule on the same subject with another text', () => {
+    const candidate = { category: 'preference' as const, text: 'Categorizzazione: palestra → Sport' };
+    expect(supersedesCategorizationRule(candidate, rule('Categorizzazione: palestra → Salute › Palestra'))).toBe(true);
+    expect(supersedesCategorizationRule(candidate, rule('Categorizzazione: cinema → Svago'))).toBe(false);
+    expect(supersedesCategorizationRule(candidate, rule('Categorizzazione: palestra → Salute › Palestra', { status: 'archived' }))).toBe(false);
+    expect(supersedesCategorizationRule(candidate, rule('Categorizzazione: palestra → Sport'))).toBe(false);
+    expect(supersedesCategorizationRule({ category: 'fact', text: candidate.text }, rule('Categorizzazione: palestra → Salute'))).toBe(false);
+  });
+
+  // The repeat carries the real prefix, so it reaches the rules' exact-text branch: with a lower-case prefix it fell to
+  // isSimilarText, and dropping the branch left this green (2026-11-11, the retirement of the Registra details).
+  it('compares a rule by its exact text: a changed rule is no duplicate, a repeat is', () => {
+    const existing = [rule('Categorizzazione: palestra → Salute › Palestra')];
+    expect(dedupeMemoryItems([{ category: 'preference', text: 'Categorizzazione: palestra → Salute › Benessere' }], existing)).toHaveLength(1);
+    expect(dedupeMemoryItems([{ category: 'preference', text: 'Categorizzazione: Palestra → Salute › Palestra.' }], existing)).toHaveLength(0);
+  });
+});

@@ -37,7 +37,7 @@ import { AssistantStreamingResponse } from '@/components/assistant/AssistantStre
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import type { AssistantFollowUp } from '@/lib/utils/assistantFollowUps';
 import type { Narrative } from '@/lib/utils/narrative';
-import type { AssistantMessage } from '@/types/assistant';
+import type { AssistantMessage, AssistantMode, AssistantProposalState } from '@/types/assistant';
 
 interface AssistantConversazioneTileProps {
   /** The active period as the tile's aside («Analisi · Luglio 2026»). */
@@ -59,9 +59,15 @@ interface AssistantConversazioneTileProps {
   streamingMessageId: string | undefined;
   followUps: AssistantFollowUp[];
   onRetry: () => void;
-  onFollowUpSelect: (prompt: string) => void;
+  /** The whole chip: the page reads its `action` (send, prefill, focus the composer). */
+  onFollowUpSelect: (followUp: AssistantFollowUp) => void;
   /** Anchor for auto-scroll to the latest message — owned by the page (scroll effect). */
   conversationEndRef: React.RefObject<HTMLDivElement | null>;
+  /** The mode the conversation is shown in (an expense proposal is a card in Registra alone). */
+  mode: AssistantMode;
+  /** The open thread and the hook's recorder, handed to the message list for the cards' outcomes. */
+  threadId: string | undefined;
+  recordProposal: (messageId: string, threadId: string, key: string, state: Omit<AssistantProposalState, 'at'>) => void;
 }
 
 /** The streaming state as an 11px chip in the aside; web search gets its own so a slow lookup does not read as a generic delay. */
@@ -122,6 +128,9 @@ export function AssistantConversazioneTile({
   onRetry,
   onFollowUpSelect,
   conversationEndRef,
+  mode,
+  threadId,
+  recordProposal,
 }: AssistantConversazioneTileProps) {
   const aside = (
     <span className="inline-flex flex-wrap items-center gap-2">
@@ -135,9 +144,12 @@ export function AssistantConversazioneTile({
   return (
     <Tile eyebrow="Conversazione" aside={aside} reading={reading} className="flex-1" ariaLabel="Conversazione">
       {isEmpty ? (
-        <div className="mt-3">
-          <AssistantPromptRows rows={promptRows} onSelect={onPromptSelect} disabled={isStreaming} ariaLabel="Domande suggerite" />
-        </div>
+        // Registra has no starter rows (an analysis chip would leave the mode): no empty list.
+        promptRows.length > 0 && (
+          <div className="mt-3">
+            <AssistantPromptRows rows={promptRows} onSelect={onPromptSelect} disabled={isStreaming} ariaLabel="Domande suggerite" />
+          </div>
+        )
       ) : loadingThreadDetail ? (
         <div className="mt-4 space-y-2" role="status" aria-label="Caricamento conversazione">
           <Skeleton className="ml-auto h-10 w-2/3 rounded-xl" />
@@ -153,6 +165,9 @@ export function AssistantConversazioneTile({
             isInterrupted={isInterrupted}
             onRetry={onRetry}
             streamingMessageId={streamingMessageId}
+            mode={mode}
+            threadId={threadId}
+            recordProposal={recordProposal}
           />
           {followUps.length > 0 && (
             <div className="mt-4 border-t border-border pt-3">
@@ -165,7 +180,7 @@ export function AssistantConversazioneTile({
                   rows={followUps.map((followUp) => ({ id: followUp.id, label: followUp.label }))}
                   onSelect={(row) => {
                     const followUp = followUps.find((f) => f.id === row.id);
-                    if (followUp) onFollowUpSelect(followUp.prompt);
+                    if (followUp) onFollowUpSelect(followUp);
                   }}
                   disabled={isStreaming}
                   ariaLabel="Continua con"

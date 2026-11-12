@@ -8,9 +8,24 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildChatPrompt, buildMonthAnalysisPrompt, formatTodayContextForPrompt } from '@/lib/server/assistant/prompts';
+import {
+  ASSISTANT_SYSTEM_CORE,
+  REGISTER_CONTRACT,
+  buildChatPrompt,
+  buildRegisterPrompt,
+  REGISTER_MEMORY_EMPTY_LINE,
+  buildHistoryAnalysisPrompt,
+  buildMonthAnalysisPrompt,
+  buildYearAnalysisPrompt,
+  buildYtdAnalysisPrompt,
+  formatTodayContextForPrompt,
+  formatCashflowBlockSection,
+} from '@/lib/server/assistant/prompts';
 import { AssistantMonthContextBundle, AssistantPreferences } from '@/types/assistant';
 import { emptyAssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
+import { EXPENSE_PROPOSALS_MAX_PER_MESSAGE } from '@/lib/utils/expenseProposal';
+import { ASSISTANT_QUESTION_MAX_PER_MESSAGE } from '@/lib/utils/questionSet';
+import { MAX_RECURRENCE_OCCURRENCES } from '@/lib/utils/recurrenceDates';
 
 const PREFERENCES: AssistantPreferences = {
   responseStyle: 'balanced',
@@ -684,5 +699,194 @@ describe('assistant prompt data block', () => {
       // data into it would silently break the prefix match.
       expect(first).toBe(second);
     });
+  });
+});
+
+describe('the CASHFLOW 12 MESI block in every mode of the Assistente (since 2026-11-07)', () => {
+  const BLOCK = '--- CASHFLOW 12 MESI (x) ---\nX';
+  // The note the owner approved on 2026-11-07, verbatim.
+  const NOTE = "Il blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi, qualunque sia il periodo in esame: le cifre di un periodo vengono dai blocchi del periodo; usalo per l'andamento recente, la capacità di risparmio e la sua stabilità, gli impegni ricorrenti e i conti.";
+  const builders = [
+    ['month', buildMonthAnalysisPrompt],
+    ['year', buildYearAnalysisPrompt],
+    ['ytd', buildYtdAnalysisPrompt],
+    ['history', buildHistoryAnalysisPrompt],
+  ] as const;
+
+  it.each(builders)('%s: the note and the block sit after the numeric block and before the question', (_, build) => {
+    const bundle = makeBundle();
+    const withBlock = build(bundle, 'Come va?', PREFERENCES, [], BLOCK).userContent;
+    const numeric = withBlock.indexOf('--- CASHFLOW ---');
+    const note = withBlock.indexOf(NOTE);
+    const block = withBlock.indexOf(BLOCK);
+    const question = withBlock.indexOf("Domanda dell'utente: Come va?");
+    expect(numeric).toBeGreaterThan(-1);
+    expect(note).toBeGreaterThan(numeric);
+    expect(block).toBe(note + NOTE.length + 1);
+    expect(question).toBeGreaterThan(block);
+    expect(withBlock).toContain(`${BLOCK}\n\nDomanda dell'utente: Come va?`);
+  });
+
+  it.each(builders)('%s: without the block the user turn is today\'s, and system is the same with or without', (_, build) => {
+    const bundle = makeBundle();
+    const without = build(bundle, 'Come va?', PREFERENCES, []);
+    const withBlock = build(bundle, 'Come va?', PREFERENCES, [], BLOCK);
+    expect(without.userContent).not.toContain('CASHFLOW 12 MESI');
+    // The block adds exactly its three lines (note, block, blank) and changes nothing else.
+    expect(withBlock.userContent.replace(`${NOTE}\n${BLOCK}\n\n`, '')).toBe(without.userContent);
+    expect(withBlock.system).toBe(without.system);
+    expect(withBlock.system).not.toContain('CASHFLOW 12 MESI');
+  });
+
+  function todayContext() {
+    const bundle = makeBundle();
+    return { portfolio: bundle.portfolio, goals: null, targetAllocation: bundle.targetAllocation, targetAllocationSource: bundle.targetAllocationSource };
+  }
+
+  it.each([
+    ['a period attached', () => buildChatPrompt('x', PREFERENCES, 'marzo 2026', [], makeBundle(), null, BLOCK), () => buildChatPrompt('x', PREFERENCES, 'marzo 2026', [], makeBundle(), null)],
+    ['the portfolio of today', () => buildChatPrompt('x', PREFERENCES, undefined, [], null, todayContext(), BLOCK), () => buildChatPrompt('x', PREFERENCES, undefined, [], null, todayContext())],
+    ['no data at all', () => buildChatPrompt('x', PREFERENCES, undefined, [], null, null, BLOCK), () => buildChatPrompt('x', PREFERENCES, undefined, [], null, null)],
+  ])('the chat with %s carries it right before the request, and system does not move', (_, withIt, withoutIt) => {
+    const withBlock = withIt();
+    const without = withoutIt();
+    expect(withBlock.userContent).toContain(`\n\n${NOTE}\n${BLOCK}\n\nRichiesta utente: x`);
+    expect(withBlock.userContent.replace(`\n${NOTE}\n${BLOCK}\n`, '')).toBe(without.userContent);
+    expect(without.userContent).not.toContain('CASHFLOW 12 MESI');
+    expect(withBlock.system).toBe(without.system);
+  });
+
+  it('formatCashflowBlockSection prints the note, the block and a blank line, or nothing', () => {
+    expect(formatCashflowBlockSection(BLOCK)).toEqual([NOTE, BLOCK, '']);
+    expect(formatCashflowBlockSection(null)).toEqual([]);
+    expect(formatCashflowBlockSection('')).toEqual([]);
+  });
+});
+
+describe('the Registra prompt (2026-11)', () => {
+  const REGISTER_BLOCK = '--- REGISTRA ---\nOggi: domenica 1 novembre 2026 (2026-11-01)\n[cat-cibo] Cibo';
+  const CASHFLOW_BLOCK = '--- CASHFLOW 12 MESI (x) ---\nX';
+  const NOTE_START = 'Il blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi';
+
+  it('puts the proposal contract in the system, after the shared core, and nowhere else', () => {
+    const { system } = buildRegisterPrompt('ho fatto spesa per 103 euro', PREFERENCES, [], REGISTER_BLOCK, null);
+    expect(system).toBe(`${ASSISTANT_SYSTEM_CORE}\n\n${REGISTER_CONTRACT}`);
+    expect(REGISTER_CONTRACT).toContain('```expense-proposal'.slice(3));
+    expect(REGISTER_CONTRACT).toContain('al massimo 5 per messaggio');
+    // The owner's tour, 2026-11-11: the answer stays short whatever the style preference says, with no
+    // titled sections under the cards and no mention of the rows' cut.
+    expect(REGISTER_CONTRACT).toContain('qualunque sia lo stile di risposta');
+    expect(REGISTER_CONTRACT).toContain('Niente sezioni con titolo');
+    expect(REGISTER_CONTRACT).toContain('Non dire quante righe hai letto');
+  });
+
+  it('carries the four kinds, when to ask, the questions and the chain of caps, verbatim (2026-11)', () => {
+    const sentences = [
+      'TIPI DI RIGA: "kind" è "expense" (type "fixed" o "variable"), "income" (type "income"), "transfer" (type "transfer") o "debt" (type "debt").',
+      'Un trasferimento sposta soldi fra due conti, o fra un conto e un immobile: scrivi "fromAccount" e "toAccount" con l\'[id] dei blocchi CONTI o IMMOBILI (o il nome come lo dice l\'utente), mai "accountId"; un immobile sta su un lato solo. Se l\'utente non nomina uno dei due lati, chiedilo.',
+      'Una rata di mutuo o di prestito ha kind "debt" e "loanName" con l\'[id] o il nome del blocco PRESTITI; con due o più prestiti e un nome che non li distingue, chiedi «Quale prestito?» con una domanda "loan:"; una rata che non ripaga un prestito del blocco si propone senza "loanName"; "payoff": true solo per un\'estinzione anticipata.',
+      `Le entrate e i trasferimenti non si ripetono: una serie ("recurring") è solo per spese e rate, al più ${MAX_RECURRENCE_OCCURRENCES.monthly} occorrenze mensili o ${MAX_RECURRENCE_OCCURRENCES.yearly} annuali; un'estinzione anticipata è una riga sola.`,
+      'Una commissione si scrive "fee": { "amount" } sulla riga che la paga; la sua categoria è quella di Impostazioni: non sceglierla.',
+      'Proponi una categoria nuova SOLO se nessuna esistente si adatta, e preferisci una sottocategoria sotto una categoria esistente; segui il modo di categorizzare dell\'utente (le righe recenti, le regole in memoria). Si scrive "newSubCategory": { "categoryId", "name" } con "categoryId" uguale a quello della riga, oppure "newCategory": { "name", "type" } senza "categoryId"; mai una categoria nuova di tipo "transfer".',
+      'L\'ordine è: ciò che l\'utente dice in questo messaggio, poi le regole di categorizzazione in memoria, poi lo storico delle righe recenti.',
+      'QUANDO CHIEDERE: chiedi il conto solo se l\'utente non l\'ha nominato E (non c\'è un conto predefinito per quel tipo O il conto più usato della categoria copre meno dell\'80% delle sue righe). Chiedi l\'intestatario solo se la Divisione è attiva e almeno il 50% delle righe della categoria è personale. Applica «fuori budget» se l\'utente lo dice o se almeno il 50% delle righe della categoria lo è: non chiederlo mai. Chiedi il centro di costo solo se i centri sono attivi e almeno una riga della categoria negli ultimi 12 mesi sta in un centro. Le percentuali sono quelle del blocco PATTERN.',
+      'Se l\'importo arriva senza oggetto, chiedi «Di cosa si tratta?» con 2-4 categorie probabili e "allowOther": true. Non chiedere mai ciò che il messaggio, la memoria o le righe recenti già dicono.',
+      'DOMANDE: una domanda è un blocco ```assistant-question con UN oggetto JSON { "id", "kind": "single", "text", "options": [{ "value", "label" }], "allowOther" }, alla fine del messaggio. L\'"id" di una domanda su conti, centri, intestatari, prestiti o categorie comincia con "account:", "center:", "member:", "loan:" o "category:" ("account:from" e "account:to" per i due lati di un trasferimento); i "value" sono gli [id] dei blocchi (per una categoria l\'[id] della sottocategoria, o della categoria se non ne ha). Su conti, centri, intestatari e prestiti al più 3 opzioni, le più probabili secondo il blocco PATTERN, e "allowOther": true; non scrivere mai un\'opzione «Altro»: la riga «Altro…» è della card.',
+      `Al più ${EXPENSE_PROPOSALS_MAX_PER_MESSAGE} blocchi \`\`\`expense-proposal o al più ${ASSISTANT_QUESTION_MAX_PER_MESSAGE} blocchi \`\`\`assistant-question per messaggio, mai i due tipi nello stesso messaggio, mai un \`\`\`goal-proposal in questa modalità: prima chiedi, poi proponi.`,
+      'La risposta dell\'utente arriva come un messaggio con una riga per domanda, «{domanda} → {scelta} [id]»: usa l\'[id] fra parentesi quadre e riproponi la riga intera, senza chiedere di nuovo ciò che è stato risposto.',
+      'Se il blocco memoria dice «memoria disattivata» e l\'utente detta una regola, rispondi: «non posso ricordarlo: la memoria è spenta ("Apprendimento automatico" nelle Preferenze dell\'Assistente)».',
+    ];
+    for (const sentence of sentences) expect(REGISTER_CONTRACT).toContain(sentence);
+    // A real doubt is a question block, never a prose question under the cards (the owner’s tour, 2026-11-11).
+    expect(REGISTER_CONTRACT).not.toContain('come domanda breve');
+    expect(REGISTER_CONTRACT).not.toContain('non proponibile');
+    // A doubt on the property is a question too: on the owner's tour a deposit «sulla casa» became a spending
+    // row with a prose question under it (2026-11-11).
+    // The rules of the first contract defer to QUANDO CHIEDERE and to the answers' [id] (2026-11-11, the retirement of
+    // the Registra details): «fuori budget only when the user says it», «the default account, unless the user names
+    // another» and «a centre or a member only when the user names it» contradicted the thresholds and the questions
+    // printed below them, and the opening still described spending and income alone.
+    expect(REGISTER_CONTRACT).toContain("In questa modalità l'utente ti dice cosa ha speso, incassato, spostato fra i suoi conti o pagato a rata e tu gli proponi la riga da registrare nel Cashflow.");
+    expect(REGISTER_CONTRACT).toContain('- Il conto è quello che l\'utente nomina o sceglie rispondendo a una domanda "account:" (il suo [id]); se non lo nomina e QUANDO CHIEDERE non dice di chiederlo, è il predefinito del tipo (addebito per una spesa e per una rata, accredito per un\'entrata): ometti `accountId`.');
+    expect(REGISTER_CONTRACT).toContain('- `costCenterId` e `memberId` solo se il loro blocco è attivo e l\'utente li nomina o li sceglie rispondendo a una domanda; `excludeFromBudget` su una spesa o una rata quando QUANDO CHIEDERE lo applica.');
+    expect(REGISTER_CONTRACT).not.toContain('solo su una spesa che l\'utente dice fuori dal budget');
+    expect(REGISTER_CONTRACT).not.toContain('salvo che l\'utente ne nomini un altro');
+    expect(REGISTER_CONTRACT).not.toContain('cosa ha speso o incassato');
+    expect(REGISTER_CONTRACT).toContain('Un dubbio vero su categoria, conto, immobile, intestatario o prestito si chiede con un blocco ```assistant-question in un messaggio SENZA proposte, mai con una domanda in prosa sotto le card.');
+  });
+
+  it('stays byte-identical across users, rows and memory, and says when memory is off', () => {
+    const rule = { id: 'm1', userId: 'u1', category: 'preference' as const, text: 'Categorizzazione: palestra → Salute', createdAt: new Date(), updatedAt: new Date(), status: 'active' as const };
+    const a = buildRegisterPrompt('ho speso 5 euro', { ...PREFERENCES, memoryEnabled: true }, [rule], REGISTER_BLOCK, null);
+    const b = buildRegisterPrompt('stipendio', { ...PREFERENCES, memoryEnabled: false }, [], '--- REGISTRA ---\n[cat-x] X', CASHFLOW_BLOCK);
+    expect(a.system).toBe(b.system);
+    expect(a.userContent).toContain('Categorizzazione:');
+    expect(b.userContent).toContain('Memoria: memoria disattivata.');
+    const off = buildRegisterPrompt('ho speso 5 euro', { ...PREFERENCES, memoryEnabled: false }, [rule], REGISTER_BLOCK, null);
+    expect(off.userContent).toContain('memoria disattivata');
+    expect(off.userContent).not.toContain('Categorizzazione:');
+    expect(off.userContent).not.toContain(REGISTER_MEMORY_EMPTY_LINE);
+  });
+
+  it('says the memory is on when it is on and still empty, and only then (2026-11-11)', () => {
+    const archived = { id: 'm2', userId: 'u1', category: 'preference' as const, text: 'Categorizzazione: palestra → Salute', createdAt: new Date(), updatedAt: new Date(), status: 'archived' as const };
+    const empty = buildRegisterPrompt('la palestra la metto sempre in Salute', { ...PREFERENCES, memoryEnabled: true }, [archived], REGISTER_BLOCK, null);
+    expect(empty.userContent).toContain('Memoria: attiva, nessuna regola salvata.');
+    expect(empty.userContent).not.toContain('memoria disattivata');
+    const full = buildRegisterPrompt('ho speso 5 euro', { ...PREFERENCES, memoryEnabled: true }, [{ ...archived, status: 'active' as const }], REGISTER_BLOCK, null);
+    expect(full.userContent).not.toContain(REGISTER_MEMORY_EMPTY_LINE);
+    expect(empty.system).toBe(full.system);
+  });
+
+  it('prints a categorisation rule in every analysis mode and in the chat too (2026-11-01: rules in every prompt)', () => {
+    const bundle = makeBundle();
+    const rule = { id: 'm1', userId: 'u1', category: 'preference' as const, text: 'Categorizzazione: palestra → Salute', createdAt: new Date(), updatedAt: new Date(), status: 'active' as const };
+    const on = { ...PREFERENCES, memoryEnabled: true };
+    for (const build of [buildMonthAnalysisPrompt, buildYearAnalysisPrompt, buildYtdAnalysisPrompt, buildHistoryAnalysisPrompt]) {
+      expect(build(bundle, 'Come va?', on, [rule]).userContent).toContain('Categorizzazione: palestra → Salute');
+    }
+    expect(buildChatPrompt('Come va?', on, 'marzo 2025', [rule], bundle).userContent).toContain('Categorizzazione: palestra → Salute');
+  });
+
+  it('leaves the shared core and every other mode’s system without the protocol', () => {
+    const bundle = makeBundle();
+    expect(ASSISTANT_SYSTEM_CORE).not.toContain('expense-proposal');
+    expect(buildChatPrompt('Come va?', PREFERENCES, 'marzo 2025', [], bundle).system).not.toContain('expense-proposal');
+    expect(buildChatPrompt('Come va?', PREFERENCES, undefined, []).system).not.toContain('expense-proposal');
+    for (const build of [buildMonthAnalysisPrompt, buildYearAnalysisPrompt, buildYtdAnalysisPrompt, buildHistoryAnalysisPrompt]) {
+      expect(build(bundle, 'Come va?', PREFERENCES, []).system).not.toContain('expense-proposal');
+    }
+  });
+
+  it('keeps the system byte-identical across users, days and blocks: the data is in the user turn', () => {
+    const a = buildRegisterPrompt('ho speso 5 euro', PREFERENCES, [], REGISTER_BLOCK, null);
+    const b = buildRegisterPrompt('stipendio di 2000 ieri', { ...PREFERENCES, responseStyle: 'deep' }, [], '--- REGISTRA ---\nOggi: lunedì 2 novembre 2026 (2026-11-02)\n[cat-altro] Altro', CASHFLOW_BLOCK);
+    expect(a.system).toBe(b.system);
+    expect(a.system).not.toContain('2026-11-01');
+    // No date at all, in either form: one read off the clock when the module loads would be the
+    // same in `a` and `b`, and would not be the fixture's day (2026-11-11).
+    expect(a.system).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(a.system).not.toMatch(/\d{1,2} (gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre) \d{4}/);
+    expect(a.system).not.toContain('cat-cibo');
+    expect(a.userContent).toContain(REGISTER_BLOCK);
+  });
+
+  it('prints the cashflow block under its note, between the register block and the request', () => {
+    const { userContent } = buildRegisterPrompt('ho speso 5 euro', PREFERENCES, [], REGISTER_BLOCK, CASHFLOW_BLOCK);
+    const register = userContent.indexOf(REGISTER_BLOCK);
+    const note = userContent.indexOf(NOTE_START);
+    const block = userContent.indexOf(CASHFLOW_BLOCK);
+    const request = userContent.indexOf('Richiesta utente: ho speso 5 euro');
+    expect(register).toBeGreaterThan(-1);
+    expect(note).toBeGreaterThan(register);
+    expect(block).toBeGreaterThan(note);
+    expect(request).toBeGreaterThan(block);
+    expect(userContent.endsWith('Richiesta utente: ho speso 5 euro')).toBe(true);
+  });
+
+  it('prints neither the note nor the block without one', () => {
+    const { userContent } = buildRegisterPrompt('ho speso 5 euro', PREFERENCES, [], REGISTER_BLOCK, null);
+    expect(userContent).not.toContain('CASHFLOW 12 MESI');
+    expect(userContent).toContain(`${REGISTER_BLOCK}\n\nRichiesta utente: ho speso 5 euro`);
   });
 });

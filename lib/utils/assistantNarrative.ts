@@ -31,7 +31,7 @@ import {
   type OverviewVerdictInput,
 } from '@/lib/utils/overviewNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
-import type { AssistantGoalEvaluationResult, AssistantMonthContextBundle } from '@/types/assistant';
+import type { AssistantGoalEvaluationResult, AssistantMode, AssistantMonthContextBundle, AssistantRegisterSummary } from '@/types/assistant';
 import type { DashboardOverviewPayload } from '@/types/dashboardOverview';
 
 // ─── Inputs ─────────────────────────────────────────────────────────────────
@@ -322,6 +322,77 @@ export function buildNoContextVerdict(overview: OverviewVerdictInput | null): Pa
   };
 }
 
+/**
+ * The verdict of the Registra mode (2026-11): not a judgement on a period — there is none — but
+ * what the assistant knows to propose a row with. Computed by code from the summary (the browser's
+ * before the first message, the server's after it, with the rows it read), so it is never the
+ * skeleton and never wears the AI accent. Without a summary yet it says what the mode does.
+ */
+export function buildRegisterVerdict(summary: AssistantRegisterSummary | null): PageVerdictModel {
+  const headline = 'Registra un movimento.';
+  if (!summary) {
+    return {
+      headline,
+      tone: 'neutral',
+      sentence: [prose('Scrivila come la diresti: te la propongo come riga e la scrivi tu con Conferma.')],
+    };
+  }
+
+  const categories = summary.categories === 0
+    ? [prose('nessuna categoria')]
+    : [figure(String(summary.categories)), prose(plural(summary.categories, ' categoria', ' categorie'))];
+  const accounts = summary.accounts.length === 0
+    ? [prose('nessun conto')]
+    : [figure(String(summary.accounts.length)), prose(plural(summary.accounts.length, ' conto', ' conti'))];
+  const rows = summary.recent && summary.recent.rows > 0
+    ? summary.recent.rows === 1
+      ? [prose("l'ultima riga")]
+      : [prose('le ultime '), figure(String(summary.recent.rows)), prose(' righe')]
+    : null;
+
+  return {
+    headline,
+    tone: 'neutral',
+    sentence: [
+      prose('Conosco '),
+      ...categories,
+      prose(rows ? ', ' : ' e '),
+      ...accounts,
+      ...(rows ? [prose(' e '), ...rows] : []),
+      prose(": scrivi la spesa o l'entrata come la diresti."),
+    ],
+  };
+}
+
+/** The facts of the «Cosa conosce l'Assistente» tile under the accounts, one line each. */
+export function describeRegisterFacts(summary: AssistantRegisterSummary): string[] {
+  const facts = [
+    summary.categories === 0
+      ? 'nessuna categoria configurata'
+      : `${summary.categories} ${plural(summary.categories, 'categoria', 'categorie')}`,
+    `centri di costo ${summary.costCentersEnabled ? 'attivi' : 'non attivi'}`,
+    `Divisione ${summary.membersEnabled ? 'attiva' : 'non attiva'}`,
+  ];
+  if (summary.recent) {
+    const cut = summary.recent.cut > 0 ? ` (${summary.recent.cut} più vecchie omesse)` : '';
+    facts.push(
+      summary.recent.rows === 0
+        ? 'nessuna riga negli ultimi dodici mesi'
+        : `${plural(summary.recent.rows, 'ultima', 'ultime')} ${summary.recent.rows} ${plural(summary.recent.rows, 'riga letta', 'righe lette')}${cut}`,
+    );
+  }
+  return facts;
+}
+
+/** The reading of the same tile: what the list under it is for. */
+export function describeRegisterContext(summary: AssistantRegisterSummary | null): Narrative {
+  if (!summary) return [prose('Sto leggendo conti e categorie.')];
+  if (summary.accounts.length === 0) {
+    return [prose('Nessun conto configurato: una riga registrata da qui non muove alcun saldo.')];
+  }
+  return [prose('I conti che una riga può muovere, con il saldo di oggi; il predefinito è quello usato se non ne nomini uno.')];
+}
+
 // ─── Tile readings ────────────────────────────────────────────────────────────
 
 /**
@@ -479,8 +550,18 @@ export function describeConversation(input: {
   /** The period the answer's numbers come from, with its preposition (`formatPeriodInSentence`); null for a free question. */
   periodLabel: string | null;
   webSearchUsed: boolean;
+  /** Registra has no period and no starter rows: its two sentences say what the mode does with a row. */
+  mode?: AssistantMode;
 }): Narrative {
-  const { messageCount, question, periodLabel, webSearchUsed } = input;
+  const { messageCount, question, periodLabel, webSearchUsed, mode } = input;
+  if (mode === 'register') {
+    if (messageCount === 0) return [prose(`${question} Scrivi qui sotto la spesa o l'entrata.`)];
+    return [
+      figure(String(messageCount)),
+      prose(plural(messageCount, ' messaggio; ', ' messaggi; ')),
+      prose('le righe proposte si scrivono solo su Conferma.'),
+    ];
+  }
   if (messageCount === 0) return [prose(`${question} Scegli una domanda o scrivine una qui sotto.`)];
   const narrative: Narrative = [figure(String(messageCount)), prose(plural(messageCount, ' messaggio; ', ' messaggi; '))];
   if (periodLabel) {

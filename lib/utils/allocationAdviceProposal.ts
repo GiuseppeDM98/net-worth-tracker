@@ -16,6 +16,15 @@
 
 import { z } from 'zod';
 import { ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
+import {
+  QUESTION_MAX_PER_ROUND,
+  parseQuestionsLenient,
+  questionAnswerSchema,
+  questionSchema,
+  questionSetSchema,
+  type Question,
+} from '@/lib/utils/questionSet';
+import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS } from '@/types/allocationAdvice';
 import type { AssetClass } from '@/types/assets';
 
 const ASSET_CLASSES = ASSET_CLASS_SEQUENCE as [AssetClass, ...AssetClass[]];
@@ -72,6 +81,65 @@ export const allocationAdviceAnswersSchema = z.object({
 
 export type AllocationAdviceAnswers = z.infer<typeof allocationAdviceAnswersSchema>;
 export type AnswerGoal = z.infer<typeof answerGoalSchema>;
+
+// ─── The interview (Opus 5.5, 2026-11-08) ────────────────────────────────────
+// The critical friend before the strategy: up to three rounds of 0–4 questions on what the data
+// or the answers make doubtful (2026-11-08, doc/guide/consulente.md § The run). The question shape is the shared
+// `lib/utils/questionSet.ts`; here the round and what the draft, the body and the document hold.
+
+/** The round on the wire (`output_config.format`): `note` first, so the model reads before it asks. */
+export const interviewRoundSchema = z.object({
+  note: z.string().min(1).max(600),
+  satisfied: z.boolean(),
+  questions: z.array(questionSchema.extend({ why: z.string().min(1).max(240) })).max(QUESTION_MAX_PER_ROUND),
+});
+
+/** A round as the request body, the draft and the document hold it. */
+export const interviewRoundStoredSchema = z.object({
+  note: z.string().max(600),
+  satisfied: z.boolean(),
+  questions: questionSetSchema,
+  answers: z.array(questionAnswerSchema).max(QUESTION_MAX_PER_ROUND),
+  model: z.string().min(1).max(80),
+  askedAt: z.coerce.date(),
+});
+export const interviewSchema = z.object({
+  rounds: z.array(interviewRoundStoredSchema).max(ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS),
+  skipped: z.boolean(),
+});
+export type AllocationAdviceInterviewRound = z.infer<typeof interviewRoundStoredSchema>;
+export type AllocationAdviceInterview = z.infer<typeof interviewSchema>;
+
+const INTERVIEW_NOTE_MAX = 600;
+
+/**
+ * Reads a round LENIENTLY (the `parseInstrumentCandidatesLenient` pattern): the API keeps only
+ * part of the schema, so the counts are enforced here. Null when the text is not JSON, `note` is
+ * not a non-empty string or `satisfied` not a boolean; the note trimmed and cut at 600 (the cut
+ * named in `refused`); the questions through `parseQuestionsLenient`, then `allowOther: true` on
+ * every kept one («Altro…» on every question of the Consulente, 2026-11-01).
+ */
+export function parseInterviewRound(text: string): { round: { note: string; satisfied: boolean; questions: Question[] } | null; refused: string[] } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { round: null, refused: ['not JSON'] };
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { round: null, refused: ['not an object'] };
+  const { note, satisfied, questions } = parsed as { note?: unknown; satisfied?: unknown; questions?: unknown };
+  if (typeof note !== 'string' || note.trim() === '') return { round: null, refused: ['note missing'] };
+  if (typeof satisfied !== 'boolean') return { round: null, refused: ['satisfied missing'] };
+  const refused: string[] = [];
+  const trimmed = note.trim();
+  if (trimmed.length > INTERVIEW_NOTE_MAX) refused.push(`note: ${trimmed.length} caratteri, tagliata a ${INTERVIEW_NOTE_MAX}`);
+  const lenient = parseQuestionsLenient(questions ?? []);
+  refused.push(...lenient.refused);
+  return {
+    round: { note: trimmed.slice(0, INTERVIEW_NOTE_MAX), satisfied, questions: lenient.questions.map((question) => ({ ...question, allowOther: true })) },
+    refused,
+  };
+}
 
 // ─── The proposal (Opus 5.5) ──────────────────────────────────────────────────
 
@@ -230,6 +298,8 @@ export const instrumentCandidateSchema = z.object({
   policy: z.enum(['accumulazione', 'distribuzione']).optional(),
   /** Percent per year, e.g. 0.2. */
   ter: z.number().finite().min(0).max(5).optional(),
+  /** Years: a bond ETF's effective duration as the agent verified it (2026-11-08, the bonds by horizon). */
+  duration: z.number().finite().min(0).max(40).optional(),
   domicile: z.string().trim().max(60).optional(),
   /** Set when the user already holds this very instrument. */
   alreadyHeld: z.boolean().optional(),

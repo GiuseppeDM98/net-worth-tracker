@@ -1,6 +1,7 @@
 /**
  * The «Consulente» of the Allocazione page (2026-10-20): a guided path — one question per
- * screen — whose answers, with the whole portfolio, go to two agents (Opus 5.5 for the strategy
+ * screen — then an interview of up to three rounds of questions (2026-11-08) — whose answers, with
+ * the whole portfolio, go to two agents (Opus 5.5 for the interview, the strategy
  * and the review, Sonnet 5.5 with web search for the instruments); the result is a report, a
  * proposal the user can apply to Impostazioni → Allocazione with one button, and a date to
  * review it by. The document lives in `allocationAdvice/{userId}`, written by the Admin SDK
@@ -13,11 +14,28 @@
 
 import type {
   AllocationAdviceAnswers,
+  AllocationAdviceInterview,
+  AllocationAdviceInterviewRound,
   AllocationAdviceProposal,
   InstrumentCandidates,
 } from '@/lib/utils/allocationAdviceProposal';
 
-export type { AllocationAdviceAnswers, AllocationAdviceProposal, InstrumentCandidates };
+export type { AllocationAdviceAnswers, AllocationAdviceInterview, AllocationAdviceInterviewRound, AllocationAdviceProposal, InstrumentCandidates };
+
+/**
+ * The interview's cap (the owner, 2026-11-01; here since 2026-11-08): three rounds of questions after
+ * the summary, then the strategy. Here and not in `run.ts`: the schema, the pure interview module
+ * and the Wizard read it, and `run.ts` is `server-only`.
+ */
+export const ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS = 3;
+
+/**
+ * How many previous paths the interview and the strategy read (2026-11-08, the owner's addition
+ * after the interview's phase F on the mirror): the live document when it has a report, then the archive
+ * `allocationAdvice/{uid}/history`, the most recent first. Six is about three years of paths at
+ * the review dates the Consulente proposes; the older ones stay archived, unread.
+ */
+export const ALLOCATION_ADVICE_HISTORY_LIMIT = 6;
 
 /** The path's screens, in order. The index is the reducer's `step`. */
 export const ALLOCATION_ADVICE_STEPS = [
@@ -118,10 +136,28 @@ export interface AllocationAdviceDocument {
   applied: AllocationAdviceApplied | null;
   /** The requests «Chiedi una modifica» sent, in order; the report is the last revision's. The mapper always sets it. */
   revisions?: AllocationAdviceRevision[];
+  /** The path's interview, from the strategy's body (2026-11-08); null when absent (older documents, an older client). */
+  interview: AllocationAdviceInterview | null;
+  /** The round asked before the last «Chiedi una modifica», from the revise's body. */
+  revisionInterview?: AllocationAdviceInterview | null;
 }
 
-/** The SSE events of `POST /api/allocation-advice/run`. */
+/**
+ * The paths before this one, as the interview and the strategy read them (2026-11-08): the
+ * documents, the most recent first, and whether the archive could be read — a failed read never
+ * fails a path, the block says it instead.
+ */
+export interface AllocationAdvicePreviousPaths {
+  paths: AllocationAdviceDocument[];
+  archiveRead: boolean;
+}
+
+/**
+ * The SSE events of `POST /api/allocation-advice/run`. An `interview` request streams exactly one
+ * terminal event: `interview` (its round, `askedAt` an ISO string on the wire) or `error`; never `done`.
+ */
 export type AllocationAdviceRunEvent =
   | { type: 'stage'; stage: AllocationAdviceStage }
+  | { type: 'interview'; round: Omit<AllocationAdviceInterviewRound, 'answers'> }
   | { type: 'done'; document: AllocationAdviceDocument }
   | { type: 'error'; error: string; retryable?: boolean };

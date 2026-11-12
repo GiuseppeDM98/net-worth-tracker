@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { BudgetConfig, BudgetItem } from '@/types/budget';
+import { normalizeBudgetItem } from '@/lib/utils/budgetUtils';
 
 // Budget Service
 //
@@ -32,7 +33,7 @@ export async function getBudgetConfig(userId: string): Promise<BudgetConfig | nu
       userId: data.userId,
       // Migrate items saved before income/expense kind, period, or the
       // monthlyAmount→amount rename existed.
-      items: ((data.items || []) as BudgetItem[]).map(normalizeItem),
+      items: ((data.items || []) as BudgetItem[]).map(normalizeBudgetItem),
       overallMonthlyAmount: data.overallMonthlyAmount,
       alertsEnabled: data.alertsEnabled,
       alertThresholds: data.alertThresholds,
@@ -55,7 +56,7 @@ export async function saveBudgetConfig(
 
     // Strip undefined fields — Firestore rejects them
     const cleanItems = items.map((item) => {
-      const normalized = normalizeItem(item);
+      const normalized = normalizeBudgetItem(item);
       const clean: Record<string, unknown> = {
         id: normalized.id,
         kind: normalized.kind,
@@ -86,28 +87,4 @@ export async function saveBudgetConfig(
     console.error('Error saving budget config:', error);
     throw error;
   }
-}
-
-/**
- * Back-fills fields added after the first budget release so older documents keep
- * working:
- *   - `kind`: a 'type'-scope item is income only when expenseType==='income';
- *     category/subcategory items default to 'expense' (reconciled later).
- *   - `period`: defaults to 'monthly'.
- *   - `amount`: falls back to the legacy `monthlyAmount` field.
- */
-function normalizeItem(item: BudgetItem): BudgetItem {
-  const legacy = item as BudgetItem & { monthlyAmount?: number };
-  const kind =
-    item.kind === 'expense' || item.kind === 'income'
-      ? item.kind
-      : item.scope === 'type' && item.expenseType === 'income'
-        ? 'income'
-        : 'expense';
-  return {
-    ...item,
-    kind,
-    period: item.period ?? 'monthly',
-    amount: item.amount ?? legacy.monthlyAmount ?? 0,
-  };
 }

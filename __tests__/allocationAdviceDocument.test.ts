@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS } from '@/lib/utils/allocationAdviceDocument';
+import { isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS, runStageStates, stageOfRunStage } from '@/lib/utils/allocationAdviceDocument';
 
 const AT = new Date('2026-10-20T10:00:00.000Z');
 
@@ -79,5 +79,53 @@ describe('pageShowsReport (2026-10-20)', () => {
   it('hides the document «Rifai il percorso» was pressed on, and shows a newer one', () => {
     expect(pageShowsReport({ document: doc('ready'), redoAt: AT.getTime(), openedAt: now, runActive: false })).toBe(false);
     expect(pageShowsReport({ document: doc('ready'), redoAt: AT.getTime() - 1, openedAt: now, runActive: false })).toBe(true);
+  });
+});
+
+describe('the run’s stage rows (2026-11-07)', () => {
+  it('reads revise as the review', () => {
+    expect(stageOfRunStage('revise')).toBe('review');
+    expect(stageOfRunStage('instruments')).toBe('instruments');
+  });
+
+  it('lights the stage, marks the ones before it done and the rest pending', () => {
+    const states = (rows: ReturnType<typeof runStageStates>) => rows.map((row) => row.state);
+    expect(runStageStates({ status: 'running', stage: null })).toEqual([
+      { stage: 'context', state: 'pending' },
+      { stage: 'strategy', state: 'pending' },
+      { stage: 'instruments', state: 'pending' },
+      { stage: 'review', state: 'pending' },
+    ]);
+    expect(states(runStageStates({ status: 'running', stage: 'instruments' }))).toEqual(['done', 'done', 'active', 'pending']);
+    expect(states(runStageStates({ status: 'failed', stage: 'strategy' }))).toEqual(['done', 'failed', 'pending', 'pending']);
+    expect(states(runStageStates({ status: 'failed', stage: 'review' }))).toEqual(['done', 'done', 'done', 'failed']);
+    expect(states(runStageStates({ status: 'done', stage: null }))).toEqual(['done', 'done', 'done', 'done']);
+  });
+});
+
+describe('the interview on the document (2026-11-08: null when absent)', () => {
+  const round = { note: 'n', satisfied: false, questions: [], answers: [], model: 'opus-finto', askedAt: { toDate: () => AT } };
+
+  it('maps interview and revisionInterview, each round\'s askedAt through toDate', () => {
+    const document = mapAllocationAdviceData('u1', {
+      status: 'ready',
+      answers: {},
+      stage: 'review',
+      createdAt: AT,
+      updatedAt: AT,
+      interview: { rounds: [round, { ...round, askedAt: AT }], skipped: true },
+      revisionInterview: { rounds: [round], skipped: false },
+    });
+    expect(document.interview?.rounds.map((r) => r.askedAt)).toEqual([AT, AT]);
+    expect(document.interview?.skipped).toBe(true);
+    expect(document.interview?.rounds[0]).toMatchObject({ note: 'n', model: 'opus-finto', answers: [] });
+    expect(document.revisionInterview).toMatchObject({ skipped: false });
+    expect(document.revisionInterview?.rounds[0].askedAt).toEqual(AT);
+  });
+
+  it('maps an older document to interview null and revisionInterview null', () => {
+    const document = mapAllocationAdviceData('u1', { status: 'ready', answers: {}, stage: 'review', createdAt: AT, updatedAt: AT });
+    expect(document.interview).toBeNull();
+    expect(document.revisionInterview).toBeNull();
   });
 });

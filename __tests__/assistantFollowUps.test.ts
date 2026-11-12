@@ -132,3 +132,26 @@ describe('buildFollowUpSuggestions', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
+
+describe('buildFollowUpSuggestions — Registra (2026-11)', () => {
+  it('offers the three register rows, each the START of a sentence to complete', () => {
+    const result = buildFollowUpSuggestions('register', null);
+    expect(result.map((row) => row.label)).toEqual(['Registra una spesa di oggi', 'Registra lo stipendio', 'Sposta soldi fra due conti']);
+    expect(result.map((row) => row.prompt)).toEqual(['Oggi ho speso ', 'Ho ricevuto lo stipendio di ', 'Ho spostato ']);
+    expect(result.every((row) => row.action === undefined)).toBe(true);
+  });
+
+  it('leads with «Registra un’altra» after a written card, the curated rows filling up to the cap', () => {
+    const result = buildFollowUpSuggestions('register', null, { afterWrittenCard: true });
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({ id: 'register-another', label: "Registra un'altra", prompt: '', action: 'focus-composer' });
+    // The third curated row is the one cut.
+    expect(result.slice(1).map((row) => row.label)).toEqual(['Registra una spesa di oggi', 'Registra lo stipendio']);
+    expect(buildFollowUpSuggestions('register', null, { afterWrittenCard: false })[0].id).toBe('register-expense-today');
+  });
+
+  it('offers no analysis row in register, with or without a bundle', () => {
+    const result = buildFollowUpSuggestions('register', makeBundle());
+    expect(result.every((row) => row.id.startsWith('register-'))).toBe(true);
+  });
+});

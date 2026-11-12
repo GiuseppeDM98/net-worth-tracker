@@ -109,3 +109,14 @@ describe('resolveAssistantWebSearchPolicy', () => {
     });
   });
 });
+
+describe('resolveAssistantWebSearchPolicy — Registra (2026-11)', () => {
+  const prompt = 'benzina 60 euro, cerca sul web il prezzo del petrolio';
+
+  it('never searches the web in register, whatever the prompt and the preference say', () => {
+    const defaultPrefs = getDefaultAssistantPreferences();
+    expect(resolveAssistantWebSearchPolicy('chat', prompt, defaultPrefs)).toBe(true);
+    expect(resolveAssistantWebSearchPolicy('register', prompt, defaultPrefs)).toBe(false);
+    expect(resolveAssistantWebSearchPolicy('register', prompt, { ...defaultPrefs, includeMacroContext: true })).toBe(false);
+  });
+});

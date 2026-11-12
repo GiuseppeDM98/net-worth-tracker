@@ -115,3 +115,12 @@ describe('resolveEquivalentCategory', () => {
     expect(match).toEqual({ categoryId: 'cat-legacy', subCategoryId: '' });
   });
 });
+
+import { categoryMatchKey } from '@/lib/utils/expenseCategoryMatching';
+
+describe('categoryMatchKey', () => {
+  it('is the type and the trimmed, lowercased name: one key per (name, type)', () => {
+    expect(categoryMatchKey('  Vasi Ornitorinco ', 'variable')).toBe('variable::vasi ornitorinco');
+    expect(categoryMatchKey('Casa', 'fixed')).not.toBe(categoryMatchKey('Casa', 'variable'));
+  });
+});

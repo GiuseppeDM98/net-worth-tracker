@@ -67,8 +67,10 @@ import {
   buildResponseStyleInstruction,
   ASSISTANT_SYSTEM_CORE,
   buildEmailPeriodicFormatContract,
+  formatCashflowBlockSection,
   type AssistantPromptParts,
 } from '@/lib/server/assistant/prompts';
+import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import {
   buildAssistantPeriodRangeContext,
   type AssistantPeriodRange,
@@ -681,7 +683,8 @@ function formatExpenseSplitForPrompt(emailData: MonthlyEmailData, label: string)
  * guardrails in ASSISTANT_SYSTEM_CORE stop promising blocks the email never sent. Appended
  * to it are the sections only the email has — the precomputed market effect, the
  * deterministic comparisons, the per-category deltas, the Hall of Fame standing, the
- * month's budget alerts and the household split.
+ * month's budget alerts and the household split — and, last, the CASHFLOW 12 MESI block under
+ * its note (2026-11-07), the one figure that is not the window's.
  *
  * The largest single expenses are deliberately NOT re-listed: the bundle already carries
  * them, with their date, in `--- SPESE SINGOLE PIU' GRANDI ---`.
@@ -698,7 +701,8 @@ export function buildEmailAiPrompt(
   comparison: PeriodComparison,
   bundle: AssistantMonthContextBundle,
   preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[]
+  memoryItems: AssistantMemoryItem[],
+  cashflowBlock?: string | null
 ): AssistantPromptParts {
   const label = periodTitle(emailData);
 
@@ -730,6 +734,8 @@ export function buildEmailAiPrompt(
     ...formatHallOfFameForPrompt(emailData),
     ...formatBudgetAlertsForPrompt(emailData),
     ...formatExpenseSplitForPrompt(emailData, label),
+    // The CASHFLOW 12 MESI block, after the period's sections (since 2026-11-07).
+    ...(cashflowBlock ? ['', ...formatCashflowBlockSection(cashflowBlock)] : []),
   ].join('\n');
 
   return {
@@ -765,7 +771,7 @@ const EMAIL_AI_MAX_TOKENS: Record<EmailPeriodType, number> = {
  * `system` block is still built to be byte-identical per period type, so turning caching on
  * would be a one-line change if traffic ever justified it.
  *
- * Every failure (bundle build, Anthropic error, missing key) is caught and logged: the
+ * Every failure (bundle build, cashflow-block read, Anthropic error, missing key) is caught and logged: the
  * email is always sent, with or without the comment.
  *
  * @returns The AI-generated markdown text, or null on failure or on a reply that did not end
@@ -797,12 +803,17 @@ export async function generateEmailAiComment(
       preferences.includeDummySnapshots
     );
 
+    // The CASHFLOW 12 MESI block (since 2026-11-07); a failed read lands in the catch below:
+    // the email goes out without the comment, never with a comment on a silent empty cashflow.
+    const cashflowBlock = await readCashflowBlockForPrompt(userId, new Date());
+
     const { system, userContent } = buildEmailAiPrompt(
       emailData,
       comparison,
       bundle,
       preferences,
-      memoryItems
+      memoryItems,
+      cashflowBlock
     );
 
     // Lazy import so a module-level `new Anthropic()` never breaks test environments

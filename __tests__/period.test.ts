@@ -7,6 +7,7 @@ import {
   isPrevMonth,
   isCurrentYear,
   parseDateInput,
+  parseCashflowMonthParam,
   type Period,
 } from '@/lib/utils/period';
 import { getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
@@ -266,5 +267,21 @@ describe('parseDateInput', () => {
 
   it('returns null for non-numeric input', () => {
     expect(parseDateInput('aa/bb/cccc')).toBeNull();
+  });
+});
+
+// ─── parseCashflowMonthParam ──────────────────────────────────────────────────
+
+describe('parseCashflowMonthParam (2026-11)', () => {
+  it('reads a YYYY-MM as that month', () => {
+    expect(parseCashflowMonthParam('2026-10')).toEqual({ kind: 'month', year: 2026, month: 10 });
+    expect(parseCashflowMonthParam('2000-01')).toEqual({ kind: 'month', year: 2000, month: 1 });
+    expect(parseCashflowMonthParam('2100-12')).toEqual({ kind: 'month', year: 2100, month: 12 });
+  });
+
+  it('is null for anything else, so the page opens on the current month', () => {
+    for (const param of ['2026-13', '2026-00', '26-10', '2026-1', '2026-10-15', '1999-12', '2101-01', 'ottobre', '', null, undefined]) {
+      expect(parseCashflowMonthParam(param), String(param)).toBeNull();
+    }
   });
 });

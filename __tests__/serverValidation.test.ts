@@ -10,6 +10,8 @@ import {
   assetTransactionDataSchema,
   assetTransactionUpdateSchema,
   parseOr400,
+  assistantStreamRequestSchema,
+  proposalPatchSchema,
 } from '@/lib/server/validation';
 
 describe('isinSchema', () => {
@@ -226,5 +228,72 @@ describe('parseOr400', () => {
       // userId is missing, month is out of range — both should appear in fieldErrors
       expect(body.details.fieldErrors).toBeDefined();
     }
+  });
+});
+
+describe('assistantStreamRequestSchema (2026-11)', () => {
+  const base = { userId: 'u1', mode: 'chat', prompt: 'Come va?' };
+
+  it('accepts the six modes and nothing else', () => {
+    for (const mode of ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'chat', 'register']) {
+      expect(assistantStreamRequestSchema.safeParse({ ...base, mode }).success, mode).toBe(true);
+    }
+    expect(assistantStreamRequestSchema.safeParse({ ...base, mode: 'weekly' }).success).toBe(false);
+    expect(assistantStreamRequestSchema.safeParse({ userId: 'u1', prompt: 'x' }).success).toBe(false);
+  });
+
+  it('trims the prompt and bounds it at 1–4000 characters in every mode', () => {
+    expect(assistantStreamRequestSchema.parse({ ...base, prompt: '  ciao  ' }).prompt).toBe('ciao');
+    expect(assistantStreamRequestSchema.safeParse({ ...base, prompt: '   ' }).success).toBe(false);
+    expect(assistantStreamRequestSchema.safeParse({ ...base, prompt: 'a'.repeat(4000) }).success).toBe(true);
+    expect(assistantStreamRequestSchema.safeParse({ ...base, mode: 'register', prompt: 'a'.repeat(4001) }).success).toBe(false);
+    expect(assistantStreamRequestSchema.safeParse({ ...base, mode: 'month_analysis', prompt: 'a'.repeat(4001) }).success).toBe(false);
+  });
+
+  it('keeps every field of the request and strips what it does not declare', () => {
+    const parsed = assistantStreamRequestSchema.parse({
+      ...base, mode: 'year_analysis', threadId: 'thread-1', month: { year: 2026, month: 3 }, year: 2025, chatContext: 'year',
+      preferences: { responseStyle: 'deep', includeDummySnapshots: true }, contextBundle: { forged: true },
+    });
+    expect(parsed).toEqual({
+      ...base, mode: 'year_analysis', threadId: 'thread-1', month: { year: 2026, month: 3 }, year: 2025, chatContext: 'year',
+      preferences: { responseStyle: 'deep', includeDummySnapshots: true },
+    });
+  });
+
+  it('refuses an empty user, a month out of the calendar, a path-shaped thread id, an unknown context or style', () => {
+    expect(assistantStreamRequestSchema.safeParse({ ...base, userId: '' }).success).toBe(false);
+    expect(assistantStreamRequestSchema.safeParse({ ...base, month: { year: 2026, month: 13 } }).success).toBe(false);
+    expect(assistantStreamRequestSchema.safeParse({ ...base, month: { year: 2026.5, month: 3 } }).success).toBe(false);
+    expect(assistantStreamRequestSchema.safeParse({ ...base, threadId: 'a/b' }).success).toBe(false);
+    expect(assistantStreamRequestSchema.safeParse({ ...base, chatContext: 'week' }).success).toBe(false);
+    expect(assistantStreamRequestSchema.safeParse({ ...base, preferences: { responseStyle: 'verbose' } }).success).toBe(false);
+  });
+});
+
+describe('proposalPatchSchema (2026-11)', () => {
+  const base = { userId: 'u1', key: 'expense:0', status: 'written' };
+
+  it('accepts the three kinds of card by «kind:index»', () => {
+    for (const key of ['expense:0', 'expense:4', 'goal:0', 'question:12']) {
+      expect(proposalPatchSchema.safeParse({ ...base, key }).success, key).toBe(true);
+    }
+    for (const key of ['expense:x', 'expense:', 'expense:0.x', 'proposals.expense:0', 'row:0', 'expense:-1']) {
+      expect(proposalPatchSchema.safeParse({ ...base, key }).success, key).toBe(false);
+    }
+  });
+
+  it('bounds the written ids and keeps the answer for an answered question', () => {
+    expect(proposalPatchSchema.safeParse({ ...base, writtenIds: ['e1'] }).success).toBe(true);
+    expect(proposalPatchSchema.safeParse({ ...base, writtenIds: [''] }).success).toBe(false);
+    expect(proposalPatchSchema.safeParse({ ...base, writtenIds: Array.from({ length: 61 }, (_, i) => `e${i}`) }).success).toBe(false);
+    expect(proposalPatchSchema.safeParse({ ...base, key: 'question:0', status: 'answered', answer: 'Sì' }).success).toBe(true);
+    expect(proposalPatchSchema.safeParse({ ...base, status: 'ignored', answer: 'Sì' }).success).toBe(false);
+    // The month of the row «Modifica» saved (2026-11-11): a real YYYY-MM, on a written row only.
+    expect(proposalPatchSchema.safeParse({ ...base, writtenIds: ['e1'], month: '2026-09' }).data).toMatchObject({ month: '2026-09' });
+    expect(proposalPatchSchema.safeParse({ ...base, month: '2026-13' }).success).toBe(false);
+    expect(proposalPatchSchema.safeParse({ ...base, month: '2026-9' }).success).toBe(false);
+    expect(proposalPatchSchema.safeParse({ ...base, status: 'ignored', month: '2026-09' }).success).toBe(false);
+    expect(proposalPatchSchema.safeParse({ ...base, status: 'done' }).success).toBe(false);
   });
 });

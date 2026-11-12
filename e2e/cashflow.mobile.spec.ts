@@ -98,3 +98,9 @@ test('the filters count what is left of the period, in the reading and on the pr
   await expect(reading).toHaveText(/^Nessun filtro attivo/);
   await expect(dialog.getByRole('button', { name: 'Ripristina' })).toBeDisabled();
 });
+
+/** The bridge to Registra (2026-11) is not on a phone: the «+» is the one add control. */
+test('no «Chiedi all’Assistente» at 390', async ({ page }) => {
+  await expect(page.getByRole('button', { name: 'Aggiungi nuova voce' })).toBeVisible();
+  await expect(page.getByRole('link', { name: "Chiedi all'Assistente" }).filter({ visible: true })).toHaveCount(0);
+});

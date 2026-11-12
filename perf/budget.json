@@ -5,44 +5,44 @@
       "raisedBy": "2026-10-11: la landing rende le tessere della Panoramica (CashflowTile con la didascalia del calendario e NarrativeText, PatrimonioTile con i blocchi sollevabili): 509,5 → 511,2 KB gz; tetto = misura +2% come #432 e #436, OK del proprietario 2026-10-11. Misura prima/dopo in doc/guide/velocita.md § Registro"
     },
     "/dashboard": {
-      "initialJsGzKB": 626,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 616,4 (2026-10-17) → 623,7 con le funzioni dopo il 17 (passo maggiore: 1c7fea18, IntestatariTile) → 625,9 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 628,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 627,2 KB gz sullo stesso develop @55cc4dcf, 627,3 già prima del libro (2219411c), tetto 627 → 628, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #507: Tile legge lib/constants/aiAccent.ts (la superficie generata) — 625,7 → 626,0 (perf:build) e 626,1 (npm run build) sulla stessa macchina (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/allocation": {
-      "initialJsGzKB": 604,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 595,2 → 601,5 (406049b7, il Consulente, +3,8; 952fe509 +1) → 603,7 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 605,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 604,8 KB gz sullo stesso develop @55cc4dcf, 604,6 già prima del libro (2219411c), tetto 604 → 605, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #497: KB gz misurati sulla stessa macchina, 595,2 → 601,5 (406049b7, il Consulente, +3,8; 952fe509 +1) → 603,7 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/analisi": {
       "initialJsGzKB": 654,
       "raisedBy": "#497: KB gz misurati sulla stessa macchina, 650,7 → 651 → 653,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assets": {
-      "initialJsGzKB": 733,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 707 → 720,4 (952fe509 +8, b08dff8a +2,8: Intestatari e quote) → 730 con zod 4.6.7 → 732,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 737,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 736,2 KB gz sullo stesso develop @55cc4dcf, 736,1 già prima del libro (2219411c), tetto 735 → 737, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #514 (2026-11-11): il codice condiviso della card di Registra (ExpenseDialog con i valori iniziali nuovi, dialogNarrative, newSubCategoryId): 732,8 → 734,4 KB gz sulla stessa macchina, tetto 733 → 735, OK del proprietario 2026-11-11. Prima: #497: KB gz misurati sulla stessa macchina, 707 → 720,4 (952fe509 +8, b08dff8a +2,8: Intestatari e quote) → 730 con zod 4.6.7 → 732,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assistant": {
-      "initialJsGzKB": 712,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 692,2 → 699,5 (406049b7, tutto il portafoglio nel contesto, +5,2) → 709,1 con zod 4.6.7 → 711,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 754,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 753,3 KB gz sullo stesso develop @55cc4dcf, 753,1 già prima del libro (2219411c), tetto 753 → 754, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #514 (2026-11-11): Registra chiede i dettagli (la card domanda: ChoiceList, radio-group), scrive trasferimenti, rate, serie, commissioni e categorie nuove (il resolver e mortgageRepayment, propertyTransfer, recurrenceDates, expenseFee): 738,1 → 751,4 KB gz (perf:build, develop misurato in un worktree sulla stessa macchina), papaparse tolto (categoryMatchKey in expenseCategoryMatching.ts, −8,2); tetto 740 → 753, OK del proprietario 2026-11-11. Prima: docs/ritiro-ai-05 (2026-11-11): i quattro fix a runtime del ritiro della spec di Registra (lo scanner dei blocchi citati o in elenco per la card obiettivo, il mese della riga salvata, il giorno riletto all'ingresso, l'avviso della card obiettivo): 737,6 → 738,1 KB gz (npm run build), tetto 738 → 740; OK del proprietario 2026-11-11. Prima: feat/assistente-registra (2026-11-10): Registra — la card che scrive la riga con i servizi delle spese, il protocollo expense-proposal con zod, il contesto puro e le quattro letture: 712,9 → 737,6 KB gz sulla stessa macchina (perf:build), ExpenseDialog fuori dal primo caricamento; OK del proprietario 2026-11-10 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/cashflow": {
-      "initialJsGzKB": 785,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 766 → 771,1 (952fe509 +2,1, d6464235 +2) → 780,7 con zod 4.6.7 → 782,9 con re2js 2.9.1 → 784,0 (fix/rata-dettaglio-select-mobile-autocomplete 2026-11-06: le tendine come foglio sotto i 769px e il combobox col Drawer, +1,1; doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 789,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 788,1 KB gz sullo stesso develop @55cc4dcf, 787,9 già prima del libro (2219411c), tetto 787 → 789, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #517 (2026-11-11): il libro del Consulente aggiunge moduli che rinumerano gli id dei moduli di ogni route (ognuna ±0,1–0,3 KB gz, Panoramica −0,2): Cashflow 786,0 → 786,2 KB gz con i KB raw invariati (2507,7), nessun codice nuovo sulla pagina; tetto 786 → 787, OK del proprietario 2026-11-11. Prima: #497: KB gz misurati sulla stessa macchina, 766 → 771,1 (952fe509 +2,1, d6464235 +2) → 780,7 con zod 4.6.7 → 782,9 con re2js 2.9.1 → 784,0 (fix/rata-dettaglio-select-mobile-autocomplete 2026-11-06: le tendine come foglio sotto i 769px e il combobox col Drawer, +1,1) → 785,7 (#509, 2026-11-08: z.union e z.coerce.date() nel chunk di zod, +1,5; doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/fire-simulations": {
-      "initialJsGzKB": 742,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 737,9 → 739,6 (d6464235 +1,6) → 741,8 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 743,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 742,2 KB gz sullo stesso develop @55cc4dcf, 742,1 già prima del libro (2219411c), tetto 742 → 743, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #497: KB gz misurati sulla stessa macchina, 737,9 → 739,6 (d6464235 +1,6) → 741,8 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/hall-of-fame": {
-      "initialJsGzKB": 621,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 616,3 → 618,4 (952fe509 +1) → 620,5 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 622,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 621,3 KB gz sullo stesso develop @55cc4dcf, 621,2 già prima del libro (2219411c), tetto 621 → 622, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #497: KB gz misurati sulla stessa macchina, 616,3 → 618,4 (952fe509 +1) → 620,5 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/history": {
-      "initialJsGzKB": 777,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 772,8 → 774,3 (952fe509 +1,5) → 776,4 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 780,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 780 KB gz sullo stesso develop @55cc4dcf, 779,9 già prima del libro (2219411c), tetto 779 → 780, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #514 (2026-11-11): lo stesso codice condiviso: 777,5 → 778,3 KB gz sulla stessa macchina, tetto 778 → 779, OK del proprietario 2026-11-11. Prima: #507: Tile legge lib/constants/aiAccent.ts (la superficie generata) — 776,6 → 777,9 sulla stessa macchina, 33 → 34 chunk iniziali (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/pension": {
-      "initialJsGzKB": 677,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 663,1 → 664,4 (952fe509 +0,6; i chunk ridivisi quando ownershipRowOn ha lasciato assetOwnership, +0,7) → 674 con zod 4.6.7 → 676,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 678,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 677,3 KB gz sullo stesso develop @55cc4dcf, 677,1 già prima del libro (2219411c), tetto 677 → 678, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #497: KB gz misurati sulla stessa macchina, 663,1 → 664,4 (952fe509 +0,6; i chunk ridivisi quando ownershipRowOn ha lasciato assetOwnership, +0,7) → 674 con zod 4.6.7 → 676,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/performance": {
       "initialJsGzKB": 658,
@@ -61,8 +61,8 @@
       "raisedBy": "#497: KB gz misurati sulla stessa macchina, 473,4 → 476 (952fe509 +1,8; 406049b7 +0,8) → 478,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assets/compravendita": {
-      "initialJsGzKB": 594,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, la route è nata senza tetto il 2026-10-21 (d6464235): 591,7 → 593,9 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 596,
+      "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 595,7 KB gz sullo stesso develop @55cc4dcf, tetto 595 → 596, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #507: ChoiceList al posto di ChoiceRows (la modalità multipla porta Checkbox e useRovingFocus) — 593,1 → 594,3 sulla stessa macchina (doc/guide/velocita.md § Registro dei tetti alzati)"
     }
   },
   "sharedGzKB": 535,

@@ -11,7 +11,7 @@
  *
  * The base seed has no composite instrument, so the test plants three (decoy names and tickers
  * absent from the seed) with the Admin SDK and removes them in `finally` — data-only, never a
- * re-seed (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+ * re-seed (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
  */
 
 import { test, expect, type Locator, type Page } from '@playwright/test';

@@ -7,10 +7,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { verifyIdTokenMock, accountAccessDocGetMock, runMock, getAdviceMock, patchAdviceMock } = vi.hoisted(() => ({
+const { verifyIdTokenMock, accountAccessDocGetMock, runMock, interviewMock, getAdviceMock, patchAdviceMock } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   accountAccessDocGetMock: vi.fn(),
   runMock: vi.fn(),
+  interviewMock: vi.fn(),
   getAdviceMock: vi.fn(),
   patchAdviceMock: vi.fn(),
 }));
@@ -31,7 +32,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 vi.mock('@/lib/server/allocationAdvice/run', async () => {
   const actual = await vi.importActual<typeof import('@/lib/server/allocationAdvice/run')>('@/lib/server/allocationAdvice/run');
-  return { runAllocationAdviceStage: runMock, AllocationAdviceStageError: actual.AllocationAdviceStageError };
+  return { runAllocationAdviceStage: runMock, runInterviewRound: interviewMock, AllocationAdviceStageError: actual.AllocationAdviceStageError };
 });
 vi.mock('@/lib/server/allocationAdvice/store', () => ({
   getAllocationAdviceAdmin: getAdviceMock,
@@ -116,6 +117,7 @@ describe('POST /api/allocation-advice/run', () => {
     ]);
     // No stage named is the first one, and the first one counts against the limit.
     expect(runMock.mock.calls[0][0]).toMatchObject({ userId: 'user-1', stage: 'strategy', answers: ANSWERS });
+    expect(rateLimitMock).toHaveBeenCalledWith('user-1:allocation-advice', 12, 3_600_000);
     expect(rateLimitMock).toHaveBeenCalledTimes(1);
   });
 
@@ -149,6 +151,7 @@ describe('POST /api/allocation-advice/run', () => {
     expect(response.status).toBe(200);
     await readSse(response);
     expect(runMock.mock.calls[0][0]).toMatchObject({ userId: 'user-1', stage: 'revise', request: 'solo bond singoli' });
+    expect(rateLimitMock).toHaveBeenCalledWith('user-1:allocation-advice', 12, 3_600_000);
     expect(rateLimitMock).toHaveBeenCalledTimes(1);
   });
 
@@ -156,6 +159,96 @@ describe('POST /api/allocation-advice/run', () => {
     runMock.mockRejectedValue(new AllocationAdviceStageError('instruments', 'Il servizio AI non ha risposto.', true));
     const events = await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', answers: ANSWERS })));
     expect(events).toEqual([{ type: 'error', error: 'Il servizio AI non ha risposto.', retryable: true }]);
+  });
+
+  // ── The interview (2026-11-08: its own branch, the 400s, the rate limit) ─────────────
+  const EMPTY_INTERVIEW = { rounds: [], skipped: false };
+  const storedRound = (overrides: Record<string, unknown> = {}) => ({
+    note: 'Vedo un reddito concentrato.',
+    satisfied: false,
+    questions: [{ id: 'reddito', kind: 'single', text: 'Quanto dipendi dal reddito?', why: "l'86% delle entrate", options: [{ value: 'si', label: 'Sì' }, { value: 'no', label: 'No' }], allowOther: true }],
+    answers: [{ questionId: 'reddito', value: 'si' }],
+    model: 'opus-finto',
+    askedAt: '2026-11-08T11:00:00.000Z',
+    ...overrides,
+  });
+
+  it('stage interview calls runInterviewRound, never the stage runner, counts against the limit of 12, and streams the round', async () => {
+    const askedAt = new Date('2026-11-08T11:05:00.000Z');
+    interviewMock.mockImplementation(async ({ onRound }: { onRound: (round: unknown) => void }) => {
+      onRound({ ...storedRound(), answers: undefined, askedAt });
+    });
+    const response = await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'interview', answers: ANSWERS, interview: EMPTY_INTERVIEW }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('text/event-stream');
+    const events = await readSse(response);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: 'interview', round: { note: 'Vedo un reddito concentrato.', model: 'opus-finto', askedAt: askedAt.toISOString() } });
+    expect(runMock).not.toHaveBeenCalled();
+    expect(interviewMock).toHaveBeenCalledTimes(1);
+    expect(interviewMock.mock.calls[0][0]).toMatchObject({ userId: 'user-1', answers: ANSWERS, previousRounds: [], revision: null });
+    expect(rateLimitMock).toHaveBeenCalledTimes(1);
+    expect(rateLimitMock).toHaveBeenCalledWith('user-1:allocation-advice', 12, 3_600_000);
+  });
+
+  it('hands the previous rounds on with askedAt as a Date, and the revision request when there is one', async () => {
+    interviewMock.mockResolvedValue(undefined);
+    await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'interview', answers: ANSWERS, interview: { rounds: [storedRound()], skipped: false } })));
+    const previous = interviewMock.mock.calls[0][0].previousRounds;
+    expect(previous).toHaveLength(1);
+    expect(previous[0].askedAt).toBeInstanceOf(Date);
+    expect(previous[0].answers).toEqual([{ questionId: 'reddito', value: 'si' }]);
+
+    await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'interview', answers: ANSWERS, interview: EMPTY_INTERVIEW, revision: { requests: '  niente ornitorinchi ' } })));
+    expect(interviewMock.mock.calls[1][0]).toMatchObject({ previousRounds: [], revision: { requests: 'niente ornitorinchi' } });
+  });
+
+  it('refuses, with 400 and no model call, a round without answers or interview, a skipped interview, a third-round-plus and a revision round after one', async () => {
+    const run = (body: Record<string, unknown>) => runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'interview', ...body }));
+    expect((await run({ interview: EMPTY_INTERVIEW })).status).toBe(400);
+    expect((await run({ answers: ANSWERS })).status).toBe(400);
+    expect((await run({ answers: ANSWERS, interview: { rounds: 'no', skipped: false } })).status).toBe(400);
+    const skipped = await run({ answers: ANSWERS, interview: { rounds: [], skipped: true } });
+    expect(skipped.status).toBe(400);
+    expect(await skipped.json()).toEqual({ error: 'Il colloquio è stato saltato.' });
+    const three = await run({ answers: ANSWERS, interview: { rounds: [storedRound(), storedRound(), storedRound()], skipped: false } });
+    expect(three.status).toBe(400);
+    expect(await three.json()).toEqual({ error: 'Il colloquio ha già tre tornate: avvia la ricerca.' });
+    const second = await run({ answers: ANSWERS, interview: { rounds: [storedRound()], skipped: false }, revision: { requests: 'niente ornitorinchi' } });
+    expect(second.status).toBe(400);
+    expect(await second.json()).toEqual({ error: "Prima della revisione c'è una sola tornata di domande." });
+    expect((await run({ answers: ANSWERS, interview: EMPTY_INTERVIEW, revision: { requests: '' } })).status).toBe(400);
+    expect(interviewMock).not.toHaveBeenCalled();
+    expect(runMock).not.toHaveBeenCalled();
+    // A 400 costs no slot.
+    expect(rateLimitMock).not.toHaveBeenCalled();
+  });
+
+  it('streams the interview failure as an error event and a 429 when the twelve slots are gone', async () => {
+    interviewMock.mockRejectedValue(new AllocationAdviceStageError('interview', 'Il modello non ha prodotto domande leggibili. Riprova.', true));
+    const events = await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'interview', answers: ANSWERS, interview: EMPTY_INTERVIEW })));
+    expect(events).toEqual([{ type: 'error', error: 'Il modello non ha prodotto domande leggibili. Riprova.', retryable: true }]);
+    rateLimitMock.mockReturnValueOnce({ allowed: false, retryAfterSeconds: 60 } as never);
+    const limited = await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'interview', answers: ANSWERS, interview: EMPTY_INTERVIEW }));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Retry-After')).toBe('60');
+    expect(interviewMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('the strategy and the revise carry the interview to the stage runner; a revise with two rounds is refused', async () => {
+    runMock.mockResolvedValue({ userId: 'user-1', status: 'ready' });
+    const interview = { rounds: [storedRound()], skipped: false };
+    await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'strategy', answers: ANSWERS, interview })));
+    expect(runMock.mock.calls[0][0]).toMatchObject({ stage: 'strategy', interview: { skipped: false } });
+    expect(runMock.mock.calls[0][0].interview.rounds[0].askedAt).toBeInstanceOf(Date);
+    await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'revise', request: 'niente ornitorinchi', interview: { rounds: [], skipped: true } })));
+    expect(runMock.mock.calls[1][0]).toMatchObject({ stage: 'revise', request: 'niente ornitorinchi', interview: { rounds: [], skipped: true } });
+    // An older client, no interview key: null, as before.
+    await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', answers: ANSWERS })));
+    expect(runMock.mock.calls[2][0]).toMatchObject({ stage: 'strategy', interview: null });
+    const two = await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'revise', request: 'x', interview: { rounds: [storedRound(), storedRound()], skipped: false } }));
+    expect(two.status).toBe(400);
+    expect(runMock).toHaveBeenCalledTimes(3);
   });
 });
 

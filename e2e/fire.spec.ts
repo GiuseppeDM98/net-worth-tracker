@@ -7,7 +7,7 @@
  * Traguardo's hero is a well-formed euro amount, the Scenari|Ventaglio toggle actually swaps the
  * chart (via the charts' aria-labels), and the Parametri disclosure really opens and closes
  * (measured by height — a collapsed region can still be "visible" to Playwright,
- * doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+ * doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
  *
  * The arithmetic (accumulation engine, percentiles, coherence with the deterministic
  * projection) lives in __tests__/monteCarloService.test.ts, the words in

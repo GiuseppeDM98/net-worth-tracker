@@ -225,6 +225,15 @@ describe('buildAssistantPortfolioContext — holdings', () => {
     expect(holdings.find((row) => row.name === 'Conto corrente')).toMatchObject({ owner: null, isLiquid: true });
     expect(holdings.find((row) => row.name === 'Conto corrente')?.ticker).toBeUndefined();
   });
+
+  it('carries the raw ticker for the profile cache on a quoted holding and the maturity on a bond, for the Consulente\'s bond block (2026-11-08)', () => {
+    const { holdings } = build();
+    expect(holdings.find((row) => row.name === 'ETF Mondo')?.profileTicker).toBe('MONDO.MI');
+    expect(holdings.find((row) => row.name === 'ETF Mondo')?.maturityIso).toBeUndefined();
+    expect(holdings.find((row) => row.name === 'BTP Esempio 2030')).toMatchObject({ maturityIso: '2030-03-01' });
+    expect(holdings.find((row) => row.name === 'BTP Esempio 2030')?.profileTicker).toBeUndefined();
+    expect(holdings.find((row) => row.name === 'Conto corrente')?.profileTicker).toBeUndefined();
+  });
 });
 
 describe('buildAssistantPortfolioContext — the goals\' hold on each holding', () => {

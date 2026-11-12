@@ -13,6 +13,8 @@ export default async function ConsulentePage({ searchParams }: { searchParams: P
   }
   // `?rivedi=1` (the review invite of Allocazione, 2026-10-20): the screens open over the applied
   // plan instead of its report, as «Rifai il percorso» would.
+  // `?pagina=<id>` (2026-11-08): the report opens on that page of the book; an array or nothing is the cover.
   const params = await searchParams;
-  return <ConsulenteClient configured={Boolean(process.env.ANTHROPIC_API_KEY)} startFresh={params.rivedi === '1'} />;
+  const initialPage = typeof params.pagina === 'string' ? params.pagina : null;
+  return <ConsulenteClient configured={Boolean(process.env.ANTHROPIC_API_KEY)} startFresh={params.rivedi === '1'} initialPage={initialPage} />;
 }

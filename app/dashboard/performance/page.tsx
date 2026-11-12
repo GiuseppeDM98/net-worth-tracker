@@ -75,6 +75,7 @@ import {
   VERDICT_CELL_CLASS,
 } from '@/lib/utils/tabletComposition';
 import { VERDICT_REST_SECTION } from '@/lib/utils/mobileSections';
+import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS } from '@/lib/constants/aiAccent';
 import { liftedBlocks } from '@/lib/utils/verdictStrip';
 import { performanceYieldsQueryOptions, withYields } from '@/lib/query/performanceQueries';
 import { resolveHasBaseline, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
@@ -295,10 +296,7 @@ function HeaderActions({
         variant="outline"
         onClick={onAI}
         disabled={aiDisabled}
-        className={cn(
-          'group gap-1.5 transition-[border-color,color,box-shadow] duration-200 hover:border-[var(--ai-accent)] hover:text-[var(--ai-accent)] hover:shadow-[0_0_14px_color-mix(in_oklch,var(--ai-accent)_40%,transparent)]',
-          size,
-        )}
+        className={cn('group gap-1.5', AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS, size)}
         aria-label={isDemo ? `${AI_LABEL}${DEMO_SUFFIX}` : AI_LABEL}
       >
         <Sparkles className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" aria-hidden="true" />

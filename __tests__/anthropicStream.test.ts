@@ -4,7 +4,23 @@ import type { AssistantPreferences } from '@/types/assistant';
 
 vi.mock('server-only', () => ({}));
 
-import { streamAssistantResponse } from '@/lib/server/assistant/anthropicStream';
+// The four analysis builders: what each receives is what the route handed over.
+const { analysisPromptMocks } = vi.hoisted(() => ({
+  analysisPromptMocks: { month_analysis: vi.fn(), year_analysis: vi.fn(), ytd_analysis: vi.fn(), history_analysis: vi.fn() },
+}));
+vi.mock('@/lib/server/assistant/prompts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/server/assistant/prompts')>();
+  return {
+    ...actual,
+    buildMonthAnalysisPrompt: analysisPromptMocks.month_analysis,
+    buildYearAnalysisPrompt: analysisPromptMocks.year_analysis,
+    buildYtdAnalysisPrompt: analysisPromptMocks.ytd_analysis,
+    buildHistoryAnalysisPrompt: analysisPromptMocks.history_analysis,
+  };
+});
+
+import { ASSISTANT_REGISTER_MAX_TOKENS, streamAssistantResponse } from '@/lib/server/assistant/anthropicStream';
+import { buildRegisterPrompt } from '@/lib/server/assistant/prompts';
 import { ASSISTANT_MODEL, SERVER_SIDE_FALLBACK_BETA } from '@/lib/constants/aiModels';
 
 const OVERLOADED_MESSAGE = 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.';
@@ -106,5 +122,90 @@ describe('streamAssistantResponse server-side fallback', () => {
       fallbacks: 'default',
       stream: true,
     });
+  });
+});
+
+describe('streamAssistantResponse — the CASHFLOW 12 MESI block (2026-11)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function* empty() {}
+
+  it.each(['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'] as const)('%s: forwards the block to its builder, as the last argument', async (mode) => {
+    const promptMock = analysisPromptMocks[mode];
+    promptMock.mockReset().mockReturnValue({ system: 'S', userContent: 'U' });
+    const create = vi.spyOn(Anthropic.Beta.Messages.prototype, 'create').mockResolvedValue(empty() as never);
+
+    await streamAssistantResponse({
+      mode,
+      month: { year: 2026, month: 3 },
+      prompt: 'Come va?',
+      contextBundle: {} as never,
+      cashflowBlock: 'BLOCCO',
+      preferences,
+      enableWebSearch: false,
+      onStatus: vi.fn(),
+      onText: vi.fn(),
+    });
+
+    expect(promptMock).toHaveBeenCalledTimes(1);
+    expect(promptMock.mock.calls[0].at(-1)).toBe('BLOCCO');
+    expect(create.mock.calls[0][0]).toMatchObject({ system: 'S' });
+  });
+
+  it('hands it to the chat too, in the user turn only (since 2026-11-07)', async () => {
+    const create = vi.spyOn(Anthropic.Beta.Messages.prototype, 'create').mockResolvedValue(empty() as never);
+
+    await streamAssistantResponse({
+      mode: 'chat',
+      prompt: 'Come va?',
+      contextBundle: null,
+      cashflowBlock: 'BLOCCO',
+      preferences,
+      enableWebSearch: false,
+      onStatus: vi.fn(),
+      onText: vi.fn(),
+    });
+
+    const params = create.mock.calls[0][0] as unknown as { system: string; messages: { content: string }[] };
+    expect(JSON.stringify(params.messages)).toContain('BLOCCO');
+    expect(JSON.stringify(params.system)).not.toContain('BLOCCO');
+  });
+});
+
+describe('streamAssistantResponse — Registra (2026-11)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function* empty() {}
+
+  it('sends the register prompt with its own token ceiling and no tool, whatever the web-search flag', async () => {
+    const create = vi.spyOn(Anthropic.Beta.Messages.prototype, 'create').mockResolvedValue(empty() as never);
+
+    await streamAssistantResponse({
+      mode: 'register',
+      prompt: 'ho fatto spesa per 103 euro',
+      contextBundle: null,
+      registerBlock: 'BLOCCO REGISTRA',
+      cashflowBlock: 'BLOCCO',
+      preferences,
+      // The flag is ON: Registra sends no tool even so (seen red on 2026-11-11 — until then this case
+      // passed `false`, and the spread alone could not send one in any mode).
+      enableWebSearch: true,
+      onStatus: vi.fn(),
+      onText: vi.fn(),
+    });
+
+    const expected = buildRegisterPrompt('ho fatto spesa per 103 euro', preferences, [], 'BLOCCO REGISTRA', 'BLOCCO');
+    const params = create.mock.calls[0][0] as unknown as { system: unknown; max_tokens: number; tools?: unknown; messages: { content: unknown }[] };
+    expect(ASSISTANT_REGISTER_MAX_TOKENS).toBe(16000);
+    expect(params.max_tokens).toBe(16000);
+    expect(params.tools).toBeUndefined();
+    // The builder's `system`, whole: nothing before it, nothing after.
+    expect(params.system).toBe(expected.system);
+    expect(JSON.stringify(params.messages)).toContain('BLOCCO REGISTRA');
+    expect(JSON.stringify(params.system)).not.toContain('BLOCCO REGISTRA');
   });
 });

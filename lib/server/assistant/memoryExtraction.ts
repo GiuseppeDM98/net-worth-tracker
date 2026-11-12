@@ -268,6 +268,33 @@ export function isSimilarText(a: string, b: string, threshold = 0.5): boolean {
   return union > 0 && intersection / union >= threshold;
 }
 
+/** The prefix of a categorisation rule (2026-11): «Categorizzazione: palestra → Salute › Palestra». */
+const CATEGORIZATION_RULE_PREFIX = 'Categorizzazione:';
+
+function isCategorizationRule(text: string): boolean {
+  return text.trim().startsWith(CATEGORIZATION_RULE_PREFIX);
+}
+
+/** A rule's subject — what it files —, normalised: the text between the prefix and the first «→». */
+function ruleSubject(text: string): string {
+  const body = text.trim().slice(CATEGORIZATION_RULE_PREFIX.length);
+  const arrow = body.indexOf('→');
+  return normalizeText(arrow === -1 ? body : body.slice(0, arrow));
+}
+
+/**
+ * Whether a new rule replaces an item (2026-11): both categorisation preferences, the item
+ * active, the same subject, a different text — «palestra → Sport» after «palestra → Salute ›
+ * Palestra». The route archives the old one in the turn's one transaction: two rules on one
+ * subject would leave the model to pick, and the user said the newer.
+ */
+export function supersedesCategorizationRule(candidate: MemoryCandidate, item: AssistantMemoryItem): boolean {
+  if (candidate.category !== 'preference' || item.category !== 'preference' || item.status !== 'active') return false;
+  if (!isCategorizationRule(candidate.text) || !isCategorizationRule(item.text)) return false;
+  const subject = ruleSubject(candidate.text);
+  return subject !== '' && subject === ruleSubject(item.text) && normalizeText(candidate.text) !== normalizeText(item.text);
+}
+
 /**
  * Filters candidates that are already represented in the active item set, AND
  * deduplicates candidates against each other within the same batch — two
@@ -276,6 +303,10 @@ export function isSimilarText(a: string, b: string, threshold = 0.5): boolean {
  *
  * Deduplication is scoped per category to avoid cross-category false positives.
  * Archived items are ignored: a re-archived topic can be re-learned.
+ *
+ * A categorisation rule is compared by its exact normalised text only (2026-11): «palestra →
+ * Salute › Benessere» is close to «… → Salute › Palestra» by bigrams, and is a different rule —
+ * the newer one supersedes the older (`supersedesCategorizationRule`), it is not a duplicate.
  */
 export function dedupeMemoryItems(
   candidates: MemoryCandidate[],
@@ -299,9 +330,10 @@ export function dedupeMemoryItems(
     const existing = activeByCategory.get(candidate.category) ?? [];
     const acceptedSoFar = acceptedByCategory.get(candidate.category) ?? [];
 
-    const isDuplicate =
-      existing.some((item) => isSimilarText(candidate.text, item.text)) ||
-      acceptedSoFar.some((accepted) => isSimilarText(candidate.text, accepted.text));
+    const same = isCategorizationRule(candidate.text)
+      ? (other: string) => normalizeText(candidate.text) === normalizeText(other)
+      : (other: string) => isSimilarText(candidate.text, other);
+    const isDuplicate = existing.some((item) => same(item.text)) || acceptedSoFar.some((accepted) => same(accepted.text));
 
     if (isDuplicate) continue;
 
@@ -328,6 +360,9 @@ Regole fondamentali:
 - Estrai SOLO ciò che l'utente dichiara esplicitamente, mai contenuti inferiti
 - NON estrarre: numeri di mercato, analisi mensili, eventi macro, dati storici temporanei
 - NON estrarre preferenze di stile risposta (bilanciato/conciso/approfondito) già gestite altrove
+- Una regola di categorizzazione detta dall'utente (“la palestra è Salute”) è una preference.
+- Una regola di categorizzazione si estrae solo se l'utente la dice come abitudine ("sempre", "di solito", "d'ora in poi"), come "preference", nel formato "Categorizzazione: {cosa, senza articolo} → {Categoria} › {Sottocategoria}" (la sottocategoria solo se nominata); non estrarre mai la scelta di una singola riga né la risposta a una domanda (un testo con "[id]").
+- Una spesa o un'entrata che l'utente registra (importo, negozio, data) non è un fatto da memorizzare.
 - Ogni item: max 120 caratteri, conciso e verificabile
 - Se non c'è nulla da estrarre, chiama comunque il tool con items: []
 

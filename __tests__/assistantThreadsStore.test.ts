@@ -12,7 +12,13 @@ vi.mock('server-only', () => ({}));
 
 type Row = { id: string; data: Record<string, unknown> };
 
-const { threads } = vi.hoisted(() => ({ threads: new Map<string, Record<string, unknown>>() }));
+const { threads, messages, messageUpdateMock, messageSetMock } = vi.hoisted(() => ({
+  threads: new Map<string, Record<string, unknown>>(),
+  // The `messages` subcollection, keyed `threadId/messageId`.
+  messages: new Map<string, Record<string, unknown>>(),
+  messageUpdateMock: vi.fn(),
+  messageSetMock: vi.fn(),
+}));
 
 vi.mock('@/lib/firebase/admin', () => {
   const millis = (value: unknown) => (value instanceof Date ? value.getTime() : Number(value));
@@ -47,13 +53,35 @@ vi.mock('@/lib/firebase/admin', () => {
         ...query([]),
         doc: (id: string) => ({
           get: async () => ({ id, exists: threads.has(id), data: () => threads.get(id) }),
+          collection: () => ({
+            doc: (messageId: string) => ({
+              get: async () => ({ id: messageId, exists: messages.has(`${id}/${messageId}`), data: () => messages.get(`${id}/${messageId}`) }),
+              update: messageUpdateMock,
+              set: messageSetMock,
+            }),
+            orderBy: () => ({
+              limit: () => ({
+                get: async () => ({
+                  docs: [...messages.entries()]
+                    .filter(([path]) => path.startsWith(`${id}/`))
+                    .map(([path, data]) => ({ id: path.slice(id.length + 1), data: () => data })),
+                }),
+              }),
+            }),
+          }),
         }),
       }),
     },
   };
 });
 
-import { ASSISTANT_THREADS_PAGE_SIZE, listAssistantThreads } from '@/lib/server/assistant/store';
+import { FieldPath, Timestamp } from 'firebase-admin/firestore';
+import {
+  ASSISTANT_THREADS_PAGE_SIZE,
+  getAssistantThreadDetail,
+  listAssistantThreads,
+  setAssistantMessageProposal,
+} from '@/lib/server/assistant/store';
 
 const OWNER = 'owner-1';
 
@@ -105,5 +133,58 @@ describe('listAssistantThreads — one page at a time', () => {
     seedThreads(3, 'someone-else', 'x');
     await expect(listAssistantThreads(OWNER, { after: 'x000' })).rejects.toMatchObject({ status: 403 });
     await expect(listAssistantThreads(OWNER, { after: 'gone' })).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('setAssistantMessageProposal — the outcome of a card on its message (2026-11)', () => {
+  beforeEach(() => {
+    threads.clear();
+    messages.clear();
+    messageUpdateMock.mockReset().mockResolvedValue(undefined);
+    messageSetMock.mockReset();
+    seedThreads(1);
+    seedThreads(1, 'someone-else', 'x');
+    messages.set('t000/msg-1', { userId: OWNER, role: 'assistant', content: 'Ecco.', createdAt: new Date(Date.UTC(2026, 10, 1, 10)), mode: 'register' });
+  });
+
+  it('updates ONE key by its field path — never a merge that could create the document', async () => {
+    const stored = await setAssistantMessageProposal(OWNER, 't000', 'msg-1', 'expense:0', { status: 'written', writtenIds: ['exp-1'] });
+
+    expect(messageSetMock).not.toHaveBeenCalled();
+    expect(messageUpdateMock).toHaveBeenCalledTimes(1);
+    const [path, value] = messageUpdateMock.mock.calls[0];
+    expect(path).toBeInstanceOf(FieldPath);
+    expect((path as FieldPath).isEqual(new FieldPath('proposals', 'expense:0'))).toBe(true);
+    expect(value).toMatchObject({ status: 'written', writtenIds: ['exp-1'] });
+    expect(value.at).toBeInstanceOf(Timestamp);
+    // The server stamps the time and answers it as a Date.
+    expect(stored).toMatchObject({ status: 'written', writtenIds: ['exp-1'] });
+    expect(stored.at).toBeInstanceOf(Date);
+  });
+
+  it('answers 404 for a message that does not exist, 403 for another account’s thread, 404 for no thread — writing nothing', async () => {
+    await expect(setAssistantMessageProposal(OWNER, 't000', 'local-assistant-1', 'expense:0', { status: 'ignored' })).rejects.toMatchObject({ status: 404 });
+    await expect(setAssistantMessageProposal(OWNER, 'x000', 'msg-1', 'expense:0', { status: 'ignored' })).rejects.toMatchObject({ status: 403 });
+    await expect(setAssistantMessageProposal(OWNER, 'gone', 'msg-1', 'expense:0', { status: 'ignored' })).rejects.toMatchObject({ status: 404 });
+    expect(messageUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('reads the outcomes back with the thread, each `at` a Date', async () => {
+    const at = Timestamp.fromDate(new Date(Date.UTC(2026, 10, 1, 10, 5)));
+    messages.set('t000/msg-1', {
+      ...messages.get('t000/msg-1'),
+      proposals: { 'expense:0': { status: 'written', writtenIds: ['exp-1'], month: '2026-09', at }, 'expense:1': { status: 'ignored', at } },
+    });
+    messages.set('t000/msg-0', { userId: OWNER, role: 'user', content: 'ho speso 5 euro', createdAt: new Date(Date.UTC(2026, 10, 1, 9)), mode: 'register' });
+
+    const detail = await getAssistantThreadDetail('t000', OWNER);
+    const assistant = detail.messages.find((message) => message.id === 'msg-1');
+    expect(assistant?.proposals).toEqual({
+      // `month` (the row «Modifica» saved in another month, 2026-11-11) comes back with the outcome.
+      'expense:0': { status: 'written', writtenIds: ['exp-1'], month: '2026-09', at: at.toDate() },
+      'expense:1': { status: 'ignored', at: at.toDate() },
+    });
+    // A message with no card carries no `proposals` key at all.
+    expect(detail.messages.find((message) => message.id === 'msg-0')).not.toHaveProperty('proposals');
   });
 });

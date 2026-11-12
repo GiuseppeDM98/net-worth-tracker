@@ -1,13 +1,13 @@
 /**
  * Every sentence of the Consulente (2026-10-20): the screens' questions and readings, the
- * run's stages, the report's verdict and tile readings, the «rivedi entro» line the
+ * run's stages, the report's verdict and page readings, the «rivedi entro» line the
  * Allocazione header prints. Pure; no component writes copy.
  */
 
 import type { Narrative, PageVerdictModel } from '@/lib/utils/narrative';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
-import type { AllocationAdviceDocument, AllocationAdviceStage, AllocationAdviceStep } from '@/types/allocationAdvice';
+import type { AllocationAdviceDocument, AllocationAdviceInterview, AllocationAdviceStage, AllocationAdviceStep } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 
 const prose = (text: string): Narrative[number] => ({ text });
@@ -59,15 +59,15 @@ export const STEP_COPY: Record<AllocationAdviceStep, { eyebrow: string; question
 };
 
 export const LOSS_TOLERANCE_OPTIONS = [
-  { value: 'bassa' as const, label: 'Bassa', description: 'Un −10% mi farebbe vendere o dormire male.' },
-  { value: 'media' as const, label: 'Media', description: 'Reggerei un −25% senza vendere, con fatica.' },
-  { value: 'alta' as const, label: 'Alta', description: 'Reggerei un −40% senza vendere, e comprerei ancora.' },
+  { value: 'bassa' as const, label: 'Bassa', hint: 'Un −10% mi farebbe vendere o dormire male.' },
+  { value: 'media' as const, label: 'Media', hint: 'Reggerei un −25% senza vendere, con fatica.' },
+  { value: 'alta' as const, label: 'Alta', hint: 'Reggerei un −40% senza vendere, e comprerei ancora.' },
 ];
 
 export const DISTRIBUTION_POLICY_OPTIONS = [
-  { value: 'accumulazione' as const, label: 'Accumulazione', description: 'Reinveste i proventi, nessuna tassazione annua sui dividendi.' },
-  { value: 'distribuzione' as const, label: 'Distribuzione', description: 'Incassi dividendi e cedole in conto.' },
-  { value: 'indifferente' as const, label: 'Scegli tu', description: 'Il Consulente motiva la scelta.' },
+  { value: 'accumulazione' as const, label: 'Accumulazione', hint: 'Reinveste i proventi, nessuna tassazione annua sui dividendi.' },
+  { value: 'distribuzione' as const, label: 'Distribuzione', hint: 'Incassi dividendi e cedole in conto.' },
+  { value: 'indifferente' as const, label: 'Scegli tu', hint: 'Il Consulente motiva la scelta.' },
 ];
 
 export const EXCHANGE_OPTIONS = ['Borsa Italiana (Milano, XMIL)', 'Xetra (Francoforte)', 'Euronext (Parigi / Amsterdam)', 'London Stock Exchange'];
@@ -92,6 +92,74 @@ export const REVISION_COPY = {
   running: 'Rivedo il report con la tua richiesta…',
 } as const;
 
+// ─── The book (2026-11-08) ────────────────────────────────────────────────────
+
+/**
+ * The words of the report read as a book: the page's eyebrow, the pager, the «Indice» modal, the
+ * risks page's aside, the instruments page's reading without candidates. Strings only: the
+ * Allocazione page loads this module (`describeReviewBy`), and it stays zod-free.
+ */
+export const BOOK_COPY = {
+  eyebrow: (n: number, total: number, title: string) => `Pagina ${n} di ${total} · ${title}`,
+  back: 'Indietro',
+  next: 'Avanti',
+  index: 'Indice',
+  indexEyebrow: (total: number) => `Il report · ${total === 1 ? '1 pagina' : `${total} pagine`}`,
+  indexTitle: 'Vai a una pagina',
+  indexReading: "Ogni pagina si legge da sola; «Applica» è l'ultima.",
+  reviewAside: (date: string) => `rivedi entro il ${date}`,
+  instrumentsTextOnly: 'La ricerca ha scritto solo testo: è quello di questa pagina.',
+} as const;
+
+// ─── The interview (2026-11-08) ───────────────────────────────────────────────
+
+/** Every label of the interview: the summary's footer, the scene, the report's «Il colloquio» and «Chiedi una modifica» pages (2026-11-08; pages since 2026-11-11). */
+export const INTERVIEW_COPY = {
+  /** The summary, with no round yet. */
+  start: 'Avvia il colloquio',
+  skipAndRun: 'Salta il colloquio e avvia la ricerca',
+  /** The summary, with rounds. */
+  resume: 'Torna al colloquio',
+  restart: 'Ricomincia il colloquio',
+  /** The scene. */
+  eyebrow: (round: number, total: number) => `Colloquio · tornata ${round} di ${total}`,
+  waitingHeadline: 'Il Consulente legge le tue risposte e i tuoi dati.',
+  asking: 'Il Consulente legge le tue risposte e i tuoi dati…',
+  back: 'Indietro',
+  skip: 'Salta il colloquio',
+  next: 'Continua',
+  run: 'Avvia la ricerca',
+  retry: 'Riprova',
+  notConfigured: 'Servizio AI non configurato',
+  /** The report's «Il colloquio» page. */
+  tileTitle: 'Il colloquio',
+  roundEyebrow: (index: number) => `Tornata ${index}`,
+  unanswered: 'non risposta',
+  noQuestions: 'nessuna domanda',
+  skippedAside: 'saltato',
+  /** The «Chiedi una modifica» page. */
+  revise: 'Rivedi il report',
+  skipQuestions: 'Salta le domande',
+  revisionAsked: 'Il Consulente ha chiesto',
+} as const;
+
+/**
+ * The ONE singular/plural rule of «tornata», read by the prompt's header, the tile's aside and the
+ * summary. Here and not in `allocationAdviceInterview.ts`: the Allocazione page loads this module
+ * (`describeReviewBy`), and that one reaches zod through `questionSet` (2026-11-08, +34 KB gz seen
+ * on `/dashboard/allocation` before the move).
+ */
+export function describeRoundCount(n: number): string {
+  return n === 1 ? '1 tornata' : `${n} tornate`;
+}
+
+/** The «Il colloquio» page's aside: «2 tornate», «2 tornate · saltato»; null with zero rounds (no page, 2026-11-01). */
+export function describeInterviewAside(interview: AllocationAdviceInterview | null | undefined): string | null {
+  if (!interview || interview.rounds.length === 0) return null;
+  const count = describeRoundCount(interview.rounds.length);
+  return interview.skipped ? `${count} · ${INTERVIEW_COPY.skippedAside}` : count;
+}
+
 // ─── The run ──────────────────────────────────────────────────────────────────
 
 export const STAGE_COPY: Record<AllocationAdviceStage, { label: string; detail: string }> = {
@@ -104,6 +172,16 @@ export const STAGE_COPY: Record<AllocationAdviceStage, { label: string; detail: 
 export function describeRunHeadline(stage: AllocationAdviceStage | null): string {
   if (stage === null) return 'Avvio il percorso.';
   return `${STAGE_COPY[stage].label}.`;
+}
+
+/** What a stage usually takes, in minutes (about five in all at effort `medium`, 2026-10-23; the owner's figures of 2026-11-01). */
+export const STAGE_TYPICAL_MINUTES: Record<AllocationAdviceStage, number> = { context: 0, strategy: 2, instruments: 2, review: 1 };
+
+/** «di solito ~N min»; null when N is 0 (the context: the row prints no duration). */
+export function describeStageTypical(stage: AllocationAdviceStage): string | null {
+  const minutes = STAGE_TYPICAL_MINUTES[stage];
+  if (minutes <= 0) return null;
+  return `di solito ~${minutes} min`;
 }
 
 // ─── The report ───────────────────────────────────────────────────────────────
@@ -129,7 +207,7 @@ export function buildConsulenteVerdict(document: AllocationAdviceDocument, today
       sentence: [
         prose(`Scritta il ${formatDate(document.applied.at)}`),
         ...(proposal ? [prose('; da rivedere entro il '), figure(formatDate(new Date(proposal.reviewByIso))), prose('.')] : [prose('.')]),
-        ...(invite ? [prose(` ${invite} «Rifai il percorso», in fondo, riparte dal piano in vigore e dal suo perché.`)] : []),
+        ...(invite ? [prose(` ${invite} «Rifai il percorso», nell'ultima pagina, riparte dal piano in vigore e dal suo perché.`)] : []),
       ],
     };
   }
@@ -137,7 +215,7 @@ export function buildConsulenteVerdict(document: AllocationAdviceDocument, today
     return {
       headline: 'Il Consulente ha scritto il report, senza una proposta leggibile.',
       tone: 'warning',
-      sentence: [prose("Leggi il testo qui sotto; «Applica» non è disponibile perché il blocco strutturato non è valido. Rifai il percorso per ottenerne uno.")],
+      sentence: [prose("Leggi il testo nelle pagine che seguono; «Applica» non è disponibile perché il blocco strutturato non è valido. Rifai il percorso per ottenerne uno.")],
     };
   }
   return {

@@ -21,6 +21,9 @@
   an epoch instead of 400 — every request date in the file goes through it (yields, dividends, transactions), pinned by
   the «a null date» case of `__tests__/performanceYieldsRoute.test.ts` and the date cases of `serverValidation.test.ts`.
   Tests that touch a `server-only` module need `vi.mock('server-only', () => ({}))`.
+  A whole-module `vi.mock` factory hides every export it does not list: once the code under test imports one more
+  (2026-11-07, `formatCashflowBlockSection` in `__tests__/allocationAdviceRun.test.ts`), make it partial with
+  `importOriginal`, or ten unrelated cases fail on an undefined function.
 - **A route's latency is a `Server-Timing` header** (`lib/server/serverTiming.ts`; five routes since 2026-10-05: overview,
   yields, dividend stats, instrument profiles, assistant threads): `startTiming()` at the handler's top, `mark('auth')`
   after `assertCanAccessAccount`, `mark('db')` after ONE round of reads, `mark('compute')` before the response; a service

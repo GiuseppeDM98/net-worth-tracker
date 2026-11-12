@@ -12,19 +12,8 @@ import { MONTH_NAMES } from '@/lib/constants/months';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { THREAD_DELETE_CONSEQUENCE } from '@/lib/utils/assistantNarrative';
 import { cn } from '@/lib/utils';
-import { AssistantMode, AssistantThread } from '@/types/assistant';
-
-/**
- * Returns a human-readable badge label for a thread's mode.
- * "chat" reads as "Libera" — the period axis renames the former Chat mode.
- */
-function getModeBadgeLabel(mode: AssistantMode): string {
-  if (mode === 'month_analysis') return 'Mese';
-  if (mode === 'year_analysis') return 'Anno';
-  if (mode === 'ytd_analysis') return 'YTD';
-  if (mode === 'history_analysis') return 'Storico';
-  return 'Libera';
-}
+import { getModeBadgeLabel } from '@/lib/utils/assistantPeriodOptions';
+import { AssistantThread } from '@/types/assistant';
 
 /**
  * Strips markdown syntax so thread list previews read as plain text.

@@ -93,7 +93,10 @@
   --warning-foreground: oklch(0.468 0.098 75);
   --warning-border: oklch(0.855 0.062 85);
   --positive: oklch(0.482 0.194 149.214);
-  --ai-accent: oklch(0.65 0.2 305);
+  /* The AI accent (DESIGN.md § 5 «AI Surfaces»): 0.56 on white, 0.65 in the dark; the glow is read
+     from the accent, once — `.dark` sits on <html>, the same element, so it follows with no copy. */
+  --ai-accent: oklch(0.56 0.2 305);
+  --ai-glow: color-mix(in oklch, var(--ai-accent) 40%, transparent);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -841,4 +844,15 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
 @keyframes popper-sheet-backdrop-out {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* The printer's shell, scoped to a page that carries a print sheet (the Consulente's book,
+   2026-11-08): `#page-main` is an `overflow-y-auto` box inside a screen-high flex column, which a
+   printer clips to one screen. Every ancestor of `#page-main` becomes a plain block, every sibling
+   of those ancestors (the sidebar, the bottom navigation, the demo banner) is removed. Without a
+   `[data-book-print]` in the page nothing here applies, so no other page's print changes. */
+@media print {
+  html:has([data-book-print]) :is(body, body *):has(#page-main) { display: block; height: auto; min-height: 0; overflow: visible; }
+  html:has([data-book-print]) :is(body, body *):has(#page-main) > :not(:has(#page-main)):not(#page-main) { display: none; }
+  html:has([data-book-print]) #page-main { overflow: visible; height: auto; padding: 0; }
 }

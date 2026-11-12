@@ -167,6 +167,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## Per-page blind spots
 
+- **The AI accent reads under 4.5:1 as TEXT on the card in five theme blocks** (measured 2026-11-06 with the Impeccable
+  detector, the figures of DESIGN.md → The AI-Accent Rule): `oklch(0.56 0.2 305)` on the light blocks (the value DESIGN.md declares and `app/globals.css` serves in `:root` since 2026-11-07; before, 0.65 in both modes
+  until the Consulente's redesign) and `oklch(0.65 0.2 305)` on the dark ones, on `--card` — Retro Arcade light 4.19:1 and dark 3.68:1, Solar Dusk dark
+  4.34:1, Elegant Luxury dark 4.31:1, Midnight Bloom dark 3.58:1; every block clears 3:1 as a border. The accent is one
+  value per mode by the owner's choice of 2026-11-01, so an AI eyebrow reads under AA there; Midnight
+  Bloom's `--primary` (hue 283) also sits 22° from the accent, Cyberpunk's (341) 36°. The fix is a per-theme
+  `--ai-accent`, a decision on those themes' look.
 - **Retro-arcade dark prints its `--foreground` on a pill at 4,02:1** (2026-10-08): the theme's foreground is a light
   teal (L 0.70) and the pill (`--muted`) now sits at L 0.36 — lowering it further would make it indistinguishable from
   the card (L 0.31). Only `--muted-foreground` is held to the floor on `--muted` (`mutedForegroundContrast`); an active
