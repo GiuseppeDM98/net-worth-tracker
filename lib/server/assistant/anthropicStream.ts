@@ -33,7 +33,7 @@ interface StreamAssistantResponseArgs {
   contextBundle: AssistantMonthContextBundle | null;
   // A free question with no period: the portfolio of today (2026-10-20). Null elsewhere.
   todayContext?: AssistantTodayContext | null;
-  // The CASHFLOW 12 MESI block, read by the route for every mode (decision 81, 2026-11-07).
+  // The CASHFLOW 12 MESI block, read by the route for every mode (2026-11-07).
   cashflowBlock?: string | null;
   // Registra only: the register block (lib/utils/assistantRegisterContext.ts), built by the route.
   registerBlock?: string | null;
@@ -86,7 +86,7 @@ function buildPrompt(
     ? `${MONTH_NAMES[month.month - 1]} ${month.year}`
     : undefined;
 
-  // Every mode receives the cashflow block (decision 81, 2026-11-07).
+  // Every mode receives the cashflow block (since 2026-11-07).
   if (mode === 'month_analysis' && contextBundle) {
     return buildMonthAnalysisPrompt(contextBundle, prompt, preferences, memoryItems, cashflowBlock ?? undefined);
   }

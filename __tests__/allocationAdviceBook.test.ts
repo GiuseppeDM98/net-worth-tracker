@@ -85,9 +85,16 @@ describe('assignSections', () => {
   it('the review’s seven ATX sections land on seven pages, each first heading dropped', () => {
     const texts = assign(SEVEN_ATX)!;
     expect([...texts.keys()]).toEqual(['copertina', 'allocazione', 'strumenti', 'obiettivi', 'ruoli', 'passi', 'rischi']);
-    expect(texts.get('copertina')).toBe('La proposta regge.');
-    expect(texts.get('strumenti')).toBe('ETF ornitorinco.');
-    expect(texts.get('rischi')).toBe('Rivedi fra un anno.');
+    // Every page's text is its body alone: the heading line is dropped on all seven (2026-11-12).
+    expect(Object.fromEntries(texts)).toEqual({
+      copertina: 'La proposta regge.',
+      allocazione: 'Settanta e trenta.',
+      strumenti: 'ETF ornitorinco.',
+      obiettivi: 'La casa al mare.',
+      ruoli: 'Il Fondo fenicottero resta fuori.',
+      passi: 'Compra a rate.',
+      rischi: 'Rivedi fra un anno.',
+    });
   });
 
   it('bold-only headings, «2. **…**» followed directly by text', () => {

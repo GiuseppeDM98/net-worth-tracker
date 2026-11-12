@@ -895,7 +895,7 @@ export function buildMonthAnalysisPrompt(
 
 /**
  * The note over the CASHFLOW 12 MESI block (lib/utils/cashflowBlock.ts), the same on every surface that
- * carries it — every mode of the Assistente and the emails' AI comments (decision 81, 2026-11-07): the
+ * carries it — every mode of the Assistente and the emails' AI comments (since 2026-11-07): the
  * block is the whole recorded history whatever the period in question, so a period's figures stay its
  * bundle's. In `userContent`, never in `system`.
  */
@@ -1087,7 +1087,7 @@ export function buildChatPrompt(
     userSections.push(noDataNote);
   }
 
-  // The CASHFLOW 12 MESI block, with or without a period (decision 81, 2026-11-07).
+  // The CASHFLOW 12 MESI block, with or without a period (2026-11-07).
   if (cashflowBlock) userSections.push('', ...formatCashflowBlockSection(cashflowBlock).slice(0, 2));
   userSections.push('', `Richiesta utente: ${prompt.trim()}`);
 

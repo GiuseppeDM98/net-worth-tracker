@@ -92,8 +92,8 @@ export function formatAnswersForPrompt(answers: AllocationAdviceAnswers): string
 // ─── Shared core ──────────────────────────────────────────────────────────────
 
 /**
- * The interview's rounds as the strategy, the review and the revision read them (2026-11-08,
- * decision 53): nothing for null or an interview with no round that was not skipped; the one
+ * The interview's rounds as the strategy, the review and the revision read them (2026-11-08):
+ * nothing for null or an interview with no round that was not skipped; the one
  * sentence «L'utente ha saltato il colloquio.» for a skip with zero rounds; otherwise the header
  * with the round count, the reading rule and the rounds, closed by the skip's sentence when the
  * user left after some rounds.

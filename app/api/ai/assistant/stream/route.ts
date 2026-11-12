@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
       contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
     }
 
-    // The CASHFLOW 12 MESI block in every mode, a chat with no context included (decision 81,
+    // The CASHFLOW 12 MESI block in every mode, a chat with no context included (since
     // 2026-11-07); a rejection reaches the catch below — a 500, never a silent empty block.
     const cashflowBlock = await readCashflowBlockForPrompt(body.userId, now);
 

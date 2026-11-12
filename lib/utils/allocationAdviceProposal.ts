@@ -117,7 +117,7 @@ const INTERVIEW_NOTE_MAX = 600;
  * part of the schema, so the counts are enforced here. Null when the text is not JSON, `note` is
  * not a non-empty string or `satisfied` not a boolean; the note trimmed and cut at 600 (the cut
  * named in `refused`); the questions through `parseQuestionsLenient`, then `allowOther: true` on
- * every kept one (decision 54: «Altro…» on every question of the Consulente).
+ * every kept one («Altro…» on every question of the Consulente, 2026-11-01).
  */
 export function parseInterviewRound(text: string): { round: { note: string; satisfied: boolean; questions: Question[] } | null; refused: string[] } {
   let parsed: unknown;

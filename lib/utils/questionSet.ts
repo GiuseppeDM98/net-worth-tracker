@@ -8,7 +8,7 @@
  *
  * Pure and client-safe: the parser, the describer of an answer and the prompt formatter are the
  * single source of their rules for the server (the round's parser, the prompts), the scene, the
- * report's tile and the chat's message.
+ * report's «Il colloquio» page and the chat's message.
  *
  * The API keeps only part of a zod schema in a structured output (the types, the required keys,
  * `additionalProperties: false`): every count, length and enum below is enforced HERE, by

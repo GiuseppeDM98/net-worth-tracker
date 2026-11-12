@@ -961,7 +961,7 @@ describe('fetchCashflowBlockInputs', () => {
   });
 
   it.each([
-    // now, today in Rome, last month of the read (the first is the whole history: decision 81, 2026-11-07)
+    // now, today in Rome, last month of the read (the first is the whole history since 2026-11-07)
     ['2026-11-15T10:00:00Z', '2026-11-15', [2027, 11]],
     ['2026-01-15T10:00:00Z', '2026-01-15', [2027, 1]],
     // 23:30 UTC on 31 October is already 1 November in Rome: the current month is November.

@@ -30,12 +30,12 @@
   through `questionSet`, so nothing the Allocazione page loads may import it — «1 tornata» / «N tornate» is
   `describeRoundCount` in the narrative for that reason), `lib/utils/allocationAdviceProposal.ts` (the zod schemas of the answers, the proposal and the
   candidates; the fenced block; the interview round's wire and stored shapes, `parseInterviewRound`),
-  `allocationAdviceBook.ts` (the book: the page table, the heading reader, the address; pure, imported by the book
-  alone), `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage with its `phase` and `interview`,
+  `allocationAdviceBook.ts` (the book: the page table, the heading reader, the address; pure, imported only on the
+  Consulente's route: by the book, and by `ConsulenteClient` for `bookPageUrl` — never by the Allocazione page), `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage with its `phase` and `interview`,
   `reopenStoredDraft`, the prefilled answers), `allocationAdviceApply.ts` (the plans of «Applica»: targets, roles, goals; today's base; the loss
   scenarios), `allocationAdviceNarrative.ts` (every sentence), `allocationAdviceDocument.ts` (the document mapper
   for both SDKs), `lib/utils/sseReader.ts`, `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, shared with
-  every mode of the Assistente and the emails' AI comments, decision 81).
+  every mode of the Assistente and the emails' AI comments since 2026-11-07).
 - **Server**: `lib/server/allocationAdvice/prompts.ts` (the builders of the strategy, the instruments, the revision and the review, the interview's and the IL COLLOQUIO
   block), `run.ts` (the orchestration: context → strategy → instruments → review, persisted at every stage;
   `runInterviewRound`, which persists nothing; the OBBLIGAZIONI block and the previous paths read beside the
@@ -93,7 +93,7 @@
 - **The summary is a list of rows, each a link to its screen** (`goto`); its primary is «Avvia il colloquio» («Torna
   al colloquio» once a round exists, with «Ricomincia il colloquio»), its secondary «Salta il colloquio e avvia la
   ricerca»; both are disabled without the key («Servizio AI non configurato»); «Avvia il colloquio» glows on hover and focus
-  only (`AI_CONTROL_ACCENT_CLASS`, DESIGN.md → The AI-Accent Rule: it asks the model), «Torna al colloquio» and the skip never (decision 78).
+  only (`AI_CONTROL_ACCENT_CLASS`, DESIGN.md → The AI-Accent Rule: it asks the model), «Torna al colloquio» and the skip never (2026-11-06).
 - **The interview** (2026-11-08, PR #509): after the summary, a scene of its own in the same card
   (`ConsulenteInterviewScene`; «Passo N di 8» untouched, the eyebrow «Colloquio · tornata N di 3» its only
   `TILE_EYEBROW_CLASS`), where the Consulente reads answers and data and asks 0–4 pointed questions, up to three
@@ -108,9 +108,9 @@
   `skipped: true`; while a round is asked the scene shows the previous note over a skeleton of two cards
   (`aria-busy`, «Indietro» and the primary held) and the skip aborts the fetch (`AbortController`; the slot is
   spent, the late event ignored). The rail's three ticks light one round at a time (`PathRail.interview.reached`,
-  the round number, 1-based). Every `QuestionCard` carries «Altro…» (forced by the parser, decision 54) and
-  «Preferisco non dire» last, both exclusive rows in a multiple question (decision 55), and no button: the footer owns
-  the one primary of a round (decision 38).
+  the round number, 1-based). Every `QuestionCard` carries «Altro…» (forced by the parser, 2026-11-01) and
+  «Preferisco non dire» last, both exclusive rows in a multiple question (2026-11-01), and no button: the footer owns
+  the one primary of a round (2026-11-01).
 
 ## The run
 
@@ -148,7 +148,7 @@
   `duration` (years, 0–40, `instrumentCandidateSchema`; the report prints « · duration 2,4 anni»), the strategy
   contract makes every bond sub-target say which horizon and which goal it covers (and which horizon stays
   uncovered), the interview contract asks what the bond part is for and whether singles or ETFs when the block has
-  rows or the class will weigh. Not a fixed screen of the path (the eight are AI-01's): a reading rule.
+  rows or the class will weigh. Not a fixed screen of the path (the eight screens stay as drawn on 2026-11-06): a reading rule.
 - **The previous paths** (owner, 2026-11-08: «tra un anno ha paura e lo rifa … il consulente nota nelle sue parole
   della paura o della fomo»): a new path's interview rounds and strategy read «--- I PERCORSI PRECEDENTI ---»
   (`formatPreviousPathsForPrompt`): the live document when it has a report — nothing has replaced it during the
@@ -166,7 +166,7 @@
   ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
   the aggregates; the current month up to today stands apart, its rows after today declared as scheduled and not
   counted; the series covers the whole recorded history — from the first month holding a row (a transfer never
-  opens it), never before `cashflowHistoryStartYear`, always the 12 full months, no cap (decision 81, 2026-11-07);
+  opens it), never before `cashflowHistoryStartYear`, always the 12 full months, no cap (2026-11-07);
   the header names that floor when it cuts the series or leaves a row out, with the count of the rows left out
   («storico contato dal 2025-01, 2 righe precedenti escluse», 2026-11-07);
   the rows after the current month serve the commitments' next date only. Income is a signed sum, dividends and coupons (`dividendIncomeCategoryId`) out of the sources; the
@@ -183,7 +183,7 @@
   («e altra 1 fonte»). The strategy prints the block after its data, under the note every surface carries
   (`formatCashflowBlockSection`, 2026-11-07). A failed read fails the context stage, retryable — never a strategy
   without the block. The contract sizes the goals' `monthlyContribution` on the block's median monthly
-  savings and the cash reserve on its median spending and accounts (decision 46). Amounts print through
+  savings and the cash reserve on its median spending and accounts (2026-11-01). Amounts print through
   `cachedFormatCurrencyEUR`: it-IT does not group four digits («1200 €», but «31.200 €») and puts U+00A0 before «€»
   — what the formatter prints, not a typo to «fix».
 - **The structure is never read from the prose** (the Assistente's rule): strategy and review answer with
@@ -288,7 +288,8 @@
   Below `tablet:` a column, the page's buttons full width on top. From `desktop:` the rail's labels are buttons, ONE
   Tab stop (the arrows move along the rail); below it «Indice» opens «Vai a una pagina», a `ResponsiveModal` of 44px
   rows — the route's one modal. The WHOLE page slides along the turn, the leaving page `inert`; after a turn the
-  headline takes the focus (`useSceneTurn`, shared with the Wizard) and the card's top scrolls into view when it is
+  headline takes the focus (`useSceneTurn`, shared with the Wizard: only the scene the turn renders may take it, so a
+  gesture made while the previous scene is still sliding in keeps its focus, 2026-11-12) and the card's top scrolls into view when it is
   above the page's scroll box. From `desktop:` the book's grid is `items-start`: a short page's card hugs its text
   instead of stretching to the ten-row rail, where its footer floated mid-card (seen at 1440 in phase E, 2026-11-11);
   the path's grid keeps the stretch.
@@ -327,7 +328,7 @@
   cost a «Rifai il percorso». The page before «Applica» (`useConsulenteRevision`, `REVISION_COPY`) sends the route
   `stage: 'revise'` with `request` (1–1000 characters; one round of questions about it first, «Salta le domande»
   available; the round and the revise each take a slot; the round stored as `revisionInterview`, printed by
-  `buildRevisionPrompt` after the requests and shown under the last request — decision 24); `runRevise` requires a
+  `buildRevisionPrompt` after the requests and shown under the last request — 2026-11-01); `runRevise` requires a
   finished report, re-enters `stage: 'review'`, calls Opus 5.5 with `buildRevisionPrompt` — strategy and instruments
   with the blocks put back, the previous report, ALL the requests in order (the last is the new one), the review's
   contract plus the section «La tua richiesta» where the request is not sensible or has a cost — and replaces
@@ -340,7 +341,7 @@
 - **«Il colloquio»** (`InterviewBody`, its page between «Rischi e revisione» and «Chiedi una modifica»):
   the rounds the Consulente asked before the strategy, each with its note, its questions and what the user answered
   («non risposta» for what was skipped), the aside «1 tornata» / «N tornate» (« · saltato» when skipped); nothing
-  with zero rounds (decision 53). It recaps the user's own words, so it does NOT wear `generated` (decision 79).
+  with zero rounds (2026-11-01). It recaps the user's own words, so it does NOT wear `generated` (2026-11-06).
 - **The pages' figures** are the former tiles' bodies, moved (`ConsulenteBookPages.tsx`): «L'allocazione proposta»
   (today → proposal per class, `buildProposalRows` on `currentAllocationOnBase`, the held classes the proposal drops
   appended at the end at 0; the footnote the base sentence alone), «Gli strumenti» (the candidates per sub-target,
@@ -369,8 +370,8 @@
 
 ## The visual direction
 
-The Consulente follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen on 2026-11-06, decision 74 of
-doc/ai/README.md): **The Path-Scene Rule** (one stage, the rail that says where the path is and fills with the run's
+The Consulente follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen by the owner on 2026-11-06 among three
+drawn concepts, archived in `git log -- doc/ai/reference/`): **The Path-Scene Rule** (one stage, the rail that says where the path is and fills with the run's
 stages, the slide forward and back, the first page's cascade), **The Question-Card Rule** (the interview's cards; the
 scene's footer owns «Continua» and «Avvia la ricerca») and **The AI-Accent Rule** (the accent on what the model wrote
 and, on hover and focus only, on «Avvia il colloquio», «Continua», «Avvia la ricerca», «Riprova», «Rivedi il report»).
@@ -467,3 +468,16 @@ on a phone, and from the row under the Assistente's conversation).
 - **Twelve requests an hour**: a run with three rounds is four, a revision with its round two.
 - **«Rifai il percorso» drops an interview the document on screen already used** (`reopenStoredDraft`): only rounds
   asked after that document's `updatedAt` survive.
+- **The arrows and a swipe never turn the card** (2026-11-11): a textarea and radios live on the pages; the arrows move
+  along the rail only, from `desktop:`.
+- **«Rivedi con il Consulente» opens the screens, never a page of the book** (`?rivedi=1`, by design, 2026-11-11).
+- **The book remembers no page across sessions**: the address is the memory (`?pagina=`), no localStorage.
+- **The book changed no contract of the model** (2026-11-11): it reads the sections the strategy's and the review's
+  contracts already prescribe; a heading a contract adds needs its alias in `BOOK_PAGE_TABLE`, or it lands on the page
+  before.
+- **A stale `?pagina=` stays in the address** when the document lost that page: the cover shows, and the next turn
+  rewrites the address.
+- **What was decided against** (owner, 2026-11-01): the interview never follows the report (it improves the input of
+  the expensive run); the Consulente never reads the raw rows, only the aggregate block; the interview is a stage after
+  the summary, never a ninth screen; nothing is written to `allocationAdvice/{uid}` before the strategy; the cashflow
+  block has no income by household member.

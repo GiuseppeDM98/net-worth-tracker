@@ -318,7 +318,7 @@
   `shellBoot.ts`): a scenario spreads its overrides over `baseOverviewPatch()`. **The hidden rest of a cut verdict is
   in the DOM**: `toContainText` on the verdict's region reads it, so «title only» is asserted with
   `getByText(/Il patrimonio vale/)` → `toBeHidden()`, never with `not.toContainText` (seen that day).
-- **A control that calls a model is pressed only on a FAKED route** (2026-11-07, decision 39 of the AI series):
+- **A control that calls a model is pressed only on a FAKED route** (owner, 2026-11-07):
   `npm run dev:e2e` is `next dev`, which loads `.env.local`, so the owner's real `ANTHROPIC_API_KEY` reaches the server
   on :3100 and enables the control (the Consulente's `configured`) — the key makes it pressable, never what answers
   it. The spec installs `page.route('**/api/allocation-advice/run', …)` BEFORE the click and answers each request by

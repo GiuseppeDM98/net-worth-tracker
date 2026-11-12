@@ -1,6 +1,6 @@
 /**
  * `ChoiceList` (components/ui/choice-list.tsx, 2026-11-07): the single mode as a radiogroup, the
- * multiple mode as ONE Tab stop of checkboxes with the exclusive row (decision 55), the «Altro…»
+ * multiple mode as ONE Tab stop of checkboxes with the exclusive row (2026-11-01), the «Altro…»
  * field under its row with no focus jump. Invented options.
  */
 
@@ -75,7 +75,7 @@ describe('ChoiceList, multiple', () => {
     expect(onChange).toHaveBeenLastCalledWith(['a', 'b']);
   });
 
-  it('turns an exclusive row on alone, and off by any other (decision 55)', () => {
+  it('turns an exclusive row on alone, and off by any other (2026-11-01)', () => {
     expect(nextMultipleValue(OPTIONS, ['a', 'b'], 'x', true)).toEqual(['x']);
     expect(nextMultipleValue(OPTIONS, ['x'], 'a', true)).toEqual(['a']);
     expect(nextMultipleValue(OPTIONS, ['b', 'a'], 'a', false)).toEqual(['b']);

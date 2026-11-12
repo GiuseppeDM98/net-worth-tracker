@@ -67,7 +67,7 @@ vi.mock('@/lib/server/assistant/store', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/server/assistant/store')>();
   return { ...actual, getAssistantMemoryDocument: vi.fn(actual.getAssistantMemoryDocument) };
 });
-// The CASHFLOW 12 MESI block the AI comment reads (decision 81, 2026-11-07).
+// The CASHFLOW 12 MESI block the AI comment reads (2026-11-07).
 const { readCashflowBlockMock } = vi.hoisted(() => ({ readCashflowBlockMock: vi.fn() }));
 vi.mock('@/lib/server/assistant/cashflowBlockPrompt', () => ({ readCashflowBlockForPrompt: readCashflowBlockMock }));
 vi.mock('@/lib/services/assistantMonthContextService', async (importActual) => {
@@ -294,7 +294,7 @@ describe('generateEmailAiComment', () => {
     readCashflowBlockMock.mockReset().mockResolvedValue('--- CASHFLOW 12 MESI (x) ---\nX');
   });
 
-  it('reads the cashflow block once for the user and puts it in the user turn, never in system (decision 81, 2026-11-07)', async () => {
+  it('reads the cashflow block once for the user and puts it in the user turn, never in system (2026-11-07)', async () => {
     anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
 
     await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
@@ -383,11 +383,11 @@ describe('buildEmailAiPrompt', () => {
     expect(userContent).toContain('--- NOTE QUALITÀ DATI ---');
     // Sub-category rows travel with their parent category.
     expect(userContent).toContain('Affitto');
-    // Without a block the user turn carries none (decision 81, 2026-11-07: the comment's caller reads it).
+    // Without a block the user turn carries none (2026-11-07: the comment's caller reads it).
     expect(userContent).not.toContain('CASHFLOW 12 MESI');
   });
 
-  it('closes the user turn with the note and the cashflow block, and leaves system alone (decision 81, 2026-11-07)', () => {
+  it('closes the user turn with the note and the cashflow block, and leaves system alone (2026-11-07)', () => {
     const data = makeMonthlyData();
     const comparison = makeComparison();
     const bundle = makeBundle();

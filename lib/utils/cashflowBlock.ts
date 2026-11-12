@@ -1,7 +1,6 @@
 /**
  * The CASHFLOW 12 MESI block — the cashflow as the Consulente's interview and strategy, every mode of the Assistente
- * and the AI comments of the emails read it (owner, 2026-11-01; every surface since 2026-11-07,
- * decision 81).
+ * and the AI comments of the emails read it (owner, 2026-11-01; every surface since 2026-11-07).
  *
  * WHY IT EXISTS
  * The period bundle (`buildCashflowBreakdown` over ONE period) says what came in and went out in that

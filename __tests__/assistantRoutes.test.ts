@@ -816,7 +816,7 @@ describe('Assistant private API routes', () => {
       ['chat', { chatContext: 'ytd' }],
       ['chat', { chatContext: 'history' }],
       ['chat', { chatContext: 'none' }],
-    ])('%s %o reads the block once, for the owner, and hands it to the stream — never on the SSE (decision 81, 2026-11-07)', async (mode, extra) => {
+    ])('%s %o reads the block once, for the owner, and hands it to the stream — never on the SSE (since 2026-11-07)', async (mode, extra) => {
       const response = await streamRequest({ mode, ...extra });
       expect(response.status).toBe(200);
       const streamText = await response.text();

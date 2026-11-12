@@ -108,7 +108,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the declined partial — and the email names no model; the log line says which one wrote the comment. Pinned by
   `generateEmailAiComment` / `generateWeeklyBudgetComment` in `__tests__/{monthlyEmailService,weeklyBudgetEmailService}.test.ts`
   (both exported for that; refusal and cut seen red before the fix).
-- **Both AI comments read the CASHFLOW 12 MESI block** (decision 81, 2026-11-07, doc/guide/assistente.md § Prompt
+- **Both AI comments read the CASHFLOW 12 MESI block** (owner, 2026-11-07, doc/guide/assistente.md § Prompt
   builders): `generateEmailAiComment` and `buildAndSendWeeklyBudget` read it at the send instant through
   `readCashflowBlockForPrompt`; it closes the periodic user turn and sits under the weekly budgets, `system`
   untouched. A failed read sends the email WITHOUT the comment and spends no call — never a comment on a silent

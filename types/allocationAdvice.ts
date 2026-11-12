@@ -23,7 +23,7 @@ import type {
 export type { AllocationAdviceAnswers, AllocationAdviceInterview, AllocationAdviceInterviewRound, AllocationAdviceProposal, InstrumentCandidates };
 
 /**
- * The interview's cap (2026-11-08, decision 6 of the AI series): three rounds of questions after
+ * The interview's cap (the owner, 2026-11-01; here since 2026-11-08): three rounds of questions after
  * the summary, then the strategy. Here and not in `run.ts`: the schema, the pure interview module
  * and the Wizard read it, and `run.ts` is `server-only`.
  */

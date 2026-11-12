@@ -27,7 +27,7 @@ export type PathRailProps =
       mode: 'path';
       steps: readonly string[];
       current: number;
-      /** The interview's rounds: `reached` is the ROUND number, 1-based — `2` is «Tornata 2 di 3» current, the first done; `null` before the interview opens (decision 86). */
+      /** The interview's rounds: `reached` is the ROUND number, 1-based — `2` is «Tornata 2 di 3» current, the first done; `null` before the interview opens (2026-11-07). */
       interview?: { total: 3; reached: number | null };
     }
   | { mode: 'run'; stages: readonly { label: string; state: PathRailStageState }[] }

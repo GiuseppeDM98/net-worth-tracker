@@ -44,7 +44,7 @@ describe('useSceneTurn', () => {
     render(<Host />);
     screen.getByRole('button', { name: 'Avanti' }).focus();
     act(() => api!.move(1, () => {}));
-    act(() => api!.focusTarget());
+    act(() => api!.focusTarget(api!.turn));
     expect(document.activeElement).toBe(screen.getByText('Titolo'));
   });
 
@@ -53,7 +53,7 @@ describe('useSceneTurn', () => {
     screen.getByRole('button', { name: 'Avanti' }).focus();
     act(() => api!.move(1, () => {}));
     (document.activeElement as HTMLElement).blur();
-    act(() => api!.focusTarget());
+    act(() => api!.focusTarget(api!.turn));
     expect(document.activeElement).toBe(screen.getByText('Titolo'));
   });
 
@@ -62,19 +62,34 @@ describe('useSceneTurn', () => {
     screen.getByRole('button', { name: 'Avanti' }).focus();
     act(() => api!.move(1, () => {}));
     screen.getByRole('textbox', { name: 'Campo' }).focus();
-    act(() => api!.focusTarget());
+    act(() => api!.focusTarget(api!.turn));
     expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Campo' }));
 
     act(() => api!.move(1, () => {}, { always: true }));
     screen.getByRole('textbox', { name: 'Campo' }).focus();
-    act(() => api!.focusTarget());
+    act(() => api!.focusTarget(api!.turn));
     expect(document.activeElement).toBe(screen.getByText('Titolo'));
   });
 
   it('nothing moves without a turn', () => {
     render(<Host />);
     screen.getByRole('button', { name: 'Avanti' }).focus();
-    act(() => api!.focusTarget());
+    act(() => api!.focusTarget(api!.turn));
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Avanti' }));
+  });
+
+  // The race of 2026-11-12: «Avvia il colloquio» pressed while the summary was still sliding in.
+  // The summary's own slide landed AFTER the gesture and took the focus meant for the interview's
+  // headline, which then never got it (the focus ended on body). Only the scene rendered by the
+  // turn — the one carrying the new `turn` — may take it.
+  it('a scene already on screen at the gesture never takes the focus; the scene of the turn does', () => {
+    render(<Host />);
+    screen.getByRole('button', { name: 'Avanti' }).focus();
+    const before = api!.turn;
+    act(() => api!.move(1, () => {}));
+    act(() => api!.focusTarget(before));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Avanti' }));
+    act(() => api!.focusTarget(api!.turn));
+    expect(document.activeElement).toBe(screen.getByText('Titolo'));
   });
 });

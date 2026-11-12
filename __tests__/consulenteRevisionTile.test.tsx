@@ -2,7 +2,7 @@
  * «Chiedi una modifica» (components/allocation/consulente/ConsulenteRevisionTile.tsx): a request
  * typed enables «Rivedi il report»; a round with questions shows the cards and «Salta le domande»;
  * a round without questions sends the revision at once; «Salta le domande» sends `skipped: true`.
- * Written against the tile before the book split it (AI-07, 2026-11-11), then run on a host that
+ * Written against the tile before the book split it (2026-11-11), then run on a host that
  * calls `useRevisionDraft` and renders `RevisionBody` and the two buttons, as the book does. The
  * route is a mocked `authenticatedFetch` answering SSE streams; invented figures.
  */

@@ -32,7 +32,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **One aggregator per block, not two**: every figure of the BUNDLE comes from a single `buildCashflowBreakdown` call
   per builder, so `Σ expensesByCategory[].total === cashflow.totalExpenses` holds structurally. `transactionCount`
   **excludes transfers**, and a new required bundle field means updating ALL 5 builders (month/year/ytd/history/period range). The
-  CASHFLOW 12 MESI block every prompt carries beside the bundle (2026-11, every mode since decision 81) is built by
+  CASHFLOW 12 MESI block every prompt carries beside the bundle (2026-11, every mode since 2026-11-07) is built by
   `buildCashflowBlock` on its own read of the whole history (`fetchCashflowBlockInputs`) and never enters the bundle
   nor the `context` SSE event.
 - **Removing an `AssistantMode` ripples past the WARNING checklist in `types/assistant.ts`**: grep `Record<AssistantMode,
@@ -54,7 +54,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **`ASSISTANT_SYSTEM_CORE` is shared with `buildEmailAiPrompt`**, so its phrasing about the goals block stays
   conditional: **check every consumer before extending the core unconditionally**, or a surface starts talking about
   data it was never given.
-- **Every builder takes the CASHFLOW 12 MESI block** (2026-11; every surface since decision 81, 2026-11-07): the
+- **Every builder takes the CASHFLOW 12 MESI block** (2026-11; every surface since 2026-11-07): the
   four analyses as their fifth argument, printed after the numeric block and before «Domanda dell'utente»; the chat
   as its seventh, right before «Richiesta utente» with or without a period; `buildEmailAiPrompt` as its sixth, at
   the end of the user turn; `generateWeeklyBudgetComment` as its second, under the budgets; `buildRegisterPrompt` as its fifth
@@ -304,8 +304,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## The visual direction
 
-The whole page follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen on 2026-11-06, decision 74 of
-doc/ai/README.md): **The AI-Accent Rule** (the accent on the «Assistente» sub-eyebrow of a model's message, on
+The whole page follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen by the owner on 2026-11-06 among three
+drawn concepts, archived in `git log -- doc/ai/reference/`): **The AI-Accent Rule** (the accent on the «Assistente» sub-eyebrow of a model's message, on
 proposal and question cards, and on the hover of «Invia messaggio», «Registra», «Rigenera», «Rispondi» and the suggestion rows;
 never on the verdict, the companion column, the thread list or the user's messages), **The Question-Card Rule** (the
 cards inside a message, ONE «Rispondi» under the last) and the paragraph «The Assistente page» (the conversation stays
@@ -460,7 +460,7 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
   stream has closed — possibly a minute later. The second read is what honours a `memoryEnabled` switched off while
   the answer was streaming, and what dedupes against an item added from the panel meanwhile; it runs in the
   background, off the reader's wait. Do not hand the first read down to it.
-- **Every message reads the whole cashflow history** (decision 81, 2026-11-07): the route's
+- **Every message reads the whole cashflow history** (owner, 2026-11-07): the route's
   `readCashflowBlockForPrompt` reads every expense row up to the Italian end of the month 12 ahead, in every mode,
   apart from the period's own read — a period's rows are read twice, and the read grows with the history. Accepted:
   one Admin query per message, off the browser; the block is never cached across messages, so a row confirmed a
@@ -469,6 +469,11 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
 - **A Registra day past 100 messages shows its oldest 100** (`getAssistantThreadDetail` reads `orderBy createdAt asc, limit 100`), and the history is cut from those.
 - **A row written from Registra carries no mark**: in Tracciamento it is a row like any other — and never «Legata all'immobile»: «Modifica» sets it.
 - **A question is answered by a message** (2026-11-11): the thread shows the answer lines as the user's message, and the read-only cards above it.
+- **What Registra does not do** (owner, 2026-11-01): it never edits or deletes an existing row (the writer is the
+  card's «Conferma», once, through today's services — never a new server route); no receipt attachments and no voice;
+  no per-user «always ask the account» setting (the asking policy is the contract's thresholds); it is a mode of the
+  Assistente, never a page under Cashflow; what belongs to ONE mode never enters `formatBundleForPrompt` or
+  `ASSISTANT_SYSTEM_CORE`, which the emails read too.
 - **Memory is the account's**: the owner and a co-owner share the categorisation rules; two wordings of one subject («palestra», «la palestra») stay two rules.
 - **The Cashflow bridge reads the key at build, as this page does**: `app/dashboard/cashflow/page.tsx` passes `Boolean(process.env.ANTHROPIC_API_KEY)`; a key added on Vercel shows «Chiedi all'Assistente» after the next deploy.
 - **IL MESE's totals are as fresh as the Panoramica's summary** (2026-11): the first line is the server summary, the lines under it are computed from the rows read for the message; a row written outside the app's services (an Admin write, a restore) leaves the two apart until the summary is rebuilt — seen on the emulator after a spec's Admin deletes.

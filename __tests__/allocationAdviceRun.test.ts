@@ -519,7 +519,7 @@ describe('runInterviewRound', () => {
     expect(patchMock).not.toHaveBeenCalled();
   });
 
-  it('in revision mode needs a finished report, prints it with every request numbered and no plan in force (decision 24)', async () => {
+  it('in revision mode needs a finished report, prints it with every request numbered and no plan in force (the round before a revision, 2026-11-01)', async () => {
     const calls = vi.spyOn(Anthropic.Beta.Messages.prototype, 'stream');
     await expect(runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], revision: { requests: 'niente ornitorinchi' }, onRound: vi.fn() })).rejects.toMatchObject({ stage: 'interview', retryable: false, message: "Non c'è un report finito da rivedere. Avvia la ricerca." });
     getMock.mockResolvedValue(afterStrategy());
@@ -589,7 +589,7 @@ describe('the interview on the run (the IL COLLOQUIO block and the document, 202
     expect(firstWrite).toMatchObject({ interview: { rounds: [], skipped: true } });
   });
 
-  it('the revision prints ITS round and patches revisionInterview; a skipped one is patched as such (decision 24)', async () => {
+  it('the revision prints ITS round and patches revisionInterview; a skipped one is patched as such (the round before a revision, 2026-11-01)', async () => {
     const withReport = { ...afterStrategy(), instruments: { markdown: '', candidates: null, model: 's', webSearchUsed: false, finishedAt: NOW }, report: { markdown: 'Prima versione.', proposal: PROPOSAL as never, model: 'o', finishedAt: NOW } };
     const calls = answerWith(message(reviewText(PROPOSAL)));
     await runAllocationAdviceStage({ userId: 'u1', stage: 'revise', document: structuredClone(withReport), request: 'niente ornitorinchi', interview: ONE_ROUND, onStage: vi.fn() });

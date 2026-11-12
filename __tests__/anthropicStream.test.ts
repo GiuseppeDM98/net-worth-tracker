@@ -154,7 +154,7 @@ describe('streamAssistantResponse — the CASHFLOW 12 MESI block (2026-11)', () 
     expect(create.mock.calls[0][0]).toMatchObject({ system: 'S' });
   });
 
-  it('hands it to the chat too, in the user turn only (decision 81, 2026-11-07)', async () => {
+  it('hands it to the chat too, in the user turn only (since 2026-11-07)', async () => {
     const create = vi.spyOn(Anthropic.Beta.Messages.prototype, 'create').mockResolvedValue(empty() as never);
 
     await streamAssistantResponse({

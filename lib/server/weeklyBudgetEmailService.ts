@@ -291,7 +291,7 @@ export async function generateWeeklyBudgetComment(
 ): Promise<string | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   try {
-    // The CASHFLOW 12 MESI block under the budgets (decision 81, 2026-11-07).
+    // The CASHFLOW 12 MESI block under the budgets (since 2026-11-07).
     const cashflowSection = cashflowBlock ? `\n\n${formatCashflowBlockSection(cashflowBlock).slice(0, 2).join('\n')}` : '';
     const prompt = `Sei un assistente finanziario personale italiano. Questo è lo stato dei budget dell'utente:
 

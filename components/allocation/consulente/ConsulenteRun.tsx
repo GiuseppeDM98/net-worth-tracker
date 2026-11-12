@@ -59,7 +59,7 @@ function useElapsed(since: number | null): string {
 /**
  * The stage rows: an icon, the stage's words, what it usually takes and — on the active row —
  * how long it has been going. The active row is a generated surface (DESIGN.md → The AI-Accent
- * Rule): a 1px accent frame laid over the list's lines in its band (decision 84).
+ * Rule): a 1px accent frame laid over the list's lines in its band (2026-11-07).
  */
 export function StageRows({ rows, elapsed }: { rows: readonly { stage: AllocationAdviceStage; state: StageRowState }[]; elapsed?: string }) {
   return (

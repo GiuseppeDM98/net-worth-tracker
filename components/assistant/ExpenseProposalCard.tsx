@@ -81,7 +81,7 @@ export interface CreatedForRow {
 }
 
 /**
- * The category or subcategory the row needs, written before it (decision 40): the subcategory
+ * The category or subcategory the row needs, written before it (2026-11-01): the subcategory
  * appended to a FRESH read of its category (the page's copy may be stale, and an append on it
  * would drop a subcategory added in another tab), a name already there reused; a category
  * created bare, as the CSV import creates them; the transfers' «Trasferimenti». Then the

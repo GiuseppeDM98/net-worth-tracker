@@ -13,7 +13,7 @@ let mockCategoryDocs: Array<{ id: string; data: () => unknown }> = [];
 
 vi.mock('server-only', () => ({}));
 vi.mock('firebase-admin/firestore', () => ({ Timestamp: { fromDate: (d: Date) => d } }));
-// The CASHFLOW 12 MESI block the AI comment reads (decision 81, 2026-11-07).
+// The CASHFLOW 12 MESI block the AI comment reads (2026-11-07).
 const { readCashflowBlockMock } = vi.hoisted(() => ({ readCashflowBlockMock: vi.fn() }));
 vi.mock('@/lib/server/assistant/cashflowBlockPrompt', () => ({ readCashflowBlockForPrompt: readCashflowBlockMock }));
 vi.mock('resend', () => ({
@@ -349,7 +349,7 @@ describe('generateWeeklyBudgetComment', () => {
     expect(await generateWeeklyBudgetComment(data)).toBeNull();
   });
 
-  it('prints the note and the cashflow block under the budgets, and nothing without one (decision 81, 2026-11-07)', async () => {
+  it('prints the note and the cashflow block under the budgets, and nothing without one (2026-11-07)', async () => {
     anthropicCreateMock.mockResolvedValue(answer('Spesa al 50% del tetto.', 'end_turn'));
     await generateWeeklyBudgetComment(data, '--- CASHFLOW 12 MESI (x) ---\nX');
     await generateWeeklyBudgetComment(data);
@@ -363,7 +363,7 @@ describe('generateWeeklyBudgetComment', () => {
   });
 });
 
-describe('buildAndSendWeeklyBudget — the cashflow block (decision 81, 2026-11-07)', () => {
+describe('buildAndSendWeeklyBudget — the cashflow block (2026-11-07)', () => {
   const now = new Date(2026, 5, 15, 12);
   const previousKey = process.env.ANTHROPIC_API_KEY;
 

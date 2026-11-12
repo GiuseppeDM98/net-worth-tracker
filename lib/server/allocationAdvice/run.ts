@@ -464,7 +464,7 @@ export interface RunInterviewRoundArgs {
  * context, calls Opus 5.5 with `interviewRoundSchema` as the structured output and hands the
  * round to `onRound`. It never writes: no `setAllocationAdviceAdmin`, no
  * `patchAllocationAdviceAdmin`, no `enterStage` — the rounds live in the browser's draft until
- * the strategy's body carries them (decision 23). A failure rejects with an
+ * the strategy's body carries them (no server draft of the interview, 2026-11-01). A failure rejects with an
  * `AllocationAdviceStageError` of stage `'interview'`.
  */
 export async function runInterviewRound({ userId, answers, previousRounds, revision = null, onRound, now = new Date() }: RunInterviewRoundArgs): Promise<void> {
