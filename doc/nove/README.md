@@ -101,6 +101,62 @@
     measure), not annual savings / 12. → NOVE-16
 31. PR #489: the tax estimates use a SEPARATE fiscal cost basis that includes the fees (purchase and sale); the PMC
     shown stays without them. → NOVE-07, read by NOVE-18
+Decided at the adversarial reading of the whole series (2026-11-12, numbered on from the list above):
+
+33. `mobile:budget` closes on a COMPARISON: `mobile:census` + `mobile:budget` on `develop` and on the branch the same
+    day, same build; every entry the spec does not name reads the same on both, the entries it names are
+    re-recorded with `raisedBy`. A session stops only on an unnamed entry that moves. → every spec (§ 8)
+34. `perf:budget`: measured before and after on the same machine; a route that crosses its ceiling by ≤ 1 KB gz for
+    one spec has the ceiling raised with `raisedBy` and a row in doc/guide/velocita.md § Registro, without asking;
+    above 1 KB the session stops with the two measures. → every spec (§ 8)
+35. One spec = one session = one commit, also for the largest: 16, 17 and 20 are «one long session, ~8 h», resumed
+    on the same branch without committing when the context runs out. → NOVE-16, 17, 20
+36. The old words «Fisse / Variabili» outside Analisi: NOVE-10 renames the three UI and email sites through
+    `SPENDING_TYPE_LABELS`, NOVE-15 the Assistente's system prompt. → NOVE-10, 15
+37. The old product name on surfaces outside the repo (the Firebase project's public name, the OAuth consent
+    screen, the sender in Vercel's env): out of scope, declared. → NOVE-01
+38. The page's meta description stays as it is. → NOVE-01
+39. A trade's edit and delete carry `expectedUpdatedAt` (the row the form or the button was drawn from): a form
+    opened on an older version is refused with the 409 that exists. → NOVE-03
+40. Compravendita, a mortgage above the residual: the «saldo» screen asks «Su quale conto la banca accredita quanto
+    avanza del mutuo?», label «Sul conto». → NOVE-04
+41. Panoramica, spending above income so far: «Finora hai messo da parte −X €: le spese superano le entrate; …»,
+    the cell «−X €» — signed where it is read as a saving. → NOVE-05
+42. Storico › Driver: when ONE part of the rest is non-zero the reading names it by its ledger label; with two or
+    three it stays «altre variazioni». → NOVE-06
+43. Divisione: a trade's fee row belongs to the sole holder of the ASSET; when the asset is shared or split by
+    quota, to the sole holder of the settlement ACCOUNT; else it is in comune. → NOVE-07
+44. A fee the server could not write as a row (the category gone) is said in the toast: «Commissione non registrata
+    in Cashflow: manca la categoria in Impostazioni › Spese». → NOVE-07
+45. The ring has SIX rank colours: the sixth is `var(--chart-4)`. → NOVE-08, 09
+46. Divisione's ring centre reads «entrate». → NOVE-09
+47. A ring's centre is never a lifted figure: The Lifted-Figure Rule is amended. → NOVE-10
+48. A ring of one part is not drawn: the total stands as the column's hero line above the single legend row. → NOVE-10
+49. «Dove vanno i soldi», view «Sottocategorie»: the reading stays the categories'. → NOVE-10
+50. A «senza sottocategoria» row opens the CATEGORY's Scheda; two categories with one name are qualified in the
+    caption. → NOVE-10
+51. The Classifica's bars stay `--chart-1`; each row carries its type's swatch. → NOVE-10
+52. A «Continua con» row is sent as `'auto'`: the router reads it. → NOVE-15
+53. A turn sent with a reading it inherited (an answer to a question card, «Rigenera») is `source: 'carried'` and
+    reads «Ho letto: …»; «Hai scelto: …» only after «cambia». → NOVE-14, 15
+54. Patrimonio calls an instrument created empty and never traded «Mai comprato». → NOVE-16
+55. The model's «Importo da investire» is money TAKEN FROM THE ACCOUNTS: the base is what is held, and in
+    «Raggiungibile» the liquidity may go down to (liquidity − amount). → NOVE-17
+56. The model is «superato» when the targets, the roles OR the criteria change; an «Applica» that writes the same
+    targets does not. → NOVE-17
+57. Spending the liquidity is not a sale: out of the sold total and of the taxes, its «Tasse» cell «—», the total
+    line adds «, usi X € di liquidità». → NOVE-18
+58. The hand-off accepts that a new instrument at 0 quotes in a class without sub-targets starts near 0 % and says
+    so. → NOVE-21
+59. The hand-off's seed holds EVERY tradable instrument held; the reading names the ones the Consulente did not
+    name. → NOVE-21
+60. DESIGN.md: The Two-Font Rule's opening, «the one ornament» and The Unifying Law take the costume's clause;
+    «inevitability over ornament» stays. → NOVE-11
+61. Egeo's own `--positive` (both blocks) and the sign tokens' contrast test are born in NOVE-12. → NOVE-12, 19
+62. `develop` goes to `main` only when the WHOLE series is implemented and retired: a defect declared «until a
+    later spec» never reaches production. → every spec
+63. The COMPRA chip never reads in the red of a loss: Orbita's and Egeo's `--chart-3` sit ≥ 30° of hue from
+    `--destructive`, both modes, the contrasts re-measured. → NOVE-12, 13
 
 ## 4. The adopted choices (reversible before the implementation; each is repeated in the spec that uses it)
 
@@ -111,22 +167,26 @@
 - e. `lib/utils/savingsRate.ts` without imports, `SAVINGS_RATE_FLOOR = -100`; «Risparmio nel tempo» averages by
   income. (NOVE-05)
 - f. Accumulo is a tab loaded on demand. (NOVE-16)
-- g. The new collections `accumulationPlans` and `modelPortfolios` are accepted; their Firestore rules are published
+- g. The new collections `accumulationPlans`, `accumulationPlanLocks` and `modelPortfolios` are accepted; their Firestore rules are published
   by hand by the owner. (NOVE-16, 17)
-- h. The saved model becomes «superato» after a Consulente's «Applica» or a change of the targets. (NOVE-17)
+- h. The saved model becomes «superato» after a change of the targets, by hand or by a Consulente's «Applica»; an
+  «Applica» that writes the same targets changes nothing (decision 56). (NOVE-17)
 - i. The Consulente does not read the model nor its criteria (decision 29 adds the active plan only). (NOVE-21)
 - j. The model's base is Bilanciamento's (net of debts, `resolveAllocationRoleWithin`; cash is a candidate). (NOVE-17)
 - k. The criteria are edited in Accumulo, read-only in Impostazioni. (NOVE-17)
-- l. Model and plans are read only on the Accumulo tab, except the Piano's note. (NOVE-16)
+- l. Model and plans are read only on the Accumulo tab, except the Piano's note, the Consulente's «Applica» page
+  (the active-plan note, choice p, and the hand-off's offer or draft, NOVE-21: the plans' state only, never their
+  weights) and the Consulente's server read of the active plan (decision 29). (NOVE-16)
 - m. Limits that force a tax above the cap: the forced tax becomes the cap, and the UI says so. (NOVE-18)
 - n. Losses are not counted in the tax estimate, declared in the text. (NOVE-18)
 - o. Loans and properties are never offered in «+ Aggiungi». (NOVE-16)
 - p. The Consulente's «Applica» page warns in one line when a plan is active. (NOVE-16)
-- q. «superato» fires on targets AND roles: the fingerprint saved with the model covers both. (NOVE-17)
+- q. «superato» fires on targets, roles AND criteria (decision 56): the fingerprint saved with the model covers the
+  three. (NOVE-17)
 - r. In the hand-off, instruments not held are offered to be created at quantity 0, prefilled. (NOVE-21)
 - s. The `pacClause` PR #486 adds to the Bilanciamento verdict is removed (decision 24). (NOVE-16)
 - t. A warning when the PAC sells in month 1 an instrument the Consulente says to keep. (NOVE-21)
-- u. The AI's STRUMENTI block prints a quantity-0 asset as «0 quote, mai comprato»; `findAssetByName` prefers
+- u. The AI's STRUMENTI block prints an asset created empty and never traded as «0 quote, mai comprato»; `findAssetByName` prefers
   quantity > 0. (NOVE-16)
 - v. A note when the plan ends after the «rivedi entro» date. (NOVE-16)
 - w. Compravendita: a mortgage above the PRICE is refused; property and account move in one transaction. (NOVE-04)
@@ -146,45 +206,54 @@ The order of implementation (each followed by its retirement session, § 8):
   `tradeAwarePriceEffect` change together).
 - **09** and **10** after **08** (the ring); **10** also after **05** (`readSavings`).
 - **15** after **14** (the router's contract).
-- **16** after **02** (the same grid cell); **17** after **16**; **18** after **17** and **07** (the fiscal cost basis).
+- **16** after **02** (the same grid cell), reading **03**'s and **07**'s dialogs (the fresh ledger meta, the fee
+  field), already before it in the order; **17** after **16**; **18** after **17** and **07** (the fiscal cost basis).
 - **21** after **16** and **17** (the editor's seed, the optimizer, the active-plan reader).
-- **11 → 12 → 13 → 19 → 20** come LAST (13 extends 12's contrast test): the page-by-page pass dresses pages that 08–10, 15 and 16 change.
-- 01, 02, 03, 04, 05, 06, 14 and 11 depend on nothing.
+- **11 → 12 → 13 → 19 → 20** come LAST (13 extends 12's contrast test): the page-by-page pass dresses pages that 08–10, 15, 16, 17, 18 and 21 change.
+- 01, 02, 03, 04, 05, 06, 08, 14 and 11 depend on nothing.
 
 ## 6. Status
 
 | Spec | Title | Effort | Depends on | Model · effort | Status |
 | --- | --- | --- | --- | --- | --- |
-| NOVE-01 | The product is called «Net Worth Tracker» everywhere | S | — | Sonnet 5.5 · medium | written on 2026-11-12 |
-| NOVE-02 | Allocazione: a short Piano as tall as Bilanciamento + Per classe | S | — | Sonnet 5.5 · medium | written on 2026-11-12 |
-| NOVE-03 | Registro operazioni: every write decides inside its transaction | L | — | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-04 | Compravendita: a mortgage larger than what is left to pay | M | — | Sonnet 5.5 · medium | written on 2026-11-12 |
-| NOVE-05 | The savings rate: one rule, a floor, and euros below it | L | — | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-06 | Storico › Driver: «altre» split by cause | M | — | Sonnet 5.5 · medium | written on 2026-11-12 |
-| NOVE-07 | A trade's fee is a spending row, out of the average cost (PR #489) | L | 03, 06 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-08 | The ring: one primitive, one DESIGN rule, four homes | L | — | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-09 | The ring in the minor tiles | M | 08 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-10 | Analisi recomposed as «Classifica» | L | 05, 08 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-11 | Themes: the mechanisms beyond colour and radius | L | — | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-12 | The «Egeo» theme | M | 11 | Sonnet 5.5 · medium | written on 2026-11-12 |
-| NOVE-13 | The «Orbita» theme | M | 11, 12 | Sonnet 5.5 · medium | written on 2026-11-12 |
-| NOVE-14 | The Assistente's router | L | — | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-15 | The Assistente as only a chat | L | 14 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-16 | Allocazione › Accumulo: the PAC tab (PR #486) | L | 02 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-17 | The model portfolio and the optimizer (PR #487) | L | 16 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-18 | «Con vendite mirate» (PR #488) | M | 17, 07 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-19 | The costume, first pass: shell, portals, controls, Panoramica, Patrimonio, Cashflow | L | 11, 12, 13 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-20 | The costume, round B: every dialog and the other nine pages | L | 19 | Opus 5.5 · medium | written on 2026-11-12 |
-| NOVE-21 | The Consulente and the plan of accumulation | L | 16, 17 (after 18) | Opus 5.5 · medium | written on 2026-11-12 |
+| NOVE-01 | The product is called «Net Worth Tracker» everywhere | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 11 findings, 2 owner decisions |
+| NOVE-02 | Allocazione: a short Piano as tall as Bilanciamento + Per classe | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 16 findings, 0 owner decisions |
+| NOVE-03 | Registro operazioni: every write decides inside its transaction | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 19 findings, 1 owner decision |
+| NOVE-04 | Compravendita: a mortgage larger than what is left to pay | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 14 findings, 1 owner decision |
+| NOVE-05 | The savings rate: one rule, a floor, and euros below it | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 31 findings, 1 owner decision |
+| NOVE-06 | Storico › Driver: «altre» split by cause | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 21 findings, 1 owner decision |
+| NOVE-07 | A trade's fee is a spending row, out of the average cost (PR #489) | L | 03, 06 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 2 owner decisions |
+| NOVE-08 | The ring: one primitive, one DESIGN rule, four homes | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 22 findings, 1 owner decision |
+| NOVE-09 | The ring in the minor tiles | M | 08 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 17 findings, 2 owner decisions |
+| NOVE-10 | Analisi recomposed as «Classifica» | L | 05, 08 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 31 findings, 6 owner decisions |
+| NOVE-11 | Themes: the mechanisms beyond colour and radius | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 27 findings, 2 owner decisions |
+| NOVE-12 | The «Egeo» theme | M | 11 | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 22 findings, 3 owner decisions |
+| NOVE-13 | The «Orbita» theme | M | 11, 12 | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 2 owner decisions |
+| NOVE-14 | The Assistente's router | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 20 findings, 1 owner decision |
+| NOVE-15 | The Assistente as only a chat | L | 14 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 27 findings, 3 owner decisions |
+| NOVE-16 | Allocazione › Accumulo: the PAC tab (PR #486) | L | 02 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 33 findings, 2 owner decisions |
+| NOVE-17 | The model portfolio and the optimizer (PR #487) | L | 16 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 32 findings, 3 owner decisions |
+| NOVE-18 | «Con vendite mirate» (PR #488) | M | 17, 07 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 1 owner decision |
+| NOVE-19 | The costume, first pass: shell, portals, controls, Panoramica, Patrimonio, Cashflow | L | 11, 12, 13 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 1 owner decision |
+| NOVE-20 | The costume, round B: every dialog and the other nine pages | L | 19 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 23 findings, 1 owner decision |
+| NOVE-21 | The Consulente and the plan of accumulation | L | 16, 17 (after 18) | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 2 owner decisions |
+
+The transversal reading of the same day (the 21 specs against each other and against this index): 21 findings;
+decisions 33, 34, 35 and 62 hold for every spec.
 
 ## 7. Shared contracts (name, signature, file — IDENTICAL in every spec that reads them)
 
 A spec that needs one of these differently changes it HERE first, then in every live spec that names it (§ 8).
 
 **The ledger's transaction** — defined by NOVE-03, extended by NOVE-07
-- `assertTradeUnchanged(existing, plan)`, `PreparedMutation.preparedOnUpdatedAt`, `fetchFreshLedgerMeta` (NOVE-03).
+- `assertTradeUnchanged(existing, plan)`, `PreparedMutation.preparedOnUpdatedAt`, `fetchFreshLedgerMeta`; the
+  PUT body's and the DELETE query's `expectedUpdatedAt` (ISO; the version the form was drawn from, optional on
+  the wire), passed as the last argument of `updateAssetTransaction` / `deleteAssetTransaction` on both sides
+  (NOVE-03).
 - `PreparedMutation.newFeeRefId` (and no `tradeDocData`); `lib/utils/tradeFeeExpense.ts`: `TradeFeeFacts`,
-  `planTradeFee`, `isTradeFeeRow`, `feeOutsideCashflow`; `isFeeRow` recognises `feeOfTradeId` (NOVE-07).
+  `planTradeFee`, `isTradeFeeRow`, `feeOutsideCashflow`, `tradeFeeOwner(asset, settlementAccount)` (the fee row's
+  `personalMemberId`); `isFeeRow` recognises `feeOfTradeId`; `TradeMutationResult.feeRow: 'written' | 'none' |
+  'refused'` (NOVE-07).
 
 **The cost basis** — defined by NOVE-07, read by NOVE-18
 - `fiscalCostPerUnitEur` in `lib/utils/costBasisEur.ts`; `Asset.fiscalAverageCostEur`;
@@ -197,6 +266,9 @@ A spec that needs one of these differently changes it HERE first, then in every 
 - `SAVINGS_RATE_FLOOR = -100`; `SavingsReading` = `none | no-income{spending} | deficit{deficit,income,spending} |
   rate{rate,savings,income,spending}`; `readSavings(income, spending)`; `meaningfulSavingsRate`;
   `weightedSavingsRate`.
+- `describeFlow(flow: FlowSummary, reading: SavingsReading): Narrative | null` in `analisiNarrative.ts` (NOVE-10's
+  AnalisiTab calls it with `readSavings(totals.income, totals.expenses)`); `describeCashflow` takes the month's
+  `SavingsReading`.
 
 **The Driver's split** — defined by NOVE-06, moved by NOVE-07
 - `GrowthDrivers.otherPension / otherHoldings / otherAccounts`, `driverRestParts`; `tradeMoneyIn` private in
@@ -207,10 +279,10 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `buildRingArcs`, `formatRingCenter(amount, maxChars)`, `isRingWhole`, `foldRingSegments(segments, restLabel)`,
   `ringSwatchAt`, `describeRingSegments`, `ringCenterFontPx`, `ringCenterMaxChars(size)`; `RING_VIEWBOX = 100`,
   `RING_RADIUS = 43`, `RING_STROKE = 9`, `RING_DEFAULT_SIZE = 120`, `RING_MIN_PARTS = 2`, `RING_MAX_PARTS = 6`,
-  `RING_REST_KEY = 'ring-rest'`, `RING_REST_COLOR`, `RING_CATEGORY_COLORS`.
+  `RING_REST_KEY = 'ring-rest'`, `RING_REST_COLOR`, `RING_CATEGORY_COLORS` (six slots: `--chart-2, 7, 6, 3, 8, 4`).
 - `components/ui/ring-chart.tsx`: `RingChart({ segments, centerValue: number, centerLabel, ariaLabel, size? })`,
   `RING_LAYOUT_CLASS`, `RING_ROWS_CLASS`; DOM hooks `data-ring`, `data-ring-max-chars`,
-  `data-ring-center="hole" | "above"`. `RankedRows`' legend mode: `RankedRow.swatch?`, `bars?: boolean`.
+  `data-ring-center="hole" | "above"`. `RankedRows`' legend mode: `RankedRow.swatch?`, each `remainders` entry's `swatch?`, `bars?: boolean`.
 - `e2e/ringFit.ts`: `expectRingFiguresInside(scope)`; `e2e/overviewFixture.ts`: the `charts` merge.
 - DESIGN.md → «Ring Chart / The Ring Rule»: written by NOVE-08, its «Homes» sentence extended by NOVE-09, then by
   NOVE-10 — in that order.
@@ -224,11 +296,16 @@ A spec that needs one of these differently changes it HERE first, then in every 
 - `types/assistant.ts`: `AssistantRoutePeriod`, `AssistantRoute{ intent: AssistantMode; period; webSearch;
   confidence }`, `AssistantRouteOverride`, `AssistantRouteReading{ route; source; reason? }`,
   `AssistantMessage.routeReading?`; the stream event `{ type: 'route'; reading }` right after `meta`; the request's
-  `mode: AssistantMode | 'auto'` and `route?: AssistantRouteOverride`.
+  `mode: AssistantMode | 'auto'`, `route?: AssistantRouteOverride` and `routeCarried?: boolean`;
+  `AssistantRouteSource = 'router' | 'override' | 'carried' | 'fallback'` (`'carried'`: a route re-sent from the
+  previous turn's reading — NOVE-15 writes «Ho letto», never «Hai scelto», decision 53).
 - `lib/utils/assistantRoute.ts`: `ASSISTANT_ROUTER_MIN_CONFIDENCE = 0.6`, `FALLBACK_ROUTE`, `checkRouteConsistency`,
   `parseRouterToolInput`, `routeToSelection`; NOVE-15 adds `routeToChooserDraft`, `chooserDraftToOverride`.
-- `lib/server/assistant/router.ts`: `routeAssistantMessage(input, client)`; `ASSISTANT_ROUTER_MODEL =
-  'claude-haiku-5-5'`. `lib/utils/assistantChatNarrative.ts` (NOVE-15): `describeRoute`, `describeReadingLine`,
+- `lib/server/assistant/router.ts`: `routeAssistantMessage(input: AssistantRouterInput, client: RouterClient):
+  Promise<AssistantRouteReading & { elapsedMs: number }>`, `createRouterClient(): RouterClient`;
+  `lib/constants/aiModels.ts`: `ASSISTANT_ROUTER_MODEL = 'claude-haiku-5-5'`. A model reading that is Registra with a
+  period keeps Registra and drops the period; the thread's detail is its last 100 messages.
+  `lib/utils/assistantChatNarrative.ts` (NOVE-15): `describeRoute`, `describeReadingLine`,
   `buildEmptyChatSuggestions`.
 
 **The plan of accumulation** — defined by NOVE-16, read by NOVE-17, NOVE-18 and NOVE-21
@@ -238,8 +315,13 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `openPlanHeldBy(lockOpenPlanId, pointedStatus)`; `lib/hooks/useAccumulationPlans.ts`: `useAccumulationPlans`.
 - `lib/utils/accumuloMonth.ts`: `summarizePacMonth`, `planEndsAfterReview(plan, reviewByIso)`,
   `describeOpenPlanForAdvice(plan, monthKey, nameOf): OpenPlanForAdvice | null` (null unless the plan is active).
-- `isPlanBuyable(asset, allAssets)`; `useMonthlySavingsMedian(ownerId, assets, { enabled })`;
-  `AssistantHoldingRow.neverBought?: true`; `APPLY_ACTIVE_PLAN_NOTE` in `allocationAdviceNarrative.ts`.
+- `isPlanBuyable(asset, allAssets)` in `lib/utils/accumulationPlanUtils.ts` (a ledger type, not cash, role tradable
+  WITH the financed asset); `useMonthlySavingsMedian(ownerId, assets, { enabled }): { medianEur; months } | null |
+  undefined`; `describeSuggestedInflow(suggestedEur, months)`; `Asset.createdEmpty?: true` (written only by
+  `AssetDialog`'s `createEmpty`); `AssistantHoldingRow.neverBought?: true`; `roundPlanEuros` (private to the service:
+  every euro field of a written plan in cents); `monthLabelLong` in `lib/utils/planMonths.ts`;
+  `seedAccumuloFixture({ startOffset, status })` (NOVE-21 adds `status?: 'active' | 'draft'`), `plantCriteria()` /
+  `restoreCriteria()` (NOVE-17); `APPLY_ACTIVE_PLAN_NOTE` in `allocationAdviceNarrative.ts`.
 
 **The optimizer and the model** — defined by NOVE-17, extended by NOVE-18, read by NOVE-21
 - `types/optimizer.ts`: `OptimizerMode = 'reachable' | 'ideal'` (NOVE-18 adds `'targeted'`), `OptimizerSnapshot`
@@ -247,15 +329,21 @@ A spec that needs one of these differently changes it HERE first, then in every 
   PlanPosition[]; disposals?: PlanDisposal[]; optimizerSnapshot?: OptimizerSnapshot }`, the editor's one seed
   (`AccumulationPlanDialog`'s `seedDraft`).
 - `lib/utils/weightOptimizer.ts`: `runOptimizer(input): OptimizerResult` (NOVE-18 adds `input.holdings?`),
-  `buildStandaloneCandidates(assets, valueOf, newMoneyEur, evaluateAssetIds?, groups?): StandaloneCandidates`,
+  `buildStandaloneCandidates(assets, valueOf, investEur, evaluateAssetIds?, groups?): StandaloneCandidates`
+  (`investEur`: money taken from the accounts, never added to the base — decision 55),
   `LIQUIDITY_CANDIDATE_KEY = 'liquidita'`, `roundWeights(x, lo, hi)`.
 - `modelPortfolios/{ownerUid}` `{ userId, weights, origin, optimizerSnapshot?, fingerprint, updatedAt }`;
-  `lib/utils/modelPortfolio.ts`: `modelFingerprint(targets, assets)`, `isModelStale(model, targets, assets)`;
-  `saveModelPortfolio(ownerId, input, allAssets, targets)`.
+  `lib/utils/modelPortfolio.ts`: `ModelBasis { targets; criteria; goals }`, `buildModelBasis(settings, goals)` (the stored
+  targets, the criteria and the goals' inputs, never a price nor a date — decision 56), `modelFingerprint(basis, assets)`, `isModelStale(model, basis,
+  assets)`; `saveModelPortfolio(ownerId, input, allAssets, basis)`, `ModelPortfolioInput.keepFingerprint?`;
+  `StandaloneCandidates.liquidityEur`; `LIQUIDITY_CANDIDATE_KEY` defined in `lib/constants/idealAllocation.ts`.
 
 **The sale's tax** — defined by NOVE-18 — `lib/utils/saleTax.ts`
 - `SaleTaxPerEuro` = `exempt | taxed{perEuro} | unknown{reason: 'cost-basis' | 'rate'}`;
-  `saleTaxPerEuro(holding)`; `candidateSaleTaxPerEuro(memberAssetIds, holdings)`; `estimatePlanSaleTax` calls them.
+  `saleTaxPerEuro(holding)`; `candidateSaleTaxPerEuro(buyAssetId, holdings)` (a group is priced at its buyer);
+  `estimatePlanSaleTax` calls `saleTaxPerEuro`, the targeted optimizer and the dialog's locks call
+  `candidateSaleTaxPerEuro`; a proposed sale deducts no sale fee. `OptimizerSaleReport.liquiditySpentEur`: the
+  liquidity is spent, never sold — out of `soldEur` and `taxEur`.
 
 **The Consulente's hand-off** — defined by NOVE-21, on the two groups above
 - `lib/server/allocationAdvice/accumulationPlan.ts`: `readAccumulationPlanForAdvice(userId, now):
@@ -265,14 +353,16 @@ A spec that needs one of these differently changes it HERE first, then in every 
 - `lib/utils/allocationAdviceDocument.ts`: `handoffProposalOf(document)`, `ApplyHandoff = 'offer' | 'draft' |
   'none'`, `applyHandoffOf(document, plans)`, `CONSULENTE_HANDOFF_HREF`.
 - `lib/utils/allocationAdviceHandoff.ts`: `planConsulenteHandoff(proposal, candidates, keepAssets, assets)`,
-  `handoffCriteria(base, targets, unmapped)`, `buildHandoffSeed(input): HandoffSeedOutcome`,
+  `handoffCriteria(base, targets, unmapped)`, `buildHandoffSeed(input): HandoffSeedOutcome` (computed: `seed`, `unmappedClasses`, `zeroClasses`,
+  `extraNames`), `describeHandoffZero`, `describeHandoffExtra`,
   `findKeptSales(disposals, keepAssetIds)`.
 - Additive props: `AccumulationPlanDialog.advisorKeepAssetIds?`, `AssetDialog.prefill?: AssetPrefill`
-  (`types/assets.ts`), `AccumuloTab.advice`, `ApplyPiecesInput.handoff`.
+  (`types/assets.ts`), `AccumuloTab.advice`, `ApplyPiecesInput.handoff`, `ConsulenteHandoff.basis` (NOVE-17's `ModelBasis`);
+  `components/allocation/KeptSalesNote.tsx`.
 
 **The costume** — defined by NOVE-11 § 4.3, filled by NOVE-12 and NOVE-13, read by NOVE-19 and NOVE-20
-- `lib/constants/colorTheme.ts`: `COSTUME_ATTRIBUTE = 'data-costume'`, `CostumeOrnament = 'header-band'`,
-  `ThemeCostume { ornaments; resourceBar }`, `ColorThemeMeta { name; description; costume: ThemeCostume | null }`,
+- `lib/constants/colorTheme.ts`: `COSTUME_ATTRIBUTE = 'data-costume'`,
+  `ThemeCostume { resourceBar }` (the header band is CSS alone: `--costume-header-band-height` > 0), `ColorThemeMeta { name; description; costume: ThemeCostume | null }`,
   `COLOR_THEME_META: Record<ColorTheme, ColorThemeMeta>`, `COSTUME_THEMES`,
   `buildColorThemeInitScript(attributeThemes, costumeThemes)`.
 - `contexts/CostumeScopeContext.tsx`: `CostumeScope` (a `display: contents` box with `data-costume-scope`),
@@ -285,7 +375,9 @@ A spec that needs one of these differently changes it HERE first, then in every 
 - CSS: a costume theme is four blocks (`[data-theme="<id>"]`, `.dark[data-theme="<id>"]`, and the same two followed
   by ` [data-costume-scope]`); every rule of the «Theme costume» section starts with
   `[data-costume] [data-costume-scope]`; hooks `#page-main`, `[data-tile]`, `.costume-heading`, `.tile-eyebrow`,
-  `.costume-figure`, `.costume-header-band`; `:root` becomes `:root, [data-theme="default"]`.
+  `.costume-figure`, `.costume-header-band`; `:root` becomes `:root, [data-theme="default"]`. Outside the section
+  a `--costume-*` is read only inside a scope block's own declarations (from NOVE-19 also by the
+  `[data-popper-sheet]` radius, with its fallback).
 - `components/ui/theme-costume.tsx`: `EmblemSvg`, `ThemeEmblem({ page, size })`, `ThemeEmblemLead`,
   `ThemeHeaderBand`, `HeadingText({ text })`; `lib/utils/headingFigures.ts`: `splitHeadingFigures(text)`;
   `PageHeader`'s `emblem?: EmblemPage`.
@@ -294,12 +386,16 @@ A spec that needs one of these differently changes it HERE first, then in every 
 - Tests: `__tests__/themeBlocks.ts` (`THEME_MODES`, `themeBlockHeader`, `themeBlockBody`);
   `__tests__/themeCostumeContrast.test.ts` (NOVE-12, extended by 13, 19, 20); `e2e/themeNeutral.ts` +
   `e2e/themeNeutral.baseline.json` (the palette themes' identity, green in every later spec).
+- NOVE-12 and NOVE-13 write the palettes: Egeo declares its own `--positive` in BOTH its palette blocks (a
+  light-block token reaches dark mode by source order); in both themes `--chart-3` (Criptovalute, the COMPRA chip)
+  sits at hue 60, ≥ 30° from `--destructive` (decisions 61, 63); `__tests__/themeCostumeContrast.test.ts` K1
+  (surfaces), K3 (sign tokens), G2 (the hue gap).
 - NOVE-19 extends it: `COSTUME_SCOPE_PROPS` and `useCostumeScopeProps()` in `contexts/CostumeScopeContext.tsx`,
   spread by every portalled primitive (popover, select, dropdown menu, tooltip, sheet, drawer, dialog, alert dialog);
   `COSTUME_SCOPE_PROPERTIES` 18 → 22 (`--costume-control-frame-radius`, `-pill-radius`, `-chip-radius`,
   `-switch-on`, each read only through a `var()` with today's value as fallback); `COSTUME_PILL_RADIUS_CLASS`,
   `COSTUME_FRAME_RADIUS_CLASS`; the hook classes `.costume-shell-eyebrow`, `.costume-shell-quiet`,
-  `.costume-wordmark`; Egeo's `--positive` (light) and its page emblems; `e2e/theme.costume{,.mobile,.tablet}.spec.ts`.
+  `.costume-wordmark`; Egeo's page emblems; `e2e/theme.costume{,.mobile,.tablet}.spec.ts`.
 - NOVE-20 extends it again: the 23rd property `--costume-page-generated-fill` and `COSTUME_GENERATED_FILL_CLASS`;
   `data-costume-frame` on the dialog, drawer and alert-dialog contents (a modal's cap or marks, its Float shadow
   kept); `.costume-title`; the `@media print` reset of every scope property; `lib/constants/sankeyCostumeColors.ts`
@@ -332,7 +428,8 @@ A spec that needs one of these differently changes it HERE first, then in every 
   faked (`page.route(...)` with a fake SSE answer, or a spy on the SDK's `stream`); the real run is done ONCE, on the
   mirror or in production after the deploy, with the owner's key, in phase F — never on the PR's Vercel preview.
 - **The system prompt is byte-identical for every user**: everything that is the user's sits in the `userContent`;
-  the proof is `expect(a.system).toBe(b.system)`. The repo has no snapshot tests and none is added.
+  the proof is `expect(a.system).toBe(b.system)`. The repo has no snapshot tests and none is added (NOVE-11's E1 is a recorded baseline of
+  computed styles compared with `toEqual`, the one declared recorded comparison: re-recorded only on untouched code).
 - **A spec is only a development instruction**: no open choice survives a reading — a «da decidere», a «verify at
   implementation», an alternative offered to the implementer are findings of the adversarial reading. Component
   tests are `.test.tsx` with RTL.
@@ -346,8 +443,16 @@ A spec that needs one of these differently changes it HERE first, then in every 
 - **The guided verification** follows WORKFLOW.md § 2: phases A–G, the expected outcome declared first, the decoys
   («ornitorinco», «fenicottero»), the assertions on the data (Firestore or the HTTP answer), phase F only at the
   owner's «pronto», phase G removing fixtures, mirror and scripts.
-- **A composed page closes on `mobile:census` + `mobile:budget`; a bundle change on `perf:budget`**; a raised
-  ceiling is registered (doc/guide/velocita.md § Registro, doc/guide/prima-schermata-misure.md).
+- **The two budgets, ONE rule for every spec** (decisions 33, 34). `mobile:budget`: `mobile:census` + `mobile:budget`
+  on `develop` and on the branch the same day, same build; every entry the spec does not name reads the same on
+  both (twelve entries of other surfaces are red since 2026-11-11: they stay as they are), the entries it names are
+  re-recorded with `raisedBy` (doc/guide/prima-schermata-misure.md); the session stops on an unnamed entry that
+  moves. `perf:budget`: every route measured before and after on the same machine; a route that crosses its
+  ceiling by ≤ 1 KB gz has the ceiling raised with `raisedBy` and a row in doc/guide/velocita.md § Registro,
+  without asking; above 1 KB the session stops with the two measures. A spec's own «≤ N KB» is its estimate, never
+  a second rule.
+- **`develop` goes to `main` only when the whole series is implemented and retired** (decision 62): what a spec
+  declares «until NOVE-NN» lives on `develop` only.
 
 ## 9. The line for prompt 07 and prompt 08
 

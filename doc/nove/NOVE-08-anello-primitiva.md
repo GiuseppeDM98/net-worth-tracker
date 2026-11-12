@@ -49,29 +49,30 @@ its legend; the four homes use it; DESIGN.md says when.
    sum of the shares; one part is one closed arc of 100; a part ≤ 0 draws nothing; seven parts become six, the last
    `ring-rest`. **Proof**: `__tests__/ringChart.test.ts` R1-R4.
 2. `formatRingCenter`: `(31900, 8)` «31.900 €», `(31900, 7)` «31,9k €», `(32000, 7)` «32k €», `(125400, 7)` «125k €»,
-   `(1234500, 9)` «1,2 Mln €», `(1234500, 7)` «1 Mln €», `(999960, 7)` «1 Mln €», `(4200, 7)` «4200 €», `(821, 4)` ''
+   `(1234500, 9)` «1,2 Mln €», `(1234500, 7)` «1 Mln €», `(999960, 7)` «1 Mln €», `(999600, 7)` «1 Mln €», `(4200, 7)` «4200 €», `(821, 4)` ''
    (U+00A0 before «€» and «Mln»); `ringCenterMaxChars`: 120 → 7, 96 → 7, 72 → 4. **Proof**: R5-R6.
-3. `isRingWhole`: false with one positive part, false with a part of −1 €, true with a part of −0,40 € (it prints as
-   zero) beside two positive ones. **Proof**: R7.
+3. `isRingWhole`: false with one positive part, false with a part of −1 €, false with a part of −0,50 € (it prints
+   «−1 €»), true with a part of −0,40 € (it prints as zero) beside two positive ones. **Proof**: R7.
 4. `RingChart` renders one `svg[role="img"]` named «{ariaLabel}: Stipendio 72%, Dividendi 14%, …; entrate 4000 €», one
-   `circle` per part, and nothing with fewer than two parts. **Proof**: `__tests__/RingChart.test.tsx` C1-C2.
+   `circle` per part, and nothing with fewer than two parts. **Proof**: `__tests__/ringChart.dom.test.tsx` C1-C2.
 5. The figure in the hole is `formatRingCenter(centerValue, ringCenterMaxChars(size))` (`[data-ring-center="hole"]`);
    when that is '' the full figure stands ABOVE the ring (`[data-ring-center="above"]`) and the hole is empty.
    **Proof**: C3 (120px, 31.900 € → «31,9k €» in the hole), C4 (72px, 821 € → «821 €» above).
 6. The first render carries the final dashes (no draw-in); under reduced motion `transition` is `none`, otherwise
    400 ms ease-out-quart on the two dash properties. **Proof**: C5.
 7. `RankedRows` as a legend (`bars={false}`, a `swatch` per row and remainder): an 8×8 swatch before each label, no bar
-   track, the share column hidden only under a 200px container; without the props, today's DOM. **Proof**:
-   `__tests__/RankedRows.test.tsx` K1-K2.
+   track, the share column hidden only under a 200px container; without the props, the rows are today's (K2 names
+   what it asserts). **Proof**: `__tests__/rankedRows.test.tsx` K1-K2.
 8. Previdenza: three natures → a ring coloured by nature (TFR `--chart-2`, Volontario `--chart-7`, Datoriale
    `--chart-6`), centre `total` «versati»; one nature → no ring, today's bars. **Proof**: `pensionSummary.test.ts` P1,
-   `__tests__/VersatoTile.test.tsx` P2.
+   `__tests__/versatoTile.test.tsx` P2.
 9. Tracciamento Entrate: the rows plus «Altre categorie» as the last part, rows coloured by rank, the residual in
    `RING_REST_COLOR`, centre `total` «entrate»; one category → no ring. The Panoramica's category tiles and «Spese per
-   categoria» are unchanged. **Proof**: `tracciamentoSummary.test.ts` T1, `__tests__/CategoryTile.test.tsx` T2.
+   categoria» are unchanged. **Proof**: `tracciamentoSummary.test.ts` T1, `__tests__/categoryTile.test.tsx` T2.
 10. Composizione / Classi / landing: positive classes → a ring in the classes' own colours; seven classes → five rows
-    and «Altre 2 classi» captioned with the two names; a class below zero → no ring, today's bar and rows. **Proof**:
-    `overviewSummary.test.ts` O1-O2, `__tests__/ComposizioneTile.test.tsx` O3.
+    and «Altre 2 classi» captioned with the two names; a class below zero → no ring, today's bar and rows; a class at
+    exactly 0 € has no row beside the ring. **Proof**: `overviewSummary.test.ts` O1-O2,
+    `__tests__/composizioneTile.test.tsx` O3.
 11. **The figure stays INSIDE its hole** at 390, 768, 1024 landscape and 1440 on the four homes: every
     `[data-ring-center="hole"]` has its four corners within the hole's radius of the `svg`'s centre and at most
     `data-ring-max-chars` characters; the patched Composizione reads «1 Mln €». **Proof**: `e2e/ring-chart.spec.ts`
@@ -79,7 +80,8 @@ its legend; the four homes use it; DESIGN.md says when.
 12. No list paints outside its tile at 1440 and 1024: `e2e/cashflow.tracciamento.spec.ts:112-120`, untouched, green.
 13. `grep -rn "<Pie" components app` finds nothing; `ring-chart.tsx` and `ringChart.ts` import nothing from recharts.
     **Proof**: the command.
-14. DESIGN.md carries the five amendments and the new section of § 4 to the letter. **Proof**: the diff, owner's read.
+14. DESIGN.md carries the nine amendments and the new section of § 4 to the letter, and `.impeccable/design.json`
+    mirrors amendments 4, 5 and 8 word for word. **Proof**: the diff, owner's read.
 15. `mobile:census` + `mobile:budget` unchanged for `panoramica`, `patrimonio`, `cashflow-tracciamento`, `previdenza`
     (the four homes are closed rows on a first visit at 390, 768 and in the landscape index); `perf:budget` green.
     **Proof**: the runs.
@@ -92,8 +94,11 @@ its legend; the four homes use it; DESIGN.md says when.
   amendment as BEFORE/AFTER sentences, applied to the letter.
 - **Adopted, reversible**:
   - colours: Versato fixed BY NATURE (the canvas's three slots), so TFR wears one hue every year; a host without
-    colours of its own takes `RING_CATEGORY_COLORS` by rank (`--chart-2, 7, 6, 3, 8`: income's slot first, never
-    `--chart-1` = spending on Cashflow nor `--chart-5`, the coral beside the loss token); the classes keep theirs; the
+    colours of its own takes `RING_CATEGORY_COLORS` by rank (`--chart-2, 7, 6, 3, 8, 4`: income's slot first, never
+    `--chart-1` = spending on Cashflow nor `--chart-5`, the coral beside the loss token; SIX slots, one per part
+    of a full ring — decision 45: with five, the sixth part of `RING_MAX_PARTS` would repeat the first's colour
+    beside it at 12 o'clock; `--chart-4` is also «Spese Non Necessarie» on Cashflow, declared where a host sits
+    there); the classes keep theirs; the
     fold and the residuals take `var(--muted-foreground)` (the canvas's `--muted` measures under 3:1 on the card);
   - in legend mode the rows lose their bar (the ring is the bar, as on the canvas) and keep amount and share;
   - ring and rows side by side from a 400px container, stacked and centred below it (a phone, every 3-column tile);
@@ -102,6 +107,13 @@ its legend; the four homes use it; DESIGN.md says when.
   - **a class below zero keeps today's `CompositionBar`**: the canvas's footnote drew the positive classes and left
     the negative one as a row, but a whole with a negative member is a signed quantity, which the rule forbids;
   - past six classes the rows fold with the ring («Altre 2 classi», the names as its caption);
+  - a class at exactly 0 € (a position sold out) has no row beside the ring, as it has no segment in today's bar: a
+    legend row without an arc is a key to nothing;
+  - the arcs are a non-text signal that reinforces the rows, which carry every figure: one slot of
+    `RING_CATEGORY_COLORS` (`--chart-3`, default theme, light) measures 2,74:1 on the card
+    (doc/guide/temi.md), accepted and declared as a blind spot — the slots' contrast is a temi.md matter;
+  - the three Playwright files share one body through a helper, and Tracciamento's planted rows live in their own
+    `describe` (§ 6);
   - centre labels «versati», «entrate», «patrimonio»; `CategoryTile` keeps the exact total in its aside;
   - the Panoramica's «Entrate per categoria» and every «Spese per categoria» keep their rows (the owner named
     Tracciamento's Entrate; spending categories are a ranking).
@@ -140,16 +152,16 @@ export const RING_REST_KEY = 'ring-rest';
 export const RING_REST_COLOR = 'var(--muted-foreground)';
 /** A host without colours of its own, by rank: income's slot first, never spending's nor the coral. */
 export const RING_CATEGORY_COLORS = ['var(--chart-2)', 'var(--chart-7)', 'var(--chart-6)', 'var(--chart-3)',
-  'var(--chart-8)'] as const;
+  'var(--chart-8)', 'var(--chart-4)'] as const;
 
-const RING_GAP = 1; // the white after each arc, in pathLength units
+const RING_GAP = 1; // the gap after each arc, where the card shows through (pathLength units)
 const round3 = (value: number) => Math.round(value * 1000) / 1000;
 
 /** Parts of one positive whole: none prints below zero, at least two are above it. */
 export function isRingWhole(segments: readonly RingSegment[]): boolean {
   let parts = 0;
   for (const segment of segments) {
-    if (!Number.isFinite(segment.value) || Math.round(segment.value) < 0) return false;
+    if (!Number.isFinite(segment.value) || segment.value <= -0.5) return false; // −0,50 € prints «−1 €»
     if (segment.value > 0) parts += 1;
   }
   return parts >= RING_MIN_PARTS;
@@ -192,7 +204,7 @@ export function buildRingArcs(segments: readonly RingSegment[]): RingArc[] {
 
 /** «Stipendio 72%, Dividendi 14%, Altre categorie 5%» — the parts as drawn, for the text alternative. */
 export function describeRingSegments(segments: readonly RingSegment[]): string {
-  const parts = foldRingSegments(segments, (count) => `altre ${count}`);
+  const parts = foldRingSegments(segments, (count) => `Altre ${count}`);
   const total = parts.reduce((sum, segment) => sum + segment.value, 0);
   if (total <= 0) return '';
   return parts.map((segment) => `${segment.label} ${Math.round((segment.value / total) * 100)}%`).join(', ');
@@ -219,14 +231,15 @@ export function ringCenterMaxChars(size: number): number {
 
 /**
  * The total in the hole, in the first form of at most `maxChars` characters: «31.900 €», «31,9k €», «32k €»;
- * from a million «1,2 Mln €», «1 Mln €» (the axes' dialect, `formatCurrencyCompact`). '' when none fits: the ring
+ * from a million «1,2 Mln €», «1 Mln €» (the words of the axes' `formatCurrencyCompact`, without its forced
+ * decimal; U+00A0 before «€» and «Mln»). '' when none fits: the ring
  * prints the full figure above itself. A ring never draws a signed quantity, so the magnitude is printed.
  */
 export function formatRingCenter(amount: number, maxChars: number): string {
   const magnitude = Math.abs(amount);
   const forms = [cachedFormatCurrencyEUR(magnitude, true)];
   const thousands = Math.round(magnitude / 100) / 10;
-  if (magnitude >= 1_000 && thousands < 1_000) {
+  if (magnitude >= 1_000 && Math.round(magnitude / 1_000) < 1_000) {
     forms.push(`${formatNumberIt(thousands, Number.isInteger(thousands) ? 0 : 1)}k €`,
       `${Math.round(magnitude / 1_000)}k €`);
   } else if (magnitude >= 1_000) {
@@ -333,6 +346,11 @@ export function RingChart({ segments, centerValue, centerLabel, ariaLabel, size 
 - A `swatch` renders first inside the label span (and the remainder's): `<span className="h-2 w-2 shrink-0
   self-center rounded-[2px]" style={{ background: row.swatch }} aria-hidden="true" />` (DESIGN → Chart Legend
   Swatch). The row button's `aria-label` is unchanged.
+- With `bars === false` the remainder's label span (`:134`, a plain truncating span today, where an inline swatch
+  would have no size) becomes `cn('flex min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground',
+  labelWidth)`, its swatch first and the label in an inner `<span className="truncate">`; without `bars={false}`
+  it is unchanged.
+- The header comment (`:62-66`) adds «; with `bars={false}` the list is a ring's legend: a swatch per row, no bar».
 
 ### Previdenza — `lib/utils/pensionSummary.ts`, `VersatoTile.tsx`, `PensionOverview.tsx`
 
@@ -363,7 +381,7 @@ of a ring (`versatoRing`), each nature in its own slot; with one, a bar in `--ch
 ```ts
 /** The ranking as ring parts: the rows by rank, then what the cut left as «Altre categorie»; null unless a whole. */
 export function incomeRingSegments(ranking: CategoryRanking): RingSegment[] | null {
-  const segments: RingSegment[] = ranking.rows.map((row, index) => ({ key: row.categoryKey ?? row.category,
+  const segments: RingSegment[] = ranking.rows.map((row, index) => ({ key: row.categoryKey,
     label: row.category, value: row.amount, color: RING_CATEGORY_COLORS[index % RING_CATEGORY_COLORS.length] }));
   const rest = ranking.total - ranking.rows.reduce((sum, row) => sum + row.amount, 0);
   if (rest >= 1) segments.push({ key: RING_REST_KEY, label: 'Altre categorie', value: rest, color: RING_REST_COLOR });
@@ -377,7 +395,8 @@ centerLabel={ringCenterLabel ?? ''} ariaLabel={eyebrow} />`, the rows with `bars
 `new Map(ring.map((s) => [s.key, s.color]))` by `rowKey(c)`, the residual's `swatch: RING_REST_COLOR`. The aside, the
 scheduled caption, the empty copy and the footer are unchanged. `ExpenseTrackingTab.tsx:1350-1361` passes
 `ring={incomeRing}` (`const incomeRing = useMemo(() => incomeRingSegments(incomeRanking), [incomeRanking])` after
-`:911`) and `ringCenterLabel="entrate"`; no other caller passes them.
+`:911`) and `ringCenterLabel="entrate"`; no other caller passes them. `CategoryTile`'s header comment adds «; with
+`ring` (Tracciamento's income) the rows are its legend».
 
 ### Composizione and Classi — `lib/utils/overviewSummary.ts`, `ComposizioneTile.tsx`
 
@@ -409,20 +428,23 @@ compositionRing(data)`. With `ring`: `@container mt-3.5` › `RING_LAYOUT_CLASS`
 centerValue={ring.total} centerLabel="patrimonio" ariaLabel="Composizione per asset class" />` and, in
 `RING_ROWS_CLASS`, one `ClassRow` per segment (`percentage = segment.value / ring.total * 100`; the rest row's caption
 `ring.folded.map((d) => d.name).join(', ')`). Without it (a class below zero, one class): today's bar and rows. The
-empty copy (`:42`) and the footer are unchanged.
+empty copy (`:42`) and the footer are unchanged. The header comment (`:26`) becomes «"Dove sono i soldi?" — a
+ring of the classes over their rows as its legend when every class is ≥ 0 (The Ring Rule); one stacked bar and the
+rows when a class is below zero or only one is positive.»
 
 ### `BalanceRing.tsx` and DESIGN.md
 
 `components/allocation/BalanceRing.tsx:8-9` — «the ONE ring DESIGN.md still keeps (§5 Savings / Metric Ring Chart: a
 bounded 0-100 score is not a rate)» becomes «the one ring of a SCORE DESIGN.md keeps (§5 Savings / Metric Ring Chart);
-rings of PARTS are `RingChart` (The Ring Rule)».
+rings of PARTS are `RingChart` (The Ring Rule)»; `:4-5` «WHY a ring, when the rule is «flat rows over donuts»»
+becomes «WHY a ring for one figure, when The Ring Rule draws parts».
 
 **DESIGN.md (decision 16), applied to the letter.** The quotes are the file's text; their line breaks are this spec's.
 
 1. `DESIGN.md:1107`. BEFORE: «- Use this pattern when the donut is integral to the card layout and must flex-align
    with text. Use Recharts `PieChart` only for standalone chart sections.» AFTER: «- Use this pattern when the donut
    is integral to the card layout and must flex-align with text. Parts of one whole are the Ring Chart (**The Ring
-   Rule**), never Recharts' `PieChart`.»
+   Rule**), never this donut nor Recharts' `PieChart`.»
 2. `DESIGN.md:1113`, its last sentence. BEFORE: «It animates through `initial`/`animate` on the element with
    `useReducedMotion`, not through `useAnimation`; it is the tree's only `motion.circle`, and the next ring must be a
    score with a bounded domain, or it must be a figure.» AFTER: «It animates through `initial`/`animate` on the element
@@ -471,7 +493,23 @@ rings of PARTS are `RingChart` (The Ring Rule)».
    individual percentages) with less visual noise.» AFTER: «- **Don't** draw a ring without its rows: the ring is the
    picture of the rows (the total in the centre, each part a row with its swatch and figure), never their replacement
    — the animated donut in the Liquid card was replaced by a flat 3-row breakdown because a ring alone says less.»
-6. **New section**, inserted before `### Chart Legend Swatch` (`DESIGN.md:1327`):
+6. `DESIGN.md:1296-1297`. BEFORE: «Two related primitives replace pie/donut charts everywhere the question is a
+   magnitude comparison or a full breakdown, not a simple part-of-whole read:» AFTER: «Two related primitives replace
+   pie/donut charts everywhere the question is a magnitude comparison or a ranking; the parts of one positive whole,
+   two to six, are the Ring Chart (**The Ring Rule**):»
+7. `DESIGN.md:1113`, inside its first paragraph. BEFORE: «where «how far from 100» is the part-of-whole read the pie
+   rule below allows for a single slice,» AFTER: «where «how far from 100» is a bounded score read on one arc — not
+   a part, which The Ring Rule never draws alone —»
+8. `DESIGN.md:1413` (and its mirror, `.impeccable/design.json:1202`). BEFORE: «the one ring left, `BalanceRing`, is
+   a bounded 0-100 score animated through `initial`/`animate` under `useReducedMotion`» AFTER: «the one SCORE ring,
+   `BalanceRing`, is a bounded 0-100 score animated through `initial`/`animate` under `useReducedMotion`; the
+   rings of parts (Ring Chart) never draw themselves on mount and glide through a CSS transition»
+9. `DESIGN.md:1090`. BEFORE: «A two-color SVG donut rendered directly inside a card (no Recharts), with a
+   `motion.circle` for the animated segment. Used when a pie metaphor must integrate tightly with text values in a
+   flex layout.» AFTER: «**Superseded on 2026-11-12 by the Ring Chart (The Ring Rule)**: no surface draws this donut
+   (the Liquid card's became rows), and parts of one whole are `components/ui/ring-chart.tsx`. The anatomy below
+   is history.»
+10. **New section**, inserted before `### Chart Legend Swatch` (`DESIGN.md:1327`):
 
    > ### Ring Chart (Parts of One Whole)
    >
@@ -481,7 +519,7 @@ rings of PARTS are `RingChart` (The Ring Rule)».
    > `CompositionBar`s over one legend, Bilanciamento's form), never a single part (one part is a sentence). It is
    > `components/ui/ring-chart.tsx` on `lib/utils/ringChart.ts`, hand-written SVG: stroke 9 on r 43 in a 100 viewBox,
    > `pathLength=100`, `butt` caps, rotated −90° so the first part starts at 12 o'clock and runs clockwise, one unit
-   > of white after each arc. It must carry the total in its hole (Geist Mono, one word under it); the tile's rows as
+   > of gap after each arc, where the card shows through. It must carry the total in its hole (Geist Mono, one word under it); the tile's rows as
    > its legend, each with the 8×8 swatch of its arc and its figure, the bar gone (the ring is the bar); the same
    > colour on arc and swatch, from the theme's chart slots, the fold and any residual in `--muted-foreground`; a text
    > alternative (`role="img"`, every part's share and the total in its `aria-label`; the rows are the data table).
@@ -525,17 +563,21 @@ rings of PARTS are `RingChart` (The Ring Rule)».
 | R1 | `ringChart.test.ts`: 72/14/9/5 → lengths 71/13/8/4, offsets 0/72/86/95 | drop `Math.min(RING_GAP, share / 2)` |
 | R2 | one part → `{ length: 100, offset: 0 }`; a 0,4% part → length 0,2 | `share − RING_GAP` unclamped |
 | R3 | a zero and a negative part draw nothing | keep `value <= 0` parts |
-| R4 | seven parts → six, the last `ring-rest` «Altre 2»; `ringSwatchAt(seven, 5)` grey | slice at `RING_MAX_PARTS` |
-| R5 | the nine `formatRingCenter` cases of criterion 2 | return the full form always |
+| R4 | `foldRingSegments(seven, (n) => `Altre ${n}`)` → six, the last `{ key: 'ring-rest', label: 'Altre 2', color: RING_REST_COLOR }`; `buildRingArcs(seven)` → six arcs, the last keyed `ring-rest`; `ringSwatchAt(seven, 5)` → `RING_REST_COLOR` | slice at `RING_MAX_PARTS` |
+| R5 | the ten `formatRingCenter` cases of criterion 2 | return the full form always |
 | R6 | `ringCenterMaxChars` 120 → 7, 96 → 7, 72 → 4 | drop `reach` (the centre's chord) |
-| R7 | `isRingWhole`, criterion 3 | test `value < 0` instead of the rounded value |
-| C1-C2 | `RingChart.test.tsx` (RTL): the name; one `circle` per part; nothing with one part | render with one part |
+| R7 | `isRingWhole`, the four cases of criterion 3 | test `value < 0` (−0,40 € then refuses the ring) |
+| C1-C2 | `ringChart.dom.test.tsx` (RTL; `ringChart.test.ts` is the pure module's): the name; one `circle` per part; nothing with one part | render with one part |
 | C3-C4 | 120px 31.900 € in the hole; 72px 821 € above, the hole empty | always print in the hole |
 | C5 | first render's dash = final; `useReducedMotion` mocked true → `transition: none` | ignore `reducedMotion` |
-| K1-K2 | `RankedRows.test.tsx`: swatches, no bar track with `bars={false}`; today's DOM without | the bar always |
-| P1-P2 | `versatoRing` three natures / one; `VersatoTile.test.tsx` ring vs bars | drop `isRingWhole` |
-| T1-T2 | `incomeRingSegments` with a cut / one category; `CategoryTile.test.tsx` swatch by key | colour by list index |
-| O1-O3 | `compositionRing`: seven classes folded, −2.000 € → null; `ComposizioneTile.test.tsx` both | skip the guard |
+| K1 | `rankedRows.test.tsx` (RTL): with `bars={false}` and swatches, each row and the remainder carry an `[aria-hidden="true"].h-2.w-2` swatch (the remainder's inside a `flex` span), no `[role="presentation"]` track | the bar always |
+| K2 | without `bars`/`swatch`: each row has its `[role="presentation"]` 3px track, the label span carries `w-[42%]`, the share span `@max-[250px]:hidden`, and no swatch exists | render the legend mode always |
+| P1 | `pensionSummary.test.ts` `versatoRing`: three natures → three segments in `NATURE_RING_COLORS`; one nature → null | drop `isRingWhole` |
+| P2 | `versatoTile.test.tsx` (RTL): with `ring` a `[data-ring]` and no `[role="presentation"]` track; with `ring={null}` three tracks and no `[data-ring]` | render the bars when `ring` is set |
+| T1 | `tracciamentoSummary.test.ts` `incomeRingSegments`: five rows + a cut → six parts, the last `ring-rest` in `RING_REST_COLOR`; one category → null | drop the residual |
+| T2 | `categoryTile.test.tsx` (RTL): a hand-built ring whose colours are NOT in rank order (row 1 `var(--chart-8)`, row 2 `var(--chart-3)`); each row's swatch is its key's colour, the residual's `RING_REST_COLOR` | swatch = `RING_CATEGORY_COLORS[index]` |
+| O1-O2 | `overviewSummary.test.ts` `compositionRing`: seven classes folded («Altre 2 classi», `folded` the two); a class of −2.000 € → null; a class at 0 € is in no segment | skip the guard |
+| O3 | `composizioneTile.test.tsx` (RTL): positive classes → a `[data-ring]` and one row per segment (the 0 € class has none); a negative class → no `[data-ring]`, today's rows | render the ring always |
 
 **Playwright** (`workers: 1`; base account, data-only planting). `e2e/ringFit.ts`:
 
@@ -558,14 +600,22 @@ export async function expectRingFiguresInside(scope: Locator): Promise<void> {
 }
 ```
 
-The three specs share one body. Panoramica and Patrimonio: `patchOverview(page, { charts: { assetClassData: CLASSES },
-metrics: { totalValue: 1_000_000 } })` with seven invented classes (equity 520.000, bonds 180.000, realestate 140.000,
-crypto 60.000, cash 40.000, commodity 30.000, trendFollowing 30.000) → «1 Mln €» and «Altre 2 classi»;
+The three specs share one body through `e2e/ringChartSuite.ts` (a helper, not collected by `testMatch`) exporting
+`registerRingChartSuite({ openRows: boolean })`; each spec file is the one call (`openRows: false` at 1440, `true`
+on the mobile and tablet files). Panoramica and Patrimonio: `patchOverview(page, { charts: { assetClassData: CLASSES },
+metrics: { totalValue: 1_000_000 } })` with seven invented classes, each `{ assetClass, name, value, percentage, color
+}` (the shape of `PieChartData`, `types/assets.ts`) with `name` from `getAssetClassName`, `percentage = value /
+10_000` and `color: 'var(--chart-1)'` (the page remaps it): equity «Azioni» 520.000, bonds «Obbligazioni» 180.000,
+realestate «Immobili» 140.000, crypto «Criptovalute» 60.000, cash «Liquidità» 40.000, commodity «Materie Prime» 30.000,
+trendFollowing «Trend Following» 30.000 → «1 Mln €» and «Altre 2 classi» captioned «Materie Prime, Trend Following»;
 `e2e/overviewFixture.ts:83-90` gains `charts: { ...(body.charts as Json), ...((overrides.charts as Json | undefined)
-?? {}) }`, the merge `metrics` and `flags` already have. Tracciamento: two income rows planted by REST in `beforeAll`
-(ids `e2e-exp-ornitorinco-ring-1`/`-2`, 24.000 € «Stipendio» and 7.900 € «Affitto», day 1 of the running month at
-noon UTC, note «entrata ornitorinco»), removed in `afterAll` (the pattern of
-`e2e/mobile-composition.cashflow.mobile.spec.ts:56-115`). Previdenza: the seed's 2026 (three natures, a ring) and 2025
+?? {}) }`, the merge `metrics` and `flags` already have. Tracciamento, in its own `test.describe` registered LAST in the suite, with its own `beforeAll`/`afterAll` (the
+Panoramica and Patrimonio tests fetch the real overview body first and must never see the rows): two rows planted
+by REST, `type: 'income'`, `currency: 'EUR'`, a positive `amount`, day 1 of the running month at noon UTC, note
+«entrata ornitorinco» — `e2e-exp-ornitorinco-ring-1`, 24.000 € on `categoryId: 'seed-cat-income'` («Stipendio»:
+the month then reads 26.500 € with the seed's 2.500 €) and `e2e-exp-ornitorinco-ring-2`, 7.900 € on `categoryId:
+'e2e-cat-ornitorinco-affitto'`, `categoryName: 'Affitto'` (no category document: the name is the row's) — removed in
+`afterAll` (the pattern of `e2e/mobile-composition.cashflow.mobile.spec.ts:56-115`). Previdenza: the seed's 2026 (three natures, a ring) and 2025
 (one nature: `[data-ring]` count 0 beside the visible «Versato per natura» list). At 390 and 768 each spec opens the
 row first (`#panoramica-composizione-trigger`, `#patrimonio-classi-trigger`, `#trk-entrate-trigger`,
 `#prev-versato-trigger`); in landscape the index row opens in place. Falsification seen red: `formatRingCenter`
@@ -579,15 +629,18 @@ its centre abbreviated and inside the hole at 1440 (three columns) and on a phon
 the classes' ring with the patched «1 Mln €»; a planted personal loan larger than the accounts brings back the bar.
 
 - **A**: `tsc`, lint, Vitest (three zones), `npx playwright test e2e/ring-chart e2e/pension e2e/overview
-  e2e/cashflow.tracciamento e2e/mobile-composition` (every project of those files).
+  e2e/cashflow.tracciamento e2e/cashflow.tablet e2e/cashflow.mobile e2e/patrimonio.tablet e2e/mobile-composition`
+  (every project of those files).
 - **B**: emulators + seed + the planted rows (decoys «ornitorinco», «fenicottero»).
 - **C (browser, the session)**: the four homes at 390, 768, 1024 landscape and 1440, light and dark on two themes; the
   landing's Composizione; a period change on Tracciamento (the arcs glide); reduced motion on (they jump).
-- **D (data)**: the ring's `aria-label` shares against the rows' printed shares, on each home.
-- **E**: a loan planted larger than the accounts → «Liquidità» below zero → no ring, today's bar; a month without
-  income → «Nessuna entrata registrata nel periodo.», no ring.
+- **D (data)**: on each home, every share in the ring's `aria-label` equals its row's printed share rounded to the
+  unit (Composizione and Classi print one decimal).
+- **E**: a personal loan larger than the accounts, created through Patrimonio's asset dialog (an app write, which
+  invalidates the day's summary) → «Liquidità» below zero → no ring on Panoramica and Patrimonio, today's bar;
+  deleted the same way afterwards. A month without income → «Nessuna entrata registrata nel periodo.», no ring.
 - **F (owner, at his «pronto»)**: the mirror — his four homes on his own figures; `npm run mirror:remove`.
-- **G**: `mobile:census` + `mobile:budget`, `perf:budget`; remove fixtures, mirror and scripts.
+- **G** (the two budgets close by README.md § 8's ONE rule, decisions 33 and 34): `mobile:census` + `mobile:budget`, `perf:budget`; remove fixtures, mirror and scripts.
 
 ## 8. Putting it into service
 
@@ -596,14 +649,22 @@ reads `charts.assetClassData` as it is).
 
 ## 9. Documentation
 
-- `DESIGN.md`: the five amendments and the new section of § 4, to the letter.
+- `DESIGN.md`: the nine amendments and the new section of § 4, to the letter.
+- `.impeccable/design.json` (its narrative mirrors DESIGN.md word for word, `DESIGN.md:303-306`): the Don'ts at its
+  `:1261` and `:1262` take the AFTER sentences of amendments 4 and 5, the Do at `:1202` the AFTER of amendment 8,
+  each copied exactly. No other key changes.
 - `doc/guide/grafici.md`: a section «## The ring (2026-11-12)» — the files, the contract's names, `RankedRows`'s
-  legend mode, the `motion.circle` + `pathLength` trap, `ringCenterMaxChars`'s rule, the helper `e2e/ringFit.ts`; its
-  «When to open this guide» line names `ring-chart.tsx` and `ringChart.ts`.
-- `AGENTS.md` § Recharts, one bullet: «parts of one whole are `RingChart` (hand-written SVG, The Ring Rule), never a
-  Recharts `<Pie>`; its figure stays inside the hole (`formatRingCenter`) — doc/guide/grafici.md § The ring».
+  legend mode, the `motion.circle` + `pathLength` trap, `ringCenterMaxChars`'s rule, the helpers `e2e/ringFit.ts` and
+  `e2e/ringChartSuite.ts`, and the blind spot «an arc is a non-text signal beside rows that carry every figure:
+  `--chart-3` on the default light card is 2,74:1 (temi.md)»; its «When to open this guide» line names
+  `ring-chart.tsx` and `ringChart.ts`.
+- `AGENTS.md` § Recharts, one bullet: «**Parts of one whole are `RingChart`** (2026-11-12, The Ring Rule):
+  hand-written SVG, never a Recharts `<Pie>`; its figure stays inside the hole (`formatRingCenter` +
+  `ringCenterMaxChars`, held by `__tests__/ringChart.test.ts` and `e2e/ringFit.ts`) — doc/guide/grafici.md § The
+  ring.»
 - `doc/guide/previdenza.md` (Versato), `cashflow-tracciamento.md` (Entrate), `panoramica.md` and `patrimonio.md`
-  (Composizione / Classi, and the blind spot «a class below zero keeps the bar»), `landing.md`: one bullet each.
+  (Composizione / Classi, and the blind spots «a class below zero keeps the bar» and «a class at 0 € has no row
+  beside the ring»), `landing.md`: one bullet each.
 - `CLAUDE.md` › Key Files › Shared primitives: `ring-chart` beside `composition-bar`, `ringChart.ts` among the utils;
   «Latest»; `README.md` (one sentence per home); `Draft Release Temp.md`; `doc/nove/README.md` § 6.
 
@@ -653,10 +714,10 @@ interattivo), dammelo una riga alla volta con l'esito atteso.
 
 Implementa la spec così com'è scritta, nell'ordine: ringChart.ts e ring-chart.tsx con i
 loro test; la modalità legenda di RankedRows; Previdenza, Tracciamento Entrate, Composizione
-e Classi; i tre spec Playwright con e2e/ringFit.ts; gli emendamenti di DESIGN.md alla
-lettera. I test PRIMA del codice, ciascuno visto rosso con la sua mutazione; cifre inventate
+e Classi; i tre spec Playwright con e2e/ringFit.ts e e2e/ringChartSuite.ts; gli emendamenti
+di DESIGN.md alla lettera, e le stesse frasi in .impeccable/design.json. I test PRIMA del codice, ciascuno visto rosso con la sua mutazione; cifre inventate
 e tonde. Fermati e chiedimi se: una cifra esce dal suo foro a una delle quattro larghezze;
-mobile:budget o perf:budget si muovono su una superficie; e2e/pension.spec.ts o
+nel confronto con develop dello stesso giorno, stessa build, si muove una voce di mobile:budget che la spec non nomina; perf:budget, misurato prima e dopo sulla stessa macchina, supera un tetto di più di 1 KB gz (fino a 1 KB lo alzi tu, con raisedBy e una riga in velocita.md § Registro); e2e/pension.spec.ts o
 e2e/cashflow.tracciamento.spec.ts diventano rossi. Collaudo: § 7, la F sul mirror al mio
 «pronto». Un branch, un commit, solo dopo il mio OK con il riassunto del diff.
 SESSION_NOTES.md non si committa.

@@ -26,27 +26,39 @@ eyebrow, a glow on the primary action in dark, a planet beside the page's name, 
 a bar of four figures under the header. Every figure stays Geist Mono.
 
 1. Impostazioni › Aspetto shows «Colore 8 di 8: Orbita», described «Spazio profondo e ambra»; choosing it sets
-   `data-theme="orbita"` and `data-costume`. **Proof**: `AspettoTab.test.tsx`, `colorTheme.test.ts` C4.
+   `data-theme="orbita"` and `data-costume`. **Proof**: `aspettoTab.test.tsx` R1 (eight), `colorTheme.test.ts` C4.
 2. The four gate tests measure Orbita in both modes and pass with the numbers of § 4.5. **Proof**: green; the
    mutation of § 6 turns `chartPaletteDistinctness` red.
 3. Every costume token printed as text reads ≥ 4,5:1 where it lands, the nebula included. **Proof**:
    `themeCostumeContrast.test.ts` (NOVE-12) with the new nebula case K2.
 4. On `/dashboard` at 1440 in Orbita dark: `#page-main`'s `background-image` holds six `radial-gradient`s; the first
    tile's `border-top-left-radius` is `0px` and its `background-image` holds four `linear-gradient`s; the verdict `h2`
-   is `Chakra Petch`, `uppercase`, `28px`; a `.costume-figure` inside it is `Geist Mono` with `text-transform: none`;
-   the first primary button's `box-shadow` is the glow at rest and the focus ring once focused by keyboard.
-   **Proof**: `e2e/theme.orbita.spec.ts` (E1).
+   is `Chakra Petch`, `uppercase`, `28px`. On `/dashboard/allocation` (headline «Allineato al N%.»,
+   `lib/utils/allocazioneNarrative.ts:204` — the Panoramica's headline never prints a digit) the `.costume-figure`
+   inside the verdict `h2` is `Geist Mono` with `text-transform: none`. On `/dashboard/cashflow?tab=tracking` «Nuova
+   Spesa» (`components/cashflow/CashflowPageClient.tsx:277-288`, default variant; never clicked) has `box-shadow`
+   equal to the computed `--costume-primary-glow` at rest and the focus ring, no glow, once reached with Tab — the
+   Panoramica has no primary button at rest. **Proof**: `e2e/theme.orbita.spec.ts` (E1).
 5. The resource bar: on `/dashboard` at 1440 in Orbita, `dl[aria-label="Quadro rapido"]` lists «Patrimonio»,
-   «Liquidità», «Messo da parte», «Da inizio anno», and each figure's text equals the text the tile prints for the
-   same quantity (Patrimonio's hero, Sintesi's «Liquidità», Cashflow's «Risparmio», the year's chip). It is absent at
-   1024 and 390, on every other page, and in every other theme. **Proof**: E1, E2; `ResourceBar.test.tsx`;
+   «Liquidità», «Risparmio», «Da inizio anno», and each figure's text equals the text the tile prints for the
+   same quantity (Patrimonio's hero, Sintesi's «Liquidità», Cashflow's «Risparmio», the percentage in the year's
+   chip), a negative and a zero included. It is absent at 1024 and 390, on every other page, in every other theme,
+   and on an account with no asset or with a total at or below zero (the Sintesi tile prints no rows there). **Proof**: E1, E2; `resourceBar.test.tsx`;
    `overviewSummary.test.ts` (identity).
 6. At 390: corners, uppercase headline at 24px, an 18px planet beside the title, no bar, no horizontal overflow.
    **Proof**: `e2e/theme.orbita.mobile.spec.ts` (E2).
-7. Chakra Petch is fetched only where it paints (`document.fonts` faces `unloaded` with the default theme and on
-   `/login` with Orbita, one `loaded` on `/dashboard` with Orbita). **Proof**: E1.
-8. The twelve existing blocks render as their baseline; `mobile:budget` does not move; `perf:budget` moves ≤ 0,6 KB
-   gz on `/dashboard` and 0 elsewhere. **Proof**: NOVE-11 E1 green; the two runs.
+7. Chakra Petch is fetched only where it paints: with the default theme on `/dashboard`, and with Orbita on
+   `/login`, every `document.fonts` face of family `Chakra Petch` is `unloaded`; on `/dashboard` with Orbita exactly
+   two are `loaded` — the latin faces of weight 500 (the eyebrows) and 600 (the headline) — and every other face
+   (thai, vietnamese, latin-ext: `subsets` only chooses the preload) stays `unloaded`. **Proof**: E1.
+8. The twelve palette blocks render as their baseline and Egeo as NOVE-12 pinned it; `mobile:budget` does not
+   move; `perf:budget`, measured before and after on the same machine and build day, moves ≤ 0,6 KB gz on
+   `/dashboard` and ≤ 0,1 KB on every other route and on the shared chunk (the registry entry ships through
+   `ColorThemeProvider`, `app/layout.tsx:112`). **Proof**: `e2e/theme.neutral{,.mobile}.spec.ts` and
+   `e2e/theme.egeo{,.mobile}.spec.ts` green; the two runs.
+9. With Orbita dark on `/` and `/login`, signed out: no emblem before the header label, the first tile's
+   `border-top-left-radius` is `16px` and its `background-image` `none`, the page's `background-image` `none`, no
+   heading in `Chakra Petch` (decision 17). **Proof**: E1.
 
 ## 3. Decisions
 
@@ -54,9 +66,13 @@ a bar of four figures under the header. Every figure stays Geist Mono.
   uppercase, the HUD corners and radius 0, the glow on the primary button, the emblem, the four-figure resource
   bar), 14 (the bar ONLY at ≥ 1440 and ONLY on Panoramica), 17 (the costume only in the dashboard and its dialogs),
   (a) (the name is ours; no game's name or asset).
+- **Owner 63 (2026-11-12)**: the COMPRA chip never reads in the red of a loss: `--chart-3` sits ≥ 30° of hue from
+  `--destructive` (the mock's red for Criptovalute was 3° from it). **Owner 62**: what this spec leaves to NOVE-19
+  and NOVE-20 is seen on `develop` only.
 - **Adopted, reversible**:
   - id `orbita`, name «Orbita», description «Spazio profondo e ambra»; eighth in `COLOR_THEMES`, after `egeo`;
-  - the mock's colour per asset class kept, not its order (as Egeo: `--chart-3` Criptovalute = the mock's c5,
+  - the mock's colour per asset class kept, not its order (as Egeo: `--chart-3` Criptovalute = the mock's c5 re-pitched to hue 60 — light `0.58 0.19 25` →
+    `0.52 0.10 60`, dark `0.68 0.19 25` → `0.64 0.13 60`, decision 63 —,
     `--chart-4` Immobili = gold c3, `--chart-5` Liquidità = violet c4); light 6-9 and dark/light `--chart-9` derived;
   - re-pitched for the gates: Trend Following dark `0.62 0.07 240` → `0.52 0.08 240` (row 4), light derived at
     `0.38 0.06 240` (16,3 to Azioni); Azioni light C 0.13 → 0.098 and Immobili light `0.70 0.15 75` →
@@ -67,10 +83,18 @@ a bar of four figures under the header. Every figure stays Geist Mono.
   - the palette block keeps `--radius: 0.25rem` (the landing and the access pages, decision 17); the scope sets
     `--radius` and `--radius-2xl` to 0;
   - the corner marks are 2px × 14px layers at the border box: the 26-30% border lies over their outer pixel;
-  - the bar repeats each tile's figure with the tile's rounding (The Lifted-Figure Rule), not the mock's: Patrimonio
-    and Liquidità with cents, «Messo da parte» as the Cashflow tile's «Risparmio» (no «+», no colour), the year with
-    the chip's two decimals and its sign colour; the bar is absent on an account with no asset; its `aria-label` is
-    «Quadro rapido»; a figure that cannot be measured prints its reason;
+  - the bar repeats each tile's figure with the tile's rounding, not the mock's: Patrimonio and Liquidità with
+    cents, «Risparmio» — the Cashflow tile's own label for the same euro (the mock's «Messo da parte» already names
+    a RATE in that tile's reading and the lived part on the phone) — with no «+» and no colour, the year with the
+    chip's two decimals and its sign colour; its `aria-label` is «Quadro rapido»; a figure that cannot be measured
+    prints its reason;
+  - the bar is absent on an account with no asset and when the total is at or below zero (the Sintesi tile prints
+    no «Liquidità» row there: the bar never prints a figure its tiles do not);
+  - one text everywhere (The Comma Rule: the minus is U+2212): the Patrimonio hero, the Sintesi rows and the year
+    chip's percentage move to the bar's formatters, so a negative total or cash and a 0% year read the same in the
+    bar and in the tile;
+  - DESIGN.md admits the bar in The Costume Rule: at ≥ 1440 on the Panoramica it is the one place a figure is
+    printed twice on one screen (The Lifted-Figure Rule holds below `desktop:`) — § 9;
   - one emblem (the planet) for every page; per-page emblems are the heirs' (§ 10).
 
 ## 4. Solution
@@ -78,7 +102,8 @@ a bar of four figures under the header. Every figure stays Geist Mono.
 ### 4.1 Registry — `lib/constants/colorTheme.ts`, `lib/constants/themeCostume.ts`
 
 `COLOR_THEMES` gains `'orbita'` after `'egeo'`; `COLOR_THEME_META` gains
-`orbita: { name: 'Orbita', description: 'Spazio profondo e ambra', costume: { ornaments: [], resourceBar: true } }`.
+`orbita: { name: 'Orbita', description: 'Spazio profondo e ambra', costume: { resourceBar: true } }` (no band: the
+scope block's `--costume-header-band-height: 0px`).
 
 ```ts
 /** A planet with a tilted ring: the Orbita costume's mark (decorative, DESIGN.md → The Costume Rule). */
@@ -135,7 +160,7 @@ heading (600) or eyebrow (500). Licence: SIL Open Font License 1.1, self-hosted 
   --ring: oklch(0.48 0.10 235);
   --chart-1: oklch(0.52 0.098 225);
   --chart-2: oklch(0.60 0.12 165);
-  --chart-3: oklch(0.58 0.19 25);
+  --chart-3: oklch(0.52 0.10 60);
   --chart-4: oklch(0.66 0.13 75);
   --chart-5: oklch(0.48 0.19 300);
   --chart-6: oklch(0.56 0.11 105);
@@ -176,7 +201,7 @@ heading (600) or eyebrow (500). Licence: SIL Open Font License 1.1, self-hosted 
   --ring: oklch(0.78 0.12 215);
   --chart-1: oklch(0.70 0.13 225);
   --chart-2: oklch(0.76 0.14 165);
-  --chart-3: oklch(0.68 0.19 25);
+  --chart-3: oklch(0.64 0.13 60);
   --chart-4: oklch(0.80 0.15 75);
   --chart-5: oklch(0.66 0.19 300);
   --chart-6: oklch(0.70 0.12 105);
@@ -245,17 +270,17 @@ export type ResourceFigure = Omit<StripFigure, 'opens' | 'lifts'>;
  * The four figures a costume theme with a resource bar prints under the Panoramica's header at
  * ≥ 1440 (DESIGN.md → The Costume Rule). Each repeats a tile's figure with the tile's rounding
  * (The Lifted-Figure Rule): the hero's and Sintesi's cents, the Cashflow tile's «Risparmio», the
- * year's chip. No asset → no bar.
+ * year's chip. No asset, or a total at or below zero (Sintesi prints no rows there) → no bar.
  */
 export function selectResourceBar(overview: DashboardOverviewPayload): ResourceFigure[] {
-  if (overview.flags.assetCount === 0) return [];
+  if (overview.flags.assetCount === 0 || overview.metrics.totalValue <= 0) return [];
   const month = overview.expenseStats?.currentMonth;
   const yearly = overview.variations.yearly;
   return [
     { label: 'Patrimonio', value: overview.metrics.totalValue, format: 'currency', decimals: 2 },
     { label: 'Liquidità', value: overview.metrics.cashNetWorth, format: 'currency', decimals: 2 },
     {
-      label: 'Messo da parte',
+      label: 'Risparmio',
       value: month ? month.net : null,
       format: 'currency',
       ...(month ? {} : { reason: 'nessun movimento nel mese' }),
@@ -273,6 +298,14 @@ export function selectResourceBar(overview: DashboardOverviewPayload): ResourceF
 
 `format: 'currency'` without `decimals` is `cachedFormatCurrencyEUR(|v|, true)` with «−» in front
 (`verdictStrip.ts:79-81`, `:110-121`): exactly `formatEuroMinus(net)` (`CashflowTile.tsx:121`).
+
+**The tiles take the same text.** `components/dashboard/OverviewAnimatedCurrency.tsx:96-98` (the hero) and
+`components/dashboard/overview/SintesiTile.tsx:46-47` (the rows) print
+`withTypographicMinus(value, cachedFormatCurrencyEUR(Math.abs(value)))` (`lib/utils/formatters.ts:58`) instead of
+`cachedFormatCurrencyEUR(value)` (Intl's hyphen on a negative: cash goes below zero with a credit card in the red,
+`dashboardOverviewService.ts:351-356`); `PatrimonioTile.tsx:123-124`'s chip prints its percentage with
+`formatSignedPercentIt(percentage, 2)` («0,00%» at zero, as the bar's `signed-percent`). The Patrimonio page and the
+landing render the same tiles and take the same text.
 
 `components/dashboard/overview/ResourceBar.tsx` (new, `'use client'`):
 
@@ -314,8 +347,10 @@ guard at `:411`.
 | --- | --- | --- |
 | closest ΔE00 between the nine slots (≥ 14) | 16,3 Azioni–Trend Following; 17,6 Materie Prime–Previdenza | 17,4 Materie Prime–Previdenza; 18,9 Immobili–Materie Prime |
 | slot L band · hue drift between modes | 0,38-0,66 · 0° on all nine | 0,52-0,80 · 0° |
-| slot on the card (guide ≥ 3:1), slots 1-9 | 5,21 3,62 4,58 3,09 7,00 4,47 9,65 4,20 6,65 | 7,15 9,15 5,88 9,69 5,50 7,01 3,40 7,39 4,89 |
-| COMPRA / VENDI / OK, text on card · on the 8% chip (≥ 4,5) | 7,58·6,51 / 7,64·6,72 / 6,32·5,61 | 7,83·7,06 / 8,81·7,78 / 10,49·9,11 |
+| slot on the card (guide ≥ 3:1), slots 1-9 | 5,21 3,62 5,52 3,09 7,00 4,47 9,65 4,20 6,65 | 7,15 9,15 5,30 9,69 5,50 7,01 3,40 7,39 4,89 |
+| COMPRA / VENDI / OK, text on card · on the 8% chip (≥ 4,5) | 7,15·6,33 / 7,64·6,72 / 6,32·5,61 | 9,60·8,49 / 8,81·7,78 / 10,49·9,11 |
+| `--chart-3` (COMPRA) hue gap to `--destructive` (≥ 30°) · ΔE00 between the two | 32° · 19,4 | 30° · 20,2 |
+| `--positive` (inherited) · `--destructive` on the darkest ground (≥ 4,5) | 4,96 · 5,34 | 7,95 · 6,48 (nebula) |
 | `--muted-foreground` on background · card · muted (≥ 4,5) | 6,52 · 7,21 · 5,96 | 9,11 · 8,37 · 7,25 |
 | `--foreground` on background · card · muted | 14,06 · 15,55 · 12,85 | 16,93 · 15,55 · 13,48 |
 | primary-fg on primary · destructive on card · AI accent on card | 6,23 · 5,90 · 4,99 | 10,07 · 6,94 · 5,23 |
@@ -328,21 +363,23 @@ Every slot is inside sRGB; Previdenza (hue 135) sits 30° from its nearest chrom
 ### 4.6 Strings
 
 «Orbita», «Spazio profondo e ambra» (the swatch); «Quadro rapido» (the bar's `aria-label`); «Patrimonio»,
-«Liquidità», «Messo da parte», «Da inizio anno» (the bar's labels); «nessun movimento nel mese», «nessuno snapshot da
+«Liquidità», «Risparmio», «Da inizio anno» (the bar's labels); «nessun movimento nel mese», «nessuno snapshot da
 cui contare l'anno» (its reasons; the second is the strip's own).
 
 ## 5. Constraints and traps (AGENTS.md / DESIGN.md rules, «here it means that»)
 
 - **The Lifted-Figure Rule / The First-Screen Rule**: the bar adds no new figure; here it means every cell reads the
-  value a tile prints and `overviewSummary.test.ts` holds the identity; the strip below `desktop:` is untouched.
+  value a tile prints and `overviewSummary.test.ts` holds the identity; the strip below `desktop:` is untouched;
+  the repeat at ≥ 1440 is the exception The Costume Rule states (§ 9).
 - **The Mono Mandate**: an uppercase heading in Chakra Petch keeps its figures in `.costume-figure` (Geist Mono,
   `text-transform: none`); the bar's figures go through `NarrativeSegments` (mono, tabular).
-- **The AI-Accent Rule**: a generated tile keeps its glow (NOVE-11 excludes `[data-generated]`); the primary glow is
-  the button's only, and gives way to the focus ring.
+- **The AI-Accent Rule**: a generated tile keeps its glow (NOVE-11 excludes `[data-generated]`); a control that asks
+  a model keeps the AI glow on hover and focus and takes no costume glow (NOVE-11's `:not(.ai-control)`); elsewhere
+  the primary glow is the button's only, and gives way to the focus ring.
 - **The Costume Rule — nothing moves**: the stars are a still background; no animation, no reduced-motion branch.
 - **`desktop:` = 1440**: the 1024×768 tablet stage shows no bar (the tablet project checks it).
-- **`perf:budget` on `/dashboard` has ~0,7 KB of headroom**: the bar and its selector are ~0,5 KB gz; above the
-  ceiling the session stops and asks (`raisedBy` in `perf/budget.json`, doc/guide/velocita.md § Registro).
+- **`perf:budget` on `/dashboard`**: the bar and its selector are ~0,5 KB gz, the allowance 0,6 (criterion 8); the
+  route's headroom is read on the untouched branch before the first edit (the specs before this one grow it).
 - **The census reads the default theme**: no `mobile:budget` entry moves.
 - **Sentences live in `*Narrative.ts`**: the bar has labels and reasons, not sentences — they sit beside the strip's
   in `overviewSummary.ts`, as the strip's do.
@@ -354,13 +391,16 @@ cui contare l'anno» (its reasons; the second is the strip's own).
 | G1 | the four gate tests on sixteen blocks (derived) | `--chart-7` dark back to the mock's `0.62 0.07 240`: ΔE00 12,6 to Azioni |
 | T3 | `themeCostume.test.ts`: Orbita's light scope block declares the 18 properties | delete `--costume-primary-glow` |
 | K1 | `themeCostumeContrast.test.ts` (NOVE-12) now on Orbita too | eyebrow light `oklch(0.66 0.13 75)` |
+| K3, G2 | same file: NOVE-12's sign-token case and hue-gap case now run on Orbita too, K3 also on K2's composited nebula | Orbita light's `--chart-3` back to `0.58 0.19 25` (3°) |
 | K2 | same file, new case: a `radial-gradient` layer of a ground whose first size is > 2px is composited at its alpha over `--background`; `--foreground`, `--muted-foreground`, `--costume-eyebrow-color` ≥ 4,5 on it | nebula `oklch(0.70 0.08 265 / 70%)` |
 | C4 | `colorTheme.test.ts`: `color-theme = orbita` sets both attributes | `orbita`'s `costume` set to `null` |
-| U1 | `overviewSummary.test.ts`: on an invented payload (250.000 €, liquidity 25.000 €, net 900 €, year +6,4%) `selectResourceBar` prints «250.000,00 €», «25.000,00 €», «900 €», «+6,40%», each equal to `cachedFormatCurrencyEUR(totalValue)`, `cachedFormatCurrencyEUR(cashNetWorth)`, `formatEuroMinus(net)` and the strip's yearly cell; net −1.200 → «−1.200 €» uncoloured; `expenseStats: null` → reason; `assetCount: 0` → `[]` | `decimals: 0` on «Patrimonio» |
-| R5 | `ResourceBar.test.tsx`: inside `CostumeScope` with `orbita` stored → a `dl` named «Quadro rapido», four `dt` in order, the `dl` has `hidden` and `desktop:flex`; with `egeo` or `default` → nothing; outside the scope → nothing | render without `useThemeCostume` |
-| E1 | `e2e/theme.orbita.spec.ts` (desktop): criteria 4, 5 (the bar's texts against the tiles' on the seed; absent on `/dashboard/history` and with the default theme), 7 | drop `:not(:focus-visible)`: the focused button loses its ring |
+| U1 | `overviewSummary.test.ts`: on an invented payload (250.000 €, liquidity 25.000 €, net 900 €, year +6,4%) `selectResourceBar` prints «250.000,00 €», «25.000,00 €», «900 €», «+6,40%», each equal to the text its tile's formatter gives (the hero's and Sintesi's `withTypographicMinus` form, `formatEuroMinus(net)`, the chip's `formatSignedPercentIt`); liquidity −1.200 → «−1.200,00 €» with U+2212, equal to the Sintesi row's text; year 0 → «0,00%» in the cell and in the chip; net −1.200 → «−1.200 €» uncoloured; `expenseStats: null` → reason; `assetCount: 0` → `[]`; `totalValue: -5.000` with assets → `[]` | `decimals: 0` on «Patrimonio»; drop the `totalValue <= 0` gate |
+| R1 | `aspettoTab.test.tsx` (NOVE-11): eight buttons, the eighth «Colore 8 di 8: Orbita» | drop `orbita` from `COLOR_THEMES` |
+| R5 | `resourceBar.test.tsx`: `vi.mock('@/contexts/ColorThemeContext', () => ({ useColorTheme: () => ({ colorTheme: theme, setColorTheme: vi.fn() }) }))` with `theme` set per case, the scope from the real `CostumeScope`: with `orbita` inside it → a `dl` named «Quadro rapido», four `dt` in order, the `dl` has `hidden` and `desktop:flex`; with `egeo` or `default` → nothing; outside the scope → nothing | render without `useThemeCostume` |
+| R6 | `costumeScope.test.tsx` (the same mock, `orbita`): `<PageHeader title="Novembre" label="Panoramica" />` inside `CostumeScope` renders two `svg[aria-hidden="true"]` (18 and 22 wide), each holding one `circle` (r 5) and one `ellipse` (rx 10, ry 3.6, `transform="rotate(-24 11 11)"`) | `THEME_EMBLEMS.orbita` deleted |
+| E1 | `e2e/theme.orbita.spec.ts` (desktop; the `colorTheme` preference of `test-user-1` written to `orbita` in `beforeAll` and restored in `afterAll`, the mode by `addInitScript`, as NOVE-12's E1): criterion 4 (the ground, the tile, the verdict on `/dashboard`; the figure on `/dashboard/allocation`; the glow and the ring on «Nuova Spesa»; hovering a filled AI control — the Assistente's «Rispondi», `AssistantQuestionBlock.tsx:174`, on a faked question card — serves a `box-shadow` holding the computed `--ai-glow` colour); criterion 5 — each cell's `dd` text and its tile's text compared with every space (U+0020, U+00A0, U+202F) removed, the hero read once `expect.poll` sees its count-up settled, «Da inizio anno» against the percentage inside the yearly chip's parentheses, «Liquidità» against the first Sintesi row, «Risparmio» against the Cashflow tile's figure; absent on `/dashboard/history` and with the default theme —; criteria 7 and 9 (signed out, `test.use({ storageState: { cookies: [], origins: [] } })`) | drop `:not(:focus-visible)`: the focused button loses its ring |
 | E2 | `e2e/theme.orbita.mobile.spec.ts` (390) and `theme.orbita.tablet.spec.ts` (768×1024, 1024×768): criterion 6; the bar not visible | `desktop:flex` → `md:flex` |
-| E3 | `e2e/theme.neutral{,.mobile}.spec.ts` (NOVE-11) unchanged | a token of `:root` edited |
+| E3 | `e2e/theme.neutral{,.mobile}.spec.ts` (NOVE-11) and `e2e/theme.egeo{,.mobile}.spec.ts` (NOVE-12) unchanged | a token of `:root` edited |
 
 ## 7. Guided verification (WORKFLOW.md § 2)
 
@@ -376,29 +416,45 @@ a pale ground without stars or glow; landing and access pages show the colours o
 - **C (browser, the session)**: Panoramica, Patrimonio, Cashflow › Tracciamento, Storico, a «Nuova Spesa» dialog,
   Impostazioni › Aspetto; light and dark; 1440, 1024×768, 768×1024, 390; screenshots in the scratchpad.
 - **D (data)**: each bar text against its tile on the seed; an account with no snapshot of this year → «Da inizio
-  anno» prints the reason; Tab onto a primary button → ring, no glow.
-- **E**: an account with no asset → no bar; a headline with «−1.200 €» keeps the minus in the mono; Orbita → Default
+  anno» prints the reason; Tab onto «Nuova Spesa» → ring, no glow.
+- **E**: an account with no asset → no bar; on Allocazione the headline's «N%» is in the mono and not uppercased
+  (a Panoramica headline has no figure); Orbita → Default
   from Aspetto removes stars, corners, bar and planet without a reload.
 - **F (owner, at his «pronto»)**: the mirror in Orbita dark and light, Panoramica at 1440.
-- **G**: `perf:budget` (≤ 0,6 KB on `/dashboard`), `mobile:census` + `mobile:budget` (unchanged); remove decoys,
+- **G** (the two budgets close by README.md § 8's ONE rule, decisions 33 and 34): `perf:budget` (≤ 0,6 KB on `/dashboard`), `mobile:census` + `mobile:budget` (unchanged); remove decoys,
   fixtures, the mirror.
 
 ## 8. Putting it into service
 
 One PR to `develop`, after NOVE-12's. No data change (the choice lives in `localStorage` and the preference
 `colorTheme`; the overview payload is read as it is, `DASHBOARD_OVERVIEW_SOURCE_VERSION` is not raised). Rolling back =
-removing `'orbita'` from the registry; a stored `orbita` reads as the default through `isColorTheme`.
+removing `'orbita'` from the registry and its four CSS blocks; a stored or synced `orbita` reads as the default
+through `isColorTheme` (storage, the head script, the Firestore sync — NOVE-11's guard).
 
 ## 9. Documentation
 
-- `doc/guide/temi.md`: the theme table gains «Orbita — costume theme (Chakra Petch, corners, glow, resource bar)»;
-  § Il costume names the resource bar (`ThemeCostume.resourceBar`, `selectResourceBar`, `ResourceBar`); § 4.5's
-  numbers as the theme's measures.
+- `doc/guide/temi.md` § Il costume: the costume themes gain «Orbita — Chakra Petch 500/600, corner marks, a still
+  star ground in dark, the primary glow in dark, the planet, the resource bar»; the paragraph names
+  `ThemeCostume.resourceBar`, `selectResourceBar`, `ResourceBar`; § Per-theme measures (NOVE-12's) gains Orbita's —
+  § 4.5's table, one paragraph per mode; `:3` and the Files line say «sixteen theme blocks (eight themes; Egeo and
+  Orbita also with two scope blocks each)».
+- `DESIGN.md` → The Costume Rule (as NOVE-11 left it) BEFORE: «a glow on the primary action and an emblem beside the
+  page's name, within five limits:» AFTER: «a glow on the primary action, an emblem beside the page's name and — on
+  the Panoramica at ≥ 1440 only — a resource bar of four figures its tiles print, each with the tile's rounding (the
+  one place a figure is printed twice on one screen: The Lifted-Figure Rule holds below `desktop:`), within five
+  limits:».
+- `DESIGN.md:256` (as NOVE-12 left it) BEFORE: «Egeo is a costume theme:» AFTER: «Egeo and Orbita are costume
+  themes:» (and «it also sets» → «they also set»).
 - `doc/guide/panoramica.md` § Files and a sentence: «Under the header, a costume theme with a resource bar prints four
   figures at ≥ 1440, each a tile's (`selectResourceBar`, 2026-11-12).»
 - `DESIGN.md:144-145` (as NOVE-12 left it) BEFORE: «Egeo to 0.3125rem with a 4px `2xl` in the dashboard». AFTER:
-  «Egeo to 0.3125rem with a 4px `2xl` in the dashboard, Orbita to 0.25rem and to 0 (`2xl` too) in the dashboard».
-- `README.md` (what the user sees); `CLAUDE.md` «Themes» (sixteen theme blocks); `doc/guide/velocita.md` § Registro if
+  «Egeo to 0.3125rem with a 4px `2xl` in the dashboard, Orbita to 0.25rem with r = 0 and a 0 `2xl` in the dashboard
+  (so sm–lg 0, xl 4px there)».
+- `README.md`: `:134`'s list gains «Orbita — deep space, a console face, a four-figure bar on the Panoramica at
+  desktop width» and every count of the colour themes (`:49`, `:97`, `:124`, `:134`, `:139` @ b841cbd7) reads «eight»;
+  «fourteen» → «sixteen» where NOVE-12 wrote it (`doc/guide/temi.md`, `AGENTS.md`, `doc/guide/allocazione.md`).
+  `doc/guide/panoramica.md` § Per-page blind spots: nothing (the hero and the Sintesi rows now print U+2212).
+  `CLAUDE.md` «Themes» (sixteen theme blocks); `doc/guide/velocita.md` § Registro if
   a ceiling moves; `Draft Release Temp.md`; `doc/nove/README.md` § 6.
 
 ## 10. Declared out of scope
@@ -424,7 +480,7 @@ Contesto, prima di toccare qualsiasi file (le regole del repo cambiano il modo d
   contesto: usalo per trovare la guida giusta
 - Leggi la spec doc/nove/NOVE-13-tema-orbita.md e l'indice della serie
   doc/nove/README.md (§ 3 decisioni, § 4 scelte adottate, § 7 contratti condivisi, § 8 regole)
-- Leggi doc/guide/temi.md (§ Il costume), panoramica.md, shell.md, dialog.md,
+- Leggi doc/guide/temi.md (§ Il costume), panoramica.md, allocazione.md, shell.md, dialog.md,
   prima-schermata.md, velocita.md, e2e-playwright.md PRIMA di scrivere codice
 - Leggi DESIGN.md (The Costume Rule, The Mono Mandate, The Lifted-Figure Rule,
   The First-Screen Rule, The AI-Accent Rule) e PRODUCT.md
@@ -446,12 +502,14 @@ nel riassunto. Se serve un comando che solo io posso lanciare (produzione, un lo
 interattivo), dammelo una riga alla volta con l'esito atteso.
 
 Implementa la spec così com'è scritta, nell'ordine: i casi nuovi dei test (contrasti con la
-nebulosa, selectResourceBar con le cifre inventate della spec, ResourceBar); il registro e
+nebulosa, selectResourceBar con le cifre inventate della spec, ResourceBar); il meno
+tipografico nell'eroe, nelle righe di Sintesi e nel chip dell'anno; il registro e
 l'emblema; i quattro blocchi CSS con i valori della spec, alla lettera; Chakra Petch in
 app/layout.tsx; la barra nella Panoramica; le spec e2e. I test PRIMA del codice, ciascuno
-visto rosso con la sua mutazione. Fermati e chiedimi se: un gate misura un numero diverso da
-§ 4.5 oltre il secondo decimale; una cifra della barra non coincide con quella della sua
-tessera; perf:budget supera il tetto di /dashboard; mobile:budget si muove. Collaudo: § 7,
+visto rosso con la sua mutazione. Fermati e chiedimi se: un valore di § 4.5, ricalcolato con le
+formule dei test in uno script nello scratchpad, differisce di più di 0,01 (contrasti) o
+0,1 (ΔE00); una cifra della barra non coincide con quella della sua
+tessera; perf:budget, misurato prima e dopo sulla stessa macchina, supera un tetto di più di 1 KB gz (fino a 1 KB lo alzi tu, con raisedBy e una riga in velocita.md § Registro); nel confronto con develop dello stesso giorno, stessa build, si muove una voce di mobile:budget che la spec non nomina. Collaudo: § 7,
 la F al mio «pronto». Un branch, un commit, solo dopo il mio OK con il riassunto del diff.
 SESSION_NOTES.md non si committa.
 ```

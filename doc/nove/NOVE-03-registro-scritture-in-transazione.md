@@ -53,7 +53,9 @@ The route tests (`__tests__/assetTransactionsRoutes.test.ts`) run the real use c
 
 ## 2. Goal and acceptance criteria
 
-No ledger write acts on a fact it read outside its own transaction; a second, late caller changes nothing.
+No ledger write acts on a trade, a meta document, a baseline, an asset TYPE or a settlement account it read outside
+its own transaction; a second, late caller changes nothing. The asset's CURRENCY stays read in prepare (declared,
+§ 10).
 
 1. A migration that resolves after another one completed writes nothing: a baseline corrected in between keeps the
    corrected quantity and the late caller's answer is `{ alreadyMigrated: true }`. **Proof**: test M1.
@@ -73,19 +75,34 @@ No ledger write acts on a fact it read outside its own transaction; a second, la
 9. A trade on an asset that is no longer a ledger type at commit answers 422 «Questo tipo di asset non usa il
    registro operazioni.» **Proof**: test T1.
 10. A new ledger asset created while the cached meta is `null` asks the server once before choosing its path; with a
-    meta on the server it takes the ledger path. **Proof**: test C1 (`__tests__/ledgerMetaFreshness.test.ts`).
-11. Every existing test of `assetTransactionsRoutes.test.ts` stays green; `tsc`, lint, Vitest in the three zones,
-    `npx playwright test e2e/assets` green.
+    meta on the server it takes the ledger path. **Proof**: test C1 (`__tests__/ledgerMetaFreshness.test.ts`) for the
+    read, test C2 (`e2e/assets.ledger-meta.spec.ts`) for the dialog.
+11. Every existing test of `assetTransactionsRoutes.test.ts` and of
+    `assetTransactionAverageCostEurBackfill.test.ts` stays green with unchanged assertions (their fakes and seeding
+    extended as § 6 says); `tsc`, lint, Vitest in the three zones, `npx playwright test e2e/assets` green;
+    `npm run perf:budget` green on `/dashboard/assets` (737 KB gz, 736,2 measured: `AssetDialog` is in the route's
+    first load).
+12. A settlement account that is no longer a cash account when the trade commits answers 422 «Il conto di regolamento
+    selezionato non è valido.» and writes nothing. **Proof**: test S1.
 
 ## 3. Decisions
 
 - **Owner 13 (2026-11-12)**: the migration AND the other writes with the same defect, in one spec.
 - **Adopted, reversible**:
   - an edit on a changed trade is REFUSED (409), never merged: the owner sees the fresh row and repeats the edit;
+- **Owner 39 (2026-11-12)**: the version an edit or a delete is checked against is the one the FORM or the BUTTON was
+  drawn from, not only the server's own read: both requests carry `expectedUpdatedAt`, so a form left open in a
+  second tab on an older version is refused with the same 409.
+- **Adopted, reversible (continued)**:
   - a delete of a trade already deleted is 404, the answer of today's `getOwnedTradeOrThrow`;
-  - the migration writes at most 450 baselines (one transaction; Firestore's cap is 500 writes); beyond that it
-    answers 422 «Troppi strumenti per inizializzare il registro in una volta: contatta il supporto.» — no account of
-    this app is near that figure;
+  - the migration writes at most 450 baselines: a self-imposed guard that keeps the one transaction small (the old
+    batch wrote ≤ 400); beyond that it answers 422 «Troppi strumenti per inizializzare il registro in una volta:
+    contatta il supporto.» — no account of this app is near that figure;
+  - a trade document without `updatedAt` is not a case: every writer stores it (`buildTradeSetDocData`, the
+    migration, the e2e seeds), and a test fixture that edits or deletes a trade sets it (`toDate(undefined)` is
+    «now», which the guard would read as a changed trade);
+  - `deleteAllAssetTransactionsForAsset` does not refuse a still-ledger asset: its one caller flips the type first,
+    and its in-transaction read of the asset only locks it against a trade commit;
   - the alternative «`batch.create()` instead of `batch.set()`» was rejected: it cures the overwrite and leaves the
     meta rewrite and variant (ii).
 - No earlier decision is overturned.
@@ -132,9 +149,22 @@ function assertTradeUnchanged(existing: AssetTransaction[], plan: PreparedMutati
 ```
 
 - `PreparedMutation` gains `preparedOnUpdatedAt?: number` («`updatedAt` of the trade the plan was prepared on, in
-  ms; absent for create»). `prepareEdit` and `prepareDelete` set it to `oldTrade.updatedAt.getTime()`.
-- `commitTradeMutation`, in COMPUTE, right after `const existing = …`:
-  `assertTradeUnchanged(existing, plan);` and, where `assetSnap.exists` is checked:
+  ms; absent for create»). `prepareEdit` and `prepareDelete` set it to `(expectedUpdatedAt ?? oldTrade.updatedAt).getTime()`.
+- **The client's version** (decision 39). `lib/services/assetTransactionService.ts`:
+  `updateAssetTransaction(ownerId, transactionId, updates, expectedUpdatedAt: Date)` adds
+  `expectedUpdatedAt: expectedUpdatedAt.toISOString()` to the PUT body beside `updates`;
+  `deleteAssetTransaction(ownerId, transactionId, expectedUpdatedAt: Date)` adds
+  `&expectedUpdatedAt=<ISO, URI-encoded>` to the DELETE query. Their callers (`lib/hooks/useAssetTransactions.ts`'s
+  two mutations, fed by `TransactionDialog`'s submit and by the row's delete) pass the `updatedAt` of the
+  `AssetTransaction` the form or the button was rendered from. `app/api/asset-transactions/[transactionId]/route.ts`
+  reads the field in PUT and DELETE: absent → `undefined` (an older client: the server's read is the version, as
+  before); present and not a valid ISO date → 400, as the route's other malformed input; else a `Date` passed as
+  the last argument of the use case's `updateAssetTransaction(ownerId, transactionId, updates, expectedUpdatedAt?)` /
+  `deleteAssetTransaction(ownerId, transactionId, expectedUpdatedAt?)`, which hand it to `prepareEdit` /
+  `prepareDelete`. On a 409 the dialog shows the server's message and refetches the asset's trades (the hook's
+  `onError` invalidates the list), so the reopened form is drawn from the fresh row.
+- `commitTradeMutation`: COMPUTE opens, in this order, with `const existing = …` (a pure map),
+  `assertTradeUnchanged(existing, plan);`, then:
 
 ```ts
 if (!assetSnap.exists) throw new TradeUseCaseError(404, 'Asset non trovato.');
@@ -143,7 +173,11 @@ if (!isLedgerAssetType(assetSnap.data()?.type as AssetType)) {
 }
 ```
 
-  Both checks move ABOVE `buildNewSequence` (a 404/409/422 must win over a replay error on a stale sequence).
+  The three checks sit ABOVE `buildNewSequence` (a 404/409/422 must win over a replay error on a stale sequence).
+- In the cash-settlement loop of `commitTradeMutation` (the `cashReads` it already holds), an account with a
+  non-zero delta that exists and is no longer `assetClass === 'cash' && type === 'cash'` throws
+  `new TradeUseCaseError(422, 'Il conto di regolamento selezionato non è valido.')` — the sentence of
+  `assertCashSettlementAsset`; a missing account keeps today's skip-and-warn.
 
 **`migrateAssetLedger`**, rewritten:
 
@@ -288,14 +322,16 @@ const metaNow = !asset && isLedgerAssetType(data.type) && ledgerMeta == null && 
 const ledgerCreateFlow = !asset && isLedgerAssetType(data.type) && metaNow != null;
 ```
 
-`ledgerCreateReady` (`:1028`, the form's affordances) is not touched: when the fresh meta exists and the form was
-drawn without the opening-trade fields, the dialog closes with the toast «Registro operazioni appena inizializzato:
-riapri il dialog per registrare la posizione.» and creates nothing (the sentence lives with the dialog's other
-messages; `returnFocusTo` unchanged).
+`ledgerCreateReady` (`:1028`) is not touched: it gates only the hint «Il registro operazioni si sta inizializzando:
+la posizione viene salvata comunque.» (`:2256`). The opening-trade fields are drawn for every ledger create
+(`isLedgerCreate`, `:2176`), so a fresh meta found at submit takes the ledger path with the values typed: no toast,
+no early close, `returnFocusTo` unchanged. The fetched meta lands in the query cache and the hint disappears on the
+next render. A rejected fresh read reaches `onSubmit`'s catch like any other failed step: nothing is created.
 
 ## 5. Constraints and traps (AGENTS.md / repo rules, «here it means that»)
 
-- **«ALL reads before ANY writes» inside `runTransaction`** (the file's own header, AGENTS.md § runTransaction): here
+- **«ALL reads before ANY writes» inside `runTransaction`** (AGENTS.md § Firestore Writes, the `runTransaction`
+  bullet, and the section comment above `commitTradeMutation`): here
   it means the three reads of the migration come first and a query inside a transaction goes through `tx.get(query)`,
   Admin SDK only.
 - **No network inside a transaction**: `resolveBaselinePriceEur` stays outside; the transaction only checks that the
@@ -304,60 +340,97 @@ messages; `returnFocusTo` unchanged).
   never assigns to outer state that a retry would double (the pattern `outcome = …` of `commitTradeMutation` is
   safe because it is overwritten, not accumulated).
 - **`removeUndefinedDeep` on every payload**; `holdingStartDate` is never written by the migration (invariant #4).
-- **`tx.create` on an existing document throws `ALREADY_EXISTS`**: here it can only happen for a baseline written
-  between the in-transaction query and the commit, which the transaction's own conflict detection retries; it is not
-  caught.
-- **The test fake** (`__tests__/assetTransactionsRoutes.test.ts:45-125`) has no `tx.create`, returns nothing from
-  `runTransaction` and mocks `assetAdminRepository` whole: § 6 extends it (it is test code; keep it small).
+- **`tx.create` on an existing document fails the commit with `ALREADY_EXISTS`**, which the Admin SDK does not
+  retry (`isRetryableTransactionError`). The only other writer of `baseline-<id>` is another migration, and the two
+  serialize on the meta document both read: the losing one is ABORTED, retried, and returns
+  `{ alreadyMigrated: true }`. If `ALREADY_EXISTS` ever surfaces it reaches the route as a 500 and the next visit
+  retries; it is not caught.
+- **The test fakes**: `__tests__/assetTransactionsRoutes.test.ts:45-125` has no `tx.create`, returns nothing from
+  `runTransaction`, runs two transactions interleaved and mocks `assetAdminRepository` whole;
+  `__tests__/assetTransactionAverageCostEurBackfill.test.ts` has no `runTransaction` at all. § 6 extends both (it
+  is test code; keep it small).
 - **The equality-only query `userId == … AND isBaseline == true`** needs no composite index (two equalities merge
   single-field indexes); `firestore.indexes.json` is not touched.
 - **Dates**: `getItalyDayBoundsUtc` as today; no `setHours`.
 - **NOVE-07 will add the fee row's reads and writes to `commitTradeMutation`**: keep `assertTradeUnchanged` the
-  FIRST statement of COMPUTE so every later decision (the fee plan included) stands on a checked trade.
+  first check of COMPUTE (right after the `existing` map) so every later decision (the fee plan included) stands on
+  a checked trade.
 
 ## 6. Tests per level (with the mutation that proves each)
 
 Harness changes in `__tests__/assetTransactionsRoutes.test.ts`: `tx.create` (throws `new Error('ALREADY_EXISTS')`
-when the key is in the store or already pending); `runTransaction` returns the closure's value; the
+when the key is in the store or already pending); `runTransaction` returns the closure's value and SERIALIZES —
+every call joins a module-level promise chain (`mocks.txQueue`), so one closure runs AND applies its pending writes
+before the next closure starts (the fake's model of Firestore's serializable isolation: without it two released
+closures read the same pre-write store and D1/E1 cannot tell the fix from the bug); query results carry
+`ref: makeDocRef(collection, id)`, so `tx.delete(doc.ref)` resolves; the
 `assetAdminRepository` mock keeps the real `mapAssetDoc` (`vi.mock(…, async (orig) => ({ ...(await orig()),
 getUserAssetsAdmin: mocks.getUserAssetsAdmin }))`); a helper `seedAsset(id, data)` writes the asset into the store
 AND into the `getUserAssetsAdmin` mock's answer, so pre-read and in-transaction read agree; `resolveBaselinePriceEur`
-can be made deferred (`mocks.fx.gate`, a promise the test resolves).
+can be made deferred (`mocks.fx.gate`, a promise the test resolves). The existing test «migrates once, then reports
+alreadyMigrated on a second call» (`:472`) seeds its two assets through `seedAsset`; its assertions do not change
+(the transaction now reads the store: the new contract, not a regression). Every fixture trade that a test edits
+or deletes carries an `updatedAt`.
+
+`__tests__/assetTransactionAverageCostEurBackfill.test.ts` gains a `runTransaction` in its fake: `tx.get` on a doc
+ref or on a query object, `tx.update` queued and applied after the closure returns, the closure's value returned.
+Its header sentence «get/update only — no transaction needed here» becomes «get/update and a per-asset
+transaction». Its nine tests stay green unchanged.
 
 | # | Test (Vitest, node) | Mutation that turns it red |
 | --- | --- | --- |
 | M1 | A migrates; baseline of `asset-1` edited to quantity 12 via PUT; B (started before A, FX deferred) resolves → B's body `{ alreadyMigrated: true }`, baseline quantity 12; then a BUY of 1 → asset quantity 13 | remove the in-transaction `tx.get(metaRef)` check |
 | M2 | store holds `baseline-asset-1` (quantity 7) and no meta → migrate → quantity still 7, meta created, `migratedAssetCount` 0 | drop `!alreadyBaselined.has(a.id)` |
-| M3 | meta holds `averageCostEurBackfilledAt` → migrate → field still there | replace `tx.create(metaRef…)` with `tx.set` and remove the in-tx meta check |
+| M3 | migration B starts with no meta and its FX pre-read deferred (`mocks.fx.gate`); while it waits the test plants the baselines and a meta holding `averageCostEurBackfilledAt` (A's run plus its backfill), then releases the gate → the meta still holds the field and B answers `{ alreadyMigrated: true }` | replace `tx.create(metaRef…)` with `tx.set` and remove the in-tx meta check |
 | M4 | `asset-2` is added to the store after the first pre-read (the mock's second answer includes it) → both baselines exist, `migratedAssetCount` 2 | catch-and-return instead of retrying on `MigrationInputsChangedError` |
-| D1 | a SELL of 2 at 100 settled on `cash-1`; two DELETE requests whose `prepareDelete` both ran before either commit (the fake's `runTransaction` is gated) → statuses 200 and 404, `cash-1` moved once | remove `assertTradeUnchanged` |
+| M5 | the pre-read returns 451 ledger assets → 422 with the Italian message; no baseline and no meta in the store | remove the `MIGRATION_MAX_BASELINES` check |
+| D1 | a SELL of 2 at 100 settled on `cash-1`; two DELETE requests whose `prepareDelete` both ran before either commit (calls 1 and 2 gated, released together) → statuses 200 and 404, `cash-1` moved once | remove `assertTradeUnchanged` |
 | E1 | two PUTs prepared on the same version (quantity 3; note «x») → 200 then 409 with the Italian message; the stored trade is the first edit | compare nothing when `op === 'update'` |
-| B1 | backfill: between its trades read and its write a BUY commits (gate) → the asset's `averageCostEur` is the BUY's replay, not the backfill's | read the trades with a plain `.get()` outside the transaction |
-| A1 | `deleteAllAssetTransactionsForAsset` on three trades → returns 3, store has none, and the asset doc was read through `tx.get` (spy on the fake) | delete the `tx.get(assetRef)` line |
-| T1 | the asset's `type` flips to `pensionFund` after `prepareCreate` (gate) → 422 with the Italian message, no trade written | remove the in-transaction type check |
+| E2 | a trade edited once (its `updatedAt` moves); a PUT whose `expectedUpdatedAt` is the `updatedAt` of BEFORE that edit → 409 with the Italian message, the stored trade is the first edit; the same PUT without the field → 200 | ignore `expectedUpdatedAt` in `prepareEdit` |
+| D2 | the same stale `expectedUpdatedAt` on DELETE → 409, the trade and its settlement still there; `expectedUpdatedAt=not-a-date` → 400 | ignore the field in `prepareDelete` |
+| B1 | backfill with its transaction held (call 1 gated); a BUY of 1 commits in full; release → the asset's `averageCostEur` is the replay WITH the BUY | read the trades with a plain `.get()` outside the transaction |
+| A1 | `deleteAllAssetTransactionsForAsset` (imported from the use case) on three trades → returns 3, store has none, and the asset doc was read through `tx.get` (spy on the fake) | delete the `tx.get(assetRef)` line |
+| T1 | the asset's `type` flips to `pensionFund` after `prepareCreate` (call 1 gated) → 422 with the Italian message, no trade written | remove the in-transaction type check |
+| S1 | a BUY settled on `cash-1`; after `prepareCreate` (call 1 gated) `cash-1`'s `type` becomes `etf` → 422 «Il conto di regolamento selezionato non è valido.», no trade written, `cash-1` untouched | remove the in-transaction account check |
 | C1 | `__tests__/ledgerMetaFreshness.test.ts`: a `QueryClient` whose cache holds `null` for the meta key and a `getAssetLedgerMeta` mock returning a meta → `fetchFreshLedgerMeta` resolves the meta and calls the service once | `staleTime: Infinity` |
 
-The gate for D1/E1/B1/T1: `mocks.txGate` — when set, the fake's `runTransaction` awaits it before running the
-closure; the test starts both requests, lets both `prepare*` finish (`await Promise.resolve()` twice is not enough:
-it awaits a `prepared` counter the fake increments), then releases the gate.
+The gate for D1/E1/B1/T1/S1: `mocks.txGate = { calls: number[], release }` holds only the listed
+`runTransaction` calls (counted by a `mocks.prepared` counter the fake increments on entry), the others pass; a
+held call awaits the gate BEFORE joining the queue. D1/E1 gate calls 1 and 2: the test starts both requests,
+awaits `mocks.prepared === 2` (`await Promise.resolve()` twice is not enough), then releases them together. T1 and
+S1 gate call 1, change the document, release. B1 gates call 1 (the backfill's transaction), runs the BUY to
+completion, then releases.
 
-No new E2E: the races cannot be driven from a browser; `e2e/assets*.spec.ts` prove nothing regressed.
+One E2E, for the dialog half of criterion 10 — **C2**, `e2e/assets.ledger-meta.spec.ts` (`desktop` project, the
+base account), on the pattern of `e2e/assets.bond.spec.ts` «a bond with ONE coupon at maturity»: the test reads
+`assetTransactionsMeta/<uid>` with the Admin SDK and deletes it (it RESTORES what it read in `finally`, or deletes
+the planted one when there was none); `page.route('**/api/asset-transactions/migrate', (r) => r.abort())`; opens
+`/dashboard/assets` (the page reads `null`, the migration is held off); plants the meta with the Admin SDK (the
+shape of `assets.bond.spec.ts:197-201`); «Aggiungi asset» → «Obbligazione», ticker `ORNITORINCO-META`, name «BTP
+Ornitorinco Meta», quantity 1000, average cost 100 → «Crea strumento»; then, by Admin SDK: the new asset has ONE
+`assetTransactions` document, `type: 'buy'`, quantity 1000 (the ledger path), and the asset's quantity is 1000. The
+asset and its trade are deleted by Admin SDK in `finally`. Mutation: `ledgerMeta != null` in place of
+`metaNow != null` → no trade document, the test is red. The races themselves cannot be driven from a browser;
+`e2e/assets*.spec.ts` prove nothing regressed.
 
 ## 7. Guided verification (WORKFLOW.md § 2)
 
 Expected outcome, declared first: on a fresh emulator account with one ETF (quantity 10), two tabs opened together
 on Patrimonio end with ONE baseline of 10; after correcting it to 12 in one tab, reloading the other leaves 12.
+Phases C–E prove that nothing regressed on a real Firestore (today's code passes them too); the races themselves
+are proven only by M1–S1 (§ 6).
 
-- **A**: `tsc`, lint, Vitest (three zones), `npx playwright test e2e/assets`.
-- **B**: emulators + a seed account WITHOUT the ledger meta (delete `assetTransactionsMeta/<uid>` and the baselines in
-  the emulator UI).
+- **A**: `tsc`, lint, Vitest (three zones), `npx playwright test e2e/assets`, `npm run perf:budget`.
+- **B**: emulators + a throwaway script (`scripts/*.tmp.mts`, deleted in G) that creates a fresh account
+  `ornitorinco@example.com` with ONE ETF «Ornitorinco ETF» (quantity 10, PMC 100 EUR), a cash account «Conto
+  Fenicottero» (1000), no trades and no `assetTransactionsMeta` document.
 - **C (browser, the session)**: two tabs on `/dashboard/assets`; the Firestore emulator shows one meta, one baseline
   per ledger asset. Edit the baseline to 12; `curl` the migrate route again with the tab's token → `alreadyMigrated`.
 - **D (data)**: in the emulator, `assetTransactionsMeta/<uid>` keeps `averageCostEurBackfilledAt` after the second call.
 - **E (failure)**: delete a trade in tab 1, then press delete on the same row in tab 2 (stale list) → the toast shows
   «Operazione non trovata.», the cash account's balance did not move twice.
 - **F (owner)**: nothing to do on production data — his account is migrated; a look at Patrimonio after the deploy.
-- **G**: stop the emulators, remove the throwaway account.
+- **G** (the two budgets close by README.md § 8's ONE rule, decisions 33 and 34): stop the emulators, remove the throwaway account.
 
 ## 8. Putting it into service
 
@@ -366,15 +439,26 @@ edit, 404 on a repeated delete) that the client already shows through the mutati
 
 ## 9. Documentation
 
-- `doc/guide/registro-operazioni.md`: a section «Concurrency» — the three rules (the migration decides inside its
-  transaction and never rewrites a baseline; an edit or delete stands on `assertTradeUnchanged`; the asset's type is
-  checked at commit) with the date; the blind spot «a restored `null` meta asks the server before a ledger asset is
-  created».
-- `AGENTS.md` § runTransaction: one line, RULE + DATE + WHERE PINNED — «a decision read outside a transaction is
-  re-checked inside it (2026-11-12; `assetTransactionsRoutes.test.ts` M1, D1, E1)».
-- `doc/guide/server.md`: the two new statuses of the trade routes.
-- `CLAUDE.md` › «Latest», `Draft Release Temp.md` (one entry: «Due schede aperte non possono più sovrascrivere una
-  correzione del registro»), `doc/nove/README.md` § 6.
+- `doc/guide/server.md` and `doc/guide/registro-operazioni.md` § Concurrency: «an edit and a delete carry
+  `expectedUpdatedAt`, the version the form or the button was drawn from; an older one is the 409» (decision 39).
+- `doc/guide/registro-operazioni.md`: a section «## Concurrency» — the four rules (the migration decides inside its
+  transaction and never rewrites a baseline; an edit or delete stands on `assertTradeUnchanged`; the asset's type
+  and the settlement account are checked at commit; the currency is read in prepare) with the date. The bullet
+  «**Migration is idempotent**…» (`:88`) is rewritten: «**Migration is idempotent and decides in ONE transaction**
+  (2026-11-12): the meta doc is read inside it and `tx.create`d last; an existing baseline is never rewritten; at
+  most 450 baselines (422 beyond); prices are resolved before it, re-checked by currency and unit price, three
+  attempts». The guide has no blind-spot section: a new closing «## Per-page blind spots» opens with «a restored
+  `null` meta asks the server before a ledger asset is created (`fetchFreshLedgerMeta`)».
+- `AGENTS.md` § Firestore Writes, the `runTransaction` bullet: one sentence, RULE + DATE + WHERE PINNED — «a
+  decision read outside a transaction is re-checked inside it (2026-11-12; `assetTransactionsRoutes.test.ts` M1,
+  D1, E1)».
+- `doc/guide/server.md`: the new answers of the trade routes (409 on a changed trade, 404 on a repeated delete,
+  422 on a non-ledger asset or a non-cash settlement account at commit).
+- `doc/guide/e2e-playwright.md`: `e2e/assets.ledger-meta.spec.ts` in the Patrimonio inventory.
+- `CLAUDE.md` › «Latest»; `Draft Release Temp.md`, prepended to `## 🐛 Bug Fixes`: «- **Patrimonio — registro
+  operazioni** — Two tabs open at once can no longer overwrite a correction of the ledger: every write decides
+  inside its transaction, and a trade changed or deleted in the meantime is refused with a message.»;
+  `doc/nove/README.md` § 6.
 
 ## 10. Declared out of scope
 
@@ -383,6 +467,9 @@ edit, 404 on a repeated delete) that the client already shows through the mutati
 - **The Compravendita executor and the expense transactions** (`realEstateOperationService.ts`, `expenseService.ts`):
   not ledger writes; NOVE-04 touches the first and keeps its single transaction. No heir for the second: no report,
   no finding.
+- **The asset's currency changed between prepare and commit**: `priceEur` is resolved from the currency read in
+  prepare; a currency change on a held instrument is a deliberate act with a window of a few hundred milliseconds.
+  No heir (declared).
 - **Frankfurter's fetch without a timeout** (`tradeFxService`): it only lengthens a request now that the decision is
   in the transaction; no heir in this series (declared).
 
@@ -399,8 +486,8 @@ Contesto, prima di toccare qualsiasi file (le regole del repo cambiano il modo d
   contesto: usalo per trovare la guida giusta
 - Leggi la spec doc/nove/NOVE-03-registro-scritture-in-transazione.md e l'indice della serie
   doc/nove/README.md (§ 3 decisioni, § 4 scelte adottate, § 7 contratti condivisi, § 8 regole)
-- Leggi doc/guide/registro-operazioni.md, doc/guide/server.md e doc/guide/cache-persistita.md
-  PRIMA di scrivere codice in quel dominio
+- Leggi doc/guide/registro-operazioni.md, doc/guide/server.md, doc/guide/cache-persistita.md e
+  doc/guide/e2e-playwright.md PRIMA di scrivere codice in quel dominio
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md: il codice che scrivi li segue
 
 Lancia npm audit e confrontalo con doc/guide/dipendenze.md (regola 8 di WORKFLOW.md).
@@ -421,13 +508,15 @@ interattivo), dammelo una riga alla volta con l'esito atteso.
 Implementa la spec così com'è scritta: mapAssetDoc estratto, assertTradeUnchanged e il
 controllo del tipo dentro commitTradeMutation, migrateAssetLedger in transazione con il
 pre-read dei prezzi e i tre tentativi, il backfill e la cancellazione totale in transazione,
-fetchFreshLedgerMeta e il suo uso in AssetDialog. I test PRIMA del codice, uno per riga
-della § 6, ciascuno visto rosso con la sua mutazione. Fermati e chiedimi se: un test
-esistente di assetTransactionsRoutes.test.ts diventa rosso per un motivo che non è il nuovo
-contratto; il finto adminDb non riesce a esprimere un intreccio della § 6 senza diventare
-un secondo Firestore. Collaudo: § 7. Un branch, un commit, solo dopo il mio OK con il
+il conto di regolamento ricontrollato al commit, fetchFreshLedgerMeta e il suo uso in
+AssetDialog (nessun toast, nessuna chiusura anticipata: § 4). I test PRIMA del codice, uno
+per riga della § 6, ciascuno visto rosso con la sua mutazione; i due finti adminDb si
+estendono come dice la § 6 (la coda che serializza, il cancello per chiamata, runTransaction
+nel finto del backfill). Fermati e chiedimi se: un test esistente dei due file diventa rosso
+con le SUE asserzioni cambiate (il seeding e i finti estesi della § 6 non contano);
+perf:budget, misurato prima e dopo sulla stessa macchina, supera un tetto di più di 1 KB gz (fino a 1 KB lo alzi tu, con raisedBy e una riga in velocita.md § Registro). Collaudo: § 7. Un branch, un commit, solo dopo il mio OK con il
 riassunto del diff. SESSION_NOTES.md non si committa.
 ```
 
 Model: **Opus 5.5**, effort **medium** — an L spec on a shared contract (the ledger's transaction, concurrency of
-money writes). Estimated size: 1 session, ~4 h; ~150 lines of use case, ~15 of client, ~350 of tests and harness.
+money writes). Estimated size: 1 session, ~4 h; ~160 lines of use case, ~15 of client, ~420 of tests and harness, one E2E.
