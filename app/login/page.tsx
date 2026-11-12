@@ -87,7 +87,7 @@ export default function LoginPage() {
   return (
     <AuthShell
       verdict={buildLoginVerdict()}
-      verdictAriaLabel="Che cos’è Portfolio Tracker"
+      verdictAriaLabel="Che cos’è Net Worth Tracker"
       footer={{ question: 'Non hai un account?', linkLabel: 'Registrati', href: '/register' }}
     >
       <Tile eyebrow="Accesso" ariaLabel="Accedi al tuo profilo" className="p-5 desktop:p-6">

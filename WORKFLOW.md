@@ -173,12 +173,15 @@ resource** (the test — must fail), with the same identical file or record.
 Restore any configuration that was changed, remove fixtures and test attachments, delete the script,
 and **record the outcome somewhere that survives the session** (`CLAUDE.md` or equivalent).
 
-**No collaudo script outlives its session** (2026-11-09). `node ~/.claude/processi-collaudo.mjs` counts the
-trees of `scripts/collaudo-*` alive in the repo and says whose they are: this session's (closed with
+**No collaudo script outlives its session** (2026-11-09; the services too, 2026-11-13). `node ~/.claude/processi-collaudo.mjs` counts the
+trees of `scripts/collaudo-*` alive in the repo, and the services a session starts and forgets (the Firebase
+emulators with their JVM, the Next.js `dev`/`start` servers), and says whose they are: this session's (closed with
 `--chiudi`), another open session's (never touched), or nobody's known (named to the owner, closed with
 `--chiudi --anche-ignote` only on their yes). The count is the **first gate** of every repo's gate list:
 zero, or the gates do not start. The standard `settings.json` runs it with `--hook` at `SessionEnd`, so a
-session that ends closes its own windows; one that dies without ending is caught by the next gate.
+session that ends closes its own windows and servers (a service gets SIGTERM first: the emulators export on
+exit); one that dies without ending is caught by the next gate, and by the same count at the start of every
+session (`prompts/01_SESSION_START.md`): what is alive then belongs to no session that is running now.
 *A verification that was not recorded counts as not done.*
 
 **The outcome is one line, the signals are not** (2026-10-19). In `CLAUDE.md` the session's status

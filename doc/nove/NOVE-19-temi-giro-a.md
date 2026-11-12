@@ -357,7 +357,7 @@ properties and the classes go together; a palette theme never depended on them.
   radii** (frame, pill, chip, § 4.2's table, the sites of § 4.4, what stays round); **The shell**
   (`.costume-shell-eyebrow`, `.costume-shell-quiet`, `.costume-wordmark`); «the layered consumers are
   `TILE_EYEBROW_CLASS`, `COSTUME_PILL_RADIUS_CLASS`, `COSTUME_FRAME_RADIUS_CLASS` and the
-  `rounded-[var(--costume-control-*,…)]` sites; one unlayered rule outside the section reads a scope property,
+  `rounded-[…]` sites that read `--costume-control-*`; one unlayered rule outside the section reads a scope property,
   `[data-popper-sheet]`, always with today's fallback». § Per-theme measures: § 4.6's rows; `:193` gains «a costume theme paints it `--primary`
   (`--costume-control-switch-on`)».
 - `doc/guide/shell.md`: «in a costume theme the shell's labels take the eyebrow's colour and its quiet text

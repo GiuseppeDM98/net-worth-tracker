@@ -102,6 +102,7 @@
 
 ## 🔧 Improvements
 
+- **Ogni pagina — il nome** — The app is called «Net Worth Tracker» everywhere you read it: the browser tab, the sidebar, the top bar of a phone held sideways, the login and registration pages and the landing.
 - **Email — il cashflow nel commento AI** — Improved the AI comment of the periodic emails and of the weekly budget email: it also reads your whole cashflow history, so it can set the period against how much you usually spend and save.
 - **Ogni pagina (telefono e tablet in verticale) — le tendine** — Every dropdown now opens as a sheet from the bottom of the screen instead of a small list beside the field: the type, account, loan, period and filter pickers, the account menu under «Altro», the category icon picker and the assistant's preferences, with thumb-sized rows and a backdrop; Categoria and Sottocategoria (and the dividend's instrument, the Storico month) open a sheet with the search field at the top and «Aggiungi …» at the bottom.
 - **Ogni modulo — niente suggerimenti automatici** — The browser no longer proposes previously typed values on the app's fields (amounts, names, notes, dates, search), and the password managers keep their icon out of them; the login and registration fields still offer your saved credentials.
