@@ -53,7 +53,7 @@ export default function DashboardLayout({
               target and the bar 4 + 44 + 4 + 1 = 53px (doc/guide/shell.md § Navigation). */}
           <div className="flex shrink-0 items-center gap-2 border-b bg-background px-4 py-1 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex tablet-landscape:hidden">
             <SidebarTrigger aria-label="Apri il menu" />
-            <span className="text-[13px] font-semibold tracking-[-0.01em]">Portfolio Tracker</span>
+            <span className="text-[13px] font-semibold tracking-[-0.01em]">Net Worth Tracker</span>
           </div>
 
           {isDemo && (

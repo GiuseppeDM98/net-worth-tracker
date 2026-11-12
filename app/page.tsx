@@ -173,7 +173,7 @@ export default function HomePage() {
             which this page does not have. */}
         <PageContainer className="max-desktop:portrait:pb-0">
           <PageHeader
-            label="Portfolio Tracker"
+            label="Net Worth Tracker"
             title="Panoramica"
             description="dati d’esempio"
             actions={
@@ -188,7 +188,7 @@ export default function HomePage() {
 
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
             <motion.div variants={cardItem} className="flex flex-col gap-5 pt-1">
-              <PageVerdict verdict={verdict} ariaLabel="Cos’è Portfolio Tracker" />
+              <PageVerdict verdict={verdict} ariaLabel="Cos’è Net Worth Tracker" />
 
               <div className="flex flex-col gap-2.5">
                 <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center">
@@ -321,12 +321,12 @@ export default function HomePage() {
       <footer className="border-t border-border px-4 py-4 desktop:px-5">
         <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-1 text-[11px] text-muted-foreground tablet:flex-row tablet:items-center tablet:justify-between">
           <span>
-            Portfolio Tracker — open source su{' '}
+            Net Worth Tracker — open source su{' '}
             <a
               href="https://github.com/GiuseppeDM98/net-worth-tracker"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Portfolio Tracker su GitHub (apre in una nuova scheda)"
+              aria-label="Net Worth Tracker su GitHub (apre in una nuova scheda)"
               className="underline underline-offset-2 hover:text-foreground"
             >
               GitHub

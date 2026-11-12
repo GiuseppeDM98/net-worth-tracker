@@ -61,7 +61,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Portfolio Tracker - Gestisci il tuo Patrimonio",
+  title: "Net Worth Tracker - Gestisci il tuo Patrimonio",
   description: "Traccia e monitora il tuo portafoglio di investimenti",
   icons: {
     icon: [

@@ -125,7 +125,7 @@ export function AppSidebar() {
               onClick={closeMobile}
               className="flex h-8 flex-1 min-w-0 items-center rounded-md px-2 text-[13px] font-semibold tracking-[-0.01em] hover:bg-sidebar-accent transition-colors group-data-[state=collapsed]:hidden"
             >
-              <span className="truncate">Portfolio Tracker</span>
+              <span className="truncate">Net Worth Tracker</span>
             </SceneLink>
             <TooltipProvider delayDuration={300}>
               <Tooltip>

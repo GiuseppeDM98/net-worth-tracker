@@ -780,6 +780,7 @@ file used to carry.
   again to undo it (2026-11-07: a chat mutation stayed applied until restored by hand). **`next dev`
   rewrites `tsconfig.json`** (an extra dist dir in `include`, the formatting): a stray `tsconfig.json` in a diff is
   checked out again, never committed (2026-10-10).
+- **Tailwind scans every non-ignored file, `doc/` and `SESSION_NOTES.md` included** (2026-11-13): an arbitrary `rounded` class that holds a `var(--costume-control-*,…)`, quoted in a spec, made the CSS fail to compile and every page answer 500 in dev. Quote such a class broken up; once removed, restart `next dev` (its cache keeps the broken rule). Pinned by nothing: a dev server that 500s on every page is the symptom.
 - **Components and hooks are tested under jsdom** (2026-11-07): `__tests__/<name>.test.tsx` runs in the `dom`
   project of `vitest.config.ts` (Testing Library, `@testing-library/user-event`, `__tests__/domSetup.ts` for cleanup,
   `ResizeObserver` and `matchMedia`), `.test.ts` in the `node` one; plain assertions, no jest-dom. An `aria-hidden`

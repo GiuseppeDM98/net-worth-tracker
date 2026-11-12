@@ -217,7 +217,7 @@ The order of implementation (each followed by its retirement session, § 8):
 
 | Spec | Title | Effort | Depends on | Model · effort | Status |
 | --- | --- | --- | --- | --- | --- |
-| NOVE-01 | The product is called «Net Worth Tracker» everywhere | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 11 findings, 2 owner decisions |
+| NOVE-01 | The product is called «Net Worth Tracker» everywhere | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 11 findings, 2 owner decisions; implemented on 2026-11-13 (PR #522), to retire |
 | NOVE-02 | Allocazione: a short Piano as tall as Bilanciamento + Per classe | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 16 findings, 0 owner decisions |
 | NOVE-03 | Registro operazioni: every write decides inside its transaction | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 19 findings, 1 owner decision |
 | NOVE-04 | Compravendita: a mortgage larger than what is left to pay | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 14 findings, 1 owner decision |
