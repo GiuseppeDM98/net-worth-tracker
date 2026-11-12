@@ -44,17 +44,6 @@
         ],
         "createdAt": "2026-09-13T17:42:22.433Z",
         "reason": "Storybook stories are fixtures, not UI: a story's category colour (user-picked palette stored per category) is sample data, like the CategoryManagementDialog waiver. Confirmed by Giuseppe 2026-09-13"
-      },
-      {
-        "rule": "undersized-ui-text",
-        "value": "*",
-        "files": [
-          "doc/ai/reference/concept-a.html",
-          "doc/ai/reference/concept-b.html",
-          "doc/ai/reference/concept-c.html"
-        ],
-        "createdAt": "2026-11-06T17:51:01.290Z",
-        "reason": "AI-01 static mocks (2026-11-06): the 9/10px strings are the app's own tile eyebrow and sub-eyebrow tiers; on these mocks only `low-contrast` and `design-system-*` were criteria, the detector's advisory families were not. Confirmed by Giuseppe 2026-11-06"
       }
     ]
   }

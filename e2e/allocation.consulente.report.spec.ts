@@ -141,6 +141,22 @@ test('the rail is the index: its label turns the page, one Tab stop between the 
   expect(inCard).toBe(true);
 });
 
+// The defect phase E found on 2026-11-11: the grid stretched a short page's card to the ten-row
+// rail, its footer left mid-card. `desktop:items-start` on the book's grid fixed it; this pins it
+// (pinned 2026-11-12). «Cosa fare adesso» is the fixture's shortest page at 1440 (223px against the
+// 338px rail); «Gli obiettivi» is as tall as the rail and proves nothing.
+test('a short page hugs its text: the card ends at its footer, shorter than the rail', async ({ page }) => {
+  await plant('ready');
+  await openReport(page, '?pagina=passi');
+  await expectPage(page, 'Pagina 6 di 10 · Cosa fare adesso', 'passi');
+  const card = bookCard(page);
+  const footer = card.getByRole('button', { name: 'Avanti' });
+  const [cardBox, footerBox, railBox] = await Promise.all([card.boundingBox(), footer.boundingBox(), rail(page).boundingBox()]);
+  expect(cardBox && footerBox && railBox).toBeTruthy();
+  expect(cardBox!.height).toBeLessThan(railBox!.height);
+  expect(cardBox!.y + cardBox!.height - (footerBox!.y + footerBox!.height)).toBeLessThan(48);
+});
+
 test('a page is an address: replaceState on every turn, the history never grows, «Rifai il percorso» cleans it', async ({ page }) => {
   await plant('ready');
   await openReport(page, '?pagina=strumenti');

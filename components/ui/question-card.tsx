@@ -5,10 +5,10 @@
  * sub-eyebrow «Il Consulente chiede · i di n» in the AI accent, the question, the figure that
  * prompted it (`why`), and a `ChoiceList` of its options with the two rows the app adds — «Altro…»
  * (every question with `allowOther`) and «Preferisco non dire», last — both `exclusive` in a
- * multiple question (decision 55). The card is what the model WROTE, so it wears the generated
+ * multiple question (2026-11-01). The card is what the model WROTE, so it wears the generated
  * surface (the 1px accent border, the glow on hover and while a radio inside has the keyboard
  * focus); never `bg-card`, never a button: the scene's footer owns the one primary of a round
- * (decision 38). Shared with the Assistente's in-chat questions, whose `otherSelect` turns the
+ * (2026-11-01). Shared with the Assistente's in-chat questions, whose `otherSelect` turns the
  * «Altro…» row into a pick among the app's entities.
  *
  * The answer maps onto the list's value and back: the decline value is tested before any string

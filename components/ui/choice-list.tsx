@@ -8,7 +8,7 @@
  *
  * Single mode is the Radix `RadioGroup` (its own roving focus); multiple mode is a `role="group"`
  * of checkboxes made ONE Tab stop by `useRovingFocus` (AGENTS.md § Accessibility). An `exclusive`
- * option («Nessuna di queste») clears the others and is cleared by any other (decision 55). The
+ * option («Nessuna di queste») clears the others and is cleared by any other (2026-11-01). The
  * «Altro…» row opens a text field under its label while it is chosen — with no autofocus: Radix
  * selects a radio as the arrows reach it, and a focus jump would pull a keyboard reader out of
  * the group; the field is the next Tab stop.
@@ -25,7 +25,7 @@ export interface ChoiceListOption<T extends string> {
   label: string;
   /** The second line under the label. */
   hint?: string;
-  /** Multiple mode: choosing it clears the others, choosing another clears it (decision 55). */
+  /** Multiple mode: choosing it clears the others, choosing another clears it (2026-11-01). */
   exclusive?: boolean;
 }
 
@@ -50,7 +50,7 @@ export type ChoiceListProps<T extends string> = {
   | { mode: 'multiple'; value: T[]; onChange: (value: T[]) => void }
 );
 
-/** The next array of a multiple list, in the options' order (decision 55). */
+/** The next array of a multiple list, in the options' order (2026-11-01). */
 export function nextMultipleValue<T extends string>(options: readonly ChoiceListOption<T>[], current: readonly T[], toggled: T, checked: boolean): T[] {
   const option = options.find((candidate) => candidate.value === toggled);
   if (!checked) return options.filter((candidate) => current.includes(candidate.value) && candidate.value !== toggled).map((candidate) => candidate.value);

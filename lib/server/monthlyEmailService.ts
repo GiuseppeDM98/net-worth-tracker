@@ -734,7 +734,7 @@ export function buildEmailAiPrompt(
     ...formatHallOfFameForPrompt(emailData),
     ...formatBudgetAlertsForPrompt(emailData),
     ...formatExpenseSplitForPrompt(emailData, label),
-    // The CASHFLOW 12 MESI block, after the period's sections (decision 81, 2026-11-07).
+    // The CASHFLOW 12 MESI block, after the period's sections (since 2026-11-07).
     ...(cashflowBlock ? ['', ...formatCashflowBlockSection(cashflowBlock)] : []),
   ].join('\n');
 
@@ -803,7 +803,7 @@ export async function generateEmailAiComment(
       preferences.includeDummySnapshots
     );
 
-    // The CASHFLOW 12 MESI block (decision 81, 2026-11-07); a failed read lands in the catch below:
+    // The CASHFLOW 12 MESI block (since 2026-11-07); a failed read lands in the catch below:
     // the email goes out without the comment, never with a comment on a silent empty cashflow.
     const cashflowBlock = await readCashflowBlockForPrompt(userId, new Date());
 

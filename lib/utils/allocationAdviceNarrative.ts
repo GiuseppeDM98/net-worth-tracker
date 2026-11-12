@@ -1,6 +1,6 @@
 /**
  * Every sentence of the Consulente (2026-10-20): the screens' questions and readings, the
- * run's stages, the report's verdict and tile readings, the «rivedi entro» line the
+ * run's stages, the report's verdict and page readings, the «rivedi entro» line the
  * Allocazione header prints. Pure; no component writes copy.
  */
 
@@ -113,7 +113,7 @@ export const BOOK_COPY = {
 
 // ─── The interview (2026-11-08) ───────────────────────────────────────────────
 
-/** Every label of the interview: the summary's footer, the scene, the report's tile and the revision tile (2026-11-08). */
+/** Every label of the interview: the summary's footer, the scene, the report's «Il colloquio» and «Chiedi una modifica» pages (2026-11-08; pages since 2026-11-11). */
 export const INTERVIEW_COPY = {
   /** The summary, with no round yet. */
   start: 'Avvia il colloquio',
@@ -131,13 +131,13 @@ export const INTERVIEW_COPY = {
   run: 'Avvia la ricerca',
   retry: 'Riprova',
   notConfigured: 'Servizio AI non configurato',
-  /** The report's tile. */
+  /** The report's «Il colloquio» page. */
   tileTitle: 'Il colloquio',
   roundEyebrow: (index: number) => `Tornata ${index}`,
   unanswered: 'non risposta',
   noQuestions: 'nessuna domanda',
   skippedAside: 'saltato',
-  /** The revision tile. */
+  /** The «Chiedi una modifica» page. */
   revise: 'Rivedi il report',
   skipQuestions: 'Salta le domande',
   revisionAsked: 'Il Consulente ha chiesto',
@@ -153,7 +153,7 @@ export function describeRoundCount(n: number): string {
   return n === 1 ? '1 tornata' : `${n} tornate`;
 }
 
-/** The tile's aside: «2 tornate», «2 tornate · saltato»; null with zero rounds (no tile, decision 53). */
+/** The «Il colloquio» page's aside: «2 tornate», «2 tornate · saltato»; null with zero rounds (no page, 2026-11-01). */
 export function describeInterviewAside(interview: AllocationAdviceInterview | null | undefined): string | null {
   if (!interview || interview.rounds.length === 0) return null;
   const count = describeRoundCount(interview.rounds.length);
@@ -174,7 +174,7 @@ export function describeRunHeadline(stage: AllocationAdviceStage | null): string
   return `${STAGE_COPY[stage].label}.`;
 }
 
-/** What a stage usually takes, in minutes (about five in all at effort `medium`, 2026-10-23; decision 50). */
+/** What a stage usually takes, in minutes (about five in all at effort `medium`, 2026-10-23; the owner's figures of 2026-11-01). */
 export const STAGE_TYPICAL_MINUTES: Record<AllocationAdviceStage, number> = { context: 0, strategy: 2, instruments: 2, review: 1 };
 
 /** «di solito ~N min»; null when N is 0 (the context: the row prints no duration). */

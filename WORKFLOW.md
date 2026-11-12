@@ -335,12 +335,12 @@ The app **is** locally runnable; there is no fallback to declare.
   document with side effects — a transaction or trade, whose deletion re-runs the replay — is
   deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
 - **A mock page published as an Artifact inherits the host skeleton's `body{color:#000}`** (2026-11-06, the concept
-  pages of AI-01): the Artifact host prepends `:root{color-scheme:light} body{background:#fff;color:#000}` and nests the
+  pages of the AI surfaces' visual direction): the Artifact host prepends `:root{color-scheme:light} body{background:#fff;color:#000}` and nests the
   page inside its body, so a text colour declared on `html` is overridden for every descendant and a dark page shows
   black on black — Playwright on `file://` never shows it. A page meant for an Artifact sets `background` AND `color`
   on `body` (the page contract asks for the background alone).
 - **`impeccable detect` runs its `design-system-*` checks only on a file inside the repo root** (2026-11-06, the
-  retirement of AI-01): a copy in the scratchpad reports 0 for that family while `low-contrast` still fires, so a
+  check of those concept pages): a copy in the scratchpad reports 0 for that family while `low-contrast` still fires, so a
   probe page (a light copy, a themes sheet) goes in the repo root as `.tmp-*.html` and is deleted before the commit.
 
 ### Where things are recorded

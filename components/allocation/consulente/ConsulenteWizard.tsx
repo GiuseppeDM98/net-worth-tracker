@@ -91,7 +91,7 @@ interface ConsulenteWizardProps {
 export const HEADLINE_CLASS = 'text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]';
 const HELP_CLASS = 'text-[14px] leading-[1.6] text-muted-foreground desktop:text-[15px]';
 const BUTTON_CLASS = 'h-11 desktop:h-9';
-/** A control that asks the model: the hover accent on a filled button (decisions 36 and 85). */
+/** A control that asks the model: the hover accent on a filled button, which needs `border border-transparent` for it (2026-11-07). */
 const AI_PRIMARY_CLASS = cn(BUTTON_CLASS, 'border border-transparent', AI_CONTROL_ACCENT_CLASS);
 
 /**
@@ -191,7 +191,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
   // once the slide has landed (`useSceneTurn`, shared with the report's book). All before the early return.
   const headlineRef = useRef<HTMLParagraphElement>(null);
   const turn = useSceneTurn(headlineRef);
-  const { direction, focusTarget } = turn;
+  const { direction, turn: sceneTurn, focusTarget } = turn;
   const reduced = useReducedMotion();
   const move = (toward: 1 | -1, action: Parameters<typeof dispatch>[0]) => turn.move(toward, () => dispatch(action));
 
@@ -245,7 +245,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
               initial="enter"
               animate="center"
               exit="exit"
-              onAnimationComplete={(definition) => definition === 'center' && focusTarget()}
+              onAnimationComplete={(definition) => definition === 'center' && focusTarget(sceneTurn)}
             >
               <ConsulenteInterviewScene
                 interview={interview}
@@ -261,7 +261,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
               />
             </motion.div>
           ) : (
-            <motion.div key="path" custom={direction} variants={variants} initial="enter" animate="center" exit="exit" onAnimationComplete={(definition) => definition === 'center' && focusTarget()}>
+            <motion.div key="path" custom={direction} variants={variants} initial="enter" animate="center" exit="exit" onAnimationComplete={(definition) => definition === 'center' && focusTarget(sceneTurn)}>
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className={TILE_EYEBROW_CLASS}>
                   Passo {stepNumber} di {ALLOCATION_ADVICE_STEPS.length} · {copy.eyebrow}
@@ -277,7 +277,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  onAnimationComplete={(definition) => definition === 'center' && focusTarget()}
+                  onAnimationComplete={(definition) => definition === 'center' && focusTarget(sceneTurn)}
                 >
                   <p ref={headlineRef} tabIndex={-1} className={cn(HEADLINE_CLASS, 'mt-3 outline-none')}>{currentGoal ? (currentGoal.goalId ? `«${currentGoal.name}» è ancora un tuo obiettivo?` : 'Un nuovo obiettivo.') : copy.question}</p>
                   <p className={cn(HELP_CLASS, 'mt-2 max-w-[600px]')}>{copy.help}</p>
@@ -416,7 +416,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
                   )}
                   {step === 'riepilogo' ? (
                     // The interview first (2026-11-08): with no round, «Avvia il colloquio» (the accent: it asks the
-                    // model) beside «Salta il colloquio e avvia la ricerca» (never accented, decision 78); with
+                    // model) beside «Salta il colloquio e avvia la ricerca» (never accented: DESIGN.md → The AI-Accent Rule); with
                     // rounds, back to the scene or a fresh start. All four need the key.
                     <div className="flex flex-col-reverse gap-2 tablet:flex-row tablet:items-center">
                       {interview.rounds.length === 0 ? (

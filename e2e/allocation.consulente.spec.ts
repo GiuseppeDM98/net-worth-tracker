@@ -94,7 +94,7 @@ test('walks the eight screens, «Avanti» held until a screen is complete, and �
   await next(page);
 
   // Step 8: the summary rows, each a link back; «Avvia il colloquio» (an AI control) beside the skip
-  // that starts the run (never accented, decision 78); neither pressed here (2026-11-08).
+  // that starts the run (never accented: DESIGN.md → The AI-Accent Rule); neither pressed here (2026-11-08).
   await expect(page.getByRole('heading', { name: /Passo 8 di 8/ })).toBeVisible();
   const summary = page.getByRole('list', { name: 'Le tue risposte' });
   await expect(summary).toContainText('35 anni · 20 anni di orizzonte');

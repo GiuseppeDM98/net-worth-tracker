@@ -702,7 +702,7 @@ describe('assistant prompt data block', () => {
   });
 });
 
-describe('the CASHFLOW 12 MESI block in every mode of the Assistente (decision 81, 2026-11-07)', () => {
+describe('the CASHFLOW 12 MESI block in every mode of the Assistente (since 2026-11-07)', () => {
   const BLOCK = '--- CASHFLOW 12 MESI (x) ---\nX';
   // The note the owner approved on 2026-11-07, verbatim.
   const NOTE = "Il blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi, qualunque sia il periodo in esame: le cifre di un periodo vengono dai blocchi del periodo; usalo per l'andamento recente, la capacità di risparmio e la sua stabilità, gli impegni ricorrenti e i conti.";

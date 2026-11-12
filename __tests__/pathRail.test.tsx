@@ -1,6 +1,6 @@
 /**
  * `PathRail` (components/ui/path-rail.tsx, 2026-11-07): the path's eight ticks with ONE current step,
- * the interview's three (the interview passes them, `reached` the round number — decision 86) hidden
+ * the interview's three (the interview passes them, `reached` the round number, 1-based — 2026-11-07) hidden
  * until a round is on, the run's four fills hidden from the reader (the card's rows speak).
  */
 
@@ -39,7 +39,7 @@ describe('PathRail, path mode', () => {
     expect(screen.getByRole('list', { name: 'Il percorso' }).contains(current[0])).toBe(true);
   });
 
-  it('moves the current step onto the round being asked, the ones before it lit (decision 86)', () => {
+  it('moves the current step onto the round being asked, the ones before it lit (the round 1-based, 2026-11-07)', () => {
     const { container } = render(<PathRail mode="path" steps={STEPS} current={7} interview={{ total: 3, reached: 2 }} />);
     const interview = screen.getByRole('list', { name: 'Il colloquio' });
     const items = within(interview).getAllByRole('listitem');
@@ -119,13 +119,20 @@ describe('PathRail, book mode (2026-11-08)', () => {
     expect(selected).toEqual([1]);
   });
 
-  it('without interactive: plain items, no button, no handler', () => {
-    const { container } = render(<PathRail mode="book" pages={PAGES} current={1} interactive={false} onSelect={() => {}} />);
+  it('without interactive: plain items, no button, no handler', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const selected: number[] = [];
+    const { container } = render(<PathRail mode="book" pages={PAGES} current={1} interactive={false} onSelect={(index) => selected.push(index)} />);
     expect(screen.getAllByRole('navigation', { name: 'Dove sei' })).toHaveLength(1);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
     const current = container.querySelectorAll('[aria-current="page"]');
     expect(current).toHaveLength(1);
     expect(current[0].tagName).toBe('LI');
     expect(current[0].textContent).toBe("L'allocazione proposta");
+    // No handler and no Tab stop: a click on a tick selects nothing, and nothing in the rail is focusable (2026-11-12).
+    for (const item of screen.getAllByRole('listitem')) await user.click(item);
+    expect(selected).toEqual([]);
+    expect(container.querySelectorAll('[tabindex]')).toHaveLength(0);
   });
 });

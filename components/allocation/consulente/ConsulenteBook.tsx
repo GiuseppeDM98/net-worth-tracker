@@ -119,7 +119,7 @@ function piecesOf(page: BookPage, pages: readonly BookPage[], props: ConsulenteB
   }
 }
 
-/** The page's text, as the report's tile drew it. */
+/** The page's text, drawn as the report's text tile drew it before the book (2026-11-11). */
 function PageText({ text }: { text: string }) {
   return (
     <div className="mt-3">
@@ -166,7 +166,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
   const [plays] = useState(() => ({ cascade: !consulenteReportEntrance.cascade && !reduced, countUp: !consulenteReportEntrance.countUp && !reduced }));
   const targetRef = useRef<HTMLElement>(null);
   const cardRef = useRef<HTMLElement>(null);
-  const { direction, move, focusTarget } = useSceneTurn(targetRef);
+  const { direction, turn: sceneTurn, move, focusTarget } = useSceneTurn(targetRef);
   const draft = useRevisionDraft(ownerId, document, revision);
   const compact = useCompactLayout();
 
@@ -223,7 +223,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
           className={cn(TILE_SURFACE_CLASS, SCENE_CARD_CLASS, 'scroll-mt-4 desktop:scroll-mt-5', page.generated && AI_GENERATED_SURFACE_CLASS)}
         >
           <AnimatePresence mode="wait" custom={direction}>
-            <BookPageSlide key={page.id} pageId={page.id} direction={direction} reduced={reduced} turned={turned} cascade={plays.cascade} onSettled={focusTarget}>
+            <BookPageSlide key={page.id} pageId={page.id} direction={direction} reduced={reduced} turned={turned} cascade={plays.cascade} onSettled={() => focusTarget(sceneTurn)}>
               <motion.div variants={cardItem} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
                 {/* One h2 per page: the eyebrow, or on the cover the verdict's own. */}
                 {page.id === 'copertina' ? <p className={eyebrowClass}>{eyebrow}</p> : <h2 className={eyebrowClass}>{eyebrow}</h2>}

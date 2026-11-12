@@ -2,7 +2,7 @@
  * `QuestionCard` (components/ui/question-card.tsx, 2026-11-08, DESIGN.md § 5 → The Question-Card
  * Rule): the sub-eyebrow «Il Consulente chiede · i di n», the question and its why, a ChoiceList
  * with «Altro…» and «Preferisco non dire» appended in that order — exclusive in a multiple
- * question (decision 55) — the answer mapped to the list and back, the «Altro…» text as `{ other }`,
+ * question (2026-11-01) — the answer mapped to the list and back, the «Altro…» text as `{ other }`,
  * the `otherSelect` pick as `{ entity }`, the generated surface, and no button inside.
  * Invented questions.
  */
@@ -123,7 +123,7 @@ describe('QuestionCard', () => {
     expect(screen.getByRole('checkbox', { name: 'I conti correnti' }).getAttribute('aria-checked')).toBe('false');
     expect(screen.getByRole('checkbox', { name: 'Preferisco non dire' }).getAttribute('aria-checked')).toBe('true');
 
-    // An option after the decline replaces it (the decline row is exclusive, decision 55): without `exclusive` the list would keep both and still read as the decline.
+    // An option after the decline replaces it (the decline row is exclusive, 2026-11-01): without `exclusive` the list would keep both and still read as the decline.
     await userEvent.click(screen.getByRole('checkbox', { name: 'I conti correnti' }));
     expect(onAnswer).toHaveBeenLastCalledWith(['conti']);
     expect(screen.getByRole('checkbox', { name: 'Preferisco non dire' }).getAttribute('aria-checked')).toBe('false');

@@ -392,7 +392,7 @@ async function fetchExpenseCategories(userId: string): Promise<ExpenseCategory[]
 /**
  * The inputs of the CASHFLOW 12 MESI block (lib/utils/cashflowBlock.ts) in ONE expense read: every row
  * up to the Italian end of the month 12 after the current one — the whole recorded history for the
- * series (decision 81, 2026-11-07: no lower bound; the builder starts at the first month holding a
+ * series (2026-11-07: no lower bound; the builder starts at the first month holding a
  * row and never before `cashflowHistoryStartYear`) plus the rows ahead that give the commitments their
  * next date. The end crosses years, so it is a `getItalyMonthBoundsUtc` call on month arithmetic, and
  * the current month is the ITALIAN one: at 23:30 UTC on 31 October it is already November in Rome.

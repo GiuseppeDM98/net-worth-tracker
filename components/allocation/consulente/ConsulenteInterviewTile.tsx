@@ -12,7 +12,7 @@ import { describeInterviewAside, INTERVIEW_COPY } from '@/lib/utils/allocationAd
 import { answerOf, describeAnswer, type Question, type QuestionAnswer } from '@/lib/utils/questionSet';
 import { cn } from '@/lib/utils';
 
-/** One round's questions with their answers, shared with the revision tile's recap. */
+/** One round's questions with their answers, shared with the recap on «Chiedi una modifica». */
 export function InterviewRoundRows({ questions, answers, className }: { questions: Question[]; answers: QuestionAnswer[]; className?: string }) {
   if (questions.length === 0) return <p className={cn('text-[13px] text-muted-foreground', className)}>{INTERVIEW_COPY.noQuestions}</p>;
   return (

@@ -261,6 +261,27 @@ DESIGN.md → Small-Screen Composition, each page's composition in its guide's �
 `doc/guide/prima-schermata.md` and `doc/guide/prima-schermata-misure.md`, the budget in `perf/mobile-budget.json`; the
 specs, their index and the 110 owner decisions are in `git log -- doc/mobile/`.
 
+**The AI series (2026-11-01 → 2026-11-12, closed).** On 2026-11-01 the owner asked for two things: a Consulente that,
+after the path, questions the user «tipo da "amico critico"» with access to the whole cashflow, and «molto ma molto
+curata e bella»; and an Assistente able to record an expense or an income from a sentence in the chat, asking the
+details with options. A planning session wrote seven specs (#494), read adversarially the same day (#495: 283 findings,
+53 owner decisions); the series then landed on `develop` one spec at a time, each retired by a session of its own that
+read the code against it: **AI-00** the dependency upgrade on Node 24 (#497, retired in #499, 2026-11-03: sixteen
+defects, `mirror:remove` and an older legacy-debt migration fixed; `develop` reached `main` by #498 as a one-off),
+**AI-01** the visual direction — three concepts drawn on invented figures and critiqued, A «Il taccuino», B «La scena»,
+C «Il colloquio»; the owner chose **B** for both surfaces, written as DESIGN.md § 5 «AI Surfaces» (#503 / #504,
+2026-11-06: «Il colloquio» left without the accent, the later specs rewritten to DESIGN.md), **AI-02** the CASHFLOW 12
+MESI block, extended to every mode of the Assistente and the emails' AI comments (#505 / #506, 2026-11-07: four runtime
+defects), **AI-03** the path, the run and the report as a scene, `ChoiceList` and the jsdom test harness (#507 / #508,
+2026-11-07: three), **AI-04** the interview, the bond block and the previous paths (#509 / #510, 2026-11-08: the
+`history` rule deployed, two code residues), **AI-05** Registra (#512 / #513, 2026-11-11: four), **AI-06** Registra's
+detail questions, transfers, instalments, series and memory rules (#514 / #515, 2026-11-11: the first contract's rules
+against the WHEN thresholds), **AI-07** the Consulente's report read as a book, added on 2026-11-08 after AI-04's tour
+(#517, 2026-11-12; retired the same day with its folder: a focus race of the scene's turn fixed, three proofs pinned).
+The rules now live in DESIGN.md § 5 «AI Surfaces», `doc/guide/consulente.md`, `doc/guide/assistente.md`,
+`doc/guide/cashflow-tracciamento.md`, `doc/guide/dipendenze.md` and AGENTS.md; the specs, their index, the concept pages
+and the 118 owner decisions are in `git log -- doc/ai/`.
+
 ## Tech Stack
 
 | Category | Technology | Purpose |

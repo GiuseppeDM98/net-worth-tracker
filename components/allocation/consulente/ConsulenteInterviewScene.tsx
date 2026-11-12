@@ -4,12 +4,12 @@
  * The INTERVIEW as a scene of the Wizard (2026-11-08, doc/guide/consulente.md § The path; DESIGN.md →
  * The Path-Scene Rule): after the summary, inside the path's card, the Consulente's rounds of
  * questions. Top to bottom: the eyebrow «Colloquio · tornata N di 3» (the scene's only
- * `TILE_EYEBROW_CLASS`, decision 57), the last round's `note` as the headline, the round's
+ * `TILE_EYEBROW_CLASS`, 2026-11-01), the last round's `note` as the headline, the round's
  * `QuestionCard`s — or, while a round is asked, the skeleton of two cards under the previous
- * note (decision 56) — and the footer: «Indietro», «Salta il colloquio» (never accented, though it
- * starts the strategy: decision 78) and ONE primary — «Continua» while another round can be asked,
+ * note (2026-11-01) — and the footer: «Indietro», «Salta il colloquio» (never accented, though it
+ * starts the strategy: DESIGN.md → The AI-Accent Rule, 2026-11-06) and ONE primary — «Continua» while another round can be asked,
  * «Avvia la ricerca» otherwise, «Riprova» after a failed round — which takes the AI accent on hover
- * and focus only (decision 36) and waits until every question is answered or declined.
+ * and focus only (2026-11-01) and waits until every question is answered or declined.
  *
  * The Wizard owns the state (the draft's interview, `useConsulenteInterview`) and the slide in
  * and out of this scene; here only what the card shows. A new round replaces the cards inside the

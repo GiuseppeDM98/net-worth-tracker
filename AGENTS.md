@@ -474,7 +474,7 @@ file used to carry.
 
 ### Assistant · Assistente → `doc/guide/assistente.md`
 - The context service runs server-side (`adminDb` directly); every mode maps to its own builder in `stream/route.ts` (a missing branch silently falls through to monthly); `buildAssistantPeriodRangeContext` is the FIFTH builder.
-- ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 5 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's interview and strategy and of the emails' AI comments, always under the same note (decision 81, 2026-11-07). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
+- ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 5 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's interview and strategy and of the emails' AI comments, always under the same note (owner, 2026-11-07). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
 - A silent cap in a context builder becomes a hallucinated "N/D": a cap either does not exist or is stated in the text the model reads. `ASSISTANT_SYSTEM_CORE` is shared with `buildEmailAiPrompt`.
 - A free question with NO context still gets the portfolio of today (`buildAssistantTodayContext` → `AssistantTodayContext`, the sixth argument of `buildChatPrompt`, 2026-10-20): the period bundle is a chosen period's, never a substitute for the portfolio.
 - THE PROPOSAL PROTOCOL: the AI never writes — it emits fenced blocks that a card turns into a write on the user's Conferma: ONE ```goal-proposal (`POST`/`PATCH /api/goals`, `goalProposal.ts` the ONE schema, quotas by instrument NAME) and, in Registra (2026-11), up to five ```expense-proposal (`expenseProposal.ts`; the browser writes through `createExpenseSettledOnDate`, never a server route); a card's outcome is saved on its message (`proposals["kind:N"]`, N the block's rank among its language's blocks, derived from the markdown, never counted in render) through `PATCH …/messages/[messageId]`, so a reload never writes twice; questions travel as ```assistant-question blocks, one per block, at most two, answered by ONE user message (2026-11).
@@ -557,7 +557,7 @@ file used to carry.
   displayed. Data-scoped hooks and pages take `ownerId`; manual `useEffect` loaders include it in their deps.
 - **Three enforcement layers, kept in sync** over the grant `account-access/{ownerUid}`: `firestore.rules`,
   `assertCanAccessAccount` on Admin routes, the client substituting `ownerId`. Rules changes are inert until deployed — by hand, never by a merge
-  (the `history` rule PR #509 wrote reached production only on 2026-11-08, at its spec's retirement; decision 97 in `doc/ai/README.md`).
+  (the `history` rule PR #509 wrote reached production only on 2026-11-08, deployed by hand in the next session on the owner's call).
 - Il resto — l'auto-login dalla landing, dove resta `user.uid`, `memberUids` e la discovery, il banner demo, le rules
   per collezione, lo switcher in Sidebar E `SecondaryMenuDrawer` — in `doc/guide/account-condiviso-demo.md`.
 

@@ -256,7 +256,7 @@ describe('the strategy, the review and the revision read the interview, system u
     expect(without.userContent).not.toContain('colloquio');
   });
 
-  it("the revision prints ITS round after the requests, framed by its two lines, only with a round (decision 24)", () => {
+  it("the revision prints ITS round after the requests, framed by its two lines, only with a round (2026-11-01)", () => {
     const requests = ['meno cripto', 'solo bond singoli'];
     const without = buildRevisionPrompt(ANSWERS, 'S', 'I', null, 'REPORT', requests);
     const withRound = buildRevisionPrompt(ANSWERS, 'S', 'I', null, 'REPORT', requests, { interview: ONE });
