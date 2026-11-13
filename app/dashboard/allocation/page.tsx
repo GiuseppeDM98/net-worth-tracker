@@ -579,7 +579,7 @@ export default function AllocationPage() {
           stretched to the Piano's bottom edge when the Piano is the taller (owner, 2026-10-17 — the
           `1fr` second row takes the Piano's extra height and the cell no longer `self-start`s, so
           Per classe's rows stay at the top and its footer sits on the Piano's last line; with a
-          shorter Piano everything is at natural height). Until that day both columns sat at
+          shorter Piano the Piano's cell stretches to Per classe's bottom edge, owner 2026-11-12, its footer on the column's last line). Until that day both columns sat at
           natural height, by the 2026-09-21 reading of AGENTS.md → a tile stretched beside a taller
           neighbour is cured in the GRID: the owner preferred the aligned edges to the void under
           Per classe. Esposizione takes the full width below. Below `desktop:` the tiles are items of the grid in the DOM's order — ONE
@@ -591,7 +591,8 @@ export default function AllocationPage() {
       {/* At 1440 the left column is placed on the grid, not wrapped (since 2026-10-16, so that «Il resto»
           and the rows fit ONE index on a tablet in landscape): Bilanciamento on row 1, Per classe under it
           on row 2, Piano across both; the `1fr` second row takes Piano's extra height, and Per classe
-          fills it (no `desktop:self-start` on its cell, 2026-10-17). */}
+          fills it (no `desktop:self-start` on its cell, 2026-10-17); the Piano's cell has none either, so a short Piano stretches to the bottom
+          of Per classe (2026-11-12). */}
       <div className={cn(COMPACT_GRID_CLASS, 'desktop:grid-rows-[auto_1fr]')}>
         <div data-stage="lead" className={cn(TILE_CELL_CLASS, LEAD_CELL_CLASS, 'desktop:col-span-5 desktop:row-start-1 desktop:self-start')}>
           <BilanciamentoTile
@@ -639,7 +640,7 @@ export default function AllocationPage() {
           />
         </div>
 
-        <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ALLOCAZIONE_SECTION_IDS.piano), 'desktop:col-span-7 desktop:col-start-6 desktop:row-span-2 desktop:row-start-1 desktop:self-start')}>
+        <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ALLOCAZIONE_SECTION_IDS.piano), 'desktop:col-span-7 desktop:col-start-6 desktop:row-span-2 desktop:row-start-1')}>
           <PianoTile
             collapse={sections.collapse(ALLOCAZIONE_SECTION_IDS.piano)}
             asideWhenClosed={ALLOCAZIONE_CLOSED_ASIDES[ALLOCAZIONE_SECTION_IDS.piano]}
