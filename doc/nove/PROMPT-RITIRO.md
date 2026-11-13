@@ -271,8 +271,8 @@ ORDINE DI LAVORO
 5) AGGIORNA indici e stato — lo stato vive in PIÙ punti che possono divergere e si
    chiude con un grep, non con una riga: la cartella è `doc/nove/` (21 spec
    `NOVE-NN-<slug>.md`, l'indice, questo prompt: `ls doc/nove/`); l'indice è
-   `doc/nove/README.md` (479 righe; `grep -n "^## " doc/nove/README.md`: § 1 i punti del
-   proprietario, § 2 il codice di partenza, § 3 le decisioni 1–63, § 4 le scelte a–x,
+   `doc/nove/README.md` (481 righe; `grep -n "^## " doc/nove/README.md`: § 1 i punti del
+   proprietario, § 2 il codice di partenza, § 3 le decisioni 1–64, § 4 le scelte a–x,
    § 5 l'ordine — 01 02 03 04 05 06 07 08 09 10 14 15 16 17 18 21 11 12 13 19 20 — e le
    dipendenze, § 6 la tabella di stato, § 7 i contratti condivisi, § 8 le regole, § 9 la
    riga SPEC VIVE, § 10 ciò che non si fa). LA RIGA DI STATO è l'ultima colonna della

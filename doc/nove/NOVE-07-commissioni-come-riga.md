@@ -4,6 +4,8 @@
 > transaction, `assertTradeUnchanged`) **and NOVE-06** (`tradeMoneyIn`, the Driver's split). Integrates contributor
 > PR #489 (head 9d163bb1, base 54634a9) **with changes**. Written on 2026-11-12; every `file:line` is cited on
 > `develop` @ b841cbd7, the PR's as `pr489:<path>:<line>`. Executes the owner's decisions 18–23 and 31 (README.md § 3).
+> **Extended on 2026-11-13 by decision 64** (the first purchase of a new instrument takes its fee): § 1 item 16,
+> § 2 criterion 16, the `AssetDialog.tsx` part of § 4, test E2; its `AssetDialog.tsx` lines cited on `develop` @ c0bba2ea.
 
 ## 1. The problem today (evidence on the code)
 
@@ -68,6 +70,12 @@ fourth write of `commitTradeMutation` (`pr489:lib/server/assetTransactionUseCase
     could never be deleted.
 14. **The stored PMCs** are fee-inclusive and the one-shot backfill is spent (`averageCostEurBackfilledAt`,
     `assetTransactionUseCase.ts:696-736`, trigger `app/dashboard/assets/page.tsx:241-258`).
+16. **The first purchase of a new instrument takes no fee** (found by the owner on 2026-11-13, recording a real
+    buy): the «Posizione iniziale (primo acquisto)» block of `components/assets/AssetDialog.tsx` (`:2176-2262`) asks
+    quantity, price, date and settlement account, never the fee, and the `firstBuy` it sends
+    (`:1631-1640`) carries no `fees`. The settlement account is debited `quantity × price` only, so it drifts from the
+    broker's by the fee until the owner opens «Movimenti» › «Modifica» on that buy and types it there — the only
+    path today, and one that every first purchase needs. Neither PR #489 nor this spec's first draft touched the form.
 
 ## 2. Goal and acceptance criteria
 
@@ -103,6 +111,9 @@ shown; still in every RETURN (net) and in every TAX estimate (a fiscal basis of 
     `/dashboard/history` 780 of 780 KB gz, `/dashboard/cashflow` 788,1 of 789, `/dashboard/assets` 736,2 of 737,
     `/dashboard/allocation` 604,8 of 605, `/dashboard/performance` 657,1 of 658.
 15. A trade's fee row counts in Budget like any expense. **Proof**: F3.
+16. A new instrument created with an opening fee of 5 € and a fee category: the first buy carries `fees: 5`, its row
+    −5 is written with it, the account is debited `quantity × price + 5`; without a category the field is disabled
+    and links Impostazioni › Spese, exactly as in «Registra operazione» (decision 64). **Proof**: E2.
 
 ## 3. Decisions
 
@@ -122,6 +133,9 @@ shown; still in every RETURN (net) and in every TAX estimate (a fiscal basis of 
 - **Owner 43 (2026-11-12)**: in Divisione a trade's fee row belongs to whoever owns what is traded: the sole holder
   of the ASSET; when the asset is in comune or split by quota, the sole holder of the settlement ACCOUNT; else the
   row is in comune. **Owner 44 (2026-11-12)**: a fee the server could not write as a row is said in the toast.
+- **Owner 64 (2026-11-13)**: the first purchase recorded by the new-instrument form takes its fee, with the same
+  field, the same rules (decision 22) and the same toast (decision 44) as «Registra operazione»; it travels on the
+  first buy, so the server treats it as any trade's fee — no second write path.
 - **Adopted, reversible**:
   - *Gain vs return*: every capital GAIN (realized P&L, G/P, the month's «hai realizzato») is fee-free; every RETURN
     (per-asset total return, XIRR, the Dividendi card, Rendimenti) is net of every fee and keeps today's figure — but
@@ -474,6 +488,33 @@ export function describeTradeFeeField(facts: TradeFeeFieldFacts): string | null 
 export const TRADE_FEE_NEEDS_CATEGORY = 'Per registrare una commissione scegli prima la categoria delle commissioni in';
 ```
 
+### `components/assets/AssetDialog.tsx` — the opening buy's fee (decision 64)
+
+The fee rides on the first buy the form already sends (`:1631-1640`), so `commitTradeMutation` plans its row like any
+trade's: nothing changes server-side.
+
+- **Schema** (`:415-419`, beside `openingCashAssetId`): `openingFees: z.number().min(0, 'Le commissioni non possono
+  essere negative').optional().or(z.nan())`; the three resets that set `openingCashAssetId: '__none__'` (`:990`,
+  `:1256`, `:1310`) set `openingFees: undefined`. The comment above the opening fields: «… the first buy's date,
+  optional settlement account and fee».
+- **The facts**: beside `useSettings` (`:949`), `useExpenseCategories(ownerId, { enabled: open && isLedgerCreate })`;
+  `feeCategory` is `undefined` while either loads, else `resolveExpenseFeeCategory(categories, settings)` — the
+  derivation of `TransactionDialog`, with `hasRow: false` and `legacyFee: false` (a create has neither).
+- **The field**: a third grid row of the opening block, after the date + account row (`:2224-2254`), half width like
+  its siblings: `<Label htmlFor="openingFees">Commissioni (€)</Label>`, `<Input id="openingFees" type="number"
+  step="0.01" min="0" placeholder="es. 1.00" aria-describedby="opening-fees-hint" …>`, `disabled={!ledgerCreateReady
+  || !feeCategory}` (`:1028`: without the ledger the classic create writes no trade, so nothing could carry the
+  fee — the block's own «Il registro operazioni si sta inizializzando» line already says why); under it
+  `describeTradeFeeField(…)` or, on null, `TRADE_FEE_NEEDS_CATEGORY` + the link to `?tab=spese`, the markup of the
+  `TransactionDialog` field above with the id `opening-fees-hint`.
+- **The write** (`:1631-1640`): `firstBuy` gains `fees: normalizeExpenseFee(data.openingFees) ?? undefined`
+  (`lib/utils/expenseFee.ts:87`: NaN, 0 and negatives → none). `SettlementTimingHint` is unchanged: the timing of
+  the debit does not move, only its amount.
+- **The toast** (`:1652`): «Asset creato con successo», and on `feeRow === 'refused'` the same
+  `TRADE_FEE_NOT_WRITTEN` appended as in `TransactionDialog` (decision 44).
+- **A failed first buy** (`:1643-1651`, the asset survives at quantity 0) keeps today's recovery: the retry in
+  «Registra operazione» has the same field, so the fee is typed there.
+
 `:153`'s comment: «the fiscal gain: both fees deducted». `TaxCalculatorModal`: the reading (`:165`) moves to
 `dialogNarrative.ts` as `TAX_SIMULATION_READING` = «Una simulazione: niente viene registrato. La plusvalenza è
 calcolata in euro sul costo fiscale del registro operazioni — il PMC più le commissioni d’acquisto — con l’aliquota
@@ -577,6 +618,7 @@ Harness: `__tests__/assetTransactionWriteTx.test.ts` (the PR's fee `describe`, r
 | A2 | `assistantRegisterContext.test.ts`: a trade-fee row is in no pattern | revert `isFeeRow` |
 | N1 | `dialogNarrative.test.ts`: the five outcomes of `describeTradeFeeField` (hasRow, legacyFee, reading, no category → null, the category sentence); the feed reading with `tradeFee` | swap the `hasRow`/`legacyFee` order |
 | E1 | `e2e/assets.trade-fee.spec.ts` (new, 1440): no category → `#trade-fees` disabled, link to `?tab=spese`; category planted → a BUY with fee 5 writes the row; on Tracciamento its delete is disabled with the title and «Modifica» shows the note, no `#amount`; fee 8 → row −8; on the ETF bought with fee 5, «Quanto costa vendere» lists «PMC» 100,0000 € and «Costo fiscale» 100,5000 €, and a sale of 10 at 120 reads a gain of 195,00 €; trade deleted → row gone | render the delete enabled |
+| E2 | `e2e/assets.trade-fee.spec.ts`, a second test (1440): no category → in the new-instrument form `#openingFees` is disabled with the link; category planted → a new ETF «Ornitorinco» with opening 10 at 100, fee 5, on the account «Fenicottero» → its «Movimenti» show one buy with «Commissioni 5,00 €», Tracciamento one row −5, the account down by 1005 | drop `fees` from `firstBuy` |
 
 `e2e/assets.sale-tax.spec.ts`: plants the fee category and removes it and the fee row in `remove()` (the pattern of
 `e2e/cashflow.transfer-fee.spec.ts:94-101`); `:98` expects `'63.7'` ((750 − 5 − 500) × 26%); the account assertion
@@ -602,7 +644,8 @@ on Tracciamento that can be neither deleted nor re-amounted there, the account �
 
 - **A**: `tsc`, lint, Vitest (three zones), `npx playwright test e2e/assets e2e/cashflow e2e/history`.
 - **B**: emulators + seed; an ETF «Ornitorinco», an account «Fenicottero» and a fee category planted.
-- **C (browser, the session)**: Patrimonio at 1440 and 390 — the trade form with and without the category, the PMC
+- **C (browser, the session)**: Patrimonio at 1440 and 390 — the trade form and the new-instrument form's
+  «Posizione iniziale» (decision 64), each with and without the category, the PMC
   cell, «Movimenti» (P&L fee-free, return net), the tax simulation; Tracciamento — the row, its detail, its edit.
 - **D (data)**: `feeExpenseId` ↔ `feeOfTradeId`; `fiscalAverageCostEur` on the asset; `averageCostEurFeeFreeAt` on the
   meta after the first visit.
@@ -626,7 +669,8 @@ commit carries only an assistant identity, and this GitHub noreply form is the o
   shared or split asset, to the sole holder of the settlement account; else in comune — written once at the
   row's creation, a member set by hand survives» (decision 43). `doc/guide/registro-operazioni.md`: the answer's
   `feeRow` and the toast «Commissione non registrata in Cashflow: manca la categoria in Impostazioni › Spese»
-  (decision 44).
+  (decision 44). `doc/guide/registro-operazioni.md`: the first purchase of the new-instrument form takes its fee on
+  the first buy, same field and rules as «Registra operazione» (decision 64).
 - `doc/guide/registro-operazioni.md`: `:21-23` «the PMC carries no fee; `fiscalAverageCostEur` keeps the purchase fees
   for the tax estimates»; `:62-69` rewritten: the fiscal gain deducts both fees (owner, 2026-11-12), with one clause of history
   WITHOUT figures, month or broker name — «until 2026-11-12 the estimate stood on the price difference alone, as a
@@ -703,7 +747,8 @@ lettori, tradeFeeExpense.ts dalla PR #489 di Ciocc128 (refs/tmp/pr489) con le mo
 § 4 (la PR entra con git cherry-pick --no-commit 9d163bb1; fermati se un conflitto tocca un
 file che la § 4 non nomina), il piano della commissione DENTRO la transazione di commitTradeMutation, lo sgancio in
 deleteAllAssetTransactionsForAsset e nell'eliminazione dello strumento, la riproiezione con averageCostEurFeeFreeAt, tradeMoneyIn in
-marketEffect.ts, Rendimenti, le superfici di Cashflow, TransactionDialog, l'AI. I test PRIMA del
+marketEffect.ts, Rendimenti, le superfici di Cashflow, TransactionDialog, il campo commissioni del
+primo acquisto in AssetDialog (decisione 64), l'AI. I test PRIMA del
 codice, uno per riga della § 6, ciascuno visto rosso con la sua mutazione; cifre inventate e
 tonde, le fixture e i commenti da estratti conto sostituiti (§ 5). Fermati e chiedimi se: un test
 esistente diventa rosso per un motivo che non è il nuovo contratto (§ 6 elenca quelli attesi);

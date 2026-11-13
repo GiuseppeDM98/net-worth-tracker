@@ -158,6 +158,8 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
     later spec» never reaches production. → every spec
 63. The COMPRA chip never reads in the red of a loss: Orbita's and Egeo's `--chart-3` sit ≥ 30° of hue from
     `--destructive`, both modes, the contrasts re-measured. → NOVE-12, 13
+64. (2026-11-13) The first purchase of a new instrument takes its fee, with the field and rules of «Registra
+    operazione»; it travels on the first buy. → NOVE-07
 
 ## 4. The adopted choices (reversible before the implementation; each is repeated in the spec that uses it)
 
@@ -223,7 +225,7 @@ The order of implementation (each followed by its retirement session, § 8):
 | NOVE-04 | Compravendita: a mortgage larger than what is left to pay | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 14 findings, 1 owner decision |
 | NOVE-05 | The savings rate: one rule, a floor, and euros below it | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 31 findings, 1 owner decision |
 | NOVE-06 | Storico › Driver: «altre» split by cause | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 21 findings, 1 owner decision |
-| NOVE-07 | A trade's fee is a spending row, out of the average cost (PR #489) | L | 03, 06 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 2 owner decisions |
+| NOVE-07 | A trade's fee is a spending row, out of the average cost (PR #489) | L | 03, 06 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 2 owner decisions; extended on 2026-11-13 by decision 64 (the first purchase's fee) |
 | NOVE-08 | The ring: one primitive, one DESIGN rule, four homes | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 22 findings, 1 owner decision |
 | NOVE-09 | The ring in the minor tiles | M | 08 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 17 findings, 2 owner decisions |
 | NOVE-10 | Analisi recomposed as «Classifica» | L | 05, 08 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 31 findings, 6 owner decisions |
