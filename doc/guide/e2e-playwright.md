@@ -235,12 +235,14 @@
 - **Prove the test can fail before trusting it** (the 1440px assertions were re-run at 1200px, where they must fail).
 - **The full run and its known flakes** (the record of each run is in its commit message since 2026-10-19; before
   that, in `git log -- doc/guide/e2e-emulatori.md`). A full run is ~290 tests incl. 6 setups in ~12 min on the reference
-  machine (2026-10-16). Each flake below was red once or twice in a full run and green alone right after
+  machine (2026-10-16); 351 tests in 18,2 min on the Windows machine on 2026-11-13 (§ The suite's speed). Each flake below was red once or twice in a full run and green alone right after
   (`--repeat-each=3`); a second red of the same test is a pattern, not noise:
   - `cashflow.tablet.spec.ts` «the tabs are 44×44…» [tablet] (2026-10-16): 0 visible tabs 1,3 s after the verdict — the tab
     bar not yet painted when `open()` returned on the verdict and THE tile. Returned on 2026-10-20 (landscape, one full run); since then `open()` waits for the tablist and a visible tab too.
   - `overview.mobile.spec.ts` «a cell with a six-figure variation…» (2026-10-16, twice): the strip's second row 1,3–1,6 px
     apart where the cells share a line. Fixed: the test polls until the two cells share their line before reading the boxes.
+    Red again on 2026-11-13 (once in a full run: 212,55 against 213,57 px at the `toBe` of the shared line; green ×3 alone
+    and in the three runs after it): the poll did not close it — a pattern, still open.
   - The «remembered across a reload» tests of `mobile-composition.patrimonio.mobile.spec.ts` and `overview.mobile.spec.ts`
     (2026-10-15/16): `apiResponse.json: Response has been disposed` — the response a probe holds across `page.reload()`,
     the shape of the `holdChunks` entry below. Closed on 2026-10-16: `patchOverview` reads the body in a `try` and lets a
@@ -388,3 +390,58 @@
   `new Date('YYYY-MM-DD')`, UTC midnight, so every coupon derived from a local-midnight fixture reads the 14th.
   (Moved here whole from `AGENTS.md` → *Audit habits* on 2026-09-20; the rule stays there in one line.)
 - **A throwaway probe on the dev server** (2026-11-13): the Next dev overlay (`nextjs-portal`) covers the bottom-left button of the 1024×768 rail and swallows its click — the probe hides it with `nextjs-portal{display:none!important}`; the dashboard never reaches `networkidle` (Firestore listeners stay open), so a window opened for the owner waits on `domcontentloaded` and a failed `goto` is caught, or the script exits and takes the window with it.
+
+## The suite's speed
+
+Measured on 2026-11-13 on the Windows machine (8 logical cores, 31,5 GB, Playwright 1.62.1, Next 16.4.2), one run per
+configuration, same day; two equal runs differ by about 15% (the run of that morning took 21,1 min). Nothing was
+implemented that day: the gate in two levels is WORKFLOW.md § 3, the three levers below wait for a session of their own.
+
+| Run | Tests | Wall | Outcome |
+| --- | --- | --- | --- |
+| `next dev`, `trace: 'retain-on-failure'` (the config as it is) | 351 | 18,2 min | 349 green, 1 red (the `overview.mobile` flake above), 1 skipped |
+| production server on :3100, trace on | 351 | 18,3 min, ~6 of them the timeouts of its 7 reds | 343 green, 7 red |
+| `next dev`, `--trace=off`, 71 files of 75 | 333 | 12,5 min | 332 green |
+| production server, `--trace=off`, 71 files of 75 | 333 | 9,9 min | 332 green |
+
+On the 331 tests green in all four: 954,5 s → 680,8 s without the trace (−29%) → 643,9 s on the production server with it
+(−33%) → 528,5 s with both (−45%). The whole suite is about 13 min on `next dev` without the trace, about 10,3 min on the
+production server without it.
+
+- **The trace is the cost, not the compilation** — `retain-on-failure` records EVERY test: about 274 s of the 1001 s of
+  tests, most of it on `next dev`, whose unminified chunks go into the trace (`allocation.consulente.report` 88,2 → 29,6 s,
+  `allocation.consulente.interview` 71,1 → 20,5 s). The first visit of each page costs the server 20,6 s in a whole run
+  (49 paths, 1236 requests, one «Compiling» line): `.next-e2e/dev/cache` is Turbopack's persistent cache (1,3 GB). Not
+  measured with `.next-e2e` deleted.
+- **Every invocation pays ~40 s before its first test**: `global-setup` runs its eight seeds in series, ~5 s each, nearly
+  all of it the start of `npm run` + `tsx` — four tests alone are 41,8 s of wall. The six logins are 15,9 s on `next dev`,
+  3,7 s on the production server; worker start and the gaps between tests 51 s.
+- **What a production server breaks**: seven tests in four files go red and three stay green asserting nothing, all because
+  `e2e/chunkProbe.ts` knows a chunk by its unminified CONTENT (`node_modules/d3-sankey/`, `function AssetSparkline`) —
+  red `bundle.lazy.spec.ts` ×3, `cashflow.split.spec.ts` and `cashflow.split.mobile.spec.ts` (the lazy tab's landing),
+  `assets.rows.mobile.spec.ts` ×2; mute `bundle.lazy.mobile.spec.ts` ×2 and `assets.rows.spec.ts`'s «no sparkline». The
+  rest: `next start` refuses `output: "standalone"` (the recipe is `scripts/perfServe.mjs`'s); a standalone `server.js`
+  does not read `.env.local`, which `next dev` does — set the emulator variables first, then load the file with
+  `@next/env`, or the Consulente (a dynamic page) reads no key, while `/dashboard/assistant` and `/dashboard/cashflow` are
+  prerendered and took `assistantConfigured` at BUILD time; `perf:build` bakes the same `NEXT_PUBLIC_*` as `dev:e2e`; a
+  change to the code needs a build (44 s) and a restart, and `reuseExistingServer` would run on a stale build in silence;
+  `.next-perf` is shared with `perf:serve` and the census. Not verified: whether `shell.boot`'s hydration checks still
+  see a mismatch on a production build.
+- **Sharding by account does not pay as the accounts stand**: the base account is 59 files, 254 tests and 77% of the
+  time (772 s; degraded 56 s, analisi 55 s, hof 44,5 s, split 44 s, centri 29 s), so the wall stays the base account's.
+  Cloning it means `test-user-1` in 21 specs and 2 helpers, about 35 files that write to it, about 40 fixed ids
+  (`seed-*`, `e2e-*`) in root collections and three seeds to parametrise; `hof` must precede `hof-mobile`, and
+  `global-setup` logs every parked session out on each invocation. Playwright has `projects[].workers` but no exclusion
+  between two projects of one account. **And the trace serialises the workers**: three accounts on three workers went
+  49,3 → 40,2 s with it (the CPU at 1,7 cores of 8) and 42,1 → 21,9 s without; four workers on the base account with the
+  trace made each test 3–7× slower. One port is enough on a production server.
+- **To implement, in this order** (decided 2026-11-13 on the owner's delegation): the trace off in the config, a red
+  re-run with `--trace=on`; the seeds of `global-setup` in parallel (Previdenza before Coast); then the production server
+  for the WHOLE run only — the ten chunk tests rewritten on a signature that survives minification or kept on a `next dev`
+  project, a guard against a stale build, `scripts/perfServe.mjs` parametrised by port rather than a twin. No sharding.
+
+Time per area, `next dev` with the trace · production without it (the specs of an area: its guide's § *Files*):
+Consulente 207 · 73 s; Cashflow's Tracciamento, accounts, mortgage and fee 140 · 92; Patrimonio 82 · 51; Assistente 64 · 33;
+Analisi 53 · 28; Previdenza 48 · 33; FIRE 45 · 29; Divisione 42; Hall of Fame 41 · 23; Panoramica 38 · 23; Allocazione
+34 · 20; Impostazioni 34 · 18; motion 31 · 24; Centri 27 · 13; Rendimenti 27 · 17; Dividendi 16 · 10; Storico 15 · 11;
+bundle 12; Budget 10 · 8; shell 9 · 4.

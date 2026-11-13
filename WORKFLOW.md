@@ -208,7 +208,7 @@ changes from repo to repo and is the only part to rewrite when the tooling chang
 | Unit tests | `TZ=Europe/Rome npx vitest run` (or `npm test -- <file>`) |
 | Lint | `npm run lint` (flat ESLint config, `eslint.config.mjs`) |
 | Build | `npm run build` |
-| Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) |
+| Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) — the whole suite once, before the commit is asked for; while working, the touched area's specs: `npx playwright test e2e/<area>` (Obligation 4, below) |
 
 npm is the package manager (`package-lock.json`; there is no Makefile, no pnpm/yarn lockfile).
 **Phantom `tsc` errors** clustered in `e2e/` and `lib/utils/expenseImport.ts` after a branch switch
@@ -319,7 +319,13 @@ The app **is** locally runnable; there is no fallback to declare.
   doc/guide/e2e-playwright.md). A throwaway spec
   must match that project's `testMatch` to be collected, and must be deleted at the end.
 - **Automated suites are yours to run, always**: `npx tsc --noEmit`, `TZ=Europe/Rome npx vitest run`
-  and `npx playwright test`.
+  and `npx playwright test`. **Playwright runs in two levels** (2026-11-13, decided by the agent on the owner's
+  delegation after that day's measures: a whole run 18,2 min, an area 1–4 min — doc/guide/e2e-playwright.md § The
+  suite's speed): while working, the specs of the area touched, in every project that collects them (each guide's
+  § *Files* lists them); the WHOLE suite once, with the work finished, before the commit is asked for — and again if
+  code changes after it. A change with no area (`components/ui`, `lib/hooks`, shared `lib/utils`, the shell,
+  `app/globals.css`, a seed, `playwright.config.ts`, a dependency) runs the whole suite at once. § 2's obligation
+  stands: nothing is declared verified with that final run unrun.
 - **Assert on data, not on pixels.** Read back from the Firestore emulator —
   `curl -H "Authorization: Bearer owner" "http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/<collection>"`;
   without that header the call is silently filtered to an empty result, which looks exactly like
