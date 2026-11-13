@@ -1,6 +1,6 @@
 # NOVE-16 — Allocazione › Accumulo: the PAC tab of PR #486, brought in with changes
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-02** (the Piano cell it rebases on) and reads NOVE-03's and
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-02 (retired on 2026-11-13, PR #524)** (the Piano cell it rebases on) and reads NOVE-03's and
 > NOVE-07's dialogs (the fresh ledger meta, the fee field); **NOVE-17, NOVE-18 and
 > NOVE-21 are implemented after it** (they read the editor, the plan document and the active-plan reader defined
 > here). Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7, a PR line as `pr486:file:line` on

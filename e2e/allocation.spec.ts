@@ -269,6 +269,9 @@ test('a 1440 la pagina è quella di oggi: nessuna riga chiusa, nessuna striscia,
   await expect(bilanciamento.getByText('Fuori posizione', { exact: true }).locator('xpath=following-sibling::p[1]')).toBeVisible();
 });
 
+// Seen red with `desktop:self-start` back on the Piano's cell (2026-11-13): already at «Ribilancia», where the
+// fixture's Piano is the shorter column; the >32px guard of the cleared-amount step below is green without the
+// mutation, it proves that step really stretches the Piano.
 test('il Piano finisce dove finisce Per classe, in ogni modo', async ({ page }) => {
   await openAllocazione(page);
   const piano = page.locator('section[aria-label="Piano"]');
