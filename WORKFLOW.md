@@ -203,6 +203,7 @@ changes from repo to repo and is the only part to rewrite when the tooling chang
 
 | Purpose | Command |
 | --- | --- |
+| Collaudo count (first gate) | `node ~/.claude/processi-collaudo.mjs` — zero collaudo trees and forgotten services (the Firebase emulators, the Next `dev`/`start` server), or the gates do not start (§ 2) |
 | Types | `npx tsc --noEmit` |
 | Unit tests | `TZ=Europe/Rome npx vitest run` (or `npm test -- <file>`) |
 | Lint | `npm run lint` (flat ESLint config, `eslint.config.mjs`) |
