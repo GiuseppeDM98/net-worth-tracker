@@ -3,7 +3,7 @@
 > The index of the series: the owner's points, the decisions, the order, the shared contracts and the rules every
 > spec obeys. Written on 2026-11-12 on `develop` @ b841cbd7 by the planning session; **read adversarially, all
 > the specs together, on 2026-11-12** (decisions 33–63 in § 3); a spec in service is retired with
-> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). No spec is implemented yet: the next is NOVE-01. One spec = one
+> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522); the next is NOVE-02. One spec = one
 > implementation session = one branch. A spec's NUMBER is its identity; the ORDER is § 5.
 
 ## 1. The owner's points (their words, 2026-11-12)
@@ -115,8 +115,8 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 36. The old words «Fisse / Variabili» outside Analisi: NOVE-10 renames the three UI and email sites through
     `SPENDING_TYPE_LABELS`, NOVE-15 the Assistente's system prompt. → NOVE-10, 15
 37. The old product name on surfaces outside the repo (the Firebase project's public name, the OAuth consent
-    screen, the sender in Vercel's env): out of scope, declared. → NOVE-01
-38. The page's meta description stays as it is. → NOVE-01
+    screen, the sender in Vercel's env): out of scope, declared. → NOVE-01 (retired on 2026-11-13, PR #522)
+38. The page's meta description stays as it is. → NOVE-01 (retired on 2026-11-13, PR #522)
 39. A trade's edit and delete carry `expectedUpdatedAt` (the row the form or the button was drawn from): a form
     opened on an older version is refused with the 409 that exists. → NOVE-03
 40. Compravendita, a mortgage above the residual: the «saldo» screen asks «Su quale conto la banca accredita quanto
@@ -162,7 +162,7 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 ## 4. The adopted choices (reversible before the implementation; each is repeated in the spec that uses it)
 
 - a. The themes' names are ours: «Egeo» (`egeo`), «Orbita» (`orbita`); no name or asset of a game in the app.
-- b. «Portfolio Tracker» → «Net Worth Tracker» in the UI and in SETUP.md. (NOVE-01)
+- b. «Portfolio Tracker» → «Net Worth Tracker» in the UI and in SETUP.md. (NOVE-01, retired on 2026-11-13, PR #522)
 - c. Allocazione: the Piano cell loses `desktop:self-start`. (NOVE-02)
 - d. «altre» in three parts; the third is the remainder, and holds the estimated-vs-withheld tax gap. (NOVE-06)
 - e. `lib/utils/savingsRate.ts` without imports, `SAVINGS_RATE_FLOOR = -100`; «Risparmio nel tempo» averages by
@@ -201,7 +201,7 @@ by saying so before that spec is implemented.
 
 The order of implementation (each followed by its retirement session, § 8):
 
-`01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 14 → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
+`01 (retired on 2026-11-13) → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 14 → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
 
 - **07** after **03** (the fee row commits inside the ledger's transaction contract) and **06** (`tradeMoneyIn` and
   `tradeAwarePriceEffect` change together).
@@ -217,7 +217,7 @@ The order of implementation (each followed by its retirement session, § 8):
 
 | Spec | Title | Effort | Depends on | Model · effort | Status |
 | --- | --- | --- | --- | --- | --- |
-| NOVE-01 | The product is called «Net Worth Tracker» everywhere | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 11 findings, 2 owner decisions; implemented on 2026-11-13 (PR #522), to retire |
+| NOVE-01 | The product is called «Net Worth Tracker» everywhere | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 11 findings, 2 owner decisions; implemented on 2026-11-13, PR #522 in develop since 2026-11-13; **retired on 2026-11-13**: the 13 strings and the criteria held with no divergence in the text; criterion 4 (the brand on one line, untruncated) re-measured on the retirement day, which the implementation had not written down; the three mutations of § 6 seen red again; the commit's side effects (WORKFLOW.md process count, NOVE-19's quoted `rounded` class, AGENTS.md's «Tailwind scans doc/» rule) were already written where they live |
 | NOVE-02 | Allocazione: a short Piano as tall as Bilanciamento + Per classe | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 16 findings, 0 owner decisions |
 | NOVE-03 | Registro operazioni: every write decides inside its transaction | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 19 findings, 1 owner decision |
 | NOVE-04 | Compravendita: a mortgage larger than what is left to pay | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 14 findings, 1 owner decision |
@@ -457,7 +457,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
+`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
 
 Prompt 08 (`08_CREA_RITIRO_SPEC`) was run on 2026-11-12, after the adversarial reading, in a session of its own:
 `doc/nove/PROMPT-RITIRO.md` is the prompt the owner pastes to retire ONE spec. A retirement updates its precedents

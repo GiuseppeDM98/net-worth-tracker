@@ -1,8 +1,9 @@
 /**
  * The product name. The app is called «Net Worth Tracker» on every surface the user reads (owner,
  * 2026-11-12): the tab title, the sidebar and the top bar, the access pages' eyebrow, the landing. The old
- * name must not come back in the source or in the setup guide; each expectation was seen red with the old
- * string put back.
+ * name must not come back in the source or in the setup guide; each expectation was seen red
+ * (2026-11-13): the old name put back in `components/layout/Sidebar.tsx` turns the scan and its row red; «Net Worth»
+ * alone there turns only its row red; the old title restored on `SETUP.md`'s first line turns the guide test red.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';

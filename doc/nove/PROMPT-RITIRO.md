@@ -3,6 +3,8 @@
 > Generato il 2026-11-12 da `08_CREA_RITIRO_SPEC`. Chi lo usa dopo un ritiro aggiorna i precedenti e le misure e
 > lascia il corpo com'è; il ritiro dell'ultima spec porta via questo file con la cartella.
 >
+> Ritiri fatti: NOVE-01 (2026-11-13, PR #522: nessuna divergenza nel testo, il criterio 4 rimisurato con una sonda usa e getta, le tre mutazioni del test rivedute rosse; Vitest 295 file / 6391 test al commit di implementazione).
+>
 > Il prompt che il proprietario incolla per ritirare UNA spec di `doc/nove/` dopo che il suo codice è in `develop`
 > (WORKFLOW.md § 3 «Where things are recorded»; `doc/nove/README.md` § 8: implementazione → ritiro →
 > implementazione). Ogni segnaposto del corpo è sostituito con ciò che il repo diceva il 2026-11-12 su
