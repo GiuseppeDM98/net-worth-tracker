@@ -268,3 +268,34 @@ test('a 1440 la pagina è quella di oggi: nessuna riga chiusa, nessuna striscia,
   const bilanciamento = page.getByRole('region', { name: "Bilanciamento dell'allocazione" });
   await expect(bilanciamento.getByText('Fuori posizione', { exact: true }).locator('xpath=following-sibling::p[1]')).toBeVisible();
 });
+
+test('il Piano finisce dove finisce Per classe, in ogni modo', async ({ page }) => {
+  await openAllocazione(page);
+  const piano = page.locator('section[aria-label="Piano"]');
+  const perClasse = page.locator('section[aria-label="Allocazione per classe"]');
+  const bilanciamento = page.locator('section[aria-label="Bilanciamento dell\'allocazione"]');
+  const footer = piano.locator('p.mt-auto');
+
+  const expectAligned = async (label: string) => {
+    const [p, c, b, f] = await Promise.all([piano.boundingBox(), perClasse.boundingBox(), bilanciamento.boundingBox(), footer.boundingBox()]);
+    expect(Math.abs(p!.y + p!.height - (c!.y + c!.height)), `${label}: i bordi inferiori`).toBeLessThanOrEqual(1);
+    expect(Math.abs(p!.y - b!.y), `${label}: i bordi superiori`).toBeLessThanOrEqual(1);
+    expect(p!.y + p!.height - (f!.y + f!.height), `${label}: il piè in fondo`).toBeLessThan(32);
+  };
+
+  for (const mode of ['Ribilancia', 'Versa', 'Preleva']) {
+    const button = piano.getByRole('button', { name: mode, exact: true });
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    await expectAligned(mode);
+  }
+
+  // Il Piano più basso che la pagina disegna: «Versa» con il campo vuotato (si apre su 1000).
+  await piano.getByRole('button', { name: 'Versa', exact: true }).click();
+  const amount = piano.getByRole('spinbutton');
+  await amount.fill('');
+  await expectAligned('Versa senza importo');
+  const [field, f] = await Promise.all([amount.boundingBox(), footer.boundingBox()]);
+  // Ad altezza naturale il piè starebbe 14px sotto il campo (mb-3.5): più di 32px vuol dire che il Piano si è allungato.
+  expect(f!.y - (field!.y + field!.height), 'senza importo il Piano è il più basso').toBeGreaterThan(32);
+});

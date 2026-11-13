@@ -675,9 +675,10 @@ file used to carry.
   moving eight method footers behind «Come si calcola» made the voids BIGGER, Benchmark ~170 → ~215px, Plusvalenze ~280
   → ~380px). Tiles share a row only with tiles of their own height; below that row two columns at natural height —
   wrappers `contents` below `desktop:`, `desktop:flex desktop:flex-col` from it — and the ONE element that can be any
-  height (a chart, `desktop:flex-1`) takes the slack. **The declared exception is Allocazione's Per classe** (owner,
-  2026-10-17): it fills the grid's `1fr` row to the Piano's bottom edge, its footer on the Piano's last line, because
-  the owner preferred the aligned edges to the void under it (doc/guide/allocazione.md). **Keep ONE sequence: the DOM order is the reading order on every
+  height (a chart, `desktop:flex-1`) takes the slack. **The declared exceptions are both on Allocazione**: Per classe (owner,
+  2026-10-17) fills the grid's `1fr` row to the Piano's bottom edge, its footer on the Piano's last line, because
+  the owner preferred the aligned edges to the void under it; the Piano (owner, 2026-11-12) stretches to Per
+  classe's bottom edge when it is the shorter, its cell without `desktop:self-start` (doc/guide/allocazione.md). **Keep ONE sequence: the DOM order is the reading order on every
   device**; the desktop places cells with `desktop:col-start-*`/`row-start-*`, never with an `order` swap (2026-09-27,
   DESIGN.md → The First-Screen Rule; Hall of Fame lost its `order-1…5` on 2026-10-10,
   `e2e/mobile-composition.hof.mobile.spec.ts` holds the DOM-equals-vertical order at 390 and 1440 and the `order-*`

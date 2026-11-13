@@ -10,8 +10,8 @@
 
 | | |
 | --- | --- |
-| **Last audit** | 2026-11-11 (`npm audit --json`, on the lock of 2026-11-11 — `fast-xml-parser` moved on the lock of 2026-11-07 (PR #507), § Registro › Moves) |
-| **Result** | **30 advisories**: 9 high · 21 moderate, no critical, no low (32 on 2026-11-07: 9 high · 23 moderate — two moderate rows left the registry's advisories; 31 on the morning of 2026-11-11 with a new low on `fast-xml-parser`, cured the same day; 41 on 2026-11-03; 54 before the upgrade of that day) |
+| **Last audit** | 2026-11-13 (`npm audit --json`, on the lock of 2026-11-13 — `hono` moved that day, § Registro › Moves) |
+| **Result** | **30 advisories**: 9 high · 21 moderate, no critical, no low (31 on the morning of 2026-11-13 with a new moderate on `hono`, cured the same day; 30 on 2026-11-11, 32 on 2026-11-07, 41 on 2026-11-03; 54 before the upgrade of that day) |
 | **Frameworks** | Next.js `^16.4.2` · React 19 (compiler on) · firebase `^12.5.0` (12.19.0) · firebase-admin `^14.5.0` · zod `^4.6.7` · `@anthropic-ai/sdk` `^0.115.0` · storybook `^10.6.5` · firebase-tools `^15.24.0` (15.33.0) · vitest `^4.1.12` |
 | **Node** | 24.x (`engines.node`, held by `__tests__/vercelConfig.test.ts`) |
 | **Next step** | none open: the next audit opens the next session (WORKFLOW.md rule 8) |
@@ -65,6 +65,7 @@ exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslin
 | 2026-11-03 | @hono/node-server | 1.19.17 → 2.1.6 (published 2026-11-02, the newest in `@modelcontextprotocol/sdk`'s `^1.19.9 \|\| ^2.0.5`; a major inside the parent's range) | `serveStatic` decoding the path twice | #497 |
 | 2026-11-07 | jsdom · @testing-library/react · @testing-library/dom · @testing-library/user-event | new devDependencies at exact versions: 30.1.3 · 16.3.3 · 10.4.2 · 14.6.8 (the newest stable at least seven days old; `dom` and `user-event` were already hoisted under storybook, now declared) | none — the component-test harness of the `dom` project in `vitest.config.ts` (owner, 2026-11-07); the gate below run once, 0 new advisories (32, unchanged) | #507 |
 | 2026-11-11 | fast-xml-parser (with is-unsafe 2.0.2 → 2.0.3 and strnum 2.4.2 → 2.5.1; under `firebase-admin` → `@google-cloud/storage`, optional) | 5.11.2 → 5.12.0 (published 2026-11-03) | quadratic CPU on unterminated stop-node tags (low, GHSA-474x-hrwr-fgx4, new that morning) | the retirement of the Registra spec (branch `docs/ritiro-ai-05`) — in that session by the owner's waiver of WORKFLOW.md rule 8 for this row (2026-11-11); `npm update fast-xml-parser`, the gate run once |
+| 2026-11-13 | hono (under `firebase-tools` → `@modelcontextprotocol/sdk` and `@hono/node-server`, dev CLI only) | 4.13.13 → 4.13.18 (published 2026-11-11) | `mount()` forwarding a path that bypasses scoped middleware; RegExpRouter skipping wildcard middleware (two moderate, fixed in 4.13.16) | the NOVE-02 session (branch `feat/nove-02-allocazione-piano-altezza`) — in that session by the owner's waiver of WORKFLOW.md rule 8 for this row (2026-11-13); `npm update hono`, the gate run once |
 
 ## How an upgrade is done
 

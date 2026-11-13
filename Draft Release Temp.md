@@ -115,7 +115,7 @@
 
 - **Rendimenti › Analizza con AI** — Improved the button: on hover and focus it takes the violet edge of the AI surfaces, like every control that asks a model to write.
 
-- **Allocazione (computer)** — Improved the two left tiles: Per classe now stretches to the bottom edge of the Piano when the Piano is the taller, so the two columns end on one line; with a shorter Piano everything keeps its natural height.
+- **Allocazione (computer)** — Improved the page's two columns: they now always end on one line — Per classe stretches to the bottom edge of the Piano when the Piano is the taller, and the Piano stretches to the bottom edge of Per classe when it is the shorter, its footer on the last line.
 
 - **Panoramica · Cashflow (telefono e tablet)** — Improved «Crea snapshot», the chart's periods and the Cashflow settings icon: 44-pixel targets for the thumb.
 - **Menu (telefono in orizzontale)** — Improved the menu button in the top bar, shown on a phone turned sideways where the bottom bar is hidden: a 44-pixel target for the thumb instead of 28, the bar a little taller.
