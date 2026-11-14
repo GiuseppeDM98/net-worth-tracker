@@ -68,7 +68,7 @@
   operation's centre. A refund is income and never in the centre. Transfers and instalments are never in the centre.
 - **A purchase**: the property is created at ZERO (`allocationRole: 'excluded'` and `isPrimaryResidence` when it is
   home, the «Intestatari» typed) and the transfers raise it — the deposit at the preliminare, the balance at the
-  rogito. **The mortgage's principal lands on the property's value at once** (`adjustProperty`, reason `mortgage`):
+  rogito. **Without an excess (below), the mortgage's principal lands on the property's value at once** (`adjustProperty`, reason `mortgage`):
   the bank pays the seller, so the loan (`financedAssetId`, its TAN, no owner field — it follows the property's) and
   the value appear together and the net worth does not move. **A mortgage up to the PRICE is accepted: what exceeds
   the residual (price − value today) is credited to the run's account in the same transaction that raises the house
