@@ -150,6 +150,7 @@ import { summarizeSpendingRoles } from '@/lib/utils/spendingRoles';
 import { SchedaTile, type SchedaFocus } from '@/components/cashflow/analisi/tiles/SchedaTile';
 import { ENTITY_DOSSIER_LAZY_CHARTS } from '@/components/cashflow/EntityDossier';
 import { usePreloadWhenIdle } from '@/components/ui/lazy-component';
+import { readSavings } from '@/lib/utils/savingsRate';
 
 type DrillDownLevel = 'category' | 'subcategory' | 'expenseList';
 type ChartType = 'expenses' | 'income';
@@ -977,7 +978,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
                 printedFigures={printedFigures}
                 expenses={periodExpenses}
                 isMobile={flussoNarrow}
-                reading={describeFlow(flow, totals.savingsRate)}
+                reading={describeFlow(flow, readSavings(totals.income, totals.expenses))}
                 flow={flow}
                 spendingRoles={spendingRolesFlow}
                 // The verdict's own calendar slice: on a phone the surplus note declares it too.

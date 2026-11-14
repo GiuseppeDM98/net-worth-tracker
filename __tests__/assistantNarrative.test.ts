@@ -48,6 +48,8 @@ import {
 import type { DashboardOverviewPayload } from '@/types/dashboardOverview';
 import type { AssistantRegisterSummary } from '@/types/assistant';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
+import { buildOverviewVerdict, resolveLivedCashflow } from '@/lib/utils/overviewNarrative';
+import { monthSavingsRate } from '@/lib/utils/overviewSummary';
 
 /**
  * The screen prints a no-break space before € (the browser U+00A0, Node's ICU the narrow
@@ -71,6 +73,17 @@ function period(overrides: Partial<AssistantPeriodInput> = {}): AssistantPeriodI
 // ─── The verdict on a period ─────────────────────────────────────────────────
 
 describe('buildAssistantPeriodVerdict — a closed month', () => {
+  // The article follows the figure as printed (The Comma Rule; «il 81%» until 2026-11-14).
+  it('says «l’81%» in both savings sentences', () => {
+    const cashflow = { totalIncome: 1000, totalDividends: 0, totalExpenses: -190, netCashFlow: 810 };
+    expect(plain(buildAssistantPeriodVerdict(period({ cashflow }), TODAY).sentence)).toContain("Hai messo da parte l'81% delle entrate.");
+    const onlyCashflow = buildAssistantPeriodVerdict(
+      period({ cashflow, netWorth: { start: 308_270, end: null, delta: null, deltaPct: null }, dataQuality: { hasSnapshot: false, hasCashflowData: true, isPartialMonth: false } }),
+      TODAY,
+    );
+    expect(plain(onlyCashflow.sentence)).toContain(": hai messo da parte l'81%.");
+  });
+
   it('says the month went well, in the past tense, with the value, the change and the savings', () => {
     const verdict = buildAssistantPeriodVerdict(period(), TODAY);
 
@@ -335,6 +348,16 @@ describe('resolveSavingsRate', () => {
   it('is null without income: a rate needs a denominator', () => {
     expect(resolveSavingsRate({ totalIncome: 0, totalDividends: 0, totalExpenses: -500, netCashFlow: -500 })).toBeNull();
   });
+
+  it('is null below the savings floor, while the words still say the spending beat the income', () => {
+    // 3 € in, 500 € out: −16.567% is not a rate (owner, 2026-11-12); what the page prints does not change.
+    const tiny = { totalIncome: 3, totalDividends: 0, totalExpenses: -500, netCashFlow: -497 };
+    expect(resolveSavingsRate(tiny)).toBeNull();
+    const verdict = buildAssistantPeriodVerdict(period({ cashflow: tiny }), TODAY);
+    expect(verdict.tone).toBe('warning');
+    expect(plain(verdict.sentence)).toContain('Hai speso più di quanto è entrato.');
+    expect(plain(describeAssistantCashflow(tiny))).toBe('Speso più di quanto è entrato.');
+  });
 });
 
 // ─── Tile readings ──────────────────────────────────────────────────────────
@@ -535,6 +558,43 @@ describe('toNoContextVerdictInput', () => {
     expect(input.savingsRate).toBeCloseTo(31.03, 2);
     expect(input.marketEffect).toBe(2890);
     expect(input.topMover?.assetClass).toBe('equity');
+  });
+
+  // A1: the free question's verdict is the Panoramica's sentence for the same payload, below the
+  // savings floor too — 3 € in and 500 € out so far, with a salary of 2600 € in the calendar; and the
+  // same month on a payload without `incomeScheduled`, where the sentence prints no percentage.
+  it('feeds the Panoramica verdict exactly what the Panoramica feeds it, below the floor too (A1)', () => {
+    const asThePanoramica = (payload: DashboardOverviewPayload) => {
+      const cashflow = resolveLivedCashflow(payload.expenseStats);
+      return buildOverviewVerdict({
+        month: 8,
+        totalValue: payload.metrics.totalValue,
+        monthlyVariation: payload.variations.monthly,
+        yearlyVariation: payload.variations.yearly,
+        isNewATH: payload.ath?.isNewATH ?? false,
+        savingsRate: cashflow ? cashflow.savingsRate : monthSavingsRate(payload.expenseStats),
+        cashflow,
+        marketEffect: payload.marketEffect ?? null,
+        monthFlows: payload.monthFlows ?? null,
+        topMover: payload.topMovers?.[0] ?? null,
+        sales: payload.monthSales ?? null,
+      });
+    };
+    const current = {
+      ...overview,
+      expenseStats: { currentMonth: { income: 2603, expenses: 500, net: 2103, expensesScheduled: 0, incomeScheduled: 2600 } },
+    } as unknown as DashboardOverviewPayload;
+    expect(buildNoContextVerdict(toNoContextVerdictInput(current, 8))).toEqual(asThePanoramica(current));
+    expect(plain(buildNoContextVerdict(toNoContextVerdictInput(current, 8)).sentence)).toContain('Finora hai messo da parte −497 €');
+
+    const older = {
+      ...overview,
+      variations: { monthly: null, yearly: null },
+      expenseStats: { currentMonth: { income: 3, expenses: 500, net: -497, expensesScheduled: 0 } },
+    } as unknown as DashboardOverviewPayload;
+    const verdict = buildNoContextVerdict(toNoContextVerdictInput(older, 8));
+    expect(verdict).toEqual(asThePanoramica(older));
+    expect(plain(verdict.sentence)).not.toContain('%');
   });
 
   it('has no savings rate without income and no market driver without attribution', () => {

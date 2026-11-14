@@ -28,7 +28,6 @@ import {
 } from '@/lib/utils/hallOfFameSummary';
 import { describeFullRanking, describePartialYearChip } from '@/lib/utils/hallOfFameNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { formatPercentage } from '@/lib/services/chartService';
 import { signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -36,6 +35,7 @@ import { SegmentedPill } from '@/components/ui/segmented-pill';
 import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { NoteTrigger, type NotePrefill } from '@/components/hall-of-fame/NoteTrigger';
+import { formatRecordPercentage } from '@/components/hall-of-fame/RecordRows';
 
 interface HallOfFameDettaglioProps {
   summary: HallOfFameSummary;
@@ -234,14 +234,7 @@ export function HallOfFameDettaglio({ summary, notes, onNoteClick, onAddNote }: 
                             </td>
                             {showPercentage && (
                               <td className="py-[9px] text-right font-mono text-[13px] tabular-nums text-muted-foreground">
-                                {row.percentage === null ? (
-                                  '—'
-                                ) : (
-                                  <>
-                                    {signedPercentage && (row.percentage >= 0 ? '+' : MINUS)}
-                                    {formatPercentage(Math.abs(row.percentage), 1)}
-                                  </>
-                                )}
+                                {row.percentage === null ? '—' : formatRecordPercentage(row.percentage, signedPercentage)}
                               </td>
                             )}
                             {showBase && (

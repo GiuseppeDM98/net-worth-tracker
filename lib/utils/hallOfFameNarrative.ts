@@ -16,7 +16,7 @@
  * `cachedFormatCurrencyEUR` (no-break space before €) — AGENTS.md → Italian Localization.
  */
 
-import { cachedFormatCurrencyEUR, formatDate } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatDate, withTypographicMinus } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { articleForPercent, pluralArticleFor } from '@/lib/utils/patrimonioNarrative';
 import { MONTH_NAMES } from '@/lib/constants/months';
@@ -68,6 +68,18 @@ function share(value: number, decimals = 1): NarrativeSegment {
  * «, l'88,5%» / «, il 53,6%» — the article follows the figure AS PRINTED (`articleForPercent`),
  * never a hand-written «il»: «il 88,5%» shipped for a month before the critique of 2026-09-24.
  */
+/**
+ * A savings rate: it keeps its minus (owner, 2026-11-12) and takes no «+» — a proportion of the
+ * income, not a gain. «il» before a negative one: «il −8,0%» is read «il meno otto».
+ */
+function savingsRate(value: number): NarrativeSegment {
+  return figure(withTypographicMinus(value, formatPercentage(Math.abs(value), 1)));
+}
+
+function withSavingsRate(value: number): Narrative {
+  return [prose(value < 0 && savingsRate(value).text.startsWith('−') ? ', il ' : `, ${articleForPercent(value, 1)}`), savingsRate(value)];
+}
+
 function withArticle(value: number, decimals = 1): Narrative {
   return [prose(`, ${articleForPercent(value, decimals)}`), share(value, decimals)];
 }
@@ -316,7 +328,7 @@ export function describeSavingsRecords(top: RecordEntry | null): Narrative {
     narrative.push(prose(' su '), amount(top.income), prose(' di entrate'));
   }
   if (top.percentage !== null) {
-    narrative.push(...withArticle(top.percentage));
+    narrative.push(...withSavingsRate(top.percentage));
   }
   narrative.push(prose('.'));
   return narrative;
@@ -574,7 +586,7 @@ export interface HallOfFameClosedAnswersInput {
 export function describeHallOfFameClosedAnswers({ stats, savingsTop, bestYear }: HallOfFameClosedAnswersInput): RowAnswerMap {
   return {
     [HOF_SECTION_IDS.entrate]: stats && stats.averageMonthlyIncome > 0 ? [prose('media mensile'), amount(stats.averageMonthlyIncome)] : null,
-    [HOF_SECTION_IDS.risparmio]: savingsTop && savingsTop.percentage !== null ? [share(savingsTop.percentage), prose('delle entrate')] : null,
+    [HOF_SECTION_IDS.risparmio]: savingsTop && savingsTop.percentage !== null ? [savingsRate(savingsTop.percentage), prose('delle entrate')] : null,
     [HOF_SECTION_IDS.anni]: bestYear && !bestYear.isCurrent ? [prose(bestYear.label), signedCurrency(bestYear.value)] : null,
     [HOF_SECTION_IDS.note]: null,
   };

@@ -1,7 +1,7 @@
 import type { HallOfFameNote } from '@/types/hall-of-fame';
 import type { RecordCategory, RecordEntry } from '@/lib/utils/hallOfFameSummary';
 import { describePartialYearChip } from '@/lib/utils/hallOfFameNarrative';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, withTypographicMinus } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
@@ -34,8 +34,8 @@ interface RecordRowsProps {
  *
  * The rule lives here once: a net-worth change is a gain or a loss and takes the sign tokens
  * with a typographic sign; an income and a COST are neither — a cost is the size of a cost, not
- * a loss (AGENTS.md → Sign tokens mean gain and loss, and nothing else) — and a savings rate is
- * a proportion, so it is printed unsigned beside a signed amount.
+ * a loss (AGENTS.md → Sign tokens mean gain and loss, and nothing else) — and a savings rate keeps
+ * its minus (owner, 2026-11-12) and takes no «+»: it is a proportion of the income, not a gain.
  */
 function readingOf(category: RecordCategory): { signedValue: boolean; signedPercentage: boolean } {
   switch (category) {
@@ -47,6 +47,16 @@ function readingOf(category: RecordCategory): { signedValue: boolean; signedPerc
     default:
       return { signedValue: false, signedPercentage: false };
   }
+}
+
+/**
+ * The percentage beside a record: a net-worth variation signed «+»/«−»; any other — the savings
+ * rate — with the typographic minus alone (`withTypographicMinus`, none on a printed zero).
+ */
+export function formatRecordPercentage(percentage: number, signed: boolean): string {
+  const magnitude = formatPercentage(Math.abs(percentage), 1);
+  if (signed) return `${percentage >= 0 ? '+' : MINUS}${magnitude}`;
+  return withTypographicMinus(percentage, magnitude);
 }
 
 /**
@@ -128,8 +138,7 @@ export function RecordRows({
 
             {row.percentage !== null && (
               <span className="w-[46px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
-                {signedPercentage && (row.percentage >= 0 ? '+' : MINUS)}
-                {formatPercentage(Math.abs(row.percentage), 1)}
+                {formatRecordPercentage(row.percentage, signedPercentage)}
               </span>
             )}
 

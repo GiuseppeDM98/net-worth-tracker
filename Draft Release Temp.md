@@ -59,6 +59,8 @@
 
 ## 🐛 Bug Fixes
 
+- **Tasso di risparmio — Panoramica · Assistente · Cashflow · Analisi · Hall of Fame · PDF · email** — Fixed a month with almost no income printing an absurd savings rate («Hai messo da parte il −16567% delle entrate finora»): below −100%, or with spending and no income, the app now speaks in euros, as in «Finora hai messo da parte −497 €: le spese superano le entrate», and the month's bar on «Risparmio nel tempo» no longer squashes the others. The twelve-month average now weighs each month by its income («In media il 33% su 10 mesi misurabili»), a negative rate keeps its minus everywhere, the Hall of Fame included, and the article follows the figure («l'81%», «Stipendio copre l'86,1%», where it read «il 81%»).
+
 - **Patrimonio — registro operazioni** — Fixed two tabs open at once overwriting a correction of the ledger or moving an account twice: a trade edited or deleted from a list that is no longer current is refused («Operazione non trovata.», «L'operazione è cambiata nel frattempo: riapri e riprova.») and the list refreshes by itself. A new ETF or bond created on a device that had not yet seen the ledger now gets its first purchase recorded too.
 
 - **Cashflow — la rata del mutuo** — Fixed the line under «Riduce il debito di» printing today's split of principal and interest on every instalment: an instalment already settled now reads the figures of its own day, dated («Il 01/10/2026 il debito di Mutuo Casa è sceso della quota capitale: 505,20 € di 557,30 €, il resto (52,10 €) sono interessi al TAN 0,7%»); an instalment still to come says its figures are an estimate on today's debt, computed for real the day it settles.

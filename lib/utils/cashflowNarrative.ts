@@ -27,7 +27,8 @@ import type {
 } from '@/lib/utils/tracciamentoSummary';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatEuroMinus, withTypographicMinus } from '@/lib/utils/formatters';
+import type { SavingsReading } from '@/lib/utils/savingsRate';
 import { formatNumberIt as formatNumber, formatPercentageIt as formatPercentage } from '@/lib/utils/formatters';
 import { articleForPercent, ofThePercent, pluralArticleFor } from '@/lib/utils/patrimonioNarrative';
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
@@ -308,18 +309,22 @@ export const TRACKING_CLOSED_ASIDES = {
   risparmio: 'mese per mese',
 } as const;
 
-function resolveTone(savingsRate: number | null, expenses: number): VerdictTone {
-  if (savingsRate === null) return expenses > 0 ? 'negative' : 'neutral';
-  if (savingsRate < 0) return 'negative';
-  return savingsRate >= GOOD_SAVINGS_RATE ? 'positive' : 'neutral';
+// The verdict branches on the TOTALS, never on `savingsRate === null`: a null rate is also a deficit
+// beyond the savings floor (`meaningfulSavingsRate`, 2026-11-12), and 3 € in with 500 € out is not
+// «senza entrate».
+function resolveTone(totals: PeriodCashflowTotals): VerdictTone {
+  if (totals.income <= 0) return totals.expenses > 0 ? 'negative' : 'neutral';
+  if (totals.net < 0) return 'negative';
+  return totals.savingsRate !== null && totals.savingsRate >= GOOD_SAVINGS_RATE ? 'positive' : 'neutral';
 }
 
 function resolveHeadline(subject: PeriodSubject, totals: PeriodCashflowTotals, settled = false): string {
   const { savingsRate, income, expenses } = totals;
   // Judging the lived part with a calendar still ahead: an empty lived part is «not yet», not «none».
   if (income <= 0 && expenses <= 0) return settled ? `Nessun movimento ancora ${subject.inPeriod}.` : `Nessuna entrata né spesa ${subject.inPeriod}.`;
-  if (savingsRate === null) return `${capitalise(subject.inPeriod)} hai speso senza entrate.`;
-  if (savingsRate < 0) return `${capitalise(subject.inPeriod)} hai speso più di quanto è entrato.`;
+  if (income <= 0) return `${capitalise(subject.inPeriod)} hai speso senza entrate.`;
+  if (totals.net < 0) return `${capitalise(subject.inPeriod)} hai speso più di quanto è entrato.`;
+  if (savingsRate === null) return `${subject.subject} ${subject.ongoing ? 'tiene' : 'ha tenuto'}, ma con poco margine.`;
   if (savingsRate >= GOOD_SAVINGS_RATE) return `${subject.subject} ${subject.ongoing ? 'sta andando' : 'è andato'} bene.`;
   return `${subject.subject} ${subject.ongoing ? 'tiene' : 'ha tenuto'}, ma con poco margine.`;
 }
@@ -345,10 +350,10 @@ function expensesDeltaClause(delta: PeriodDelta | null, comparison: string | nul
  */
 function figuresSentence(opening: string, subject: PeriodSubject, totals: PeriodCashflowTotals, delta: PeriodDelta | null, comparison: string | null): Narrative {
   const sentence: Narrative = [];
-  if (totals.savingsRate === null) {
+  if (totals.income <= 0) {
     sentence.push(prose(`${opening} nessuna entrata: spese `), figure(euro(totals.expenses)));
   } else {
-    if (totals.savingsRate < 0) {
+    if (totals.net < 0 || totals.savingsRate === null) {
       sentence.push(
         prose(`${opening} le spese ${subject.ongoing ? 'superano' : 'hanno superato'} le entrate di `),
         signed(euro(totals.net), 'negative'),
@@ -444,7 +449,7 @@ export function buildCashflowVerdict(input: CashflowVerdictInput): PageVerdictMo
 
   if (!hasCalendar) {
     const headline = resolveHeadline(subject, totals);
-    const tone = resolveTone(totals.savingsRate, totals.expenses);
+    const tone = resolveTone(totals);
     if (totals.income <= 0 && totals.expenses <= 0) {
       // A transfer is a movement, not a flow: the inventory counts it, the verdict must not deny it.
       const sentence =
@@ -464,7 +469,7 @@ export function buildCashflowVerdict(input: CashflowVerdictInput): PageVerdictMo
 
   const settled = settleTotals(totals, scheduled);
   const headline = resolveHeadline(subject, settled, true);
-  const tone = resolveTone(settled.savingsRate, settled.expenses);
+  const tone = resolveTone(settled);
   const calendar = calendarSentence(input.period, input.now, totals, scheduled);
 
   if (settled.income <= 0 && settled.expenses <= 0) {
@@ -568,11 +573,11 @@ function historyRate(rate: number): NarrativeSegment {
  * only over the months that had income; one measured month is named as such, none → null.
  */
 export function describeSavingsHistory(history: SavingsHistory): Narrative | null {
-  if (history.measuredCount === 0 || history.average === null || !history.best || !history.worst) return null;
+  if (history.rankedCount === 0 || history.average === null || !history.best || !history.worst) return null;
 
-  if (history.measuredCount === 1) {
+  if (history.rankedCount === 1) {
     return [
-      prose(`Un solo mese con entrate: ${monthInSentence(history.best.month)} (`),
+      prose(`Un solo mese misurabile: ${monthInSentence(history.best.month)} (`),
       historyRate(history.best.savingsRate ?? 0),
       prose(').'),
     ];
@@ -581,14 +586,17 @@ export function describeSavingsHistory(history: SavingsHistory): Narrative | nul
   // A negative average takes no article ("In media −8%"): the elision would bind to a minus.
   const average: Narrative = history.average < 0 ? [historyRate(history.average)] : percentWithArticle(history.average);
 
-  // The running month was left out of the ranking: say over how many closed months it runs.
-  const scope: Narrative = history.ongoing
-    ? [prose(' su '), figure(String(history.closedCount)), prose(` ${pluralize(history.closedCount, 'mese chiuso', 'mesi chiusi')}`)]
+  // The running month, or a month below the savings floor, was left out of the average: say over
+  // how many months it runs — «misurabili», the months that are rates (owner, 2026-11-14).
+  const leftOut = history.ongoing !== null || history.measuredCount > history.rankedCount;
+  const scope: Narrative = leftOut
+    ? [prose(' su '), figure(String(history.rankedCount)), prose(` ${pluralize(history.rankedCount, 'mese misurabile', 'mesi misurabili')}`)]
     : [];
 
   // Equal rates everywhere are not a ranking.
   if ((history.best.savingsRate ?? 0) === (history.worst.savingsRate ?? 0)) {
-    return [prose('In media '), ...average, ...scope, prose(`, uguale in tutti ${pluralArticleFor(history.measuredCount)} ${history.measuredCount} mesi con entrate.`)];
+    const tail = leftOut ? ', uguale in tutti.' : `, uguale in tutti ${pluralArticleFor(history.rankedCount)} ${history.rankedCount} mesi misurabili.`;
+    return [prose('In media '), ...average, ...scope, prose(tail)];
   }
 
   return [
@@ -601,6 +609,27 @@ export function describeSavingsHistory(history: SavingsHistory): Narrative | nul
     historyRate(history.worst.savingsRate ?? 0),
     prose(').'),
   ];
+}
+
+/**
+ * One month of «Risparmio nel tempo» in words — the `<title>` of its bar, its entry in the SVG's
+ * `aria-label` and the hover tip, so the three never disagree: «Ago: 20%», «Ago: −30%» (the
+ * typographic minus, none on a printed zero), «Ago: spese oltre le entrate, −497 €» below the
+ * savings floor or without income (2026-11-12), «Ago: nessun movimento», and «Ago: non ancora
+ * iniziato» for a month after today's, which is not judged.
+ */
+export function describeSavingsBar(reading: SavingsReading, label: string, isFuture: boolean): string {
+  if (isFuture) return `${label}: non ancora iniziato`;
+  switch (reading.kind) {
+    case 'rate':
+      return `${label}: ${withTypographicMinus(reading.rate, formatPercentage(Math.abs(reading.rate), 0))}`;
+    case 'deficit':
+      return `${label}: spese oltre le entrate, ${formatEuroMinus(-reading.deficit)}`;
+    case 'no-income':
+      return `${label}: spese oltre le entrate, ${formatEuroMinus(-reading.spending)}`;
+    case 'none':
+      return `${label}: nessun movimento`;
+  }
 }
 
 /** Whether the history ends on the current Italian month — what makes «ultimi N mesi» true. */
@@ -649,7 +678,7 @@ export function describeFlowWindow(flows: MonthFlow[], isYear: boolean, now: Dat
 
 /** The footer of the savings tile: how many of the measured months closed in deficit, named up to three. */
 export function describeDeficitMonths(history: SavingsHistory, now: Date): Narrative | null {
-  if (history.measuredCount === 0) return null;
+  if (history.measuredCount === 0 && history.deficitMonths.length === 0) return null;
   const deficit = history.deficitMonths;
   if (deficit.length === 0) {
     const { measuredCount, closedCount, months } = history;
@@ -775,7 +804,7 @@ export function describeCategoryShareAnswer(ranking: CategoryRanking, kind: 'exp
  * that month instead). Beside THE tile's rate of the period, «in media» tells them apart.
  */
 function describeSavingsHistoryAnswer(history: SavingsHistory): Narrative | null {
-  if (history.average === null || history.measuredCount < 2) return null;
+  if (history.average === null || history.rankedCount < 2) return null;
   // Decided on the printed integer: −0,3 prints «0%», with no sign.
   if (Math.round(history.average) < 0) return [prose('in media'), historyRate(history.average)];
   const average = Math.max(history.average, 0);

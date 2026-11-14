@@ -13,6 +13,7 @@ import {
   describeAllocationSection,
   describeHistorySection,
   describeCashflowSection,
+  describeNetSavingsNote,
   describePerformanceSection,
   describeFireSection,
   describeSummarySection,
@@ -170,6 +171,20 @@ describe('describeAllocationSection', () => {
     const reading = plain(describeAllocationSection({ ...drifted, hasTargets: false }));
     expect(reading).toContain('Nessun obiettivo di allocazione è impostato');
     expect(reading).not.toContain('bersaglio;');
+  });
+});
+
+// The savings floor (owner, 2026-11-12): the note under «Risparmio netto» is a percentage only when
+// it is a rate; a negative one takes the typographic minus (P1).
+describe('describeNetSavingsNote', () => {
+  it('prints the rate as a share of the income, a negative one with U+2212', () => {
+    expect(describeNetSavingsNote(4000, 3000)).toBe('25,0% di quanto è entrato');
+    expect(describeNetSavingsNote(2000, 2600)).toBe('−30,0% di quanto è entrato');
+  });
+
+  it('has no note without income or below the floor', () => {
+    expect(describeNetSavingsNote(0, 500)).toBeNull();
+    expect(describeNetSavingsNote(3, 500)).toBeNull();
   });
 });
 

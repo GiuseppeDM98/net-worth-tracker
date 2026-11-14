@@ -167,6 +167,42 @@ describe('selectOverviewStrip', () => {
     for (const figure of strip) expect(sentence).toContain(cellText(figure));
   });
 
+  // The savings floor (owner, 2026-11-12): ① nothing in, 500 € out; ② 3 € in, 500 € out; ③ 2000 €
+  // in, 2600 € out (−30%), with 1500 € of spending and 2600 € of income still in the calendar.
+  describe('«Messo da parte finora» below the savings floor', () => {
+    const withLived = (income: number, spending: number) =>
+      makeOverview({
+        expenseStats: {
+          ...STATS,
+          currentMonth: { income: income + 2600, expenses: spending + 1500, net: income + 2600 - spending - 1500, expensesScheduled: 1500, incomeScheduled: 2600 },
+        },
+      });
+
+    it('has no value without income so far (S1)', () => {
+      expect(selectOverviewStrip(withLived(0, 500))[2]).toMatchObject({ value: null, reason: 'nessuna entrata finora' });
+    });
+
+    it('prints a deficit beyond the floor in signed euros, the text of the sentence (S2)', () => {
+      const overview = withLived(3, 500);
+      const cell = selectOverviewStrip(overview)[2];
+      expect(cellText(cell)).toBe('−497 €');
+      expect(plain(narrativeToText(buildOverviewVerdict(verdictInput(overview)).sentence))).toContain(cellText(cell));
+    });
+
+    it('keeps a true −30% as a rate (S3)', () => {
+      const overview = withLived(2000, 2600);
+      const cell = selectOverviewStrip(overview)[2];
+      expect(cellText(cell)).toBe('−30%');
+      expect(plain(narrativeToText(buildOverviewVerdict(verdictInput(overview)).sentence))).toContain(cellText(cell));
+    });
+
+    it('says the deficit in words on a payload without the calendar, whose sentence has no clause', () => {
+      const olderPayload = makeOverview({ expenseStats: { ...STATS, currentMonth: { income: 3, expenses: 500, net: -497, expensesScheduled: 0 } } });
+      expect(selectOverviewStrip(olderPayload)[2]).toMatchObject({ value: null, reason: 'spese oltre le entrate' });
+      expect(plain(narrativeToText(buildOverviewVerdict(verdictInput(olderPayload)).sentence))).not.toContain('delle entrate');
+    });
+  });
+
   it('says why a figure is missing, never a zero', () => {
     const noSnapshots = selectOverviewStrip(makeOverview({ variations: { monthly: null, yearly: null } }));
     expect(noSnapshots[0]).toMatchObject({ value: null, reason: 'nessuno snapshot prima di questo mese' });
