@@ -1,6 +1,6 @@
 # NOVE-07 — A trade's fee is a spending row, out of the average cost
 
-> Series `doc/nove/` (README.md § 5): **implemented after NOVE-03** (every ledger write decides inside its
+> Series `doc/nove/` (README.md § 5): **implemented after NOVE-03 (retired on 2026-11-14, PR #526)** (every ledger write decides inside its
 > transaction, `assertTradeUnchanged`) **and NOVE-06** (`tradeMoneyIn`, the Driver's split). Integrates contributor
 > PR #489 (head 9d163bb1, base 54634a9) **with changes**. Written on 2026-11-12; every `file:line` is cited on
 > `develop` @ b841cbd7, the PR's as `pr489:<path>:<line>`. Executes the owner's decisions 18–23 and 31 (README.md § 3).
@@ -93,7 +93,7 @@ shown; still in every RETURN (net) and in every TAX estimate (a fiscal basis of 
 5. A trade saved with a fee before this change never gets a row; a fee given to a trade that had none creates one.
    **Proof**: W5, W6.
 6. The fee plan is decided in the transaction: a row deleted, or a category deleted, between prepare and commit is
-   seen by the commit. **Proof**: X1, X2, W7. (Two concurrent edits of the same trade are NOVE-03's 409, its E1.)
+   seen by the commit. **Proof**: X1, X2, W7. (Two concurrent edits of the same trade are already the 409 of `assertTradeUnchanged`, `assetTransactionsRoutes.test.ts` E1.)
 7. Converting the asset to a pension fund, or deleting the asset, keeps its fee rows as plain spending, deletable in
    Cashflow. **Proof**: W8, D1.
 8. Driver: a 5 € fee with a row → «risparmio» −5, «mercato» 0, `other` 0; without a row → «mercato» −5, `other` 0.
@@ -328,7 +328,8 @@ The header keeps the PR's text dated 2026-11-12 plus the legacy rule. `lib/utils
     const storedFeeSnap = storedFeeRef ? await tx.get(storedFeeRef) : undefined;
 ```
 
-COMPUTE, after NOVE-03's checks (which stay first):
+COMPUTE, after its four checks (which stay first: `assertTradeUnchanged`, the asset's existence, its ledger type,
+`assertSettlementAccountsStillCash`, all above `buildNewSequence` in `lib/server/assetTransactionUseCase.ts`):
 
 ```ts
     const feeCategory = feeCategoryFrom(plan.ownerId, settingsSnap, categorySnap);
@@ -392,10 +393,10 @@ the trade.
 in Cashflow: manca la categoria in Impostazioni › Spese» (`lib/utils/dialogNarrative.ts`, beside
 `describeTradeFeeField`).
 
-**`deleteAllAssetTransactionsForAsset`** (NOVE-03's transaction): after its two reads, `tx.get` each fee row its trades
+**`deleteAllAssetTransactionsForAsset`** (one transaction since 2026-11-12): after its two reads, `tx.get` each fee row its trades
 name; beside the deletes, `tx.update(ref, { feeOfTradeId: FieldValue.delete(), updatedAt: new Date() })` on each that
 exists; docstring «its fee rows stay as plain spending: the money left». `AssetDialog.tsx:1602` then invalidates
-`queryKeys.expenses.all(ownerId)`. **`backfillAverageCostEur`** (`:696-736`, NOVE-03's per-asset transaction): guard
+`queryKeys.expenses.all(ownerId)`. **`backfillAverageCostEur`** (`:696-736`, one transaction per asset since 2026-11-12): guard
 on `averageCostEurFeeFreeAt`; writes `{ averageCostEur, fiscalAverageCostEur, updatedAt }`; stamps
 `averageCostEurFeeFreeAt`; docstring «re-run once on 2026-11-12: the PMC lost the fees».
 `app/dashboard/assets/page.tsx:245` reads the new flag, `assetTransactionService.ts:101-102` maps it.
@@ -550,7 +551,7 @@ it holds. The data block only: no system prompt changes. `:78`: «The PMC per un
 - **`runTransaction`: ALL `tx.get()` before ANY write** (AGENTS.md § Firestore Writes): r4–r6 precede w1; the pure
   `existing` map moves into READS.
 - **A transaction retries its closure**: the new row's id comes from `prepare*`, never from inside the closure.
-- **NOVE-03's `assertTradeUnchanged` is the FIRST statement of COMPUTE**: the fee plan stands on `stored`, just
+- **`assertTradeUnchanged` is the FIRST statement of COMPUTE** (2026-11-12): the fee plan stands on `stored`, just
   checked. Never plan the fee from `prepareEdit`'s copy: X1 and X2 change the store between prepare and commit.
 - **Money in cents**: the row's amount is `normalizeExpenseFee`'s (to the cent), the settlement `roundToCents` as today.
 - **The optional-field trap**: `buildTradeUpdateDocData` writes `feeExpenseId ?? FieldValue.delete()`; the unlink is a
@@ -578,7 +579,7 @@ it holds. The data block only: no system prompt changes. `:78`: «The PMC per un
 
 ## 6. Tests per level (with the mutation that proves each)
 
-Harness: `__tests__/assetTransactionWriteTx.test.ts` (the PR's fee `describe`, re-pointed); X1 on NOVE-03's gate in
+Harness: `__tests__/assetTransactionWriteTx.test.ts` (the PR's fee `describe`, re-pointed); X1 on the per-call gate (`gateTransactions`) of
 `__tests__/assetTransactionsRoutes.test.ts`.
 
 | # | Test | Mutation that turns it red |
@@ -611,9 +612,9 @@ Harness: `__tests__/assetTransactionWriteTx.test.ts` (the PR's fee `describe`, r
 | W8 | `deleteAllAssetTransactionsForAsset` on two trades, one with a row → trades gone, row kept without `feeOfTradeId` | `tx.delete` the row |
 | W9 | stored trade fee 5 naming `fee-1` (no such row), no category, note edited → the trade still names `fee-1`, no row; category planted, note edited again → `expenses/fee-1` −5 | drop `keepsLink` |
 | D1 | `__tests__/assetDeleteRoute.test.ts` (new): DELETE of an asset with two trades, one naming a fee row → asset gone, the row kept without `feeOfTradeId` | skip the unlink |
-| X1 | `assetTransactionsRoutes.test.ts`, NOVE-03's gate: a BUY with fee 5 and its row `expenses/fee-1`; a PUT fee 8 is prepared, then (gate) `fee-1` is deleted from the store, then the PUT commits → success, `expenses/fee-1` exists whole (amount −8, `feeOfTradeId`, `categoryId`), the trade names `fee-1` | read the row's existence in `prepareEdit` |
+| X1 | `assetTransactionsRoutes.test.ts`, its per-call gate: a BUY with fee 5 and its row `expenses/fee-1`; a PUT fee 8 is prepared, then (gate) `fee-1` is deleted from the store, then the PUT commits → success, `expenses/fee-1` exists whole (amount −8, `feeOfTradeId`, `categoryId`), the trade names `fee-1` | read the row's existence in `prepareEdit` |
 | X2 | a POST BUY fee 4 is prepared with the fee category set, then (gate) the category doc is deleted, then it commits → success, no `expenses/` doc, the trade has no `feeExpenseId`, the answer carries `feeRow: 'refused'` | read the category in `prepareCreate` |
-| B1 | `assetTransactionAverageCostEurBackfill.test.ts` (its fake gains NOVE-03's `runTransaction`): backfill with `averageCostEurBackfilledAt` only → runs, both PMCs written, flag stamped; again → `alreadyBackfilled` | guard on the old flag |
+| B1 | `assetTransactionAverageCostEurBackfill.test.ts` (its fake has a `runTransaction` since 2026-11-12): backfill with `averageCostEurBackfilledAt` only → runs, both PMCs written, flag stamped; again → `alreadyBackfilled` | guard on the old flag |
 | A1 | `assistantPortfolioContext.test.ts` `feeIsSpendingRow`; `assistantPromptBundle.test.ts` «commissioni 2,00 € (già fra le spese)» and the `system` equality | print the suffix always |
 | A2 | `assistantRegisterContext.test.ts`: a trade-fee row is in no pattern | revert `isFeeRow` |
 | N1 | `dialogNarrative.test.ts`: the five outcomes of `describeTradeFeeField` (hasRow, legacyFee, reading, no category → null, the category sentence); the feed reading with `tradeFee` | swap the `hasRow`/`legacyFee` order |
