@@ -537,6 +537,9 @@ export function driverRestParts(row: Omit<GrowthDrivers, 'isMarketMeasured'>): A
   ].filter((part) => Math.abs(Math.round(part.value)) >= 1);
 }
 
+/** The note under «Risparmio e mercato per mese» on the parts with no bar (they are in each month's tooltip, under the same labels). */
+export const DRIVER_MONTHLY_NO_BAR_NOTE = 'Mutuo rimborsato, versamenti al fondo pensione, fondo pensione non tracciato, quantità fuori dal registro e saldi dei conti non hanno una barra: sono nel dettaglio di ogni mese, passando sul grafico.';
+
 /** The method note's three sentences on «altre»; `text` follows the term and its colon. */
 export const DRIVER_METHOD_OTHER: ReadonlyArray<{ term: string; text: string }> = [
   {

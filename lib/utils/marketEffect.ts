@@ -26,7 +26,7 @@ export interface PositionValue {
  * fees). For a held quote this is the old `q_prev × Δu`; for a bought one `q × (u_now − p) − fees`;
  * for a sold one `q × (p − u_prev) − fees`. A quantity change no BUY/SELL explains — a migration
  * baseline, an adjustment, a hand-edited quantity — moves no money the ledger knows, so it is
- * valued at the current unit price and kept OUT of the market (it lands in «altre variazioni»).
+ * valued at the current unit price and kept OUT of the market (it lands in «altre variazioni»; Storico's Driver names it «Quantità fuori dal registro»).
  *
  * `trades` must already be scoped to the window between the two valuations. Returns null when the
  * instrument has no BUY/SELL in it (the caller keeps `q_prev × Δu`), and for a position closed
@@ -90,7 +90,7 @@ export function pensionPaidInBetween(
  * «versati nel fondo pensione» of the Panoramica, Patrimonio and the email, and Storico's
  * «versamenti al fondo pensione». 0 before `startMonth` (`resolvePensionReturnStart`): the
  * contributions are complete only from there, and naming half of them would push the rest of
- * the fund's growth into a negative «altre variazioni».
+ * the fund's growth into a negative «altre variazioni» (in Storico's Driver, «Fondo pensione non tracciato»).
  */
 export function pensionPaidInAcross(
   contributions: PensionContribution[],

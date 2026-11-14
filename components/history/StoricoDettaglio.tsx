@@ -18,7 +18,7 @@ import { useReducedMotion } from 'framer-motion';
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { PeriodMonth } from '@/lib/utils/storicoSummary';
-import { reconcileRemainder, describeLabor, describeLaborTaxes, describeLaborWindow, describeMonthlyDrivers, describeNotes, describeOtherIncome, describeYearlyVariation, DIVIDENDS_OUTSIDE_CASHFLOW, formatPeriodMonth, type LaborMetricsInput, type MonthlyDriverRow, type YearlyVariationRow } from '@/lib/utils/storicoNarrative';
+import { reconcileRemainder, describeLabor, describeLaborTaxes, describeLaborWindow, describeMonthlyDrivers, describeNotes, describeOtherIncome, describeYearlyVariation, DIVIDENDS_OUTSIDE_CASHFLOW, DRIVER_MONTHLY_NO_BAR_NOTE, formatPeriodMonth, type LaborMetricsInput, type MonthlyDriverRow, type YearlyVariationRow } from '@/lib/utils/storicoNarrative';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
@@ -239,7 +239,7 @@ function MonthlyDriversTile({ rows, years, startYear }: { rows: MonthlyDriverRow
       )}
       <TileMethodNote subject="Risparmio e mercato per mese" summary={`La scomposizione del Driver, mese per mese, dal ${startYear}.`}>
         <span>Il {startYear} è l&apos;anno da cui il cashflow è completo: prima non ci sono entrate e spese da cui misurare il risparmio.</span>
-        <span>Mutuo rimborsato, versamenti al fondo pensione e altre variazioni non hanno una barra: sono nel dettaglio di ogni mese, passando sul grafico.</span>
+        <span>{DRIVER_MONTHLY_NO_BAR_NOTE}</span>
       </TileMethodNote>
     </Tile>
   );
