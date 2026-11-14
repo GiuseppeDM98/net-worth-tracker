@@ -1,8 +1,21 @@
+import type { DocumentData } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { Asset, MonthlySnapshot } from '@/types/assets';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { ASSET_TRANSACTIONS_COLLECTION, type AssetTransaction } from '@/types/assetTransactions';
 import type { PensionContribution } from '@/types/pension';
+
+/** A stored asset doc in the domain shape (Timestamp → Date at the boundary). */
+export function mapAssetDoc(id: string, data: DocumentData): Asset {
+  return {
+    id,
+    ...data,
+    lastPriceUpdate: data.lastPriceUpdate?.toDate() || new Date(),
+    createdAt: data.createdAt?.toDate() || new Date(),
+    updatedAt: data.updatedAt?.toDate() || new Date(),
+    holdingStartDate: data.holdingStartDate?.toDate(),
+  } as Asset;
+}
 
 /**
  * Fetch all assets for a user using Firebase Admin SDK (server-side only).
@@ -17,14 +30,7 @@ export async function getUserAssetsAdmin(userId: string): Promise<Asset[]> {
       .where('userId', '==', userId)
       .get();
 
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      lastPriceUpdate: doc.data().lastPriceUpdate?.toDate() || new Date(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      holdingStartDate: doc.data().holdingStartDate?.toDate(),
-    })) as Asset[];
+    return querySnapshot.docs.map((doc) => mapAssetDoc(doc.id, doc.data()));
   } catch (error) {
     console.error('[getUserAssetsAdmin] Error fetching assets:', error);
     throw new Error('Failed to fetch assets');

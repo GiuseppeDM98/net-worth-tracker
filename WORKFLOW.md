@@ -150,6 +150,10 @@ time limit; never an endless wait. The repo writes that wait **once**, in a help
 import, never again in each script. And stopping the background task kills the shell, not the tree
 beneath it (`npx → tsx → node → Chromium`): a window is closed by its root with the whole tree, then the
 count says zero.
+**Once the owner confirms an item, the agent closes its windows** (2026-11-13, «after my confirmation of a
+test the windows of that case you close them yourself»): the owner never has to close a window to move on.
+The helper closes its browser on SIGTERM, so the agent stops it by its root, checks the count at zero and
+only then opens the next item; the owner closing a window by hand still ends the helper, never an error.
 
 ### Standard phases, when they make sense
 
@@ -243,6 +247,12 @@ The app **is** locally runnable; there is no fallback to declare.
   Vitest exhausted the machine's memory and the system killed all three; an emulator killed that
   way exports nothing, so the fixtures have to be re-seeded. The tour runs on the emulators plus
   ONE server.
+- **The windows: `scripts/collaudo-finestre.mts`** (2026-11-13, the § 2 helper written once): `npx tsx
+  scripts/collaudo-finestre.mts --email=<fixture> --url=<path> [--url=<path>] [--title=…]` opens visible windows
+  already signed in (two `--url` = one session in two windows, a comparison; the tab title starts with «Finestra N»),
+  refuses a non-local base, and exits when the owner closes every window, on SIGTERM (`pkill -TERM -f
+  scripts/collaudo-finestre.mts` — how the agent closes them after the owner's confirmation) or after 30 minutes.
+  Run it in the background, as its own task: a throwaway seed beside it in one command dies with it.
 - **Getting in**: the login is email/password on `/login` — no OAuth, no MFA, so it is a five-second
   manual step and also fully scriptable. Fixture identities (all password `test1234`):
 

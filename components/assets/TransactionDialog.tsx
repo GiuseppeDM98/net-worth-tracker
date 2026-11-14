@@ -452,7 +452,12 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
               ...(taxValue !== undefined ? { withheldTaxEur: taxValue } : {}),
               note: noteValue,
             };
-        const result = await updateMutation.mutateAsync({ transactionId: transaction.id, updates });
+        // The version the form was drawn from: a trade changed since (another tab) is refused, 409.
+        const result = await updateMutation.mutateAsync({
+          transactionId: transaction.id,
+          updates,
+          expectedUpdatedAt: transaction.updatedAt,
+        });
         toast.success(
           result.realizedPnlEur !== undefined
             ? `Operazione aggiornata · P&L realizzato ${formatSignedEur(result.realizedPnlEur)}`

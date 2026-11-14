@@ -155,6 +155,12 @@ export const assetTransactionUpdateSchema = assetTransactionBaseSchema
   .superRefine(refineAssetTransaction);
 
 /**
+ * The version of a trade an edit or a delete was drawn from (`updatedAt`, ISO). Absent from an older
+ * client: the server's own read is then the version (2026-11-12).
+ */
+export const tradeVersionSchema = isoDateSchema.optional();
+
+/**
  * GET /api/ai/assistant/threads?after= — the cursor of the next page is a thread id: never empty
  * (`.doc('')` throws) and never a path (a slash would address a subcollection).
  */

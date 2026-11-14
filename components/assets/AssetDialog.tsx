@@ -48,7 +48,7 @@ import { createAsset, updateAsset, updateAssetMetadata } from '@/lib/services/as
 import { isLedgerAssetType, type AssetTransactionFormData } from '@/types/assetTransactions';
 import { deleteAllAssetTransactionsForAsset } from '@/lib/services/assetTransactionService';
 import { useAssets } from '@/lib/hooks/useAssets';
-import { useAssetLedgerMeta, useCreateAssetTransaction } from '@/lib/hooks/useAssetTransactions';
+import { fetchFreshLedgerMeta, useAssetLedgerMeta, useCreateAssetTransaction } from '@/lib/hooks/useAssetTransactions';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -1523,7 +1523,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
 
       // Ledger flows (Phase C): edit is metadata-only; create opens the position as a first buy.
       const ledgerEditFlow = !!asset && isLedgerAssetType(asset.type);
-      const ledgerCreateFlow = !asset && isLedgerAssetType(data.type) && ledgerMeta != null;
+      // A cached `null` may be a restored one (IndexedDB) on an account migrated elsewhere: ask once.
+      const metaNow = !asset && isLedgerAssetType(data.type) && ledgerMeta == null
+        ? await fetchFreshLedgerMeta(queryClient, ownerId)
+        : ledgerMeta;
+      const ledgerCreateFlow = !asset && isLedgerAssetType(data.type) && metaNow != null;
 
       // Step 1: Resolve current price using priority chain:
       //   Path 0 — ledger create: fetch the live market price for the asset's currentPrice (same rule

@@ -30,6 +30,10 @@
   with stages of its own takes the recorder (`timing?: ServerTimingRecorder`) instead of returning times, and a count
   the header carries travels BESIDE the body, never inside it (`resolveInstrumentProfiles` → `{ response, counts }`).
   The route tests read the header's stage names (`__tests__/{dividendStatsRoute,instrumentProfilesRoute}.test.ts`).
+- **The trade routes' answers beyond validation** (2026-11-12, doc/guide/registro-operazioni.md § Concurrency): an edit
+  and a delete carry `expectedUpdatedAt` (PUT body / DELETE query, ISO, through `tradeVersionSchema`; malformed → 400),
+  the version the form or the button was drawn from; a trade changed since is 409, one deleted since 404; a trade on an
+  asset that is no longer a ledger type, or settled on an account that is no longer a cash account, at commit is 422.
 - **`REGISTRATION_WHITELIST` has no `NEXT_PUBLIC_` prefix**, and `lib/constants/appConfig.ts` must stay client-safe.
 - **A Vercel Function never `require()`s an ESM-only package — whatever the Node version** (2026-10-08): Vercel starts
   Node with `--no-experimental-require-module`, so `firebase-admin@14 → jwks-rsa@4 → jose@6` (pure ESM, loaded by

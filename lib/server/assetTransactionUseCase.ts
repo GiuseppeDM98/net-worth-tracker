@@ -11,7 +11,7 @@ import {
   resolveTradePriceEur,
   resolveBaselinePriceEur,
 } from '@/lib/server/tradeFxService';
-import { getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
+import { getUserAssetsAdmin, mapAssetDoc } from '@/lib/server/assetAdminRepository';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { toDate, getItalyDayBoundsUtc } from '@/lib/utils/dateHelpers';
@@ -24,7 +24,7 @@ import {
   type AssetTransactionFormData,
   type AssetTransactionType,
 } from '@/types/assetTransactions';
-import type { AssetType } from '@/types/assets';
+import type { Asset, AssetType } from '@/types/assets';
 
 /**
  * Server-side orchestration for the asset trade ledger (Registro operazioni asset).
@@ -41,6 +41,12 @@ import type { AssetType } from '@/types/assets';
  * on any invalid history (over-sell, negative input, mis-ordered baseline), which the route forwards
  * as a 422. Editing/deleting a mid-history trade re-runs the whole replay, so a later over-sell is
  * caught even though the edited row itself looks fine.
+ *
+ * CONCURRENCY (2026-11-12): every write decides inside its own transaction. What a plan was
+ * prepared on outside it — the trade's version, the asset's type, the settlement account, the
+ * migration's «done» signal — is re-read and re-checked inside, so a late or concurrent caller
+ * changes nothing it did not see. Only the asset's CURRENCY stays read in prepare: `priceEur` is a
+ * network call and cannot run inside the transaction.
  */
 
 const ASSETS_COLLECTION = 'assets';
@@ -227,6 +233,8 @@ interface PreparedMutation {
   tradeDocData?: Record<string, unknown>;
   /** Id of the trade replaced (edit) or removed (delete). Absent for create. */
   targetTransactionId?: string;
+  /** `updatedAt` of the trade the plan was prepared on, in ms; absent for create. */
+  preparedOnUpdatedAt?: number;
   /** Reversal of old + application of new, aggregated per cash-asset docId (self-edit nets). */
   cashDeltaByDocId: Map<string, number>;
   /** Trade type whose result drives the response (new type for create/edit, old type for delete). */
@@ -290,10 +298,15 @@ async function prepareCreate(
   };
 }
 
+/**
+ * `expectedUpdatedAt` is the version the client's form was drawn from (absent from an older client:
+ * the server's own read is then the version). Either way the commit refuses a trade changed since.
+ */
 async function prepareEdit(
   ownerId: string,
   transactionId: string,
-  updates: Partial<AssetTransactionFormData>
+  updates: Partial<AssetTransactionFormData>,
+  expectedUpdatedAt?: Date
 ): Promise<PreparedMutation> {
   const oldTrade = await getOwnedTradeOrThrow(ownerId, transactionId);
   await assertLedgerInitialized(ownerId);
@@ -365,13 +378,19 @@ async function prepareEdit(
     newTransaction,
     tradeDocData: buildTradeUpdateDocData(newTransaction),
     targetTransactionId: transactionId,
+    preparedOnUpdatedAt: (expectedUpdatedAt ?? oldTrade.updatedAt).getTime(),
     cashDeltaByDocId,
     affectedType: newTransaction.type,
     invalidationReason: 'asset_transaction_updated',
   };
 }
 
-async function prepareDelete(ownerId: string, transactionId: string): Promise<PreparedMutation> {
+/** `expectedUpdatedAt`: the version the row's delete button was drawn from (see prepareEdit). */
+async function prepareDelete(
+  ownerId: string,
+  transactionId: string,
+  expectedUpdatedAt?: Date
+): Promise<PreparedMutation> {
   const oldTrade = await getOwnedTradeOrThrow(ownerId, transactionId);
   if (oldTrade.isBaseline) {
     throw new TradeUseCaseError(400, 'La posizione iniziale non può essere eliminata.');
@@ -386,6 +405,7 @@ async function prepareDelete(ownerId: string, transactionId: string): Promise<Pr
     op: 'delete',
     tradeRef: adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc(transactionId),
     targetTransactionId: transactionId,
+    preparedOnUpdatedAt: (expectedUpdatedAt ?? oldTrade.updatedAt).getTime(),
     cashDeltaByDocId,
     affectedType: oldTrade.type,
     invalidationReason: 'asset_transaction_deleted',
@@ -395,6 +415,34 @@ async function prepareDelete(ownerId: string, transactionId: string): Promise<Pr
 // ---------------------------------------------------------------------------
 // Atomic commit (ALL reads before ANY writes — AGENTS.md runTransaction)
 // ---------------------------------------------------------------------------
+
+/**
+ * The trade a plan was prepared on must still be the stored one when the transaction commits.
+ * `existing` is the in-transaction read of the asset's trades, so the comparison is on locked
+ * data. A missing row is a 404 (deleted meanwhile); a different `updatedAt` is a 409.
+ */
+function assertTradeUnchanged(existing: AssetTransaction[], plan: PreparedMutation): void {
+  if (plan.op === 'set') return;
+  const stored = existing.find((t) => t.id === plan.targetTransactionId);
+  if (!stored) throw new TradeUseCaseError(404, 'Operazione non trovata.');
+  if (stored.updatedAt.getTime() !== plan.preparedOnUpdatedAt) {
+    throw new TradeUseCaseError(409, "L'operazione è cambiata nel frattempo: riapri e riprova.");
+  }
+}
+
+/** The settlement accounts read in the transaction must still be cash accounts (a missing one is skipped at write). */
+function assertSettlementAccountsStillCash(
+  cashReads: { ref: DocumentReference; snap: DocumentSnapshot }[],
+  cashDeltaByDocId: Map<string, number>
+): void {
+  for (const { ref, snap } of cashReads) {
+    if ((cashDeltaByDocId.get(ref.id) ?? 0) === 0 || !snap.exists) continue;
+    const data = snap.data();
+    if (data?.assetClass !== 'cash' || data?.type !== 'cash') {
+      throw new TradeUseCaseError(422, 'Il conto di regolamento selezionato non è valido.');
+    }
+  }
+}
 
 async function commitTradeMutation(
   plan: PreparedMutation
@@ -431,6 +479,16 @@ async function commitTradeMutation(
 
     // ── COMPUTE (pure) ─────────────────────────────────────────────────────────
     const existing = existingSnap.docs.map((d) => docToAssetTransaction(d.id, d.data()));
+    // The checks of what prepare read outside, above the replay: a 404/409/422 must win over a
+    // replay error on a stale sequence. assertTradeUnchanged stays FIRST, so every later decision
+    // stands on a checked trade.
+    assertTradeUnchanged(existing, plan);
+    if (!assetSnap.exists) throw new TradeUseCaseError(404, 'Asset non trovato.');
+    if (!isLedgerAssetType(assetSnap.data()?.type as AssetType)) {
+      throw new TradeUseCaseError(422, 'Questo tipo di asset non usa il registro operazioni.');
+    }
+    assertSettlementAccountsStillCash(cashReads, plan.cashDeltaByDocId);
+
     const newSequence = buildNewSequence(existing, plan);
 
     // replayTransactions throws LedgerValidationError (→ 422) on any invalid history.
@@ -445,10 +503,6 @@ async function commitTradeMutation(
       realizedDelta = newState.realizedPnlEur - oldState.realizedPnlEur;
     } catch {
       realizedDelta = undefined;
-    }
-
-    if (!assetSnap.exists) {
-      throw new TradeUseCaseError(404, 'Asset non trovato.');
     }
 
     // ── WRITES ───────────────────────────────────────────────────────────────
@@ -537,21 +591,25 @@ export async function createAssetTransaction(
   return buildResult(plan, commit);
 }
 
+/** `expectedUpdatedAt`: the version the form was drawn from; a trade changed since is a 409. */
 export async function updateAssetTransaction(
   ownerId: string,
   transactionId: string,
-  updates: Partial<AssetTransactionFormData>
+  updates: Partial<AssetTransactionFormData>,
+  expectedUpdatedAt?: Date
 ): Promise<TradeMutationResult> {
-  const plan = await prepareEdit(ownerId, transactionId, updates);
+  const plan = await prepareEdit(ownerId, transactionId, updates, expectedUpdatedAt);
   const commit = await commitTradeMutation(plan);
   return buildResult(plan, commit);
 }
 
+/** `expectedUpdatedAt`: the version the delete button was drawn from; a trade changed since is a 409. */
 export async function deleteAssetTransaction(
   ownerId: string,
-  transactionId: string
+  transactionId: string,
+  expectedUpdatedAt?: Date
 ): Promise<TradeMutationResult> {
-  const plan = await prepareDelete(ownerId, transactionId);
+  const plan = await prepareDelete(ownerId, transactionId, expectedUpdatedAt);
   const commit = await commitTradeMutation(plan);
   return buildResult(plan, commit);
 }
@@ -563,104 +621,152 @@ export async function deleteAssetTransaction(
  * LEDGER_ASSET_TYPE, so the caller's metadata write already stopped deriving quantity/PMC from these
  * trades. Left in place, they would still be summed by ledger consumers keyed on `assetId` alone
  * (e.g. Rendimenti "Capitale investito") even though the asset itself no longer looks like a ledger
- * position — a silent, hard-to-diagnose overcount. Batched delete, well under Firestore's 500-op cap
- * for a single asset's trade history.
+ * position — a silent, hard-to-diagnose overcount. One transaction (an asset's history is well under
+ * Firestore's 500-write cap), so a trade committed meanwhile cannot survive as the orphan this exists
+ * to remove.
  *
  * Not exposed for any other use case: a still-ledger asset must never lose its trades this way (use
- * `deleteAssetTransaction` for a single trade, which re-validates the replay).
+ * `deleteAssetTransaction` for a single trade, which re-validates the replay). It does not refuse a
+ * still-ledger asset itself: its one caller flips the type first.
  */
 export async function deleteAllAssetTransactionsForAsset(
   ownerId: string,
   assetId: string
 ): Promise<number> {
-  const snap = await adminDb
-    .collection(ASSET_TRANSACTIONS_COLLECTION)
-    .where('userId', '==', ownerId)
-    .where('assetId', '==', assetId)
-    .get();
-
-  if (snap.empty) return 0;
-
-  const batch = adminDb.batch();
-  for (const doc of snap.docs) {
-    batch.delete(doc.ref);
-  }
-  await batch.commit();
-  return snap.docs.length;
+  return adminDb.runTransaction(async (tx: Transaction) => {
+    const snap = await tx.get(
+      adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).where('userId', '==', ownerId).where('assetId', '==', assetId)
+    );
+    // Reading the asset locks it against a trade commit, which reads and writes the same doc.
+    await tx.get(adminDb.collection(ASSETS_COLLECTION).doc(assetId));
+    for (const doc of snap.docs) tx.delete(doc.ref);
+    return snap.docs.length;
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Migration (idempotent, per-user, server-side)
 // ---------------------------------------------------------------------------
 
+const MIGRATION_MAX_ATTEMPTS = 3;
+/** A self-imposed guard that keeps the one transaction small; no account of this app is near it. */
+const MIGRATION_MAX_BASELINES = 450;
+
+/** Thrown inside the migration's transaction when the assets moved since the price pre-read. */
+class MigrationInputsChangedError extends Error {}
+
+/** What a baseline's EUR price is resolved from: the transaction re-checks it on locked data. */
+const baselineInputOf = (asset: Asset) => `${asset.currency ?? 'EUR'}|${asset.averageCost ?? asset.currentPrice}`;
+
 /**
  * One-shot migration: every ledger asset with quantity > 0 gets ONE baseline BUY freezing the
- * position held at migration time. Idempotent — the meta doc's presence is the "done" signal, and
- * deterministic baseline ids (`baseline-${assetId}`) make a crashed re-run overwrite, not duplicate.
+ * position held at migration time. Idempotent — the meta doc is read INSIDE the transaction that
+ * writes it; a baseline that exists is never rewritten (2026-11-12). Two callers serialize on the
+ * meta document both read: the late one finds it and writes nothing.
+ *
+ * The EUR prices are a network call, so they are resolved BEFORE the transaction, keyed by what
+ * each was resolved from (`baselineInputOf`); an asset that appeared or changed currency/price
+ * meanwhile fails the check and the whole migration retries, at most three times (the third
+ * failure reaches the route as a 500, and the page's next visit retries).
+ *
  * Does NOT touch the asset docs: quantity/PMC are identical by construction and holdingStartDate
  * must not move (invariant #4).
  */
 export async function migrateAssetLedger(ownerId: string): Promise<MigrationResult> {
   const metaRef = adminDb.collection(ASSET_TRANSACTIONS_META_COLLECTION).doc(ownerId);
-  const metaSnap = await metaRef.get();
-  if (metaSnap.exists) {
-    return { alreadyMigrated: true };
+  // Fast path, outside any transaction: the common case costs one read.
+  if ((await metaRef.get()).exists) return { alreadyMigrated: true };
+
+  for (let attempt = 1; attempt <= MIGRATION_MAX_ATTEMPTS; attempt++) {
+    const priceEurByAsset = await resolveBaselinePrices(ownerId);
+    try {
+      return await commitMigration(ownerId, metaRef, priceEurByAsset);
+    } catch (error) {
+      if (!(error instanceof MigrationInputsChangedError) || attempt === MIGRATION_MAX_ATTEMPTS) throw error;
+    }
   }
+  throw new Error('Ledger migration did not complete'); // unreachable: the loop returns or throws
+}
 
-  const assets = await getUserAssetsAdmin(ownerId);
-  const ledgerAssets = assets.filter((a) => isLedgerAssetType(a.type) && a.quantity > 0);
+/** Network BEFORE the transaction: one EUR price per ledger asset, keyed by what it was resolved from. */
+async function resolveBaselinePrices(
+  ownerId: string
+): Promise<Map<string, { input: string; priceEur: number }>> {
+  const preRead = (await getUserAssetsAdmin(ownerId)).filter((a) => isLedgerAssetType(a.type) && a.quantity > 0);
+  if (preRead.length > MIGRATION_MAX_BASELINES) {
+    throw new TradeUseCaseError(422, 'Troppi strumenti per inizializzare il registro in una volta: contatta il supporto.');
+  }
+  const priceEurByAsset = new Map<string, { input: string; priceEur: number }>();
+  for (const asset of preRead) {
+    priceEurByAsset.set(asset.id, { input: baselineInputOf(asset), priceEur: await resolveBaselinePriceEur(asset) });
+  }
+  return priceEurByAsset;
+}
 
+/** The migration's one transaction: decide on locked data, create the missing baselines, then the meta. */
+function commitMigration(
+  ownerId: string,
+  metaRef: DocumentReference,
+  priceEurByAsset: Map<string, { input: string; priceEur: number }>
+): Promise<MigrationResult> {
   // Start-of-day Italy of migration day: the date of every baseline BUY (and, through the replay,
   // the floor of the migrated assets' trades only — an asset without a baseline accepts any past
   // date since 2026-09-13).
   const { start: baselineDate } = getItalyDayBoundsUtc();
   const now = new Date();
 
-  // Batched writes, well under Firestore's 500-op cap (costCenterService precedent uses ≤400).
-  let batch = adminDb.batch();
-  let opsInBatch = 0;
-  for (const asset of ledgerAssets) {
-    const priceEur = await resolveBaselinePriceEur(asset);
-    const baselineRef = adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc(`baseline-${asset.id}`);
-    batch.set(
-      baselineRef,
+  return adminDb.runTransaction(async (tx: Transaction): Promise<MigrationResult> => {
+    // ── READS ──
+    if ((await tx.get(metaRef)).exists) return { alreadyMigrated: true };
+    const assetsSnap = await tx.get(adminDb.collection(ASSETS_COLLECTION).where('userId', '==', ownerId));
+    const baselinesSnap = await tx.get(
+      adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).where('userId', '==', ownerId).where('isBaseline', '==', true)
+    );
+
+    // ── COMPUTE ──
+    // A baseline already there (another migration, or a crashed run of the old batch) is never rewritten.
+    const alreadyBaselined = new Set(baselinesSnap.docs.map((d) => d.data().assetId as string));
+    const ledgerAssets = assetsSnap.docs
+      .map((d) => mapAssetDoc(d.id, d.data()))
+      .filter((a) => isLedgerAssetType(a.type) && a.quantity > 0 && !alreadyBaselined.has(a.id));
+    for (const asset of ledgerAssets) {
+      if (priceEurByAsset.get(asset.id)?.input !== baselineInputOf(asset)) throw new MigrationInputsChangedError();
+    }
+
+    // ── WRITES ──
+    for (const asset of ledgerAssets) {
+      tx.create(
+        adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc(`baseline-${asset.id}`),
+        removeUndefinedDeep({
+          userId: ownerId,
+          assetId: asset.id,
+          type: 'buy' as const,
+          isBaseline: true,
+          date: baselineDate,
+          quantity: asset.quantity,
+          // No PMC → the position starts at market; returns are then measured from today (user decision).
+          pricePerUnit: asset.averageCost ?? asset.currentPrice,
+          priceEur: priceEurByAsset.get(asset.id)!.priceEur,
+          note: 'Posizione iniziale (migrazione registro operazioni)',
+          createdAt: now,
+          updatedAt: now,
+        })
+      );
+    }
+    // The meta LAST and created, never set: its presence is the «done» signal and nobody rewrites it.
+    tx.create(
+      metaRef,
       removeUndefinedDeep({
         userId: ownerId,
-        assetId: asset.id,
-        type: 'buy' as const,
-        isBaseline: true,
-        date: baselineDate,
-        quantity: asset.quantity,
-        // No PMC → the position starts at market; returns are then measured from today (user decision).
-        pricePerUnit: asset.averageCost ?? asset.currentPrice,
-        priceEur,
-        note: 'Posizione iniziale (migrazione registro operazioni)',
+        migratedAt: now,
+        baselineDate,
+        migratedAssetCount: ledgerAssets.length,
         createdAt: now,
         updatedAt: now,
       })
     );
-    opsInBatch++;
-    if (opsInBatch >= 400) {
-      await batch.commit();
-      batch = adminDb.batch();
-      opsInBatch = 0;
-    }
-  }
-  if (opsInBatch > 0) await batch.commit();
-
-  // Meta doc LAST — its presence marks the migration complete.
-  await metaRef.set(
-    removeUndefinedDeep({
-      userId: ownerId,
-      migratedAt: now,
-      baselineDate,
-      migratedAssetCount: ledgerAssets.length,
-      createdAt: now,
-      updatedAt: now,
-    })
-  );
-
-  return { migratedAssetCount: ledgerAssets.length, baselineDate };
+    return { migratedAssetCount: ledgerAssets.length, baselineDate };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -707,18 +813,22 @@ export async function backfillAverageCostEur(ownerId: string): Promise<AverageCo
   let skippedAssetCount = 0;
   for (const asset of ledgerAssets) {
     try {
-      const tradesSnap = await adminDb
-        .collection(ASSET_TRANSACTIONS_COLLECTION)
-        .where('userId', '==', ownerId)
-        .where('assetId', '==', asset.id)
-        .get();
-      if (tradesSnap.empty) continue;
-
-      const trades = tradesSnap.docs.map((d) => docToAssetTransaction(d.id, d.data() as DocumentData));
-      const { averageCostEur } = buildDerivedAssetFields(replayTransactions(trades));
-      if (averageCostEur === undefined) continue; // a closed position: nothing to stand a G/P on
-      await adminDb.collection(ASSETS_COLLECTION).doc(asset.id).update({ averageCostEur, updatedAt: new Date() });
-      recomputedAssetCount += 1;
+      // Trades and asset read in ONE transaction: a trade mutation committed meanwhile is either
+      // in this replay or serialized after it, never overwritten by a stale value (2026-11-12).
+      const assetRef = adminDb.collection(ASSETS_COLLECTION).doc(asset.id);
+      const wrote = await adminDb.runTransaction(async (tx: Transaction) => {
+        const tradesSnap = await tx.get(
+          adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).where('userId', '==', ownerId).where('assetId', '==', asset.id)
+        );
+        const assetSnap = await tx.get(assetRef);
+        if (tradesSnap.empty || !assetSnap.exists) return false;
+        const trades = tradesSnap.docs.map((d) => docToAssetTransaction(d.id, d.data() as DocumentData));
+        const { averageCostEur } = buildDerivedAssetFields(replayTransactions(trades));
+        if (averageCostEur === undefined) return false; // a closed position: nothing to stand a G/P on
+        tx.update(assetRef, { averageCostEur, updatedAt: new Date() });
+        return true;
+      });
+      if (wrote) recomputedAssetCount += 1;
     } catch (error) {
       skippedAssetCount += 1;
       console.error(`[backfillAverageCostEur] asset ${asset.id} skipped:`, error);
