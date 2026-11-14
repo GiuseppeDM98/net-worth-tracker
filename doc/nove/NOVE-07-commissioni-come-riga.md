@@ -1,7 +1,7 @@
 # NOVE-07 — A trade's fee is a spending row, out of the average cost
 
 > Series `doc/nove/` (README.md § 5): **implemented after NOVE-03 (retired on 2026-11-14, PR #526)** (every ledger write decides inside its
-> transaction, `assertTradeUnchanged`) **and NOVE-06** (`tradeMoneyIn`, the Driver's split). Integrates contributor
+> transaction, `assertTradeUnchanged`) **and NOVE-06 (retired on 2026-11-14, PR #532)** (`tradeMoneyIn`, the Driver's split). Integrates contributor
 > PR #489 (head 9d163bb1, base 54634a9) **with changes**. Written on 2026-11-12; every `file:line` is cited on
 > `develop` @ b841cbd7, the PR's as `pr489:<path>:<line>`. Executes the owner's decisions 18–23 and 31 (README.md § 3).
 > **Extended on 2026-11-13 by decision 64** (the first purchase of a new instrument takes its fee): § 1 item 16,

@@ -34,6 +34,7 @@ import {
   describeDriverRest,
   driverRestParts,
   DRIVER_METHOD_OTHER,
+  DRIVER_MONTHLY_NO_BAR_NOTE,
   describeDrivers,
   describeEvolution,
   describeEvolutionAside,
@@ -487,6 +488,14 @@ describe('«altre» named by its three parts (2026-11-12)', () => {
   it('should explain each part in one sentence', () => {
     expect(DRIVER_METHOD_OTHER.map((entry) => entry.term)).toEqual(['Fondo pensione non tracciato', 'Quantità fuori dal registro', 'Saldi dei conti']);
     expect(DRIVER_METHOD_OTHER.every((entry) => entry.text.length > 0)).toBe(true);
+  });
+
+  // Falsified on 2026-11-14 by restoring «e altre variazioni» in the note: it named a row the month's tooltip no longer prints.
+  it('should name in the Dettaglio note the parts the month tooltip prints, never «altre variazioni»', () => {
+    expect(DRIVER_MONTHLY_NO_BAR_NOTE).not.toMatch(/altre variazioni/i);
+    for (const label of ['Mutuo rimborsato', 'versamenti al fondo pensione', 'fondo pensione non tracciato', 'quantità fuori dal registro', 'saldi dei conti']) {
+      expect(DRIVER_MONTHLY_NO_BAR_NOTE).toContain(label);
+    }
   });
 });
 

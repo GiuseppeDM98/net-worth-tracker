@@ -223,7 +223,7 @@ Also: the twelve tooltips of § 1 row 10 — `GoalProjectionChart.tsx:75` `borde
 
 - **Rendimenti**: `performance/tiles/AttribuzioneTile.tsx:85`, `:87`; `PlusvalenzeTile.tsx:51`, `:53`;
   `performance/PerformancePeriodPicker.tsx:74`; `app/dashboard/performance/page.tsx:770` (the toolbar skeleton).
-- **Storico**: `history/tiles/DriverTile.tsx:152`; `RaddoppiTile.tsx:100`, `:108`.
+- **Storico**: `history/tiles/DriverTile.tsx:139`; `RaddoppiTile.tsx:100`, `:108`.
 - **Analisi**: `cashflow/ConfrontoAnnualeSection.tsx:123`, `:126`.
 - **Allocazione and Accumulo**: `ActionChip.tsx:37`; `pr488:` `TargetTick.tsx:70`, `:72` (`:50`, `:52` @ b841cbd7);
   `tiles/EsposizioneTile.tsx:92`; `AccumulationPlanDialog.tsx:1455`; `OptimizerReport.tsx:108`, `:126`, `:128`;
