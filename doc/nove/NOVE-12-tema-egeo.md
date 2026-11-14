@@ -38,7 +38,7 @@ outside the dashboard it is its palette only. Every figure stays Geist Mono.
    `7px` high; the desktop label's previous sibling is an `svg[aria-hidden="true"]` of width 22. On
    `/dashboard/cashflow?tab=tracking` the Periodo tile's eyebrow («Cashflow · {Mese} {anno}»,
    `components/cashflow/ExpenseTrackingTab.tsx:1311`) reads `Marcellus` and its `.costume-figure` (the year) `Geist
-   Mono` — the Panoramica's headline never prints a digit (`lib/utils/overviewNarrative.ts:230-269`).
+   Mono` — the Panoramica's headline never prints a digit (`lib/utils/overviewNarrative.ts:238-277`).
    **Proof**: `e2e/theme.egeo.spec.ts` (E1).
 5. At 390 the same page has the ground, the cap, the frieze and an 18px emblem beside the mobile title; the headline
    is Marcellus at 24px. **Proof**: `e2e/theme.egeo.mobile.spec.ts` (E2).

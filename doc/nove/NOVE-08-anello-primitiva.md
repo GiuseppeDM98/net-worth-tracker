@@ -22,7 +22,7 @@ domain, or it must be a figure»), `:1107` («Use Recharts `PieChart` only for s
 - **Tracciamento «Entrate per categoria»** — `CategoryTile` (`components/dashboard/overview/CategoryTile.tsx:86-113`):
   `RankedRows` + the residual «Altre categorie» (`:101-111`); mounted `components/cashflow/ExpenseTrackingTab.tsx:
   1349-1361`, `desktop:col-span-3`. Parts: `rankCategories(expenses, 'income')` (`lib/utils/tracciamentoSummary.ts:
-  570-604`, called at `ExpenseTrackingTab.tsx:911`): ≤ 5 positive rows, `total` = rows + the cut.
+  586-620`, called at `ExpenseTrackingTab.tsx:911`): ≤ 5 positive rows, `total` = rows + the cut.
 - **Panoramica «Composizione»** — `ComposizioneTile` (`components/dashboard/overview/ComposizioneTile.tsx:45-75`): a
   `CompositionBar` (`:46-52`) over flat rows with swatch, value and share (`:54-75`); mounted `app/dashboard/page.tsx:
   609-614`, `desktop:col-span-3`. Parts: `charts.assetClassData` (`prepareAssetClassDistributionData`,

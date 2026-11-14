@@ -201,7 +201,7 @@ export function buildEmptyChatSuggestions(input: { overview: DashboardOverviewPa
 }
 ```
 
-`describeConversation` (`lib/utils/assistantNarrative.ts:546-573`): its empty branch (:565) becomes
+`describeConversation` (`lib/utils/assistantNarrative.ts:566-593`): its empty branch (:585) becomes
 `[prose(`${question} Scegli un suggerimento o scrivi qui sotto.`)]`, the page passing `EMPTY_CHAT_QUESTION`; the
 `mode` passed is the display mode (below). `buildNoContextVerdict`'s fallback sentence (:316-323) becomes
 «L'assistente risponde sui dati di oggi; nomina un periodo nella domanda per ragionare sui suoi numeri.».
@@ -520,7 +520,7 @@ already in it); `DropdownMenu` is the shell's. The ceiling (754) is not raised.
 | N1 | `assistantChatNarrative.test.ts`: `describeRoute` for the ten readings (the four analyses on their period, register, chat on each of the five periods; exact strings); `describeReadingLine` for router, carried («Ho letto: …»), override («Hai scelto: …»), fallback, web from `webSearchUsed` over the reading | `toLowerCase()` dropped |
 | N2 | `buildEmptyChatSuggestions`: the four states' exact labels; `registerFirst` order; a 40-character category → «Quanto ho speso in <it> questo mese?», a 41-character one → «Dove sono andati i soldi questo mese?»; January → «dicembre» | the `top.length <= CATEGORY_IN_SENTENCE_MAX` guard dropped |
 | N3 | `assistantRoute.test.ts`: `chooserDraftToOverride(routeToChooserDraft(r))` equals `r` for the ten readings, each with `webSearch` true and false (register always false); analysis + `none` → null | `none: null` → `'chat'` |
-| N4 | `assistantNarrative.test.ts:317-325` rewritten: `buildNoContextVerdict(null)` reads «L'assistente risponde sui dati di oggi; nomina un periodo nella domanda per ragionare sui suoi numeri.»; `:488-493` rewritten: the empty branch with `EMPTY_CHAT_QUESTION` reads «Cosa vuoi sapere, o cosa vuoi registrare? Scegli un suggerimento o scrivi qui sotto.» | the old sentence back |
+| N4 | `assistantNarrative.test.ts:330-338` rewritten: `buildNoContextVerdict(null)` reads «L'assistente risponde sui dati di oggi; nomina un periodo nella domanda per ragionare sui suoi numeri.»; `:511-516` rewritten: the empty branch with `EMPTY_CHAT_QUESTION` reads «Cosa vuoi sapere, o cosa vuoi registrare? Scegli un suggerimento o scrivi qui sotto.» | the old sentence back |
 | N5 | `assistantPromptBundle.test.ts`: the today block `toContain('nominarlo nella domanda')` and not «selezionarlo» | the old sentence |
 | U1 | `useAssistantStreaming.test.tsx`: the body is `mode: 'auto'` without period fields; `route` when passed; a `route` event sets the slot's `mode` and `routeReading`; `retry` re-sends a route passed; an `'auto'` send whose stream emits a `router` reading then an `error` → `retry` posts that reading as `route`, with a `fallback` reading it posts none; after a `register` answer the next placeholders are born `register` | keep `chatContext` in the body; the `route` handler leaves the ref alone; born `'chat'` |
 | H1 | `assistantHeader.test.tsx` (rewritten): two buttons per header copy; the menu's three items with counts; «Nuova conversazione» off in demo and while streaming only; no «Registra un movimento» | `disabled={isDemo \|\| isStreaming}` → `disabled={isDemo}` |

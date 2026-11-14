@@ -570,7 +570,9 @@ function historyRate(rate: number): NarrativeSegment {
 
 /**
  * "In media il 31%; il mese migliore è stato aprile (44%), il peggiore dicembre (12%)." —
- * only over the months that had income; one measured month is named as such, none → null.
+ * only over the measurable months (`rankedCount`: closed months whose reading is a rate, so a
+ * month below the savings floor or without income is out, 2026-11-14); one is named as such,
+ * none → null.
  */
 export function describeSavingsHistory(history: SavingsHistory): Narrative | null {
   if (history.rankedCount === 0 || history.average === null || !history.best || !history.worst) return null;
