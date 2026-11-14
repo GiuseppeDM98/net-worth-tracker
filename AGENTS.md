@@ -237,7 +237,8 @@ holds it): how it was learned is `git log`'s.
   in updates` guard, or a price refresh wipes it.
 - **`runTransaction`: ALL `tx.get()` before ANY write** — a `get→update` loop breaks on the second doc and is invisible
   when the function is mocked; aggregate deltas per docId first (template
-  `__tests__/updateCashAssetBalancesAtomic.test.ts`), success toasts AFTER the reconcile returns. Firestore rejects
+  `__tests__/updateCashAssetBalancesAtomic.test.ts`), success toasts AFTER the reconcile returns. **A decision read
+  outside a transaction is re-checked inside it** (2026-11-12; `assetTransactionsRoutes.test.ts` M1, D1, E1). Firestore rejects
   `undefined` inside an array element: `assetAllocationService.ts` builds `docData` by hand, so its array fields need a
   whitelisting serializer with conditional spreads.
 - **A bare `.set()` on a server-owned doc DELETES every field its object omits, and the daily cron re-runs them all.**

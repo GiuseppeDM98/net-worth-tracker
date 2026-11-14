@@ -72,24 +72,43 @@ export function useCreateAssetTransaction(ownerId: string) {
   });
 }
 
+/**
+ * Edit and delete carry the `updatedAt` of the row the form or the button was drawn from: the server
+ * refuses a trade changed (409) or deleted (404) since. A refusal also invalidates, so the list —
+ * and a form reopened from it — shows the stored row (2026-11-12).
+ */
 export function useUpdateAssetTransaction(ownerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       transactionId,
       updates,
+      expectedUpdatedAt,
     }: {
       transactionId: string;
       updates: Partial<AssetTransactionFormData>;
-    }) => updateAssetTransaction(ownerId, transactionId, updates),
+      expectedUpdatedAt: Date;
+    }) => updateAssetTransaction(ownerId, transactionId, updates, expectedUpdatedAt),
     onSuccess: () => invalidateTradeCaches(queryClient, ownerId),
+    onError: () => invalidateTradeCaches(queryClient, ownerId),
   });
 }
 
 export function useDeleteAssetTransaction(ownerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (transactionId: string) => deleteAssetTransaction(ownerId, transactionId),
+    mutationFn: ({ transactionId, expectedUpdatedAt }: { transactionId: string; expectedUpdatedAt: Date }) =>
+      deleteAssetTransaction(ownerId, transactionId, expectedUpdatedAt),
     onSuccess: () => invalidateTradeCaches(queryClient, ownerId),
+    onError: () => invalidateTradeCaches(queryClient, ownerId),
+  });
+}
+
+/** The ledger meta as the SERVER holds it now — for a decision a restored `null` must not take. */
+export function fetchFreshLedgerMeta(queryClient: QueryClient, ownerId: string) {
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.assetTransactions.meta(ownerId),
+    queryFn: () => getAssetLedgerMeta(ownerId),
+    staleTime: 0,
   });
 }

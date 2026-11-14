@@ -59,6 +59,8 @@
 
 ## 🐛 Bug Fixes
 
+- **Patrimonio — registro operazioni** — Fixed two tabs open at once overwriting a correction of the ledger or moving an account twice: a trade edited or deleted from a list that is no longer current is refused («Operazione non trovata.», «L'operazione è cambiata nel frattempo: riapri e riprova.») and the list refreshes by itself. A new ETF or bond created on a device that had not yet seen the ledger now gets its first purchase recorded too.
+
 - **Cashflow — la rata del mutuo** — Fixed the line under «Riduce il debito di» printing today's split of principal and interest on every instalment: an instalment already settled now reads the figures of its own day, dated («Il 01/10/2026 il debito di Mutuo Casa è sceso della quota capitale: 505,20 € di 557,30 €, il resto (52,10 €) sono interessi al TAN 0,7%»); an instalment still to come says its figures are an estimate on today's debt, computed for real the day it settles.
 
 - **Assistente AI — proposta di obiettivo** — Fixed a confirmed goal proposal offering «Conferma» again after a reload, where a second press created a second goal: the card now remembers «Obiettivo creato», tells you when that could not be saved (so you do not confirm it again after a reload) and offers no button on an answer that was interrupted. A proposal the assistant wrote inside a quote or a list is still a card.

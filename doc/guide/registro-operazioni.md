@@ -7,7 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Asset trade ledger**: engine `lib/utils/assetTransactionUtils.ts` + `types/assetTransactions.ts`; server `lib/server/{assetTransactionUseCase,tradeFxService}.ts` (+ `backfillAverageCostEur`) + `app/api/asset-transactions/*` (incl. `backfill-average-cost-eur`); client `lib/services/assetTransactionService.ts`, UI `components/assets/{TransactionDialog,AssetMovementsDialog}.tsx`; collections `assetTransactions`/`assetTransactionsMeta`
-- **Suites to run after a change here — Asset Trade Ledger** (moved from `AGENTS.md` § Commands on 2026-09-30): **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx`, `saleTax`, `cents`, `periodSales` · **Browser** `e2e/assets.sale-tax.spec.ts`
+- **Suites to run after a change here — Asset Trade Ledger** (moved from `AGENTS.md` § Commands on 2026-09-30): **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx`, `assetTransactionAverageCostEurBackfill`, `ledgerMetaFreshness`, `saleTax`, `cents`, `periodSales` · **Browser** `e2e/assets.sale-tax.spec.ts`, `e2e/assets.ledger-meta.spec.ts`
 
 ## Asset Trade Ledger
 
@@ -85,8 +85,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   Admin SDK can `tx.get(query)` in a transaction. Reads stay client-SDK; auth = `assertCanAccessAccount`.
 - All reads before any writes; `resolveTradePriceEur` (network) resolves BEFORE the transaction; derived fields written
   DIRECTLY in-tx, not via `updateAsset`.
-- **Migration is idempotent**: meta doc present → done; else one baseline BUY per eligible asset, batched ≤400, **meta
-  doc written LAST**. Mutation hooks invalidate a TRIPLE: `assetTransactions.all` + `assets.all` + `dashboard.overview`.
+- **Migration is idempotent and decides in ONE transaction** (2026-11-12): the meta doc is read inside it and
+  `tx.create`d last; an existing baseline is never rewritten; at most 450 baselines (422 beyond); prices are resolved
+  before it, re-checked by currency and unit price, three attempts. Mutation hooks invalidate a TRIPLE:
+  `assetTransactions.all` + `assets.all` + `dashboard.overview` — on success AND on a refusal, so the list a form is
+  reopened from is the stored one.
 - **`updateAssetMetadata` closes the `deleteField()` trap** — ledger-type edits go through it, never `updateAsset`.
   **Testing the atomic write**: the in-memory Admin fake is built inside the hoisted `vi.mock` factory, so reference
   `vi.hoisted(...)` state, never a plain const.
@@ -108,3 +111,44 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `Dividend.costPerShare`, never a flat ratio (which loses the anti-dilution property). `costPerShare` is stamped in
   NATIVE currency despite its type comment, so `fallbackAverageCost` must also be native.
 - **When a second computation path lands next to an existing card, audit the STATIC COPY**, not just the numbers.
+
+## Concurrency
+
+Every ledger write decides inside its own transaction (2026-11-12): what a plan read outside it is re-read and
+re-checked inside, so a late or concurrent caller (two tabs, the owner and a co-owner) changes nothing it did not see.
+Pinned by `__tests__/assetTransactionsRoutes.test.ts` § concurrent writes, whose fake `adminDb` serializes the
+transactions and gates chosen calls.
+
+- **The migration decides inside its transaction and never rewrites a baseline**: the meta doc is read there, the
+  baselines and the meta are `tx.create`d (a second migration finds the meta and answers `{ alreadyMigrated: true }`;
+  a baseline left by a crashed run of the old batch is skipped). Prices are network, resolved before; the transaction
+  re-checks each by `currency|averageCost ?? currentPrice` and retries the whole migration on a change (three
+  attempts, then a 500 the page's next visit retries).
+- **An edit or a delete stands on `assertTradeUnchanged`**: the first check of the commit, on the in-transaction read
+  of the asset's trades — a missing row is 404 «Operazione non trovata.», a different `updatedAt` 409
+  «L'operazione è cambiata nel frattempo: riapri e riprova.». **An edit and a delete carry `expectedUpdatedAt`**, the
+  version the form or the button was drawn from (PUT body / DELETE query, ISO; absent from an older client = the
+  server's own read), so a form left open in another tab on an older version gets the same 409 (owner, 2026-11-12).
+  An edit on a changed trade is refused, never merged.
+- **The asset's type and the settlement account are checked at commit**: a trade on an asset that left the ledger
+  meanwhile is 422 «Questo tipo di asset non usa il registro operazioni.», a settlement account that is no longer
+  `cash`/`cash` 422 «Il conto di regolamento selezionato non è valido.» (a missing one is still skipped with a warning).
+  The backfill of `averageCostEur` reads trades and asset in one transaction per asset; the delete of every trade of an
+  asset is one transaction that also reads the asset doc (it locks it against a trade commit).
+- **The asset's currency is read in prepare**: `priceEur` is a network call; a currency change between prepare and
+  commit (a few hundred milliseconds) is declared out of scope.
+- A trade document always carries `updatedAt` (every writer stores it): a test fixture that edits or deletes a trade
+  sets one, or `toDate(undefined)` reads «now» and the guard answers 409.
+
+## Per-page blind spots
+
+- **A restored `null` meta asks the server before a ledger asset is created** (`fetchFreshLedgerMeta`,
+  `lib/hooks/useAssetTransactions.ts`, 2026-11-12): the meta query is persisted to IndexedDB, `null` included, so on an
+  account migrated from another device the cached `null` would send a new ETF down the non-ledger path. `AssetDialog`
+  re-reads it at submit (`staleTime: 0`) and takes the ledger path with the values typed — no toast, no early close;
+  the hint «Il registro operazioni si sta inizializzando…» may show until then, and is not a bug. Pinned by
+  `__tests__/ledgerMetaFreshness.test.ts` and `e2e/assets.ledger-meta.spec.ts`.
+- **A «stale list» only exists in a Movimenti dialog opened BEFORE the other window's delete** (2026-11-13, the
+  NOVE-03 tour): `AssetMovementsDialog` reads the trades when it opens, so a second window that opens it afterwards
+  already shows the list without the row — not a missed 404. To see «Operazione non trovata.», open the dialog in both
+  windows first, then delete in one and in the other; the list then refreshes by itself (the hooks invalidate on error).

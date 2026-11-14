@@ -135,9 +135,10 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
     [sortedAsc, vitals],
   );
 
-  const performDelete = async (transactionId: string) => {
+  // The row's version travels with the delete: a trade changed or deleted since is refused.
+  const performDelete = async (transaction: AssetTransaction) => {
     try {
-      await deleteMutation.mutateAsync(transactionId);
+      await deleteMutation.mutateAsync({ transactionId: transaction.id, expectedUpdatedAt: transaction.updatedAt });
       toast.success('Operazione eliminata');
     } catch (error) {
       toast.error(describeWriteError(error));
@@ -262,7 +263,7 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
                       effect={effectsById[transaction.id]}
                       isDemo={isDemo}
                       onEdit={() => openEditTrade(transaction)}
-                      onDelete={() => void performDelete(transaction.id)}
+                      onDelete={() => void performDelete(transaction)}
                     />
                   ))}
                 </tbody>
@@ -277,7 +278,7 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
                     effect={effectsById[transaction.id]}
                     isDemo={isDemo}
                     onEdit={() => openEditTrade(transaction)}
-                    onDelete={() => void performDelete(transaction.id)}
+                    onDelete={() => void performDelete(transaction)}
                   />
                 ))}
               </div>

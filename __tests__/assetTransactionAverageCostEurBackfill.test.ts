@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * Integration test for backfillAverageCostEur (assetTransactionUseCase.ts) — the one-shot,
  * per-user projection that fixes G/P for foreign-currency positions predating averageCostEur (see
  * lib/utils/patrimonioSummary.ts → costBasisPerUnitEur). Runs the REAL use-case function against a
- * minimal fake Admin SDK (get/update only — no transaction needed here), with getUserAssetsAdmin
+ * minimal fake Admin SDK (get/update and a per-asset transaction), with getUserAssetsAdmin
  * mocked to sidestep Firestore Timestamp plumbing unrelated to what this function does.
  */
 
@@ -69,6 +69,19 @@ vi.mock('@/lib/firebase/admin', () => {
         return query;
       },
     }),
+    // A doc ref and a query both answer `get()`, so tx.get delegates; updates apply after the closure.
+    runTransaction: async (fn: (tx: unknown) => Promise<unknown>) => {
+      const pending: (() => Promise<void>)[] = [];
+      const tx = {
+        get: (refOrQuery: { get: () => Promise<unknown> }) => refOrQuery.get(),
+        update: (ref: { update: (data: Record<string, unknown>) => Promise<void> }, data: Record<string, unknown>) => {
+          pending.push(() => ref.update(data));
+        },
+      };
+      const result = await fn(tx);
+      for (const write of pending) await write();
+      return result;
+    },
   };
 
   return { adminDb };

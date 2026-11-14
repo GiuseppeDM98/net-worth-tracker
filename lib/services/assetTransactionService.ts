@@ -145,25 +145,33 @@ export async function createAssetTransaction(
   return parseWriteResponse(response, "Errore durante la registrazione dell'operazione.");
 }
 
+/**
+ * `expectedUpdatedAt` is the `updatedAt` of the trade the form was drawn from: the server refuses
+ * (409) a trade changed since, so a form left open on an older version cannot overwrite a newer one.
+ */
 export async function updateAssetTransaction(
   ownerId: string,
   transactionId: string,
-  updates: Partial<AssetTransactionFormData>
+  updates: Partial<AssetTransactionFormData>,
+  expectedUpdatedAt: Date
 ): Promise<AssetTransactionMutationResult> {
   const response = await authenticatedFetch(`/api/asset-transactions/${transactionId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: ownerId, updates }),
+    body: JSON.stringify({ userId: ownerId, updates, expectedUpdatedAt: expectedUpdatedAt.toISOString() }),
   });
   return parseWriteResponse(response, "Errore durante la modifica dell'operazione.");
 }
 
+/** `expectedUpdatedAt`: the version the row's delete button was drawn from (see the edit). */
 export async function deleteAssetTransaction(
   ownerId: string,
-  transactionId: string
+  transactionId: string,
+  expectedUpdatedAt: Date
 ): Promise<AssetTransactionMutationResult> {
   const response = await authenticatedFetch(
-    `/api/asset-transactions/${transactionId}?userId=${encodeURIComponent(ownerId)}`,
+    `/api/asset-transactions/${transactionId}?userId=${encodeURIComponent(ownerId)}` +
+      `&expectedUpdatedAt=${encodeURIComponent(expectedUpdatedAt.toISOString())}`,
     { method: 'DELETE' }
   );
   return parseWriteResponse(response, "Errore durante l'eliminazione dell'operazione.");
