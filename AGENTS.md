@@ -322,6 +322,14 @@ holds it): how it was learned is `git log`'s.
 ### Shared Constants and Fixed Hooks
 - **Rule of Three**: a map used in 3+ files lives in `lib/constants/<domain>.ts`. The canonical symptom of a duplicated
   `Record<Type, string>` is one copy missing its `dark:` variants — illegible in dark mode with a clean `tsc`.
+- **A savings rate goes through `readSavings` (`lib/utils/savingsRate.ts`)**: below −100% (`SAVINGS_RATE_FLOOR`) or
+  without income the app speaks in euros («Finora hai messo da parte −497 €: le spese superano le entrate»), never «il
+  −16567%»; `meaningfulSavingsRate` is the number-or-null door, `weightedSavingsRate` the average of a window (Σ
+  saved / Σ income, never a mean of rates). A negative rate keeps the typographic minus (`withTypographicMinus`).
+  2026-11-12; pinned by `__tests__/savingsRate.test.ts` and by the grep
+  `grep -rnE "/ ?\(?[A-Za-z_.]*([Ii]ncome|[Ii]nflows?)\)? ?\* ?100" lib components app`, which prints only
+  `savingsRate.ts`, `savingsRateBadge.ts` (last month ≥ 30%, positive by construction), `landingSampleData.ts`, the
+  income variation of `dashboardOverviewService.ts` and `whatIfSummary.ts` (a share of income lost, not a rate).
 - **Declare N fixed hook instances with `enabled: false` for the inactive ones — never loop over hooks.**
 - **Yahoo module asymmetry** — funds `topHoldings` → `sectorWeightings`, stocks `assetProfile` → `sector`, the two
   maps in `lib/constants/exposureSectors.ts`, two MODULES of one per-ticker document since 2026-09-28:

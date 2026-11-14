@@ -13,7 +13,8 @@
  * belong there, behind a test, not in a sentence builder.
  */
 
-import { cachedFormatCurrencyEUR, formatPercentageIt as formatPercentage } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatPercentageIt as formatPercentage, withTypographicMinus } from '@/lib/utils/formatters';
+import { meaningfulSavingsRate } from '@/lib/utils/savingsRate';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 import type {
@@ -287,6 +288,17 @@ export function describeHistorySection(data: HistoryData): Narrative {
   }
   narrative.push(prose('.'));
   return narrative;
+}
+
+/**
+ * The note under the PDF's «Risparmio netto»: «28,2% di quanto è entrato», «−30,0% …» with the
+ * typographic minus; `null` — no note — when it is not a rate (no income, or a deficit beyond
+ * the savings floor, `meaningfulSavingsRate`, 2026-11-12): the euro figure above says it.
+ */
+export function describeNetSavingsNote(income: number, spending: number): string | null {
+  const rate = meaningfulSavingsRate(income, spending);
+  if (rate === null) return null;
+  return `${withTypographicMinus(rate, formatPercentage(Math.abs(rate), 1))} di quanto è entrato`;
 }
 
 /**

@@ -56,6 +56,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `preparePerformanceData` without the ledger (26,05% against the page's 27,08%) — call `fetchPDFData` through the
   client SDK on the emulators (a `globalThis.fetch` shim prefixes the tour server's origin to the relative yield
   routes) and compare its metrics with `getAllPerformanceData`'s.
+- **The note under «Risparmio netto»** is `describeNetSavingsNote(income, spending)` (`pdfNarrative.ts`, 2026-11-12):
+  «28,2% di quanto è entrato», «−30,0% …» with the typographic minus, no note without income or below the savings
+  floor (`meaningfulSavingsRate`) — the euro figure above it says it. Pinned by `__tests__/pdfNarrative.test.ts`.
 
 ## Periodic Emails (`lib/server/monthlyEmailService.ts`, `weeklyBudgetEmailService.ts`)
 
@@ -145,6 +148,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **`max_tokens` scales with the period** (6000/8000/8000/10000), and the format contract names the period in its
   length line instead of a word count. Web search is offered only when `includeMacroContext` allows it, like the
   assistant's structured analyses.
+- **A deficit without a baseline reads as the Cashflow tile reads it** (2026-11-12): the period verdict's fallback
+  (no snapshot before the period) says «Sono usciti 600 € più di quanto è entrato.», never «Hai messo da parte −600 €, il
+  −30,0%»; a surplus keeps its share, from `meaningfulSavingsRate`, as `describeCashflowTile` does. Pinned by
+  `__tests__/emailNarrative.test.ts`. Both «Hai messo da parte» sentences take the article from the figure as printed
+  («l'81,0%», The Comma Rule, 2026-11-14), and so does the income tile's ranked category («Stipendio copre l'86,1%»,
+  the share passed to the lead-in as a number).
 
 ## Verifying a surface with no DOM
 

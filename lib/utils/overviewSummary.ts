@@ -23,6 +23,7 @@ import {
 import { VERDICT_REST_SECTION } from '@/lib/utils/mobileSections';
 import { cachedFormatCurrencyEUR, formatPercentageIt, withTypographicMinus } from '@/lib/utils/formatters';
 import { describeOwnershipAnswer } from '@/lib/utils/patrimonioNarrative';
+import { meaningfulSavingsRate, readSavings } from '@/lib/utils/savingsRate';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
 import type { DashboardOverviewCategoryAmount, DashboardOverviewExpenseStats, DashboardOverviewPayload } from '@/types/dashboardOverview';
@@ -48,12 +49,14 @@ export type OverviewSectionId = (typeof OVERVIEW_SECTION_IDS)[keyof typeof OVERV
 
 // ─── The two ratios of the Cashflow tile (the WHOLE month, calendar included) ─────────────────
 
-/** The month's savings rate in percent — `null` (not 0) without income: a rate needs a denominator. */
+/**
+ * The month's savings rate in percent — `null` (not 0) when it is not a rate: no income, or a
+ * deficit beyond the floor (`meaningfulSavingsRate`).
+ */
 export function monthSavingsRate(stats: DashboardOverviewExpenseStats | null | undefined): number | null {
   if (!stats) return null;
   const { income, expenses } = stats.currentMonth;
-  if (income <= 0) return null;
-  return ((income - expenses) / income) * 100;
+  return meaningfulSavingsRate(income, expenses);
 }
 
 /** income / expenses; `null` without expenses. */
@@ -67,14 +70,24 @@ export function monthCoverageRatio(stats: DashboardOverviewExpenseStats | null |
 // ─── The strip ────────────────────────────────────────────────────────────────────────────────
 
 /**
- * The savings rate the verdict judges — what has already happened (`resolveLivedCashflow`), or
- * the whole month on a payload that cannot say — rounded as the sentence rounds it
- * (`Math.round`; doc/guide/panoramica.md § Composizione mobile). `null` with nothing to divide by.
+ * The cell «Messo da parte finora», the verdict's own figure: what has already happened
+ * (`resolveLivedCashflow`), or the whole month on a payload that cannot say. A rate is rounded as
+ * the sentence rounds it (`Math.round`; doc/guide/panoramica.md § Composizione mobile); a lived
+ * deficit beyond the floor is the sentence's signed whole euro («−497 €», owner 2026-11-12) —
+ * without `decimals` the strip prints `cachedFormatCurrencyEUR(magnitude, true)`, the form
+ * `formatEuroMinus` prints in the sentence. On a payload without the calendar the sentence has no
+ * clause below the floor, so the cell names the reason.
  */
-function verdictSavingsRate(stats: DashboardOverviewExpenseStats | null | undefined): { rate: number | null; lived: boolean } {
+function savedSoFarFigure(stats: DashboardOverviewExpenseStats | null | undefined): Pick<StripFigure, 'value' | 'format' | 'decimals' | 'reason'> {
   const lived = resolveLivedCashflow(stats);
-  const rate = lived ? lived.savingsRate : monthSavingsRate(stats);
-  return { rate: rate === null ? null : Math.round(rate), lived: lived !== null };
+  const reading = lived ? lived.reading : stats ? readSavings(stats.currentMonth.income, stats.currentMonth.expenses) : { kind: 'none' as const };
+  if (reading.kind === 'rate') return { value: Math.round(reading.rate), format: 'percent', decimals: 0 };
+  if (reading.kind === 'deficit') {
+    return lived
+      ? { value: -reading.deficit, format: 'signed-currency' }
+      : { value: null, format: 'percent', decimals: 0, reason: 'spese oltre le entrate' };
+  }
+  return { value: null, format: 'percent', decimals: 0, reason: lived ? 'nessuna entrata finora' : 'nessuna entrata nel mese' };
 }
 
 /**
@@ -87,7 +100,6 @@ function verdictSavingsRate(stats: DashboardOverviewExpenseStats | null | undefi
 export function selectOverviewStrip(overview: DashboardOverviewPayload): StripFigure[] {
   const monthly = overview.variations.monthly;
   const yearly = overview.variations.yearly;
-  const saved = verdictSavingsRate(overview.expenseStats);
 
   const figures: StripFigure[] = [
     {
@@ -110,11 +122,8 @@ export function selectOverviewStrip(overview: DashboardOverviewPayload): StripFi
     },
     {
       label: 'Messo da parte finora',
-      value: saved.rate,
-      format: 'percent',
-      decimals: 0,
+      ...savedSoFarFigure(overview.expenseStats),
       opens: OVERVIEW_SECTION_IDS.cashflow,
-      ...(saved.rate === null ? { reason: saved.lived ? 'nessuna entrata finora' : 'nessuna entrata nel mese' } : {}),
     },
   ];
   return figures.every((figure) => figure.value === null) ? [] : figures;

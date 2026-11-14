@@ -1,5 +1,5 @@
 import type { PeriodCashflowTotals } from '@/lib/utils/tracciamentoSummary';
-import { cachedFormatCurrencyEUR, formatEuroMinus } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatEuroMinus, withTypographicMinus } from '@/lib/utils/formatters';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { printedDelta } from '@/lib/utils/cashflowNarrative';
 import { cn } from '@/lib/utils';
@@ -89,7 +89,7 @@ export function CashflowKpiTrio({ totals, incomeDelta, expensesDelta, previousLa
         <p className={cn(valueClass, 'text-foreground')}>{formatEuroMinus(net)}</p>
         <p className="text-[11px] text-muted-foreground">
           {savingsRate !== null ? (
-            <span className="font-mono tabular-nums text-foreground">{formatPercentage(savingsRate, 1)}</span>
+            <span className="font-mono tabular-nums text-foreground">{withTypographicMinus(savingsRate, formatPercentage(Math.abs(savingsRate), 1))}</span>
           ) : (
             <span>—</span>
           )}

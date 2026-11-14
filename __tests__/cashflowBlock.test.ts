@@ -345,8 +345,44 @@ describe('savings', () => {
     const block = buildCashflowBlock(rows, input());
     expect(block.savings.rate).toBeNull();
     const text = printBlock(rows);
-    expect(text).toContain('Risparmio: -300 € in 12 mesi (tasso —: entrate nulle o negative); le rate contano per intero');
+    expect(text).toContain('Risparmio: -300 € in 12 mesi (tasso —: entrate nulle o negative, oppure spese oltre il doppio delle entrate); le rate contano per intero');
     expect(text).toContain('2026-05: 0 / 300 / 0 / 0 / -300 / —');
+  });
+});
+
+// The savings floor (owner, 2026-11-12): a month or an aggregate below −100%, or without income, is
+// not a rate — the block prints «—» and says once what it means; a true −30% keeps its percentage,
+// with the typographic minus.
+describe('the savings floor', () => {
+  const LEGEND = 'tasso —: entrate nulle o negative, oppure spese oltre il doppio delle entrate';
+
+  it('prints «—» for a month below the floor and the legend once after the series (B1)', () => {
+    const rows = [
+      row('2026-05-10', 'income', 3), row('2026-05-11', 'variable', -500),
+      row('2026-06-10', 'income', 3), row('2026-06-11', 'variable', -400),
+      row('2026-07-10', 'income', 2000), row('2026-07-11', 'variable', -2600),
+    ];
+    const block = buildCashflowBlock(rows, input());
+    expect(block.series.find((m) => m.ym === '2026-05')?.savingsRate).toBeNull();
+    const text = printBlock(rows);
+    expect(text).toContain('2026-05: 3 / 0 / 500 / 0 / -497 / —');
+    expect(text).toContain('2026-07: 2000 / 0 / 2600 / 0 / -600 / −30%');
+    expect(text.split(LEGEND)).toHaveLength(2);
+    // The aggregate: 2006 € in, 3500 € out — −74%, still a rate.
+    expect(text).toContain('Risparmio: -1494 € in 12 mesi, il −74% delle entrate;');
+  });
+
+  it('prints «—» for an aggregate below the floor (B1)', () => {
+    const rows = [row('2026-05-10', 'income', 3), row('2026-05-11', 'variable', -500)];
+    expect(buildCashflowBlock(rows, input()).savings.rate).toBeNull();
+    expect(printBlock(rows)).toContain(`Risparmio: -497 € in 12 mesi (${LEGEND});`);
+  });
+
+  it('prints no legend when every month with rows is a rate (B2)', () => {
+    const rows = [row('2026-05-10', 'income', 2000), row('2026-05-11', 'variable', -2600)];
+    const text = printBlock(rows);
+    expect(text).toContain('2026-05: 2000 / 0 / 2600 / 0 / -600 / −30%');
+    expect(text).not.toContain(LEGEND);
   });
 });
 

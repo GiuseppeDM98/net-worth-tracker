@@ -13,6 +13,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer } from '@/components/ui/charts/recharts';
 import { formatPercentage } from '@/lib/services/chartService';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
+import { SAVINGS_RATE_FLOOR } from '@/lib/utils/savingsRate';
 
 // 20% is the commonly cited minimum savings target for Italian households.
 // Above this line = "on track"; below = "needs attention" (red zone).
@@ -23,7 +24,7 @@ export function SavingsRateLineChart({
   colors,
   height,
 }: {
-  data: Array<{ label: string; rate: number | null }>;
+  data: Array<{ label: string; rate: number | null; overspent: boolean }>;
   colors: string[];
   height: number;
 }) {
@@ -34,7 +35,7 @@ export function SavingsRateLineChart({
         margin={{ top: 4, right: 16, left: -16, bottom: 0 }}
         role="img"
         accessibilityLayer={false}
-        aria-label={`Tasso di risparmio per mese, obiettivo ${SAVINGS_TARGET}%. ${data.map((point) => `${point.label}: ${point.rate === null ? 'nessuna entrata' : formatPercentage(point.rate, 1)}`).join('; ')}`}
+        aria-label={`Tasso di risparmio per mese, obiettivo ${SAVINGS_TARGET}%. ${data.map((point) => `${point.label}: ${point.rate === null ? (point.overspent ? 'spese oltre le entrate' : 'nessuna entrata') : formatPercentage(point.rate, 1)}`).join('; ')}`}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
 
@@ -46,7 +47,9 @@ export function SavingsRateLineChart({
           tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
-          domain={['auto', 'auto']}
+          // The floor of the savings rate (`SAVINGS_RATE_FLOOR`): a point is never below it, and the
+          // axis never reaches past it on its own rounding.
+          domain={[(min: number) => Math.max(Math.floor(min), SAVINGS_RATE_FLOOR), 'auto']}
         />
 
         {/* CSS vars for tooltip — never hardcoded hex (doc/guide/grafici.md § Recharts — tooltip style props) */}

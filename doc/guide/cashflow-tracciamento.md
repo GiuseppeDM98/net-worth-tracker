@@ -128,8 +128,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   gap-free and bucketed by `getItalyYear`/`getItalyMonth`, while the period slice uses `periodToRange` (local time) —
   the same split `cashflowTimeSeries.ts` already lives with. **The running month is drawn but never ranked**
   (`summarizeSavingsHistory(months, now)` → `ongoing`/`closedCount`): its salary is in and its spending is not, so it
-  would be «il mese migliore» by construction; the reading says «su 11 mesi chiusi». A window is called «ultimi N
+  would be «il mese migliore» by construction; the reading says «su 11 mesi misurabili» — the months the average runs on, the running month and any month below the savings floor left out (owner, 2026-11-14: «mesi chiusi» and «con entrate» named months the average skipped). A window is called «ultimi N
   mesi» only when it ends today (`describeMonthWindow`/`describeFlowWindow`), else it is named by its bounds.
+- **«Risparmio nel tempo» and the savings floor** (2026-11-12, `readSavings`): every month carries its `reading`;
+  the average is `weightedSavingsRate` over the closed months (Σ saved / Σ income — a 3 €-income month no longer drags
+  it to −16.567%); best and worst rank only the months whose reading is a rate (`rankedCount`, the guard of the
+  reading and of «Mese per mese»); a month below the floor, or spending without income, is a deficit month and a bar
+  from 0 to −100% in full `--destructive` — the floor then sits on the plot's bottom edge, so one such month never
+  flattens the others; its title, label and tip say «Gen: spese oltre le entrate, −497 €» (`describeSavingsBar`).
+  A month after today's (`futureMonths`) draws no bar and is not judged. The period trio's caption prints «— ·
+  0,01×» below the floor and «−30,0%» with the typographic minus above it; `settleTotals` returns `savingsRate: null`
+  below the floor. Pinned by `__tests__/{tracciamentoSummary,cashflowNarrative,savingsRate}.test.ts` and
+  `__tests__/{risparmioTile,cashflowKpiTrio}.test.tsx`.
 - **Italian tense is data**: `describePeriodSubject` returns `ongoing` (the current month/year, a custom range whose
   `to` is today or later) and the headline conjugates on it («sta andando bene» / «è andato bene», «tiene» / «ha
   tenuto»); the article before the savings rate follows the figure AS PRINTED (`articleForPercent(rate, 0)`, now

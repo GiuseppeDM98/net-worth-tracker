@@ -21,6 +21,7 @@ vi.mock('firebase/firestore', () => ({
 import { narrativeToText, splitVerdict, type Narrative } from '@/lib/utils/narrative';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { readSavings } from '@/lib/utils/savingsRate';
 import type { PeriodCashflowTotals, ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 import type { CategoryDeltaRow, TotalsPacing } from '@/lib/utils/comparisonDeltas';
 import type { SpendingAnomaly } from '@/lib/utils/cashflowComposition';
@@ -420,7 +421,7 @@ describe('describeFlow', () => {
         { type: 'debt', label: 'Debiti', amount: 1000, percentage: third, printedPercentage: 33 },
       ],
     };
-    expect(plain(describeFlow(flow, 20))).toContain('Fisse 34%, variabili 33%, debiti 33%.');
+    expect(plain(describeFlow(flow, readSavings(1000, 800)))).toContain('Fisse 34%, variabili 33%, debiti 33%.');
   });
 
   it('should write a type that holds money but rounds to zero as «meno dell’1%», never «0%»', () => {
@@ -432,22 +433,30 @@ describe('describeFlow', () => {
         { type: 'debt', label: 'Debiti', amount: 40, percentage: 0.4, printedPercentage: 0 },
       ],
     };
-    expect(plain(describeFlow(flow, 20))).toContain("Fisse 100%, debiti meno dell'1%.");
+    expect(plain(describeFlow(flow, readSavings(1000, 800)))).toContain("Fisse 100%, debiti meno dell'1%.");
   });
 
   it('should describe the flow from the sources to the types and categories, with the savings share', () => {
-    expect(plain(describeFlow(FLOW, 20.81))).toBe('Da 4 fonti (39.400 €) a 3 tipi di spesa e 10 categorie; il 21% resta come risparmio. Fisse 58%, variabili 37%, debiti 5%.');
+    expect(plain(describeFlow(FLOW, readSavings(10000, 7919)))).toBe('Da 4 fonti (39.400 €) a 3 tipi di spesa e 10 categorie; il 21% resta come risparmio. Fisse 58%, variabili 37%, debiti 5%.');
   });
 
   it('should say when spending exceeds income, and when there is one source or one type', () => {
-    expect(plain(describeFlow({ ...FLOW, incomeSources: 1, typeShares: [FLOW.typeShares[0]] }, -12.3))).toBe('Da una fonte (39.400 €) a 1 tipo di spesa e 10 categorie; le spese superano le entrate del 12,3%. Tutte spese fisse.');
-    expect(plain(describeFlow({ ...FLOW, typeShares: [FLOW.typeShares[2]] }, 10))).toContain('Tutte spese di debito.');
-    expect(plain(describeFlow({ incomeTotal: 3200, incomeSources: 2, expensesTotal: 0, categoryCount: 0, typeShares: [] }, 100))).toBe('Nessuna spesa: 3200 € da 2 fonti, tutto resta come risparmio.');
+    expect(plain(describeFlow({ ...FLOW, incomeSources: 1, typeShares: [FLOW.typeShares[0]] }, readSavings(1000, 1123)))).toBe('Da una fonte (39.400 €) a 1 tipo di spesa e 10 categorie; le spese superano le entrate del 12,3%. Tutte spese fisse.');
+    expect(plain(describeFlow({ ...FLOW, typeShares: [FLOW.typeShares[2]] }, readSavings(1000, 900)))).toContain('Tutte spese di debito.');
+    expect(plain(describeFlow({ incomeTotal: 3200, incomeSources: 2, expensesTotal: 0, categoryCount: 0, typeShares: [] }, readSavings(3200, 0)))).toBe('Nessuna spesa: 3200 € da 2 fonti, tutto resta come risparmio.');
   });
 
   it('should describe spending without income, and return null with nothing', () => {
-    expect(plain(describeFlow({ ...FLOW, incomeTotal: 0, incomeSources: 0 }, null))).toBe('Nessuna entrata: 31.200 € di spese in 10 categorie. Fisse 58%, variabili 37%, debiti 5%.');
-    expect(describeFlow({ incomeTotal: 0, incomeSources: 0, expensesTotal: 0, categoryCount: 0, typeShares: [] }, null)).toBeNull();
+    expect(plain(describeFlow({ ...FLOW, incomeTotal: 0, incomeSources: 0 }, readSavings(0, 31200)))).toBe('Nessuna entrata: 31.200 € di spese in 10 categorie. Fisse 58%, variabili 37%, debiti 5%.');
+    expect(describeFlow({ incomeTotal: 0, incomeSources: 0, expensesTotal: 0, categoryCount: 0, typeShares: [] }, readSavings(0, 0))).toBeNull();
+  });
+
+  // The savings floor (owner, 2026-11-12): 3 € in and 500 € out is said in euros, a true −30% keeps its percentage (F1).
+  it('should say a deficit beyond the floor in euros and keep a true negative rate', () => {
+    const tiny = { ...FLOW, incomeTotal: 3, incomeSources: 1, expensesTotal: 500, typeShares: [FLOW.typeShares[0]] };
+    expect(plain(describeFlow(tiny, readSavings(3, 500)))).toContain('; le spese superano le entrate di 497 €.');
+    expect(plain(describeFlow(tiny, readSavings(3, 500)))).not.toContain('%.');
+    expect(plain(describeFlow({ ...tiny, incomeTotal: 2000, expensesTotal: 2600 }, readSavings(2000, 2600)))).toContain('; le spese superano le entrate del 30,0%.');
   });
 });
 

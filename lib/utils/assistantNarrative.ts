@@ -30,6 +30,9 @@ import {
   resolveLivedCashflow,
   type OverviewVerdictInput,
 } from '@/lib/utils/overviewNarrative';
+import { monthSavingsRate } from '@/lib/utils/overviewSummary';
+import { articleForPercent } from '@/lib/utils/patrimonioNarrative';
+import { meaningfulSavingsRate, readSavings, type SavingsReading } from '@/lib/utils/savingsRate';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 import type { AssistantGoalEvaluationResult, AssistantMode, AssistantMonthContextBundle, AssistantRegisterSummary } from '@/types/assistant';
 import type { DashboardOverviewPayload } from '@/types/dashboardOverview';
@@ -115,39 +118,58 @@ function monthSubject(selector: AssistantPeriodInput['selector'], today: Assista
 // ─── Savings rate ─────────────────────────────────────────────────────────────
 
 /**
+ * What came in (income and dividends) against what went out — `readSavings` of the inflows and
+ * of the spending the net cash flow implies (`totalExpenses` is signed negative).
+ */
+function periodSavings(cashflow: AssistantPeriodInput['cashflow']): SavingsReading {
+  const inflows = cashflow.totalIncome + cashflow.totalDividends;
+  return readSavings(inflows, inflows - cashflow.netCashFlow);
+}
+
+/** Spending above the inflows: a negative rate, or a deficit beyond the savings floor. */
+function spentMoreThanCameIn(reading: SavingsReading): boolean {
+  return reading.kind === 'deficit' || (reading.kind === 'rate' && reading.rate < 0);
+}
+
+/**
  * The share of what came in (income and dividends) that stayed: the net cash flow over the
- * inflows, in percent. Null without inflows — a rate needs a denominator.
+ * inflows, in percent. Null when it is not a rate (`meaningfulSavingsRate`: no inflows, or a
+ * deficit beyond the floor).
  */
 export function resolveSavingsRate(cashflow: AssistantPeriodInput['cashflow']): number | null {
   const inflows = cashflow.totalIncome + cashflow.totalDividends;
-  if (inflows <= 0) return null;
-  return (cashflow.netCashFlow / inflows) * 100;
+  return meaningfulSavingsRate(inflows, inflows - cashflow.netCashFlow);
 }
 
-/** « Hai messo da parte il 31% delle entrate.» / « Hai speso più di quanto è entrato.» — or nothing. */
-function savingsClause(savingsRate: number | null): Narrative {
-  if (savingsRate === null) return [];
-  if (savingsRate < 0) return [prose(' Hai speso più di quanto è entrato.')];
-  return [prose(' Hai messo da parte il '), figure(`${Math.round(savingsRate)}%`), prose(' delle entrate.')];
+/**
+ * « Hai messo da parte il 31% delle entrate.» / « Hai speso più di quanto è entrato.» — or nothing.
+ * A deficit beyond the floor reads as words, as any deficit: this clause never prints a negative
+ * percentage.
+ */
+function savingsClause(reading: SavingsReading): Narrative {
+  if (spentMoreThanCameIn(reading)) return [prose(' Hai speso più di quanto è entrato.')];
+  if (reading.kind !== 'rate') return [];
+  // The article follows the figure as printed (The Comma Rule): «il 31%», «l'81%».
+  return [prose(` Hai messo da parte ${articleForPercent(Math.round(reading.rate), 0)}`), figure(`${Math.round(reading.rate)}%`), prose(' delle entrate.')];
 }
 
 /** «entrate 3900 €, uscite 2690 €: hai messo da parte il 31%.» — the cashflow-only sentence body. */
 function cashflowOnlyClause(cashflow: AssistantPeriodInput['cashflow']): Narrative {
-  const savingsRate = resolveSavingsRate(cashflow);
+  const reading = periodSavings(cashflow);
   const inflows = cashflow.totalIncome + cashflow.totalDividends;
-  if (savingsRate === null) return [prose('uscite '), amount(cashflow.totalExpenses), prose('.')];
+  if (reading.kind === 'none' || reading.kind === 'no-income') return [prose('uscite '), amount(cashflow.totalExpenses), prose('.')];
   const clause: Narrative = [prose('entrate '), amount(inflows), prose(', uscite '), amount(cashflow.totalExpenses)];
-  if (savingsRate < 0) clause.push(prose(': hai speso più di quanto è entrato.'));
-  else clause.push(prose(': hai messo da parte il '), figure(`${Math.round(savingsRate)}%`), prose('.'));
+  if (reading.kind === 'deficit' || reading.rate < 0) clause.push(prose(': hai speso più di quanto è entrato.'));
+  else clause.push(prose(`: hai messo da parte ${articleForPercent(Math.round(reading.rate), 0)}`), figure(`${Math.round(reading.rate)}%`), prose('.'));
   return clause;
 }
 
 // ─── The verdict on a period ─────────────────────────────────────────────────
 
 /** Tone of a measured change: a fall is a fall, growth with spending over income is a warning. */
-function resolveTone(delta: number, savingsRate: number | null): VerdictTone {
+function resolveTone(delta: number, reading: SavingsReading): VerdictTone {
   if (delta < 0) return 'negative';
-  return savingsRate !== null && savingsRate < 0 ? 'warning' : 'positive';
+  return spentMoreThanCameIn(reading) ? 'warning' : 'positive';
 }
 
 /** The headline for each period kind and tone; `subject` is «Luglio» / «Dicembre 2025» / the year. */
@@ -189,7 +211,7 @@ function noDataHeadline(kind: PeriodKind, selector: AssistantPeriodInput['select
 export function buildAssistantPeriodVerdict(input: AssistantPeriodInput, today: AssistantToday): PageVerdictModel {
   const { selector, netWorth, cashflow, dataQuality } = input;
   const kind = periodKind(selector);
-  const savingsRate = resolveSavingsRate(cashflow);
+  const savings = periodSavings(cashflow);
 
   if (!dataQuality.hasSnapshot && !dataQuality.hasCashflowData) {
     return {
@@ -238,7 +260,7 @@ export function buildAssistantPeriodVerdict(input: AssistantPeriodInput, today: 
           prose(`A fine ${monthName} il patrimonio valeva `),
           amount(netWorth.end),
           prose('; nessun mese precedente con cui misurare la variazione.'),
-          ...savingsClause(savingsRate),
+          ...savingsClause(savings),
         ],
       };
     }
@@ -251,12 +273,12 @@ export function buildAssistantPeriodVerdict(input: AssistantPeriodInput, today: 
         prose(running || kind === 'history' ? 'Il patrimonio vale ' : `A fine ${selector.year} il patrimonio valeva `),
         amount(netWorth.end),
         prose(`; ${missing} con cui misurare la variazione.`),
-        ...savingsClause(savingsRate),
+        ...savingsClause(savings),
       ],
     };
   }
 
-  const tone = resolveTone(netWorth.delta, savingsRate);
+  const tone = resolveTone(netWorth.delta, savings);
   const subject = kind === 'month' ? monthSubject(selector, today, true) : String(selector.year);
   const headline = resolveHeadline(kind, tone, subject, partial);
   const change: Narrative = [prose(': '), signedCurrency(netWorth.delta), prose(' ('), signedPercent(netWorth.deltaPct), prose(')')];
@@ -279,7 +301,7 @@ export function buildAssistantPeriodVerdict(input: AssistantPeriodInput, today: 
         : [prose('Il patrimonio vale '), amount(netWorth.end), ...change, prose('.')];
   }
 
-  return { headline, tone, sentence: [...sentence, ...savingsClause(savingsRate)] };
+  return { headline, tone, sentence: [...sentence, ...savingsClause(savings)] };
 }
 
 /**
@@ -289,10 +311,8 @@ export function buildAssistantPeriodVerdict(input: AssistantPeriodInput, today: 
  * source version 19, null without income.
  */
 export function toNoContextVerdictInput(overview: DashboardOverviewPayload, month: number): OverviewVerdictInput {
-  const current = overview.expenseStats?.currentMonth;
   const cashflow = resolveLivedCashflow(overview.expenseStats);
-  const wholeMonthRate = current && current.income > 0 ? ((current.income - current.expenses) / current.income) * 100 : null;
-  const savingsRate = cashflow ? cashflow.savingsRate : wholeMonthRate;
+  const savingsRate = cashflow ? cashflow.savingsRate : monthSavingsRate(overview.expenseStats);
   return {
     month,
     totalValue: overview.metrics.totalValue,
@@ -441,12 +461,12 @@ export function describeNetWorthToday(totalValue: number | null, assetCount: num
  * instead of dropped, since the tile still shows the spending.
  */
 export function describeAssistantCashflow(cashflow: AssistantPeriodInput['cashflow']): Narrative | null {
-  const savingsRate = resolveSavingsRate(cashflow);
-  if (savingsRate === null) {
+  const reading = periodSavings(cashflow);
+  if (reading.kind === 'none' || reading.kind === 'no-income') {
     if (cashflow.totalExpenses === 0) return [prose('Nessun movimento registrato.')];
     return [prose('Nessuna entrata registrata; uscite '), amount(cashflow.totalExpenses), prose('.')];
   }
-  return describeCashflow(savingsRate, 0, 1);
+  return describeCashflow(reading, 0, 1);
 }
 
 /** «3 obiettivi attivi, 1 raggiunto; 3 altri fatti guidano le risposte.» */

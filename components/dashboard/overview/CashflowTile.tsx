@@ -1,6 +1,7 @@
 import type { DashboardOverviewExpenseStats } from '@/types/dashboardOverview';
 import type { Narrative } from '@/lib/utils/narrative';
-import { cachedFormatCurrencyEUR, formatEuroMinus } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatEuroMinus, withTypographicMinus } from '@/lib/utils/formatters';
+import { readSavings } from '@/lib/utils/savingsRate';
 import { formatPercentage } from '@/lib/services/chartService';
 import {
   atPreviousMonth,
@@ -21,7 +22,7 @@ interface CashflowTileProps {
   month: number;
   dayOfMonth: number;
   daysInMonth: number;
-  /** Current-month savings rate in percent; null when there is no income. */
+  /** Current-month savings rate in percent; null when it is not a rate (`monthSavingsRate`). */
   savingsRate: number | null;
   /** income / expenses; null when there are no expenses. */
   coverageRatio: number | null;
@@ -91,7 +92,7 @@ export function CashflowTile({
       }
       asideWhenClosed={asideWhenClosed}
       collapse={collapse}
-      reading={describeCashflow(savingsRate, expenseStats.delta.expenses, month)}
+      reading={describeCashflow(readSavings(income, expenses), expenseStats.delta.expenses, month)}
       className={className}
     >
       {/* The three figures are the WHOLE month, calendar included; what is still in the calendar is
@@ -122,7 +123,7 @@ export function CashflowTile({
           <ScheduledCaption caption={describeScheduledNetCaption(expensesScheduled, incomeScheduled, daysInMonth)} />
           <p className="text-[11px] text-muted-foreground">
             {savingsRate !== null ? (
-              <span className="font-mono tabular-nums text-foreground">{formatPercentage(savingsRate, 1)}</span>
+              <span className="font-mono tabular-nums text-foreground">{withTypographicMinus(savingsRate, formatPercentage(Math.abs(savingsRate), 1))}</span>
             ) : (
               <span>—</span>
             )}

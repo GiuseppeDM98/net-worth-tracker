@@ -1,10 +1,11 @@
 'use client';
 
 import type { Narrative } from '@/lib/utils/narrative';
-import type { SavingsHistory } from '@/lib/utils/tracciamentoSummary';
-import { cachedFormatCurrencyEUR, withTypographicMinus } from '@/lib/utils/formatters';
+import type { MonthFlow, SavingsHistory } from '@/lib/utils/tracciamentoSummary';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { SAVINGS_RATE_FLOOR } from '@/lib/utils/savingsRate';
+import { describeSavingsBar } from '@/lib/utils/cashflowNarrative';
 import { ChartHoverTip, useChartHover } from '@/components/ui/chart-hover';
-import { formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 import { Tile, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
@@ -33,26 +34,29 @@ const BAR_SHARE = 0.8;
 /**
  * One bar per month of savings rate, a deficit drawn below the baseline, the average as a
  * dashed line that the reading names («In media il 31%») — a label on the plot would paint
- * over whichever bar stands at the edge. The scale is symmetric around zero only when a month
- * is negative, so a history of surpluses uses the full height. Hand-written SVG
+ * over whichever bar stands at the edge. The scale reaches below zero only when a month is
+ * negative, so a history of surpluses uses the full height. A month below the savings floor, or
+ * spending without income (2026-11-12), is a bar from 0 to the floor in full `--destructive` —
+ * the floor then sits on the plot's bottom edge, so one month of −16.567% never flattens the
+ * others; the reduced fill is reserved for a window still running (DESIGN.md), and a deficit is
+ * not one. A month after today's draws no bar: it is not judged. Hand-written SVG
  * (`preserveAspectRatio="none"`, labels outside the plot), like the hero's bars.
  */
 function SavingsRateBars({ history, highlightKey }: { history: SavingsHistory; highlightKey: string | null }) {
-  const rates = history.months.map((m) => m.savingsRate ?? 0);
+  const futureKeys = new Set(history.futureMonths.map((m) => m.key));
+  const isFuture = (m: MonthFlow) => futureKeys.has(m.key);
+  const isFloorMonth = (m: MonthFlow) => !isFuture(m) && (m.reading.kind === 'deficit' || m.reading.kind === 'no-income');
+  const rates = history.months.filter((m) => !isFuture(m)).map((m) => m.savingsRate ?? 0);
   const top = Math.max(...rates, history.average ?? 0, 1);
-  const bottom = Math.min(...rates, 0);
+  const bottom = history.months.some(isFloorMonth) ? SAVINGS_RATE_FLOOR : Math.min(...rates, 0);
   const span = top - bottom;
   const yOf = (rate: number) => ((top - rate) / span) * VIEW_H;
   const baseline = yOf(0);
   const slot = VIEW_W / history.months.length;
   const barWidth = slot * BAR_SHARE;
 
-  // The typographic minus, as everywhere on the page (The Comma Rule) — none on a rate that
-  // prints as zero («0%» for −0,4; the printed-zero rule, since 2026-10-12).
-  const rateText = (rate: number) => withTypographicMinus(rate, formatPercentage(Math.abs(rate), 0));
-  const label = history.months
-    .map((m) => `${m.label}: ${m.savingsRate === null ? 'nessuna entrata' : rateText(m.savingsRate)}`)
-    .join('; ');
+  const textOf = (m: MonthFlow) => describeSavingsBar(m.reading, m.label, isFuture(m));
+  const label = history.months.map(textOf).join('; ');
 
   // A mouse over a month reads its rate and the two figures behind it (desktop only).
   const hover = useChartHover(history.months.length, 'slot');
@@ -72,13 +76,14 @@ function SavingsRateBars({ history, highlightKey }: { history: SavingsHistory; h
             <rect x={hover.index * slot} y={0} width={slot} height={VIEW_H} fill="var(--foreground)" opacity={0.06} />
           )}
           {history.months.map((month, i) => {
-            if (month.savingsRate === null) return null;
-            const rate = month.savingsRate;
+            if (isFuture(month)) return null;
+            const rate = isFloorMonth(month) ? SAVINGS_RATE_FLOOR : month.savingsRate;
+            if (rate === null) return null;
             const y = rate >= 0 ? yOf(rate) : baseline;
             const height = Math.abs(yOf(rate) - baseline);
             return (
               <g key={month.key}>
-                <title>{`${month.label}: ${rateText(rate)}`}</title>
+                <title>{textOf(month)}</title>
                 <rect
                   x={i * slot + (slot - barWidth) / 2}
                   y={y}
@@ -107,8 +112,17 @@ function SavingsRateBars({ history, highlightKey }: { history: SavingsHistory; h
         </svg>
         {hovered && hover.index !== null && (
           <ChartHoverTip x={(hover.index + 0.5) / history.months.length} label={`${hovered.label} ${hovered.year}`}>
-            <span className={cn('font-mono text-[13px] font-semibold tabular-nums', hovered.savingsRate === null ? 'text-muted-foreground' : hovered.savingsRate < 0 ? 'text-destructive' : 'text-positive')}>
-              {hovered.savingsRate === null ? 'nessuna entrata' : rateText(hovered.savingsRate)}
+            <span
+              className={cn(
+                'font-mono text-[13px] font-semibold tabular-nums',
+                isFloorMonth(hovered) || (hovered.savingsRate !== null && hovered.savingsRate < 0 && !isFuture(hovered))
+                  ? 'text-destructive'
+                  : hovered.savingsRate === null || isFuture(hovered)
+                    ? 'text-muted-foreground'
+                    : 'text-positive',
+              )}
+            >
+              {textOf(hovered)}
             </span>
             <span className="font-mono tabular-nums text-muted-foreground">
               entrate {cachedFormatCurrencyEUR(hovered.income, true)} · spese {cachedFormatCurrencyEUR(hovered.expenses, true)}
@@ -133,12 +147,12 @@ function SavingsRateBars({ history, highlightKey }: { history: SavingsHistory; h
 /**
  * "Quanto metto da parte, mese dopo mese?" — the savings rate of the trailing twelve months
  * (`summarizeSavingsHistory`), read as average, best and worst, drawn as bars around the
- * average. Months without income draw no bar: a missing denominator is not a zero.
+ * average. A month without any movement draws no bar: a missing denominator is not a zero.
  */
 export function RisparmioTile({ history, aside, reading, footer, highlightKey, collapse, asideWhenClosed, className }: RisparmioTileProps) {
   return (
     <Tile eyebrow="Risparmio nel tempo" aside={<NarrativeText segments={aside} figureClassName="font-medium" />} reading={reading} collapse={collapse} asideWhenClosed={asideWhenClosed} className={className}>
-      {history.measuredCount === 0 ? (
+      {history.measuredCount === 0 && history.deficitMonths.length === 0 ? (
         <p className="mt-3 text-[13px] text-muted-foreground">Nessun mese con entrate nella finestra.</p>
       ) : (
         <div className="mt-3 mb-3.5 flex flex-1 flex-col">

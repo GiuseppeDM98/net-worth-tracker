@@ -253,6 +253,10 @@ The app **is** locally runnable; there is no fallback to declare.
   refuses a non-local base, and exits when the owner closes every window, on SIGTERM (`pkill -TERM -f
   scripts/collaudo-finestre.mts` — how the agent closes them after the owner's confirmation) or after 30 minutes.
   Run it in the background, as its own task: a throwaway seed beside it in one command dies with it.
+  A file the page downloads (the PDF export, the CSV) lands in Playwright's temp folder, out of the owner's sight
+  (2026-11-14; the helper keeps no handle on its pages): for that item a throwaway Playwright script signs in the same
+  way and saves `page.on('download')` into the scratchpad, opens it for the owner, and deletes it with the fixtures
+  (it carries the mirror's figures).
 - **Getting in**: the login is email/password on `/login` — no OAuth, no MFA, so it is a five-second
   manual step and also fully scriptable. Fixture identities (all password `test1234`):
 

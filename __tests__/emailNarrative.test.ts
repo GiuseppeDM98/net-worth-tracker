@@ -165,6 +165,15 @@ describe('buildPeriodEmailVerdict', () => {
     );
   });
 
+  // The fallback without a baseline: a deficit is said as the email's tile says it, never as a
+  // negative «messo da parte» (owner, 2026-11-12) (E1).
+  it('says a deficit without a baseline in euros, never as a negative share', () => {
+    const verdict = buildPeriodEmailVerdict({ ...GROWING, previousNetWorth: 0, rank: null, totalIncome: 2000, totalExpenses: 2600 });
+    expect(plain(verdict.sentence)).toBe('Il patrimonio vale 312.480 €. Sono usciti 600 € più di quanto è entrato.');
+    const tiny = buildPeriodEmailVerdict({ ...GROWING, previousNetWorth: 0, rank: null, totalIncome: 3, totalExpenses: 500 });
+    expect(plain(tiny.sentence)).toBe('Il patrimonio vale 312.480 €. Sono usciti 497 € più di quanto è entrato.');
+  });
+
   /**
    * The pension contributions and the debts repaid are the user's money, taken out of the
    * residual by the caller (`marketEffectOf`) and named here (owner, 2026-10-14): left in, the
@@ -423,6 +432,13 @@ describe('describeClassMovesTile', () => {
 });
 
 describe('describeCashflowTile', () => {
+  // The article follows the figure as printed (The Comma Rule; «il 81,0%» until 2026-11-14).
+  it('says «l’81,0%» in the tile and in the verdict without a baseline', () => {
+    expect(plain(describeCashflowTile({ totalIncome: 1000, totalExpenses: 190 }))).toBe("Hai messo da parte 810 €, l'81,0% di quanto è entrato.");
+    const verdict = buildPeriodEmailVerdict({ ...GROWING, previousNetWorth: 0, rank: null, totalIncome: 1000, totalExpenses: 190 });
+    expect(plain(verdict.sentence)).toContain("Hai messo da parte +810 €, l'81,0% di quanto è entrato.");
+  });
+
   it('reads the savings rate', () => {
     expect(plain(describeCashflowTile({ totalIncome: 4180, totalExpenses: 3000 }))).toBe(
       'Hai messo da parte 1180 €, il 28,2% di quanto è entrato.',
@@ -482,7 +498,13 @@ describe('ranked category readings', () => {
           3,
         ),
       ),
-    ).toBe('Stipendio copre il 86,1% di quanto è entrato.');
+    ).toBe('Stipendio copre l\'86,1% di quanto è entrato.');
+  });
+
+  it('takes the article from the share as printed (The Comma Rule)', () => {
+    expect(plain(describeIncomeCategoriesTile([{ name: 'Stipendio', amount: 3000 }, { name: 'Altro', amount: 7000 }], 5))).toBe(
+      'Altro copre il 70,0% di quanto è entrato.',
+    );
   });
 
   it('is absent when there is nothing to rank', () => {

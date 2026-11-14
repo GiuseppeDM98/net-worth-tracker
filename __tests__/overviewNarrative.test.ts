@@ -39,6 +39,7 @@ import {
   type OverviewVerdictInput,
 } from '@/lib/utils/overviewNarrative';
 import { splitVerdict } from '@/lib/utils/narrative';
+import { readSavings } from '@/lib/utils/savingsRate';
 import type { DashboardOverviewExpenseStats } from '@/types/dashboardOverview';
 
 // Intl 'it-IT' separates the amount from "€" with a no-break space and leaves four-digit
@@ -57,6 +58,16 @@ const AUGUST: OverviewVerdictInput = {
   marketEffect: 3980,
   topMover: { assetClass: 'equity', delta: 3480 },
 };
+
+/**
+ * The lived cashflow the page builds from the payload (`resolveLivedCashflow`): `income` and
+ * `expenses` are the WHOLE month, calendar included, as the payload carries them.
+ */
+function livedOf(income: number, expenses: number, expensesScheduled = 0, incomeScheduled = 0) {
+  return resolveLivedCashflow({
+    currentMonth: { income, expenses, net: income - expenses, expensesScheduled, incomeScheduled },
+  } as DashboardOverviewExpenseStats)!;
+}
 
 describe('buildOverviewVerdict — headline and tone', () => {
   it('should call a growing month with healthy savings a good month', () => {
@@ -163,7 +174,8 @@ describe('buildOverviewVerdict — headline and tone', () => {
     yearlyVariation: { value: 35288.88, percentage: 13.47 },
     isNewATH: true,
     savingsRate: 44.92,
-    cashflow: { savings: 2094.62, savingsRate: 44.92, scheduledExpenses: 1296.75, scheduledIncome: 0 },
+    // 4663 − (3865,13 − 1296,75) = 2094,62 already saved, 44,92% of the income.
+    cashflow: livedOf(4663, 3865.13, 1296.75, 0),
     marketEffect: 2018.47,
     topMover: { assetClass: 'crypto', delta: 725.63 },
     sales: {
@@ -375,7 +387,8 @@ describe('buildOverviewVerdict — the month split and the savings already made'
   const WITH_CASHFLOW: OverviewVerdictInput = {
     ...AUGUST,
     savingsRate: 28.2,
-    cashflow: { savings: 1180, savingsRate: 28.2, scheduledExpenses: 0, scheduledIncome: 0 },
+    // 4200 − 3020 = 1180 saved (28,1% → «28%»).
+    cashflow: livedOf(4200, 3020),
   };
 
   it('should split the month into market, savings and the other changes, exactly', () => {
@@ -395,19 +408,103 @@ describe('buildOverviewVerdict — the month split and the savings already made'
   });
 
   it('should drop the other changes under 1 €, and say «spesi oltre le entrate» for negative savings', () => {
-    const exact = { ...WITH_CASHFLOW, cashflow: { ...WITH_CASHFLOW.cashflow!, savings: 140.5 } };
+    const exact = { ...WITH_CASHFLOW, cashflow: livedOf(4200, 4059.5) };
     expect(plain(buildOverviewVerdict(exact).sentence)).toContain('Di quel movimento: +3980 € dal mercato e +141 € risparmiati.');
-    const overspent = { ...WITH_CASHFLOW, savingsRate: -10, cashflow: { ...WITH_CASHFLOW.cashflow!, savings: -300, savingsRate: -10 } };
+    const overspent = { ...WITH_CASHFLOW, savingsRate: -10, cashflow: livedOf(3000, 3300) };
     expect(plain(buildOverviewVerdict(overspent).sentence)).toContain('−300 € spesi oltre le entrate, +440 € di altre variazioni.');
   });
 
   it('should name the calendar beside the rate, both sides when both are scheduled', () => {
-    const both = { ...WITH_CASHFLOW, cashflow: { ...WITH_CASHFLOW.cashflow!, scheduledExpenses: 1296.75, scheduledIncome: 2456.41 } };
+    const both = { ...WITH_CASHFLOW, cashflow: livedOf(4200 + 2456.41, 3020 + 1296.75, 1296.75, 2456.41) };
     expect(plain(buildOverviewVerdict(both).sentence)).toContain(
       'Hai messo da parte il 28% delle entrate finora (in calendario altri 1297 € di spese e 2456 € di entrate); sul mercato',
     );
-    const income = { ...WITH_CASHFLOW, cashflow: { ...WITH_CASHFLOW.cashflow!, scheduledIncome: 2456.41 } };
+    const income = { ...WITH_CASHFLOW, cashflow: livedOf(4200 + 2456.41, 3020, 0, 2456.41) };
     expect(plain(buildOverviewVerdict(income).sentence)).toContain('finora (altri 2456 € di entrate in calendario);');
+  });
+});
+
+// The three cases of the savings floor (owner, 2026-11-12): ① nothing in, 500 € out; ② 3 € in, 500 €
+// out (−16.567% as a rate, so euros); ③ 2000 € in, 2600 € out, a true −30%. The calendar holds
+// 1500 € of spending and 2600 € of income still to come; the whole month then closes at 23%.
+describe('buildOverviewVerdict — the lived part below the savings floor', () => {
+  const CALENDAR = { expenses: 1500, income: 2600 };
+  const NO_INCOME = livedOf(CALENDAR.income, 500 + CALENDAR.expenses, CALENDAR.expenses, CALENDAR.income);
+  const TINY_INCOME = livedOf(3 + CALENDAR.income, 500 + CALENDAR.expenses, CALENDAR.expenses, CALENDAR.income);
+  const TRUE_RATE = livedOf(2000 + CALENDAR.income, 2600 + CALENDAR.expenses, CALENDAR.expenses, CALENDAR.income);
+  const inputOf = (cashflow: ReturnType<typeof livedOf>): OverviewVerdictInput => ({
+    ...AUGUST,
+    topMover: null,
+    savingsRate: cashflow.savingsRate,
+    cashflow,
+  });
+
+  it('should say in euros a lived part without income, and how the calendar closes the month (V1)', () => {
+    expect(plain(buildOverviewVerdict(inputOf(NO_INCOME)).sentence)).toContain(
+      ' Nessuna entrata finora, 500 € di spese; con il calendario (2600 € di entrate, 1500 € di spese) il mese chiude al 23%.',
+    );
+  });
+
+  it('should say a deficit larger than the income as a signed saving in euros (V2)', () => {
+    const text = plain(buildOverviewVerdict(inputOf(TINY_INCOME)).sentence);
+    expect(text).toContain(
+      ' Finora hai messo da parte −497 €: le spese superano le entrate; con il calendario (2600 € di entrate, 1500 € di spese) il mese chiude al 23%.',
+    );
+    expect(text).not.toContain('delle entrate finora');
+  });
+
+  it('should keep a true −30% as a rate, with the calendar aside and no closing (V3)', () => {
+    const text = plain(buildOverviewVerdict(inputOf(TRUE_RATE)).sentence);
+    expect(text).toContain(' Hai messo da parte il −30% delle entrate finora (in calendario altri 1500 € di spese e 2600 € di entrate).');
+    expect(text).not.toContain('con il calendario');
+  });
+
+  it('should end at the first clause with nothing in the calendar (V4)', () => {
+    const noIncome = plain(buildOverviewVerdict(inputOf(livedOf(0, 500))).sentence);
+    expect(noIncome).toContain(' Nessuna entrata finora, 500 € di spese.');
+    expect(noIncome).not.toContain('con il calendario');
+    const tinyIncome = plain(buildOverviewVerdict(inputOf(livedOf(3, 500))).sentence);
+    expect(tinyIncome).toContain(' Finora hai messo da parte −497 €: le spese superano le entrate.');
+    expect(tinyIncome).not.toContain('con il calendario');
+  });
+
+  it('should follow the whole month in the headline when the lived part is not a rate (V5-V6)', () => {
+    // ② with a month that closes at 23%: not the warning.
+    const closesPositive = buildOverviewVerdict(inputOf(TINY_INCOME));
+    expect(closesPositive.headline).toBe('Agosto sta andando bene.');
+    expect(closesPositive.tone).toBe('positive');
+    // ② with only spending in the calendar: the whole month is a deficit too, the warning stays.
+    const closesNegative = buildOverviewVerdict(inputOf(livedOf(3, 500 + CALENDAR.expenses, CALENDAR.expenses, 0)));
+    expect(closesNegative.headline).toBe('Agosto cresce, ma le spese superano le entrate.');
+    expect(closesNegative.tone).toBe('warning');
+    expect(plain(closesNegative.sentence)).toContain(
+      ' Finora hai messo da parte −497 €: le spese superano le entrate; con il calendario (1500 € di spese) il mese chiude a −1997 €.',
+    );
+  });
+
+  // The article of every savings rate follows the figure as printed (The Comma Rule; «il 81%»
+  // printed until 2026-11-14), «il» before a negative one as before.
+  it('should say «l’81%» in the verdict and in the Cashflow tile', () => {
+    expect(plain(buildOverviewVerdict(inputOf(livedOf(1000, 190))).sentence)).toContain(" Hai messo da parte l'81% delle entrate finora");
+    expect(plain(describeCashflow(readSavings(1000, 190), 0, 8)!)).toBe("Messo da parte l'81%.");
+    expect(plain(describeCashflow(readSavings(1000, 920), 0, 8)!)).toBe("Messo da parte l'8%.");
+  });
+
+  it('should take the article of the closing from the figure as printed (The Comma Rule)', () => {
+    // 3 € in, 500 € out so far, a salary of 2600 € still to come: the month closes at 81%, «all'81%».
+    expect(plain(buildOverviewVerdict(inputOf(livedOf(2603, 500, 0, 2600))).sentence)).toContain(
+      ' Finora hai messo da parte −497 €: le spese superano le entrate; con il calendario (2600 € di entrate) il mese chiude all\'81%.',
+    );
+  });
+
+  it('should keep the headline of a month where nothing has happened yet (V8)', () => {
+    // Lived none, 300 € of spending in the calendar: no clause supports a warning.
+    const verdict = buildOverviewVerdict(inputOf(livedOf(0, 300, 300, 0)));
+    expect(verdict.headline).toBe('Agosto sta andando bene.');
+  });
+
+  it('should name «il risparmio» behind «Il perché» when the clause is in euros', () => {
+    expect(buildOverviewVerdict(inputOf(TINY_INCOME)).restLabel).toBe('il patrimonio, il risparmio e il mercato del mese');
   });
 });
 
@@ -453,14 +550,17 @@ describe('tile readings', () => {
   });
 
   it('describeCashflow should read savings and the expense trend against the previous month', () => {
-    expect(plain(describeCashflow(40, -6.4, 8)!)).toBe(
+    expect(plain(describeCashflow(readSavings(1000, 600), -6.4, 8)!)).toBe(
       'Messo da parte il 40%; spese in calo del 6,4% su luglio.',
     );
-    expect(plain(describeCashflow(12.4, 3, 8)!)).toBe(
+    expect(plain(describeCashflow(readSavings(1000, 876), 3, 8)!)).toBe(
       'Messo da parte il 12%; spese in aumento del 3,0% su luglio.',
     );
-    expect(plain(describeCashflow(-8, 0, 8)!)).toBe('Speso più di quanto è entrato.');
-    expect(describeCashflow(null, 0, 8)).toBeNull();
+    expect(plain(describeCashflow(readSavings(1000, 1080), 0, 8)!)).toBe('Speso più di quanto è entrato.');
+    // Below the floor the tile still says it in words; without income it says nothing.
+    expect(plain(describeCashflow(readSavings(3, 500), 0, 8)!)).toBe('Speso più di quanto è entrato.');
+    expect(describeCashflow(readSavings(0, 500), 0, 8)).toBeNull();
+    expect(describeCashflow(readSavings(0, 0), 0, 8)).toBeNull();
   });
 
   it('describeComposition should name the dominant class and the smallest one', () => {
@@ -566,7 +666,7 @@ describe('buildOverviewVerdict — the phone cut', () => {
       yearlyVariation: { value: 30000, percentage: 11.11 },
       isNewATH: false,
       savingsRate: 40,
-      cashflow: { savings: 2000, savingsRate: 40, scheduledExpenses: 0, scheduledIncome: 0 },
+      cashflow: livedOf(5000, 3000),
       marketEffect: 2000,
       topMover: { assetClass: 'equity', delta: 1500 },
       sales: {

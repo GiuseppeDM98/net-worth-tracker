@@ -44,6 +44,8 @@ import {
   summarizeSavingsHistory,
   summarizeScheduled,
 } from '@/lib/utils/tracciamentoSummary';
+import type { MonthFlow } from '@/lib/utils/tracciamentoSummary';
+import { readSavings } from '@/lib/utils/savingsRate';
 
 function makeExpense(overrides: Partial<Expense> & { amount: number; date: Date }): Expense {
   return {
@@ -245,7 +247,7 @@ describe('buildTrailingMonthFlows', () => {
     expect(flows[2].savingsRate).toBe(100);
     expect(flows[3]).toMatchObject({ income: 0, expenses: 0, savingsRate: null });
     // Spending without income: the transfer never counts, the rate has no denominator.
-    expect(flows[4]).toMatchObject({ income: 0, expenses: 800, savingsRate: null });
+    expect(flows[4]).toMatchObject({ income: 0, expenses: 800, savingsRate: null, reading: { kind: 'no-income', spending: 800 } });
     expect(flows[5]).toMatchObject({ income: 4850, expenses: 2910 });
   });
 
@@ -256,17 +258,24 @@ describe('buildTrailingMonthFlows', () => {
 });
 
 describe('summarizeSavingsHistory', () => {
-  const flow = (month: number, savingsRate: number | null) => ({
-    key: `2026-${String(month).padStart(2, '0')}`,
-    year: 2026,
-    month,
-    label: 'x',
-    income: savingsRate === null ? 0 : 100,
-    expenses: 0,
-    net: 0,
-    savingsRate,
-    scheduled: false,
-  });
+  /** A month of `income` and `expenses`, its reading derived as `buildTrailingMonthFlows` derives it. */
+  const month = (n: number, income: number, expenses: number, year = 2026): MonthFlow => {
+    const reading = readSavings(income, expenses);
+    return {
+      key: `${year}-${String(n).padStart(2, '0')}`,
+      year,
+      month: n,
+      label: 'x',
+      income,
+      expenses,
+      net: income - expenses,
+      savingsRate: reading.kind === 'rate' ? reading.rate : null,
+      reading,
+      scheduled: false,
+    };
+  };
+  /** A month of 100 € of income saving `rate`%, or without any movement for `null`. */
+  const flow = (n: number, savingsRate: number | null) => (savingsRate === null ? month(n, 0, 0) : month(n, 100, 100 - savingsRate));
 
   it('should average only the measured months and name the best and the worst', () => {
     const history = summarizeSavingsHistory([flow(1, 35), flow(2, null), flow(3, 29), flow(4, 44), flow(5, -8)], NOW);
@@ -290,6 +299,47 @@ describe('summarizeSavingsHistory', () => {
     expect(history.average).toBeCloseTo(32, 5);
     expect(history.best?.month).toBe(7);
     expect(history.months).toHaveLength(3);
+  });
+
+  // The savings floor (owner, 2026-11-12): 3 € in and 500 € out is a deficit in euros, not −16.567%.
+  it('should leave a month below the floor out of the average, the best and the worst, and keep it in the footer (H1)', () => {
+    const history = summarizeSavingsHistory([month(1, 1000, 500), month(2, 3, 500), month(3, 2000, 1500)], NOW);
+    expect(history.rankedCount).toBe(2);
+    expect(history.measuredCount).toBe(3);
+    expect(history.average).toBeCloseTo(((500 + 500) / 3000) * 100, 5);
+    expect(history.best?.month).toBe(1);
+    expect(history.worst?.month).toBe(3);
+    expect(history.deficitMonths.map((m) => m.month)).toEqual([2]);
+  });
+
+  it('should keep a footer when every closed month is below the floor or without income (H2)', () => {
+    const history = summarizeSavingsHistory([month(1, 3, 500), month(2, 3, 400), month(3, 0, 300)], NOW);
+    expect(history.rankedCount).toBe(0);
+    expect(history.average).toBeNull();
+    expect(history.best).toBeNull();
+    expect(history.deficitMonths.map((m) => m.month)).toEqual([1, 2, 3]);
+    expect(history.measuredCount).toBe(2);
+  });
+
+  it('should weigh the average by income, Σ savings / Σ income (H3)', () => {
+    // 50% of 1000 € and 25% of 4000 €: 1500 / 5000 = 30%, where the mean of the rates is 37,5%.
+    const history = summarizeSavingsHistory([month(1, 1000, 500), month(2, 4000, 3000)], NOW);
+    expect(history.average).toBeCloseTo(30, 5);
+  });
+
+  it('should judge no month after today: out of every ranking and of the footer (H5)', () => {
+    // A window anchored two months ahead of August 2026, September and October holding instalments only.
+    const rows = [
+      makeExpense({ type: 'income', amount: 2000, date: d(2026, 7) }),
+      makeExpense({ amount: -1500, date: d(2026, 7) }),
+      makeExpense({ type: 'fixed', amount: -400, date: d(2026, 9) }),
+      makeExpense({ type: 'fixed', amount: -400, date: d(2026, 10) }),
+    ];
+    const history = summarizeSavingsHistory(buildTrailingMonthFlows(rows, 2026, 10, 12, NOW), NOW);
+    expect(history.futureMonths.map((m) => m.key)).toEqual(['2026-09', '2026-10']);
+    expect(history.deficitMonths).toEqual([]);
+    expect(history.closedCount).toBe(9);
+    expect(history.ongoing?.key).toBe('2026-08');
   });
 
   it('should return an empty history when no month has income', () => {
@@ -555,7 +605,8 @@ describe('settleTotals', () => {
       makeExpense({ type: 'transfer', amount: 100, date: d(2026, 9, 3) }),
     ]);
     const settled = settleTotals(totals, { count: 3, expenses: 1297, income: 2758, throughMonth: 9 });
-    expect(settled).toEqual({ income: 302, expenses: 656, net: -354, savingsRate: ((302 - 656) / 302) * 100, coverageRatio: 302 / 656, transferCount: 1 });
+    // 302 € in, 656 € out: −117% is below the savings floor, so no rate (2026-11-12).
+    expect(settled).toEqual({ income: 302, expenses: 656, net: -354, savingsRate: null, coverageRatio: 302 / 656, transferCount: 1 });
     // Nothing scheduled → the totals themselves.
     expect(settleTotals(totals, { count: 0, expenses: 0, income: 0, throughMonth: null })).toEqual(totals);
     // The lived part can be empty while the period is not: null rate, no coverage.

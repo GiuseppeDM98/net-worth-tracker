@@ -262,8 +262,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   verdict NEVER says «il mercato ha pesato» here, and the old context card's sign-coloured class rows are gone. `netWorth.end ===
   null` (a month without its snapshot; the running month is `isPartialMonth`) → «Di luglio conosco solo il cashflow.» /
   «Agosto è ancora in corso.» with the cashflow figures; no snapshot AND no cashflow → «Nessun dato per …».
-- **The savings rate is `netCashFlow / (totalIncome + totalDividends)`** (`resolveSavingsRate`), null without inflows; the
-  Cashflow tile's reading is the Panoramica's `describeCashflow` on it (no month-over-month delta: the bundle carries one period).
+- **The savings rate is `netCashFlow / (totalIncome + totalDividends)`** (`resolveSavingsRate` = `meaningfulSavingsRate`),
+  null without inflows and below the savings floor (2026-11-12); the Cashflow tile's reading is the Panoramica's
+  `describeCashflow` on the period's `readSavings` (no month-over-month delta: the bundle carries one period). **The
+  words read the reading, not the number**: `savingsClause`, `cashflowOnlyClause`, `resolveTone` and
+  `describeAssistantCashflow` take `periodSavings(cashflow)` and treat a `deficit` as a negative rate — had they kept
+  branching on `null` (the spec's assumption that the swap «changes nothing printed»), 3 € in and 500 € out would have
+  read «Nessuna entrata registrata» with a positive tone. Pinned by `__tests__/assistantNarrative.test.ts` («is null
+  below the savings floor, while the words still say…»). Both savings sentences take the article from the figure as
+  printed («l'81%», The Comma Rule, 2026-11-14).
 - **Every count on the page is a sentence from the pure layer**: the header's description (`describeAssistantHeader`), the
   Conversazione reading (`describeConversation` — the period question while empty, then «2 messaggi; la risposta usa i numeri di
   luglio 2026 e una ricerca web» with `formatPeriodInSentence`), «Cosa sa di te» (`describeMemory`), the sheet's Obiettivi and

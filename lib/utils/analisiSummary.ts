@@ -25,6 +25,7 @@ import {
 } from '@/lib/utils/spendingRoles';
 import type { PeriodCashflowTotals } from '@/lib/utils/tracciamentoSummary';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
+import { meaningfulSavingsRate } from '@/lib/utils/savingsRate';
 
 // ─── The period ───────────────────────────────────────────────────────────────
 
@@ -495,4 +496,22 @@ export function selectAnalisiStrip(totals: Pick<PeriodCashflowTotals, 'income' |
       lifts: { section: ANALISI_SECTION_IDS.flusso, block: ANALISI_SAVINGS_BLOCK },
     },
   ];
+}
+
+// ─── «Andamento risparmio» ────────────────────────────────────────────────────
+
+/**
+ * The points of the savings-rate line, one per month in the order given: `rate` is
+ * `meaningfulSavingsRate` of the month's income and spending — `null` (a gap, never a zero) with
+ * no income or a deficit beyond the floor, so one month of −16.567% never rescales the axis
+ * (2026-11-12). The component walks the window and sums each month; this decides what is drawn.
+ */
+export function buildSavingsRateTrendPoints(
+  months: readonly { label: string; month: number; year: number; income: number; expenses: number }[],
+): { label: string; month: number; year: number; rate: number | null; overspent: boolean }[] {
+  return months.map(({ label, month, year, income, expenses }) => {
+    const rate = meaningfulSavingsRate(income, expenses);
+    // A gap with income is a deficit beyond the floor: the chart's description says so.
+    return { label, month, year, rate, overspent: rate === null && income > 0 };
+  });
 }

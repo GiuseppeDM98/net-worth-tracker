@@ -22,6 +22,7 @@ import type { ExpenseType } from '@/types/expenses';
 import { summarizeSpendingRoleShares, type FlowAbsence, type SpendingRoleShares, type SpendingRolesSummary } from '@/lib/utils/spendingRoles';
 import type { AnalisiPeriod, CategoryMover, FlowSummary, MonthRef, SpendingPoint, SpendingType, TopExpenses, TypeFlowBreakdown } from '@/lib/utils/analisiSummary';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import type { SavingsReading } from '@/lib/utils/savingsRate';
 import { formatPercentage } from '@/lib/services/chartService';
 import { articleForPercent, monthWithPrepositionA, ofThePercent } from '@/lib/utils/patrimonioNarrative';
 import { describeCategoryShareAnswer, printedDelta, scheduledScope, scheduledSentence } from '@/lib/utils/cashflowNarrative';
@@ -511,9 +512,11 @@ const SPENDING_TYPE_ADJECTIVES: Record<SpendingType, string> = { fixed: 'fisse',
 
 /**
  * «Da 4 fonti (39.400 €) a 3 tipi di spesa e 10 categorie; il 21% resta come risparmio.
- * Fisse 58%, variabili 37%, debiti 5%.» — what the Sankey draws, in one sentence.
+ * Fisse 58%, variabili 37%, debiti 5%.» — what the Sankey draws, in one sentence. `reading` is
+ * the period's `readSavings(totals.income, totals.expenses)`: a deficit beyond the savings floor
+ * is said in euros, «le spese superano le entrate di 497 €» (2026-11-12).
  */
-export function describeFlow(flow: FlowSummary, savingsRate: number | null): Narrative | null {
+export function describeFlow(flow: FlowSummary, reading: SavingsReading): Narrative | null {
   if (flow.incomeTotal <= 0 && flow.expensesTotal <= 0) return null;
 
   const types = flow.typeShares.length;
@@ -546,7 +549,10 @@ export function describeFlow(flow: FlowSummary, savingsRate: number | null): Nar
     figure(euro(flow.incomeTotal)),
     prose(`) a ${types} ${pluralize(types, 'tipo', 'tipi')} di spesa e ${flow.categoryCount} ${pluralize(flow.categoryCount, 'categoria', 'categorie')}`),
   ];
-  if (savingsRate !== null) {
+  if (reading.kind === 'deficit') {
+    narrative.push(prose('; le spese superano le entrate di '), figure(euro(reading.deficit)));
+  } else if (reading.kind === 'rate') {
+    const savingsRate = reading.rate;
     if (savingsRate < 0) narrative.push(prose(`; le spese superano le entrate ${ofThePercent(Math.abs(savingsRate))}`), figure(formatPercentage(Math.abs(savingsRate), 1)));
     else if (Math.round(savingsRate) === 0) narrative.push(prose('; nulla resta come risparmio'));
     else narrative.push(prose('; '), ...percentWithArticle(savingsRate), prose(' resta come risparmio'));
