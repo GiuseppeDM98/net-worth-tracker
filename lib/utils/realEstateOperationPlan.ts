@@ -292,7 +292,7 @@ export function percentOfPrice(principal: number | null, price: number | null): 
 export interface RealEstateFigures {
   /** The property's value today (0 for a new one). */
   valueToday: number;
-  /** Purchase rogito: what leaves the account for the price (price − value today − mortgage), never below 0. */
+  /** Purchase rogito: what leaves the account for the price (price − value today − mortgage); a negative result is not a balance, it is `mortgageExcess` below, so this is never below 0. */
   purchaseBalance: number;
   /** Purchase rogito: the part of the mortgage beyond what is left to pay, credited to the account (≥ 0). */
   mortgageExcess: number;
