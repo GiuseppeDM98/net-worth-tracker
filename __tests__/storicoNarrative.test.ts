@@ -32,6 +32,8 @@ import {
   buildDriverLedger,
   reconcileRemainder,
   describeDriverRest,
+  driverRestParts,
+  DRIVER_METHOD_OTHER,
   describeDrivers,
   describeEvolution,
   describeEvolutionAside,
@@ -343,7 +345,7 @@ describe('describeComposition', () => {
 });
 
 describe('describeDrivers', () => {
-  const row = (year: string, netSavings: number, market: number, growthPct: number | null = null) => ({ year, netSavings, market, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: netSavings + market, growthPct, latest: { year: Number(year), month: 12 } });
+  const row = (year: string, netSavings: number, market: number, growthPct: number | null = null) => ({ year, netSavings, market, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, isMarketMeasured: true, netWorthGrowth: netSavings + market, growthPct, latest: { year: Number(year), month: 12 } });
 
   it("should split the year's growth between the two engines, the heavier first, with the growth in percent and no share", () => {
     expect(plain(describeDrivers({ row: { ...row('2026', 14100, 7300), latest: { year: 2026, month: 8 } }, isRunning: true }))).toBe('Da gennaio ad agosto 2026 il patrimonio è cresciuto di 21.400 €: 14.100 € dal risparmio e 7300 € dal mercato.');
@@ -372,7 +374,7 @@ describe('describeDrivers', () => {
 
   it('should close on the rest as ONE netted flow, so the sentence adds up without listing the parts', () => {
     // The real account, gennaio–settembre 2026 (owner, 2026-09-19): 5413 + 21.916 + 8028 = 35.357, a euro of rounding.
-    const year = { ...row('2026', 5413, 21916, 13.5), baseline: { year: 2025, month: 12 }, latest: { year: 2026, month: 9 }, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7454, netWorthGrowth: 35356 };
+    const year = { ...row('2026', 5413, 21916, 13.5), baseline: { year: 2025, month: 12 }, latest: { year: 2026, month: 9 }, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7454, otherPension: 0, otherHoldings: 0, otherAccounts: 7454, netWorthGrowth: 35356 };
     expect(plain(describeDrivers({ row: year, isRunning: true }))).toBe(
       'Da gennaio a settembre 2026 il patrimonio è cresciuto di 35.356 € (+13,5%): 21.916 € dal mercato e 5413 € dal risparmio. Il resto, voce per voce qui sotto, vale +8028 €.',
     );
@@ -380,7 +382,7 @@ describe('describeDrivers', () => {
     const net = describeDriverRest(year).find((s) => s.mono);
     expect(net?.text.replace(/\s/g, ' ')).toBe('+8028 €');
     expect(net?.sign).toBeUndefined();
-    expect(plain(describeDriverRest({ ...year, taxes: 4655, pensionContributions: 0, other: 0 }))).toBe(' Il resto, voce per voce qui sotto, si compensa.');
+    expect(plain(describeDriverRest({ ...year, taxes: 4655, pensionContributions: 0, other: 0, otherAccounts: 0 }))).toBe(' Il resto, voce per voce qui sotto, si compensa.');
   });
 
   it('should name a single part, the tax as a loss and a flow uncoloured', () => {
@@ -393,19 +395,19 @@ describe('describeDrivers', () => {
   });
 
   it('should leave an immaterial «altre variazioni» unsaid, and say nothing when only the engines moved', () => {
-    const year = { ...row('2026', 5413, 21916), netWorthGrowth: 27379, other: 50 };
+    const year = { ...row('2026', 5413, 21916), netWorthGrowth: 27379, other: 50, otherAccounts: 50 };
     expect(plain(describeDriverRest(year))).toBe('');
-    expect(plain(describeDriverRest({ ...year, other: 1400 }))).toBe(' Il resto: +1400 € di altre variazioni.');
-    expect(plain(describeDriverRest({ ...year, other: 0 }))).toBe('');
+    expect(plain(describeDriverRest({ ...year, other: 1400, otherAccounts: 1400 }))).toBe(' Il resto: +1400 € di saldi dei conti.');
+    expect(plain(describeDriverRest({ ...year, other: 0, otherAccounts: 0 }))).toBe('');
   });
 });
 
 describe('buildDriverLedger', () => {
-  const year = { netSavings: 5413, market: 21916, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7453, netWorthGrowth: 35356 };
+  const year = { netSavings: 5413, market: 21916, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7453, otherPension: 0, otherHoldings: 0, otherAccounts: 7453, netWorthGrowth: 35356 };
 
   it('should list every part with its sign and close on the growth the rows add up to', () => {
     const rows = buildDriverLedger(year);
-    expect(rows.map((r) => r.key)).toEqual(['savings', 'market', 'taxes', 'debtRepaid', 'pensionContributions', 'other', 'total']);
+    expect(rows.map((r) => r.key)).toEqual(['savings', 'market', 'taxes', 'debtRepaid', 'pensionContributions', 'otherAccounts', 'total']);
     const total = rows.at(-1)!;
     expect(rows.slice(0, -1).reduce((sum, r) => sum + r.value, 0)).toBe(total.value);
     // The tax is a magnitude in the model and a loss in the ledger.
@@ -416,11 +418,11 @@ describe('buildDriverLedger', () => {
 
   it('should add up to the euro on the PRINTED figures, the rounding landing in the remainder', () => {
     // Each part rounds up by half a euro: rounded one by one they would overshoot the total by two.
-    const rows = buildDriverLedger({ netSavings: 1000.5, market: 2000.5, taxes: 0, debtRepaid: 300.5, pensionContributions: 0, other: 99.5, netWorthGrowth: 3401 });
+    const rows = buildDriverLedger({ netSavings: 1000.5, market: 2000.5, taxes: 0, debtRepaid: 300.5, pensionContributions: 0, other: 99.5, otherPension: 0, otherHoldings: 0, otherAccounts: 99.5, netWorthGrowth: 3401 });
     const total = rows.at(-1)!;
     expect(total.value).toBe(3401);
     expect(rows.slice(0, -1).reduce((sum, r) => sum + r.value, 0)).toBe(3401);
-    expect(rows.find((r) => r.key === 'other')?.value).toBe(98);
+    expect(rows.find((r) => r.key === 'otherAccounts')?.value).toBe(98);
     expect(rows.every((r) => Number.isInteger(r.value))).toBe(true);
   });
 
@@ -431,8 +433,60 @@ describe('buildDriverLedger', () => {
   });
 
   it('should always print the two engines and drop any other part printed as zero', () => {
-    const rows = buildDriverLedger({ netSavings: 1200, market: 0, taxes: 0.3, debtRepaid: 0, pensionContributions: 0, other: -0.3, netWorthGrowth: 1200 });
+    const rows = buildDriverLedger({ netSavings: 1200, market: 0, taxes: 0.3, debtRepaid: 0, pensionContributions: 0, other: -0.3, otherPension: 0, otherHoldings: 0, otherAccounts: -0.3, netWorthGrowth: 1200 });
     expect(rows.map((r) => r.key)).toEqual(['savings', 'market', 'total']);
+  });
+});
+
+describe('«altre» named by its three parts (2026-11-12)', () => {
+  const base = { netSavings: 1000, market: 2000, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, netWorthGrowth: 3000 };
+
+  // L1
+  it('should print one row per non-zero part, in the table\'s order after the pension contributions, none for a zero part', () => {
+    const all = buildDriverLedger({ ...base, pensionContributions: 50, other: 700, otherPension: 100, otherHoldings: 200, otherAccounts: 400, netWorthGrowth: 3750 });
+    expect(all.map((r) => r.key)).toEqual(['savings', 'market', 'pensionContributions', 'otherPension', 'otherHoldings', 'otherAccounts', 'total']);
+    expect(all.filter((r) => r.key.startsWith('other')).map((r) => [r.label, r.value, r.kind])).toEqual([
+      ['Fondo pensione non tracciato', 100, 'flow'],
+      ['Quantità fuori dal registro', 200, 'flow'],
+      ['Saldi dei conti', 400, 'flow'],
+    ]);
+    const onlyHoldings = buildDriverLedger({ ...base, other: 200, otherHoldings: 200, netWorthGrowth: 3200 });
+    expect(onlyHoldings.map((r) => r.key)).toEqual(['savings', 'market', 'otherHoldings', 'total']);
+  });
+
+  // L2
+  it('should add up to the euro with parts of 0,4: the drift lands on «Saldi dei conti»', () => {
+    const rows = buildDriverLedger({ ...base, other: 1.2, otherPension: 0.4, otherHoldings: 0.4, otherAccounts: 0.4, netWorthGrowth: 3001.2 });
+    expect(rows.slice(0, -1).reduce((sum, r) => sum + r.value, 0)).toBe(rows.at(-1)!.value);
+    expect(rows.find((r) => r.key === 'otherAccounts')?.value).toBe(1);
+  });
+
+  // L1b
+  it('should name the rest by the ledger\'s label when ONE part is non-zero, «altre variazioni» when two or three are', () => {
+    const month = { ...base, netWorthGrowth: 4000 };
+    expect(plain(describeDriverRest({ ...month, other: 400, otherAccounts: 400 }))).toBe(' Il resto: +400 € di saldi dei conti.');
+    expect(plain(describeDriverRest({ ...month, other: 400, otherPension: 400 }))).toBe(' Il resto: +400 € di fondo pensione non tracciato.');
+    expect(plain(describeDriverRest({ ...month, other: 400, otherHoldings: 400 }))).toBe(' Il resto: +400 € di quantità fuori dal registro.');
+    expect(plain(describeDriverRest({ ...month, other: 400, otherPension: 200, otherAccounts: 200 }))).toBe(' Il resto: +400 € di altre variazioni.');
+    expect(plain(describeDriverRest({ ...month, other: 400, otherPension: 100, otherHoldings: 100, otherAccounts: 200 }))).toBe(' Il resto: +400 € di altre variazioni.');
+  });
+
+  it('should list the hover\'s parts with the ledger\'s words, a zero dropped', () => {
+    const parts = driverRestParts({ ...base, taxes: 30, debtRepaid: 20, pensionContributions: 10, other: 0, otherPension: 5, otherHoldings: 200, otherAccounts: -205 });
+    expect(parts.map((p) => [p.label, p.value, p.isLoss])).toEqual([
+      ['tasse', -30, true],
+      ['mutuo', 20, false],
+      ['fondo pensione', 10, false],
+      ['fondo non tracciato', 5, false],
+      ['fuori registro', 200, false],
+      ['saldi dei conti', -205, false],
+    ]);
+    expect(driverRestParts({ ...base, otherHoldings: 0.4 })).toEqual([]);
+  });
+
+  it('should explain each part in one sentence', () => {
+    expect(DRIVER_METHOD_OTHER.map((entry) => entry.term)).toEqual(['Fondo pensione non tracciato', 'Quantità fuori dal registro', 'Saldi dei conti']);
+    expect(DRIVER_METHOD_OTHER.every((entry) => entry.text.length > 0)).toBe(true);
   });
 });
 
@@ -670,7 +724,7 @@ describe('describeStoricoClosedAnswers', () => {
     mode,
   });
   const driverRow = (market: number) =>
-    ({ year: '2026', netSavings: 12000, market, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 12000 + market, growthPct: null, latest: { year: 2026, month: 9 } }) as DriverYear;
+    ({ year: '2026', netSavings: 12000, market, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, isMarketMeasured: true, netWorthGrowth: 12000 + market, growthPct: null, latest: { year: 2026, month: 9 } }) as DriverYear;
   const breakdown = {
     month: { key: '2026-9', year: 2026, month: 9, label: 'Settembre 2026' },
     previous: { key: '2026-8', year: 2026, month: 8, label: 'Agosto 2026' },

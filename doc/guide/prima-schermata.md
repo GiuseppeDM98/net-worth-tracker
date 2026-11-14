@@ -38,6 +38,8 @@ le opzioni lette. **Una chiave di `--surfaces` o un valore di `--viewports` scon
 sovrascriveva `last-run.json`; `validateSelection`, `__tests__/mobileCensusOptions.test.ts`). L'uscita è `.mobile-census/` (gitignored): `last-run.json` con la durata in coda e due screenshot per
 superficie × viewport (`<viewport>/<superficie>-fold.png` e `-full.png`).
 
+**Il confronto con `develop` dello stesso giorno** (2026-11-14, decisione 33 della serie `doc/nove/`): si costruisce `develop` in un worktree (`git worktree add <cartella> develop`) con `cp -Rc node_modules <cartella>/node_modules` — un symlink fuori dalla root rompe Turbopack — più `.env.local`, si fa `perf:build` + `perf:serve` lì, si copia `.mobile-census/last-run.json`, poi lo stesso sul branch; le due corse si confrontano voce per voce (57 voci, `results`), e il worktree si rimuove con `git worktree remove --force`. Non tocca il working tree della sessione.
+
 **Il fixture** `census@example.com` (`scripts/seedCensusE2E.mts`, `npm run e2e:seed:census`): con `--email` uguale al
 suo, il censimento lo risemina, ristampa i profili strumento (`e2e:seed:profiles`), ricostruisce i record di Hall of Fame
 chiamando `POST /api/hall-of-fame/recalculate` (solo il server li costruisce; proprietario, 2026-10-10) e **si rifiuta dal

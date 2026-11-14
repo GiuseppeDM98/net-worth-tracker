@@ -42,6 +42,8 @@
  *     quantities the ledger does not explain (an adjustment), cash balances typed by hand on a
  *     different day than the rows (a credit card is debited the month AFTER its rows, so `other`
  *     swings and gives it back), the gap between the estimated and the withheld tax.
+ *     `other` is printed in three parts (2026-11-12): `otherPension`, `otherHoldings`, and
+ *     `otherAccounts`, which is what is left — so the three add up to `other` by construction.
  *
  * A pair of snapshots WITHOUT `byAsset` on both sides cannot be measured: its market falls back to
  * the residual net of the tax and of the recorded pension contributions (`growth − savings + taxes −
@@ -52,7 +54,7 @@
  */
 
 import { fromZonedTime } from 'date-fns-tz';
-import { isLoanAsset, type Asset, type MonthlySnapshot } from '@/types/assets';
+import { isCashAccount, isLoanAsset, type Asset, type MonthlySnapshot } from '@/types/assets';
 import type { Expense } from '@/types/expenses';
 import type { AssetTransaction } from '@/types/assetTransactions';
 import type { PensionContribution } from '@/types/pension';
@@ -74,6 +76,12 @@ export interface GrowthDrivers {
   pensionContributions: number;
   /** netWorthGrowth − netSavings − market + taxes − debtRepaid − pensionContributions. */
   other: number;
+  /** The part of `other` in the pension funds: their value change that is neither measured market nor a recorded contribution. */
+  otherPension: number;
+  /** The part of `other` in the instruments held today (not accounts, funds or loans): value change that neither price nor recorded trades explain. */
+  otherHoldings: number;
+  /** The rest of `other`: account balances against rows and trades, the tax gap, assets deleted since. `other − otherPension − otherHoldings`. */
+  otherAccounts: number;
   /** True when every pair of snapshots in the period was measured instrument by instrument. */
   isMarketMeasured: boolean;
 }
@@ -151,6 +159,10 @@ export function createGrowthDriverMeter(context: GrowthDriverContext) {
   // still read by its negative `totalValue` in the snapshots, which is why the set is not enough.
   const loans = context.assets.filter(isLoanAsset);
   const isLoanRow = isLoanRowOf(new Set(loans.map((a) => a.id)), realEstateIds);
+  // Instruments: what is held today and is neither an account, a fund, a loan nor a property.
+  const instrumentIds = new Set(
+    context.assets.filter((a) => !isCashAccount(a) && !isLoanAsset(a) && a.type !== 'pensionFund' && a.type !== 'realestate').map((a) => a.id)
+  );
   // A property is measured GROSS of its debt: the snapshot's `price` is the property value.
   const grossRows = (rows: SnapshotRow[]) => rows.map((row) => (realEstateIds.has(row.assetId) ? { ...row, totalValue: row.quantity * row.price } : row));
 
@@ -168,7 +180,8 @@ export function createGrowthDriverMeter(context: GrowthDriverContext) {
     return debtRepaymentsBetween(previous.byAsset, current.byAsset, loans, realEstateIds).reduce((sum, debt) => sum + debt.repaid, 0);
   }
 
-  function measuredMarket(previous: MonthlySnapshot, current: MonthlySnapshot, trades: AssetTransaction[]): number {
+  /** The market, and the share of it each asset contributed — the split of `other` reads the SAME figures the market summed. */
+  function measuredMarket(previous: MonthlySnapshot, current: MonthlySnapshot, trades: AssetTransaction[]): { market: number; byAsset: Map<string, number> } {
     const previousRows = grossRows(previous.byAsset);
     const currentRows = grossRows(current.byAsset);
     const previousById = new Map(previousRows.map((row) => [row.assetId, row]));
@@ -182,6 +195,7 @@ export function createGrowthDriverMeter(context: GrowthDriverContext) {
     const pensionTrackable = startMonth !== null && startMonth <= previousKey;
 
     let market = 0;
+    const byAsset = new Map<string, number>();
     for (const assetId of new Set([...previousById.keys(), ...currentById.keys()])) {
       const previousRow = previousById.get(assetId);
       const currentRow = currentById.get(assetId);
@@ -192,15 +206,60 @@ export function createGrowthDriverMeter(context: GrowthDriverContext) {
       if (pensionFundIds.has(assetId)) {
         // Before the contributions are complete the fund's growth is not attributable: `other`.
         if (pensionTrackable && before && after) {
-          market += after.totalValue - before.totalValue - pensionPaidInBetween(contributions, assetId, previousKey, currentKey);
+          const effect = after.totalValue - before.totalValue - pensionPaidInBetween(contributions, assetId, previousKey, currentKey);
+          market += effect;
+          byAsset.set(assetId, effect);
         }
         continue;
       }
       const assetTrades = realEstateIds.has(assetId) ? undefined : tradesByAsset.get(assetId);
       const fromLedger = assetTrades ? tradeAwarePriceEffect(before, after, assetTrades) : null;
-      market += fromLedger ?? attributeSelectedChange(previousRows, currentRows, new Set([assetId])).priceEffect;
+      const effect = fromLedger ?? attributeSelectedChange(previousRows, currentRows, new Set([assetId])).priceEffect;
+      market += effect;
+      byAsset.set(assetId, effect);
     }
-    return market;
+    return { market, byAsset };
+  }
+
+  /** Net money the recorded trades put into an instrument in the window (buys in, sells out, fees as the market effect counts them). */
+  function tradeMoneyIn(trades: AssetTransaction[]): number {
+    let moneyIn = 0;
+    for (const trade of trades) {
+      if (trade.type === 'buy' && !trade.isBaseline) moneyIn += trade.quantity * trade.priceEur + (trade.fees ?? 0);
+      else if (trade.type === 'sell') moneyIn -= trade.quantity * trade.priceEur - (trade.fees ?? 0);
+    }
+    return moneyIn;
+  }
+
+  /**
+   * The two named parts of `other`; the third (`otherAccounts`) is what is left, so the identity
+   * cannot break. A fund counts its whole change net of its measured market and of the recorded
+   * contributions; an instrument its change net of its market and of the money the trades moved.
+   */
+  function splitOther(
+    previous: MonthlySnapshot,
+    current: MonthlySnapshot,
+    trades: AssetTransaction[],
+    marketByAsset: Map<string, number>,
+    pensionContributions: number
+  ): { otherPension: number; otherHoldings: number } {
+    const previousById = new Map(grossRows(previous.byAsset).map((row) => [row.assetId, row]));
+    const currentById = new Map(grossRows(current.byAsset).map((row) => [row.assetId, row]));
+    let pensionChange = 0;
+    let pensionMarket = 0;
+    let otherHoldings = 0;
+    for (const assetId of new Set([...previousById.keys(), ...currentById.keys()])) {
+      const change = (currentById.get(assetId)?.totalValue ?? 0) - (previousById.get(assetId)?.totalValue ?? 0);
+      if (pensionFundIds.has(assetId)) {
+        pensionChange += change;
+        pensionMarket += marketByAsset.get(assetId) ?? 0;
+        continue;
+      }
+      // Only an instrument that exists today has a type to read: accounts, loans, properties and deleted assets stay in the rest.
+      if (!instrumentIds.has(assetId)) continue;
+      otherHoldings += change - (marketByAsset.get(assetId) ?? 0) - tradeMoneyIn(trades.filter((t) => t.assetId === assetId));
+    }
+    return { otherPension: pensionChange - pensionMarket - pensionContributions, otherHoldings };
   }
 
   /** The drivers between two snapshots, over the months after `previous` through `current`. */
@@ -223,10 +282,13 @@ export function createGrowthDriverMeter(context: GrowthDriverContext) {
     // Named only once the contributions are complete (the Panoramica's rule): before `startMonth`
     // the fund's growth is not attributable, and naming half of it would push the other half negative.
     const pensionContributions = pensionPaidInAcross(context.pension.contributions, pensionFundIds, context.pension.startMonth, previousKey, currentKey);
-    const market = isMarketMeasured ? measuredMarket(previous, current, trades) : netWorthGrowth - netSavings + taxes - pensionContributions;
+    const measured = isMarketMeasured ? measuredMarket(previous, current, trades) : null;
+    const market = measured ? measured.market : netWorthGrowth - netSavings + taxes - pensionContributions;
     const debtRepaid = isMarketMeasured ? debtRepaidBetween(previous, current) : 0;
     const other = netWorthGrowth - netSavings - market + taxes - debtRepaid - pensionContributions;
-    return { netWorthGrowth, netSavings, market, taxes, debtRepaid, pensionContributions, other, isMarketMeasured };
+    const split = measured ? splitOther(previous, current, trades, measured.byAsset, pensionContributions) : { otherPension: 0, otherHoldings: 0 };
+    const otherAccounts = other - split.otherPension - split.otherHoldings;
+    return { netWorthGrowth, netSavings, market, taxes, debtRepaid, pensionContributions, other, ...split, otherAccounts, isMarketMeasured };
   }
 
   return { measure, hasCashflowBetween };
@@ -243,6 +305,9 @@ export function sumGrowthDrivers(rows: GrowthDrivers[]): GrowthDrivers | null {
     debtRepaid: sum.debtRepaid + row.debtRepaid,
     pensionContributions: sum.pensionContributions + row.pensionContributions,
     other: sum.other + row.other,
+    otherPension: sum.otherPension + row.otherPension,
+    otherHoldings: sum.otherHoldings + row.otherHoldings,
+    otherAccounts: sum.otherAccounts + row.otherAccounts,
     isMarketMeasured: sum.isMarketMeasured && row.isMarketMeasured,
   }));
 }
