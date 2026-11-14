@@ -3,7 +3,7 @@
 > Generato il 2026-11-12 da `08_CREA_RITIRO_SPEC`. Chi lo usa dopo un ritiro aggiorna i precedenti e le misure e
 > lascia il corpo com'è; il ritiro dell'ultima spec porta via questo file con la cartella.
 >
-> Ritiri fatti: NOVE-02 (2026-11-13, PR #524: nessuna divergenza nel codice, due sviluppi della spec nel suo testo — il passo del primo rosso e l'àncora di e2e-playwright.md —, la suite d'area rifatta sugli emulatori, 49 verdi); NOVE-01 (2026-11-13, PR #522: nessuna divergenza nel testo, il criterio 4 rimisurato con una sonda usa e getta, le tre mutazioni del test rivedute rosse; Vitest 295 file / 6391 test al commit di implementazione).
+> Ritiri fatti: NOVE-03 (2026-11-14, PR #526: i dodici criteri retti sul codice mergiato, un workflow di cinque `cercatore` e quattro `verificatore` — 75 voci, 13 segnalate, 10 rette, tutte di testo; il confronto `mobile:budget` che l'implementazione non aveva scritto speso nel ritiro — 3fdf11a1 contro `develop`, 57 voci uguali, Patrimonio 1024 a 11 o 12 sulla stessa build —; due etichette della serie tolte dalle guide, i rinvii senza erede in registro-operazioni.md); NOVE-02 (2026-11-13, PR #524: nessuna divergenza nel codice, due sviluppi della spec nel suo testo — il passo del primo rosso e l'àncora di e2e-playwright.md —, la suite d'area rifatta sugli emulatori, 49 verdi); NOVE-01 (2026-11-13, PR #522: nessuna divergenza nel testo, il criterio 4 rimisurato con una sonda usa e getta, le tre mutazioni del test rivedute rosse; Vitest 295 file / 6391 test al commit di implementazione).
 >
 > Il prompt che il proprietario incolla per ritirare UNA spec di `doc/nove/` dopo che il suo codice è in `develop`
 > (WORKFLOW.md § 3 «Where things are recorded»; `doc/nove/README.md` § 8: implementazione → ritiro →
@@ -69,7 +69,7 @@ nuova, e quando il caso arriva si annota nella riga di stato della spec ritirata
 storia. Il collaudo della sessione di implementazione vale come prova della spec, non
 come segnale. DDL: nessun DDL SQL, nessuna migrazione di dati e nessun indice (`grep -n
 -i -E "firestore\.indexes|firestore:indexes" doc/nove/*.md` → una riga il 2026-11-12,
-NOVE-03 `:353`, che dice che `firestore.indexes.json` non si tocca); l'equivalente sono
+NOVE-03 `:353`, che diceva che `firestore.indexes.json` non si tocca; zero dal suo ritiro, 2026-11-14); l'equivalente sono
 le REGOLE Firestore di NOVE-16 (`accumulationPlans`, `accumulationPlanLocks`) e NOVE-17
 (`modelPortfolios`): `grep -n "firestore:rules" doc/nove/*.md` → NOVE-16 `:563`, NOVE-17
 `:613`. Una regola è inerte finché non è pubblicata, a mano, mai da un merge (AGENTS.md

@@ -231,6 +231,13 @@ di Tracciamento — Patrimonio 1024
 (`figuresOutsideVerdict` 10 su 8). Non allargate: restano l'aperto di CLAUDE.md («`mobile:budget` non rimisurato dopo le
 etichette più lunghe»), da decidere voce per voce in una sessione sua.
 
+**Rimisurata il 2026-11-14 al ritiro delle scritture del registro in transazione** (il codice mergiato di #526 contro
+`develop` prima del merge, 3fdf11a1; due build `perf:build` sulla stessa macchina, :3200): 57 voci identiche, le stesse
+12 rosse. **Patrimonio 1024 legge 11 o 12 sulla STESSA build**: i primi tre census di HEAD (il primo sull'account
+`census` appena migrato) hanno dato `figuresAboveFold` 11, i nove successivi 12 come la base; nello screenshot del
+run a 11 la riga «Strumenti» era ancora sbiadita. Una voce che si muove di una cifra su Patrimonio 1024 si ripete prima
+di fermarsi.
+
 ## Registro delle voci allargate (`raisedBy`)
 
 Una voce di `perf/mobile-budget.json` si allarga solo a mano, con l'OK del proprietario, e porta la ragione nel suo

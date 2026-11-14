@@ -1,6 +1,6 @@
 # NOVE-16 — Allocazione › Accumulo: the PAC tab of PR #486, brought in with changes
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-02 (retired on 2026-11-13, PR #524)** (the Piano cell it rebases on) and reads NOVE-03's and
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-02 (retired on 2026-11-13, PR #524)** (the Piano cell it rebases on) and reads NOVE-03's (retired on 2026-11-14, PR #526) and
 > NOVE-07's dialogs (the fresh ledger meta, the fee field); **NOVE-17, NOVE-18 and
 > NOVE-21 are implemented after it** (they read the editor, the plan document and the active-plan reader defined
 > here). Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7, a PR line as `pr486:file:line` on
@@ -129,8 +129,8 @@ git cherry-pick --no-commit d1e2666d
 ```
 
 Conflicts and their resolution: `firestore.rules` (develop's blocks + the PR's `accumulationPlans` block + the
-lock block below); `components/assets/AssetDialog.tsx` (keep `autoComplete="off"`; at the submit NOVE-03's fresh
-meta is fetched only when `!emptyCreateFlow`, and the line reads `const ledgerCreateFlow = !asset &&
+lock block below); `components/assets/AssetDialog.tsx` (keep `autoComplete="off"`; at the submit the fresh
+meta (`fetchFreshLedgerMeta`, the `metaNow` line) is fetched only when `!emptyCreateFlow`, and the line reads `const ledgerCreateFlow = !asset &&
 !emptyCreateFlow && isLedgerAssetType(data.type) && metaNow != null;`); `components/assets/TransactionDialog.tsx`
 (keep NOVE-07's fee field and `autoComplete="off"`, add the PR's `prefill` / `onCreated`); the Piano cell of
 `page.tsx` (NOVE-02's: no `desktop:self-start`); `e2e/allocation.spec.ts` (NOVE-02's test and the PR's two, all

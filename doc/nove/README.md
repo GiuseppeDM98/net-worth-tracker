@@ -3,7 +3,7 @@
 > The index of the series: the owner's points, the decisions, the order, the shared contracts and the rules every
 > spec obeys. Written on 2026-11-12 on `develop` @ b841cbd7 by the planning session; **read adversarially, all
 > the specs together, on 2026-11-12** (decisions 33–63 in § 3); a spec in service is retired with
-> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522) and so is NOVE-02 (2026-11-13, PR #524); the next is NOVE-03. One spec = one
+> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524) and NOVE-03 (2026-11-14, PR #526); the next is NOVE-04. One spec = one
 > implementation session = one branch. A spec's NUMBER is its identity; the ORDER is § 5.
 
 ## 1. The owner's points (their words, 2026-11-12)
@@ -76,7 +76,7 @@
 11. Assistente: a router (Haiku 5.5: intent, period, web search) in front of today's pipeline; a line «Ho letto: … ·
     cambia» under the answer. → NOVE-14, 15
 12. Assistente: instead of the Mese / Anno / YTD / Storico selector, written suggestions on an empty chat. → NOVE-15
-13. Ledger: the migration in a transaction AND the other writes with the same defect. → NOVE-03
+13. Ledger: the migration in a transaction AND the other writes with the same defect. → NOVE-03 (retired on 2026-11-14, PR #526)
 14. Orbita: the resource bar only on desktop (≥ 1440) and only on Panoramica. → NOVE-13
 15. Assistente, header: in sight only «Nuova conversazione» and a «⋯» menu (Conversazioni, Memoria, Preferenze); the
     «Registra» button disappears, the router recognises a written expense. → NOVE-15
@@ -118,7 +118,7 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
     screen, the sender in Vercel's env): out of scope, declared. → NOVE-01 (retired on 2026-11-13, PR #522)
 38. The page's meta description stays as it is. → NOVE-01 (retired on 2026-11-13, PR #522)
 39. A trade's edit and delete carry `expectedUpdatedAt` (the row the form or the button was drawn from): a form
-    opened on an older version is refused with the 409 that exists. → NOVE-03
+    opened on an older version is refused with the 409 that exists. → NOVE-03 (retired on 2026-11-14, PR #526)
 40. Compravendita, a mortgage above the residual: the «saldo» screen asks «Su quale conto la banca accredita quanto
     avanza del mutuo?», label «Sul conto». → NOVE-04
 41. Panoramica, spending above income so far: «Finora hai messo da parte −X €: le spese superano le entrate; …»,
@@ -203,7 +203,7 @@ by saying so before that spec is implemented.
 
 The order of implementation (each followed by its retirement session, § 8):
 
-`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 14 → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
+`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 14 → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
 
 - **07** after **03** (the fee row commits inside the ledger's transaction contract) and **06** (`tradeMoneyIn` and
   `tradeAwarePriceEffect` change together).
@@ -221,7 +221,7 @@ The order of implementation (each followed by its retirement session, § 8):
 | --- | --- | --- | --- | --- | --- |
 | NOVE-01 | The product is called «Net Worth Tracker» everywhere | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 11 findings, 2 owner decisions; implemented on 2026-11-13, PR #522 in develop since 2026-11-13; **retired on 2026-11-13**: the 13 strings and the criteria held with no divergence in the text; criterion 4 (the brand on one line, untruncated) re-measured on the retirement day, which the implementation had not written down; the three mutations of § 6 seen red again; the commit's side effects (WORKFLOW.md process count, NOVE-19's quoted `rounded` class, AGENTS.md's «Tailwind scans doc/» rule) were already written where they live |
 | NOVE-02 | Allocazione: a short Piano as tall as Bilanciamento + Per classe | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 16 findings, 0 owner decisions; implemented on 2026-11-13, PR #524 in develop since 2026-11-13 (one class removed, two comments, the Playwright test; criteria 1–5 held: `perf:budget` unchanged on every route — Allocazione 604,8 — and `mobile:budget` identical to develop's of the same day, same build); the test was seen red with `desktop:self-start` back on the cell — already at «Ribilancia», where the fixture's Piano is the shorter column, earlier than the «Versa senza importo» step the spec names; the 32px guard of that step is green without the mutation; guided tour done on the mirror (the three modes, the cleared amount, the dark scheme: all as expected) and closed; the session also took `hono` 4.13.13 → 4.13.18 by the owner's waiver of WORKFLOW.md rule 8 (doc/guide/dipendenze.md) |
-| NOVE-03 | Registro operazioni: every write decides inside its transaction | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 19 findings, 1 owner decision; implemented on 2026-11-13 (branch `fix/nove-03-registro-transazioni`; the 14 tests of § 6 and C2 each seen red with its mutation; `perf:budget` `/dashboard/assets` 734,6 → 734,7 KB gz, under its ceiling; collaudo C–E and the owner's tour done) |
+| NOVE-03 | Registro operazioni: every write decides inside its transaction | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 19 findings, 1 owner decision; implemented on 2026-11-13, PR #526 in develop since 2026-11-14 (branch `fix/nove-03-registro-transazioni`; the 14 tests of § 6 and C2 each seen red with its mutation; `perf:budget` `/dashboard/assets` 734,6 → 734,7 KB gz, under its ceiling; collaudo C–E and the owner's tour done); **retired on 2026-11-14**: the twelve criteria held on the merged code (75 items read, 10 findings that held, all text); the closure re-run (ledger suite 127/127, `e2e/assets.ledger-meta` and `assets.sale-tax` green) and the missing `mobile:budget` comparison spent that day — 3fdf11a1 against `develop`, 57 entries identical, the same 12 red, Patrimonio 1024 reading 11 or 12 on one build (doc/guide/prima-schermata-misure.md); `perf:budget` before/after also moved Storico and Rendimenti by 0,1 KB gz, under their ceilings. Divergences written, behaviour equal: the migration split into `resolveBaselinePrices` + `commitMigration`; the settlement account checked by `assertSettlementAccountsStillCash` in COMPUTE (four checks above `buildNewSequence`, not three in the write loop); `AssetDialog` without `&& ownerId` (guarded at the top of `onSubmit`); the e2e spec listed in doc/guide/patrimonio.md and registro-operazioni.md, as e2e-playwright.md has no per-area inventory. The § 10 deferrals with no heir went to registro-operazioni.md § Concurrency; the label in two guides (registro-operazioni.md, dipendenze.md) rewritten as dates |
 | NOVE-04 | Compravendita: a mortgage larger than what is left to pay | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 14 findings, 1 owner decision |
 | NOVE-05 | The savings rate: one rule, a floor, and euros below it | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 31 findings, 1 owner decision |
 | NOVE-06 | Storico › Driver: «altre» split by cause | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 21 findings, 1 owner decision |
@@ -248,11 +248,13 @@ decisions 33, 34, 35 and 62 hold for every spec.
 
 A spec that needs one of these differently changes it HERE first, then in every live spec that names it (§ 8).
 
-**The ledger's transaction** — defined by NOVE-03, extended by NOVE-07
+**The ledger's transaction** — defined by NOVE-03 (retired on 2026-11-14, PR #526), extended by NOVE-07
 - `assertTradeUnchanged(existing, plan)`, `PreparedMutation.preparedOnUpdatedAt`, `fetchFreshLedgerMeta`; the
   PUT body's and the DELETE query's `expectedUpdatedAt` (ISO; the version the form was drawn from, optional on
   the wire), passed as the last argument of `updateAssetTransaction` / `deleteAssetTransaction` on both sides
-  (NOVE-03).
+  (`lib/server/assetTransactionUseCase.ts`, `lib/hooks/useAssetTransactions.ts`; doc/guide/registro-operazioni.md
+  § Concurrency). At the head of COMPUTE, in this order: `assertTradeUnchanged`, the asset's existence, its ledger
+  type, `assertSettlementAccountsStillCash` — then `buildNewSequence`.
 - `PreparedMutation.newFeeRefId` (and no `tradeDocData`); `lib/utils/tradeFeeExpense.ts`: `TradeFeeFacts`,
   `planTradeFee`, `isTradeFeeRow`, `feeOutsideCashflow`, `tradeFeeOwner(asset, settlementAccount)` (the fee row's
   `personalMemberId`); `isFeeRow` recognises `feeOfTradeId`; `TradeMutationResult.feeRow: 'written' | 'none' |
@@ -459,7 +461,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
+`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
 
 Prompt 08 (`08_CREA_RITIRO_SPEC`) was run on 2026-11-12, after the adversarial reading, in a session of its own:
 `doc/nove/PROMPT-RITIRO.md` is the prompt the owner pastes to retire ONE spec. A retirement updates its precedents

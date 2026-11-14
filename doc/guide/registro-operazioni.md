@@ -137,6 +137,10 @@ transactions and gates chosen calls.
   asset is one transaction that also reads the asset doc (it locks it against a trade commit).
 - **The asset's currency is read in prepare**: `priceEur` is a network call; a currency change between prepare and
   commit (a few hundred milliseconds) is declared out of scope.
+- **Out of scope, declared (2026-11-12)**: Frankfurter's fetch in `lib/server/tradeFxService.ts` has no timeout — with
+  the decision inside the transaction it only lengthens a request; the Compravendita executor
+  (`realEstateOperationService.ts`, its own single transaction) and the expense writes (`expenseService.ts`) are not
+  ledger writes and were not reviewed for this shape — no report and no finding on them.
 - A trade document always carries `updatedAt` (every writer stores it): a test fixture that edits or deletes a trade
   sets one, or `toDate(undefined)` reads «now» and the guard answers 409.
 
@@ -149,6 +153,6 @@ transactions and gates chosen calls.
   the hint «Il registro operazioni si sta inizializzando…» may show until then, and is not a bug. Pinned by
   `__tests__/ledgerMetaFreshness.test.ts` and `e2e/assets.ledger-meta.spec.ts`.
 - **A «stale list» only exists in a Movimenti dialog opened BEFORE the other window's delete** (2026-11-13, the
-  NOVE-03 tour): `AssetMovementsDialog` reads the trades when it opens, so a second window that opens it afterwards
+  owner's tour of the concurrency rules above): `AssetMovementsDialog` reads the trades when it opens, so a second window that opens it afterwards
   already shows the list without the row — not a missed 404. To see «Operazione non trovata.», open the dialog in both
   windows first, then delete in one and in the other; the list then refreshes by itself (the hooks invalidate on error).
