@@ -9,7 +9,8 @@
  *   purchase · rogito        the property (new, or the one the preliminare created), the mortgage as a
  *                            `loan` that finances it — its principal lands on the property's value at
  *                            once, the bank pays the seller — the rest of the price transferred from the
- *                            account, the instalments as a monthly `debt` series linked to the loan, the
+ *                            account (a mortgage beyond what is left to pay is disbursed onto the house
+ *                            and the account in one transaction, without a row: owner, 2026-11-12), the instalments as a monthly `debt` series linked to the loan, the
  *                            policies (a premium, a monthly series, or a personal loan that paid it) and
  *                            the costs (notary, taxes, the mortgage's own) as spending rows.
  *   sale · preliminare       the deposit RECEIVED: a transfer out of the property onto the account.
@@ -272,13 +273,29 @@ export function suggestCategory(
   return null;
 }
 
+// ─── The mortgage as a share of the price ──────────────────────────────────────
+
+/** The mortgage a percentage of the price asks for, in cents; null without a price or a percentage (owner, 2026-11-14). */
+export function mortgageFromPercent(price: number | null, percent: number | null): number | null {
+  if (price === null || price <= 0 || percent === null) return null;
+  return roundToCents((price * percent) / 100);
+}
+
+/** The percentage of the price an amount is, to two decimals; null when either is missing. The field reads it back, so the amount stays the one truth. */
+export function percentOfPrice(principal: number | null, price: number | null): number | null {
+  if (principal === null || price === null || price <= 0) return null;
+  return Math.round((principal / price) * 10000) / 100;
+}
+
 // ─── The figures of a run ──────────────────────────────────────────────────────
 
 export interface RealEstateFigures {
   /** The property's value today (0 for a new one). */
   valueToday: number;
-  /** Purchase rogito: what leaves the account for the price (price − value today − mortgage). */
+  /** Purchase rogito: what leaves the account for the price (price − value today − mortgage), never below 0. */
   purchaseBalance: number;
+  /** Purchase rogito: the part of the mortgage beyond what is left to pay, credited to the account (≥ 0). */
+  mortgageExcess: number;
   /** Sale rogito: what the buyer still pays (price − deposits received). */
   saleBalance: number;
   /** Sale rogito: the debt the price closes (the loans ticked on the payoff screen). */
@@ -299,9 +316,11 @@ export function figuresOf(answers: RealEstateOperationAnswers, context: Pick<Rea
   const saleBalance = roundToCents(price - positive(answers.depositsReceived));
   const salePayoff = answers.kind === 'sale' && answers.event === 'rogito' ? roundToCents(answers.payoffs.filter((payoff) => payoff.include).reduce((sum, payoff) => sum + positive(payoff.amount), 0)) : 0;
   const months = loanMonths(answers.mortgage);
+  const residual = roundToCents(price - valueToday - principal);
   return {
     valueToday,
-    purchaseBalance: roundToCents(price - valueToday - principal),
+    purchaseBalance: Math.max(0, residual),
+    mortgageExcess: answers.kind === 'purchase' && answers.event === 'rogito' && answers.hasMortgage ? Math.max(0, roundToCents(-residual)) : 0,
     saleBalance,
     salePayoff,
     saleNet: roundToCents(saleBalance - salePayoff),
@@ -345,6 +364,8 @@ export type PlanStep =
   | { kind: 'createLoan'; ref: 'mortgage' | `lifeLoan:${number}`; name: string; principal: number; ratePct: number; financesProperty: boolean; ownership: OwnershipAnswer }
   /** The property's value moved by hand: the mortgage's principal at a purchase, the revaluation at a sale. */
   | { kind: 'adjustProperty'; delta: number; reason: 'mortgage' | 'revaluation' }
+  /** The mortgage's disbursement when it exceeds the residual: the seller's part raises the property, the rest reaches the account. One transaction, no row. */
+  | { kind: 'disburseMortgage'; toProperty: number; toAccount: number; accountId: string }
   /**
    * A loan closed WITH the price at a sale: the buyer's bank pays the seller's, so the debt and the
    * house's value fall by the same amount and no row is written — patrimony changing form, never
@@ -426,8 +447,13 @@ export function buildRealEstatePlan(answers: RealEstateOperationAnswers, context
     if (answers.hasMortgage) {
       const principal = positive(answers.mortgage.principal);
       steps.push({ kind: 'createLoan', ref: 'mortgage', name: `Mutuo ${name}`, principal, ratePct: answers.mortgage.ratePct ?? 0, financesProperty: true, ownership: answers.ownership });
-      // The bank pays the seller: the principal becomes the property's value the day the loan opens.
-      steps.push({ kind: 'adjustProperty', delta: principal, reason: 'mortgage' });
+      if (figures.mortgageExcess > 0) {
+        // The bank pays the seller what is still owed and credits the rest to the borrower (2026-11-12).
+        steps.push({ kind: 'disburseMortgage', toProperty: roundToCents(principal - figures.mortgageExcess), toAccount: figures.mortgageExcess, accountId: answers.accountId });
+      } else {
+        // The bank pays the seller: the principal becomes the property's value the day the loan opens.
+        steps.push({ kind: 'adjustProperty', delta: principal, reason: 'mortgage' });
+      }
     }
     if (figures.purchaseBalance > 0) {
       steps.push({ kind: 'row', label: 'balance', row: { type: 'transfer', amount: figures.purchaseBalance, dateIso: date, category: TRANSFER_CATEGORY_PLACEHOLDER, notes: `Saldo al rogito · ${name}`, account, destination: propertyRef, inCostCenter: false } });

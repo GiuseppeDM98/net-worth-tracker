@@ -32,7 +32,7 @@
 - **Suites to run after a change here**: `realEstateOperationPlan`, `realEstateOperationDraft`,
   `realEstateOperationNarrative`, `realEstateOperationService`, `propertyTransfer`, `propertyLink`, `dialogNarrative`,
   `settingsDraft`, `settingsRoundTrip`, `reactCompilerCoverage` · **Browser** `e2e/assets.compravendita.spec.ts`
-  (the four acts on the base seed, every write read back from Firestore; two decoy series in calendar — a debt and a
+  (the five acts on the base seed — the second house takes the mortgage above the residual —, every write read back from Firestore; two decoy series in calendar — a debt and a
   life policy of no house — are planted so the sale's pre-tick has something to leave unticked: the base seed has no
   future series of its own).
 
@@ -45,11 +45,15 @@
   its date (`balancePending`).
 - **One question per screen, «Indietro» always** — the Consulente's card (doc/guide/consulente.md), so the reader
   learns one shape. `screensFor` keeps the screens an answer set needs, in `REAL_ESTATE_OPERATION_SCREENS` order:
-  the mortgage BEFORE the balance at a purchase (the balance is the price minus the mortgage), «Rivaluta» only when the
+  the mortgage BEFORE the balance at a purchase (the balance is the price minus the mortgage; **with a mortgage above
+  the residual the `saldo` screen asks «Su quale conto la banca accredita quanto avanza del mutuo?», field «Sul conto»,
+  never «Da quale conto paghi il resto del prezzo?»**, owner 2026-11-12), «Rivaluta» only when the
   price moves the property's value, «Estinzione» only with a loan financing the property, «Serie» only with series in
   calendar after the rogito, «Centro» only with the cost centres on. The draft holds the screen by NAME
   (`neighbour` steps from a screen the answers no longer need), and lives on this browser
-  (`real-estate-operation-draft:{uid}`), cleared by a confirmed run or by **«Ricomincia»** (any screen, armed like a
+  (`real-estate-operation-draft:{uid}`; **the summary re-checks every screen of the run before «Conferma»**,
+  `firstScreenRefusal`: a restored draft, or a house whose value moved in another tab, cannot skip a refusal — the
+  status line prints the first one), cleared by a confirmed run or by **«Ricomincia»** (any screen, armed like a
   movement's delete — `useArmedDelete`: «Premi di nuovo per ricominciare» — owner, 2026-10-21 tour, when a draft
   could not be thrown away halfway).
 - **Leaving the property screen for a new (kind, event, property) fills what depends on it** (`prefillForProperty`):
@@ -66,7 +70,11 @@
   home, the «Intestatari» typed) and the transfers raise it — the deposit at the preliminare, the balance at the
   rogito. **The mortgage's principal lands on the property's value at once** (`adjustProperty`, reason `mortgage`):
   the bank pays the seller, so the loan (`financedAssetId`, its TAN, no owner field — it follows the property's) and
-  the value appear together and the net worth does not move. The instalment is the French one (`frenchInstalment`,
+  the value appear together and the net worth does not move. **A mortgage up to the PRICE is accepted: what exceeds
+  the residual (price − value today) is credited to the run's account in the same transaction that raises the house
+  by the residual (`disburseMortgage`), without a row** (owner, 2026-11-12: neither income nor a transfer, so the
+  savings rate, Analisi and the Driver's `netSavings` never see it); above the price it is refused on «Mutuo» (a
+  loan larger than the purchase is a mutuo with liquidity, not a Compravendita). The instalment is the French one (`frenchInstalment`,
   P·r / (1 − (1 + r)^−n)) unless typed; the series is monthly, `years × 12` rows (≤ 360), linked to the loan — and
   NOT to the house: its house comes from the mortgage (below).
 - **The policies**: scoppio e incendio paid at the rogito (a row, in the centre) or monthly with the instalment (a
@@ -116,7 +124,8 @@
 - **Every write through the service that owns it** (`executeRealEstatePlan`): `createAsset` for the property and the
   loans, `createExpenseSettledOnDate` + `applyDebtRepayments` + `applyBalanceEffects` for every row (a transfer takes
   the account's transfer category, `ensureTransferCategory`), `updateCashAssetBalancesAtomic` for the value moved by
-  hand and for a loan closed with the price (the loan and the house in ONE transaction), `createCostCenter`. An asset
+  hand, for a loan closed with the price (the loan and the house in ONE transaction) and for a mortgage's disbursement
+  beyond the residual (the house and the account in ONE transaction), `createCostCenter`. An asset
   a step creates is named by the next through a ref (`property`, `mortgage`, `lifeLoan:n`); a ref the summary prints
   carries its name (`AssetRef.name` — the tour read «riducono il debito di il prestito della polizza»).
 - **NOT atomic across steps**: the steps run in plan order and the first failure stops the run; the page says which
@@ -151,6 +160,17 @@ path — one column at 720px, one card per screen, 44px buttons below `desktop:`
   stay; a mortgage series linked neither to the loan nor to the house is listed but not proposed.
 - **A loan closed with the price leaves no row**: Cashflow shows the net balance, not the payoff; the loan's own
   history in the rows ends at its last instalment, and «Estinto» in Patrimonio is the record.
+- **«Oppure in % del prezzo» on «Mutuo»** (owner, 2026-11-14): typing a percentage sets the amount
+  (`mortgageFromPercent`, price × % in cents, e.g. 95% of the price); the field is READ BACK from the amount
+  (`percentOfPrice`, two decimals), so the amount stays the one truth, typed or derived, and the plan never sees the
+  percentage. Without a price it says so and sets nothing. It was added after the owner's own case (a price, a deposit
+  not yet recorded, a 95% mortgage) and is not in any draft: nothing stored.
+- **The deposit is an advance on the price, whatever the bank** (owner, 2026-11-12): at the rogito it is deducted from
+  what is still owed. What DOES depend on the bank is the loan-to-value base (the LOWER of price and appraisal), whether
+  it disburses more than the residual and credits the difference, and the net disbursed amount — the imposta
+  sostitutiva, the istruttoria and the policies stay cost rows the owner enters, never inside the principal.
+- **The loan and its disbursement are two steps**: a failure between them leaves the loan open and the house not
+  raised, named by the partial-failure message (only the house and the account move in one transaction).
 - **The insured is not a written name any more**: a draft saved before the select keeps no insured and asks again.
 - **The run is not atomic** (above): a failure halfway leaves the landed steps; the page names them and does not
   offer a retry.

@@ -23,11 +23,12 @@ import {
   readStoredDraft,
   realEstateOperationReducer,
   screenPosition,
+  screensFor,
   writeStoredDraft,
   type RealEstateDraftContext,
 } from '@/lib/utils/realEstateOperationDraft';
-import { buildRealEstatePlan, propertyNameOf } from '@/lib/utils/realEstateOperationPlan';
-import { describeDone, describePartialFailure, describePlanStep, describeScreenBlock, screenCopy, type PlanNames } from '@/lib/utils/realEstateOperationNarrative';
+import { buildRealEstatePlan, figuresOf, propertyNameOf } from '@/lib/utils/realEstateOperationPlan';
+import { describeDone, describePartialFailure, describePlanStep, describeScreenBlock, firstScreenRefusal, screenCopy, type PlanNames } from '@/lib/utils/realEstateOperationNarrative';
 import { executeRealEstatePlan } from '@/lib/services/realEstateOperationService';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { TILE_EYEBROW_CLASS, TILE_SURFACE_CLASS } from '@/components/ui/tile';
@@ -63,9 +64,12 @@ export function CompravenditaWizard({ ownerId, context, familyMembers }: Comprav
   const { answers, screen } = draft;
   const accounts = useMemo(() => context.assets.filter((asset: Asset) => asset.type === 'cash' && asset.assetClass === 'cash'), [context.assets]);
   const propertyName = propertyNameOf(answers, context);
-  const copy = screenCopy(screen, answers);
+  const copy = screenCopy(screen, answers, figuresOf(answers, context).mortgageExcess);
   const position = screenPosition(draft, context);
   const block = describeScreenBlock(screen, answers, context);
+  // The summary has no block of its own: it re-checks every screen of the run, so a restored draft or a house
+  // moved in another tab cannot slip past a refusal (2026-11-12).
+  const refusal = screen === 'riepilogo' ? firstScreenRefusal(screensFor(answers, context), answers, context) : null;
   const plan = useMemo(() => (screen === 'riepilogo' ? buildRealEstatePlan(answers, context) : null), [screen, answers, context]);
 
   const names: PlanNames = {
@@ -167,13 +171,13 @@ export function CompravenditaWizard({ ownerId, context, familyMembers }: Comprav
           </Button>
         </div>
         <div className="flex flex-col gap-2 tablet:items-end">
-          {(block || run.kind === 'failed') && (
+          {(block || refusal || run.kind === 'failed') && (
             <p role="status" className={cn('text-[12px]', run.kind === 'failed' ? 'text-destructive' : 'text-warning-foreground')}>
-              {run.kind === 'failed' ? run.message : block}
+              {run.kind === 'failed' ? run.message : block ?? refusal}
             </p>
           )}
           {screen === 'riepilogo' ? (
-            <Button type="button" className={BUTTON_CLASS} disabled={run.kind === 'running' || run.kind === 'failed' || !plan || plan.steps.length === 0} onClick={confirm}>
+            <Button type="button" className={BUTTON_CLASS} disabled={run.kind === 'running' || run.kind === 'failed' || refusal !== null || !plan || plan.steps.length === 0} onClick={confirm}>
               {run.kind === 'running' ? 'Registro…' : 'Conferma'}
             </Button>
           ) : (
