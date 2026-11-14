@@ -140,11 +140,11 @@ function YearlyVariationTile({ rows, currentYear }: { rows: YearlyVariationRow[]
 type MonthlyDriverDatum = MonthlyDriverRow & { period: string; taxBar: number };
 
 /**
- * Every part of the hovered month — the three drawn as bars and the three that are not (mortgage,
- * pension contributions, other changes: owner, 2026-09-19, «riga + tooltip, niente barra»). A
+ * Every part of the hovered month — the three drawn as bars and the ones that are not (mortgage,
+ * pension contributions, the three parts of «altre»: owner, 2026-09-19, «riga + tooltip, niente barra»). A
  * module-level component, cloned by Recharts with its props (an inline arrow would remount it).
  */
-function DriverMonthTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: MonthlyDriverDatum }> }) {
+export function DriverMonthTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: MonthlyDriverDatum }> }) {
   const row = active ? payload?.[0]?.payload : undefined;
   if (!row) return null;
   const parts: Array<{ label: string; value: number }> = [
@@ -153,7 +153,9 @@ function DriverMonthTooltip({ active, payload }: { active?: boolean; payload?: A
     { label: 'Tasse sulle vendite', value: -row.taxes },
     { label: 'Mutuo rimborsato', value: row.debtRepaid },
     { label: 'Versamenti al fondo pensione', value: row.pensionContributions },
-    { label: 'Altre variazioni', value: row.other },
+    { label: 'Fondo pensione non tracciato', value: row.otherPension },
+    { label: 'Quantità fuori dal registro', value: row.otherHoldings },
+    { label: 'Saldi dei conti', value: row.otherAccounts },
   ].filter((part, i) => i < 2 || Math.abs(Math.round(part.value)) >= 1);
   return (
     <div style={TOOLTIP_CONTENT_STYLE} className="px-2.5 py-2">

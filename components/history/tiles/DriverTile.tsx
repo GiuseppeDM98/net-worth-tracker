@@ -3,9 +3,9 @@
 /**
  * DRIVER DELLA CRESCITA — «da dove viene la crescita?»: for every year since the cashflow floor,
  * the year's growth with a split 3px bar of the two engines, and behind each year a LEDGER — the
- * six parts as rows that add up in sight to the growth they close on (savings, the market
- * measured instrument by instrument, the estimated tax on the sales, the mortgage principal
- * repaid, the pension contributions, the other changes). The featured year opens on its ledger;
+ * parts as rows that add up in sight to the growth they close on (savings, the market measured
+ * instrument by instrument, the estimated tax on the sales, the mortgage principal repaid, the
+ * pension contributions, and «altre» in its three named parts). The featured year opens on its ledger;
  * «Dal {startYear}» is one more row, not a footnote. Then the last twelve months as hand-written
  * bars (savings, market and tax side by side, a losing month drawn under the baseline), every
  * part in the hover and in a table for a screen reader.
@@ -23,7 +23,7 @@ import { ChevronDown } from 'lucide-react';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { GrowthDrivers } from '@/lib/utils/growthDrivers';
 import { resolveDriverShares, type DriverYear, type PeriodMonth } from '@/lib/utils/storicoSummary';
-import { buildDriverLedger, describeRunningWindowShort, formatDriverEuro, formatPeriodMonth, type DriverLedgerRow, type MonthlyDriverRow } from '@/lib/utils/storicoNarrative';
+import { buildDriverLedger, describeRunningWindowShort, DRIVER_METHOD_OTHER, driverRestParts, formatDriverEuro, formatPeriodMonth, type DriverLedgerRow, type MonthlyDriverRow } from '@/lib/utils/storicoNarrative';
 import { formatPercentage } from '@/lib/services/chartService';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
@@ -70,19 +70,6 @@ const isPrintedZero = (value: number) => Math.abs(Math.round(value)) < 1;
 /** The one Driver formatter (storicoNarrative): the strip's «Risparmio {anno}» cell prints a ledger row with it. */
 const signed = formatDriverEuro;
 const signedPct = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${formatPercentage(Math.abs(value), 1)}`;
-
-/**
- * The parts after the two engines, for the bars' hover; a part printed as zero is dropped. The
- * tax is a loss (coloured); the rest are flows (uncoloured, DESIGN → The Comma Rule).
- */
-function restParts(row: Omit<GrowthDrivers, 'isMarketMeasured'>): Array<{ label: string; value: number; isLoss: boolean }> {
-  return [
-    { label: 'tasse', value: -row.taxes, isLoss: true },
-    { label: 'mutuo', value: row.debtRepaid, isLoss: false },
-    { label: 'fondo pensione', value: row.pensionContributions, isLoss: false },
-    { label: 'altre', value: row.other, isLoss: false },
-  ].filter((part) => !isPrintedZero(part.value));
-}
 
 // ─── Year rows ────────────────────────────────────────────────────────────────
 
@@ -184,9 +171,9 @@ const BAR_GAP = 0.04;
  * market can be negative and a stack with a negative segment stops meeting its total. A losing
  * market month is drawn under the baseline in the loss token; the tax is always a loss and has its
  * own colour, so it is never read as the market's; a month of negative savings keeps the savings
- * colour under the baseline. The mortgage, the pension contributions and the other changes are in
- * the hover and the rows, not in the bars (owner, 2026-09-19): twelve months of five bars would not
- * fit a four-column tile. The last month is outlined, never the others dimmed.
+ * colour under the baseline. The mortgage, the pension contributions and the three parts of «altre»
+ * are in the hover and the rows, not in the bars (owner, 2026-09-19): twelve months of more bars
+ * would not fit a four-column tile. The last month is outlined, never the others dimmed.
  *
  * The plot is a picture of twelve months × three bars: its `aria-label` names what is drawn and the
  * figures live in a visually hidden table after it — one concatenated label of 72 figures was
@@ -206,7 +193,7 @@ function DriverBars({ months, className }: { months: MonthlyDriverRow[]; classNa
 
   const caption = (m: MonthlyDriverRow) => `${MONTH_NAMES[m.month - 1].toLowerCase()} ${m.year}`;
   const describe = (m: MonthlyDriverRow) =>
-    [`risparmio ${signed(m.netSavings)}`, `mercato ${signed(m.market)}`, ...restParts(m).map((part) => `${part.label} ${signed(part.value)}`)].join(', ');
+    [`risparmio ${signed(m.netSavings)}`, `mercato ${signed(m.market)}`, ...driverRestParts(m).map((part) => `${part.label} ${signed(part.value)}`)].join(', ');
 
   const bar = (value: number, x: number, color: string, lossColor: string) => {
     const height = Math.abs(value) * scale;
@@ -247,7 +234,7 @@ function DriverBars({ months, className }: { months: MonthlyDriverRow[]; classNa
             <span className="font-mono text-[12px] tabular-nums">
               mercato <span className={cn('font-semibold', signTextClass(hovered.market))}>{signed(hovered.market)}</span>
             </span>
-            {restParts(hovered).map((part) => (
+            {driverRestParts(hovered).map((part) => (
               <span key={part.label} className="font-mono text-[12px] tabular-nums">
                 {part.label} <span className={cn('font-semibold', part.isLoss && 'text-destructive')}>{signed(part.value)}</span>
               </span>
@@ -272,7 +259,9 @@ function DriverBars({ months, className }: { months: MonthlyDriverRow[]; classNa
             <th scope="col">Tasse sulle vendite</th>
             <th scope="col">Mutuo rimborsato</th>
             <th scope="col">Versamenti al fondo pensione</th>
-            <th scope="col">Altre variazioni</th>
+            <th scope="col">Fondo pensione non tracciato</th>
+            <th scope="col">Quantità fuori dal registro</th>
+            <th scope="col">Saldi dei conti</th>
           </tr>
         </thead>
         <tbody>
@@ -284,7 +273,9 @@ function DriverBars({ months, className }: { months: MonthlyDriverRow[]; classNa
               <td>{signed(-m.taxes)}</td>
               <td>{signed(m.debtRepaid)}</td>
               <td>{signed(m.pensionContributions)}</td>
-              <td>{signed(m.other)}</td>
+              <td>{signed(m.otherPension)}</td>
+              <td>{signed(m.otherHoldings)}</td>
+              <td>{signed(m.otherAccounts)}</td>
             </tr>
           ))}
         </tbody>
@@ -376,9 +367,11 @@ export function DriverTile({ reading, years, featured, total, startYear, measure
         <span>
           <strong className="font-medium text-foreground">Tasse sulle vendite</strong>: una stima sulle plusvalenze realizzate. <strong className="font-medium text-foreground">Mutuo rimborsato</strong>: la quota capitale delle rate, che resta nel patrimonio.
         </span>
-        <span>
-          <strong className="font-medium text-foreground">Altre variazioni</strong>: ciò che nessuna voce spiega, soprattutto saldi aggiornati in giorni diversi dalle spese (la carta di credito si addebita il mese dopo).
-        </span>
+        {DRIVER_METHOD_OTHER.map((entry) => (
+          <span key={entry.term}>
+            <strong className="font-medium text-foreground">{entry.term}</strong>: {entry.text}
+          </span>
+        ))}
       </TileMethodNote>
     </Tile>
   );

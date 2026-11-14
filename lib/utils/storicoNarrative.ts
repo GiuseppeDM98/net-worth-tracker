@@ -417,13 +417,27 @@ export function describeDrivers(input: { row: DriverYear; isRunning: boolean } |
 }
 
 /**
+ * How the single clause names «altre»: by the ledger's label of its part when exactly ONE of the
+ * three is printed non-zero, «altre variazioni» when two or three are (owner, 2026-11-12) — the
+ * reading says what the ledger under it says.
+ */
+function otherLabel(row: Pick<GrowthDrivers, 'otherPension' | 'otherHoldings' | 'otherAccounts'>): string {
+  const printed = [
+    { value: row.otherPension, label: 'di fondo pensione non tracciato' },
+    { value: row.otherHoldings, label: 'di quantità fuori dal registro' },
+    { value: row.otherAccounts, label: 'di saldi dei conti' },
+  ].filter((part) => !isPrintedZero(signedFlow(part.value).text));
+  return printed.length === 1 ? printed[0].label : 'di altre variazioni';
+}
+
+/**
  * What moved the growth besides the two engines, as ONE clause, so the sentence adds up without
  * listing four signed figures (it carried eight until 2026-09-20; the parts are the ledger's):
  * - a single part is named: « Il resto: −4091 € di tasse stimate sulle vendite.» — the tax a loss
  *   (signed and coloured), a mortgage, a contribution or the other changes a FLOW (uncoloured);
  * - several parts are netted: « Il resto, voce per voce qui sotto, vale +4638 €.» — a flow, since
  *   it mixes a loss with flows.
- * A part printed as zero does not count, and «altre variazioni» alone is said only when material
+ * A part printed as zero does not count, and «altre» alone is said only when material
  * (`isMaterialOtherChange`: mostly timing — a card debited next month).
  */
 export function describeDriverRest(row: Omit<GrowthDrivers, 'isMarketMeasured'>): Narrative {
@@ -431,7 +445,7 @@ export function describeDriverRest(row: Omit<GrowthDrivers, 'isMarketMeasured'>)
     { segment: signedCurrency(-row.taxes), label: 'di tasse stimate sulle vendite', isOther: false },
     { segment: signedFlow(row.debtRepaid), label: 'di mutuo rimborsato', isOther: false },
     { segment: signedFlow(row.pensionContributions), label: 'di versamenti al fondo pensione', isOther: false },
-    { segment: signedFlow(row.other), label: 'di altre variazioni', isOther: true },
+    { segment: signedFlow(row.other), label: otherLabel(row), isOther: true },
   ].filter((part) => !isPrintedZero(part.segment.text));
   if (parts.length === 0) return [];
   if (parts.length === 1) {
@@ -447,7 +461,8 @@ export function describeDriverRest(row: Omit<GrowthDrivers, 'isMarketMeasured'>)
 /**
  * The remainder row of a list that must add up ON SCREEN: the printed total minus the printed
  * parts, in whole euros. Rounding each figure on its own drifts by a euro or two; the remainder
- * («altre variazioni») is a residual by definition, so the drift is its to carry.
+ * row is a residual by definition, so the drift is its to carry («Saldi dei conti» in the Driver,
+ * «Altre variazioni» in «Lavoro e investimenti»).
  */
 export function reconcileRemainder(total: number, parts: number[]): number {
   return Math.round(total) - parts.reduce((sum, part) => sum + Math.round(part), 0);
@@ -467,7 +482,7 @@ export function formatDriverEuro(value: number): string {
 export type DriverLedgerKind = 'flow' | 'market' | 'loss' | 'total';
 
 export interface DriverLedgerRow {
-  key: 'savings' | 'market' | 'taxes' | 'debtRepaid' | 'pensionContributions' | 'other' | 'total';
+  key: 'savings' | 'market' | 'taxes' | 'debtRepaid' | 'pensionContributions' | 'otherPension' | 'otherHoldings' | 'otherAccounts' | 'total';
   label: string;
   value: number;
   kind: DriverLedgerKind;
@@ -475,15 +490,16 @@ export interface DriverLedgerRow {
 
 /**
  * The Driver's identity as rows that add up in sight — `Δ = risparmio + mercato − tasse + mutuo +
- * fondo pensione + altre` — closed by the growth they sum to (DESIGN.md → Ranked Rows with
- * Residual). The two engines are always printed, a zero included: a year with no market is a
- * fact. Every other part printed as zero has no row. The labels are «Lavoro e investimenti»'s,
- * so the page names each part once.
+ * fondo pensione + altre`, «altre» in its three parts — closed by the growth they sum to
+ * (DESIGN.md → Ranked Rows with Residual). The two engines are always printed, a zero included:
+ * a year with no market is a fact. Every other part printed as zero has no row. The labels of the
+ * first five rows are «Lavoro e investimenti»'s, so the page names each part once; the three
+ * parts of «altre» are the Driver's own.
  *
  * The values are WHOLE EUROS and the printed rows add up to the printed total, to the euro: a
- * reader who adds them by hand is the reader this list is for, and six figures rounded one by one
+ * reader who adds them by hand is the reader this list is for, and the figures rounded one by one
  * drift by a euro (44.967 against 44.966 on the real 2025). The drift goes where it belongs by
- * definition — «altre variazioni» IS the remainder — so that row is the growth minus the rows above.
+ * definition — «Saldi dei conti» IS the remainder — so that row is the growth minus the rows above.
  */
 export function buildDriverLedger(row: Omit<GrowthDrivers, 'isMarketMeasured'>): DriverLedgerRow[] {
   const total = Math.round(row.netWorthGrowth);
@@ -493,15 +509,49 @@ export function buildDriverLedger(row: Omit<GrowthDrivers, 'isMarketMeasured'>):
     { key: 'taxes', label: 'Tasse sulle vendite', value: -Math.round(row.taxes), kind: 'loss' },
     { key: 'debtRepaid', label: 'Mutuo rimborsato', value: Math.round(row.debtRepaid), kind: 'flow' },
     { key: 'pensionContributions', label: 'Versamenti al fondo pensione', value: Math.round(row.pensionContributions), kind: 'flow' },
+    { key: 'otherPension', label: 'Fondo pensione non tracciato', value: Math.round(row.otherPension), kind: 'flow' },
+    { key: 'otherHoldings', label: 'Quantità fuori dal registro', value: Math.round(row.otherHoldings), kind: 'flow' },
   ];
   const remainder = reconcileRemainder(total, measured.map((part) => part.value));
   const isEngine = (part: DriverLedgerRow) => part.key === 'savings' || part.key === 'market';
   return [
     ...measured.filter((part) => isEngine(part) || part.value !== 0),
-    ...(remainder !== 0 ? [{ key: 'other', label: 'Altre variazioni', value: remainder, kind: 'flow' } satisfies DriverLedgerRow] : []),
+    ...(remainder !== 0 ? [{ key: 'otherAccounts', label: 'Saldi dei conti', value: remainder, kind: 'flow' } satisfies DriverLedgerRow] : []),
     { key: 'total', label: 'Crescita del patrimonio', value: total, kind: 'total' },
   ];
 }
+
+/**
+ * The parts after the two engines, for the bars' hover and each month's `<title>`; a part printed
+ * as zero is dropped. The tax is a loss (coloured); the rest are flows (uncoloured, DESIGN → The
+ * Comma Rule). The words are the ledger's, shortened for a tooltip.
+ */
+export function driverRestParts(row: Omit<GrowthDrivers, 'isMarketMeasured'>): Array<{ label: string; value: number; isLoss: boolean }> {
+  return [
+    { label: 'tasse', value: -row.taxes, isLoss: true },
+    { label: 'mutuo', value: row.debtRepaid, isLoss: false },
+    { label: 'fondo pensione', value: row.pensionContributions, isLoss: false },
+    { label: 'fondo non tracciato', value: row.otherPension, isLoss: false },
+    { label: 'fuori registro', value: row.otherHoldings, isLoss: false },
+    { label: 'saldi dei conti', value: row.otherAccounts, isLoss: false },
+  ].filter((part) => Math.abs(Math.round(part.value)) >= 1);
+}
+
+/** The method note's three sentences on «altre»; `text` follows the term and its colon. */
+export const DRIVER_METHOD_OTHER: ReadonlyArray<{ term: string; text: string }> = [
+  {
+    term: 'Fondo pensione non tracciato',
+    text: 'la variazione dei fondi che non è né rendimento misurato né un versamento registrato — tutta la loro crescita, prima del mese da cui Previdenza tiene i versamenti.',
+  },
+  {
+    term: 'Quantità fuori dal registro',
+    text: 'la variazione di uno strumento che né il prezzo né gli acquisti e le vendite del registro spiegano: quote comparse o sparite senza un acquisto o una vendita (uno strumento aggiunto o corretto a mano, una rettifica, l\'apertura del registro), o il valore aggiornato a mano di uno strumento senza quotazione (private equity).',
+  },
+  {
+    term: 'Saldi dei conti',
+    text: 'ciò che resta — saldi aggiornati in giorni diversi dalle spese (la carta di credito si addebita il mese dopo, quindi un mese sale e il successivo scende), lo scarto fra tassa stimata e trattenuta, gli strumenti eliminati nel frattempo.',
+  },
+];
 
 /**
  * «Da gennaio ad agosto 2026» — the running year's window, from the month after its baseline

@@ -44,7 +44,7 @@ function contribution(assetId: string, amount: number, createdAt: Date): Pension
 const ASSETS = [
   { id: 'vwce', name: 'VWCE', type: 'etf', taxRate: 26 },
   { id: 'copper', name: 'Copper', type: 'etf', taxRate: 26 },
-  { id: 'cash', name: 'Conto', type: 'cash' },
+  { id: 'cash', name: 'Conto', type: 'cash', assetClass: 'cash' },
   { id: 'house', name: 'Casa', type: 'realestate' },
   { id: 'fund', name: 'Fondo', type: 'pensionFund' },
 ] as unknown as Asset[];
@@ -180,7 +180,7 @@ describe('buildYearlyGrowthDrivers — the savings window is the growth window',
       bare([flow('income', 30000, 2025, 1), flow('fixed', -6322, 2025, 12), flow('transfer', 5000, 2025, 3)]),
     );
     expect(rows).toEqual([
-      { year: '2025', netSavings: 23678, market: 21288, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: false, netWorthGrowth: 44966, growthPct: 44.966, baseline: { year: 2024, month: 12 }, latest: { year: 2025, month: 12 } },
+      { year: '2025', netSavings: 23678, market: 21288, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, isMarketMeasured: false, netWorthGrowth: 44966, growthPct: 44.966, baseline: { year: 2024, month: 12 }, latest: { year: 2025, month: 12 } },
     ]);
   });
 
@@ -209,10 +209,129 @@ describe('buildYearlyGrowthDrivers — the savings window is the growth window',
     const ctx = context({ expenses: [...context().expenses, flow('income', 50, 2026, 8)] });
     const [year] = buildYearlyGrowthDrivers(snapshots, ctx);
     const months = sumGrowthDrivers(buildMonthlyGrowthDrivers(snapshots, ctx))!;
-    for (const key of ['netWorthGrowth', 'netSavings', 'market', 'taxes', 'debtRepaid', 'pensionContributions', 'other'] as const) {
+    for (const key of ['netWorthGrowth', 'netSavings', 'market', 'taxes', 'debtRepaid', 'pensionContributions', 'other', 'otherPension', 'otherHoldings', 'otherAccounts'] as const) {
       expect(year[key]).toBeCloseTo(months[key], 6);
     }
     // August's market: 10 × (100 − 95) = 50.
     expect(year.market).toBeCloseTo(320, 6);
+  });
+});
+
+/**
+ * «altre» in three parts (2026-11-12): the fund's change that is neither market nor a recorded
+ * contribution, the instruments' change that neither price nor recorded trades explain, and the
+ * rest — which makes the three add up to `other` by construction. Figures are invented and round.
+ */
+describe('the three parts of «altre»', () => {
+  const ACCOUNT = { id: 'cash', name: 'Conto', type: 'cash', assetClass: 'cash' };
+  const parts = (d: { otherPension: number; otherHoldings: number; otherAccounts: number }) => d.otherPension + d.otherHoldings + d.otherAccounts;
+  const bare = (assets: unknown[], overrides: Partial<GrowthDriverContext> = {}): GrowthDriverContext => ({
+    expenses: [],
+    transactions: [],
+    assets: assets as Asset[],
+    pension: { contributions: [], startMonth: null },
+    today: new Date(2026, 11, 20, 12),
+    ...overrides,
+  });
+
+  // G1
+  it('should add up to «altre» on every pair of a six-month history, and be zero on an unmeasured pair', () => {
+    const assets = [ACCOUNT, { id: 'etf', name: 'ETF', type: 'etf' }, { id: 'fund', name: 'Fondo', type: 'pensionFund' }];
+    const history = [
+      snap(2026, 1, [row('cash', 1000, 1, 1000), row('etf', 10, 100, 1000), row('fund', 5000, 1, 5000)]),
+      snap(2026, 2, [row('cash', 1300, 1, 1300), row('etf', 12, 100, 1200), row('fund', 5200, 1, 5200)]),
+      snap(2026, 3, [row('cash', 900, 1, 900), row('etf', 12, 110, 1320), row('fund', 5300, 1, 5300)]),
+      snap(2026, 4, [row('cash', 900, 1, 900), row('etf', 9, 110, 990), row('fund', 5300, 1, 5300)]),
+      snap(2026, 5, [row('cash', 1400, 1, 1400), row('etf', 9, 120, 1080), row('fund', 5450, 1, 5450)]),
+      snap(2026, 6, [], 8000),
+    ];
+    const rows = buildMonthlyGrowthDrivers(history, bare(assets, {
+      expenses: [flow('income', 1000, 2026, 2), flow('fixed', -400, 2026, 3), flow('fixed', -250, 2026, 5)],
+      transactions: [trade('etf', 'sell', new Date(2026, 3, 10, 12), 3, 110)],
+      pension: { contributions: [contribution('fund', 100, new Date(2026, 4, 10, 12))], startMonth: '2026-04' },
+    }));
+    expect(rows).toHaveLength(5);
+    for (const month of rows) expect(parts(month)).toBeCloseTo(month.other, 6);
+    // The last pair has no `byAsset` on its far side: unmeasured, so the three parts are 0.
+    const unmeasured = buildMonthlyGrowthDrivers(history.slice(-2), bare(assets));
+    expect(unmeasured[0]).toMatchObject({ isMarketMeasured: false, otherPension: 0, otherHoldings: 0, otherAccounts: 0 });
+  });
+
+  // G2
+  it('should put a fund\'s growth before the contributions are complete in «fondo non tracciato»', () => {
+    const july = snap(2026, 7, [row('fund', 10000, 1, 10000)]);
+    const august = snap(2026, 8, [row('fund', 10500, 1, 10500)]);
+    const [drivers] = buildMonthlyGrowthDrivers([july, august], bare([{ id: 'fund', name: 'Fondo', type: 'pensionFund' }], { pension: { contributions: [], startMonth: '2026-09' } }));
+    expect(drivers.market).toBeCloseTo(0, 6);
+    expect(drivers.otherPension).toBeCloseTo(500, 6);
+    expect(drivers.other).toBeCloseTo(500, 6);
+    expect(drivers.otherAccounts).toBeCloseTo(0, 6);
+  });
+
+  // G3
+  it('should put units that appeared with no trade in «quantità fuori dal registro», and none once the buy is recorded', () => {
+    const assets = [ACCOUNT, { id: 'etf', name: 'ETF', type: 'etf' }];
+    const july = snap(2026, 7, [row('cash', 500, 1, 500), row('etf', 10, 100, 1000)]);
+    const august = snap(2026, 8, [row('cash', 500, 1, 500), row('etf', 12, 100, 1200)]);
+    const [edited] = buildMonthlyGrowthDrivers([july, august], bare(assets));
+    expect(edited.market).toBeCloseTo(0, 6);
+    expect(edited.otherHoldings).toBeCloseTo(200, 6);
+    expect(edited.otherAccounts).toBeCloseTo(0, 6);
+    // The same two units bought through the ledger, paid from the account: explained, nothing left.
+    const paid = snap(2026, 8, [row('cash', 300, 1, 300), row('etf', 12, 100, 1200)], 1500);
+    const [bought] = buildMonthlyGrowthDrivers([july, paid], bare(assets, { transactions: [trade('etf', 'buy', new Date(2026, 7, 5, 12), 2, 100)] }));
+    expect(bought.otherHoldings).toBeCloseTo(0, 6);
+    expect(bought.other).toBeCloseTo(0, 6);
+  });
+
+  // G4
+  it('should read a card as «saldi dei conti»: +400 the month of the rows, −400 the month of the debit', () => {
+    const assets = [ACCOUNT];
+    const july = snap(2026, 7, [row('cash', 1000, 1, 1000)]);
+    const august = snap(2026, 8, [row('cash', 1000, 1, 1000)]);
+    const september = snap(2026, 9, [row('cash', 600, 1, 600)]);
+    const [first, second] = buildMonthlyGrowthDrivers([july, august, september], bare(assets, { expenses: [flow('fixed', -400, 2026, 8)] }));
+    expect(first.otherAccounts).toBeCloseTo(400, 6);
+    expect(first.otherHoldings).toBeCloseTo(0, 6);
+    expect(second.otherAccounts).toBeCloseTo(-400, 6);
+  });
+
+  // G6
+  it('should keep a hand-valued stake\'s revaluation in «quantità fuori dal registro», never in the market', () => {
+    // A `Private Equity` instrument lives in `quantity` at price 1 (doc/guide/patrimonio.md).
+    const stake = { id: 'pe', name: 'Private Equity', type: 'etf' };
+    const july = snap(2026, 7, [row('pe', 1000, 1, 1000)]);
+    const august = snap(2026, 8, [row('pe', 1100, 1, 1100)]);
+    const [drivers] = buildMonthlyGrowthDrivers([july, august], bare([stake]));
+    expect(drivers.market).toBeCloseTo(0, 6);
+    expect(drivers.otherHoldings).toBeCloseTo(100, 6);
+  });
+
+  it('should leave a property and a deleted asset in «saldi dei conti», never in the holdings', () => {
+    const july = snap(2026, 7, [row('house', 1, 100000, 100000), row('gone', 5, 20, 100)]);
+    const august = snap(2026, 8, [row('house', 1, 101000, 101000)]);
+    const [drivers] = buildMonthlyGrowthDrivers([july, august], bare([{ id: 'house', name: 'Casa', type: 'realestate' }]));
+    expect(drivers.otherHoldings).toBeCloseTo(0, 6);
+    expect(drivers.otherAccounts).toBeCloseTo(drivers.other, 6);
+  });
+
+  // G5
+  it('should sum each part over months and over a year', () => {
+    const assets = [ACCOUNT, { id: 'etf', name: 'ETF', type: 'etf' }];
+    const history = [
+      snap(2026, 6, [row('cash', 500, 1, 500), row('etf', 10, 100, 1000)]),
+      snap(2026, 7, [row('cash', 500, 1, 500), row('etf', 12, 100, 1200)]),
+      snap(2026, 8, [row('cash', 500, 1, 500), row('etf', 12, 100, 1200)]),
+      snap(2026, 9, [row('cash', 100, 1, 100), row('etf', 15, 100, 1500)]),
+    ];
+    const ctx = bare(assets, { expenses: [flow('income', 50, 2026, 8)] });
+    const months = buildMonthlyGrowthDrivers(history, ctx);
+    const total = sumGrowthDrivers(months)!;
+    expect(total.otherHoldings).toBeCloseTo(months.reduce((sum, m) => sum + m.otherHoldings, 0), 6);
+    expect(total.otherAccounts).toBeCloseTo(months.reduce((sum, m) => sum + m.otherAccounts, 0), 6);
+    expect(total.otherPension).toBeCloseTo(0, 6);
+    expect(total.otherHoldings).toBeCloseTo(500, 6);
+    const [year] = buildYearlyGrowthDrivers(history, ctx);
+    for (const key of ['otherPension', 'otherHoldings', 'otherAccounts'] as const) expect(year[key]).toBeCloseTo(total[key], 6);
   });
 });
