@@ -26,7 +26,7 @@ After NOVE-19 every portalled content carries `data-costume-scope`. What still m
 | 7 | `ConsulenteWizard.tsx:266-268`, `ConsulenteInterviewScene.tsx:94`, `CompravenditaWizard.tsx:134-136`, `ConsulenteBook.tsx:229` | eyebrows with digits printed as JSX, not through `HeadingText` |
 | 8 | `app/globals.css:60` (`--radius-xl`); § 4.4's list | 36 `rounded-xl` boxes inside tiles and modals plus `card.tsx:10` and `link-banner.tsx:41` (NOVE-19 § 10) @ b841cbd7 (38), and Accumulo's two (`pr488:PlanDraftSidePanel.tsx:43`, `:64`): 40 — 9px Egeo, 4px Orbita, rounder than the tile |
 | 9 | `components/allocation/ActionChip.tsx:37` and § 4.4b's sites | `rounded-full` bars, pills and pill chips, `rounded-[Npx]` chips on the nine pages and in the Accumulo code: round or literal under Orbita, while NOVE-19 squares the same roles on its three pages |
-| 10 | `ComposizioneTile.tsx:65`, `EvoluzioneTile.tsx:110`, `ValoreStrumentoTile.tsx:90`, `StoricoDettaglio.tsx:74`, `LaborMetricsChart.tsx:34`, `FireDettaglio.tsx:53`, `RollingLineChart.tsx:19`, `AndamentoStoricoCharts.tsx:22`, `ConfrontoAnnualeCharts.tsx:23`, `EntityTrendChart.tsx:21`, `SavingsRateLineChart.tsx:62`, `components/goals/GoalProjectionChart.tsx:75` (10) | twelve Recharts tooltips `borderRadius` 8px / 10px literal (in the chart's DOM, so in scope): rounded under Orbita |
+| 10 | `ComposizioneTile.tsx:65`, `EvoluzioneTile.tsx:110`, `ValoreStrumentoTile.tsx:90`, `StoricoDettaglio.tsx:74`, `LaborMetricsChart.tsx:34`, `FireDettaglio.tsx:53`, `RollingLineChart.tsx:19`, `AndamentoStoricoCharts.tsx:22`, `ConfrontoAnnualeCharts.tsx:23`, `EntityTrendChart.tsx:21`, `SavingsRateLineChart.tsx:65`, `components/goals/GoalProjectionChart.tsx:75` (10) | twelve Recharts tooltips `borderRadius` 8px / 10px literal (in the chart's DOM, so in scope): rounded under Orbita |
 | 11 | `lib/utils/cashflowSankey.ts:66-92` | income, type, Budget, Risparmi hexes fixed; the ring (NOVE-10 ClassificaTile) and the phone flow (`SpendingTypesMobileFlow.tsx:44`, `:52`) paint the same types by token (`expenseTypeColors.ts:30-36`, `:61-64`): under a costume the Sankey disagrees with its neighbours |
 | 12 | `components/performance/UnderwaterDrawdownChart.tsx:102-109`, `:140-142`, `:170` | the red is a `useState` seeded with the default's oklch, read once from `<html>` in a rAF (empty deps): wrong first frame, stale after a theme switch |
 | 13 | `AssistantQuestionBlock.tsx:147-148`, `:159`; `ExpenseProposalCard.tsx:261-263`; `GoalProposalCard.tsx:212-216` | the AI eyebrow on `bg-muted/40` over the card: **4,48:1** Egeo light, **4,39** Egeo dark; `DESIGN.md:70-72` promises 4,5 there |
@@ -232,7 +232,7 @@ Also: the twelve tooltips of § 1 row 10 — `GoalProjectionChart.tsx:75` `borde
 - **Previdenza**: `pension/tiles/AnnoFiscaleTile.tsx:89`, `:96`.
 - **FIRE**: `fire-simulations/tiles/TraguardoTile.tsx:93`, `:102`; `coast/tiles/CoastTraguardoTile.tsx:73`, `:82`;
   `monte-carlo/tiles/ScenariConfrontoTile.tsx:60`, `:61`; `goals/tiles/ObiettiviTile.tsx:73`, `:80`.
-- **Hall of Fame**: `hall-of-fame/RecordRows.tsx:109`, `:111`.
+- **Hall of Fame**: `hall-of-fame/RecordRows.tsx:119`, `:121`.
 - **Assistente**: `assistant/GoalProposalCard.tsx:227`.
 - **Impostazioni**: `settings/tabs/GeneraleTab.tsx:440`; `AllocazioneTab.tsx:111`; `AspettoTab.tsx:157`, `:161`;
   `app/dashboard/settings/page.tsx:352`.
@@ -369,7 +369,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 | `EGEO_COLUMN` | `impostazioni` | path `M6 4 H16 M6 4 C4 4 4 7 6 7 M16 4 C18 4 18 7 16 7 M6 7 H16 M8 7 V18 M11 7 V18 M14 7 V18 M6 18 H16 M5 20 H17` |
 
 `THEME_EMBLEMS.egeo.pages` gains the nine; Orbita's `pages` stays `{}`. The ids:
-`components/cashflow/AnalisiTab.tsx:756` `analisi`; `app/dashboard/performance/page.tsx:697` `rendimenti`;
+`components/cashflow/AnalisiTab.tsx:757` `analisi`; `app/dashboard/performance/page.tsx:697` `rendimenti`;
 `app/dashboard/history/page.tsx:460` `storico`; `app/dashboard/allocation/page.tsx:461`, `ConsulenteClient.tsx:82`
 `allocazione`; `app/dashboard/pension/page.tsx:39` `previdenza`; `app/dashboard/fire-simulations/page.tsx:92`
 `fire`; `app/dashboard/hall-of-fame/page.tsx:361` `hall-of-fame`; `AssistantHeader.tsx:85` `assistente`;
@@ -381,7 +381,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 - `dialog.tsx:42` overlay, `:80` close `rounded-md` (follows); `drawer.tsx:83` handle; `path-rail.tsx:44` ticks (a
   4px line's cap), `:154` `rounded-md`; `CashflowSankeyChart.tsx:103` `nodeBorderRadius={3}` (a mark), `:120` labels
   (`cashflowSankey.ts:111`, ≥ 7:1 on every ground), `:130` node tooltip `rounded-md`.
-- `AndamentoStoricoCharts.tsx:80`, `:140`, `:203-204`, `SavingsRateLineChart.tsx:87`: `?? '#6366f1'` only when
+- `AndamentoStoricoCharts.tsx:80`, `:140`, `:203-204`, `SavingsRateLineChart.tsx:90`: `?? '#6366f1'` only when
   `useChartColors` has fewer slots. The tooltip divs `rounded-lg` (FireDettaglio:100, CoastFireProjectionChart:102,
   FIREProjectionChart:87, FireFanChart:84, WhatIfProjectionChart:57, MonteCarloFanChart:60, ScenarioOverlayChart:43,
   UnderwaterDrawdownChart:34) follow `--radius`.
@@ -439,7 +439,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 | U2 | `chartColorsContext.test.ts:120` updated: `THEME_HEX_TOKENS` = role tokens then `SANKEY_COSTUME_TOKEN` values | drop the spread |
 | C1 | `themeCostume.test.ts` + T11: the section's `@media print` block declares each of the 23 `COSTUME_SCOPE_PROPERTIES` (`--radius` with `inherit`), each `!important`; `theme-costume.tsx`'s `EmblemSvg` class holds `print:hidden`; T3: `toHaveLength(22)` → `toHaveLength(23)`, the order gains `'--costume-page-generated-fill'` last; T6 + `COSTUME_GENERATED_FILL_CLASS` equals § 4.1's string | delete `--costume-ground` from the print block |
 | C2 | same file + T12: no `rounded-xl` in the files of § 4.4 (Accumulo's included), no `borderRadius: '8px'` / `borderRadius: 8` / `borderRadius: 10` in § 1 row 10's twelve files; the four AI sub-tiles' lines hold `COSTUME_GENERATED_FILL_CLASS` and no `bg-muted/40`. `__tests__/expenseProposalCard.test.tsx:159` (existing) updated: the list holds `COSTUME_FRAME_RADIUS_CLASS` and `COSTUME_GENERATED_FILL_CLASS` in place of `'rounded-xl'` | `question-card.tsx:95` back to `rounded-xl`; `ExpenseProposalCard.tsx:261` back to `rounded-xl` |
-| C3 | same file + T13: in the files of § 4.4b the only `rounded-full` / `rounded-[Npx]` (N ≠ 2) left are the «stay as they are» lines § 4.4b names in those files (`goals/tiles/ObiettiviTile.tsx`, `settings/page.tsx`, `EvoluzioneTile.tsx`, `AspettoTab.tsx`, `TargetTick.tsx`, `GeneraleTab.tsx`, `RendimentoTile.tsx`, `PerformancePeriodPicker.tsx`: one each); every other file of the list has none | `RecordRows.tsx:109` back to `rounded-full` |
+| C3 | same file + T13: in the files of § 4.4b the only `rounded-full` / `rounded-[Npx]` (N ≠ 2) left are the «stay as they are» lines § 4.4b names in those files (`goals/tiles/ObiettiviTile.tsx`, `settings/page.tsx`, `EvoluzioneTile.tsx`, `AspettoTab.tsx`, `TargetTick.tsx`, `GeneraleTab.tsx`, `RendimentoTile.tsx`, `PerformancePeriodPicker.tsx`: one each); every other file of the list has none | `RecordRows.tsx:119` back to `rounded-full` |
 | K6 | `themeCostumeContrast.test.ts`: `--warning-foreground` ≥ 4,5 on K3's surfaces and on `--warning` | Egeo light `--warning-foreground` `oklch(0.62 0.11 80)` |
 | K7 | same file: `--ai-accent` ≥ 4,5 on `--card` and on `--costume-page-generated-fill` over `--card` (`var(--card)` is the card, `initial` is `--muted` at 40% over it) | Egeo light's fill `initial` (4,48) |
 | N2 | `e2e/themeNeutral.ts` (NOVE-11, NOVE-19 N1) gains two probes: the «Nuova Spesa» title and content (desktop), the same drawer (390). The Sankey's neutrality is E5's default-theme case. Baseline RE-RECORDED (`THEME_NEUTRAL_RECORD=1`) on the untouched code, then compared | drawer fallback `12px` |

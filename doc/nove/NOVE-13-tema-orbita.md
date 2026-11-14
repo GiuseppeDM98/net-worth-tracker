@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | 1 | `lib/constants/colorTheme.ts:15-22` | no theme with `resourceBar: true` (NOVE-11 names the flag; nothing reads it yet) |
 | 2 | `app/dashboard/page.tsx:507-529` | under the Panoramica's `PageHeader` comes `RowAnswers` and the verdict: no place for a bar of figures |
-| 3 | `lib/utils/overviewSummary.ts:87-121` | `selectOverviewStrip`: the phone's three cells; no selector of the four figures the mock shows at 1440 |
+| 3 | `lib/utils/overviewSummary.ts:100-130` | `selectOverviewStrip`: the phone's three cells; no selector of the four figures the mock shows at 1440 |
 | 4 | the mock's dark slots | Azioni `0.70 0.13 225` and Trend Following `0.62 0.07 240` measure ΔE00 12,6: under the gate of 14 |
 | 5 | the mock's `--primary` light `0.48 0.12 235`, eyebrow light `0.50 0.13 60`, Immobili light `0.70 0.15 75` | outside sRGB (max chroma 0.102, 0.117, under 0.15) |
 | 6 | the mock | five slots in the light half, no `--chart-9` in either |
@@ -297,7 +297,7 @@ export function selectResourceBar(overview: DashboardOverviewPayload): ResourceF
 ```
 
 `format: 'currency'` without `decimals` is `cachedFormatCurrencyEUR(|v|, true)` with «−» in front
-(`verdictStrip.ts:79-81`, `:110-121`): exactly `formatEuroMinus(net)` (`CashflowTile.tsx:121`).
+(`verdictStrip.ts:79-81`, `:110-121`): exactly `formatEuroMinus(net)` (`CashflowTile.tsx:122`).
 
 **The tiles take the same text.** `components/dashboard/OverviewAnimatedCurrency.tsx:96-98` (the hero) and
 `components/dashboard/overview/SintesiTile.tsx:46-47` (the rows) print

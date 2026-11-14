@@ -1,6 +1,6 @@
 # NOVE-10 — Analisi recomposed as «Classifica»: the ranking first, the Flusso in «Dettaglio»
 
-> Series `doc/nove/` (README.md § 5): **implemented after NOVE-05** (`readSavings`, the `describeFlow` change)
+> Series `doc/nove/` (README.md § 5): **implemented after NOVE-05 (retired on 2026-11-14, PR #530)** (`readSavings`, the `describeFlow` change)
 > **and NOVE-08** (the ring: `lib/utils/ringChart.ts`, `components/ui/ring-chart.tsx`,
 > the ring rule in DESIGN.md). Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7 and moves
 > with 05 and 08 — reread by function name. Executes the owner's point 5 and decisions 5 and 6 (README.md § 1, § 3).
@@ -9,19 +9,19 @@
 
 The owner: «di tutte le pagine è quella dove devo sempre andare a cercarmi l'info specifica […] voglio capire quali
 spese impattano di più il timeframe di riferimento». The grid's dominant tile is the PERIOD, not the ranking
-(`components/cashflow/AnalisiTab.tsx:9-18`, `:862-989`: Periodo 5 × 2 rows · Fuori scala 3 · Spese maggiori 4 /
+(`components/cashflow/AnalisiTab.tsx:9-18`, `:863-990`: Periodo 5 × 2 rows · Fuori scala 3 · Spese maggiori 4 /
 Spese per categoria 4 · Entrate per categoria 3 / Scheda 12 / Flusso 12):
 
-- **The heaviest rows are five**: `rankTopExpenses(periodExpenses, dayOf, 5, …)` (`AnalisiTab.tsx:497`), each named
-  by its category (`lib/utils/analisiSummary.ts:133-155`), never by what it was.
+- **The heaviest rows are five**: `rankTopExpenses(periodExpenses, dayOf, 5, …)` (`AnalisiTab.tsx:498`), each named
+  by its category (`lib/utils/analisiSummary.ts:134-156`), never by what it was.
 - **What moved is computed and hidden**: the per-category comparison against year−1 feeds ONE mover of the verdict
-  (`AnalisiTab.tsx:568-571`); the list lives behind the closed «Confronto annuale» (`ConfrontoDisclosure.tsx:69-72`).
-- **The type split is only in the Flusso**: `summarizeFlow` (`analisiSummary.ts:282-322`) feeds the Sankey's reading
-  and the phone's bar; the Flusso is a full-width grid tile (`AnalisiTab.tsx:972-989`).
+  (`AnalisiTab.tsx:569-572`); the list lives behind the closed «Confronto annuale» (`ConfrontoDisclosure.tsx:69-72`).
+- **The type split is only in the Flusso**: `summarizeFlow` (`analisiSummary.ts:283-323`) feeds the Sankey's reading
+  and the phone's bar; the Flusso is a full-width grid tile (`AnalisiTab.tsx:973-990`).
 - **Stale labels**: the types read «Spese Necessarie» / «Spese Non Necessarie» since 2026-10-20 (ids unchanged;
   doc/guide/cashflow.md § Expense Sign Convention), yet `SPENDING_TYPE_LABELS` = «Fisse / Variabili / Debiti»
-  (`analisiSummary.ts:252-253`), printed by `describeFlow` (`analisiNarrative.ts:526`) and the closed answer
-  (`:902-908`); the adjectives «fisse / variabili» (`:510`, comments `:509`, `:513-514`, `:875`); the aside «· fisse
+  (`analisiSummary.ts:253-254`), printed by `describeFlow` (`analisiNarrative.ts:529`) and the closed answer
+  (`:908-914`); the adjectives «fisse / variabili» (`:511`, comments `:510`, `:514-515`, `:881`); the aside «· fisse
   / variabili / debiti» (`components/cashflow/AndamentoStoricoSection.tsx:209`).
 - **A figure can leave its plot**: on the canvas «31.900 €» overflowed the Entrate ring at three columns (decision 6).
 
@@ -244,16 +244,16 @@ ANALISI_TRIO_BLOCK }`; «Risparmio» `opens: periodo`, `lifts: { section: flusso
   « variabili» → « non necessaria» / « non necessarie» (the count sentence of Impostazioni › Spese).
 - `components/CreateDummySnapshotModal.tsx:261`: «Media delle spese mensili (distribuite tra necessarie, non
   necessarie e debiti)».
-- `lib/utils/emailNarrative.ts:629` and `lib/server/monthlyEmailService.ts:151`: the two comments read
+- `lib/utils/emailNarrative.ts:635` and `lib/server/monthlyEmailService.ts:151`: the two comments read
   «Necessarie/Non necessarie/Debiti»; the email's labels already come from `EXPENSE_TYPE_LABELS`
-  (`monthlyEmailService.ts:1051`), so only the fixture of `__tests__/emailNarrative.test.ts:498-504` is relabelled.
+  (`monthlyEmailService.ts:1051`), so only the fixture of `__tests__/emailNarrative.test.ts:520-526` is relabelled.
 - `components/expenses/ExpenseDialog.tsx:1140`, `:1374`: the two JSX comments, same words.
 
 ### `lib/utils/analisiNarrative.ts`
 
-`SPENDING_TYPE_ADJECTIVES` (`:510`) = `{ fixed: 'necessarie', variable: 'non necessarie', debt: 'di debito' }`, the
-comments at `:509`, `:513-514`, `:875` follow («Necessarie 58%, non necessarie 37%, debiti 5%.»). `describeFlow`
-(NOVE-05's signature) is called by AnalisiTab, which passes `reading: describeFlow(flow, readSavings(totals.income,
+`SPENDING_TYPE_ADJECTIVES` (`:511`) = `{ fixed: 'necessarie', variable: 'non necessarie', debt: 'di debito' }`, the
+comments at `:510`, `:514-515`, `:881` follow («Necessarie 58%, non necessarie 37%, debiti 5%.»). `describeFlow`
+(its signature in README.md § 7) is called by AnalisiTab, which passes `reading: describeFlow(flow, readSavings(totals.income,
 totals.expenses))` inside DettaglioDisclosure's `flusso` prop; DettaglioDisclosure computes no sentence.
 `ANALISI_CLOSED_ASIDES` = `{ maggiori: 'per importo', entrate: 'per categoria', periodo: 'entrate e spese' }`.
 Deleted: `describeAnomalies`, `describeAnomaliesAnswer`, `describeTypesFlowAnswer`, `describeRolesFlowAnswer`,
@@ -398,7 +398,7 @@ null; `periodo` = «messo da parte » + the rate's figure when the reading is a 
   caption under `LIFTED_FIGURE_CLASS`; reading `describePeriodoSavings`; `collapse` / `asideWhenClosed`; bars
   `max-desktop:min-h-[120px] desktop:min-h-[72px]`. `CashflowKpiTrio` loses `expensesDeltaLifted` (no caller left).
 - **`analisi/DettaglioDisclosure.tsx`**: gains `flusso: Omit<FlussoTileProps, 'isMobile' | 'className'> | null`; owns
-  `FLUSSO_SANKEY_MIN_CELL` and the cell measure (from `AnalisiTab.tsx:198-199`, `:409-415`); `FlussoTile` =
+  `FLUSSO_SANKEY_MIN_CELL` and the cell measure (from `AnalisiTab.tsx:199-200`, `:410-416`); `FlussoTile` =
   `lazyComponent(() => import('./tiles/FlussoTile').then((m) => m.FlussoTile))` at module level, in
   `DETTAGLIO_LAZY_CHARTS` (`:14`), fallback `<Skeleton className="min-h-[360px] sm:min-h-[600px] rounded-2xl" />`;
   rendered first, only with a flow. Trigger line: «Il flusso del periodo e il risparmio mese per mese» («Il flusso,
@@ -414,9 +414,9 @@ null; `periodo` = «messo da parte » + the rate's figure when the reading is a 
   7/9 · 5/10 · 5/6 · 3/5 · 4/5. `resetFocus` without an opener focuses `ANALISI_REST_BUTTON_ID`. The header comment
   (`:1-42`) is rewritten; `handlePeriodModeChange` stays after `availableYears` (React Compiler).
 - **Labels**: `AndamentoStoricoSection.tsx:209` → «· necessarie / non necessarie / debiti»; the comments
-  `AndamentoStoricoCharts.tsx:155`, `lib/utils/cashflowTimeSeries.ts:358`,
+  `AndamentoStoricoCharts.tsx:155`, `lib/utils/cashflowTimeSeries.ts:312`,
   `components/cashflow/analisi/SpendingTypesMobileFlow.tsx:8-9` («necessarie 53%, non necessarie 37%, debiti 10%»);
-  the test name `__tests__/cashflowTimeSeries.test.ts:195`.
+  the test name `__tests__/cashflowTimeSeries.test.ts:194`.
 
 ## 5. Constraints and traps (AGENTS.md / DESIGN.md, «here it means that»)
 
@@ -443,7 +443,7 @@ null; `periodo` = «messo da parte » + the rate's figure when the reading is a 
 | --- | --- | --- |
 | L1 | `analisiSummary.test.ts:269` → `['Necessarie', 'Non necessarie', 'Debiti']` | the old labels |
 | T1-T3 | 25 rows → 20; `limitTopExpenses(top, 10).shownTotal`; note «Caldaia nuova» → label, caption «Casa · 14 mar»; 60 chars → 48 with «…» | drop `note` / the cut |
-| L2 | `settingsNarrative.test.ts:713` → «14 categorie: 4 di entrate, 4 necessarie, 5 non necessarie e 1 di debito; 8 con sottocategorie.»; one of each → «1 necessaria», «1 non necessaria»; `emailNarrative.test.ts:498-504` relabelled → «Spese Necessarie 1640 € (54,7%) · Spese Non Necessarie 1180 € (39,3%) · Debiti 180 € (6,0%).» | the old adjectives |
+| L2 | `settingsNarrative.test.ts:713` → «14 categorie: 4 di entrate, 4 necessarie, 5 non necessarie e 1 di debito; 8 con sottocategorie.»; one of each → «1 necessaria», «1 non necessaria»; `emailNarrative.test.ts:520-526` relabelled → «Spese Necessarie 1640 € (54,7%) · Spese Non Necessarie 1180 € (39,3%) · Debiti 180 € (6,0%).» | the old adjectives |
 | S1b | `buildSubCategoryRanking`: «Casa» as a necessaria and as a non necessaria category, each with rows without subcategory → captions «senza sottocategoria · necessarie» and «senza sottocategoria · non necessarie»; one «Casa» only → «senza sottocategoria» | never qualify |
 | K5 | `classificaTile.test.tsx`: in «Sottocategorie» a click on a «senza sottocategoria» row calls `onSelect` with a target that has no `subCategoryKey`; the reading's text is the same before and after the toggle; every ranking row holds one `aria-hidden` swatch whose colour is its type's; with one type no `role="img"` ring and the total «2.000 €» with «spese» | select the subcategory key; a reading per view; drop `swatch`; draw the ring |
 | S1 | `buildSubCategoryRanking`: «Condominio» under two categories = two rows; no subcategory → «Casa», «senza sottocategoria» | key without the category |
@@ -456,7 +456,7 @@ null; `periodo` = «messo da parte » + the rate's figure when the reading is a 
 | N6 | «A novembre fuori scala sulla media dei 6 mesi precedenti: Ristoranti (+80%) e Auto (+40%).»; on the period «Fuori scala …» | always the month |
 | N7 | 2000/1400 «Hai messo da parte il 30% delle entrate.»; 3/500 «… di 497 €.»; 1000/1300 «… del 30%.»; 1000/1000; 0/500 | a % for a deficit |
 | N8 | closed answers: cambiato «Alimentari −100 €», periodo «messo da parte 61%»; no `analisi-flusso` / `analisi-fuori-scala` | the old keys |
-| N10 | `analisiNarrative.test.ts:406-454` relabelled «Necessarie 58%, non necessarie 37%, debiti 5%.»; the `FLOW` fixture of `:825-826` relabelled for the closed-answers cases that stay | the old adjectives |
+| N10 | `analisiNarrative.test.ts:407-463` relabelled «Necessarie 58%, non necessarie 37%, debiti 5%.»; the `FLOW` fixture of `:834-835` relabelled for the closed-answers cases that stay | the old adjectives |
 | K1-K3 | `classificaTile.test.tsx` (RTL): centre «42,5k €» for 42.500 € at 150px, three legend rows; toggle → «Condominio» captioned «Casa»; click → `onSelect` with `subCategoryKey` | swap the views |
 | K4 | `entrateTile.test.tsx` (RTL): the legend's printed shares sum to 100; «Mostra tutte (N)» lists every category with the ring still drawn | list only the head |
 | T4 | `speseMaggioriTile.test.tsx` (RTL): 14 rows → 10 shown, aside «10 di 14», reading «Le dieci più grandi…»; «Mostra altre 4» → 14 shown, `aria-expanded` true, aside «14 di 14»; 7 rows → no toggle | read `top.rows.length` for the aside |

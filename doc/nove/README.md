@@ -3,7 +3,7 @@
 > The index of the series: the owner's points, the decisions, the order, the shared contracts and the rules every
 > spec obeys. Written on 2026-11-12 on `develop` @ b841cbd7 by the planning session; **read adversarially, all
 > the specs together, on 2026-11-12** (decisions 33–63 in § 3); a spec in service is retired with
-> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524), NOVE-03 (2026-11-14, PR #526) and NOVE-04 (2026-11-14, PR #528); the next is NOVE-05. One spec = one
+> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524), NOVE-03 (2026-11-14, PR #526), NOVE-04 (2026-11-14, PR #528) and NOVE-05 (2026-11-14, PR #530); the next is NOVE-06. One spec = one
 > implementation session = one branch. A spec's NUMBER is its identity; the ORDER is § 5.
 
 ## 1. The owner's points (their words, 2026-11-12)
@@ -67,7 +67,7 @@
    its hole is abbreviated or moves above the ring. → NOVE-08, 09, 10
 6. Analisi: composition A «Classifica»; «i numeri devono stare dentro il loro grafico». → NOVE-10
 7. Savings rate: a floor at −100% plus the calendar — without income or below the floor no percentage, euros; on
-   the Panoramica the sentence adds how the month closes with the calendar; a true −30% stays. → NOVE-05
+   the Panoramica the sentence adds how the month closes with the calendar; a true −30% stays. → NOVE-05 (retired on 2026-11-14, PR #530)
 8. Storico › Driver: «altre» is SPLIT by cause. → NOVE-06
 9. The contributor's PRs enter the series; agents beyond the cap of five authorised («valuta tu»).
 10. Rings also in: Panoramica «Composizione» and Patrimonio «Classi»; Previdenza «Versato»; Tracciamento «Entrate»;
@@ -122,7 +122,7 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 40. Compravendita, a mortgage above the residual: the «saldo» screen asks «Su quale conto la banca accredita quanto
     avanza del mutuo?», label «Sul conto». → NOVE-04 (retired on 2026-11-14, PR #528)
 41. Panoramica, spending above income so far: «Finora hai messo da parte −X €: le spese superano le entrate; …»,
-    the cell «−X €» — signed where it is read as a saving. → NOVE-05
+    the cell «−X €» — signed where it is read as a saving. → NOVE-05 (retired on 2026-11-14, PR #530)
 42. Storico › Driver: when ONE part of the rest is non-zero the reading names it by its ledger label; with two or
     three it stays «altre variazioni». → NOVE-06
 43. Divisione: a trade's fee row belongs to the sole holder of the ASSET; when the asset is shared or split by
@@ -168,7 +168,7 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 - c. Allocazione: the Piano cell loses `desktop:self-start`. (NOVE-02, retired on 2026-11-13, PR #524)
 - d. «altre» in three parts; the third is the remainder, and holds the estimated-vs-withheld tax gap. (NOVE-06)
 - e. `lib/utils/savingsRate.ts` without imports, `SAVINGS_RATE_FLOOR = -100`; «Risparmio nel tempo» averages by
-  income. (NOVE-05)
+  income. (NOVE-05, retired on 2026-11-14, PR #530)
 - f. Accumulo is a tab loaded on demand. (NOVE-16)
 - g. The new collections `accumulationPlans`, `accumulationPlanLocks` and `modelPortfolios` are accepted; their Firestore rules are published
   by hand by the owner. (NOVE-16, 17)
@@ -193,7 +193,7 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
   quantity > 0. (NOVE-16)
 - v. A note when the plan ends after the «rivedi entro» date. (NOVE-16)
 - w. Compravendita: a mortgage above the PRICE is refused; property and account move in one transaction. (NOVE-04, retired on 2026-11-14, PR #528)
-- x. Panoramica: with a lived part that is not a rate, the headline follows the whole month. (NOVE-05)
+- x. Panoramica: with a lived part that is not a rate, the headline follows the whole month. (NOVE-05, retired on 2026-11-14, PR #530)
 
 These are the choices that cross specs or answer one of the owner's points. Each spec's § 3 lists, under «Adopted,
 reversible», the further choices that stay inside it (a wording, a file's home, a rounding): the owner overturns one
@@ -203,7 +203,7 @@ by saying so before that spec is implemented.
 
 The order of implementation (each followed by its retirement session, § 8):
 
-`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 → 06 → 07 → 08 → 09 → 10 → 14 → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
+`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 → 07 → 08 → 09 → 10 → 14 → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
 
 - **07** after **03** (the fee row commits inside the ledger's transaction contract) and **06** (`tradeMoneyIn` and
   `tradeAwarePriceEffect` change together).
@@ -223,7 +223,7 @@ The order of implementation (each followed by its retirement session, § 8):
 | NOVE-02 | Allocazione: a short Piano as tall as Bilanciamento + Per classe | S | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 16 findings, 0 owner decisions; implemented on 2026-11-13, PR #524 in develop since 2026-11-13 (one class removed, two comments, the Playwright test; criteria 1–5 held: `perf:budget` unchanged on every route — Allocazione 604,8 — and `mobile:budget` identical to develop's of the same day, same build); the test was seen red with `desktop:self-start` back on the cell — already at «Ribilancia», where the fixture's Piano is the shorter column, earlier than the «Versa senza importo» step the spec names; the 32px guard of that step is green without the mutation; guided tour done on the mirror (the three modes, the cleared amount, the dark scheme: all as expected) and closed; the session also took `hono` 4.13.13 → 4.13.18 by the owner's waiver of WORKFLOW.md rule 8 (doc/guide/dipendenze.md) |
 | NOVE-03 | Registro operazioni: every write decides inside its transaction | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 19 findings, 1 owner decision; implemented on 2026-11-13, PR #526 in develop since 2026-11-14 (branch `fix/nove-03-registro-transazioni`; the 14 tests of § 6 and C2 each seen red with its mutation; `perf:budget` `/dashboard/assets` 734,6 → 734,7 KB gz, under its ceiling; collaudo C–E and the owner's tour done); **retired on 2026-11-14**: the twelve criteria held on the merged code (75 items read, 10 findings that held, all text); the closure re-run (ledger suite 127/127, `e2e/assets.ledger-meta` and `assets.sale-tax` green) and the missing `mobile:budget` comparison spent that day — 3fdf11a1 against `develop`, 57 entries identical, the same 12 red, Patrimonio 1024 reading 11 or 12 on one build (doc/guide/prima-schermata-misure.md); `perf:budget` before/after also moved Storico and Rendimenti by 0,1 KB gz, under their ceilings. Divergences written, behaviour equal: the migration split into `resolveBaselinePrices` + `commitMigration`; the settlement account checked by `assertSettlementAccountsStillCash` in COMPUTE (four checks above `buildNewSequence`, not three in the write loop); `AssetDialog` without `&& ownerId` (guarded at the top of `onSubmit`); the e2e spec listed in doc/guide/patrimonio.md and registro-operazioni.md, as e2e-playwright.md has no per-area inventory. The § 10 deferrals with no heir went to registro-operazioni.md § Concurrency; the label in two guides (registro-operazioni.md, dipendenze.md) rewritten as dates |
 | NOVE-04 | Compravendita: a mortgage larger than what is left to pay | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 14 findings, 1 owner decision; implemented on 2026-11-14, PR #528 in develop since 2026-11-14 (branch `feat/nove-04-mutuo-oltre-il-residuo`; P1–P3, N1–N4, S1–S2 and C1 each seen red with its mutation, C1 with the account's credit zeroed instead of the spec's income row; `perf:budget` `/dashboard/assets/compravendita` 594,5 → 595,2 KB gz under its 596 ceiling; guided tour on the mirror with the owner's own case, done and closed; the spec's e2e-playwright.md inventory has no target there; **added by the owner after the tour**: «Oppure in % del prezzo» on «Mutuo», outside the spec, not toured); **retired on 2026-11-14**: the nine criteria held on the merged code (51 items read, 3 flagged, 2 held, both text); the closure re-run (the four `realEstateOperation*` suites 67/67, `e2e/assets.compravendita.spec.ts` 7/7 on the emulators, `perf:budget` `/dashboard/assets/compravendita` 595,3 KB gz under its 596 ceiling). Divergence written, behaviour of the spec untouched: the «% del prezzo» field on «Mutuo» (`mortgageFromPercent`, `percentOfPrice`) added by the owner after the tour, in doc/guide/compravendita.md. Text fixes: NOVE-20's eight `CompravenditaWizard.tsx` / `CompravenditaScreens.tsx` line cites moved by this spec re-pointed to the current lines; the «never below 0» comment of `purchaseBalance` and the guide's mortgage sentence opened to the excess case |
-| NOVE-05 | The savings rate: one rule, a floor, and euros below it | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 31 findings, 1 owner decision; implemented on 2026-11-14 (branch `feat/nove-05-tasso-di-risparmio`; every test of the spec seen red with its mutation; criterion 15 grep as listed; `perf:budget` before/after on the same machine all under the ceilings — Cashflow 786,1 → 788,1, Assistente 751,6 → 753,4, Panoramica 625,8 → 627,0 KB gz, re-measured on the final code; `mobile:budget` identical to develop of the same day, same build, the same 12 red, re-run on the final build). Divergences written: the Assistente words read the reading, not only `resolveSavingsRate` (doc/guide/assistente.md); «chiude all'81%» by The Comma Rule where the spec wrote «al 81%»; outside the spec, the Hall of Fame record sentence and closed answer, and «Andamento risparmio»'s description of a gap («spese oltre le entrate»); an owner decision during the tour (2026-11-14): «Risparmio nel tempo» counts «mesi misurabili» (`rankedCount`) where the spec kept «mesi chiusi» / «con entrate»; found in the tour and fixed: «il 81%» → «l'81%» in every «messo da parte» (Panoramica, Assistente, email), and at the owner's OK the email's «copre il 86,1%» → «copre l'86,1%»; phase F on the mirror (2026-11-14, owner): Panoramica, Tracciamento and the PDF of the running month as expected; the Hall of Fame and the floor cases left to the tests (`recordRows.test.tsx`, `pdfNarrative.test.ts` and the emulator tour B–E) |
+| NOVE-05 | The savings rate: one rule, a floor, and euros below it | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 31 findings, 1 owner decision; implemented on 2026-11-14, PR #530 in develop since 2026-11-14 (branch `feat/nove-05-tasso-di-risparmio`; every test of the spec seen red with its mutation; criterion 15 grep as listed; `perf:budget` before/after on the same machine all under the ceilings — Cashflow 786,1 → 788,1, Assistente 751,6 → 753,4, Panoramica 625,8 → 627,0 KB gz, re-measured on the final code; `mobile:budget` identical to develop of the same day, same build, the same 12 red, re-run on the final build). Divergences written: the Assistente words read the reading, not only `resolveSavingsRate` (doc/guide/assistente.md); «chiude all'81%» by The Comma Rule where the spec wrote «al 81%»; outside the spec, the Hall of Fame record sentence and closed answer, and «Andamento risparmio»'s description of a gap («spese oltre le entrate»); an owner decision during the tour (2026-11-14): «Risparmio nel tempo» counts «mesi misurabili» (`rankedCount`) where the spec kept «mesi chiusi» / «con entrate»; found in the tour and fixed: «il 81%» → «l'81%» in every «messo da parte» (Panoramica, Assistente, email), and at the owner's OK the email's «copre il 86,1%» → «copre l'86,1%»; phase F on the mirror (2026-11-14, owner): Panoramica, Tracciamento and the PDF of the running month as expected; the Hall of Fame and the floor cases left to the tests (`recordRows.test.tsx`, `pdfNarrative.test.ts` and the emulator tour B–E); **retired on 2026-11-14**: the seventeen criteria, decisions 7 and 41 and choices (e) and (x) held on the merged code (a read-only workflow of five `cercatore` and four `verificatore`: 131 items, 27 flagged, 11 held, all text); the closure re-run (the area suites 49 files / 1941 tests, the four Playwright specs of § 6 44/44 on the emulators); criterion 15's grep reprints the list now in AGENTS.md § Shared Constants. Divergences written, behaviour equal: `summarizeSavingsHistory` returns early on `rankedCount === 0` (best and worst `null`, never `undefined`), the spec's «no measured month and no deficit» condition lives in `describeDeficitMonths` and the tile's empty state; «Andamento risparmio»'s gap is the point's `overspent` field (`buildSavingsRateTrendPoints`); `Draft Release Temp.md` took one new Bug Fixes entry for every surface, the Panoramica and Tracciamento entries holding no stale text. Text fixes: the `describeSavingsHistory` comment opened to `rankedCount`; doc/guide/assistente.md's blind spot on the rate through `meaningfulSavingsRate`; 35 line cites of seven live specs (08, 10, 12, 13, 15, 16, 20) moved by 78ae52e8 re-pointed to the current lines; NOVE-10's header marks this spec retired and its «NOVE-05's signature» points at § 7. No runtime code changed |
 | NOVE-06 | Storico › Driver: «altre» split by cause | M | — | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 21 findings, 1 owner decision |
 | NOVE-07 | A trade's fee is a spending row, out of the average cost (PR #489) | L | 03, 06 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 2 owner decisions; extended on 2026-11-13 by decision 64 (the first purchase's fee) |
 | NOVE-08 | The ring: one primitive, one DESIGN rule, four homes | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 22 findings, 1 owner decision |
@@ -267,7 +267,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `DASHBOARD_OVERVIEW_SOURCE_VERSION` 25 → 26. NOVE-18 reads ONLY `AllocatableHolding.costBasisEur`, which NOVE-07
   feeds with the fiscal basis.
 
-**The savings rate** — defined by NOVE-05, read by NOVE-10 — `lib/utils/savingsRate.ts`
+**The savings rate** — defined by NOVE-05 (retired on 2026-11-14, PR #530), read by NOVE-10 — `lib/utils/savingsRate.ts`
 - `SAVINGS_RATE_FLOOR = -100`; `SavingsReading` = `none | no-income{spending} | deficit{deficit,income,spending} |
   rate{rate,savings,income,spending}`; `readSavings(income, spending)`; `meaningfulSavingsRate`;
   `weightedSavingsRate`.
@@ -461,7 +461,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
+`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
 
 Prompt 08 (`08_CREA_RITIRO_SPEC`) was run on 2026-11-12, after the adversarial reading, in a session of its own:
 `doc/nove/PROMPT-RITIRO.md` is the prompt the owner pastes to retire ONE spec. A retirement updates its precedents
