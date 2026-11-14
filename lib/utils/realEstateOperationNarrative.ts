@@ -45,6 +45,10 @@ export function formatIsoMonth(iso: string): string {
 /** The page's header line and the path's one-line purpose. */
 export const COMPRAVENDITA_DESCRIPTION = 'Registra l’acquisto o la vendita di una casa: caparra, rogito, mutuo, polizze e costi, un evento alla volta.';
 
+/** Under the mortgage's «% del prezzo»: what the field does, and why it waits for a price. */
+export const MORTGAGE_PERCENT_HINT = 'Facoltativa: calcola l’importo del mutuo dal prezzo pattuito.';
+export const MORTGAGE_PERCENT_NO_PRICE_HINT = 'Scrivi prima il prezzo della casa: la percentuale si calcola su quello.';
+
 /** Under a life policy's «Assicurato»: what the choice does, and the shape without a household. */
 export const LIFE_POLICY_INSURED_HINT = 'Con la Divisione accesa, i premi di una polizza personale sono suoi («Spesa di»); una CPI legata alla casa resta in comune.';
 export const LIFE_POLICY_NO_MEMBERS_HINT = 'Per scegliere l’assicurato aggiungi i componenti della famiglia in Impostazioni › Generale; senza, la polizza prende il suo numero.';
@@ -59,7 +63,8 @@ export interface ScreenCopy {
   help: string;
 }
 
-export function screenCopy(screen: RealEstateOperationScreen, answers: RealEstateOperationAnswers): ScreenCopy {
+/** `mortgageExcess` is the run's figure: with a purchase's mortgage beyond the residual the `saldo` screen asks where the excess lands (owner, 2026-11-12). */
+export function screenCopy(screen: RealEstateOperationScreen, answers: RealEstateOperationAnswers, mortgageExcess = 0): ScreenCopy {
   const purchase = answers.kind === 'purchase';
   const preliminare = answers.event === 'preliminare';
   switch (screen) {
@@ -86,6 +91,13 @@ export function screenCopy(screen: RealEstateOperationScreen, answers: RealEstat
           : 'Non è un’entrata: è patrimonio che cambia forma. La casa scende, il conto sale dello stesso importo.',
       };
     case 'saldo':
+      if (purchase && mortgageExcess > 0) {
+        return {
+          eyebrow: 'Rogito',
+          question: 'Su quale conto la banca accredita quanto avanza del mutuo?',
+          help: 'Il mutuo supera quanto resta del prezzo: la banca versa al venditore il resto e accredita su questo conto quello che avanza.',
+        };
+      }
       return {
         eyebrow: 'Rogito',
         question: purchase ? 'Da quale conto paghi il resto del prezzo?' : 'Su quale conto ricevi il resto del prezzo?',
@@ -174,7 +186,6 @@ export function describeScreenBlock(screen: RealEstateOperationScreen, answers: 
       if (!answers.accountId) return 'Scegli il conto.';
       if (answers.kind === 'sale' && (answers.depositsReceived ?? 0) < 0) return 'Le caparre ricevute non possono essere negative.';
       if (answers.kind === 'sale' && figures.saleBalance <= 0) return 'Le caparre coprono già tutto il prezzo: controlla gli importi.';
-      if (answers.kind === 'purchase' && figures.purchaseBalance < -0.005) return `Caparre e mutuo superano il prezzo di ${eur(-figures.purchaseBalance)}: controlla gli importi.`;
       return null;
     case 'rivaluta':
       return null;
@@ -182,7 +193,7 @@ export function describeScreenBlock(screen: RealEstateOperationScreen, answers: 
       if (!answers.hasMortgage) return null;
       const loan = answers.mortgage;
       if (!positive(loan.principal)) return 'Scrivi l’importo del mutuo.';
-      if (figures.purchaseBalance < -0.005) return `Il mutuo supera quanto resta da pagare della casa (${eur((answers.price ?? 0) - figures.valueToday)}).`;
+      if ((loan.principal ?? 0) > (answers.price ?? 0) + 0.005) return `Il mutuo supera il prezzo della casa (${eur(answers.price ?? 0)}).`;
       if (loan.ratePct === null || loan.ratePct < 0) return 'Scrivi il TAN (0 se non ci sono interessi).';
       if (!positive(loan.years) || loanMonths(loan) > 360) return 'Scrivi la durata in anni, al massimo 30.';
       if (!isValidIso(loan.firstInstalmentIso)) return 'Scegli la data della prima rata.';
@@ -241,6 +252,15 @@ export function describeScreenBlock(screen: RealEstateOperationScreen, answers: 
   }
 }
 
+/** The first refusal among the run's screens, or null: what «Conferma» must not pass over (2026-11-12). */
+export function firstScreenRefusal(screens: readonly RealEstateOperationScreen[], answers: RealEstateOperationAnswers, context: RealEstatePlanContext): string | null {
+  for (const screen of screens) {
+    const refusal = describeScreenBlock(screen, answers, context);
+    if (refusal) return refusal;
+  }
+  return null;
+}
+
 /** The «Rivaluta» screen's sentence: from what, to what, by how much. */
 export function describeSaleAdjustment(answers: RealEstateOperationAnswers, context: RealEstatePlanContext, propertyName: string): string {
   const { valueToday, saleBalance, saleAdjustment } = figuresOf(answers, context);
@@ -249,11 +269,14 @@ export function describeSaleAdjustment(answers: RealEstateOperationAnswers, cont
 }
 
 /** The rogito's balance in a sentence: what leaves (purchase) or reaches (sale) the account, and why. */
-export function describeBalance(answers: RealEstateOperationAnswers, context: RealEstatePlanContext): string {
+export function describeBalance(answers: RealEstateOperationAnswers, context: RealEstatePlanContext, accountName: string): string {
   const figures = figuresOf(answers, context);
   if (answers.kind === 'sale') {
     const payoff = figures.salePayoff > 0 ? ` e meno ${eur(figures.salePayoff)} di mutuo, che la banca dell’acquirente chiude` : '';
     return `Sul conto entrano ${eur(Math.max(0, figures.saleNet))}: il prezzo meno le caparre già ricevute${payoff}.`;
+  }
+  if (figures.mortgageExcess > 0) {
+    return `Dal conto non esce nulla: il mutuo copre quanto resta del prezzo e avanzano ${eur(figures.mortgageExcess)}, che la banca accredita su ${accountName}.`;
   }
   const already = figures.valueToday > 0 ? ` meno ${eur(figures.valueToday)} già nella casa` : '';
   const mortgage = answers.hasMortgage ? ` e ${eur(answers.mortgage.principal ?? 0)} di mutuo` : '';
@@ -301,6 +324,8 @@ export function describePlanStep(step: PlanStep, names: PlanNames): string {
       return step.reason === 'mortgage'
         ? `Il valore di ${names.propertyName} sale di ${eur(step.delta)}: il mutuo che la banca versa al venditore.`
         : `${step.delta > 0 ? 'Rivaluta' : 'Svaluta'} ${names.propertyName} di ${eur(Math.abs(step.delta))}, al prezzo di vendita.`;
+    case 'disburseMortgage':
+      return `Il mutuo paga al venditore ${eur(step.toProperty)}, che diventano valore di ${names.propertyName}; i ${eur(step.toAccount)} che avanzano entrano su ${refName({ id: step.accountId }, names)}. Nessuna entrata: è debito, non reddito.`;
     case 'row': {
       const { row } = step;
       const center = row.inCostCenter && names.costCenterName ? ` · centro «${names.costCenterName}»` : '';

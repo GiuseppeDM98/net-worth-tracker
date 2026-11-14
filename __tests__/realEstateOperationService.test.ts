@@ -24,7 +24,8 @@ import { executeRealEstatePlan, ownershipFields } from '@/lib/services/realEstat
 import { buildRealEstatePlan } from '@/lib/utils/realEstateOperationPlan';
 import { initialAnswers } from '@/lib/utils/realEstateOperationDraft';
 import type { RealEstateOperationAnswers } from '@/types/realEstateOperation';
-import { CATEGORIES, makeContext } from './fixtures/realEstateOperation';
+import { describePlanStep } from '@/lib/utils/realEstateOperationNarrative';
+import { ACCOUNT, asset, CATEGORIES, makeContext } from './fixtures/realEstateOperation';
 
 const context = makeContext();
 const answersWith = (patch: Partial<RealEstateOperationAnswers>): RealEstateOperationAnswers => ({ ...initialAnswers(context), ...patch });
@@ -129,5 +130,43 @@ describe('executeRealEstatePlan', () => {
 
     expect(result).toMatchObject({ done: 1, total: 3, failedAt: 1 });
     expect(createExpenseSettledOnDate).toHaveBeenCalledTimes(1);
+  });
+
+  describe('a mortgage beyond the residual', () => {
+    // A house worth 20.000 already, a price of 200.000, a mortgage of 190.000, no costs: three steps.
+    const depositContext = makeContext({ assets: [ACCOUNT, asset({ id: 'deposit-house', name: 'Casa Airone', type: 'realestate', assetClass: 'realestate', quantity: 20000 })] });
+    const exceeding = answersWith({
+      event: 'rogito',
+      propertyId: 'deposit-house',
+      price: 200000,
+      hasMortgage: true,
+      mortgage: { principal: 190000, ratePct: 3, years: 25, firstInstalmentIso: '2026-07-27', instalmentOverride: null },
+      costCenter: { mode: 'none', name: '', existingId: '' },
+    });
+
+    it('should raise the house and the account in ONE transaction, with no row for the excess', async () => {
+      const result = await executeRealEstatePlan('u1', buildRealEstatePlan(exceeding, depositContext), CATEGORIES, null);
+
+      expect(result).toMatchObject({ done: 3, total: 3, failedAt: null });
+      expect(updateCashAssetBalancesAtomic).toHaveBeenCalledTimes(1);
+      expect(updateCashAssetBalancesAtomic).toHaveBeenCalledWith([
+        { assetId: 'deposit-house', signedDelta: 180000 },
+        { assetId: 'acc', signedDelta: 10000 },
+      ]);
+      // The only row is the instalments' series: the excess is neither income nor a transfer.
+      expect(vi.mocked(createExpenseSettledOnDate).mock.calls.map((call) => call[1].type)).toEqual(['debt']);
+    });
+
+    it('should stop at the disbursement and say the loan landed', async () => {
+      vi.mocked(updateCashAssetBalancesAtomic).mockRejectedValueOnce(new Error('offline'));
+      const plan = buildRealEstatePlan(exceeding, depositContext);
+      const result = await executeRealEstatePlan('u1', plan, CATEGORIES, null);
+
+      expect(result).toMatchObject({ done: 1, failedAt: 1 });
+      expect(createAsset).toHaveBeenCalledTimes(1);
+      expect(createExpenseSettledOnDate).not.toHaveBeenCalled();
+      const names = { assetName: () => 'Conto Fenicottero', propertyName: 'Casa Airone', costCenterName: null };
+      expect(describePlanStep(plan.steps[1], names)).toMatch(/^Il mutuo paga al venditore/);
+    });
   });
 });

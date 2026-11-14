@@ -13,11 +13,13 @@ import type { CostCenter } from '@/types/costCenters';
 import { REAL_ESTATE_COST_LABELS, REAL_ESTATE_COST_TYPES, type LifePolicyMode, type RealEstateOperationAnswers, type RealEstateOperationScreen } from '@/types/realEstateOperation';
 import type { RealEstateOperationAction } from '@/lib/utils/realEstateOperationDraft';
 import { costKindsOf, propertyChoices } from '@/lib/utils/realEstateOperationDraft';
-import { futureSeriesAfter, loansFinancing, type RealEstatePlanContext } from '@/lib/utils/realEstateOperationPlan';
+import { figuresOf, futureSeriesAfter, loansFinancing, mortgageFromPercent, percentOfPrice, type RealEstatePlanContext } from '@/lib/utils/realEstateOperationPlan';
 import {
   LIFE_POLICY_INSURED_HINT,
   LIFE_POLICY_LINK_HINT,
   LIFE_POLICY_NO_MEMBERS_HINT,
+  MORTGAGE_PERCENT_HINT,
+  MORTGAGE_PERCENT_NO_PRICE_HINT,
   describeBalance,
   describeMortgageEnd,
   describeMortgageInstalment,
@@ -219,6 +221,14 @@ function MutuoScreen({ answers, dispatch, context }: ScreenProps) {
         <>
           <div className="grid grid-cols-1 gap-4 tablet:grid-cols-2">
             <NumberField id="re-principal" label="Importo del mutuo, in euro" value={loan.principal} onChange={(principal) => patchLoan({ principal })} />
+            <NumberField
+              id="re-principal-percent"
+              label="Oppure in % del prezzo"
+              value={percentOfPrice(loan.principal, answers.price)}
+              step="0.01"
+              hint={answers.price ? MORTGAGE_PERCENT_HINT : MORTGAGE_PERCENT_NO_PRICE_HINT}
+              onChange={(percent) => patchLoan({ principal: mortgageFromPercent(answers.price, percent) })}
+            />
             <NumberField id="re-rate" label="TAN, in %" value={loan.ratePct} step="0.001" onChange={(ratePct) => patchLoan({ ratePct })} />
             <NumberField id="re-years" label="Durata, in anni" value={loan.years} step="1" onChange={(years) => patchLoan({ years })} />
             <DateField id="re-first" label="Prima rata" value={loan.firstInstalmentIso} onChange={(firstInstalmentIso) => patchLoan({ firstInstalmentIso })} />
@@ -239,9 +249,12 @@ function MutuoScreen({ answers, dispatch, context }: ScreenProps) {
 
 function SaldoScreen({ answers, dispatch, context, accounts }: ScreenProps) {
   const isPurchase = answers.kind === 'purchase';
+  // A mortgage beyond the residual credits the account instead of debiting it (owner, 2026-11-12).
+  const creditsAccount = !isPurchase || figuresOf(answers, context).mortgageExcess > 0;
+  const accountName = context.assets.find((asset) => asset.id === answers.accountId)?.name ?? 'il conto';
   return (
     <div className="flex flex-col gap-4">
-      <AccountField id="re-account" label={isPurchase ? 'Dal conto' : 'Sul conto'} accounts={accounts} value={answers.accountId} onChange={(accountId) => dispatch({ type: 'patch', patch: { accountId } })} />
+      <AccountField id="re-account" label={creditsAccount ? 'Sul conto' : 'Dal conto'} accounts={accounts} value={answers.accountId} onChange={(accountId) => dispatch({ type: 'patch', patch: { accountId } })} />
       {!isPurchase && (
         <NumberField
           id="re-deposits-received"
@@ -251,7 +264,7 @@ function SaldoScreen({ answers, dispatch, context, accounts }: ScreenProps) {
           onChange={(depositsReceived) => dispatch({ type: 'patch', patch: { depositsReceived } })}
         />
       )}
-      <p className="rounded-xl border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground">{describeBalance(answers, context)}</p>
+      <p className="rounded-xl border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground">{describeBalance(answers, context, accountName)}</p>
     </div>
   );
 }

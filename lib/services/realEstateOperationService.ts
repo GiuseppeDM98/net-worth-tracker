@@ -5,7 +5,8 @@
  * the expense form would write: `createAsset` for the property and the loans, `createExpenseSettledOnDate`
  * (+ `applyBalanceEffects`, `applyDebtRepayments`) for transfers, spending rows and series — each moves
  * its account ON ITS OWN DATE (lib/utils/cashSettlement.ts) —, `updateCashAssetBalancesAtomic` for a
- * value moved by hand, `reverseAppliedBalances` + `deleteExpenseRows` for the occurrences a sale stops.
+ * value moved by hand (and, in ONE transaction with the account, for a mortgage's disbursement beyond what
+ * is left to pay: no row, 2026-11-12), `reverseAppliedBalances` + `deleteExpenseRows` for the occurrences a sale stops.
  *
  * NOT atomic across steps: a property, a loan and a 360-row series are separate writes. The steps run
  * in plan order and the first failure stops the run; the result says how many landed, so the page can
@@ -152,6 +153,16 @@ export async function executeRealEstatePlan(
         const propertyId = created.property ?? plan.propertyId;
         if (!propertyId) throw new Error('The property to adjust is unknown');
         await updateCashAssetBalancesAtomic([{ assetId: propertyId, signedDelta: step.delta }]);
+        return;
+      }
+      case 'disburseMortgage': {
+        const propertyId = created.property ?? plan.propertyId;
+        if (!propertyId) throw new Error('The property to adjust is unknown');
+        // One transaction: the house and the account rise together, no row (the payOffWithSale precedent).
+        await updateCashAssetBalancesAtomic([
+          { assetId: propertyId, signedDelta: step.toProperty },
+          { assetId: step.accountId, signedDelta: step.toAccount },
+        ]);
         return;
       }
       case 'payOffWithSale': {
