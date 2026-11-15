@@ -21,6 +21,8 @@ export const SANKEY_SIGNATURE = 'node_modules/d3-sankey/';
  * module's PATH: the importer's chunk names it too, in the loader of its `import()`.
  */
 export const UNDERWATER_CHART_SIGNATURE = 'function describeUnderwaterChart';
+/** The Flusso tile, loaded by «Dettaglio» on Analisi since 2026-11-12 (`DettaglioDisclosure.tsx`). */
+export const FLUSSO_TILE_SIGNATURE = 'function FlussoTile';
 
 const CHUNK_URL = /\/_next\/static\/chunks\/.+\.js(\?|$)/;
 

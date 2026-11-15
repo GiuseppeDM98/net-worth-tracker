@@ -317,33 +317,34 @@
     },
     "analisi": {
       "390": {
-        "screens": 1.86,
+        "screens": 2.11,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 8,
-        "figuresOutsideVerdict": 5,
+        "figuresOutsideVerdict": 4,
         "firstClosedRowAbovePill": false,
         "overflowX": false,
-        "raisedBy": "2026-10-14: la prima riga chiusa (Fuori scala) finisce a 1031 contro la pill a 767 — il verdetto è alto 392 (titolo su due righe, l'asse 2×2 e il mese, il primo enunciato, le due celle, lo scope del calendario, «Il perché»), LA tessera (Periodo) 392 con le barre già a 120 px; la riga sotto la pill registrata false con raisedBy, estesa ad Analisi"
+        "raisedBy": "2026-11-12: Analisi «Classifica» — LA tessera è la classifica con l'anello per tipo (la classifica resta intera: The First-Screen Rule), Periodo diventa una riga, il Flusso entra in «Dettaglio»; misura prima/dopo in doc/guide/prima-schermata-misure.md; 2026-10-14: la prima riga chiusa (Fuori scala) finisce a 1031 contro la pill a 767 — il verdetto è alto 392 (titolo su due righe, l'asse 2×2 e il mese, il primo enunciato, le due celle, lo scope del calendario, «Il perché»), LA tessera (Periodo) 392 con le barre già a 120 px; la riga sotto la pill registrata false con raisedBy, estesa ad Analisi"
       },
       "768": {
-        "screens": 1.23,
-        "tilesAboveFold": 6,
-        "tilesFullyAboveFold": 6,
-        "figuresAboveFold": 9,
-        "figuresOutsideVerdict": 5,
-        "firstClosedRowAbovePill": true,
-        "overflowX": false
+        "screens": 1.27,
+        "tilesAboveFold": 5,
+        "tilesFullyAboveFold": 3,
+        "figuresAboveFold": 14,
+        "figuresOutsideVerdict": 11,
+        "firstClosedRowAbovePill": false,
+        "overflowX": false,
+        "raisedBy": "2026-11-12: Analisi «Classifica» — LA tessera è la classifica con l'anello per tipo (la classifica resta intera: The First-Screen Rule), Periodo diventa una riga, il Flusso entra in «Dettaglio»; misura prima/dopo in doc/guide/prima-schermata-misure.md"
       },
       "1024": {
-        "screens": 1.14,
-        "tilesAboveFold": 6,
-        "tilesFullyAboveFold": 6,
-        "figuresAboveFold": 11,
-        "figuresOutsideVerdict": 8,
+        "screens": 1.43,
+        "tilesAboveFold": 5,
+        "tilesFullyAboveFold": 4,
+        "figuresAboveFold": 14,
+        "figuresOutsideVerdict": 10,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-10-16: figuresAboveFold 8 → 11, figuresOutsideVerdict 5 → 8 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-14: LA tessera (Periodo) non sta più intera sopra la piega — l'asse sotto il titolo, la striscia, lo scope e «Il perché» (la composizione vale fino a 1439); le colonne a 1024 le ha decise la composizione tablet del 2026-10-16"
+        "raisedBy": "2026-11-12: Analisi «Classifica» — LA tessera è la classifica con l'anello per tipo (la classifica resta intera: The First-Screen Rule), Periodo diventa una riga, il Flusso entra in «Dettaglio»; misura prima/dopo in doc/guide/prima-schermata-misure.md; 2026-10-16: figuresAboveFold 8 → 11, figuresOutsideVerdict 5 → 8 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-14: LA tessera (Periodo) non sta più intera sopra la piega — l'asse sotto il titolo, la striscia, lo scope e «Il perché» (la composizione vale fino a 1439); le colonne a 1024 le ha decise la composizione tablet del 2026-10-16"
       }
     },
     "rendimenti": {

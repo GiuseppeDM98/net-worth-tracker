@@ -1,9 +1,9 @@
 /**
  * The numbers of Analisi that are born nowhere else: the period as a calendar object (its
  * month count, the month its anomalies run on, whether it is still running), the top
- * expenses of the period, the spending series the Periodo tile draws (per month against the
- * same months of the previous year, or per year), the flow summary and the year-over-year
- * movers. The compositions, the pacing and the anomalies keep living in
+ * expenses of the period, the subcategory ranking, the income ring's shares, the spending
+ * series the Periodo tile draws (per month against the same months of the previous year, or
+ * per year), the flow summary, the year-over-year movers and «Cosa è cambiato». The compositions, the pacing and the anomalies keep living in
  * `cashflowComposition.ts` / `comparisonDeltas.ts` — this module only adds what the tiles
  * need on top of them, so every figure the page prints has one source.
  *
@@ -13,6 +13,9 @@
 
 import type { Expense, ExpenseType } from '@/types/expenses';
 import type { CategoryDeltaRow } from '@/lib/utils/comparisonDeltas';
+import type { CategorySlice, CompositionSlice } from '@/lib/utils/cashflowComposition';
+import { roundToCents } from '@/lib/utils/cents';
+import { RING_REST_KEY } from '@/lib/utils/ringChart';
 import { NO_SUBCATEGORY_KEY } from '@/types/expenses';
 import { getCategoryKey, getCategoryName, getSubCategoryKey, getSubCategoryLabel } from '@/lib/utils/expenseGrouping';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
@@ -92,11 +95,17 @@ const isSpending = (expense: Expense): boolean => expense.type !== 'income' && e
 
 export interface TopExpenseRow {
   key: string;
-  /** The category, as printed. */
+  /** The category, as printed — what the reading and the closed answer name. */
   label: string;
+  /** The first line of the row's note (≤ 48 characters), the tile's label when present; null without one. */
+  note: string | null;
   /** The subcategory, when the row carries one. */
   subCategoryLabel: string | null;
-  /** «12 ago · Volo» — the day and the subcategory, under the label; «· in calendario» when the row is still ahead. */
+  /**
+   * «Volo · 12 ago» — the subcategory and the day, under the label; «· in calendario» when the row is
+   * still ahead. A row labelled by its note opens on its category («Casa · Condominio · 14 mar»;
+   * widest fact first, owner 2026-11-15).
+   */
   caption: string;
   /** Dated after today: in the period's total, not spent yet (The Scheduled-Is-Not-Spent Rule). */
   scheduled: boolean;
@@ -140,10 +149,12 @@ export function rankTopExpenses(expenses: Expense[], dayOf: DayResolver, limit =
       const subCategoryLabel = hasSubCategory ? getSubCategoryLabel(expense) : null;
       const day = `${when.day} ${MONTH_NAMES_SHORT[when.month - 1].toLowerCase()}`;
       const scheduled = isScheduled(expense);
-      const captionParts = [day, subCategoryLabel, scheduled ? 'in calendario' : null].filter((part): part is string => part !== null);
+      const note = noteLabel(expense);
+      const captionParts = [note ? getCategoryName(expense) : null, subCategoryLabel, day, scheduled ? 'in calendario' : null].filter((part): part is string => part !== null);
       return {
         key: expense.id,
         label: getCategoryName(expense),
+        note,
         subCategoryLabel,
         caption: captionParts.join(' · '),
         scheduled,
@@ -156,6 +167,104 @@ export function rankTopExpenses(expenses: Expense[], dayOf: DayResolver, limit =
     });
 
   return { rows, shownTotal: rows.reduce((sum, row) => sum + row.amount, 0), total, count: spending.length };
+}
+
+/** What Spese maggiori shows folded, and the most it unfolds to («Mostra altre N»). */
+export const TOP_EXPENSES_SHOWN = 10;
+export const TOP_EXPENSES_MORE = 20;
+const NOTE_LABEL_CHARS = 48;
+
+/** The row's own words when it has them: the first line of its note, cut at 48 characters. */
+export function noteLabel(expense: Expense): string | null {
+  const line = expense.notes?.split('\n')[0].trim();
+  if (!line) return null;
+  return line.length > NOTE_LABEL_CHARS ? `${line.slice(0, NOTE_LABEL_CHARS - 1).trimEnd()}…` : line;
+}
+
+/** The first `count` rows with their own sum: what the reading speaks of. */
+export function limitTopExpenses(top: TopExpenses, count: number): TopExpenses {
+  const rows = top.rows.slice(0, count);
+  return { ...top, rows, shownTotal: rows.reduce((sum, row) => sum + row.amount, 0) };
+}
+
+// ─── «Dove vanno i soldi» and «Entrate» ───────────────────────────────────────
+
+/** A spending subcategory; a row without one ranks under its category's name. */
+export interface SubCategorySlice extends CategorySlice {
+  subCategoryKey: string;
+  /** «Casa» under «Condominio»; «senza sottocategoria» under a category's own rows. */
+  caption: string;
+}
+
+/**
+ * The «Sottocategorie» view of the spending ranking: one row per (type, category, subcategory),
+ * largest first, the share of the period's spending. A category's rows without a subcategory are ONE
+ * row named after the category and captioned «senza sottocategoria»; when two categories of
+ * different types share a name, the caption names the type too, or the two rows read the same.
+ */
+export function buildSubCategoryRanking(expenses: Expense[]): SubCategorySlice[] {
+  const buckets = new Map<string, Omit<SubCategorySlice, 'percentage'>>();
+  for (const expense of expenses) {
+    if (!isSpending(expense)) continue;
+    const categoryKey = getCategoryKey(expense);
+    const subCategoryKey = getSubCategoryKey(expense);
+    const key = `${expense.type}:${categoryKey}:${subCategoryKey}`;
+    const none = subCategoryKey === NO_SUBCATEGORY_KEY;
+    const bucket = buckets.get(key) ?? {
+      key,
+      expenseType: expense.type,
+      categoryKey,
+      subCategoryKey,
+      value: 0,
+      name: none ? getCategoryName(expense) : getSubCategoryLabel(expense),
+      caption: none ? 'senza sottocategoria' : getCategoryName(expense),
+    };
+    bucket.value = roundToCents(bucket.value + Math.abs(expense.amount));
+    buckets.set(key, bucket);
+  }
+  const rows = Array.from(buckets.values()).filter((row) => row.value > 0);
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+  // Two categories may share a name across types («Casa» necessaria and non necessaria): name the type too.
+  const categoryName = (row: (typeof rows)[number]) => (row.subCategoryKey === NO_SUBCATEGORY_KEY ? row.name : row.caption);
+  const typesByName = new Map<string, Set<ExpenseType>>();
+  for (const row of rows) typesByName.set(categoryName(row), (typesByName.get(categoryName(row)) ?? new Set()).add(row.expenseType));
+  const qualify = (row: (typeof rows)[number]): string => {
+    if ((typesByName.get(categoryName(row))?.size ?? 0) <= 1) return row.caption;
+    const type = SPENDING_TYPE_LABELS[row.expenseType as SpendingType].toLowerCase();
+    return row.subCategoryKey === NO_SUBCATEGORY_KEY ? `senza sottocategoria · ${type}` : `${row.caption} · ${type}`;
+  };
+  return rows
+    .map((row) => ({ ...row, caption: qualify(row), percentage: (row.value / total) * 100 }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/** A ring part with its share printed so the legend adds up to 100 on screen; `key` is `RING_REST_KEY` on the rest. */
+export interface RingShare {
+  key: string;
+  label: string;
+  value: number;
+  printedPercentage: number;
+  rest: boolean;
+}
+
+/** The first `count` slices and ONE «Altre N categorie» (a single leftover keeps its name). */
+export function buildRingShares(slices: readonly CompositionSlice[], count: number): RingShare[] {
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  if (total <= 0) return [];
+  const head = slices.length === count + 1 ? slices : slices.slice(0, count);
+  const tail = slices.slice(head.length);
+  const pct = (value: number) => Math.round((value / total) * 100);
+  const shares: RingShare[] = head.map((slice) => ({ key: slice.key, label: slice.name, value: slice.value, printedPercentage: pct(slice.value), rest: false }));
+  const restValue = tail.reduce((sum, slice) => sum + slice.value, 0);
+  if (restValue > 0) {
+    shares.push({ key: RING_REST_KEY, label: `Altre ${tail.length} categorie`, value: restValue, printedPercentage: pct(restValue), rest: true });
+  }
+  // The rounding drift goes on the rest, the row that is a remainder by definition (AGENTS.md → «A list
+  // that must add up adds up ON SCREEN»); without a rest, on the largest, as `summarizeFlow` does.
+  const last = shares[shares.length - 1];
+  const drifted = last.rest ? last : shares[0];
+  drifted.printedPercentage += 100 - shares.reduce((sum, share) => sum + share.printedPercentage, 0);
+  return shares;
 }
 
 // ─── Spending series ──────────────────────────────────────────────────────────
@@ -250,8 +359,12 @@ export function buildYearlySpending(expenses: Expense[], historyStartYear: numbe
 /** The spending types, declared once in spendingRoles.ts (`SPENDING_EXPENSE_TYPES`). */
 export type SpendingType = SpendingExpenseType;
 
-/** The lowercase names the Flusso reading uses («Fisse 58%, variabili 37%, debiti 5%»). */
-export const SPENDING_TYPE_LABELS: Record<SpendingType, string> = { fixed: 'Fisse', variable: 'Variabili', debt: 'Debiti' };
+/**
+ * The types' short names — the legends, the Flusso reading («Necessarie 58%, non necessarie 37%,
+ * debiti 5%») — as the app names them since 2026-10-20 («Spese Necessarie» / «Spese Non
+ * Necessarie»; the ids stay `fixed` / `variable`).
+ */
+export const SPENDING_TYPE_LABELS: Record<SpendingType, string> = { fixed: 'Necessarie', variable: 'Non necessarie', debt: 'Debiti' };
 
 export interface TypeShare {
   type: SpendingType;
@@ -440,21 +553,74 @@ export function resolveCategoryMovers(rows: CategoryDeltaRow[]): { grown: Catego
   return { grown: grown ? toMover(grown) : null, shrunk: shrunk ? toMover(shrunk) : null };
 }
 
-// ─── The phone composition (2026-10-14) ───────────────────────────────────────
+// ─── «Cosa è cambiato» ────────────────────────────────────────────────────────
 
-/** THE tile of the page (Periodo): open at every width, never a row (The First-Screen Rule). */
-export const ANALISI_PERIODO_ID = 'analisi-periodo';
+/** The movers «Cosa è cambiato» draws. */
+export const CHANGE_ROWS = 6;
+
+/** `bar` in % of a track centred on zero: a rise right of 50, a fall left of it. */
+export interface CategoryChange extends CategoryDeltaRow {
+  bar: { left: number; width: number };
+}
+
+export interface CategoryChanges {
+  /** The six largest |delta| (a delta that prints 0 € is no mover), grown first. */
+  rows: CategoryChange[];
+  /** `pacing.expenses.delta`: the same window, so every row's delta sums to it. */
+  totalDelta: number;
+  /** The fewest movers in the total's direction that reach it, at most three; [] at 0 €. */
+  explainedBy: CategoryDeltaRow[];
+  /** Their share of the total when three do not reach it; null when they do. */
+  explainedShare: number | null;
+  newLabels: string[];
+  goneLabels: string[];
+}
 
 /**
- * The rows below `desktop:`, in the DOM's order (The First-Screen Rule — the `order-1…7` that reordered them
- * on a phone are gone). Fuori scala exists only on a month, the Scheda only with a focus, the
- * Flusso only when something flowed: the page hands the controller the rows PRESENT.
+ * The categories that moved most against the Periodo's own baseline (the comparison rows of
+ * `buildCategoryComparison`), with what explains the total: the largest movers in its direction,
+ * taken until they reach it. The bars share one scale, the largest mover filling its half.
+ */
+export function summarizeCategoryChanges(deltaRows: readonly CategoryDeltaRow[], totalDelta: number): CategoryChanges {
+  const byMagnitude = deltaRows.filter((row) => Math.round(row.delta) !== 0).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const largest = byMagnitude.slice(0, CHANGE_ROWS);
+  const scale = Math.max(0, ...largest.map((row) => Math.abs(row.delta)));
+  const rows = [...largest]
+    .sort((a, b) => b.delta - a.delta)
+    .map((row): CategoryChange => {
+      const width = scale > 0 ? (Math.abs(row.delta) / scale) * 50 : 0;
+      return { ...row, bar: { left: row.delta >= 0 ? 50 : 50 - width, width } };
+    });
+  const explainedBy: CategoryDeltaRow[] = [];
+  let explainedShare: number | null = null;
+  if (Math.round(totalDelta) !== 0) {
+    let reached = 0;
+    for (const row of byMagnitude.filter((r) => Math.sign(r.delta) === Math.sign(totalDelta)).slice(0, 3)) {
+      explainedBy.push(row);
+      reached += Math.abs(row.delta);
+      if (reached >= Math.abs(totalDelta)) break;
+    }
+    if (reached < Math.abs(totalDelta)) explainedShare = (reached / Math.abs(totalDelta)) * 100;
+  }
+  const labels = (status: CategoryDeltaRow['status']) => deltaRows.filter((row) => row.status === status).map((row) => row.label);
+  return { rows, totalDelta, explainedBy, explainedShare, newLabels: labels('new'), goneLabels: labels('gone') };
+}
+
+// ─── The phone composition (2026-10-14; THE tile «Dove vanno i soldi» since 2026-11-12) ───
+
+/** THE tile of the page («Dove vanno i soldi»): open at every width, never a row (The First-Screen Rule). */
+export const ANALISI_CLASSIFICA_ID = 'analisi-classifica';
+
+/**
+ * The rows below `desktop:`, in the DOM's order (The First-Screen Rule). «Cosa è cambiato» exists
+ * only with a comparison or the month's anomalies, the Scheda only with a focus: the page hands the
+ * controller the rows PRESENT. `flusso` is a lift key, never a row: the Flusso lives in «Dettaglio».
  */
 export const ANALISI_SECTION_IDS = {
-  fuoriScala: 'analisi-fuori-scala',
   maggiori: 'analisi-maggiori',
-  spese: 'analisi-spese',
+  cambiato: 'analisi-cambiato',
   entrate: 'analisi-entrate',
+  periodo: 'analisi-periodo',
   scheda: 'analisi-scheda',
   flusso: 'analisi-flusso',
 } as const;
@@ -466,12 +632,23 @@ export const ANALISI_TRIO_BLOCK = 'trio';
 export const ANALISI_SAVINGS_BLOCK = 'risparmio';
 
 /**
+ * The blocks of the Flusso a phone's strip repeats (since 2026-10-14). Here, not in `FlussoTile`: that
+ * module is loaded on demand, and a value imported from it would put it back in the page's first graph.
+ */
+export type FlussoLiftedBlock = 'risparmio';
+
+/** Narrows the `string[]` of `liftedBlocks(strip, section)` to the Flusso's blocks at the call site. */
+export function isFlussoLiftedBlock(block: string): block is FlussoLiftedBlock {
+  return block === ANALISI_SAVINGS_BLOCK;
+}
+
+/**
  * The two figures under the verdict on a phone (The First-Screen Rule): the period's income and
- * what was left of it, exactly as the Periodo trio prints them (`currency`: the «−» U+2212 only on
+ * what was left of it, exactly as the Periodo rows print them (`currency`: the «−» U+2212 only on
  * a negative net, a printed zero unsigned — `formatEuroMinus`). The spending is in the verdict's
- * first sentence. «Entrate» lifts the trio — whose three values the strip and the first sentence
- * all print, so the rate and the coverage stay (The Lifted-Figure Rule) — «Risparmio» the Flusso's own
- * «Risparmio» figure, which prints the same surplus.
+ * first sentence. «Entrate» opens Entrate and lifts the Periodo's amounts — which the strip and the
+ * first sentence all print (The Lifted-Figure Rule) —; «Risparmio» opens the Periodo, whose reading
+ * is the savings, and lifts the Flusso's own «Risparmio» figure, which prints the same surplus.
  *
  * `[]` when nothing flowed (income and spending both zero: a period of transfers only, and the
  * Flusso is not drawn) and when the period has not started (The Absence-Has-Three-Names Rule: what
@@ -486,13 +663,13 @@ export function selectAnalisiStrip(totals: Pick<PeriodCashflowTotals, 'income' |
       format: 'currency',
       ...(totals.income > 0 ? { tone: 'positive' as const } : {}),
       opens: ANALISI_SECTION_IDS.entrate,
-      lifts: { section: ANALISI_PERIODO_ID, block: ANALISI_TRIO_BLOCK },
+      lifts: { section: ANALISI_SECTION_IDS.periodo, block: ANALISI_TRIO_BLOCK },
     },
     {
       label: 'Risparmio',
       value: totals.net,
       format: 'currency',
-      opens: ANALISI_SECTION_IDS.flusso,
+      opens: ANALISI_SECTION_IDS.periodo,
       lifts: { section: ANALISI_SECTION_IDS.flusso, block: ANALISI_SAVINGS_BLOCK },
     },
   ];

@@ -28,13 +28,21 @@ import { formatFlowAmount } from '@/lib/utils/analisiNarrative';
 import { VERDICT_REST_SECTION } from '@/lib/utils/mobileSections';
 import { summarizePeriodCashflow } from '@/lib/utils/tracciamentoSummary';
 import { formatStripFigure, liftedBlocks, validateStrip, type StripFigure } from '@/lib/utils/verdictStrip';
+import { RING_REST_KEY } from '@/lib/utils/ringChart';
 import {
-  ANALISI_PERIODO_ID,
   ANALISI_SAVINGS_BLOCK,
   ANALISI_SECTION_IDS,
   ANALISI_TRIO_BLOCK,
+  SPENDING_TYPE_LABELS,
+  TOP_EXPENSES_MORE,
+  TOP_EXPENSES_SHOWN,
   selectAnalisiStrip,
   buildMonthlySpending,
+  buildRingShares,
+  buildSubCategoryRanking,
+  limitTopExpenses,
+  noteLabel,
+  summarizeCategoryChanges,
   buildTypeFlowBreakdown,
   buildYearlySpending,
   isPeriodOngoing,
@@ -153,7 +161,7 @@ describe('rankTopExpenses', () => {
     expect(top.rows[0]).toMatchObject({
       label: 'Vacanze',
       subCategoryLabel: 'Volo',
-      caption: '12 ago · Volo',
+      caption: 'Volo · 12 ago',
       amount: 1180,
       expenseType: 'variable',
       categoryKey: 'cat-vac',
@@ -167,7 +175,7 @@ describe('rankTopExpenses', () => {
   it('should say in the caption when a ranked row is still in the calendar', () => {
     // The Scheduled-Is-Not-Spent Rule: a row dated ahead ranks (it is in the total) and says so.
     const top = rankTopExpenses(rows, dayOf, 5, (expense) => monthOf(expense).month >= 8);
-    expect(top.rows[0]).toMatchObject({ caption: '12 ago · Volo · in calendario', scheduled: true });
+    expect(top.rows[0]).toMatchObject({ caption: 'Volo · 12 ago · in calendario', scheduled: true });
     expect(top.rows[2]).toMatchObject({ caption: '15 lug', scheduled: false });
     // The default is nothing scheduled.
     expect(rankTopExpenses(rows, dayOf, 5).rows.every((row) => !row.scheduled)).toBe(true);
@@ -186,6 +194,54 @@ describe('rankTopExpenses', () => {
 
   it('should return an empty ranking without spending', () => {
     expect(rankTopExpenses([on(2026, 1, { type: 'income', amount: 100 })], dayOf)).toEqual({ rows: [], shownTotal: 0, total: 0, count: 0 });
+  });
+
+  // Spese maggiori shows ten and unfolds to twenty (2026-11-12): the page ranks twenty, the tile cuts.
+  // Seen red with the `limit` default left at five and with `limitTopExpenses` keeping the whole sum.
+  it('should rank up to twenty rows and let the tile sum the ten it shows', () => {
+    const many = Array.from({ length: 25 }, (_, index) => on(2026, 1, { type: 'variable', amount: -(100 + index * 10), categoryId: 'cat-x', categoryName: 'Extra' }));
+    const top = rankTopExpenses(many, dayOf, TOP_EXPENSES_MORE);
+    expect(top.rows).toHaveLength(20);
+    expect(top.count).toBe(25);
+    const shown = limitTopExpenses(top, TOP_EXPENSES_SHOWN);
+    expect(shown.rows).toHaveLength(10);
+    // The ten largest: 340, 330 … 250.
+    expect(shown.shownTotal).toBe(2950);
+    expect(shown.total).toBe(top.total);
+    expect(shown.count).toBe(25);
+  });
+
+  // A row with a note is named by what it was (2026-11-12): the note's first line, the category in
+  // the caption. Seen red with `note` dropped from the row and with the cut removed.
+  it('should label a row by the first line of its note, the category moving to the caption', () => {
+    const top = rankTopExpenses(
+      [on(2026, 3, { type: 'fixed', amount: -1800, categoryId: 'cat-casa', categoryName: 'Casa', notes: 'Caldaia nuova\nfattura 12' }, 14)],
+      dayOf,
+    );
+    expect(top.rows[0]).toMatchObject({ note: 'Caldaia nuova', label: 'Casa', caption: 'Casa · 14 mar' });
+    const plain = rankTopExpenses([on(2026, 3, { type: 'fixed', amount: -50, categoryId: 'cat-casa', categoryName: 'Casa', notes: '   ' }, 14)], dayOf);
+    expect(plain.rows[0]).toMatchObject({ note: null, caption: '14 mar' });
+  });
+
+  // The caption reads from the widest fact to the narrowest (owner, 2026-11-15, the mirror tour): the
+  // category, the subcategory, then the day — «Casa · Arredamento · 12 mar». Seen red with the day
+  // left before the subcategory.
+  it('should caption a noted row category, subcategory, day', () => {
+    const top = rankTopExpenses(
+      [on(2026, 3, { type: 'fixed', amount: -1000, categoryId: 'cat-casa', categoryName: 'Casa', subCategoryId: 'sub-ar', subCategoryName: 'Arredamento', notes: 'Divano nuovo' }, 12)],
+      dayOf,
+    );
+    expect(top.rows[0]).toMatchObject({ note: 'Divano nuovo', caption: 'Casa · Arredamento · 12 mar' });
+  });
+
+  it('should cut a long note at 48 characters with an ellipsis', () => {
+    const long = 'Manutenzione straordinaria della caldaia a condensazione del piano terra';
+    expect(long.length).toBeGreaterThan(60);
+    const label = noteLabel(on(2026, 1, { type: 'fixed', amount: -10, notes: long }));
+    expect(label).toHaveLength(48);
+    expect(label!.endsWith('…')).toBe(true);
+    expect(noteLabel(on(2026, 1, { type: 'fixed', amount: -10, notes: 'x'.repeat(48) }))).toBe('x'.repeat(48));
+    expect(noteLabel(on(2026, 1, { type: 'fixed', amount: -10 }))).toBeNull();
   });
 });
 
@@ -266,7 +322,7 @@ describe('summarizeFlow', () => {
     expect(flow.incomeSources).toBe(2);
     expect(flow.expensesTotal).toBe(2050);
     expect(flow.categoryCount).toBe(3);
-    expect(flow.typeShares.map((share) => share.label)).toEqual(['Fisse', 'Variabili', 'Debiti']);
+    expect(flow.typeShares.map((share) => share.label)).toEqual(['Necessarie', 'Non necessarie', 'Debiti']);
     expect(flow.typeShares.map((share) => share.amount)).toEqual([1160, 790, 100]);
     expect(flow.typeShares[0].percentage).toBeCloseTo((1160 / 2050) * 100, 5);
   });
@@ -461,12 +517,14 @@ describe('selectAnalisiStrip', () => {
     on(2026, 1, { type: 'variable', amount: -650, categoryId: 'cat-cibo', categoryName: 'Cibo' }),
   ];
 
-  it('should open the Entrate and Flusso rows, lift the trio and the Flusso block, and pass the strip rules', () => {
+  // «Risparmio» opens the Periodo, the tile whose reading is the savings (2026-11-12); seen red with
+  // `opens` left on the Flusso, which is no row any more.
+  it('should open the Entrate and Periodo rows, lift the trio and the Flusso block, and pass the strip rules', () => {
     const strip = selectAnalisiStrip(summarizePeriodCashflow(rows));
     expect(strip.map((figure) => figure.label)).toEqual(['Entrate', 'Risparmio']);
-    expect(strip.map((figure) => figure.opens)).toEqual([ANALISI_SECTION_IDS.entrate, ANALISI_SECTION_IDS.flusso]);
+    expect(strip.map((figure) => figure.opens)).toEqual([ANALISI_SECTION_IDS.entrate, ANALISI_SECTION_IDS.periodo]);
     expect(validateStrip(strip, KNOWN)).toEqual([]);
-    expect(liftedBlocks(strip, ANALISI_PERIODO_ID)).toEqual([ANALISI_TRIO_BLOCK]);
+    expect(liftedBlocks(strip, ANALISI_SECTION_IDS.periodo)).toEqual([ANALISI_TRIO_BLOCK]);
     expect(liftedBlocks(strip, ANALISI_SECTION_IDS.flusso)).toEqual([ANALISI_SAVINGS_BLOCK]);
   });
 
@@ -493,5 +551,138 @@ describe('selectAnalisiStrip', () => {
     expect(selectAnalisiStrip({ income: 0, expenses: 0, net: 0 })).toEqual([]);
     expect(selectAnalisiStrip(summarizePeriodCashflow(rows), { notStarted: true })).toEqual([]);
     expect(selectAnalisiStrip({ income: 0, expenses: 300, net: -300 })).toHaveLength(2);
+  });
+});
+
+describe('SPENDING_TYPE_LABELS', () => {
+  // The types read «Spese Necessarie» / «Spese Non Necessarie» since 2026-10-20 (ids unchanged).
+  it('should name the types as the rest of the app does', () => {
+    expect(Object.values(SPENDING_TYPE_LABELS)).toEqual(['Necessarie', 'Non necessarie', 'Debiti']);
+  });
+});
+
+/**
+ * «Dove vanno i soldi» in its «Sottocategorie» view (2026-11-12): one row per (type, category,
+ * subcategory), a row without a subcategory under its category's own name. Seen red with the key
+ * built without the category (S1) and with the type qualifier never applied (S1b).
+ */
+describe('buildSubCategoryRanking', () => {
+  it('should keep one subcategory name under two categories as two rows', () => {
+    const ranking = buildSubCategoryRanking([
+      on(2026, 1, { type: 'fixed', amount: -300, categoryId: 'cat-casa', categoryName: 'Casa', subCategoryId: 'sub-cond', subCategoryName: 'Condominio' }),
+      on(2026, 1, { type: 'fixed', amount: -50, categoryId: 'cat-box', categoryName: 'Box', subCategoryId: 'sub-cond', subCategoryName: 'Condominio' }),
+      on(2026, 1, { type: 'fixed', amount: -150, categoryId: 'cat-casa', categoryName: 'Casa' }),
+      on(2026, 1, { type: 'income', amount: 2000, categoryId: 'cat-stip', categoryName: 'Stipendio' }),
+    ]);
+    expect(ranking.map((row) => [row.name, row.caption, row.value])).toEqual([
+      ['Condominio', 'Casa', 300],
+      ['Casa', 'senza sottocategoria', 150],
+      ['Condominio', 'Box', 50],
+    ]);
+    expect(ranking[0]).toMatchObject({ expenseType: 'fixed', categoryKey: 'cat-casa', subCategoryKey: 'sub-cond' });
+    expect(ranking[0].percentage).toBe(60);
+  });
+
+  it('should name the type when two categories share a name across types', () => {
+    const shared = buildSubCategoryRanking([
+      on(2026, 1, { type: 'fixed', amount: -200, categoryId: 'cat-casa-n', categoryName: 'Casa' }),
+      on(2026, 1, { type: 'variable', amount: -100, categoryId: 'cat-casa-v', categoryName: 'Casa' }),
+    ]);
+    expect(shared.map((row) => row.caption)).toEqual(['senza sottocategoria · necessarie', 'senza sottocategoria · non necessarie']);
+    const alone = buildSubCategoryRanking([on(2026, 1, { type: 'fixed', amount: -200, categoryId: 'cat-casa', categoryName: 'Casa' })]);
+    expect(alone.map((row) => row.caption)).toEqual(['senza sottocategoria']);
+  });
+});
+
+/**
+ * The legend of a ring adds up to 100 ON SCREEN (AGENTS.md): the drift goes on «Altre», the row that
+ * is a remainder by definition. Seen red with the drift dropped and with the drift on the largest.
+ */
+describe('buildRingShares', () => {
+  const slice = (key: string, value: number) => ({ key, name: key, value, percentage: 0 });
+
+  it('should name the first three and fold the rest into ONE row carrying the drift', () => {
+    const shares = buildRingShares([slice('A', 700), slice('B', 700), slice('C', 700), slice('D', 100), slice('E', 100)], 3);
+    expect(shares.map((share) => [share.label, share.printedPercentage, share.rest])).toEqual([
+      ['A', 30, false],
+      ['B', 30, false],
+      ['C', 30, false],
+      ['Altre 2 categorie', 10, true],
+    ]);
+    expect(shares[3].key).toBe(RING_REST_KEY);
+    expect(shares[3].value).toBe(200);
+  });
+
+  it('should keep a single leftover by its name, the drift then on the largest', () => {
+    const shares = buildRingShares([slice('A', 700), slice('B', 700), slice('C', 700), slice('D', 100)], 3);
+    expect(shares.map((share) => share.label)).toEqual(['A', 'B', 'C', 'D']);
+    expect(shares.some((share) => share.rest)).toBe(false);
+    expect(shares.reduce((sum, share) => sum + share.printedPercentage, 0)).toBe(100);
+  });
+
+  it('should return nothing for an empty whole', () => {
+    expect(buildRingShares([], 3)).toEqual([]);
+  });
+});
+
+/**
+ * «Cosa è cambiato» (2026-11-12): the six largest movers ordered by signed delta, the fewest movers
+ * in the total's direction that explain it. Seen red ordered by magnitude (C1) and without the
+ * `break` once the total is reached (C4).
+ */
+describe('summarizeCategoryChanges', () => {
+  const row = (label: string, delta: number, status: CategoryDeltaRow['status'] = 'ongoing'): CategoryDeltaRow => ({
+    key: `variable:${label}`,
+    expenseType: 'variable',
+    categoryKey: label,
+    label,
+    current: status === 'gone' ? 0 : 100 + delta,
+    previous: status === 'new' ? 0 : 100,
+    delta,
+    deltaPercent: status === 'new' ? null : delta,
+    status,
+  });
+
+  it('should order the movers by signed delta and find the fewest that explain a fall', () => {
+    const changes = summarizeCategoryChanges([row('Casa', 40), row('Palestra', -60, 'gone'), row('Alimentari', -100)], -120);
+    expect(changes.rows.map((r) => [r.label, r.delta])).toEqual([
+      ['Casa', 40],
+      ['Palestra', -60],
+      ['Alimentari', -100],
+    ]);
+    expect(changes.explainedBy.map((r) => r.label)).toEqual(['Alimentari', 'Palestra']);
+    expect(changes.explainedShare).toBeNull();
+    expect(changes.goneLabels).toEqual(['Palestra']);
+    expect(changes.newLabels).toEqual([]);
+    // A rise right of the centre, a fall left of it, the largest filling its half.
+    expect(changes.rows[0].bar).toEqual({ left: 50, width: 20 });
+    expect(changes.rows[2].bar).toEqual({ left: 0, width: 50 });
+  });
+
+  it('should give the share of a total three movers do not reach', () => {
+    const changes = summarizeCategoryChanges([row('Viaggi', 500), row('Casa', 400), row('Cibo', 300), row('Auto', 100)], 1300);
+    expect(changes.explainedBy.map((r) => r.label)).toEqual(['Viaggi', 'Casa', 'Cibo']);
+    expect(changes.explainedShare).toBeCloseTo((1200 / 1300) * 100, 5);
+  });
+
+  it('should explain nothing when the total is zero', () => {
+    const changes = summarizeCategoryChanges([row('Casa', 40), row('Cibo', -40)], 0);
+    expect(changes.explainedBy).toEqual([]);
+    expect(changes.explainedShare).toBeNull();
+    expect(changes.rows).toHaveLength(2);
+  });
+
+  it('should stop at the first mover that reaches the total', () => {
+    const changes = summarizeCategoryChanges([row('Alimentari', -150), row('Palestra', -30), row('Casa', 60)], -120);
+    expect(changes.explainedBy.map((r) => r.label)).toEqual(['Alimentari']);
+    expect(changes.explainedShare).toBeNull();
+  });
+
+  it('should keep the six largest and drop the rows that print zero', () => {
+    const many = [10, -20, 30, -40, 50, -60, 70, 0.3].map((delta, index) => row(`C${index}`, delta));
+    const changes = summarizeCategoryChanges(many, 40);
+    expect(changes.rows).toHaveLength(6);
+    expect(changes.rows.map((r) => r.label)).not.toContain('C0');
+    expect(changes.rows.map((r) => r.label)).not.toContain('C7');
   });
 });

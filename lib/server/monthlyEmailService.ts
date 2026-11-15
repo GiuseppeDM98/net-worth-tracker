@@ -148,7 +148,7 @@ export interface MonthlyEmailData {
   allIncomeCategories: Array<{ key: string; name: string; amount: number }>; // all income categories sorted desc
   topIndividualExpenses: Array<{ description: string; categoryName: string; subCategoryName?: string; amount: number }>; // top transactions (5, or 10 for yearly)
   topIndividualIncome: Array<{ description: string; categoryName: string; subCategoryName?: string; amount: number }>; // top income transactions (used only in the yearly report)
-  expensesByType: Array<{ type: ExpenseType; label: string; amount: number }>; // Fisse/Variabili/Debiti, sorted desc
+  expensesByType: Array<{ type: ExpenseType; label: string; amount: number }>; // Necessarie/Non necessarie/Debiti, sorted desc
   dividendTotal: number; // gross EUR
   dividendCount: number;
   // Hall of Fame standing of this period's net-worth change — only for monthly/yearly

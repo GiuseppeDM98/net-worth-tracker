@@ -1149,7 +1149,7 @@ function ExpenseFormBody({
             )}
           </div>
 
-          {/* ---- Acquisto rateale (solo spese variabili/fisse, solo creazione) ---- */}
+          {/* ---- Acquisto rateale (solo spese non necessarie/necessarie, solo creazione) ---- */}
           {!expense && (selectedType === 'variable' || selectedType === 'fixed') && (
             <div className="space-y-4 rounded-xl border border-border/60 bg-muted/30 p-4">
               <div className="flex items-center justify-between">
@@ -1383,7 +1383,7 @@ function ExpenseFormBody({
             </div>
           )}
 
-          {/* ---- Ricorrenza (spese fisse/variabili/debiti, solo creazione) ----
+          {/* ---- Ricorrenza (spese necessarie/non necessarie/debiti, solo creazione) ----
                One toggle, not one per cadence: the two are mutually exclusive, and two
                switches kept out of sync by hand are a state machine the user has to run.
                `canTypeRecur` is the single source on which types may recur. */}

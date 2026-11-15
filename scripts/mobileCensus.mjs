@@ -202,11 +202,6 @@ export function measureFirstScreen({ figurePattern, withTexts }) {
   const firstClosed = tiles.find((tile) => tile.closed);
 
   const stickyHeader = [...main.querySelectorAll('div')].find((el) => el.classList.contains('max-desktop:sticky'));
-  // The 50/30/20 switch of Analisi's Flusso (`settings.spendingRolesEnabled`): the tile shows the
-  // «Raggruppa il flusso» group only with the setting on, and the pressed option says which view
-  // was measured — on a phone the Flusso changes shape with it, so a mirror run must say so.
-  const flowGroup = [...main.querySelectorAll('[role="group"][aria-label="Raggruppa il flusso"]')].find(hasBox);
-  const flowPressed = flowGroup?.querySelector('[aria-pressed="true"]')?.textContent?.trim() ?? null;
   return {
     metrics: {
       screens: Number((main.scrollHeight / main.clientHeight).toFixed(2)),
@@ -228,7 +223,6 @@ export function measureFirstScreen({ figurePattern, withTexts }) {
       charts: [...main.querySelectorAll('svg.recharts-surface, svg[role="img"]')].filter(hasBox).length,
       tiles: tiles.map((tile) => ({ top: tile.top, height: tile.height, closed: tile.closed, ...(withTexts ? { eyebrow: tile.eyebrow } : {}) })),
       savingsRateBadge: [...main.querySelectorAll('.fixed')].some((el) => el.classList.contains('bg-positive/10') && hasBox(el)),
-      spendingRoles: flowGroup ? { enabled: true, view: flowPressed === 'Per ruolo' ? 'roles' : 'types' } : null,
       ...(withTexts
         ? { h1: [...main.querySelectorAll('h1')].find(hasBox)?.innerText ?? '', verdictTitle: verdict?.querySelector('h2')?.innerText ?? '' }
         : {}),
@@ -471,7 +465,7 @@ function printRow(row) {
   console.log(
     `[${row.viewport}] ${row.surface.padEnd(22)} screens=${m.screens} tiles=${m.tilesAboveFold}/${m.tilesFullyAboveFold} ` +
       `figures=${m.figuresAboveFold} fuori=${m.figuresOutsideVerdict} riga=${m.firstClosedRowAbovePill} overflowX=${m.overflowX} ` +
-      `(pill ${d.pillTop}, main ${d.mainTop}, charts ${d.charts}${d.savingsRateBadge ? ', BADGE' : ''}${d.profilesSource ? `, profili ${d.profilesSource}` : ''}${d.spendingRoles ? `, 50/30/20 ${d.spendingRoles.view}` : ''})`,
+      `(pill ${d.pillTop}, main ${d.mainTop}, charts ${d.charts}${d.savingsRateBadge ? ', BADGE' : ''}${d.profilesSource ? `, profili ${d.profilesSource}` : ''})`,
   );
 }
 

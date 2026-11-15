@@ -1,33 +1,31 @@
 /**
- * Analisi — a verdict over a tile grid (2026-08-25 redesign).
+ * Analisi — a verdict over a tile grid (2026-08-25 redesign; recomposed as «Classifica» 2026-11-12).
  *
  * The page answers «dove vanno i soldi, e cosa è cambiato?» before it shows a number: a
  * rule-generated verdict (lib/utils/analisiNarrative.ts) with the ONE period axis beside it,
  * then a 12-column bento of tiles, each answering one question with a reading line over its
- * figures, then two disclosures below the grid (Confronto annuale, Dettaglio).
+ * figures, then two disclosures below the grid (Confronto annuale, Dettaglio — the Flusso first).
  *
- *   Desktop (12 col): Periodo(5, 2 rows) | Fuori scala(3) | Spese maggiori(4)
- *                                        | Spese per categoria(4) | Entrate per categoria(3)
+ *   Desktop (12 col): Dove vanno i soldi(7) | Spese maggiori(5)
+ *                     Cosa è cambiato(5) | Entrate(3) | Periodo(4)   (Entrate 5 · Periodo 7 without Cambiato)
  *                     Scheda(12, only with a focus)
- *                     Flusso(12)
- *   Below desktop:    ONE sequence, the DOM above (The First-Screen Rule; since 2026-10-14 —
- *                     the `order-1…7` are gone): title → the axis → the first sentence → Entrate and
- *                     Risparmio as a strip → the calendar's scope → «Il perché» → Periodo, open, its
- *                     trio lifted and its bars at 120px → «Il resto della pagina» → Fuori scala,
- *                     Spese maggiori, Spese, Entrate, [Scheda], Flusso as closed rows
+ *   Below desktop:    ONE sequence, the DOM above (The First-Screen Rule): title → the axis → the
+ *                     first sentence → Entrate and Risparmio as a strip → the calendar's scope →
+ *                     «Il perché» → «Dove vanno i soldi», open → «Il resto della pagina» → Spese
+ *                     maggiori, Cosa è cambiato, Entrate, Periodo, [Scheda] as closed rows
  *                     (`useMobileSections`; doc/guide/cashflow-analisi.md § Composizione mobile).
  *
  * FOUR PERIOD MODES: "Da inizio anno" (January → the end of today's month), "Anno corrente"
  * (the whole current year, optional month), "Anno" (a past year, optional month), "Storico"
  * (from the history floor to the CURRENT year, calendar included — never to the last row a
  * plan wrote). Every figure but two follows the axis: the anomalies run on ONE month (the
- * picked one, or today's for the bare running year — the Fuori scala tile names it, and is
- * absent when no month can be meant, a month not started included), and the Scheda's per-year
+ * picked one, or today's for the bare running year — «Cosa è cambiato» names it, and says nothing
+ * of them when no month can be meant, a month not started included), and the Scheda's per-year
  * table and trend ignore the period on purpose. The running month is compared with the SAME
  * DAYS of its baseline month (Tracciamento's rule), so its verdict can carry a tone.
  *
  * ENTITY FOCUS = the Scheda tile. Level 'subcategory' (a category) → 'expenseList' (one of its
- * subcategories). Every entry point — a category row, an anomaly, a top expense, a Sankey
+ * subcategories). Every entry point — a ranking row, a mover, a top expense, a Sankey
  * node, the search, a Confronto row — lands through ONE path (handleEntitySelect), which
  * resolves labels exactly like a URL-restored focus and scrolls to the tile. The focus
  * SURVIVES period changes (the period is a cursor over the entity's timeline, not a cage) and
@@ -42,11 +40,11 @@
  */
 'use client';
 
+import { glideIntoView, riseIn } from '@/lib/utils/smoothScroll';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { COMPACT_QUERY } from '@/lib/hooks/useCompactLayout';
 import { useMobileSections, type SectionSpec } from '@/lib/hooks/useMobileSections';
 import { useTabletComposition, useTabletStage } from '@/lib/hooks/useTabletComposition';
@@ -60,7 +58,6 @@ import {
   STAGE_WRAPPER_CLASS,
   VERDICT_CELL_CLASS,
 } from '@/lib/utils/tabletComposition';
-import { useElementWidth } from '@/lib/hooks/useElementWidth';
 import { sectionPanelId, sectionTriggerId, VERDICT_REST_SECTION } from '@/lib/utils/mobileSections';
 import { splitVerdict } from '@/lib/utils/narrative';
 import { liftedBlocks } from '@/lib/utils/verdictStrip';
@@ -83,6 +80,7 @@ import {
   type CompositionSlice,
   type SpendingAnomaly,
 } from '@/lib/utils/cashflowComposition';
+import { monthWithPrepositionA } from '@/lib/utils/patrimonioNarrative';
 import { getCategoryKey, getSubCategoryKey, getSubCategoryLabel, selectExpensesForDrillDown, type CategoryScope } from '@/lib/utils/expenseGrouping';
 import { buildCategoryComparison, computeTotalsPacing, resolveComparisonScope } from '@/lib/utils/comparisonDeltas';
 import { buildEntityYearRows, computeEntityRunRate, type EntityScope } from '@/lib/utils/expenseEntityStats';
@@ -90,15 +88,19 @@ import { type EntitySearchTarget } from '@/lib/utils/entitySearch';
 import { isScheduledRow, summarizePeriodCashflow, summarizeScheduled } from '@/lib/utils/tracciamentoSummary';
 import {
   buildMonthlySpending,
+  buildSubCategoryRanking,
   buildYearlySpending,
+  isFlussoLiftedBlock,
   rankTopExpenses,
   resolveCategoryMovers,
   resolvePeriodThroughMonth,
   resolveSingleMonth,
   selectAnalisiStrip,
+  summarizeCategoryChanges,
   summarizeFlow,
-  ANALISI_PERIODO_ID,
+  ANALISI_CLASSIFICA_ID,
   ANALISI_SECTION_IDS,
+  TOP_EXPENSES_MORE,
   type AnalisiPeriod,
   type MonthRef,
   type PeriodMode,
@@ -111,20 +113,23 @@ import {
   describeAnalisiScope,
   describeAnalisiScheduledHorizon,
   describeAnalisiSubject,
-  describeAnomalies,
   describeBaseline,
+  describeCategoryChanges,
+  describeChangesAnomalies,
+  describeChangesFooter,
   describeEntityFocus,
   describeFlow,
   describeSpendingRolesFlow,
   describeMissingBaseline,
   describePeriodScope,
+  describePeriodoSavings,
   describeSpendingChart,
   describeSpendingChartFooter,
-  describeTopExpenses,
+  describeSpendingRanking,
   describeAnalisiClosedAnswers,
 } from '@/lib/utils/analisiNarrative';
 import { RowAnswers } from '@/components/ui/row-answers';
-import { describeCategoryShare, describePeriodCashflow } from '@/lib/utils/cashflowNarrative';
+import { describeCategoryShare } from '@/lib/utils/cashflowNarrative';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -142,10 +147,10 @@ import { AnalisiPeriodControls } from '@/components/cashflow/analisi/AnalisiPeri
 import { ConfrontoDisclosure } from '@/components/cashflow/analisi/ConfrontoDisclosure';
 import { DettaglioDisclosure } from '@/components/cashflow/analisi/DettaglioDisclosure';
 import { isPeriodoLiftedBlock, PeriodoTile } from '@/components/cashflow/analisi/tiles/PeriodoTile';
-import { FuoriScalaTile } from '@/components/cashflow/analisi/tiles/FuoriScalaTile';
 import { SpeseMaggioriTile } from '@/components/cashflow/analisi/tiles/SpeseMaggioriTile';
-import { CategorieTile } from '@/components/cashflow/analisi/tiles/CategorieTile';
-import { FlussoTile, isFlussoLiftedBlock } from '@/components/cashflow/analisi/tiles/FlussoTile';
+import { ClassificaTile } from '@/components/cashflow/analisi/tiles/ClassificaTile';
+import { CambiatoTile } from '@/components/cashflow/analisi/tiles/CambiatoTile';
+import { EntrateTile } from '@/components/cashflow/analisi/tiles/EntrateTile';
 import { summarizeSpendingRoles } from '@/lib/utils/spendingRoles';
 import { SchedaTile, type SchedaFocus } from '@/components/cashflow/analisi/tiles/SchedaTile';
 import { ENTITY_DOSSIER_LAZY_CHARTS } from '@/components/cashflow/EntityDossier';
@@ -171,45 +176,39 @@ interface DrillDownState {
 const NO_FOCUS: DrillDownState = { level: 'category', chartType: null, selectedCategory: null, selectedSubCategory: null };
 
 /**
- * Every row of the phone composition, in the DOM's order (The Closed-Row Rule;
- * 2026-10-14): every tile but Periodo, which is THE tile and never closes (The First-Screen Rule).
+ * Every row of the phone composition, in the DOM's order (The Closed-Row Rule; 2026-11-12): every
+ * tile but «Dove vanno i soldi», which is THE tile and never closes (The First-Screen Rule).
  * Module-level, as the controller asks; the page hands it the rows PRESENT
- * (`resolveAnalisiSections`) — Fuori scala exists only on a month, the Scheda only with a focus,
- * the Flusso only when something flowed. One read for the page: no row is ever `failed`.
+ * (`resolveAnalisiSections`) — «Cosa è cambiato» exists with a comparison or the month's anomalies,
+ * the Scheda only with a focus. One read for the page: no row is ever `failed`.
  */
 const ANALISI_SECTIONS: readonly SectionSpec[] = [
-  { id: ANALISI_SECTION_IDS.fuoriScala, eyebrow: 'Fuori scala' },
   { id: ANALISI_SECTION_IDS.maggiori, eyebrow: 'Spese maggiori' },
-  { id: ANALISI_SECTION_IDS.spese, eyebrow: 'Spese per categoria' },
-  { id: ANALISI_SECTION_IDS.entrate, eyebrow: 'Entrate per categoria' },
+  { id: ANALISI_SECTION_IDS.cambiato, eyebrow: 'Cosa è cambiato' },
+  { id: ANALISI_SECTION_IDS.entrate, eyebrow: 'Entrate' },
+  { id: ANALISI_SECTION_IDS.periodo, eyebrow: 'Periodo' },
   { id: ANALISI_SECTION_IDS.scheda, eyebrow: 'Scheda' },
-  { id: ANALISI_SECTION_IDS.flusso, eyebrow: 'Flusso' },
 ];
 
 /** The rows the period renders — one `SectionSpec` per tile present, the DOM's order kept. */
-function resolveAnalisiSections(present: { fuoriScala: boolean; scheda: boolean; flusso: boolean }): readonly SectionSpec[] {
+function resolveAnalisiSections(present: { cambiato: boolean; scheda: boolean }): readonly SectionSpec[] {
   return ANALISI_SECTIONS.filter((section) => {
-    if (section.id === ANALISI_SECTION_IDS.fuoriScala) return present.fuoriScala;
+    if (section.id === ANALISI_SECTION_IDS.cambiato) return present.cambiato;
     if (section.id === ANALISI_SECTION_IDS.scheda) return present.scheda;
-    if (section.id === ANALISI_SECTION_IDS.flusso) return present.flusso;
     return true;
   });
 }
 
-/** The Flusso's cell from which the Sankey is drawn: a 640px viewport's cell (640 − `main`'s 2 × 16px). */
-const FLUSSO_SANKEY_MIN_CELL = 608;
-
-/** «Apri tutte», where the focus goes when the Scheda closes with no opener to return to and no Flusso after it. */
+/** «Apri tutte», where the focus goes when the Scheda closes with no opener to return to. */
 const ANALISI_REST_BUTTON_ID = 'analisi-resto';
 
-/** The page's own grid, for the skeleton: Periodo · Fuori scala · Spese maggiori / Spese · Entrate / Flusso. */
+/** The page's own grid, for the skeleton: Dove vanno i soldi · Spese maggiori / Cosa è cambiato · Entrate · Periodo. */
 const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 8 },
-  { span: 3, lines: 3 },
+  { span: 7, lines: 9 },
+  { span: 5, lines: 10 },
+  { span: 5, lines: 6 },
+  { span: 3, lines: 5 },
   { span: 4, lines: 5 },
-  { span: 4, lines: 6 },
-  { span: 3, lines: 4 },
-  { span: 12, lines: 8 },
 ];
 
 interface AnalisiTabProps {
@@ -371,20 +370,28 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
       }
       const cell = schedaRef.current;
       if (!cell) return;
-      cell.scrollIntoView({ behavior: 'instant', block: 'start' });
-      // Keyboard and screen-reader focus follow the visual jump.
+      // A glide of 450 ms and the Scheda rising in as it lands (owner, 2026-11-15); a jump under reduced motion.
+      glideIntoView(cell);
+      riseIn(cell);
+      // Keyboard and screen-reader focus follow the visual move.
       cell.focus({ preventScroll: true });
     }, 50);
   }, []);
 
   // Closing the Scheda hands the focus back to what opened it (if it is still on the page),
-  // so a keyboard reader lands where it left instead of at the top of the document. False when
-  // there was nothing to return to (a deep link).
-  const restoreFocusToTrigger = useCallback((): boolean => {
+  // so a keyboard reader lands where it left instead of at the top of the document. The way back
+  // glides too (owner, 2026-11-15): the opener centred over 450 ms while the Scheda is still there,
+  // THEN the Scheda closes and the focus lands without a scroll of its own — closing first shortened
+  // the page under the reader and the browser clamped the scroll in one frame. A jump under reduced
+  // motion. False when there was nothing to return to (a deep link): the caller closes at once.
+  const closeBackToTrigger = useCallback((close: () => void): boolean => {
     const trigger = focusTriggerRef.current;
     focusTriggerRef.current = null;
     if (!trigger || !trigger.isConnected) return false;
-    trigger.focus();
+    void glideIntoView(trigger, 'center').then(() => {
+      close();
+      trigger.focus({ preventScroll: true });
+    });
     return true;
   }, []);
 
@@ -406,14 +413,6 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     }
     replaceUrl(params.toString());
   }, [periodMode, selectedYear, selectedMonth, drillDown]);
-
-  // The Flusso's drawing: bar and rows where its cell is narrower than 608px — a 640px phone's cell,
-  // the legibility threshold of the chart (owner, 2026-09-27) — so in the 360px index of a tablet in
-  // landscape too, where a Sankey of 320px does not read. Measured on the cell, not the viewport
-  // (owner, 2026-10-16: a tile lays out by its box); the viewport's guess only until the first measure.
-  const isPhoneWidth = useMediaQuery('(max-width: 639px)');
-  const [flussoCellRef, flussoCellWidth] = useElementWidth();
-  const flussoNarrow = flussoCellWidth === null ? isPhoneWidth : flussoCellWidth < FLUSSO_SANKEY_MIN_CELL;
 
   // ─── Period ──────────────────────────────────────────────────────────────────
 
@@ -495,8 +494,9 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
 
   const totals = useMemo(() => summarizePeriodCashflow(periodExpenses), [periodExpenses]);
   // A row still ahead ranks with the others (it is in the total) and says so in its caption.
-  const topExpenses = useMemo(() => rankTopExpenses(periodExpenses, dayOf, 5, (expense) => isScheduledRow(expense, nowDate)), [periodExpenses, nowDate]);
+  const topExpenses = useMemo(() => rankTopExpenses(periodExpenses, dayOf, TOP_EXPENSES_MORE, (expense) => isScheduledRow(expense, nowDate)), [periodExpenses, nowDate]);
   const expenseSlices = useMemo(() => buildExpenseComposition(periodExpenses), [periodExpenses]);
+  const subCategorySlices = useMemo(() => buildSubCategoryRanking(periodExpenses), [periodExpenses]);
   const incomeSlices = useMemo(() => buildIncomeComposition(periodExpenses), [periodExpenses]);
   const flow = useMemo(() => summarizeFlow(periodExpenses), [periodExpenses]);
   // The 50/30/20 view reads the same totals the Sankey draws (summarizeSpendingRoles), off when the setting is.
@@ -513,16 +513,43 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     [allExpenses, singleMonth],
   );
 
-  // ─── The phone composition (2026-10-14) ───────────────────────────────────────
-  // The rows present: Fuori scala on a month, the Scheda with a focus, the Flusso when something
-  // flowed. Here, before every handler that lands on the Scheda: `sections.reveal` closes over
+  // YoY pacing against the year before — scope AND caption from the SAME module the Confronto
+  // reads, so the two cannot diverge on which window they measure. Each period compares on its
+  // OWN span: «Da inizio anno» on the months lived, «Anno corrente» and a closed year on twelve.
+  // Null in Storico, for a month that has not started, or when the previous year predates the
+  // tracked history.
+  const comparisonYear = selectedYear !== null && selectedYear - 1 >= historyStartYear ? selectedYear - 1 : null;
+  // The running month is cut at today's DAY on both sides (Tracciamento's «stessi giorni»), so
+  // the rows go in with their day: `dayOf` is `monthOf` plus the day the cut reads.
+  const scope = useMemo(() => resolveComparisonScope(periodMode, selectedMonth, today.month, calendar.dayOfMonth), [periodMode, selectedMonth, today.month, calendar.dayOfMonth]);
+  const pacing = useMemo(() => {
+    if (selectedYear === null || comparisonYear === null || !scope) return null;
+    return computeTotalsPacing(allExpenses, selectedYear, comparisonYear, scope, dayOf);
+  }, [allExpenses, selectedYear, comparisonYear, scope]);
+  const baseline = scope && comparisonYear !== null && pacing ? describeBaseline(scope, comparisonYear) : null;
+  // A baseline window inside the history with no row at all: the Periodo says so, never nothing.
+  const missingBaseline = scope && comparisonYear !== null && !pacing ? describeMissingBaseline(scope, comparisonYear) : null;
+  // The category deltas of the same window: the verdict's movers and «Cosa è cambiato» read ONE list.
+  const comparisonRows = useMemo(() => {
+    if (selectedYear === null || comparisonYear === null || !scope || !pacing) return null;
+    return buildCategoryComparison(allExpenses, selectedYear, comparisonYear, scope, dayOf);
+  }, [allExpenses, selectedYear, comparisonYear, scope, pacing]);
+  const movers = useMemo(() => (comparisonRows ? resolveCategoryMovers(comparisonRows) : { grown: null, shrunk: null }), [comparisonRows]);
+  const changes = useMemo(() => (pacing && comparisonRows ? summarizeCategoryChanges(comparisonRows, pacing.expenses.delta) : null), [pacing, comparisonRows]);
+  // «Anno corrente» compares twelve months against twelve while some of them are still only in
+  // the calendar (the owner's Same-Basis call, 2026-08-30): the delta's caption says how many,
+  // right where the red is printed — a −32% on income with three salaries still to come.
+  const monthsAhead = periodMode === 'current' && selectedMonth === null && selectedYear === today.year ? 12 - today.month : 0;
+  const comparisonPhrase = baseline ? (monthsAhead > 0 ? `su ${baseline} (${monthsAhead} ${monthsAhead === 1 ? 'mese' : 'mesi'} ancora in calendario)` : `su ${baseline}`) : null;
+
+  // ─── The phone composition (2026-10-14; THE tile «Dove vanno i soldi» since 2026-11-12) ───
+  // The rows present: «Cosa è cambiato» with a comparison or the month's anomalies, the Scheda with a
+  // focus. Here, before every handler that lands on the Scheda: `sections.reveal` closes over
   // nothing of a tap (lib/hooks/useMobileSections.ts), so it is a stable dependency of theirs.
   const hasFlow = flow.incomeTotal > 0 || flow.expensesTotal > 0;
+  const hasCambiato = changes !== null || anomalies.length > 0;
   const hasScheda = drillDown.level !== 'category' && drillDown.selectedCategory !== null && drillDown.chartType !== null;
-  const sectionSpecs = useMemo(
-    () => resolveAnalisiSections({ fuoriScala: singleMonth !== null, scheda: hasScheda, flusso: hasFlow }),
-    [singleMonth, hasScheda, hasFlow],
-  );
+  const sectionSpecs = useMemo(() => resolveAnalisiSections({ cambiato: hasCambiato, scheda: hasScheda }), [hasCambiato, hasScheda]);
   const sections = useMobileSections({ route: 'analisi', sections: sectionSpecs });
   const stageRef = useTabletStage();
   const tablet = useTabletComposition({ sections, order: sectionSpecs.map((section) => section.id) });
@@ -550,31 +577,6 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     // controller's reveal are stable.
   }, [loading, allExpenses, categories, historyStartYear, landOnScheda, sections.reveal]);
 
-  // YoY pacing against the year before — scope AND caption from the SAME module the Confronto
-  // reads, so the two cannot diverge on which window they measure. Each period compares on its
-  // OWN span: «Da inizio anno» on the months lived, «Anno corrente» and a closed year on twelve.
-  // Null in Storico, for a month that has not started, or when the previous year predates the
-  // tracked history.
-  const comparisonYear = selectedYear !== null && selectedYear - 1 >= historyStartYear ? selectedYear - 1 : null;
-  // The running month is cut at today's DAY on both sides (Tracciamento's «stessi giorni»), so
-  // the rows go in with their day: `dayOf` is `monthOf` plus the day the cut reads.
-  const scope = useMemo(() => resolveComparisonScope(periodMode, selectedMonth, today.month, calendar.dayOfMonth), [periodMode, selectedMonth, today.month, calendar.dayOfMonth]);
-  const pacing = useMemo(() => {
-    if (selectedYear === null || comparisonYear === null || !scope) return null;
-    return computeTotalsPacing(allExpenses, selectedYear, comparisonYear, scope, dayOf);
-  }, [allExpenses, selectedYear, comparisonYear, scope]);
-  const baseline = scope && comparisonYear !== null && pacing ? describeBaseline(scope, comparisonYear) : null;
-  // A baseline window inside the history with no row at all: the Periodo says so, never nothing.
-  const missingBaseline = scope && comparisonYear !== null && !pacing ? describeMissingBaseline(scope, comparisonYear) : null;
-  const movers = useMemo(() => {
-    if (selectedYear === null || comparisonYear === null || !scope || !pacing) return { grown: null, shrunk: null };
-    return resolveCategoryMovers(buildCategoryComparison(allExpenses, selectedYear, comparisonYear, scope, dayOf));
-  }, [allExpenses, selectedYear, comparisonYear, scope, pacing]);
-  // «Anno corrente» compares twelve months against twelve while some of them are still only in
-  // the calendar (the owner's Same-Basis call, 2026-08-30): the delta's caption says how many,
-  // right where the red is printed — a −32% on income with three salaries still to come.
-  const monthsAhead = periodMode === 'current' && selectedMonth === null && selectedYear === today.year ? 12 - today.month : 0;
-  const comparisonPhrase = baseline ? (monthsAhead > 0 ? `su ${baseline} (${monthsAhead} ${monthsAhead === 1 ? 'mese' : 'mesi'} ancora in calendario)` : `su ${baseline}`) : null;
 
   // The spending series of the Periodo tile: the year's months beside the previous year's, or
   // the years of the history.
@@ -611,11 +613,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     [period, today, historyStartYear, totals, scheduled, pacing, baseline, expenseSlices, movers, anomalies, singleMonth],
   );
 
-  const periodoReading = describePeriodCashflow(
-    totals,
-    pacing ? { income: pacing.income.previous > 0 ? pacing.income.deltaPercent : null, expenses: pacing.expenses.previous > 0 ? pacing.expenses.deltaPercent : null } : null,
-    comparisonPhrase,
-  );
+  const savings = readSavings(totals.income, totals.expenses);
   const hasBaselineSeries = spendingPoints.some((point) => point.prevYearValue !== null);
 
   const toRanking = (slices: CategorySlice[]) => ({
@@ -623,7 +621,6 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     total: slices.reduce((sum, slice) => sum + slice.value, 0),
     remainder: null,
   });
-  const expenseTotal = expenseSlices.reduce((sum, slice) => sum + slice.value, 0);
   const incomeTotal = incomeSlices.reduce((sum, slice) => sum + slice.value, 0);
 
   // ─── Focus (the Scheda tile) ─────────────────────────────────────────────────
@@ -649,12 +646,13 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     [baseExpenses, categories, landOnScheda, sections.reveal],
   );
 
-  // «Chiudi»: the focus returns to the opener; on a phone, with no opener (a deep link), to the row
-  // after the Scheda in the DOM — the Flusso's trigger — or to «Apri tutte» without a Flusso.
+  // «Chiudi»: the focus returns to the opener; on a phone, with no opener (a deep link), to «Apri
+  // tutte» — the Scheda is the last row, and nothing follows it in the index.
   const resetFocus = () => {
+    if (closeBackToTrigger(() => setDrillDown(NO_FOCUS))) return;
     setDrillDown(NO_FOCUS);
-    if (restoreFocusToTrigger() || !sections.compact) return;
-    (document.getElementById(sectionTriggerId(ANALISI_SECTION_IDS.flusso)) ?? document.getElementById(ANALISI_REST_BUTTON_ID))?.focus();
+    if (!sections.compact) return;
+    document.getElementById(ANALISI_REST_BUTTON_ID)?.focus();
   };
   const backToCategory = () => setDrillDown((prev) => ({ ...prev, level: 'subcategory', selectedSubCategory: null }));
   const handleBack = () => (drillDown.level === 'expenseList' ? backToCategory() : resetFocus());
@@ -668,7 +666,6 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   };
 
   const handleCategorySelect = (slice: CategorySlice) => handleEntitySelect({ expenseType: slice.expenseType, categoryKey: slice.categoryKey });
-  const handleAnomalySelect = (anomaly: SpendingAnomaly) => handleEntitySelect({ expenseType: anomaly.expenseType, categoryKey: anomaly.categoryKey });
   const handleTopExpenseSelect = (row: TopExpenseRow) =>
     handleEntitySelect({ expenseType: row.expenseType, categoryKey: row.categoryKey, subCategoryKey: row.subCategoryKey ?? undefined });
   const handleSubcategorySelect = (slice: CompositionSlice) => {
@@ -750,6 +747,12 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     const slices = focus.kind === 'income' ? incomeSlices : expenseSlices;
     return slices.find((slice) => slice.categoryKey === focus.category.key && slice.expenseType === focus.category.expenseType)?.key ?? null;
   }, [focus, incomeSlices, expenseSlices]);
+  // The same in the «Sottocategorie» view: the subcategory's row, or the category's own rows without one.
+  const activeSubSliceKey = useMemo(() => {
+    if (!focus || focus.kind !== 'expenses') return null;
+    const sub = focus.subCategory?.key ?? NO_SUBCATEGORY_KEY;
+    return subCategorySlices.find((slice) => slice.categoryKey === focus.category.key && slice.expenseType === focus.category.expenseType && slice.subCategoryKey === sub)?.key ?? null;
+  }, [focus, subCategorySlices]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -813,24 +816,22 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     />
   );
 
-  // The strip: the period's income and what was left, the trio's own figures (The Binding-Clause Rule
-  // keeps the calendar in the `scope` under them, at every width). The Periodo hides the trio, the
-  // Flusso its «Risparmio» block, and in a cell narrower than 608px (`FLUSSO_SANKEY_MIN_CELL`, since
-  // 2026-10-16) a caption of the bar drops an amount the first screen already prints (2026-10-14).
+  // The strip: the period's income and what was left, the Periodo's own figures (The Binding-Clause
+  // Rule keeps the calendar in the `scope` under them, at every width). The Periodo hides its amounts,
+  // the Flusso its «Risparmio» block, and in a cell narrower than 608px a caption of the bar drops an
+  // amount the first screen already prints (2026-10-14). No ring's centre is ever lifted.
   const strip = selectAnalisiStrip(totals, { notStarted: describeAnalisiSubject(period, today, historyStartYear).future });
   const scheduledScope = describeAnalisiScope({ scheduled, period, today });
-  const periodoLifted = liftedBlocks(strip, ANALISI_PERIODO_ID).filter(isPeriodoLiftedBlock);
+  const periodoLifted = liftedBlocks(strip, ANALISI_SECTION_IDS.periodo).filter(isPeriodoLiftedBlock);
   const flussoLifted = liftedBlocks(strip, ANALISI_SECTION_IDS.flusso).filter(isFlussoLiftedBlock);
   const printedFigures = sections.compact ? collectPrintedFigures(splitVerdict(verdict).lead, strip) : undefined;
   // What the closed rows answer in the landscape index, from the figures the tiles already hold.
-  const rowAnswers = describeAnalisiClosedAnswers({
-    anomalies,
-    topExpenses,
-    expenseRanking: toRanking(expenseSlices),
-    incomeRanking: toRanking(incomeSlices),
-    flow,
-    spendingRoles: spendingRolesFlow?.summary ?? null,
-  });
+  const rowAnswers = describeAnalisiClosedAnswers({ topExpenses, changes, anomalies, incomeRanking: toRanking(incomeSlices), savings });
+  // «Cosa è cambiato»: the comparison's words, or the anomalies' month without one.
+  const anomalyMonthLabel = singleMonth ? `${MONTH_NAMES[singleMonth.month - 1].toLowerCase()} ${singleMonth.year}` : null;
+  const cambiatoAside = comparisonPhrase ?? anomalyMonthLabel ?? '';
+  const anomaliesReading = describeChangesAnomalies(anomalies, singleMonth, period);
+  const inPeriod = selectedMonth !== null ? monthWithPrepositionA(selectedMonth) : `nel ${selectedYear}`;
 
   return (
     <>
@@ -860,20 +861,20 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
         {/* ── Tile grid ───────────────────────────────────────────────────────────── */}
         <div className={COMPACT_GRID_WRAPPER_CLASS}>
         <div className={COMPACT_GRID_CLASS}>
-          <div data-stage="lead" className={cn(TILE_CELL_CLASS, LEAD_CELL_CLASS, 'desktop:col-span-5 desktop:row-span-2')}>
-            <PeriodoTile
-              id={ANALISI_PERIODO_ID}
-              liftedFigures={periodoLifted}
-              eyebrow={`Periodo · ${periodLabel}`}
-              aside={describePeriodScope(period, today, calendar, historyStartYear)}
-              reading={periodoReading}
-              totals={totals}
-              pacing={pacing}
-              missingBaseline={missingBaseline}
-              points={spendingPoints}
-              chartKind={chartKind}
-              chartLabel={describeSpendingChart(chartKind, selectedYear, hasBaselineSeries, historyStartYear)}
-              chartFooter={describeSpendingChartFooter(spendingPoints, chartKind, selectedYear, historyStartYear)}
+          <div data-stage="lead" className={cn(TILE_CELL_CLASS, LEAD_CELL_CLASS, 'desktop:col-span-7')}>
+            <ClassificaTile
+              id={ANALISI_CLASSIFICA_ID}
+              eyebrow={`Dove vanno i soldi · ${periodLabel}`}
+              ariaLabel="Dove vanno i soldi"
+              categories={expenseSlices}
+              subCategories={subCategorySlices}
+              typeShares={flow.typeShares}
+              spending={flow.expensesTotal}
+              ringSize={sections.compact ? 120 : 150}
+              reading={describeSpendingRanking(toRanking(expenseSlices), flow)}
+              activeKey={focus?.kind === 'expenses' ? activeSliceKey : null}
+              activeSubKey={activeSubSliceKey}
+              onSelect={handleEntitySelect}
             />
           </div>
 
@@ -881,62 +882,57 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
           <div className={INDEX_CLASS}>
           <PageRest sections={sections} buttonId={ANALISI_REST_BUTTON_ID} className={REST_CELL_CLASS} />
 
-          {/* Fuori scala exists only on a month; without one, Spese maggiori takes its columns. */}
-          {singleMonth && (
-            <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.fuoriScala), 'desktop:col-span-3')}>
-              <FuoriScalaTile
-                collapse={sections.collapse(ANALISI_SECTION_IDS.fuoriScala)}
-                asideWhenClosed={`${MONTH_NAMES[singleMonth.month - 1].toLowerCase()} ${singleMonth.year}`}
-                anomalies={anomalies}
-                monthLabel={`${MONTH_NAMES[singleMonth.month - 1].toLowerCase()} ${singleMonth.year}`}
-                reading={describeAnomalies(anomalies)}
-                followsPeriod={period.month !== null}
-                onSelect={handleAnomalySelect}
-              />
-            </div>
-          )}
-
-          <div
-            className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.maggiori), singleMonth ? 'desktop:col-span-4' : 'desktop:col-span-7')}
-           
-          >
+          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.maggiori), 'desktop:col-span-5')}>
             <SpeseMaggioriTile
               top={topExpenses}
-              reading={describeTopExpenses(topExpenses)}
               onSelect={handleTopExpenseSelect}
               collapse={sections.collapse(ANALISI_SECTION_IDS.maggiori)}
               asideWhenClosed={ANALISI_CLOSED_ASIDES.maggiori}
             />
           </div>
 
-          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.spese), 'desktop:col-span-4')}>
-            <CategorieTile
-              collapse={sections.collapse(ANALISI_SECTION_IDS.spese)}
-              asideWhenClosed={ANALISI_CLOSED_ASIDES.spese}
-              eyebrow="Spese per categoria"
-              kind="expenses"
-              slices={expenseSlices}
-              total={expenseTotal}
-              reading={describeCategoryShare(toRanking(expenseSlices), 'expenses')}
-              activeKey={focus?.kind === 'expenses' ? activeSliceKey : null}
-              onSelect={handleCategorySelect}
-              emptyCopy="Nessuna spesa registrata nel periodo."
-            />
-          </div>
+          {/* «Cosa è cambiato» exists with a comparison or the month's anomalies; without it, Entrate and Periodo take its columns. */}
+          {hasCambiato && (
+            <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.cambiato), 'desktop:col-span-5')}>
+              <CambiatoTile
+                collapse={sections.collapse(ANALISI_SECTION_IDS.cambiato)}
+                aside={cambiatoAside}
+                reading={changes ? describeCategoryChanges(changes) : anomaliesReading}
+                changes={changes}
+                anomaliesReading={changes ? anomaliesReading : null}
+                footer={changes ? describeChangesFooter(changes, inPeriod) : undefined}
+                onSelect={handleEntitySelect}
+              />
+            </div>
+          )}
 
-          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.entrate), 'desktop:col-span-3')}>
-            <CategorieTile
+          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.entrate), hasCambiato ? 'desktop:col-span-3' : 'desktop:col-span-5')}>
+            <EntrateTile
               collapse={sections.collapse(ANALISI_SECTION_IDS.entrate)}
               asideWhenClosed={ANALISI_CLOSED_ASIDES.entrate}
-              eyebrow="Entrate per categoria"
-              kind="income"
               slices={incomeSlices}
               total={incomeTotal}
               reading={describeCategoryShare(toRanking(incomeSlices), 'income')}
               activeKey={focus?.kind === 'income' ? activeSliceKey : null}
               onSelect={handleCategorySelect}
-              emptyCopy="Nessuna entrata registrata nel periodo."
-              labelClassName="min-w-[72px]"
+            />
+          </div>
+
+          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.periodo), hasCambiato ? 'desktop:col-span-4' : 'desktop:col-span-7')}>
+            <PeriodoTile
+              collapse={sections.collapse(ANALISI_SECTION_IDS.periodo)}
+              asideWhenClosed={ANALISI_CLOSED_ASIDES.periodo}
+              liftedFigures={periodoLifted}
+              eyebrow={`Periodo · ${periodLabel}`}
+              aside={describePeriodScope(period, today, calendar, historyStartYear)}
+              reading={describePeriodoSavings(savings)}
+              totals={totals}
+              pacing={pacing}
+              missingBaseline={missingBaseline}
+              points={spendingPoints}
+              chartKind={chartKind}
+              chartLabel={describeSpendingChart(chartKind, selectedYear, hasBaselineSeries, historyStartYear)}
+              chartFooter={describeSpendingChartFooter(spendingPoints, chartKind, selectedYear, historyStartYear)}
             />
           </div>
 
@@ -969,25 +965,6 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
             </div>
           )}
 
-          {/* Transfers are not flows: a period holding only transfers has no Sankey to draw. */}
-          {hasFlow && (
-            <div ref={flussoCellRef} className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.flusso), 'desktop:col-span-12')}>
-              <FlussoTile
-                collapse={sections.collapse(ANALISI_SECTION_IDS.flusso)}
-                liftedFigures={flussoLifted}
-                printedFigures={printedFigures}
-                expenses={periodExpenses}
-                isMobile={flussoNarrow}
-                reading={describeFlow(flow, readSavings(totals.income, totals.expenses))}
-                flow={flow}
-                spendingRoles={spendingRolesFlow}
-                // The verdict's own calendar slice: on a phone the surplus note declares it too.
-                scheduled={scheduled}
-                scheduledHorizon={describeAnalisiScheduledHorizon(period, today)}
-                onEntityClick={handleEntitySelect}
-              />
-            </div>
-          )}
           </div>
           </RowAnswers>
         </div>
@@ -1006,7 +983,28 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
             availableDataYears={availableYears}
             onCategoryFocus={handleEntitySelect}
           />
-          <DettaglioDisclosure allExpenses={allExpenses} historyStartYear={historyStartYear} scopeYear={selectedYear} showHistory={periodMode === 'history'} />
+          <DettaglioDisclosure
+            allExpenses={allExpenses}
+            historyStartYear={historyStartYear}
+            scopeYear={selectedYear}
+            showHistory={periodMode === 'history'}
+            flusso={
+              hasFlow
+                ? {
+                    liftedFigures: flussoLifted,
+                    printedFigures,
+                    expenses: periodExpenses,
+                    reading: describeFlow(flow, savings),
+                    flow,
+                    spendingRoles: spendingRolesFlow,
+                    // The verdict's own calendar slice: on a phone the surplus note declares it too.
+                    scheduled,
+                    scheduledHorizon: describeAnalisiScheduledHorizon(period, today),
+                    onEntityClick: handleEntitySelect,
+                  }
+                : null
+            }
+          />
         </div>
       </div>
     </>

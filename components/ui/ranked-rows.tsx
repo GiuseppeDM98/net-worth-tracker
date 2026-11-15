@@ -7,12 +7,12 @@ import { useRovingFocus } from '@/lib/hooks/useRovingFocus';
 export interface RankedRow {
   key: string;
   label: string;
-  /** A short muted note after the label («12 ago · Volo»): the date and the subcategory of a single expense. */
+  /** A short muted note after the label («Volo · 12 ago»): the subcategory and the date of a single expense. */
   caption?: string;
   amount: number;
   /** Share of the total, 0-100 — shown as the trailing figure. */
   percentage: number;
-  /** The arc's colour when the list is a ring's legend: an 8×8 swatch before the label. */
+  /** The colour this row is keyed to in a legend the host draws (a ring's arc, a type): an 8×8 swatch before the label. */
   swatch?: string;
 }
 
@@ -65,6 +65,12 @@ interface RankedRowsProps {
   activeKey?: string | null;
   /** Accessible name of the list. */
   ariaLabel?: string;
+  /**
+   * `stacked` (Spese maggiori, owner 2026-11-15): two lines per row — the label beside the amount and
+   * the share, then the caption beside the bar — for rows whose label is a sentence of its own (a
+   * note) and whose caption is three facts. Default `inline`: one line, the caption after the label.
+   */
+  layout?: 'inline' | 'stacked';
 }
 
 /**
@@ -74,7 +80,7 @@ interface RankedRowsProps {
  * a real `<ul>`: a clickable row keeps its button semantics instead of borrowing `listitem`; with
  * `bars={false}` the list is a ring's legend: a swatch per row, no bar.
  */
-export function RankedRows({ rows, color, remainders, bars = true, labelClassName, onRowClick, activeKey, ariaLabel }: RankedRowsProps) {
+export function RankedRows({ rows, color, remainders, bars = true, labelClassName, onRowClick, activeKey, ariaLabel, layout = 'inline' }: RankedRowsProps) {
   // A legend has no bar to share a track with, so its label takes what the figures leave.
   const labelWidth = bars ? cn(LABEL_COLUMN_CLASS, labelClassName) : cn('min-w-0 flex-1', labelClassName);
   const shareClass = bars ? SHARE_COLUMN_CLASS : SHARE_COLUMN_LEGEND_CLASS;
@@ -83,7 +89,36 @@ export function RankedRows({ rows, color, remainders, bars = true, labelClassNam
   // follows six presses further away, on every surface this primitive serves (2026-09-21).
   const roving = useRovingFocus(onRowClick ? rows.length : 0);
 
-  const rowContent = (row: RankedRow, active: boolean) => (
+  const bar = (row: RankedRow, trackClass: string) => (
+    <div className={cn('h-[3px] overflow-hidden rounded-full bg-muted', trackClass)} role="presentation">
+      <div
+        className="h-full rounded-full"
+        style={{
+          width: `${maxAmount > 0 ? (row.amount / maxAmount) * 100 : 0}%`,
+          background: color,
+        }}
+      />
+    </div>
+  );
+
+  // Two lines: the label takes the whole first line up to the figures (truncated only at the tile's
+  // edge), the caption the second up to the bar. The caption still wraps rather than truncating (a
+  // cut fact is no fact); with the row's width it seldom needs to.
+  const stackedContent = (row: RankedRow, active: boolean) => (
+    <span className="flex min-w-0 flex-1 flex-col gap-1">
+      <span data-ranked-line="head" className="flex min-w-0 items-baseline gap-3">
+        <span className={cn('min-w-0 flex-1 truncate text-[13px] text-foreground', active && 'font-semibold')}>{row.label}</span>
+        <span className="w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums text-foreground">{cachedFormatCurrencyEUR(row.amount, true)}</span>
+        <span className={shareClass}>{Math.round(row.percentage)}%</span>
+      </span>
+      <span data-ranked-line="caption" className="flex min-w-0 items-center gap-3">
+        <span className="line-clamp-2 min-w-0 flex-1 break-words font-mono text-[11px] leading-[1.35] tabular-nums text-muted-foreground">{row.caption}</span>
+        {bars && bar(row, 'w-[40%] min-w-[64px] max-w-[240px] shrink-0')}
+      </span>
+    </span>
+  );
+
+  const rowContent = (row: RankedRow, active: boolean) => layout === 'stacked' ? stackedContent(row, active) : (
     <>
       {/* The caption yields before the label: a long «12 ago · Manutenzione straordinaria» must
           never push the category name out of its own column — and it WRAPS to a second line
@@ -95,17 +130,7 @@ export function RankedRows({ rows, color, remainders, bars = true, labelClassNam
         <span className={cn('truncate', row.caption && 'max-w-[65%] shrink-0')}>{row.label}</span>
         {row.caption && <span className="line-clamp-2 min-w-0 break-words font-mono text-[11px] leading-[1.35] tabular-nums text-muted-foreground">{row.caption}</span>}
       </span>
-      {bars && (
-        <div className={cn('h-[3px] overflow-hidden rounded-full bg-muted', BAR_TRACK_CLASS)} role="presentation">
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${maxAmount > 0 ? (row.amount / maxAmount) * 100 : 0}%`,
-              background: color,
-            }}
-          />
-        </div>
-      )}
+      {bars && bar(row, BAR_TRACK_CLASS)}
       <span className="w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums text-foreground">
         {cachedFormatCurrencyEUR(row.amount, true)}
       </span>

@@ -518,22 +518,22 @@ describe('describeExpenseTypes', () => {
     expect(
       plain(
         describeExpenseTypes([
-          { label: 'Fisse', amount: 1640 },
-          { label: 'Variabili', amount: 1180 },
+          { label: 'Spese Necessarie', amount: 1640 },
+          { label: 'Spese Non Necessarie', amount: 1180 },
           { label: 'Debiti', amount: 180 },
         ]),
       ),
-    ).toBe('Fisse 1640 € (54,7%) · Variabili 1180 € (39,3%) · Debiti 180 € (6,0%).');
+    ).toBe('Spese Necessarie 1640 € (54,7%) · Spese Non Necessarie 1180 € (39,3%) · Debiti 180 € (6,0%).');
   });
 
   it('omits a type with nothing in it, rather than printing a zero row', () => {
     const reading = plain(
       describeExpenseTypes([
-        { label: 'Fisse', amount: 1640 },
+        { label: 'Spese Necessarie', amount: 1640 },
         { label: 'Debiti', amount: 0 },
       ]),
     );
-    expect(reading).toBe('Fisse 1640 € (100,0%).');
+    expect(reading).toBe('Spese Necessarie 1640 € (100,0%).');
     expect(reading).not.toContain('Debiti');
   });
 });

@@ -13,8 +13,8 @@
       "raisedBy": "branch docs/ritiro-ai-07, il ritiro del libro del Consulente (2026-11-12): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 604,8 KB gz sullo stesso develop @55cc4dcf, 604,6 già prima del libro (2219411c), tetto 604 → 605, OK del proprietario 2026-11-12 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #497: KB gz misurati sulla stessa macchina, 595,2 → 601,5 (406049b7, il Consulente, +3,8; 952fe509 +1) → 603,7 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/analisi": {
-      "initialJsGzKB": 655,
-      "raisedBy": "il ritiro dell'anello delle parti (2026-11-15): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 654,6 KB gz sullo stesso develop @25734a00, i tetti precedenti misurati sul Mac, tetto 654 → 655, OK del proprietario 2026-11-15 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #497: KB gz misurati sulla stessa macchina, 650,7 → 651 → 653,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 656,
+      "raisedBy": "NOVE-10 «Classifica» (2026-11-15): 653,3 → 655,7 KB gz sulla stessa macchina (Mac, .next-perf) — il Flusso esce dal JS iniziale ma entrano l'anello e le tessere nuove (654,9, accettato dal proprietario), poi i tre ritocchi del collaudo (Spese maggiori su due righe, lo scorrimento verso la Scheda e ritorno) +0,8; tetto 655 → 656 entro 1 KB (doc/guide/velocita.md § Registro dei tetti alzati). Prima: il ritiro dell'anello delle parti (2026-11-15): nessun codice nuovo sulla route — questa macchina (Windows, Node 24) legge 654,6 KB gz sullo stesso develop @25734a00, i tetti precedenti misurati sul Mac, tetto 654 → 655, OK del proprietario 2026-11-15 (doc/guide/velocita.md § Registro dei tetti alzati). Prima: #497: KB gz misurati sulla stessa macchina, 650,7 → 651 → 653,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assets": {
       "initialJsGzKB": 743,

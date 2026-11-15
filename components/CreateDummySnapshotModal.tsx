@@ -258,7 +258,7 @@ export function CreateDummySnapshotModal({
                     step="100"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Media delle spese mensili (distribuite tra fisse, variabili e debiti)
+                    Media delle spese mensili (distribuite tra necessarie, non necessarie e debiti)
                   </p>
                 </div>
               </>
