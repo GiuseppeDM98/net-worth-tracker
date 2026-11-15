@@ -108,6 +108,7 @@ import {
   computeReliability,
   monthsInWindow,
   nextPayments,
+  payerRingSegments,
   rankPayerShares,
   resolveMonthlyWindow,
   resolvePeriodBounds,
@@ -267,6 +268,7 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
     () => rankPayerShares(dividends, period, now, RANKED_PAYERS, heldAssetIds),
     [dividends, period, now, heldAssetIds],
   );
+  const payerRing = useMemo(() => payerRingSegments(ranking), [ranking]);
   const yearly = useMemo(() => summarizeYearlyIncome(dividends, now), [dividends, now]);
   const monthly = useMemo(() => resolveMonthlyWindow(dividends, period, now, FLOW_MONTHS), [dividends, period, now]);
   const coverage = useMemo(() => buildCoverageMonths(dividends, period, now), [dividends, period, now]);
@@ -800,6 +802,7 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
             <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(DIVIDEND_SECTION_IDS.pagatori), 'desktop:col-span-4')}>
               <PagatoriTile
                 ranking={ranking}
+                ring={payerRing}
                 reading={describePayerRanking(ranking, subject.inPeriod)}
                 footer={describePayersFooter(upcomingNet)}
                 emptyCopy={`Nessun dividendo incassato ${subject.inPeriod}.`}

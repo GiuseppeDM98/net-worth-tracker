@@ -253,6 +253,10 @@ The app **is** locally runnable; there is no fallback to declare.
   refuses a non-local base, and exits when the owner closes every window, on SIGTERM (`pkill -TERM -f
   scripts/collaudo-finestre.mts` — how the agent closes them after the owner's confirmation) or after 30 minutes.
   Run it in the background, as its own task: a throwaway seed beside it in one command dies with it.
+  **On Windows** (2026-11-15): until that day the script never ran there — its CLI guard compared `import.meta.url` with
+  `file://` + the path, which never matches `file:///C:/…`, so it exited 0 with no window (now `pathToFileURL`); and from
+  the agent's Git Bash every `--url=/dashboard/…` is rewritten into `C:/Program Files/Git/dashboard/…` (MSYS path
+  conversion): prefix the command with `MSYS_NO_PATHCONV=1`, or run it from PowerShell.
   A file the page downloads (the PDF export, the CSV) lands in Playwright's temp folder, out of the owner's sight
   (2026-11-14; the helper keeps no handle on its pages): for that item a throwaway Playwright script signs in the same
   way and saves `page.on('download')` into the scratchpad, opens it for the owner, and deletes it with the fixtures

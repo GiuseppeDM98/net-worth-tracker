@@ -416,4 +416,8 @@ prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la 
 
 ## Per-page blind spots
 
+- **Patrimonio at 1024 flips between 12 and 11 figures above the fold on the same build** (2026-11-15, NOVE-09: 11, 11, 12 in
+  three runs of `--viewports=1024 --surfaces=patrimonio`; `figuresOutsideVerdict` 9 / 8 with it): the «Strumenti» row of the
+  landscape index is caught still loading (dimmed) or not. A run that reads 11 turns that develop-red entry green; neither
+  reading is a change of the code.
 - **La tabella del fixture è il budget, non la misura di un giorno**: le celle sono i valori di `perf/mobile-budget.json`, e una corsa che legge qualche centesimo più in basso resta verde senza stringere (la deriva del giorno e della macchina, `doc/guide/prima-schermata.md` § Per-page blind spots).

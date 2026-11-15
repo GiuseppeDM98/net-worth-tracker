@@ -3,6 +3,14 @@
 > **When to open this guide** — anyone writing or changing a Playwright spec in `e2e/`, `playwright.config.ts`, `e2e/global-setup.ts`, an `e2e/auth*.setup.ts` or a helper no project collects (`e2e/*Fixture.ts`, `e2e/shellBoot.ts`, `e2e/chunkProbe.ts`, `e2e/assistantRegister.ts`), or reading a red of the full run. `AGENTS.md` keeps the stub with the essentials (`AGENTS.md § Browser-Driven E2E (Playwright)`); here is the full rule, moved whole from `doc/guide/e2e-emulatori.md` on 2026-11-11 (its history before that day: `git log -- doc/guide/e2e-emulatori.md`). The files, the seeds, the emulators' start and stop, the mirror, the throwaway exercises and «proving a refactor changed no number» stay in `doc/guide/e2e-emulatori.md` (§ Files, § Emulator Exercise Scripts); the environment in `SETUP.md` → Steps 6-7.
 
 ## Browser-Driven E2E (Playwright)
+- **The ring specs** (2026-11-15; doc/guide/grafici.md § The ring): `e2e/ring-chart{,.mobile,.tablet}.spec.ts` (the
+  homes of 2026-11-12, one body `ringChartSuite.ts`) and the minor tiles' seven files —
+  `e2e/ring-chart.split{,.mobile}.spec.ts` (projects `split`, `split-mobile`), `e2e/ring-chart.centri{,.mobile}.spec.ts`
+  (`centri`, `centri-mobile`; «Per sottocategoria» on a centre the test plants and removes), `e2e/ring-chart.owners{,.mobile}.spec.ts` (base account, «Valore» and «Carico»), `e2e/ring-chart.dividendi.spec.ts`
+  (`desktop`, two dividends created through the form and deleted by the app) — plus one assertion in
+  `e2e/cashflow.mortgage.spec.ts`; all through `expectRingFiguresInside` (`e2e/ringFit.ts`). **Deleting several rows of a
+  list that re-reads after each delete waits for the row count to drop** before the next press (2026-11-15, the Dividendi
+  spec): the refetch re-renders the next armed row mid-click, the button detaches and the click waits out the test.
 - **The tablet composition has two projects, one spec runs in both** (since 2026-10-16): `tablet` (768×1024, the pill) and
   `tablet-landscape` (1024×768: the landscape stage and the 56px icon rail `TabletRail`, no pill and no bar), copied from
   `mobile` (`isMobile`, `hasTouch`, the base account, the same `testIgnore`); a `*.tablet.spec.ts` branches on

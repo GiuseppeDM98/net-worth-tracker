@@ -4,7 +4,7 @@
 
 ## Files
 
-- **Grafici**: `components/ui/charts/recharts.ts` (the ONE door to recharts: the one module of real code that keeps the library in ONE chunk), every `*Chart.tsx` (`components/{cashflow,dashboard,fire-simulations,goals,monte-carlo,performance}/…`), every `*Sparkline.tsx` (`components/assets/AssetSparkline.tsx`, `components/dashboard/NetWorthSparkline.tsx`), `components/hall-of-fame/RecordBars.tsx`, `lib/hooks/useChartColors.ts`, `lib/hooks/useMorphingSeries.ts` (a hand-written SVG gliding between windows), `components/ui/series-legend.tsx` (`SeriesLegend`), `components/ui/chart-hover.tsx`, `components/ui/ring-chart.tsx` + `lib/utils/ringChart.ts` (the ring, § The ring); tests `__tests__/ringChart.test.ts`, `__tests__/ringChart.dom.test.tsx`, `__tests__/rankedRows.test.tsx`, `e2e/ring-chart{,.mobile,.tablet}.spec.ts` (body `e2e/ringChartSuite.ts`, helper `e2e/ringFit.ts`), `__tests__/chartColorsContext.test.ts`, `__tests__/actionColorContrast.test.ts`, `e2e/bundle.lazy.spec.ts`
+- **Grafici**: `components/ui/charts/recharts.ts` (the ONE door to recharts: the one module of real code that keeps the library in ONE chunk), every `*Chart.tsx` (`components/{cashflow,dashboard,fire-simulations,goals,monte-carlo,performance}/…`), every `*Sparkline.tsx` (`components/assets/AssetSparkline.tsx`, `components/dashboard/NetWorthSparkline.tsx`), `components/hall-of-fame/RecordBars.tsx`, `lib/hooks/useChartColors.ts`, `lib/hooks/useMorphingSeries.ts` (a hand-written SVG gliding between windows), `components/ui/series-legend.tsx` (`SeriesLegend`), `components/ui/chart-hover.tsx`, `components/ui/ring-chart.tsx` + `lib/utils/ringChart.ts` (the ring, § The ring); tests `__tests__/ringChart.test.ts`, `__tests__/ringChart.dom.test.tsx`, `__tests__/rankedRows.test.tsx`, `e2e/ring-chart{,.mobile,.tablet}.spec.ts` (body `e2e/ringChartSuite.ts`, helper `e2e/ringFit.ts`); the minor tiles' (2026-11-15): `e2e/ring-chart.{split,centri,owners}{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts` and one assertion in `e2e/cashflow.mortgage.spec.ts`, `__tests__/chartColorsContext.test.ts`, `__tests__/actionColorContrast.test.ts`, `e2e/bundle.lazy.spec.ts`
 
 ## Recharts
 - **Import recharts from `@/components/ui/charts/recharts`, never from `'recharts'`** (2026-09-30): the one module of
@@ -69,6 +69,21 @@
 - **`motion.circle` + `pathLength` is a trap**: Framer reads `pathLength` as its own drawing value and rewrites the
   dash array. The arcs are plain `<circle>`s with a CSS transition on the two dash properties (400 ms ease-out-quart,
   `none` under `useReducedMotion`), and the first render carries the final dashes — no draw-in on mount.
+- **The homes** (DESIGN.md's «Homes» sentence): Previdenza «Versato», «Entrate per categoria» on Tracciamento and the
+  Panoramica, Panoramica «Composizione», Patrimonio «Classi» (2026-11-12), and since 2026-11-15 the minor tiles —
+  Divisione «Quota» (`splitRingSegments`), «Mutuo»/«Prestito» (`mortgageRingSegments`), «Intestatari» on «Valore» and «Carico»
+  (`ownershipRingSegments`), a cost centre's «Costo» (`costCenterRingSegments`) and «Per sottocategoria» (`subCategoryRingSegments`, the owner on the
+  mirror tour), and Dividendi «Chi paga di più»
+  (`payerRingSegments`), each keeping today's form when its parts are not one positive whole of two or more. Each guide
+  says what its ring draws.
+- **A row beside a folded ring takes `ringSwatchAt`** (the Quota's people, the owners): past six parts the rows from the
+  sixth on wear the fold's grey, never the slot their index would give.
+- **A ring builder never lives in a module a shared narrative imports** (2026-11-15): `ownershipRingSegments` is in
+  `lib/utils/ownershipRing.ts`, not in `ownershipBasis.ts` (value-imported by `patrimonioNarrative`, hence by every page),
+  as `compositionRing.ts` and `categoryRing.ts` are their own modules (doc/guide/velocita.md).
+- **A containment spec is proven red by moving the figure, not the form** (2026-11-15): «270 €», «500 €» and «1012 €»
+  already fit their hole in full, so `formatRingCenter` returning the full form leaves their specs green — the seven
+  specs of the minor tiles were seen red with the centre figure drawn at three times its font size in `ring-chart.tsx`.
 
 ## Per-page blind spots
 - **An arc is a non-text signal beside rows that carry every figure: `--chart-3` on the default light card is 2,74:1**

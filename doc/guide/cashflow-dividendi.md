@@ -126,6 +126,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The type labels are the readings' words**: «Acconto» and «Saldo» (`dividendTypeLabels`), the one
   map the select, the table and the two detail dialogs read — the article map `LARGEST_TYPE_PREFIX`
   and `dividendTypeNoun` («la cedola», «il dividendo») live in `dividendiNarrative.ts`.
+- **«Chi paga di più» is a ring when the payers are one positive whole** (2026-11-15; The Ring Rule, 2026-11-12):
+  `payerRingSegments(ranking)` — the held rows by rank (`RING_CATEGORY_COLORS`), then the remainder («Altri N strumenti» /
+  «N strumenti venduti») in `RING_REST_COLOR`; `null` with fewer than two parts above zero (one held payer and nothing else,
+  or only sold instruments) or a part that prints below zero — a remainder below zero enters the segments so the whole is
+  refused (the centre prints `ranking.total`, which counts it); one at zero is left out, as `RankedRows` leaves it. One held
+  payer beside a sold one's remainder is a ring of two. The centre is `total` «netti» (the aside's figure again, declared);
+  the rows its legend, the swatch of their key. In the `desktop:col-span-4` cell the ring stands above its rows. Tests
+  `dividendAnalytics.test.ts` (V1), `__tests__/pagatoriTile.test.tsx`; browser `e2e/ring-chart.dividendi.spec.ts`.
 
 ## Dividends and Coupons
 - **A bond may pay ONE coupon, with the redemption** (`CouponFrequency 'maturity'`, 2026-10-10 — the BTP Valore

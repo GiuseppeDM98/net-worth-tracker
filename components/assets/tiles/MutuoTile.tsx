@@ -2,8 +2,10 @@
 
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { describeMortgage, describeMortgageScope, describeMortgageYearScope, loanNoun, payoffKpiValue } from '@/lib/utils/patrimonioNarrative';
-import type { MortgageSummary } from '@/lib/utils/mortgageSummary';
+import { MORTGAGE_RING_COLORS, mortgageRingSegments, mortgageYearPaid, type MortgageSummary } from '@/lib/utils/mortgageSummary';
+import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
+import { RingChart } from '@/components/ui/ring-chart';
 import { TileMethodNote } from '@/components/ui/tile-method-note';
 
 interface MutuoTileProps {
@@ -17,10 +19,14 @@ interface MutuoTileProps {
   className?: string;
 }
 
-function Kpi({ label, value, caption }: { label: string; value: string; caption?: string }) {
+/** `swatch`: the ring's arc colour before the label, when the figure is a part of the ring. */
+function Kpi({ label, value, caption, swatch }: { label: string; value: string; caption?: string; swatch?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <p className={TILE_SUB_EYEBROW_CLASS}>{label}</p>
+      <p className={cn(TILE_SUB_EYEBROW_CLASS, swatch && 'flex items-center gap-1.5')}>
+        {swatch && <span className="h-2 w-2 shrink-0 self-center rounded-[2px]" style={{ background: swatch }} aria-hidden="true" />}
+        {label}
+      </p>
       <p className="font-mono text-[22px] font-bold leading-none tracking-[-0.03em] tabular-nums text-foreground">{value}</p>
       {caption && <p className="text-[11px] leading-[1.4] text-muted-foreground">{caption}</p>}
     </div>
@@ -53,6 +59,7 @@ export function MutuoTile({ summary, showPropertyName, collapse, asideWhenClosed
   const eyebrow = summary.kind === 'mortgage' ? 'Mutuo' : 'Prestito';
   // A mortgage is named by its property, a personal loan by its own name.
   const aside = summary.propertyName ?? summary.loanName;
+  const ring = mortgageRingSegments(summary);
 
   return (
     <Tile
@@ -64,19 +71,40 @@ export function MutuoTile({ summary, showPropertyName, collapse, asideWhenClosed
       reading={describeMortgage(summary)}
       className={className}
     >
-      {/* Four KPIs across from a 560px tile, by the TILE's width (a container query): in the 360px index of a
-          tablet in landscape the tile is a phone's width at a 1024px viewport (2026-10-16). */}
+      {/* Four KPIs across from 560px of the GRID's width (a container of its own), from 680px beside the ring:
+          there the grid is the tile less the ring, and at 768 (~584px) four six-figure KPIs of ~152px touched
+          (the tour of 2026-11-15; 4 × 152 + 3 × 24 = 680); in the 360px index of a tablet in landscape the tile is a phone's width
+          at a 1024px viewport (2026-10-16). The ring (The Ring Rule, 2026-11-12) is the year's settled
+          instalments, interest and principal, its two KPIs led by their arcs' swatches. */}
       <div className="@container mt-3.5">
-      <div className="grid grid-cols-2 gap-x-6 gap-y-4 @[560px]:grid-cols-4">
-        <Kpi label="Debito residuo" value={cachedFormatCurrencyEUR(summary.debt)} />
-        <Kpi
-          label={`Interessi ${summary.year}`}
-          value={cachedFormatCurrencyEUR(summary.yearInterest)}
-          caption={summary.totalInterest > summary.yearInterest ? `${cachedFormatCurrencyEUR(summary.totalInterest)} dal collegamento` : undefined}
-        />
-        <Kpi label={`Capitale ${summary.year}`} value={cachedFormatCurrencyEUR(summary.yearPrincipal)} />
-        <Kpi label="Fine prevista" value={payoffValue} caption={payoffCaption} />
-      </div>
+        <div className="flex flex-col items-center gap-4 @[560px]:flex-row @[560px]:items-start">
+          {ring && (
+            <RingChart
+              segments={ring}
+              centerValue={mortgageYearPaid(summary)}
+              centerLabel="pagati"
+              ariaLabel={`Rate pagate nel ${summary.year}`}
+              size={96}
+            />
+          )}
+          <div className="@container w-full min-w-0 @[560px]:flex-1">
+            <div className={cn('grid grid-cols-2 gap-x-6 gap-y-4', ring ? '@[680px]:grid-cols-4' : '@[560px]:grid-cols-4')}>
+              <Kpi label="Debito residuo" value={cachedFormatCurrencyEUR(summary.debt)} />
+              <Kpi
+                label={`Interessi ${summary.year}`}
+                value={cachedFormatCurrencyEUR(summary.yearInterest)}
+                caption={summary.totalInterest > summary.yearInterest ? `${cachedFormatCurrencyEUR(summary.totalInterest)} dal collegamento` : undefined}
+                swatch={ring ? MORTGAGE_RING_COLORS.interest : undefined}
+              />
+              <Kpi
+                label={`Capitale ${summary.year}`}
+                value={cachedFormatCurrencyEUR(summary.yearPrincipal)}
+                swatch={ring ? MORTGAGE_RING_COLORS.principal : undefined}
+              />
+              <Kpi label="Fine prevista" value={payoffValue} caption={payoffCaption} />
+            </div>
+          </div>
+        </div>
       </div>
       {/* One year is already the KPIs above: the list earns its place from the second one. */}
       {summary.byYear.length >= 2 && (

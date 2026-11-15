@@ -50,7 +50,7 @@ import { assignExpensesToCostCenter } from '@/lib/services/costCenterService';
 import { buildUnlinkPlan, seriesKeyOf, seriesRowsOf, type LinkPlan } from '@/lib/utils/costCenterLinking';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { buildCategoryComposition, buildSubCategoryComposition } from '@/lib/utils/costCenterUtils';
-import { COST_CENTER_DETAIL_REST_ID, COST_CENTER_SECTION_IDS, buildCenterMonthStack, summarizeCenter } from '@/lib/utils/costCenterSummary';
+import { COST_CENTER_DETAIL_REST_ID, COST_CENTER_SECTION_IDS, buildCenterMonthStack, costCenterRingSegments, subCategoryRingSegments, summarizeCenter } from '@/lib/utils/costCenterSummary';
 import {
   CATEGORIE_CLOSED_ASIDE,
   CATEGORIE_FOOTER,
@@ -406,6 +406,7 @@ export function CostCenterDetail({
               reading={describeCosto(summary, now)}
               footer={describeCostoFooter(summary)}
               kpis={{ month: describeMonthKpi(summary, now), year: describeYearKpi(summary), average: describeAverageKpi(summary) }}
+              ring={costCenterRingSegments(summary)}
               palette={chartColors}
               now={now}
             />
@@ -443,6 +444,7 @@ export function CostCenterDetail({
               slices={subComposition}
               excludedKeys={excludedKeys}
               netTotal={netSubTotal}
+              ring={subCategoryRingSegments(subComposition, excludedKeys)}
               aside={describeSottocategorieAside(excludedKeys.size)}
               reading={describeSottocategorie(subComposition, excludedKeys, netSubTotal)}
               footer={SOTTOCATEGORIE_FOOTER}
