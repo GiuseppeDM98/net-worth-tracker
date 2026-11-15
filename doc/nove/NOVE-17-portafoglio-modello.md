@@ -588,7 +588,7 @@ that sum to 100 with «Liquidità» among the rows, the model is saved, a target
 - **A**: `npx tsc --noEmit`, lint, Vitest in three zones, `npx playwright test e2e/accumulo e2e/allocation` in every
   project.
 - **B**: emulators + seed + `dev:emulator`; decoys: a property «ornitorinco» created with the role «Bloccato» (the
-  form's default for a property is «Escluso», `components/assets/AssetDialog.tsx:1080-1083`, and an excluded
+  form's default for a property is «Escluso», `components/assets/AssetDialog.tsx:1099-1102`, and an excluded
   property leaves the base with its mortgage) and a mortgage «fenicottero» financing it.
 - **C (browser)**: 390 and 1440, light and dark: the two tiles, the criteria dialog («Prova» runs, «Salva i
   criteri» writes), the composition dialog's anatomy, the editor's «Ottimizzato» path.

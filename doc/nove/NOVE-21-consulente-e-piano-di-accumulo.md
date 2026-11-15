@@ -38,8 +38,8 @@ at all — the answers, the interview, the strategy and the instruments only (`p
 - The editor's «Aggiorna anche il portafoglio modello» is ON whenever no model is passed
   (`pr488:components/allocation/AccumulationPlanDialog.tsx:607-608`, `modelDiffers = !model || …`); the model is
   read only on the Accumulo tab (choice l). The editor therefore opens on the tab, never on the Consulente route.
-- `AssetDialog` opens a create on step 1 with empty fields (`components/assets/AssetDialog.tsx:1165`, the create
-  branch `:1286-1327`); no caller can hand it a name, an ISIN or a sub-category.
+- `AssetDialog` opens a create on step 1 with empty fields (`components/assets/AssetDialog.tsx:1184`, the create
+  branch `:1306-1348`); no caller can hand it a name, an ISIN or a sub-category.
 - NOVE-16's `APPLY_ACTIVE_PLAN_NOTE` is rendered inside the ready body only (NOVE-16 § 4 «The Assistente and the
   Consulente»): after «Applica» the line disappears with the body.
 
@@ -576,9 +576,9 @@ Sentences, in `lib/utils/accumulationNarrative.ts` (`joinNames` = «a, b e c»):
 
 ### 4.7 `AssetDialog` prefill (choice r)
 
-`AssetDialogProps` (`components/assets/AssetDialog.tsx:503`) gains `prefill?: AssetPrefill` (create mode only, beside
-NOVE-16's `createEmpty`). `:1165` becomes `setStep(asset || initialType || prefill ? 2 : 1);`. The create branch
-(`:1286-1327`) reads it, every other field as written:
+`AssetDialogProps` (`components/assets/AssetDialog.tsx:509`) gains `prefill?: AssetPrefill` (create mode only, beside
+NOVE-16's `createEmpty`). `:1184` becomes `setStep(asset || initialType || prefill ? 2 : 1);`. The create branch
+(`:1306-1348`) reads it, every other field as written:
 
 ```ts
         ticker: prefill?.ticker ?? '',

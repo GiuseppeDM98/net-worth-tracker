@@ -7,7 +7,9 @@
  * fee writes ONE row in the cashflow that Tracciamento refuses to delete and whose form shows the
  * note in place of amount and date; editing the trade's fee moves the row; «Quanto costa vendere»
  * lists the fee-free PMC and the fiscal cost beside it and taxes the gain on the latter; deleting
- * the trade removes the row. Every outcome is asserted on Firestore (Admin SDK) where it is data.
+ * the trade removes the row; the opening buy's fee lands in Tracciamento as the same locked row.
+ * Seen red once (2026-11-15): with `fees` dropped from the form's `firstBuy` and the Firestore reads set
+ * aside, the Tracciamento step alone fails (no row). Every outcome is asserted on Firestore (Admin SDK) where it is data.
  * The plan of each save belongs to Vitest (__tests__/{tradeFeeExpense,assetTransactionWriteTx}.test.ts).
  *
  * Plants its own instrument «Ornitorinco», account «Fenicottero Broker» and fee category (decoys
@@ -247,4 +249,16 @@ test('the opening buy of a new instrument takes its fee, as a row like any trade
   const edit = page.getByRole('dialog', { name: 'Modifica operazione' });
   await expect(edit.locator('#trade-fees')).toHaveValue('5');
   await expect(edit.locator('#trade-fees-hint')).toHaveText(/è la sua spesa in Cashflow/);
+  await page.keyboard.press('Escape');
+  await expect(edit).toBeHidden();
+
+  // ── 4. Tracciamento holds its row of 5,00 €, locked like any trade's fee row (2026-11-15: until then
+  //    this test read the row from Firestore only) ──
+  const table = await openCashflowTable(page);
+  const openingRowNote = `Commissione su acquisto di ${NEW_TICKER}`;
+  await expect(table.getByRole('row').filter({ hasText: openingRowNote })).toHaveCount(1);
+  await expect(table.getByRole('row').filter({ hasText: openingRowNote })).toContainText(/5,00/);
+  await expect(
+    table.getByRole('button', { name: `Elimina ${openingRowNote} — Si elimina con la sua operazione, in Patrimonio` })
+  ).toBeDisabled();
 });

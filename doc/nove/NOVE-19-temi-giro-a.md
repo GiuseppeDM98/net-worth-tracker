@@ -20,7 +20,7 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
 | 6 | `components/layout/Sidebar.tsx:128`; `app/dashboard/layout.tsx:56` | the wordmark, 13px Geist semibold: the one piece of chrome type the costume does not reach |
 | 7 | `components/layout/BottomNavigation.tsx:62`, `:114`, `:127`, `:136`, `:153`, `:162` | the nav pill, its items, the active indicator and the «+» button `rounded-full`: under Orbita the only round shapes of a frame whose tiles are square |
 | 8 | `components/layout/PageTabBar.tsx:96`, `:106` | the phone tab and its indicator `rounded-[6px]`: a literal, 6px under Orbita |
-| 9 | `components/layout/ThemePicker.tsx:56`; `components/expenses/ExpenseTable.tsx:177` | `rounded` (Tailwind's 0.25rem, a literal) |
+| 9 | `components/layout/ThemePicker.tsx:56`; `components/expenses/ExpenseTable.tsx:178` | `rounded` (Tailwind's 0.25rem, a literal) |
 | 10 | `components/ui/sidebar.tsx:493`; `components/ui/multi-select.tsx:318` | `hsl(var(--sidebar-border))`, `hsl(var(--ring))` of `oklch` tokens: invalid in every theme. No caller reaches either (the only `SidebarMenuButton`s, `Sidebar.tsx:70`, `:202`, pass no `variant`; no `MultiSelect` receives a `ref`): no visual effect |
 | 11 | `components/ui/switch.tsx:14`, `:26` | `dark:data-[state=checked]:bg-blue-600` (the debt of `DESIGN.md:405-407`): a blue ON track inside Egeo's navy-and-gold dark and Orbita's cyan dark; track and thumb `rounded-full` under Orbita |
 | 12 | `components/ui/segmented-pill.tsx:104`, `:130`, `:141` | `rounded-full` container, options, indicator: the axis of Panoramica and Patrimonio (`components/dashboard/PeriodSelector.tsx`) and of Dividendi, round under Orbita |
@@ -28,9 +28,9 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
 | 14 | `components/ui/choice-list.tsx:34` | `GROUP_CLASS … rounded-xl`: the same 9px / 4px (its pages, Compravendita and Consulente, are NOVE-20's; the primitive is here) |
 | 15 | `components/dividends/DividendiDettaglio.tsx:68`; `ProvisionalCouponBanner.tsx:31` | two card-like boxes `rounded-xl` beside the tiles: 9px / 4px |
 | 16 | `components/ui/composition-list.tsx:83`, `:85`; `composition-bar.tsx:85`, `:92`; `ranked-rows.tsx:86`, `:88`; `components/dashboard/overview/ObiettivoTile.tsx:40`, `:47`; `components/cashflow/budget/BudgetTrack.tsx:45`, `:47`, `:48`; `cost-centers/tiles/CentriTile.tsx:64`, `:65`, `:82`, `:83`; `SottocategorieTile.tsx:86`, `:87` | bar tracks and fills `rounded-full` (`rounded-l-full`/`rounded-r-full` at `composition-bar.tsx:92`, `BudgetTrack.tsx:48`): round ends under Orbita |
-| 17 | `components/assets/AssetRow.tsx:78`, `:125`, `:138`, `:341`; `StrumentiTile.tsx:490`; `ExpenseTable.tsx:168`; `budget/BudgetImpostazioni.tsx:141` | pill chips (the class chip, the composite chip and its ring overlay, «Azzerato»/«Estinto», the type badge, the mono ceiling chips) `rounded-full` |
+| 17 | `components/assets/AssetRow.tsx:78`, `:125`, `:138`, `:341`; `StrumentiTile.tsx:490`; `ExpenseTable.tsx:169`; `budget/BudgetImpostazioni.tsx:141` | pill chips (the class chip, the composite chip and its ring overlay, «Azzerato»/«Estinto», the type badge, the mono ceiling chips) `rounded-full` |
 | 18 | `components/dashboard/overview/PatrimonioTile.tsx:116`, `:197`; `components/dividends/tiles/IncassoNettoTile.tsx:105`, `:126` (9px); `components/assets/tiles/MovimentiTile.tsx:95` (7px); `components/dividends/CalendarDayCell.tsx:81` (4px); `tiles/AffidabilitaTile.tsx:94` (3px) | literal chip radii: they follow neither theme |
-| 19 | `app/dashboard/page.tsx:397`, `:510`; `app/dashboard/assets/page.tsx:606`, `:615`, `:665`; `components/cashflow/CashflowPageClient.tsx:261` | `PageHeader` without `emblem`: `resolveEmblem` falls back, so Egeo draws the temple on every page although decision 3 names «emblemi» |
+| 19 | `app/dashboard/page.tsx:397`, `:510`; `app/dashboard/assets/page.tsx:607`, `:615`, `:665`; `components/cashflow/CashflowPageClient.tsx:261` | `PageHeader` without `emblem`: `resolveEmblem` falls back, so Egeo draws the temple on every page although decision 3 names «emblemi» |
 | 20 | `components/ui/tile-grid-skeleton.tsx:31` | the loading tile has `rounded-2xl` but no `data-tile`: no cap line (Egeo) or corner marks (Orbita) until the data arrives, then they pop in |
 
 **Checked, no finding** (each looked at under both themes and both modes):
@@ -45,10 +45,10 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
   `select.tsx:60`/`:91-99`, `dropdown-menu.tsx:58`, `tooltip.tsx:45`, `badge.tsx:7`, `tabs.tsx`,
   `segmented-control.tsx:50`, `:60`, `aside-toggle.tsx:45`, `drill-breadcrumb.tsx:44`, `tile-method-note.tsx:33`,
   `error-notice.tsx:61`, `verdict-strip.tsx:60`, `page-rest.tsx:39`, `composition-list.tsx:116`, `ranked-rows.tsx:118`,
-  `CompactExpenseRow.tsx:86`, `:97`, `TransactionFeed.tsx:77`, `:318`, `LiquiditaTile.tsx:62`, `MovimentiTile.tsx:84`,
+  `CompactExpenseRow.tsx:86`, `:97`, `TransactionFeed.tsx:78`, `:318`, `LiquiditaTile.tsx:62`, `MovimentiTile.tsx:84`,
   `PerCategoriaTile.tsx:99`, `:254`, `CenterChip.tsx:14`. `radio-group.tsx:31` stays round (a radio). Destructive
   button: white on `--destructive` 7,45 / 6,07:1 light, on `/60` over the card 5,48 / 5,87:1 dark.
-- Shapes that stay round in every theme: dots (`ExpenseTable.tsx:185`, `PageTabBar.tsx:21`,
+- Shapes that stay round in every theme: dots (`ExpenseTable.tsx:186`, `PageTabBar.tsx:21`,
   `MobileFiltersDrawer.tsx:161`, `NetWorthSparkline.tsx:155`, `searchable-combobox.tsx:205`, `:358`), avatars,
   the grip, the ring. Legend swatches `rounded-[2px]` (DESIGN.md:1346) stay.
 - Floating shadows (DESIGN → Float): `popover.tsx:48`, `select.tsx:91-99`, `dropdown-menu.tsx:58`,
@@ -66,7 +66,7 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
   Mutuo, Intestatari, Costo, Pagatori) add no other surface. NOVE-05 and NOVE-07 add sentences and rows only;
   NOVE-10, 15, 16 touch none of these pages.
 - `SavingsRateBadge.tsx:119` `text-positive` on `bg-positive/10`: 6,18:1 with NOVE-12's `--positive`. `CalendarDayCell.tsx:68-69`
-  insets on tokens. `TransactionFeed.tsx:553` (card branch) has no caller: `ExpenseTrackingTab.tsx:1086` passes
+  insets on tokens. `TransactionFeed.tsx:559` (card branch) has no caller: `ExpenseTrackingTab.tsx:1086` passes
   `surface="flat"`. `TILE_SUB_EYEBROW_CLASS` (`tile.tsx:73-74`) carries digits («Ultimi {n} mesi»,
   `TettoTile.tsx:169`): it stays Geist (§ 3).
 
@@ -226,7 +226,7 @@ fixes are colours of existing tokens, and the charts of these pages read tokens 
 | `PatrimonioTile.tsx:116`, `:197`; `IncassoNettoTile.tsx:105`, `:126` | `rounded-[9px]` | `rounded-[var(--costume-control-chip-radius,9px)]` |
 | `MovimentiTile.tsx:95` · `PageTabBar.tsx:96`, `:106` | `rounded-[7px]` · `rounded-[6px]` | `…chip-radius,7px)]` · `…chip-radius,6px)]` |
 | `CalendarDayCell.tsx:81` · `AffidabilitaTile.tsx:94` | `rounded-[4px]` · `rounded-[3px]` | `…chip-radius,4px)]` · `…chip-radius,3px)]` |
-| `ThemePicker.tsx:56`; `ExpenseTable.tsx:177` | `rounded` | `rounded-[var(--costume-control-chip-radius,0.25rem)]` |
+| `ThemePicker.tsx:56`; `ExpenseTable.tsx:178` | `rounded` | `rounded-[var(--costume-control-chip-radius,0.25rem)]` |
 | `popover.tsx:48`; `choice-list.tsx:34`; `DividendiDettaglio.tsx:68`; `ProvisionalCouponBanner.tsx:31` | `rounded-xl` | `COSTUME_FRAME_RADIUS_CLASS` |
 | `app/globals.css:785` | `border-radius: 10px 10px 0 0;` | `border-radius: var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0;` |
 | `switch.tsx:14` | `dark:data-[state=checked]:bg-blue-600` | `dark:data-[state=checked]:bg-[var(--costume-control-switch-on,oklch(54.6%_0.245_262.881))]` |
@@ -256,7 +256,7 @@ const EGEO_WAVES: EmblemArt = {
 egeo: { fallback: EGEO_TEMPLE, pages: { patrimonio: EGEO_AMPHORA, cashflow: EGEO_WAVES } },
 ```
 
-The pages pass `emblem`: `app/dashboard/page.tsx:397`, `:510` → `"panoramica"`; `app/dashboard/assets/page.tsx:606`,
+The pages pass `emblem`: `app/dashboard/page.tsx:397`, `:510` → `"panoramica"`; `app/dashboard/assets/page.tsx:607`,
 `:615`, `:665` → `"patrimonio"`; `components/cashflow/CashflowPageClient.tsx:261` → `"cashflow"` (one header for the
 five tabs). Panoramica's id is passed although it resolves to the fallback: a later art needs no page edit.
 
