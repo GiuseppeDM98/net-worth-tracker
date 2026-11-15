@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
   assertCanAccessAccount,
   getApiAuthErrorResponse,
@@ -18,6 +18,8 @@ import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboa
  *   - Future dividends (exDate > today): Deleted
  *   - Historical dividends (exDate <= today): Preserved
  *   - Linked expenses: Preserved (user's cashflow history)
+ *   - Its trades' fee rows: Preserved as plain spending, unlinked (`feeOfTradeId` removed,
+ *     2026-11-12): the money left, and an unlinked row is no longer locked in Cashflow
  *
  * Why preserve historical data?
  *   - User needs historical dividend/expense records for taxes
@@ -104,6 +106,17 @@ export async function DELETE(
       .where('exDate', '>', todayTimestamp)
       .get();
 
+    // The fee rows the asset's trades name (2026-11-12): read now, unlinked in the same batch.
+    const tradesSnapshot = await adminDb
+      .collection('assetTransactions')
+      .where('userId', '==', userId)
+      .where('assetId', '==', assetId)
+      .get();
+    const feeRowIds = tradesSnapshot.docs
+      .map((tradeDoc) => tradeDoc.data().feeExpenseId as string | undefined)
+      .filter((id): id is string => !!id);
+    const feeRowSnaps = await Promise.all(feeRowIds.map((id) => adminDb.collection('expenses').doc(id).get()));
+
     // Atomic batch deletion: All-or-nothing transaction
     //
     // Why batch instead of sequential deletes?
@@ -125,6 +138,11 @@ export async function DELETE(
     // Delete future dividends
     dividendsSnapshot.docs.forEach(dividendDoc => {
       batch.delete(dividendDoc.ref);
+    });
+
+    // Keep the fee rows as plain, deletable spending
+    feeRowSnaps.forEach((feeRowSnap) => {
+      if (feeRowSnap.exists) batch.update(feeRowSnap.ref, { feeOfTradeId: FieldValue.delete(), updatedAt: new Date() });
     });
 
     // Delete the asset

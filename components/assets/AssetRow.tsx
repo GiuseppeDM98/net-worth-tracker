@@ -291,7 +291,7 @@ export function AssetRow({
   const actionCount = 2 + (onCalculateTaxes ? 1 : 0) + (showLedgerActions ? 2 : 0) + (asset.type === 'pensionFund' ? 1 : 0);
   const deleteSpansRow = actionCount % 2 === 1;
 
-  // The EUR PMC (fees included, the G/P's basis) and, on a foreign row, the native one beside it.
+  // The EUR PMC (no fee, the G/P's basis) and, on a foreign row, the native one beside it.
   const pmcEur = isHandValued ? undefined : costBasisPerUnitEur(asset);
   const nativePmc = !isHandValued && !isEurNative(asset) && asset.averageCost ? asset.averageCost : undefined;
   const details: Array<{ label: string; value: string; className?: string }> = [

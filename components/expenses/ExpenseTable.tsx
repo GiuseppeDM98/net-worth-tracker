@@ -57,7 +57,8 @@ import { cn } from '@/lib/utils';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
 import { resolveOwnerLabel } from '@/lib/utils/movementsOwnerFilter';
-import { describeExpenseDeleteConsequence, EXPENSE_BUDGET_EXCLUSION_CHIP } from '@/lib/utils/dialogNarrative';
+import { describeExpenseDeleteConsequence, EXPENSE_BUDGET_EXCLUSION_CHIP, TRADE_FEE_ROW_DELETE_BLOCKED } from '@/lib/utils/dialogNarrative';
+import { isTradeFeeRow } from '@/lib/utils/tradeFeeExpense';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { EXPENSE_TYPE_BADGE_CLASS } from '@/lib/constants/expenseTypeColors';
 import { SeriesDeleteDialog, resolveSeriesDeleteMode, type SeriesDeleteRequest } from '@/components/expenses/SeriesDeleteDialog';
@@ -260,18 +261,21 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
             size="sm"
             onClick={isSeries ? () => onDelete(expense) : onArmedClick}
             onBlur={isSeries ? undefined : onBlur}
-            disabled={disabled}
+            // A trade's fee row leaves with its trade, in Patrimonio (2026-11-12).
+            disabled={disabled || isTradeFeeRow(expense)}
             aria-pressed={isSeries ? undefined : armed}
             aria-label={
               isDemo
                 ? 'Elimina — non disponibile in modalità demo'
-                : isSeries
-                  ? `Elimina ${rowName} o la sua serie`
-                  : armed
-                    ? `Premi di nuovo per eliminare ${rowName}`
-                    : `Elimina ${rowName}`
+                : isTradeFeeRow(expense)
+                  ? `Elimina ${rowName} — ${TRADE_FEE_ROW_DELETE_BLOCKED}`
+                  : isSeries
+                    ? `Elimina ${rowName} o la sua serie`
+                    : armed
+                      ? `Premi di nuovo per eliminare ${rowName}`
+                      : `Elimina ${rowName}`
             }
-            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+            title={isDemo ? 'Non disponibile in modalità demo' : isTradeFeeRow(expense) ? TRADE_FEE_ROW_DELETE_BLOCKED : undefined}
           >
             {armed ? <span className="px-1 text-xs">Conferma</span> : <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />}
           </Button>

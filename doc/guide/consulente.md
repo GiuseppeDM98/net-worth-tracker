@@ -114,7 +114,7 @@
 
 ## The run
 
-- **Three calls in series, persisted at every stage** (`runAllocationAdvice`; on the owner's account, mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
+- **Three calls in series, persisted at every stage** (`runAllocationAdvice`; on the mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
   of the Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, portfolio block included) and the
   CASHFLOW 12 MESI block, read beside it before the strategy stage (2026-11); the strategy
   on Opus 5.5 (effort `medium`, `max_tokens` 32 000, no tool); the instruments on Sonnet 5.5 (effort `high`) with

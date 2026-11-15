@@ -344,7 +344,7 @@ export function formatPortfolioForPrompt(portfolio: AssistantPortfolioContext): 
   }
   for (const row of ledger.rows) {
     lines.push(
-      `${row.dateIso} · ${ledgerTypeLabel(row.type)}${row.isBaseline ? ' (posizione iniziale di migrazione)' : ''} · ${row.assetName}${row.ticker ? ` (${row.ticker})` : ''}: ${quantity(row.quantity)} quote a ${eurCents(row.priceEur)} = ${eur(row.amountEur)}${row.feesEur > 0 ? `, commissioni ${eurCents(row.feesEur)}` : ''}`
+      `${row.dateIso} · ${ledgerTypeLabel(row.type)}${row.isBaseline ? ' (posizione iniziale di migrazione)' : ''} · ${row.assetName}${row.ticker ? ` (${row.ticker})` : ''}: ${quantity(row.quantity)} quote a ${eurCents(row.priceEur)} = ${eur(row.amountEur)}${row.feesEur > 0 ? `, commissioni ${eurCents(row.feesEur)}${row.feeIsSpendingRow ? ' (già fra le spese)' : ''}` : ''}`
     );
   }
   lines.push('');

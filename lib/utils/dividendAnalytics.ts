@@ -377,7 +377,7 @@ export interface DividendReliability {
  *
  * The tile's question is in the present tense — «posso contare su questo reddito?» — so with
  * `heldAssetIds` the signals are measured on the instruments STILL IN THE PORTFOLIO: a payer
- * sold since is history, and «Concentrazione alta: SPM.MI vale il 47%» on a sold stock was a
+ * sold since is history, and «Concentrazione alta: ABC.MI vale il 50%» on a sold stock was a
  * risk warning about money nobody can lose (2026-09-14, the owner's call). The window's
  * length is still the period's, never the subset's. Without the set every payer counts,
  * which is what the registry-only surfaces (the verdict's «da 3 strumenti») still read.

@@ -416,7 +416,7 @@ const visible = (nodes: PlanNode[]): PlanNode[] => nodes.filter((node) => node.a
  *
  * A plan is class → sub-category → instrument, and a sub-category that receives the whole of its
  * class's move and holds exactly ONE instrument prints the same euro figure twice under two
- * different names: «ETF Obbligazionari a Breve Termine +3000 €» over «iShares … (CSBGE3) +3000 €»,
+ * different names: «ETF Obbligazionari a Breve Termine +3000 €» over «iShares … (ABCD) +3000 €»,
  * «DBMFE +5000 €» over «iMGP DBi Managed Futures (DBMFE) +5000 €», «Bitcoin −2000 €» over
  * «WisdomTree Physical Bitcoin (WBIT) −2000 €». A third of the leg rows were that on a real
  * account, and they made the Piano tile ~1060px tall beside a ~380px neighbour.
@@ -777,7 +777,8 @@ function planLeaves(nodes: PlanNode[]): PlanNode[] {
  * gross figure and the reader receives less — on a product whose defensible claim is Italian
  * fiscal fidelity, quoting only the gross is the one number it declines to finish. The estimate
  * reuses `estimateSaleTax`, the app's ONE tax rule, on the same basis the sale ledger taxes: the
- * price difference of the slice being sold, fees excluded.
+ * gain of the slice being sold over the fiscal cost (`AllocatableHolding.costBasisEur`, purchase
+ * fees included, 2026-11-12).
  *
  * Selling a fraction f of a position realizes the fraction f of its unrealized gain, so the
  * taxable gain of a leg is `amount × (value − costBasisEur) / value`, floored at zero — a position

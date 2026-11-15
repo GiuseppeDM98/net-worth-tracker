@@ -10,7 +10,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Mutuo tile** (2026-09-25; per LOAN since 2026-10-10): `components/assets/tiles/MutuoTile.tsx`, pure `lib/utils/mortgageSummary.ts` (`summarizeMortgage`, `projectPayoff`, `interestPaidOf`), words `describeMortgage*` + `loanNoun` in `patrimonioNarrative.ts`, reader `getMortgageInstalments` + `lib/hooks/useMortgageInstalments.ts`; tests `__tests__/mortgageSummary.test.ts`, `e2e/cashflow.mortgage.spec.ts`
 - **Loans — a debt as an asset** (2026-10-10): `types/assets.ts` (`LOAN_ASSET_TYPE`, `isLoanAsset`, `Asset.financedAssetId`), the sign in `calculateAssetValue` (`lib/services/assetService.ts`, with `isFireExcluded`), `lib/utils/mortgageRepayment.ts` (`debtBalanceOf`, `debtBalanceField`, `isRepayableDebt`), the one-shot migration `lib/utils/loanMigration.ts` (pure plan) + `lib/services/loanMigration.ts` (fired by `app/dashboard/assets/page.tsx`), the Liquidità rows `isLiquidityRow` (`patrimonioSummary.ts`), the row's words `describeLoanRow`, the badge `resolveMortgageOf` (`AssetRow.tsx`), the form's «Prestito» card and `loanClassOf` (`AssetDialog.tsx`); tests `__tests__/loanAssets.test.ts`, `__tests__/updateAssetDebtFields.test.ts`, `e2e/cashflow.mortgage.spec.ts` (the migration case too)
 - **Intestatari** (2026-10-17; per QUOTA since the same day): the ONE slice primitive `lib/utils/assetSlice.ts` (`AssetSlice`, `sliceFraction`, `summarizeSlices`, `sliceUnit`), the pure `lib/utils/assetOwnership.ts` (`resolveAssetOwnership`, `summarizeOwnership`, `isOwnedHolding`, the Strumenti filter `listAssetOwnerFilterOptions`/`matchesAssetOwnerFilter`, the sub-line `describeAssetOwnerLabel`, `formatOwnerUnits`/`formatOwnerPercent`/`formatOwnerSlice`, `ownerShareSlice`), the words `describeOwnership*` + `describeOwnershipFooter` in `patrimonioNarrative.ts`, the tile `components/dashboard/overview/IntestatariTile.tsx` (Panoramica and Patrimonio), `Asset.ownerShares` (units or percent) + `Asset.ownerMemberId` (`types/assets.ts`), the form's «Intestatari» rows `OwnerSharesRows` in `AssetDialog.tsx` (the % | quote switch `ownerSharesMode`, `defaultOwnerSharesMode`, the schema's `ownerShares` refusal), the clear-guards in `assetService.ts` (`updateAsset`, `updateAssetMetadata`), the owner filter and the sub-line in `StrumentiTile.tsx`/`AssetRow.tsx`; tests `__tests__/assetSlice.test.ts`, `__tests__/assetOwnership.test.ts`, the answers in `patrimonioSummary.test.ts` and `overviewSummary.test.ts`; **the «Valore | Carico» switch** (2026-10-18): `costBasisOf` in `patrimonioSummary.ts` (the ONE «quantity × PMC in euro», the G/P's own), `OwnershipBasis`/`hasCostFigures` in `assetOwnership.ts`, `ownershipRowOn` in the leaf `ownershipBasis.ts` (every narrative imports `patrimonioNarrative`: never give that file a value import of `assetOwnership`), `describeOwnership(summary, basis)` + `describeOwnershipFooter(summary, basis)`, the `AsideToggle` and the memory `patrimonio.intestatari.base` in `IntestatariTile.tsx`; the carry cases in `__tests__/assetOwnership.test.ts`, the switch and its memory in `e2e/mobile-composition.patrimonio.spec.ts`
-- **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; specs `e2e/assets.bond.spec.ts`, `e2e/assets.ledger-meta.spec.ts` (a new ledger instrument under a cached `null` ledger meta, doc/guide/registro-operazioni.md § Per-page blind spots)
+- **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur` = the fee-free PMC, `fiscalCostPerUnitEur` = the fiscal cost, `unitPriceEur` = EUR against EUR), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; specs `e2e/assets.bond.spec.ts`, `e2e/assets.ledger-meta.spec.ts` (a new ledger instrument under a cached `null` ledger meta, doc/guide/registro-operazioni.md § Per-page blind spots)
 - **Light rows and dialogs** (2026-10-07): `StrumentiTile` (`!useCompactLayout()` since 2026-10-14, one list), `AssetRow` (`ASSET_ROW_LAZY_CHARTS`, the sparkline a `lazyComponent`), `AssetSparkline` (colours as a prop), the `{ open, mounted }` state and the openers in `app/dashboard/assets/page.tsx`, `onExitComplete` in `components/ui/responsive-modal.tsx`, the six watching leaves at the top of `AssetDialog.tsx`; specs `e2e/assets.rows.spec.ts` (1440) and `e2e/assets.rows.mobile.spec.ts` (390), the census scenario `asset` (`scripts/perfRenderCensus.mjs`)
 - **Suites to run after a change here — Asset / bond** (moved from `AGENTS.md` § Commands on 2026-09-30): `assetDialogHelpers`, `couponUtils` · **Composizione mobile** `patrimonioSummary` (with `describePatrimonioClosedAnswers`, the landscape index), `tabletComposition` · **Browser (tablet)** `e2e/patrimonio.tablet.spec.ts`
 
@@ -31,7 +31,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `lib/utils/bondPricing.ts` (2026-09-11, issue #340): `eurPerUnit = quote / 100 × nominalValue × indexationCoefficient`,
   with the nominal defaulting to **1 €** (`effectiveBondNominal`) — the quantity is then the nominal in euro, as on a
   broker statement (5.000 € of BTP → quantity 5000, quote 99,5 → 4.975 €) — and 1000 meaning the quantity counts
-  1.000 € lots (the owner's BTP Valore: quantity 10, 967,48 € per lot). Before the fix the conversion was skipped unless
+  1.000 € lots (e.g. a BTP Valore: quantity 10, 980 € per lot). Before the fix the conversion was skipped unless
   the nominal was set and > 1, so a bond saved with the field empty kept the raw quote as euro (93 % → 93 € per unit,
   93.000 € on quantity 1000) — and NO quantity made that right, because coupons, the final premium and the cron
   already assumed a 1 € unit. `isBondQuotedInPercent` (bond + bonds + ISIN) decides WHETHER a price is a quote;
@@ -48,12 +48,17 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   never read by the replay). A BTP€i without any coefficient is valued at par of the real price: understated by the
   accrued inflation, and declared in the form. The coupon side is in doc/guide/cashflow-dividendi.md.
 - **Inputs that receive a back-converted quote carry `step="any"`** (`manualPrice`, both `averageCost` fields, the
-  trade's price): a stored 967,4843 € per lot comes back as 96,74843 — five decimals — and a fixed `step="0.0001"` made
-  the browser's native validation refuse the form's OWN value on every edit of the owner's BTP Valore (found in the
+  trade's price): a stored 980,1234 € per lot comes back as 98,01234 — five decimals — and a fixed `step="0.0001"` made
+  the browser's native validation refuse the form's OWN value on every edit of a lot-quoted BTP Valore (found in the
   browser, 2026-09-11).
-- **Every G/P stands EUR against EUR, fees included — ONE rule in `lib/utils/costBasisEur.ts`** (2026-09-07, PR #326
-  merged with changes). `costBasisPerUnitEur` is the ledger's `averageCostEur` (the position's cost at trade-date
-  rates, purchase fees INCLUDED — the fiscal cost a capital gain is taxed on) when the ledger has projected it, the
+- **Two numbers, one module: the PMC for every G/P, the fiscal cost for every tax** (owner, 2026-11-12; EUR against EUR
+  since 2026-09-07, PR #326 merged with changes; `lib/utils/costBasisEur.ts`). A trade's fee is a spending row of its
+  own (doc/guide/registro-operazioni.md § The fee as a spending row), so the PMC carries none.
+  `fiscalCostPerUnitEur` is the ledger's `fiscalAverageCostEur` (the PMC plus the purchase fees — what a capital gain
+  is taxed on), falling back to the PMC; it is read by `assetService.calculateEstimatedTaxes`, the withdrawal tax
+  (`withdrawalTax.ts`), the Allocazione holdings (`allocationUtils.buildHoldings`) and `TaxCalculatorModal` (which
+  prints «Costo fiscale» beside «PMC» when they differ). `costBasisPerUnitEur` is the ledger's `averageCostEur` (the
+  position's cost at trade-date rates, no fee) when the ledger has projected it, the
   native `averageCost` only for a EUR-native asset until the backfill reaches it, and `undefined` for a foreign asset
   without a EUR PMC — the consumers then print nothing rather than a dollar PMC against a euro value, which is what
   every G/P did before. `unitPriceEur` is the per-unit twin of `calculateAssetValue`'s rule (`currentPriceEur`, else
@@ -64,15 +69,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `pdfDataService` (the Patrimonio section's rows), `TaxCalculatorModal` (the simulation runs in EUR on both sides
   and shows the native price and PMC as extra rows on a foreign asset), `yieldOnCost` (YOC and current yield over the
   EUR PMC and the EUR price; a foreign asset without a EUR PMC is left out). **The PMC cell prints the EUR PMC**, and
-  on a foreign row the native one under it (alone until the backfill). The owner's call: a PMC with fees is the
-  broker's fiscal figure; a EUR position's G/P therefore drops by its total purchase fees.
-- **`averageCostEur` is projected by every ledger mutation and, once, by `backfillAverageCostEur`** (`POST
+  on a foreign row the native one under it (alone until the backfill). Never one against the other (DESIGN → The
+  Same-Basis Rule): a G/P on the fiscal cost, or a tax on the PMC, would mix the two.
+- **The two PMCs are projected by every ledger mutation and, once, by `backfillAverageCostEur`** (`POST
   /api/asset-transactions/backfill-average-cost-eur`, fired by the Patrimonio page after the ledger migration, gated on
   the demo like every write): a pure re-projection of the trades' own `priceEur` — no FX call — that writes ONLY
-  `averageCostEur`, skips a closed position, logs and counts a ledger the replay rejects instead of failing, and stamps
-  `averageCostEurBackfilledAt` on the meta doc so it never runs twice. Until an account opens Patrimonio once, its
-  foreign positions have no G/P on the Panoramica and in the PDF, and its EUR positions measure against the
-  fee-excluded native PMC: honest, and one visit away from the fiscal figure.
+  `averageCostEur` and `fiscalAverageCostEur`, skips a closed position, logs and counts a ledger the replay rejects
+  instead of failing, and stamps `averageCostEurFeeFreeAt` on the meta doc so it never runs twice (re-run once on
+  2026-11-12: the PMC lost the fees; `averageCostEurBackfilledAt` is superseded). Until an account opens Patrimonio
+  once, its stored PMC still carries the fees and stands in for the fiscal cost; its foreign positions without a EUR
+  PMC have no G/P on the Panoramica and in the PDF.
+- **Deleting an asset unlinks its trades' fee rows** (2026-11-12, `app/api/assets/[assetId]/route.ts`): in the same
+  batch each row a trade names loses `feeOfTradeId`, so it stays as plain spending, deletable in Cashflow.
 - **Patrimonio Δ columns are UNIT-PRICE variations over time windows, not profit/loss and not value changes**
   (`lib/utils/assetPerformanceDeltas.ts`): the canonical EUR unit `totalValue / quantity` of the snapshot row against
   today's, the property (by TYPE `realestate` — a REIT ETF in that class is a quoted fund) gross of debt, pension
@@ -126,7 +134,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (`allocationRole: 'excluded'`, the form's hint says so), or the cash class would count a debt the per-instrument
   list does not show. On the Liquidità tile the row shares are of the money HELD (the positive balances) and an account
   in the red reads «debito» (`summarizeCashAccounts`, `shareOfCash: null`): shares of a total that nets the card out
-  read «138%» and «−57%» on the real account. The KPI «Sui conti» stays net of it.
+  read figures like «140%» and «−40%». The KPI «Sui conti» stays net of it.
 - **Peso is measured over the GROSS total** (cash accounts included), like the Classi and Liquidità shares —
   before the redesign the table measured it over the instruments only.
 - **Below `desktop:` the rows are `AssetRow`, flat and expandable** (CSS `grid-rows-[0fr] → [1fr]` with `inert`
@@ -140,7 +148,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `lazyComponent` — the only path from Patrimonio to recharts, so the page's initial JS lost recharts (764,7 → 655,8 KB
   gz) — preloaded when idle on a phone only, and its colours come from the page's ONE `useChartColors()` as a prop. It
   no longer animates its draw: the line used to animate inside the closed row at page load, so a reader opening a row
-  always found it already still. Before: 15 recharts charts, 30 rAF and 16 `getComputedStyle` on the owner's phone at
+  always found it already still. Before: one recharts chart per row, its rAF loop and its `getComputedStyle` on a phone at
   each visit, all closed. Pinned by `e2e/assets.rows{,.mobile}.spec.ts`. Class chips take
   their label from `ASSET_CLASS_LABELS` (Italian); `lib/utils/assetUtils.ts` with its English map is gone.
 - **A composite instrument is ONE row with a split chip** (2026-09-26): a 60/40 fund stays one row, grouped and sorted
@@ -179,7 +187,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   subCategory)`: a property, a pension fund, a private-equity stake, value in `quantity` at price 1 — prints «—» in
   Quantità/Prezzo/PMC and «valore a mano dal 12/08» under its name (`describeManualValuation`, off
   `lastPriceUpdate`), and **`hasCostBasis` is false for it**: its PMC equals its price by construction, so the G/P
-  was a structural «+0,00 €» (Academia Private Equity on the real account), a zero nothing measured. A quoted
+  was a structural «+0,00 €» (on a private-equity stake, for one), a zero nothing measured. A quoted
   instrument the owner prices by hand (`autoUpdatePrice: false`) keeps its real quantity, price and PMC. A bond
   prints «scade il 10/03/2032 · prossima cedola 10/12» (`resolveBondRowFacts` in `patrimonioSummary.ts` reads the
   dates the coupon scheduler already knows, `describeBondRow` in `patrimonioNarrative.ts` says them; the coupon

@@ -2,7 +2,7 @@
  * The nine chart slots of EVERY theme must be tellable apart in both modes — a rule DESIGN.md
  * stated in prose since 2026-08-30 (when the static teal at index 6 measured ΔE00 0.87 from
  * `--chart-2`) and nothing enforced: the default light palette shipped with Liquidità 10.1 ΔE00
- * from Immobili until the Panoramica critique of 2026-09-13 measured it on the real account.
+ * from Immobili until the Panoramica critique of 2026-09-13 measured it.
  *
  * Until 2026-09-20 the suite held the default theme only, and the named themes were a declared
  * blind spot. The owner's tour on solar-dusk showed what that costs: Obbligazioni and Immobili

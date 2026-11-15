@@ -47,9 +47,12 @@ function isFeeType(type: ExpenseType): type is ExpenseFeeType {
   return type !== 'income' && type !== 'transfer';
 }
 
-/** A row that IS a fee (it names the row it was charged for): it takes no fee of its own. */
-export function isFeeRow(row: Pick<Expense, 'feeOfTransferId'>): boolean {
-  return !!row.feeOfTransferId;
+/**
+ * A row that IS a fee (it names the row or the trade it was charged for): it takes no fee of its
+ * own, and no reader treats it as a pattern of the owner's spending.
+ */
+export function isFeeRow(row: Pick<Expense, 'feeOfTransferId' | 'feeOfTradeId'>): boolean {
+  return !!row.feeOfTransferId || !!row.feeOfTradeId;
 }
 
 /**

@@ -129,21 +129,21 @@ describe('calculateStampDuty', () => {
 });
 
 // ---------------------------------------------------------------------------
-// calculateUnrealizedGains — EUR against EUR, fees included, ONE number with the table
+// calculateUnrealizedGains — EUR against EUR on the fee-free PMC, ONE number with the table
 // ---------------------------------------------------------------------------
 
 describe('calculateUnrealizedGains', () => {
-  it('stands the EUR value against the EUR PMC with fees, never the native PMC (PR #326)', () => {
-    // 10 units at 100 USD (90 € at the trade date, 91 € with the fees); now 130 € a unit.
-    const usd = makeAsset({ currency: 'USD', quantity: 10, currentPrice: 145, currentPriceEur: 130, averageCost: 100, averageCostEur: 91 });
-    expect(calculateUnrealizedGains(usd)).toBeCloseTo(1300 - 910, 6);
+  it('stands the EUR value against the EUR PMC, never the native PMC (PR #326)', () => {
+    // 10 units at 100 USD (90 € at the trade date); now 130 € a unit.
+    const usd = makeAsset({ currency: 'USD', quantity: 10, currentPrice: 145, currentPriceEur: 130, averageCost: 100, averageCostEur: 90 });
+    expect(calculateUnrealizedGains(usd)).toBeCloseTo(1300 - 900, 6);
   });
 
-  it('counts the purchase fees on a EUR position too — the fiscal cost the gain is taxed on', () => {
-    const eur = makeAsset({ currency: 'EUR', quantity: 10, currentPrice: 120, averageCost: 100, averageCostEur: 101 });
-    expect(calculateUnrealizedGains(eur)).toBeCloseTo(1200 - 1010, 6);
-    // Estimated taxes follow the same basis.
-    expect(calculateTotalEstimatedTaxes([{ ...eur, taxRate: 26 }])).toBeCloseTo(190 * 0.26, 6);
+  it('measures the gain on the fee-free PMC and the estimated tax on the fiscal cost', () => {
+    // 10 units at 120 €, PMC 100, fiscal cost 101 (10 € of purchase fees).
+    const eur = makeAsset({ currency: 'EUR', quantity: 10, currentPrice: 120, averageCost: 100, averageCostEur: 100, fiscalAverageCostEur: 101, taxRate: 26 });
+    expect(calculateUnrealizedGains(eur)).toBeCloseTo(200, 6);
+    expect(calculateTotalEstimatedTaxes([eur])).toBeCloseTo(49.4, 6); // 26% × (1200 − 1010)
   });
 
   it('is zero where there is nothing to measure', () => {

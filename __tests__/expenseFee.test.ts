@@ -112,6 +112,10 @@ describe('isFeeRow', () => {
     expect(isFeeRow({ feeOfTransferId: 'parent' })).toBe(true);
     expect(isFeeRow({})).toBe(false);
   });
+
+  it('should recognise a trade fee row too: its trade owns it', () => {
+    expect(isFeeRow({ feeOfTradeId: 't1' })).toBe(true);
+  });
 });
 
 describe('buildExpenseFeeFormData', () => {

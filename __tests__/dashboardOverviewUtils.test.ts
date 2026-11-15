@@ -223,22 +223,22 @@ describe('computeTopMovers', () => {
 
   it('should NOT count a mortgage instalment as a market move on real estate', () => {
     // The snapshot's totalValue is net of debt (calculateAssetValue), so paying down the mortgage
-    // raises the net unit value while the property is worth exactly the same. Measured on the
-    // real account: "Immobili +1.036 €" for a month in which nothing but the debt moved.
+    // raises the net unit value while the property is worth exactly the same. Seen on a lived
+    // account: an «Immobili» gain for a month in which nothing but the debt moved.
     const assets = [
       makeAsset({
         id: 'home',
         type: 'realestate',
         assetClass: 'realestate',
         quantity: 1,
-        currentPrice: 130000,
-        outstandingDebt: 65600,
+        currentPrice: 200000,
+        outstandingDebt: 80000,
       }),
     ];
     const previous = makeSnapshot({
-      byAsset: [makeSnapshotAsset({ assetId: 'home', quantity: 1, price: 130000, totalValue: 130000 - 66645 })],
+      byAsset: [makeSnapshotAsset({ assetId: 'home', quantity: 1, price: 200000, totalValue: 200000 - 81000 })],
     });
-    expect(computeTopMovers(assets, previous, 64400)).toEqual([]);
+    expect(computeTopMovers(assets, previous, 120000)).toEqual([]);
     expect(computeMarketEffect(assets, previous)).toBe(0);
   });
 
@@ -249,14 +249,14 @@ describe('computeTopMovers', () => {
         type: 'realestate',
         assetClass: 'realestate',
         quantity: 1,
-        currentPrice: 135000,
-        outstandingDebt: 65600,
+        currentPrice: 205000,
+        outstandingDebt: 80000,
       }),
     ];
     const previous = makeSnapshot({
-      byAsset: [makeSnapshotAsset({ assetId: 'home', quantity: 1, price: 130000, totalValue: 130000 - 66645 })],
+      byAsset: [makeSnapshotAsset({ assetId: 'home', quantity: 1, price: 200000, totalValue: 200000 - 81000 })],
     });
-    expect(computeTopMovers(assets, previous, 69400)).toEqual([
+    expect(computeTopMovers(assets, previous, 125000)).toEqual([
       { assetClass: 'realestate', label: 'Immobili', delta: 5000 },
     ]);
   });
@@ -271,14 +271,14 @@ describe('computeTopMovers', () => {
           { assetClass: 'equity', percentage: 60 },
           { assetClass: 'bonds', percentage: 40 },
         ],
-        quantity: 28941,
+        quantity: 28800,
         currentPrice: 1,
       });
     const previous = () =>
       makeSnapshot({
         year: 2026,
         month: 7,
-        byAsset: [makeSnapshotAsset({ assetId: 'fund', quantity: 29106, price: 1, totalValue: 29106 })],
+        byAsset: [makeSnapshotAsset({ assetId: 'fund', quantity: 29000, price: 1, totalValue: 29000 })],
       });
     const contribution = (overrides: Partial<PensionContribution> = {}): PensionContribution => ({
       id: 'c1',
@@ -294,13 +294,13 @@ describe('computeTopMovers', () => {
     });
 
     it("should subtract the contributions registered since the previous snapshot from the fund's change", () => {
-      // Value 29.106 → 28.941 with 500 € paid in during August: the market lost 665 €, not 165.
+      // Value 29.000 → 28.800 with 500 € paid in during August: the market lost 700 €, not 200.
       const pension = { contributions: [contribution()], startMonth: '2026-07' };
-      expect(computeMarketEffect([fund()], previous(), pension)).toBe(-665);
+      expect(computeMarketEffect([fund()], previous(), pension)).toBe(-700);
       // …shown as its own "Previdenza" line, like Storico's band — folded into Azioni/Obbligazioni
-      // through the fund's composition it becomes invisible ("Azioni +2.842" instead of +2.964).
-      expect(computeTopMovers([fund()], previous(), 28941, pension)).toEqual([
-        { assetClass: 'pension', label: 'Previdenza', delta: -665 },
+      // through the fund's composition it becomes invisible inside the class it is split into.
+      expect(computeTopMovers([fund()], previous(), 28800, pension)).toEqual([
+        { assetClass: 'pension', label: 'Previdenza', delta: -700 },
       ]);
     });
 
@@ -310,7 +310,7 @@ describe('computeTopMovers', () => {
         contributions: [contribution({ createdAt: new Date(2026, 6, 20, 12) })],
         startMonth: '2026-07',
       };
-      expect(computeMarketEffect([fund()], previous(), pension)).toBe(-165);
+      expect(computeMarketEffect([fund()], previous(), pension)).toBe(-200);
     });
 
     it('should attribute by the month the value moved (createdAt), never by the accounting date', () => {
@@ -319,7 +319,7 @@ describe('computeTopMovers', () => {
         contributions: [contribution({ date: new Date(2026, 5, 30, 12), createdAt: new Date(2026, 7, 10, 12) })],
         startMonth: '2026-07',
       };
-      expect(computeMarketEffect([fund()], previous(), pension)).toBe(-665);
+      expect(computeMarketEffect([fund()], previous(), pension)).toBe(-700);
     });
 
     it('should stay silent on a fund whose contributions are not tracked for the window', () => {
@@ -457,13 +457,13 @@ describe('computeTopInstrumentMovers', () => {
         { assetClass: 'equity', percentage: 60 },
         { assetClass: 'bonds', percentage: 40 },
       ],
-      quantity: 28941,
+      quantity: 28800,
       currentPrice: 1,
     });
     const previous = makeSnapshot({
       year: 2026,
       month: 7,
-      byAsset: [makeSnapshotAsset({ assetId: 'fund', quantity: 29106, price: 1, totalValue: 29106 })],
+      byAsset: [makeSnapshotAsset({ assetId: 'fund', quantity: 29000, price: 1, totalValue: 29000 })],
     });
     const pension = {
       contributions: [
@@ -482,10 +482,10 @@ describe('computeTopInstrumentMovers', () => {
       startMonth: '2026-07',
     };
 
-    const instruments = computeTopInstrumentMovers([fund], previous, 28941, pension);
-    const classes = computeTopMovers([fund], previous, 28941, pension);
+    const instruments = computeTopInstrumentMovers([fund], previous, 28800, pension);
+    const classes = computeTopMovers([fund], previous, 28800, pension);
 
-    expect(instruments).toEqual([{ id: 'fund', name: 'Fondo Cometa', delta: -665 }]);
+    expect(instruments).toEqual([{ id: 'fund', name: 'Fondo Cometa', delta: -700 }]);
     expect(instruments.reduce((sum, m) => sum + m.delta, 0)).toBe(classes.reduce((sum, m) => sum + m.delta, 0));
   });
 
@@ -545,20 +545,20 @@ describe('computeTopInstrumentMovers', () => {
 // «Asset principali» lists a property NET of its mortgage (owner, 2026-10-17). Seen red with the
 // mortgage left as a row (the debt counted twice) and with the house gross.
 describe('rankTopAssets', () => {
-  const house = makeAsset({ id: 'house', name: 'Casa', ticker: '', type: 'realestate', assetClass: 'realestate', quantity: 1, currentPrice: 130000 });
+  const house = makeAsset({ id: 'house', name: 'Casa', ticker: '', type: 'realestate', assetClass: 'realestate', quantity: 1, currentPrice: 140000 });
   const mortgage = makeAsset({ id: 'mortgage', name: 'Mutuo Casa', ticker: '', type: 'loan', assetClass: 'realestate', quantity: 95000, currentPrice: 1, financedAssetId: 'house' });
   const etf = makeAsset({ id: 'etf', name: 'World', ticker: 'VWCE', quantity: 100, currentPrice: 500, averageCostEur: 400 });
   const carLoan = makeAsset({ id: 'car', name: 'Prestito auto', ticker: '', type: 'loan', assetClass: 'cash', quantity: 8000, currentPrice: 1 });
-  // The page's net worth: 130000 − 95000 + 50000 − 8000.
-  const total = 77000;
+  // The page's net worth: 140000 − 95000 + 50000 − 8000.
+  const total = 87000;
 
   it('nets the mortgage into its property, declares it, and lists no mortgage row', () => {
     const rows = rankTopAssets([house, mortgage, etf, carLoan], total);
     expect(rows.map((r) => r.id)).toEqual(['etf', 'house', 'car']);
     const casa = rows.find((r) => r.id === 'house')!;
-    expect(casa.totalValue).toBe(35000);
+    expect(casa.totalValue).toBe(45000);
     expect(casa.debtNetted).toBe(95000);
-    expect(casa.portfolioPercent).toBeCloseTo((35000 / total) * 100, 6);
+    expect(casa.portfolioPercent).toBeCloseTo((45000 / total) * 100, 6);
     expect(casa.returnPercent).toBeNull();
     // A personal loan has nothing to net against: a negative row, last, undeclared.
     expect(rows.find((r) => r.id === 'car')).toMatchObject({ totalValue: -8000 });

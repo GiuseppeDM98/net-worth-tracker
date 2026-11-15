@@ -155,8 +155,8 @@ export function getItalyDayBoundsUtc(date: Date = new Date()): { start: Date; en
  *
  * Why not `new Date(year, month - 1, 1)`: that is the PROCESS zone's midnight, and on Vercel the
  * process runs in UTC. The expense form stores a row at Italian midnight (22:00 or 23:00 UTC of
- * the day before), so a UTC month window filed a row dated «1 agosto» under July — on the owner's
- * account 30 rows of 1793 sat in the wrong month for the assistant while Cashflow › Tracciamento,
+ * the day before), so a UTC month window filed a row dated «1 agosto» under July — on a lived
+ * account the rows of every 1st sat in the wrong month for the assistant while Cashflow › Tracciamento,
  * which slices by Italian calendar day, had them right (2026-10-20). Both ends inclusive, like
  * `endOfMonthBound` and `getItalyDayBoundsUtc`.
  *

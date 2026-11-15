@@ -60,6 +60,8 @@ export function useDeleteAsset(userId: string) {
       // Invalidate to remove deleted asset from UI
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(userId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(userId) });
+      // Its trades' fee rows were unlinked by the same delete (2026-11-12): Cashflow unlocks them.
+      queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(userId) });
     },
   });
 }

@@ -17,11 +17,10 @@ import { roundToCents } from '@/lib/utils/cents';
 /**
  * Loss → no tax; missing rate → unknown (`null`), never zero. Unrounded.
  *
- * Takes the TAXABLE gain — the replay's `LedgerTransactionEffect.taxableGainEur`, the pure price
- * difference with no commission on either side — never the realized P&L, which is net of the
- * sale's fees over a cost basis that includes the purchase fees. On the owner's statement the four
- * sells of settembre 2026 were taxed on 15.740,38 € (the net 15.726,38 € plus their 14 € of fees):
- * 4.092,50 € to the cent, where the net gain gave 4.088,86 €.
+ * Takes the TAXABLE gain — the replay's `taxableGainEur`: the sale's gross minus its fee minus the
+ * fiscal cost of the units sold (purchase fees included, owner, 2026-11-12) — never the realized
+ * P&L, which is fee-free. It sits below what a broker that ignores commissions withholds by
+ * fees × rate; the typed figure wins.
  */
 export function estimateSaleTax(taxableGain: number, taxRate: number | undefined | null): number | null {
   if (taxRate === undefined || taxRate === null) return null;

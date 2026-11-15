@@ -71,7 +71,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   list on every period switch; **indices 0-7 are theme-aware** since 2026-08-30 (`--chart-1..8` in all twelve blocks),
   index 8 (`--chart-9`) since 2026-09-20, only 9 pads from the static `CHART_COLORS`.
 - **The default theme's light slots hold the dark hue bands** (2026-09-13): `:root --chart-1..5` were re-pitched from
-  the shadcn preset (three oranges and two teals — Liquidità measured ΔE00 10.1 from Immobili on the real account's
+  the shadcn preset (three oranges and two teals — Liquidità measured ΔE00 10.1 from Immobili on the
   Composizione bar, and the hero's rising curve wore the hue of `--destructive`) onto blue · green · amber · violet ·
   coral with L and C set for white. **The floor is a test**, `__tests__/chartPaletteDistinctness.test.ts`: it reads
   `globals.css` itself, ΔE00 ≥ 14 between any two slots of a mode, every slot inside the `useChartColors` luminance

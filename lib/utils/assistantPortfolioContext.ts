@@ -75,7 +75,7 @@ export interface AssistantHoldingRow {
   currency: string;
   /** EUR, negative on a loan. */
   valueEur: number;
-  /** The fiscal PMC per unit in EUR, fees included; absent where there is no PMC to read. */
+  /** The PMC per unit in EUR, no fee (2026-11-12); absent where there is no PMC to read. */
   costPerUnitEur?: number;
   /** quantity × costPerUnitEur; absent with it. */
   costBasisEur?: number;
@@ -152,6 +152,8 @@ export interface AssistantLedgerRow {
   quantity: number;
   priceEur: number;
   feesEur: number;
+  /** The fee has its spending row in Cashflow (2026-11-12): it is already among the expenses. */
+  feeIsSpendingRow: boolean;
   /** quantity × priceEur (fees aside). */
   amountEur: number;
   isBaseline: boolean;
@@ -495,6 +497,7 @@ function buildLedger(transactions: AssetTransaction[], assets: Asset[]): Assista
       quantity: transaction.quantity,
       priceEur: transaction.priceEur,
       feesEur: transaction.fees ?? 0,
+      feeIsSpendingRow: !!transaction.feeExpenseId,
       amountEur: transaction.quantity * transaction.priceEur,
       isBaseline: transaction.isBaseline === true,
     };

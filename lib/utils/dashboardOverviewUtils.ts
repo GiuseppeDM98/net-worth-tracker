@@ -60,8 +60,8 @@ const monthKeyOf = (year: number, month: number) => `${year}-${String(month).pad
  *   - an instrument TRADED since the previous snapshot is measured from the ledger instead
  *     (`tradeAwarePriceEffect`): the price move of the quotes bought or sold in the month, from
  *     the trade price to today, is market too — a position opened this month used to contribute
- *     0, and on the real account settembre 2026 that parked +538 € in «tuoi movimenti», which the
- *     owner read as income − expenses (2026-09-19);
+ *     0, and on a lived account that parked a few hundred € in «tuoi movimenti», which the
+ *     reader read as income − expenses (2026-09-19);
  *   - cash (unit value 1) and any hand-valued asset kept at price 1 can never show a market
  *     effect — their growth lands in the quantity effect by construction. PENSION FUNDS are the
  *     exception, handled separately: their value lives in `quantity` at price 1 and moves for two
@@ -71,8 +71,8 @@ const monthKeyOf = (year: number, month: number) => `${year}-${String(month).pad
  *     contributions were not recorded and the whole growth would read as return, so the fund
  *     contributes 0 — the settings card says exactly this;
  *   - real estate is measured GROSS of debt: `calculateAssetValue` nets the mortgage out, so on
- *     the net value a mere instalment would read as the property appreciating (measured on the
- *     real account: "Immobili +1.036 €" in a month where only the debt moved). The snapshot's
+ *     the net value a mere instalment would read as the property appreciating (seen live as,
+ *     say, "Immobili +1.000 €" in a month where only the debt moved). The snapshot's
  *     raw `price` is the gross property value, so both sides use `quantity × price` instead.
  *
  * Returns null when the previous snapshot has no per-asset breakdown (older or hand-entered

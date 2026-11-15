@@ -59,6 +59,8 @@
 
 ## 🐛 Bug Fixes
 
+- **Cashflow › Dividendi — la cedola indicizzata del giorno** — Fixed the «Imposta il dato d'inflazione» banner disappearing on the very day an inflation-linked coupon is paid: a provisional coupon now stays in the banner through its payment day, by the Italian calendar.
+
 - **Tasso di risparmio — Panoramica · Assistente · Cashflow · Analisi · Hall of Fame · PDF · email** — Fixed a month with almost no income printing an absurd savings rate («Hai messo da parte il −16567% delle entrate finora»): below −100%, or with spending and no income, the app now speaks in euros, as in «Finora hai messo da parte −497 €: le spese superano le entrate», and the month's bar on «Risparmio nel tempo» no longer squashes the others. The twelve-month average now weighs each month by its income («In media il 33% su 10 mesi misurabili»), a negative rate keeps its minus everywhere, the Hall of Fame included, and the article follows the figure («l'81%», «Stipendio copre l'86,1%», where it read «il 81%»).
 
 - **Patrimonio — registro operazioni** — Fixed two tabs open at once overwriting a correction of the ledger or moving an account twice: a trade edited or deleted from a list that is no longer current is refused («Operazione non trovata.», «L'operazione è cambiata nel frattempo: riapri e riprova.») and the list refreshes by itself. A new ETF or bond created on a device that had not yet seen the ledger now gets its first purchase recorded too.
@@ -105,6 +107,8 @@
 - **Rendimenti › Analizza con AI** — Fixed the empty or cut-off report: when the model declines to write it, another model takes over where the kind of refusal allows it, and the dialog names the model that actually wrote the report; when the refusal stands, or the report reaches its maximum length, the dialog says so — refused, or stopped halfway with the text written so far incomplete — and «Rigenera» is offered after any failure, not only beside a finished report.
 
 ## 🔧 Improvements
+
+- **Patrimonio · Cashflow — le commissioni** — Improved trade commissions: a buy's or a sale's commission (the first purchase's too, now typed in the new-instrument form) becomes a spending entry in the fee category of Impostazioni › Spese that moves and leaves with its trade and cannot be deleted or re-amounted in Tracciamento, and it no longer weighs on the average cost. Every tax estimate still counts it — the sale simulation prints «Costo fiscale» beside the PMC — while commissions recorded earlier stay on their trades.
 
 - **Storico › Driver** — «Altre variazioni» no longer hides what it holds: the growth that nothing else explains is split into three named parts that still add up to the euro — «Fondo pensione non tracciato» (a pension fund's growth that is neither return nor a recorded contribution), «Quantità fuori dal registro» (units that appeared or changed with no purchase or sale in the ledger, or a hand-valued stake revalued) and «Saldi dei conti» (account balances typed on a different day than the spending, such as a card debited the month after). You see them in each year's ledger, in the hover and the table of the last twelve months, in the month tooltip of «Risparmio e mercato per mese» and in «Come si calcola»; the sentence above the ledger names the rest by its part when only one is left.
 - **Ogni pagina — il nome** — The app is called «Net Worth Tracker» everywhere you read it: the browser tab, the sidebar, the top bar of a phone held sideways, the login and registration pages and the landing.

@@ -195,8 +195,8 @@ function preparePortfolioData(assets: Asset[]): PortfolioData {
   let totalUnrealizedGains = 0;
   const assetRows: AssetRow[] = assets.map(asset => {
     const value = calculateAssetValue(asset);
-    // The same G/P as the Strumenti table: EUR value against the EUR PMC, fees included
-    // (costBasisEur.ts); a foreign asset without a EUR PMC prints no G/P rather than a wrong one.
+    // The same G/P as the Strumenti table: EUR value against the fee-free EUR PMC
+    // (costBasisEur.ts, 2026-11-12); a foreign asset without a EUR PMC prints no G/P rather than a wrong one.
     const gain = computeUnrealizedGain(asset);
     totalUnrealizedGains += gain?.gainLoss ?? 0;
 

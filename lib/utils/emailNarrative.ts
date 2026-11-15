@@ -271,7 +271,7 @@ export interface PeriodEmailVerdictInput {
    * saw, which is why the tile that prints it says so and the verdict never calls it
    * "performance". The tax is taken OUT of it because the ledger knows it (`sales`): the broker's
    * withholding leaves the account with no cashflow row, and read as «mercato» it turned a
-   * 4.000 € tax into a market loss on the real account (settembre 2026).
+   * sale's tax into a market loss (seen live).
    */
   marketEffect: number | null;
   /**

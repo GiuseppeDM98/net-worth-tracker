@@ -329,7 +329,7 @@ export interface CompanionReturnChip {
  *
  * Until 2026-09-07 this chip printed the ROI under «ROI del periodo» — a gain divided by the FIRST
  * month's capital, which is not the period's return and grows with the window on a saver's
- * account (+126% against a +134% cumulative TWR on the real account).
+ * account (seen live several points away from the cumulative TWR).
  */
 export function resolveCompanionReturnChip(
   annualizedReturn: number | null,

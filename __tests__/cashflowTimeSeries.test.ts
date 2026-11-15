@@ -93,8 +93,8 @@ describe('buildTimeBuckets', () => {
   });
 
   it('closes the axis on the ceiling, so a materialised plan does not draw the years ahead', () => {
-    // A 2027 instalment is a calendar row, not a history bucket (seventeen empty years on the
-    // real account, 2026-09-14). The running year keeps its own bucket, calendar included.
+    // A 2027 instalment is a calendar row, not a history bucket (years of empty buckets on a
+    // lived account, 2026-09-14). The running year keeps its own bucket, calendar included.
     const expenses: Expense[] = [
       makeExpense({ type: 'income', amount: 1000, date: d(2025, 3) }),
       makeExpense({ type: 'fixed', amount: -100, date: d(2026, 10) }),

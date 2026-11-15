@@ -6,10 +6,9 @@
  *   netWorthGrowth = netSavings + market − taxes + debtRepaid + pensionContributions + other
  *
  * Why not the old «market = growth − savings»: that residual charged the market with every euro
- * the cashflow does not record. On the real account (settembre 2026) it read −557 € in a month the
- * portfolio gained ~1.800 €: the broker withheld ~4.089 € of capital-gains tax on a VWCE sale
- * (regime amministrato: no cashflow row), and the month's savings counted 1.297 € of instalments
- * still in calendar after the snapshot. So:
+ * the cashflow does not record. In a month of 2026-09 it read a market LOSS while the portfolio
+ * gained: the broker withheld the capital-gains tax on a sale (regime amministrato: no cashflow
+ * row), and the month's savings counted instalments still in calendar after the snapshot. So:
  *
  *   - `netSavings` counts only the rows ALREADY happened (Italian calendar day ≤ `today`): the
  *     snapshot that closes a running month is a photo of today, and the savings stand on the same
@@ -60,7 +59,7 @@ import type { AssetTransaction } from '@/types/assetTransactions';
 import type { PensionContribution } from '@/types/pension';
 import { getItalyDateIso, getItalyMonth, getItalyYear, ITALY_TIMEZONE } from '@/lib/utils/dateHelpers';
 import { attributeSelectedChange } from '@/lib/utils/snapshotAssetBreakdown';
-import { debtRepaymentsBetween, isLoanRowOf, pensionPaidInAcross, pensionPaidInBetween, tradeAwarePriceEffect, type PositionValue } from '@/lib/utils/marketEffect';
+import { debtRepaymentsBetween, isLoanRowOf, pensionPaidInAcross, pensionPaidInBetween, tradeAwarePriceEffect, tradeMoneyIn, type PositionValue } from '@/lib/utils/marketEffect';
 import { summarizePeriodSales } from '@/lib/utils/periodSales';
 
 export interface GrowthDrivers {
@@ -219,16 +218,6 @@ export function createGrowthDriverMeter(context: GrowthDriverContext) {
       byAsset.set(assetId, effect);
     }
     return { market, byAsset };
-  }
-
-  /** Net money the recorded trades put into an instrument in the window (buys in, sells out, fees as the market effect counts them). */
-  function tradeMoneyIn(trades: AssetTransaction[]): number {
-    let moneyIn = 0;
-    for (const trade of trades) {
-      if (trade.type === 'buy' && !trade.isBaseline) moneyIn += trade.quantity * trade.priceEur + (trade.fees ?? 0);
-      else if (trade.type === 'sell') moneyIn -= trade.quantity * trade.priceEur - (trade.fees ?? 0);
-    }
-    return moneyIn;
   }
 
   /**

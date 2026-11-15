@@ -30,7 +30,7 @@ function expense(partial: Partial<Expense> & { id: string; date: Date; amount: n
   };
 }
 
-const TARGET = { id: 'jogger', name: 'Dacia Jogger' };
+const TARGET = { id: 'auto-tapiro', name: 'Auto Tapiro' };
 
 // Twelve monthly instalments of 50 €, January → December 2026: eight paid, four to come.
 const POLIZZA = Array.from({ length: 12 }, (_, i) =>
@@ -49,7 +49,7 @@ const POLIZZA = Array.from({ length: 12 }, (_, i) =>
 const ROWS: Expense[] = [
   expense({ id: 'benzina', date: day('2026-08-10'), amount: -70, subCategoryName: 'Carburante', notes: 'Pieno Q8' }),
   expense({ id: 'tagliando', date: day('2026-05-10'), amount: -430, subCategoryName: 'Manutenzione' }),
-  expense({ id: 'gia-collegata', date: day('2026-03-01'), amount: -90, costCenterId: 'jogger', costCenterName: 'Dacia Jogger' }),
+  expense({ id: 'gia-collegata', date: day('2026-03-01'), amount: -90, costCenterId: 'auto-tapiro', costCenterName: 'Auto Tapiro' }),
   expense({ id: 'autostrada', date: day('2025-08-14'), amount: -38, costCenterId: 'vacanze', costCenterName: 'Vacanze', notes: 'Casello' }),
   // A refund: spending by type, a positive amount. A center reads only outgoing rows, so linking it would hide it.
   expense({ id: 'rimborso', date: day('2026-06-02'), amount: 25, notes: 'Rimborso officina' }),
@@ -84,12 +84,12 @@ describe('buildLinkCandidates', () => {
   });
 
   it('stands a partly linked series for what is left, and drops one fully linked', () => {
-    const partly = ROWS.map((row) => (row.id === 'rata-1' || row.id === 'rata-2' ? { ...row, costCenterId: 'jogger', costCenterName: 'Dacia Jogger' } : row));
+    const partly = ROWS.map((row) => (row.id === 'rata-1' || row.id === 'rata-2' ? { ...row, costCenterId: 'auto-tapiro', costCenterName: 'Auto Tapiro' } : row));
     const left = buildLinkCandidates(partly, TARGET.id, NOW).find((c) => c.key === 'series:polizza')!;
     expect(left.rows.map((r) => r.id)).not.toContain('rata-1');
     expect(left.series?.count).toBe(10);
 
-    const fully = ROWS.map((row) => (row.installmentParentId ? { ...row, costCenterId: 'jogger', costCenterName: 'Dacia Jogger' } : row));
+    const fully = ROWS.map((row) => (row.installmentParentId ? { ...row, costCenterId: 'auto-tapiro', costCenterName: 'Auto Tapiro' } : row));
     expect(buildLinkCandidates(fully, TARGET.id, NOW).some((c) => c.key === 'series:polizza')).toBe(false);
   });
 
@@ -158,8 +158,8 @@ describe('the write and its undo', () => {
   it('writes id AND name on every row, and remembers each row as it was', () => {
     const plan = buildLinkPlan(candidates, new Set(['autostrada', 'benzina']), TARGET);
     expect(plan.writes).toEqual([
-      { expenseId: 'benzina', costCenterId: 'jogger', costCenterName: 'Dacia Jogger' },
-      { expenseId: 'autostrada', costCenterId: 'jogger', costCenterName: 'Dacia Jogger' },
+      { expenseId: 'benzina', costCenterId: 'auto-tapiro', costCenterName: 'Auto Tapiro' },
+      { expenseId: 'autostrada', costCenterId: 'auto-tapiro', costCenterName: 'Auto Tapiro' },
     ]);
     // The undo gives Vacanze its row back: «Annulla» restores, it does not merely unlink.
     expect(plan.undo).toEqual([
@@ -173,10 +173,10 @@ describe('the write and its undo', () => {
   });
 
   it('unlinks towards no center, with the same two-sided plan', () => {
-    const linked = { ...ROWS[0], costCenterId: 'jogger', costCenterName: 'Dacia Jogger' };
+    const linked = { ...ROWS[0], costCenterId: 'auto-tapiro', costCenterName: 'Auto Tapiro' };
     expect(buildUnlinkPlan([linked])).toEqual({
       writes: [{ expenseId: 'benzina', costCenterId: null, costCenterName: null }],
-      undo: [{ expenseId: 'benzina', costCenterId: 'jogger', costCenterName: 'Dacia Jogger' }],
+      undo: [{ expenseId: 'benzina', costCenterId: 'auto-tapiro', costCenterName: 'Auto Tapiro' }],
     });
   });
 

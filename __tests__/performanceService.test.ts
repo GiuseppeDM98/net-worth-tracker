@@ -1061,6 +1061,13 @@ describe('getCashFlowsFromExpenses', () => {
     expect(result.every(cf => cf.date < new Date(2025, 2, 1))).toBe(true)
   })
 
+  it('should leave a trade\'s fee row out of the money moved: the return stays net of it', () => {
+    const feeRow = { ...makeExpense(2025, 4, 10, 'variable', -5), feeOfTradeId: 't1' }
+    const result = getCashFlowsFromExpenses([makeExpense(2025, 4, 5, 'income', 1000), feeRow], new Date(2025, 3, 1), new Date(2025, 3, 30))
+    expect(result).toHaveLength(1)
+    expect(result[0].netCashFlow).toBe(1000)
+  })
+
   it('should separate dividend income from regular income', () => {
     const start = new Date(2025, 0, 1)
     const end = new Date(2025, 1, 28)

@@ -53,7 +53,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   hex WinAnsi (`<53746f72>` = «Stor») inside kerned `TJ` arrays that split words, and the metric labels are printed
   uppercase: compare space-free and case-insensitively. **And render with the REAL data path too** (2026-09-07): a
   section rendered from hand-typed metrics passed every word while the owner's own export still ran
-  `preparePerformanceData` without the ledger (26,05% against the page's 27,08%) — call `fetchPDFData` through the
+  `preparePerformanceData` without the ledger (a return about a point off the page's) — call `fetchPDFData` through the
   client SDK on the emulators (a `globalThis.fetch` shim prefixes the tour server's origin to the relative yield
   routes) and compare its metrics with `getAllPerformanceData`'s.
 - **The note under «Risparmio netto»** is `describeNetSavingsNote(income, spending)` (`pdfNarrative.ts`, 2026-11-12):
@@ -128,9 +128,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The email's «mercato» nets out the tax on the period's sales** (2026-09-11): `marketEffectOf` = `Δ − risparmio
   netto + tasse stimate` (`MonthlyEmailData.periodSales`, read from the ledger by `summarizePeriodSales` over the
   email's own window, `null` without a sale, never blocking). Why: the broker's withholding leaves the account with no
-  cashflow row, so inside the residual a 4.089 € tax read as a market loss on the real account (settembre 2026). The
+  cashflow row, so inside the residual a 4.000 € tax read as a market loss. The
   verdict then follows the Panoramica's `resolveDeclineCause` («il mercato ha pesato, le tasse sulle vendite di più»),
-  the split has THREE parts that still sum to Δ («… viene dal mercato, +988 € da quanto hai risparmiato e −4089 €
+  the split has THREE parts that still sum to Δ («… viene dal mercato, +1000 € da quanto hai risparmiato e −4000 €
   dalle tasse sulle vendite»), the sale is told by `describeSales` and the Patrimonio tile's footer names the tax
   «circa». The AI prompt's market block is unchanged (it still prints `Δ − risparmio`): a known asymmetry, and a
   tax the owner ALSO records as a cashflow expense would be counted twice in the split (doc/guide/panoramica.md § Per-page blind spots).

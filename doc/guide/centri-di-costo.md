@@ -24,10 +24,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   cost. A backdated row moves the total AND the crossing day retroactively.
 - **A CENTER HAS NO PACE (2026-09-18, the owner's call).** A window's end is what is booked plus what is already
   in the calendar — `ytd` + `yearScheduled`, `monthSpentToDate` + `monthScheduled` — and nothing else: no
-  `projectWindowEndWithScheduled`, no «al ritmo attuale», no «~» (it is a sum). Two reasons, both measured on
-  the owner's account: a recurring series is N REAL future rows, so its future already sits in `scheduled` and
-  pacing its booked part counted it twice (50 €/month of insurance read 779 € at year end instead of 600); and
-  a project spends in blocks — a 1650 € repair on the 17th read «~2942 € a fine mese». Budget KEEPS its pace (a
+  `projectWindowEndWithScheduled`, no «al ritmo attuale», no «~» (it is a sum). Two reasons, both
+  seen on real data (the figures here are illustrative): a recurring series is N REAL future rows, so its future already sits in `scheduled` and
+  pacing its booked part counted it twice (100 €/month of insurance read ~1300 € at year end instead of 1200); and
+  a project spends in blocks — a 1500 € repair on the 15th read «~3000 € a fine mese». Budget KEEPS its pace (a
   category of groceries is smooth; a project is not): do not «unify» the two. The cells are «Questo mese» /
   «Quest'anno» — the figure is what is BOOKED in the window, the caption adds the calendar («con il calendario
   chiude a 1100 €, 100 € oltre») or says «speso finora»; the verdict of a center without a ceiling adds «con
@@ -80,7 +80,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
     already paid would leave «con il calendario chiude a …» blind to the rest of the plan.
   - **An expense has ONE center, so linking a row of another center MOVES it**: those rows are hidden until
     «Mostra anche quelle di altri centri», carry «di {centro}», and the reading — which is the status line —
-    says «3 passano da Vacanze a Dacia Jogger» BEFORE the confirm. The summary runs over ALL the candidates, not
+    says «3 passano da Vacanze a Auto Tapiro» BEFORE the confirm. The summary runs over ALL the candidates, not
     the filtered ones: a tick survives a change of filter, and the confirm must never write more than it announced.
   - **Every write is a two-sided plan** (`buildLinkPlan` / `buildUnlinkPlan` → `writes` + `undo`, each row exactly
     as it was, its previous center included), so the outcome toast's «Annulla» is a second write, not a guess.
@@ -167,4 +167,4 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 ## Per-page blind spots
 
 - **The detail's rows are remembered for every centre at once** (2026-10-12): a Movimenti collegati opened on one centre is open on the next, because the memory is the page's (`cost-centers-center`), not the centre's — the list keeps its own.
-- **Centri di Costo**: **habitual spending typed by hand (fuel) is not foreseen** — a window's end is booked + calendar, by decision; two centers saved with the same colour before 2026-09-18 stay the same colour until one is edited (no backfill); «Per categoria» is not rendered for a center with one category (it would repeat the hero) and Ciclo di vita takes its columns; the expense form lists an archived center only on the expense already linked to it; «Collega spese…» is disabled on an archived center and offers no refund (a positive amount — see above) and no income; its list is the account's WHOLE expense history read once per open (`useExpenses`, ~1500 rows on the real account, 50 shown at a time); «Annulla» lives as long as its toast; the list's «Media 12 mesi» and the detail's «Al mese» are two magnitudes on purpose (trailing year / 12 vs whole cost / months since the first expense); an annual ceiling has no crossing day (`crossedOn` is monthly only); «Al mese» divides by the calendar months since the first expense (an idle project reads as a lower monthly cost, by design); «in totale» counts rows dated up to today (a future row is «in calendario»); the subcategory lens and the movements window (25 + «Mostra altre») are per-center, session-only state.
+- **Centri di Costo**: **habitual spending typed by hand (fuel) is not foreseen** — a window's end is booked + calendar, by decision; two centers saved with the same colour before 2026-09-18 stay the same colour until one is edited (no backfill); «Per categoria» is not rendered for a center with one category (it would repeat the hero) and Ciclo di vita takes its columns; the expense form lists an archived center only on the expense already linked to it; «Collega spese…» is disabled on an archived center and offers no refund (a positive amount — see above) and no income; its list is the account's WHOLE expense history read once per open (`useExpenses`, the whole history, 50 shown at a time); «Annulla» lives as long as its toast; the list's «Media 12 mesi» and the detail's «Al mese» are two magnitudes on purpose (trailing year / 12 vs whole cost / months since the first expense); an annual ceiling has no crossing day (`crossedOn` is monthly only); «Al mese» divides by the calendar months since the first expense (an idle project reads as a lower monthly cost, by design); «in totale» counts rows dated up to today (a future row is «in calendario»); the subcategory lens and the movements window (25 + «Mostra altre») are per-center, session-only state.

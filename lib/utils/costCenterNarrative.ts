@@ -421,7 +421,7 @@ export function describeTotaleFooter(summary: CostCentersSummary): Narrative | n
 /**
  * «2025, intero» — the KPI caption that names last year; «2025, da settembre» when the
  * history BEGAN in it. Four months read as a whole year beside «Quest'anno» print a growth
- * nobody had (327 € against 7022 € on the owner's account: a false ×21).
+ * nobody had (say 300 € against 6000 €: a false ×20).
  */
 export function describeLastYearCaption(now: Date, firstDate: Date | null): Narrative {
   const lastYear = getItalyYear(now) - 1;
@@ -600,7 +600,7 @@ export interface KpiReading {
  * and the caption adds the calendar when there is one («con il calendario chiude a 260 €»).
  * The cells were «Fine mese» / «Fine anno» while a pace stood behind them; without one a
  * window's end is a sum, and on a center with nothing scheduled it had nothing to print —
- * two cells out of three read «—» on the owner's account. The end is a SUM, so no «~».
+ * two cells out of three read «—» on a lived account. The end is a SUM, so no «~».
  */
 function describeWindowKpi(spentToDate: number, scheduled: number, empty: string, ceiling: number | null): KpiReading {
   if (spentToDate === 0 && scheduled === 0) return { value: '—', caption: [prose(empty)], tone: 'muted' };

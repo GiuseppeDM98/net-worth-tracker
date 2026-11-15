@@ -84,10 +84,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   più answer in the present tense («posso contare su questo reddito?»), so they measure the
   instruments STILL HELD — `computeReliability` and `rankPayerShares` take `heldAssetIds` (the page's
   assets with `quantity > 0`) — and name what the sold ones paid in their own clause: the reading
-  («altri 186 € da 2 strumenti venduti»), the residual row («2 strumenti venduti», so the shares still
+  («altri 200 € da 2 strumenti venduti»), the residual row («2 strumenti venduti», so the shares still
   add up to the aside's total, which stays the period's), the footer (`describeSoldIncomeNote`) and,
-  when every payer was sold, the empty copy of Affidabilità. On the owner's mirror «Concentrazione
-  alta: SPM.MI vale il 47% del netto» was a risk warning on a stock already sold. The window's length
+  when every payer was sold, the empty copy of Affidabilità. On a tour «Concentrazione
+  alta: ABC.MI vale il 50% del netto» was a risk warning on a stock already sold. The window's length
   never follows the subset: two months paid out of nine is «2 su 9», not «2 su 2».
 - **The verdict's yield clause names its window and its population.** «; l'unico strumento con costo
   medio rende l'1,3% lordo sul costo negli ultimi 12 mesi» (or «; i 7 strumenti con costo medio
@@ -156,7 +156,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   account, or is in another currency than the row, is skipped and the row written without a link. The BALANCE the
   credit lands on is rounded to the cent too (2026-10-07, doc/guide/cashflow.md § Expense Sign Convention).
 - **A coupon per unit is stored as the decimal it is, not its binary neighbour** (2026-10-07,
-  `lib/utils/floatNoise.ts`): `(1,3 / 100 / 2) × 1000` is 6.500000000000001 in binary, and the owner's BTP Valore showed
+  `lib/utils/floatNoise.ts`): `(1,3 / 100 / 2) × 1000` is 6.500000000000001 in binary, and a BTP Valore showed
   it in «Importo lordo per unità». It cannot be cents — a BTP€i per 1 € of nominal has five or six meaningful decimals —
   so `stripFloatNoise` keeps twelve significant digits: in `calculateCouponPerShare`, in `resolveCoupon`'s indexed
   coupon (× coefficient, + FOI inflation) and in the final premium (`couponScheduling`). Records saved before keep their
@@ -205,7 +205,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   takes the coupon's day, else the latest of its month; `latestIndexationCoefficient(entries, asOf)` feeds the
   valuation and the provisional estimate; `upsertIndexationCoefficient` replaces the same day only). The dialog that
   finalises a provisional coupon is ONE component for both mechanisms (`InflationRateDialog`: FOI % or coefficient,
-  copy from `MECHANISM_COPY`), and the banner/button say «dato d'inflazione», never «tasso FOI».
+  copy from `MECHANISM_COPY`), and the banner/button say «dato d'inflazione», never «tasso FOI». The banner lists
+  a provisional coupon through its payment day by the ITALIAN calendar (`isPendingProvisionalCoupon`,
+  `lib/utils/couponUtils.ts`, 2026-11-15): a coupon is stored at the UTC midnight of its date, and an instant
+  comparison with `now` dropped it on the very day it is paid.
 - **A zero-coupon bond (rate 0) saves its details and materialises nothing** (issue #340): `buildBondDetailsFromForm`
   (`lib/utils/bondDetailsForm.ts`, pure, tested against the real function) treats only an EMPTY rate as missing, and
   `scheduleNextCoupon` returns `{ scheduled: false }` through `hasCouponPayments` (rate 0 and no positive tier). Cron

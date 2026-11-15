@@ -16,6 +16,9 @@ import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboa
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { toDate, getItalyDayBoundsUtc } from '@/lib/utils/dateHelpers';
 import { roundToCents } from '@/lib/utils/cents';
+import { normalizeExpenseFee, resolveExpenseFeeCategory, type ExpenseFeeCategory } from '@/lib/utils/expenseFee';
+import { buildTradeFeeExpenseDoc, describeTradeFeeNote, planTradeFee, tradeFeeOwner } from '@/lib/utils/tradeFeeExpense';
+import type { ExpenseCategory } from '@/types/expenses';
 import {
   ASSET_TRANSACTIONS_COLLECTION,
   ASSET_TRANSACTIONS_META_COLLECTION,
@@ -47,9 +50,14 @@ import type { Asset, AssetType } from '@/types/assets';
  * migration's «done» signal — is re-read and re-checked inside, so a late or concurrent caller
  * changes nothing it did not see. Only the asset's CURRENCY stays read in prepare: `priceEur` is a
  * network call and cannot run inside the transaction.
+ *
+ * A TRADE'S FEE (2026-11-12) is a spending row written by the same transaction as its trade
+ * (lib/utils/tradeFeeExpense.ts): the plan — create, move, delete or nothing — is decided in the
+ * commit on the stored trade, the fee category and the named row, all read there.
  */
 
 const ASSETS_COLLECTION = 'assets';
+const EXPENSES_COLLECTION = 'expenses';
 
 /**
  * A semantic failure that needs Firestore context (meta missing, wrong asset type, a future
@@ -74,7 +82,15 @@ export interface TradeMutationResult {
   derived: { quantity: number; averageCost: number | undefined; averageCostEur: number | undefined };
   /** Realized P&L of THIS operation (present only for sells) — lets the UI toast without refetch. */
   realizedPnlEur?: number;
+  /**
+   * What became of the trade's fee in the cashflow: `'written'` (a row created or moved),
+   * `'refused'` (a row was due but the fee category the settings name is gone — the toast says so,
+   * owner 2026-11-12), `'none'` otherwise (no fee, a fee saved before fees became rows, a delete).
+   */
+  feeRow: TradeFeeRowOutcome;
 }
+
+export type TradeFeeRowOutcome = 'written' | 'none' | 'refused';
 
 export type MigrationResult =
   | { alreadyMigrated: true }
@@ -97,6 +113,7 @@ function docToAssetTransaction(id: string, data: DocumentData): AssetTransaction
     priceEur: data.priceEur,
     fees: data.fees,
     linkedCashAssetId: data.linkedCashAssetId,
+    feeExpenseId: data.feeExpenseId,
     withheldTaxEur: data.withheldTaxEur,
     isBaseline: data.isBaseline,
     indexationCoefficient: data.indexationCoefficient,
@@ -118,6 +135,7 @@ function buildTradeSetDocData(t: AssetTransaction): Record<string, unknown> {
     priceEur: t.priceEur,
     fees: t.fees,
     linkedCashAssetId: t.linkedCashAssetId,
+    feeExpenseId: t.feeExpenseId,
     withheldTaxEur: t.withheldTaxEur,
     isBaseline: t.isBaseline,
     indexationCoefficient: t.indexationCoefficient,
@@ -141,6 +159,7 @@ function buildTradeUpdateDocData(t: AssetTransaction): Record<string, unknown> {
     priceEur: t.priceEur,
     fees: t.fees ?? FieldValue.delete(),
     linkedCashAssetId: t.linkedCashAssetId ?? FieldValue.delete(),
+    feeExpenseId: t.feeExpenseId ?? FieldValue.delete(),
     withheldTaxEur: t.withheldTaxEur ?? FieldValue.delete(),
     indexationCoefficient: t.indexationCoefficient ?? FieldValue.delete(),
     note: t.note ?? FieldValue.delete(),
@@ -227,10 +246,16 @@ interface PreparedMutation {
   assetId: string;
   op: 'set' | 'update' | 'delete';
   tradeRef: DocumentReference;
-  /** The new/edited trade (in-memory, with id) used in the replay sequence. Absent for delete. */
+  /**
+   * The new/edited trade (in-memory, with id) used in the replay sequence. Absent for delete. Its
+   * `feeExpenseId` is settled in the commit, where the fee plan is decided.
+   */
   newTransaction?: AssetTransaction;
-  /** The Firestore payload for the trade write. Absent for delete. */
-  tradeDocData?: Record<string, unknown>;
+  /**
+   * The id a NEW fee row takes. Drawn here because a transaction retries its closure, and a
+   * retried closure must not mint a second id; never written on a delete (its plan is `delete` or `none`).
+   */
+  newFeeRefId: string;
   /** Id of the trade replaced (edit) or removed (delete). Absent for create. */
   targetTransactionId?: string;
   /** `updatedAt` of the trade the plan was prepared on, in ms; absent for create. */
@@ -291,7 +316,7 @@ async function prepareCreate(
     op: 'set',
     tradeRef,
     newTransaction,
-    tradeDocData: buildTradeSetDocData(newTransaction),
+    newFeeRefId: adminDb.collection(EXPENSES_COLLECTION).doc().id,
     cashDeltaByDocId,
     affectedType: newTransaction.type,
     invalidationReason: 'asset_transaction_created',
@@ -376,7 +401,7 @@ async function prepareEdit(
     op: 'update',
     tradeRef: adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc(transactionId),
     newTransaction,
-    tradeDocData: buildTradeUpdateDocData(newTransaction),
+    newFeeRefId: adminDb.collection(EXPENSES_COLLECTION).doc().id,
     targetTransactionId: transactionId,
     preparedOnUpdatedAt: (expectedUpdatedAt ?? oldTrade.updatedAt).getTime(),
     cashDeltaByDocId,
@@ -404,6 +429,7 @@ async function prepareDelete(
     assetId: oldTrade.assetId,
     op: 'delete',
     tradeRef: adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc(transactionId),
+    newFeeRefId: adminDb.collection(EXPENSES_COLLECTION).doc().id,
     targetTransactionId: transactionId,
     preparedOnUpdatedAt: (expectedUpdatedAt ?? oldTrade.updatedAt).getTime(),
     cashDeltaByDocId,
@@ -444,18 +470,29 @@ function assertSettlementAccountsStillCash(
   }
 }
 
-async function commitTradeMutation(
-  plan: PreparedMutation
-): Promise<{
+/**
+ * The fee category a NEW row lands in, from the two documents the transaction read: null unless
+ * the settings name a category whose document exists and is the owner's.
+ */
+function feeCategoryFrom(
+  ownerId: string,
+  settingsSnap: DocumentSnapshot | undefined,
+  categorySnap: DocumentSnapshot | undefined
+): ExpenseFeeCategory | null {
+  const data = categorySnap?.exists ? categorySnap.data() : undefined;
+  if (!categorySnap || !data || data.userId !== ownerId) return null;
+  const category = { ...(data as Omit<ExpenseCategory, 'id'>), id: categorySnap.id, subCategories: data.subCategories ?? [] };
+  return resolveExpenseFeeCategory([category as ExpenseCategory], settingsSnap?.data());
+}
+
+interface CommitOutcome {
   derived: { quantity: number; averageCost: number | undefined; averageCostEur: number | undefined };
   realizedDelta?: number;
-}> {
-  let outcome:
-    | {
-        derived: { quantity: number; averageCost: number | undefined; averageCostEur: number | undefined };
-        realizedDelta?: number;
-      }
-    | undefined;
+  feeRow: TradeFeeRowOutcome;
+}
+
+async function commitTradeMutation(plan: PreparedMutation): Promise<CommitOutcome> {
+  let outcome: CommitOutcome | undefined;
 
   await adminDb.runTransaction(async (tx: Transaction) => {
     // ── READS ────────────────────────────────────────────────────────────────
@@ -477,8 +514,21 @@ async function commitTradeMutation(
       cashReads.push({ ref, snap: await tx.get(ref) });
     }
 
+    const existing = existingSnap.docs.map((d) => docToAssetTransaction(d.id, d.data())); // a pure map
+    const expenses = adminDb.collection(EXPENSES_COLLECTION);
+    // r4-r5: where a NEW fee row would land — read only when the new version carries a fee.
+    const wantsFee = normalizeExpenseFee(plan.newTransaction?.fees) !== null;
+    const settingsRef = adminDb.collection('assetAllocationTargets').doc(plan.ownerId);
+    const settingsSnap = wantsFee ? await tx.get(settingsRef) : undefined;
+    const feeCategoryId = settingsSnap?.data()?.transferFeeCategoryId as string | undefined;
+    const categoryRef = feeCategoryId ? adminDb.collection('expenseCategories').doc(feeCategoryId) : undefined;
+    const categorySnap = categoryRef ? await tx.get(categoryRef) : undefined;
+    // r6: the fee row the STORED trade names (an edit or a delete).
+    const stored = plan.targetTransactionId ? existing.find((t) => t.id === plan.targetTransactionId) : undefined;
+    const storedFeeRef = stored?.feeExpenseId ? expenses.doc(stored.feeExpenseId) : undefined;
+    const storedFeeSnap = storedFeeRef ? await tx.get(storedFeeRef) : undefined;
+
     // ── COMPUTE (pure) ─────────────────────────────────────────────────────────
-    const existing = existingSnap.docs.map((d) => docToAssetTransaction(d.id, d.data()));
     // The checks of what prepare read outside, above the replay: a 404/409/422 must win over a
     // replay error on a stale sequence. assertTradeUnchanged stays FIRST, so every later decision
     // stands on a checked trade.
@@ -489,7 +539,26 @@ async function commitTradeMutation(
     }
     assertSettlementAccountsStillCash(cashReads, plan.cashDeltaByDocId);
 
-    const newSequence = buildNewSequence(existing, plan);
+    // The fee plan stands on `stored`, checked just above — never on prepare's copy.
+    const feeCategory = feeCategoryFrom(plan.ownerId, settingsSnap, categorySnap);
+    const feeFacts = {
+      fees: plan.newTransaction?.fees, stored,
+      storedRowExists: !!storedFeeSnap?.exists, canCreate: feeCategory !== null,
+    };
+    const feePlan = planTradeFee(feeFacts);
+    const feeRef = storedFeeRef ?? expenses.doc(plan.newFeeRefId);
+    const keepsRow = feePlan.kind === 'create' || feePlan.kind === 'update';
+    // A named row that is gone keeps its id while no category can re-create it: the next save with one writes it there.
+    const keepsLink = feePlan.kind === 'none' && !!stored?.feeExpenseId
+      && normalizeExpenseFee(plan.newTransaction?.fees) !== null;
+    const tradeToWrite = plan.newTransaction
+      && { ...plan.newTransaction, feeExpenseId: keepsRow || keepsLink ? feeRef.id : undefined };
+    // «Refused»: a row was due and the category the settings name is gone (decided in this transaction).
+    const feeRow: TradeFeeRowOutcome = keepsRow
+      ? 'written'
+      : feeCategoryId && planTradeFee({ ...feeFacts, canCreate: true }).kind === 'create' ? 'refused' : 'none';
+
+    const newSequence = buildNewSequence(existing, { ...plan, newTransaction: tradeToWrite });
 
     // replayTransactions throws LedgerValidationError (→ 422) on any invalid history.
     const newState = replayTransactions(newSequence);
@@ -508,9 +577,9 @@ async function commitTradeMutation(
     // ── WRITES ───────────────────────────────────────────────────────────────
     // w1: the trade doc.
     if (plan.op === 'set') {
-      tx.set(plan.tradeRef, plan.tradeDocData!);
+      tx.set(plan.tradeRef, buildTradeSetDocData(tradeToWrite!));
     } else if (plan.op === 'update') {
-      tx.update(plan.tradeRef, plan.tradeDocData!);
+      tx.update(plan.tradeRef, buildTradeUpdateDocData(tradeToWrite!));
     } else {
       tx.delete(plan.tradeRef);
     }
@@ -519,13 +588,14 @@ async function commitTradeMutation(
     // untouched"; removeUndefinedDeep drops the undefined key so the
     // stored value survives. Written directly, NOT via updateAsset (whose undefined→deleteField()
     // for averageCost is exactly the trap we avoid). Same "leave untouched at qty 0" posture for
-    // averageCostEur as for averageCost — see buildDerivedAssetFields.
+    // averageCostEur and fiscalAverageCostEur as for averageCost — see buildDerivedAssetFields.
     tx.update(
       assetRef,
       removeUndefinedDeep({
         quantity: derived.quantity,
         averageCost: derived.averageCost,
         averageCostEur: derived.averageCostEur,
+        fiscalAverageCostEur: derived.fiscalAverageCostEur,
         updatedAt: new Date(),
         ...(derived.holdingStartDate !== undefined ? { holdingStartDate: derived.holdingStartDate } : {}),
       })
@@ -543,9 +613,26 @@ async function commitTradeMutation(
       tx.update(ref, { quantity: roundToCents(currentQuantity + delta), updatedAt: new Date() });
     }
 
+    // w4: the fee row, with its trade or not at all. It moves no account: the settlement already debited it.
+    if (feePlan.kind === 'delete') tx.delete(feeRef);
+    else if (feePlan.kind === 'update') {
+      // Never the row's member: one the owner set by hand in its form survives a later edit of the trade.
+      tx.update(feeRef, { amount: -feePlan.amount, date: tradeToWrite!.date, updatedAt: new Date() });
+    } else if (feePlan.kind === 'create') {
+      const assetData = assetSnap.data();
+      const label = (assetData?.ticker as string | undefined) || (assetData?.name as string | undefined);
+      const cashData = cashReads.find(({ ref }) => ref.id === tradeToWrite!.linkedCashAssetId)?.snap.data();
+      tx.set(feeRef, buildTradeFeeExpenseDoc({
+        userId: plan.ownerId, tradeId: plan.tradeRef.id, amount: feePlan.amount, date: tradeToWrite!.date,
+        category: feeCategory!, notes: describeTradeFeeNote(tradeToWrite!.type, label), now: new Date(),
+        personalMemberId: tradeFeeOwner(assetData as Pick<Asset, 'ownerMemberId' | 'ownerShares'> | undefined, cashData as Pick<Asset, 'ownerMemberId' | 'ownerShares'> | undefined),
+      }));
+    }
+
     outcome = {
       derived: { quantity: derived.quantity, averageCost: derived.averageCost, averageCostEur: derived.averageCostEur },
       realizedDelta,
+      feeRow,
     };
   });
 
@@ -569,12 +656,13 @@ function buildNewSequence(existing: AssetTransaction[], plan: PreparedMutation):
   return existing.filter((t) => t.id !== plan.targetTransactionId);
 }
 
-function buildResult(plan: PreparedMutation, commit: Awaited<ReturnType<typeof commitTradeMutation>>): TradeMutationResult {
+function buildResult(plan: PreparedMutation, commit: CommitOutcome): TradeMutationResult {
   const includeRealized = plan.affectedType === 'sell' && commit.realizedDelta !== undefined;
   return {
     transactionId: plan.tradeRef.id,
     derived: commit.derived,
     ...(includeRealized ? { realizedPnlEur: commit.realizedDelta } : {}),
+    feeRow: commit.feeRow,
   };
 }
 
@@ -628,6 +716,9 @@ export async function deleteAssetTransaction(
  * Not exposed for any other use case: a still-ledger asset must never lose its trades this way (use
  * `deleteAssetTransaction` for a single trade, which re-validates the replay). It does not refuse a
  * still-ledger asset itself: its one caller flips the type first.
+ *
+ * Its fee rows stay as plain spending: the money left (2026-11-12). Each row a deleted trade names
+ * loses `feeOfTradeId`, so Cashflow no longer locks it and the owner can delete it there.
  */
 export async function deleteAllAssetTransactionsForAsset(
   ownerId: string,
@@ -639,7 +730,17 @@ export async function deleteAllAssetTransactionsForAsset(
     );
     // Reading the asset locks it against a trade commit, which reads and writes the same doc.
     await tx.get(adminDb.collection(ASSETS_COLLECTION).doc(assetId));
+    const feeRefs = snap.docs
+      .map((doc) => doc.data().feeExpenseId as string | undefined)
+      .filter((id): id is string => !!id)
+      .map((id) => adminDb.collection(EXPENSES_COLLECTION).doc(id));
+    const feeSnaps = [];
+    for (const ref of feeRefs) feeSnaps.push({ ref, snap: await tx.get(ref) });
+
     for (const doc of snap.docs) tx.delete(doc.ref);
+    for (const { ref, snap: feeSnap } of feeSnaps) {
+      if (feeSnap.exists) tx.update(ref, { feeOfTradeId: FieldValue.delete(), updatedAt: new Date() });
+    }
     return snap.docs.length;
   });
 }
@@ -778,16 +879,17 @@ export type AverageCostEurBackfillResult =
   | { alreadyBackfilled?: false; recomputedAssetCount: number; skippedAssetCount: number };
 
 /**
- * One-shot backfill of `averageCostEur` onto ledger asset docs that predate the field. No new FX
- * lookups: every trade has carried a correct trade-date `priceEur` since the ledger shipped
- * (including the migration baseline — resolveBaselinePriceEur), so this is a pure re-projection of
- * data already in `assetTransactions` via buildDerivedAssetFields, exactly what every trade mutation
- * already writes going forward (commitTradeMutation). Writes ONLY `averageCostEur` — the field it
- * exists to add: quantity and the native PMC are already the replay's (every mutation rewrites
- * them), and a backfill that also rewrote them could move a figure the owner did not ask to move.
- * Never holdingStartDate (invariant #4).
+ * One-shot re-projection of the two EUR PMCs onto ledger asset docs. No new FX lookups: every
+ * trade has carried a correct trade-date `priceEur` since the ledger shipped (including the
+ * migration baseline — resolveBaselinePriceEur), so this is a pure re-projection of data already in
+ * `assetTransactions` via buildDerivedAssetFields, exactly what every trade mutation already writes
+ * going forward (commitTradeMutation). Writes ONLY `averageCostEur` and `fiscalAverageCostEur`:
+ * quantity and the native PMC are already the replay's (every mutation rewrites them), and a
+ * backfill that also rewrote them could move a figure the owner did not ask to move. Never
+ * holdingStartDate (invariant #4). Re-run once on 2026-11-12: the PMC lost the fees and the fiscal
+ * cost was born, so an account backfilled before (`averageCostEurBackfilledAt`) runs it again.
  *
- * Idempotent — `averageCostEurBackfilledAt` on the ledger meta doc is the "done" signal. Requires the
+ * Idempotent — `averageCostEurFeeFreeAt` on the ledger meta doc is the "done" signal. Requires the
  * meta doc to already exist (ledger migration must have run first, and the caller is expected to have
  * awaited migrateAssetLedger before this): with no meta doc yet there is nothing to backfill, and this
  * returns a no-op WITHOUT creating one, so it can never be mistaken by migrateAssetLedger for
@@ -802,7 +904,7 @@ export type AverageCostEurBackfillResult =
 export async function backfillAverageCostEur(ownerId: string): Promise<AverageCostEurBackfillResult> {
   const metaRef = adminDb.collection(ASSET_TRANSACTIONS_META_COLLECTION).doc(ownerId);
   const metaSnap = await metaRef.get();
-  if (!metaSnap.exists || metaSnap.data()?.averageCostEurBackfilledAt) {
+  if (!metaSnap.exists || metaSnap.data()?.averageCostEurFeeFreeAt) {
     return { alreadyBackfilled: true };
   }
 
@@ -823,9 +925,9 @@ export async function backfillAverageCostEur(ownerId: string): Promise<AverageCo
         const assetSnap = await tx.get(assetRef);
         if (tradesSnap.empty || !assetSnap.exists) return false;
         const trades = tradesSnap.docs.map((d) => docToAssetTransaction(d.id, d.data() as DocumentData));
-        const { averageCostEur } = buildDerivedAssetFields(replayTransactions(trades));
+        const { averageCostEur, fiscalAverageCostEur } = buildDerivedAssetFields(replayTransactions(trades));
         if (averageCostEur === undefined) return false; // a closed position: nothing to stand a G/P on
-        tx.update(assetRef, { averageCostEur, updatedAt: new Date() });
+        tx.update(assetRef, removeUndefinedDeep({ averageCostEur, fiscalAverageCostEur, updatedAt: new Date() }));
         return true;
       });
       if (wrote) recomputedAssetCount += 1;
@@ -835,9 +937,9 @@ export async function backfillAverageCostEur(ownerId: string): Promise<AverageCo
     }
   }
 
-  await metaRef.update({ averageCostEurBackfilledAt: new Date(), updatedAt: new Date() });
+  await metaRef.update({ averageCostEurFeeFreeAt: new Date(), updatedAt: new Date() });
 
-  // Every G/P figure of the overview payload reads averageCostEur (dashboardOverviewService).
+  // Every G/P and estimated tax of the overview payload reads the two PMCs (dashboardOverviewService).
   if (recomputedAssetCount > 0) {
     await invalidateDashboardOverviewSummaryServer(ownerId, 'average_cost_eur_backfilled');
   }

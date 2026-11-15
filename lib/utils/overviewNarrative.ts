@@ -88,9 +88,9 @@ export interface LivedCashflow {
 
 /**
  * The payload's month totals minus their scheduled slice — the same subtraction Tracciamento's
- * `settleTotals` makes, so the Panoramica's «Hai messo da parte il 45% delle entrate finora» and
- * Tracciamento's verdict judge the same days (the old rate included rows dated after today: 17%
- * on the real account's 19 settembre 2026 against 45% already saved). Null when the payload
+ * `settleTotals` makes, so the Panoramica's «Hai messo da parte il 40% delle entrate finora» and
+ * Tracciamento's verdict judge the same days (the old rate included rows dated after today: a
+ * fraction of the rate already saved, mid-month on a lived account). Null when the payload
  * predates `incomeScheduled` (source version 19): a rate on half a subtraction would be wrong.
  */
 export function resolveLivedCashflow(stats: DashboardOverviewExpenseStats | null | undefined): LivedCashflow | null {
@@ -174,7 +174,7 @@ function previousMonthIndex(month: number): number {
 /**
  * «ad agosto» / «a luglio» for the month BEFORE `month` — the Cashflow tile's row label and its
  * flat-delta line read it from here so no component types the preposition (a tile printed
- * «A agosto» on the real account until 2026-09-13). `capitalised` for the start of a label.
+ * «A agosto» until 2026-09-13). `capitalised` for the start of a label.
  */
 export function atPreviousMonth(month: number, capitalised = false): string {
   const phrase = withPrepositionA(monthInSentence(previousMonthIndex(month)));
@@ -379,9 +379,9 @@ function describeCalendarAside(cashflow: LivedCashflow | null | undefined): Narr
 }
 
 /**
- * «sul mercato hanno spinto soprattutto le criptovalute (+726 €)». The top mover explains the
+ * «sul mercato hanno spinto soprattutto le criptovalute (+700 €)». The top mover explains the
  * MARKET half, not the month: «hanno fatto il grosso del lavoro» read as the month's cause, and on
- * the real account's settembre 2026 the +726 € it credited was six times the month's +124 €.
+ * a lived account the mover's figure was several times the month's own change.
  * Null when the class has no subject in the map — the clause is dropped, never guessed.
  */
 function buildDriverClause(topMover: { assetClass: string; delta: number }, leading: boolean): Narrative | null {

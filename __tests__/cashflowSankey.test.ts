@@ -614,9 +614,9 @@ describe('selectExpensesForDrillDown', () => {
 
 describe('deriveSubcategoryColors', () => {
   it('stops darkening at the floor, so a long list never fades to black', () => {
-    // Found on the owner's tour (2026-09-27): «Da classificare» held 25 categories and, with no
+    // Found on a tour (2026-09-27): «Da classificare» held a few dozen categories and, with no
     // floor, every node from the eighth on was painted #000000 — invisible on a dark theme.
-    const shades = deriveSubcategoryColors('#94a3b8', 25);
+    const shades = deriveSubcategoryColors('#94a3b8', 30);
 
     expect(shades[0]).toBe('#94a3b8');
     expect(shades).not.toContain('#000000');

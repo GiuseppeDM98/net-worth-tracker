@@ -131,17 +131,18 @@ describe('summarizeCashAccounts', () => {
   });
 
   it('should measure the shares on the money held and call an account in the red a debt', () => {
-    // The owner's accounts with a credit card at −3417,93 € (2026-09-19): the old shares read 138% and −57%.
+    // Accounts beside a credit card in the red (2026-09-19): measured on the net, the shares read
+    // 133% and −50%.
     const accounts = [
-      makeAsset({ id: 'bnl', name: 'Conto BNL', type: 'cash', assetClass: 'cash', quantity: 8277.95, currentPrice: 1 }),
-      makeAsset({ id: 'directa', name: 'Directa', type: 'cash', assetClass: 'cash', quantity: 1125.11, currentPrice: 1 }),
-      makeAsset({ id: 'carta', name: 'Carta BNL Credit', type: 'cash', assetClass: 'cash', quantity: -3417.93, currentPrice: 1 }),
+      makeAsset({ id: 'tapiro', name: 'Conto Tapiro', type: 'cash', assetClass: 'cash', quantity: 8000, currentPrice: 1 }),
+      makeAsset({ id: 'fenicottero', name: 'Conto Fenicottero', type: 'cash', assetClass: 'cash', quantity: 1000, currentPrice: 1 }),
+      makeAsset({ id: 'carta', name: 'Carta Tapiro', type: 'cash', assetClass: 'cash', quantity: -3000, currentPrice: 1 }),
     ];
-    const summary = summarizeCashAccounts(accounts, 293859.3);
-    expect(summary.total).toBeCloseTo(5985.13, 2);
-    expect(summary.accounts.find((a) => a.id === 'bnl')!.shareOfCash).toBeCloseTo(88.03, 1);
+    const summary = summarizeCashAccounts(accounts, 300000);
+    expect(summary.total).toBeCloseTo(6000, 2);
+    expect(summary.accounts.find((a) => a.id === 'tapiro')!.shareOfCash).toBeCloseTo(88.89, 1);
     expect(summary.accounts.find((a) => a.id === 'carta')!.shareOfCash).toBeNull();
-    expect(summary.largest).toMatchObject({ id: 'bnl' });
+    expect(summary.largest).toMatchObject({ id: 'tapiro' });
   });
 
   it('should value a foreign-currency account in EUR through its converted price', () => {
@@ -409,11 +410,11 @@ describe('resolveLastPriceUpdate', () => {
 
 describe('hasCostBasis — a PMC on a hand-valued holding is not a PMC', () => {
   it('refuses the structural «+0,00 €» of a private-equity stake and of a property kept at price 1', () => {
-    // Academia Private Equity on the owner's account: value 4.000 in quantity, price 1, averageCost 1.
-    const privateEquity = makeAsset({ type: 'stock', assetClass: 'equity', subCategory: 'Private Equity', quantity: 4000, currentPrice: 1, averageCost: 1 });
+    // A private-equity stake valued by hand: the value in quantity, price 1, averageCost 1.
+    const privateEquity = makeAsset({ type: 'stock', assetClass: 'equity', subCategory: 'Private Equity', quantity: 5000, currentPrice: 1, averageCost: 1 });
     expect(hasCostBasis(privateEquity)).toBe(false);
     expect(computeUnrealizedGain(privateEquity)).toBeNull();
-    expect(hasCostBasis(makeAsset({ type: 'realestate', assetClass: 'realestate', quantity: 130000, currentPrice: 1, averageCost: 1 }))).toBe(false);
+    expect(hasCostBasis(makeAsset({ type: 'realestate', assetClass: 'realestate', quantity: 200000, currentPrice: 1, averageCost: 1 }))).toBe(false);
     // A quoted instrument the owner prices by hand keeps its real PMC.
     expect(hasCostBasis(makeAsset({ autoUpdatePrice: false, averageCost: 90 }))).toBe(true);
   });

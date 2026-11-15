@@ -4,8 +4,8 @@
  *
  * Why this exists: the Panoramica, Patrimonio and the periodic email decompose a month's change
  * into «mercato» (the price effect) and «the user's own flows», and used to blame the market for
- * the whole drop whenever the price effect was negative. On the real account (settembre 2026) the
- * market explained a fifth of the decline: the rest was the capital-gains tax the broker withheld
+ * the whole drop whenever the price effect was negative. On a lived account the
+ * market explained a small part of the decline: the rest was the capital-gains tax the broker withheld
  * on an ETF sale — in regime amministrato the tax leaves the account the day of the sale, with no
  * cashflow row to explain it. The ledger knows the sale and its realized gain, so the tax can be
  * ESTIMATED (gain × the instrument's `taxRate`) and named. It stays an estimate: no loss
@@ -31,11 +31,12 @@ export interface PeriodSaleInstrument {
   name: string;
   /** Net of fees, EUR. */
   proceeds: number;
-  /** Realized P&L of the period's sells, net of fees, EUR (negative = loss). */
+  /** Realized P&L of the period's sells, fee-free (2026-11-12), EUR (negative = loss). */
   realizedGain: number;
   /**
    * The tax withheld on the sells that carry one, plus `max(taxable gain, 0) × taxRate / 100` over
-   * the sells that do not — the taxable gain carries no commission (`taxableGainEur`); `null` when a sell needs the estimate and the asset carries no `taxRate`,
+   * the sells that do not — the taxable gain is the fiscal one, both fees deducted (`taxableGainEur`,
+   * 2026-11-12); `null` when a sell needs the estimate and the asset carries no `taxRate`,
    * so a missing input is never printed as «0 € di tasse».
    */
   estimatedTax: number | null;
@@ -173,8 +174,8 @@ export function summarizePeriodSales(
  *
  *   - `taxes-despite-market` the market gained and the estimated tax on the period's sales is at
  *                            least half of the whole drop: the tax IS the story, and the headline
- *                            names it (owner's call, 2026-09-13 — on the real account settembre
- *                            fell by 4.156 € with the market at +153 € and 4.089 € of withholding,
+ *                            names it (owner's call, 2026-09-13 — on a lived account a month
+ *                            fell by 4.000 € with the market at +200 € and 4.100 € of withholding (round figures),
  *                            and «nonostante il mercato» stopped one step short of the cause)
  *   - `despite-market`     the market gained: the user's own flows explain the whole drop
  *   - `taxes-over-market`  the market lost, and the estimated tax on the period's sales lost more
@@ -227,8 +228,8 @@ export const FLAT_PERIOD_PCT = 0.5;
 
 /**
  * A period that did NOT fall, but only because the tax on its sales took the growth: the
- * counterpart of `taxes-despite-market` for the other sign. On the real account settembre 2026
- * closed at +124 € (+0,04%) with 4.089 € of estimated withholding on a VWCE sale, and the headline
+ * counterpart of `taxes-despite-market` for the other sign. A month that
+ * closed at +100 € (+0,04%) with 4.000 € of estimated withholding on an ETF sale (round figures) had the headline
  * read «Settembre sta andando bene» (owner's call, 2026-09-19).
  *
  *   - `flat`    the tax took at least half of the gross growth (Δ + tax) and what is left is

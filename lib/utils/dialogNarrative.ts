@@ -537,6 +537,8 @@ export interface MovementDetailFacts {
   phase: MovementDeletePhase;
   /** What the second press does to the accounts — read only while armed. */
   deletion: ExpenseDeleteFacts;
+  /** A trade's fee row (`isTradeFeeRow`): the idle reading says its trade keeps amount and date. */
+  tradeFee?: boolean;
 }
 
 /**
@@ -556,6 +558,7 @@ export function describeMovementDetailReading(facts: MovementDetailFacts): Modal
   const idle: Narrative = facts.scheduled
     ? [{ text: 'In calendario per il ' }, day, { text: ': non è ancora avvenuto.' }]
     : [{ text: 'Movimento del ' }, day, { text: '.' }];
+  if (facts.tradeFee) idle.push({ text: ` ${TRADE_FEE_ROW_NOTE}` });
 
   return {
     narrative: facts.phase === 'disarmed' ? [{ text: 'Eliminazione annullata. ' }, ...idle] : idle,
@@ -1090,6 +1093,40 @@ export function describeExpenseFeeField(facts: ExpenseFeeFieldFacts): string | n
 
 /** The sentence before the link to Impostazioni › Spese when no fee category is chosen. */
 export const EXPENSE_FEE_NEEDS_CATEGORY = 'Per registrare il costo bancario dell’operazione scegli prima la categoria delle commissioni in';
+
+/**
+ * A trade's fee row in Cashflow (2026-11-12): its trade owns amount, date and account, so the
+ * row's form shows this sentence in their place and its delete is refused.
+ */
+export const TRADE_FEE_ROW_NOTE =
+  'Commissione di un’operazione del registro: importo e data li tiene l’operazione, in Patrimonio, '
+  + 'che l’ha già addebitata.';
+export const TRADE_FEE_ROW_DELETE_BLOCKED = 'Si elimina con la sua operazione, in Patrimonio';
+
+export interface TradeFeeFieldFacts {
+  reading: boolean; categoryLabel: string | null; hasRow: boolean; legacyFee: boolean;
+}
+
+/** The line under «Commissioni (€)»; null when no fee category is chosen (the link to Impostazioni shows). */
+export function describeTradeFeeField(facts: TradeFeeFieldFacts): string | null {
+  if (facts.hasRow) return 'Non entra nel prezzo medio: è la sua spesa in Cashflow, e cambia con l’operazione.';
+  if (facts.legacyFee) {
+    return 'Registrata prima che le commissioni diventassero spese: resta su questa operazione, fuori dal Cashflow.';
+  }
+  if (facts.reading) return 'Sto leggendo dove va la commissione…';
+  if (!facts.categoryLabel) return null;
+  return `Non entra nel prezzo medio: diventa una spesa in ${facts.categoryLabel}, alla data dell’operazione.`;
+}
+
+export const TRADE_FEE_NEEDS_CATEGORY = 'Per registrare una commissione scegli prima la categoria delle commissioni in';
+
+/** Appended to a trade's success toast when its fee row was due but the fee category is gone (owner, 2026-11-12). */
+export const TRADE_FEE_NOT_WRITTEN = 'Commissione non registrata in Cashflow: manca la categoria in Impostazioni › Spese';
+
+/** The reading of «Quanto costa vendere»: the gain stands on the fiscal cost (2026-11-12). */
+export const TAX_SIMULATION_READING =
+  'Una simulazione: niente viene registrato. La plusvalenza è calcolata in euro sul costo fiscale del registro '
+  + 'operazioni — il PMC più le commissioni d’acquisto — con l’aliquota dello strumento.';
 
 /** The line under «Commissione» while the edited row's saved fee is being read. */
 export const EXPENSE_FEE_READING = 'Sto leggendo la commissione di questa voce…';

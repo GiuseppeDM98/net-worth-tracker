@@ -194,6 +194,11 @@ describe('a row marked excludeFromBudget', () => {
     expect(countsTowardBudget({ type: 'transfer' })).toBe(false);
   });
 
+  it('counts a trade fee row like any expense (owner, 2026-11-12)', () => {
+    const tradeFeeRow = { type: 'variable' as const, feeOfTradeId: 't1' };
+    expect(countsTowardBudget(tradeFeeRow)).toBe(true);
+  });
+
   it('weighs on no ceiling, item, split or dated row', () => {
     expect(getMonthlyTotalExpenses(expenses, 2025, 1)).toBeCloseTo(950);
     expect(getActualForItem(CAT_ITEM, expenses, 2025)).toBe(getActualForItem(CAT_ITEM, EXPENSES, 2025));

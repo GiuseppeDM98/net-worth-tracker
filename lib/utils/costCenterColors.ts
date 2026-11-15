@@ -131,7 +131,7 @@ export function mapColorSlotUsage(centers: ReadonlyArray<ColoredCenter>, exceptI
  * A NEW center's colour: the first slot no active center holds.
  *
  * Until 2026-09-18 every new center was born on `chart-1`, so two centers created without
- * touching the picker were the same colour by construction — on the owner's account two cars
+ * touching the picker were the same colour by construction — on a lived account two centers
  * shared one blue in the swatch, the rank bar, the legend and two ADJACENT bands of the stack.
  * With all eight taken a collision is unavoidable: the least crowded slot, the lowest on a tie.
  * Existing documents are NOT re-coloured (the owner's call): a saved colour is a choice, and

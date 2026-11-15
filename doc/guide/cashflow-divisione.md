@@ -24,7 +24,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **ONE field carries the whole feature**: `Expense.personalMemberId`. **Absent (or `null`) MEANS «in comune»** — that
   default is why there is no migration (every row ever written is already shared) and why the normal case costs no
   interaction. A value is a `FamilyMember` id, the SAME people as Previdenza's RAL: never a second list of names.
-  It applies to `income` too, and that is where the shares come from.
+  It applies to `income` too, and that is where the shares come from. A trade's fee row (`feeOfTradeId`, owner
+  2026-11-12, `tradeFeeOwner`) is personal to the sole holder of the asset; with a shared or split asset, to the sole
+  holder of the settlement account; else in comune — written once at the row's creation, a member set by hand
+  survives every later edit of the trade.
 - **Deliberately NOT denormalized to a name**, unlike `costCenterName`: the members live in the settings document every
   consumer already loads, so a rename costs no bulk update. The price is that every reader resolves the label itself.
   The readers outside this tab are two, both in `lib/utils/movementsOwnerFilter.ts` (2026-09-11): Tracciamento's

@@ -633,7 +633,7 @@ describe('Asset trade-ledger routes', () => {
       const first = await backfill('user-1', AUTH);
       expect(first.status).toBe(200);
       await expect(first.json()).resolves.toEqual({ recomputedAssetCount: 1, skippedAssetCount: 0 });
-      expect(store.get(docKey('assets', 'asset-1'))).toMatchObject({ averageCost: 100, averageCostEur: 90.5, quantity: 10 });
+      expect(store.get(docKey('assets', 'asset-1'))).toMatchObject({ averageCost: 100, averageCostEur: 90, fiscalAverageCostEur: 90.5, quantity: 10 });
 
       const second = await backfill('user-1', AUTH);
       expect(second.status).toBe(200);
@@ -927,6 +927,50 @@ describe('Asset trade-ledger routes', () => {
       expect(response.status).toBe(422);
       await expect(response.json()).resolves.toMatchObject({ error: 'Questo tipo di asset non usa il registro operazioni.' });
       expect(tradeKeys()).toEqual([]);
+    });
+
+    /** The fee category of Impostazioni › Spese, the owner's. */
+    function seedFeeCategory() {
+      store.set(docKey('assetAllocationTargets', 'user-1'), { transferFeeCategoryId: 'cat-fee' });
+      store.set(docKey('expenseCategories', 'cat-fee'), { userId: 'user-1', name: 'Commissioni', type: 'variable', subCategories: [] });
+    }
+
+    it('X1: a fee row deleted between an edit’s prepare and its commit is written again whole, at its id', async () => {
+      seedMeta('user-1');
+      store.set(docKey('assets', 'asset-1'), { ...ETF, quantity: 5 });
+      seedFeeCategory();
+      seedTrade('buy-1', { type: 'buy', date: T0, quantity: 5, pricePerUnit: 100, priceEur: 100, fees: 5, feeExpenseId: 'fee-1' });
+      store.set(docKey('expenses', 'fee-1'), { userId: 'user-1', amount: -5, feeOfTradeId: 'buy-1', categoryId: 'cat-fee' });
+      const release = gateTransactions(1);
+      const pending = editTrade('buy-1', { fees: 8 });
+      await vi.waitFor(() => expect(mocks.prepared.count).toBe(1));
+      store.delete(docKey('expenses', 'fee-1'));
+      release();
+
+      const response = await pending;
+
+      expect(response.status).toBe(200);
+      expect(store.get(docKey('expenses', 'fee-1'))).toMatchObject({ amount: -8, feeOfTradeId: 'buy-1', categoryId: 'cat-fee' });
+      expect(store.get(docKey('assetTransactions', 'buy-1'))!.feeExpenseId).toBe('fee-1');
+    });
+
+    it('X2: a fee category deleted between a buy’s prepare and its commit leaves the trade without a row, and says so', async () => {
+      seedMeta('user-1');
+      seedLedgerAsset('asset-1', 'user-1');
+      seedFeeCategory();
+      const release = gateTransactions(1);
+      const pending = buy({ fees: 4 });
+      await vi.waitFor(() => expect(mocks.prepared.count).toBe(1));
+      store.delete(docKey('expenseCategories', 'cat-fee'));
+      release();
+
+      const response = await pending;
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ feeRow: 'refused' });
+      expect([...store.keys()].filter((k) => k.startsWith('expenses/'))).toEqual([]);
+      const [tradeKey] = tradeKeys();
+      expect(store.get(tradeKey)!.feeExpenseId).toBeUndefined();
     });
 
     it('S1: a settlement account that stopped being a cash account before the commit answers 422 and writes nothing', async () => {

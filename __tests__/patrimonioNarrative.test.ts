@@ -50,7 +50,7 @@ const AUGUST: PatrimonioVerdictInput = {
   instrumentCount: 16,
   accountCount: 3,
   marketEffect: 2000,
-  topMover: { id: 'vwce', name: 'Vanguard FTSE All-World', delta: 2140 },
+  topMover: { id: 'orni', name: 'Ornitorinco World', delta: 2140 },
 };
 
 describe('buildPatrimonioVerdict — headline and tone', () => {
@@ -107,7 +107,7 @@ describe('buildPatrimonioVerdict — sentence', () => {
   it('should state value, monthly change, the counts and the instrument that drove the month', () => {
     expect(plain(buildPatrimonioVerdict(AUGUST).sentence)).toBe(
       'Il portafoglio vale 412.425,85 €: +3214,20 € (+0,79%) su luglio, 16 strumenti e 3 conti. ' +
-        'Sul mercato ha spinto soprattutto Vanguard FTSE All-World (+2140 €). ' +
+        'Sul mercato ha spinto soprattutto Ornitorinco World (+2140 €). ' +
         'Di quel movimento: +2000 € dal mercato e +1214 € tra risparmio e altre variazioni.',
     );
   });
@@ -124,49 +124,49 @@ describe('buildPatrimonioVerdict — sentence', () => {
     const verdict = buildPatrimonioVerdict({
       ...AUGUST,
       month: 9,
-      monthlyVariation: { value: -4937.74, percentage: -1.66 },
-      marketEffect: -1078.73,
-      topMover: { id: 'vwce', name: 'Vanguard FTSE All-World', delta: -600 },
+      monthlyVariation: { value: -5000, percentage: -1.66 },
+      marketEffect: -1100,
+      topMover: { id: 'orni', name: 'Ornitorinco World', delta: -600 },
       sales: {
-        proceeds: 39052.45,
-        realizedGain: 15726.38,
-        estimatedTax: 4088.86,
-        instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+        proceeds: 40000,
+        realizedGain: 16000,
+        estimatedTax: 4160,
+        instruments: [{ id: 'orni', name: 'Ornitorinco World', proceeds: 40000, realizedGain: 16000, estimatedTax: 4160 }],
         brokenLedgers: 0,
       },
     });
     expect(verdict.headline).toBe('Il portafoglio è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
     expect(plain(verdict.sentence)).toContain(
-      'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse: ' +
-        'senza, il mese avrebbe fatto −849 € (−1079 € dal mercato e +230 € tra risparmio e altre variazioni).',
+      'Hai venduto Ornitorinco World per 40.000 € con una plusvalenza di 16.000 € e pagato circa 4160 € di tasse: ' +
+        'senza, il mese avrebbe fatto −840 € (−1100 € dal mercato e +260 € tra risparmio e altre variazioni).',
     );
     expect(plain(verdict.sentence)).not.toContain('Di quel movimento');
   });
 
   it('should name the tax before the record when the tax took the growth', () => {
-    // The real account, settembre 2026: a new high at +0,04% with 4.089 € withheld on VWCE.
+    // A new high at +0,04% with 4160 € withheld on ORNI.
     const verdict = buildPatrimonioVerdict({
       ...AUGUST,
       month: 9,
       isNewATH: true,
-      monthlyVariation: { value: 124.32, percentage: 0.04 },
-      marketEffect: 2018.47,
-      savings: 2094.62,
-      topMover: { id: 'wbit', name: 'WBIT', delta: 534.67 },
+      monthlyVariation: { value: 120, percentage: 0.04 },
+      marketEffect: 2000,
+      savings: 2100,
+      topMover: { id: 'tapiro', name: 'TAPIRO', delta: 500 },
       sales: {
-        proceeds: 39052.45,
-        realizedGain: 15726.38,
-        estimatedTax: 4088.86,
-        instruments: [{ id: 'vwce', name: 'VWCE', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+        proceeds: 40000,
+        realizedGain: 16000,
+        estimatedTax: 4160,
+        instruments: [{ id: 'orni', name: 'ORNI', proceeds: 40000, realizedGain: 16000, estimatedTax: 4160 }],
         brokenLedgers: 0,
-        purchases: { amount: 34305.1, instrumentCount: 6 },
+        purchases: { amount: 34000, instrumentCount: 6 },
       },
     });
-    expect(verdict.headline).toBe('Il portafoglio è in pari: le tasse sulla vendita di VWCE si sono prese la crescita.');
+    expect(verdict.headline).toBe('Il portafoglio è in pari: le tasse sulla vendita di ORNI si sono prese la crescita.');
     expect(verdict.tone).toBe('warning');
     expect(plain(verdict.sentence)).toContain(
-      'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato e +2095 € risparmiati). ' +
-        'Nello stesso mese hai comprato 6 strumenti per 34.305 €.',
+      'senza, il mese avrebbe fatto +4280 € (+2000 € dal mercato e +2100 € risparmiati). ' +
+        'Nello stesso mese hai comprato 6 strumenti per 34.000 €.',
     );
   });
 
@@ -404,7 +404,7 @@ describe('buildPatrimonioVerdict — the phone composition', () => {
     const split = splitVerdict(verdict);
     expect(plain(split.lead)).toBe('Il portafoglio vale 412.425,85 €: +3214,20 € (+0,79%) su luglio, 16 strumenti e 3 conti.');
     expect(plain(split.rest)).toBe(
-      ' Da inizio anno +4,10% (+4500,00 €). Sul mercato ha spinto soprattutto Vanguard FTSE All-World (+2140 €). ' +
+      ' Da inizio anno +4,10% (+4500,00 €). Sul mercato ha spinto soprattutto Ornitorinco World (+2140 €). ' +
         'Di quel movimento: +2000 € dal mercato e +1214 € tra risparmio e altre variazioni.',
     );
     expect(split.restLabel).toBe("l'anno e il mercato del mese");
@@ -418,14 +418,14 @@ describe('buildPatrimonioVerdict — the phone composition', () => {
     const verdict = buildPatrimonioVerdict({
       ...AUGUST,
       month: 9,
-      monthlyVariation: { value: -4937.74, percentage: -1.66 },
-      marketEffect: -1078.73,
-      topMover: { id: 'vwce', name: 'Un ETF', delta: -600 },
+      monthlyVariation: { value: -5000, percentage: -1.66 },
+      marketEffect: -1100,
+      topMover: { id: 'orni', name: 'Un ETF', delta: -600 },
       sales: {
         proceeds: 39000,
         realizedGain: 15700,
         estimatedTax: 4100,
-        instruments: [{ id: 'vwce', name: 'Un ETF', proceeds: 39000, realizedGain: 15700, estimatedTax: 4100 }],
+        instruments: [{ id: 'orni', name: 'Un ETF', proceeds: 39000, realizedGain: 15700, estimatedTax: 4100 }],
         brokenLedgers: 0,
       },
     });

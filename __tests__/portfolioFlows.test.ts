@@ -102,7 +102,7 @@ describe('computeMonthlyPortfolioFlow — the ledger first, per instrument', () 
 
   it('covers the instrument from a baseline or an adjustment, but moves no money for either', () => {
     // A migration baseline is the OPENING POSITION dated to migration day: counted as a purchase it
-    // would put the whole portfolio's cost into that month (−57% on the real account's July 2026).
+    // would put the whole portfolio's cost into that month (a deep negative return on a lived account).
     const baseline = indexLedger([trade('etf', 'buy', new Date(2026, 1, 3), 100, 10, { isBaseline: true })]);
     expect(baseline.coveredFrom.get('etf')).toBe('2026-02');
     expect(amountOf(january, february, [], baseline)).toBe(0);

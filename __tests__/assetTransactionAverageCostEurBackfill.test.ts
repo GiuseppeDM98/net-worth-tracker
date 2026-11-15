@@ -132,8 +132,22 @@ describe('backfillAverageCostEur', () => {
     expect(mocks.metaStore.has(OWNER)).toBe(false); // never creates a partial meta doc
   });
 
-  it('is a no-op once already backfilled', async () => {
+  it('runs again on a ledger backfilled before the PMC lost the fees, then never again', async () => {
     seedMeta({ averageCostEurBackfilledAt: new Date(2026, 0, 2) });
+    mocks.assetsStore.set('asset-eur', { userId: OWNER, type: 'etf', currency: 'EUR', quantity: 10, averageCost: 100, averageCostEur: 101 });
+    mocks.ledgerAssets = [{ id: 'asset-eur', type: 'etf', quantity: 10 }];
+    seedTrade('asset-eur', 't1', { type: 'buy', date: new Date(2026, 0, 5), quantity: 10, pricePerUnit: 100, priceEur: 100, fees: 10 });
+
+    const first = await backfillAverageCostEur(OWNER);
+
+    expect(first).toEqual({ recomputedAssetCount: 1, skippedAssetCount: 0 });
+    expect(mocks.assetsStore.get('asset-eur')).toMatchObject({ averageCostEur: 100, fiscalAverageCostEur: 101 });
+    expect(mocks.metaStore.get(OWNER)!.averageCostEurFeeFreeAt).toBeInstanceOf(Date);
+    expect(await backfillAverageCostEur(OWNER)).toEqual({ alreadyBackfilled: true });
+  });
+
+  it('is a no-op once the fee-free re-projection has run', async () => {
+    seedMeta({ averageCostEurBackfilledAt: new Date(2026, 0, 2), averageCostEurFeeFreeAt: new Date(2026, 10, 12) });
     const result = await backfillAverageCostEur(OWNER);
     expect(result).toEqual({ alreadyBackfilled: true });
   });
@@ -152,11 +166,11 @@ describe('backfillAverageCostEur', () => {
     expect(asset.quantity).toBe(10);
     expect(asset.averageCost).toBe(100); // native PMC, unchanged
     expect(asset.averageCostEur).toBe(90); // the field this backfill exists to add
-    expect(mocks.metaStore.get(OWNER)!.averageCostEurBackfilledAt).toBeInstanceOf(Date);
+    expect(mocks.metaStore.get(OWNER)!.averageCostEurFeeFreeAt).toBeInstanceOf(Date);
     expect(mocks.invalidate).toHaveBeenCalledWith(OWNER, 'average_cost_eur_backfilled');
   });
 
-  it('writes ONLY averageCostEur: a doc whose quantity drifted from its ledger keeps its quantity', async () => {
+  it('writes ONLY the two PMCs: a doc whose quantity drifted from its ledger keeps its quantity', async () => {
     seedMeta();
     mocks.assetsStore.set('asset-eur', { userId: OWNER, type: 'etf', currency: 'EUR', quantity: 12, averageCost: 100 });
     mocks.ledgerAssets = [{ id: 'asset-eur', type: 'etf', quantity: 12 }];
@@ -167,7 +181,8 @@ describe('backfillAverageCostEur', () => {
     const asset = mocks.assetsStore.get('asset-eur')!;
     expect(asset.quantity).toBe(12); // not rewritten by the backfill
     expect(asset.averageCost).toBe(100); // native PMC: fees excluded, and not rewritten
-    expect(asset.averageCostEur).toBe(101); // (10 × 100 + 10) / 10 — the fiscal cost
+    expect(asset.averageCostEur).toBe(100); // the PMC, no fee
+    expect(asset.fiscalAverageCostEur).toBe(101); // (10 × 100 + 10) / 10 — the fiscal cost
   });
 
   it('projects the field from a baseline-only ledger (a position never traded since migration)', async () => {
@@ -207,7 +222,7 @@ describe('backfillAverageCostEur', () => {
     expect(result).toEqual({ recomputedAssetCount: 1, skippedAssetCount: 1 });
     expect(mocks.assetsStore.get('asset-bad')!.averageCostEur).toBeUndefined();
     expect(mocks.assetsStore.get('asset-ok')!.averageCostEur).toBe(90);
-    expect(mocks.metaStore.get(OWNER)!.averageCostEurBackfilledAt).toBeInstanceOf(Date);
+    expect(mocks.metaStore.get(OWNER)!.averageCostEurFeeFreeAt).toBeInstanceOf(Date);
     expect(consoleError).toHaveBeenCalledTimes(1);
     consoleError.mockRestore();
   });

@@ -2,10 +2,9 @@
  * Tests for lib/utils/periodSales.ts — the period's sales read from the trade ledger, and the ONE
  * decision on why a period fell that the three verdicts share.
  *
- * The main fixture is the owner's real September 2026: four sells of Vanguard FTSE All-World
- * (233 units at ~167,5 € against a 100,1119 € PMC) on which the broker withheld 4.092,50 € — the
- * snapshot note says so — and the estimate lands on it to the cent once the 26% is applied to the
- * gain GROSS of the sells' 14 € of fees, as the broker does (on the net gain it said 4.088,86 €).
+ * The main fixture is an invented ETF «Ornitorinco» taxed at 26%: an opening position of 100 units
+ * at 100 € and two September sells with 5 € of fees each. Its realized gain is fee-free, its
+ * estimated tax stands on the fiscal gain with both fees deducted (owner, 2026-11-12).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -61,26 +60,22 @@ function asset(id: string, name: string, taxRate: number | undefined): Asset {
   } as Asset;
 }
 
-const VWCE = asset('vwce', 'Vanguard FTSE All-World', 26);
-const VWCE_LEDGER = [
-  tx('vwce', 'buy', new Date(2026, 6, 22, 12), 740, 100.1119, undefined, true),
-  tx('vwce', 'sell', new Date(2026, 8, 1, 12), 90, 167.64, 2.5),
-  tx('vwce', 'sell', new Date(2026, 8, 1, 12), 2, 167.4, 1.5),
-  tx('vwce', 'sell', new Date(2026, 8, 1, 12), 88, 167.35, 5),
-  tx('vwce', 'sell', new Date(2026, 8, 7, 12), 53, 168.25, 5),
+const ORNI = asset('orni', 'Ornitorinco', 26);
+const ORNI_LEDGER = [
+  tx('orni', 'buy', new Date(2026, 6, 22, 12), 100, 100, undefined, true),
+  tx('orni', 'sell', new Date(2026, 8, 1, 12), 10, 150, 5),
+  tx('orni', 'sell', new Date(2026, 8, 7, 12), 10, 160, 5),
 ];
 
 describe('summarizePeriodSales', () => {
-  it('should sum the period sells of one instrument against the PMC at the sale, fees included', () => {
-    const summary = summarizePeriodSales([VWCE], VWCE_LEDGER, SEPTEMBER)!;
+  it('should sum the period sells of one instrument: a fee-free gain, a tax on the fiscal gain', () => {
+    const summary = summarizePeriodSales([ORNI], ORNI_LEDGER, SEPTEMBER)!;
 
     expect(summary.instruments).toHaveLength(1);
-    expect(summary.proceeds).toBeCloseTo(39052.45, 2);
-    expect(summary.realizedGain).toBeCloseTo(15726.38, 2);
-    // 26% of the TAXABLE gain (15.726,38 + 14 € of sale fees): the 4.092,50 € on the statement.
-    // The realized gain above stays net of fees — only the tax base is gross of them.
-    expect(summary.estimatedTax).toBeCloseTo(4092.5, 2);
-    expect(summary.instruments[0]).toMatchObject({ id: 'vwce', name: 'Vanguard FTSE All-World' });
+    expect(summary.proceeds).toBeCloseTo(3090, 9); // 1495 + 1595, net of fees
+    expect(summary.realizedGain).toBeCloseTo(1100, 9); // 10 × 50 + 10 × 60: fee-free
+    expect(summary.estimatedTax).toBeCloseTo(283.4, 9); // 26% × (1100 − 10 of sale fees)
+    expect(summary.instruments[0]).toMatchObject({ id: 'orni', name: 'Ornitorinco' });
     expect(summary.brokenLedgers).toBe(0);
   });
 
@@ -99,28 +94,27 @@ describe('summarizePeriodSales', () => {
   });
 
   it('should read the tax the broker withheld in place of the estimate, and say the figure is a fact', () => {
-    // The statement's 4.092,50 € typed sell by sell (its split across the four sells is invented).
-    const withheld = [1580.2, 35.1, 1540.3, 936.9];
+    const withheld = [100, 150];
     let index = 0;
-    const ledger = VWCE_LEDGER.map((t) => (t.type === 'sell' ? { ...t, withheldTaxEur: withheld[index++] } : t));
-    const summary = summarizePeriodSales([VWCE], ledger, SEPTEMBER)!;
+    const ledger = ORNI_LEDGER.map((t) => (t.type === 'sell' ? { ...t, withheldTaxEur: withheld[index++] } : t));
+    const summary = summarizePeriodSales([ORNI], ledger, SEPTEMBER)!;
 
-    expect(summary.estimatedTax).toBeCloseTo(4092.5, 6);
+    expect(summary.estimatedTax).toBeCloseTo(250, 6);
     expect(summary.taxIsWithheld).toBe(true);
     expect(summary.instruments[0].taxIsWithheld).toBe(true);
     // Realized P&L stays gross of the tax.
-    expect(summary.realizedGain).toBeCloseTo(15726.38, 2);
+    expect(summary.realizedGain).toBeCloseTo(1100, 9);
   });
 
-  it('should tax a sale on the price difference alone, while the realized gain stays net of every fee', () => {
+  it('should tax a sale on the fiscal gain, both fees deducted, while the realized gain stays fee-free', () => {
     const ledger = [
       tx('a', 'buy', new Date(2026, 6, 22, 12), 100, 100, 10), // 10 € of purchase fees: 0,10 € a unit
       tx('a', 'sell', new Date(2026, 8, 3, 12), 10, 150, 20),
     ];
     const summary = summarizePeriodSales([asset('a', 'A', 26)], ledger, SEPTEMBER)!;
 
-    expect(summary.realizedGain).toBeCloseTo(479, 9); // 1500 − 20 − 10 × 100,10
-    expect(summary.estimatedTax).toBeCloseTo(130, 9); // 26% × 10 × (150 − 100)
+    expect(summary.realizedGain).toBeCloseTo(500, 9); // 10 × (150 − 100)
+    expect(summary.estimatedTax).toBeCloseTo(124.54, 9); // 26% × (1500 − 20 − 10 × 100,10) = 26% × 479
   });
 
   it('should estimate only the sells that carry no withheld tax, and call the mix an estimate', () => {
@@ -149,8 +143,8 @@ describe('summarizePeriodSales', () => {
   it('should return null when nothing was sold in the range', () => {
     const buysOnly = [tx('a', 'buy', new Date(2026, 8, 3, 12), 10, 100)];
     expect(summarizePeriodSales([asset('a', 'A', 26)], buysOnly, SEPTEMBER)).toBeNull();
-    expect(summarizePeriodSales([VWCE], [], SEPTEMBER)).toBeNull();
-    expect(summarizePeriodSales([VWCE], VWCE_LEDGER, { start: new Date(2026, 9, 1), end: new Date(2026, 9, 31) })).toBeNull();
+    expect(summarizePeriodSales([ORNI], [], SEPTEMBER)).toBeNull();
+    expect(summarizePeriodSales([ORNI], ORNI_LEDGER, { start: new Date(2026, 9, 1), end: new Date(2026, 9, 31) })).toBeNull();
   });
 
   it('should charge no tax on a realized loss', () => {
@@ -165,28 +159,28 @@ describe('summarizePeriodSales', () => {
 
   it('should leave the tax unknown, never zero, when a sold instrument has no rate', () => {
     const ledger = [
-      ...VWCE_LEDGER,
+      ...ORNI_LEDGER,
       tx('b', 'buy', new Date(2026, 6, 22, 12), 10, 50, undefined, true),
       tx('b', 'sell', new Date(2026, 8, 3, 12), 10, 60),
     ];
-    const summary = summarizePeriodSales([VWCE, asset('b', 'B', undefined)], ledger, SEPTEMBER)!;
+    const summary = summarizePeriodSales([ORNI, asset('b', 'B', undefined)], ledger, SEPTEMBER)!;
 
-    expect(summary.instruments.map((row) => row.id)).toEqual(['vwce', 'b']);
+    expect(summary.instruments.map((row) => row.id)).toEqual(['orni', 'b']);
     expect(summary.instruments[1].estimatedTax).toBeNull();
-    expect(summary.instruments[0].estimatedTax).toBeCloseTo(4092.5, 2);
+    expect(summary.instruments[0].estimatedTax).toBeCloseTo(283.4, 9);
     expect(summary.estimatedTax).toBeNull();
-    expect(summary.realizedGain).toBeCloseTo(15726.38 + 100, 2);
+    expect(summary.realizedGain).toBeCloseTo(1100 + 100, 9);
   });
 
   it('should count a broken ledger and keep the others', () => {
     const ledger = [
-      ...VWCE_LEDGER,
+      ...ORNI_LEDGER,
       // Over-sell: nothing bought before it — the replay refuses the ledger.
       tx('broken', 'sell', new Date(2026, 8, 3, 12), 10, 60),
     ];
-    const summary = summarizePeriodSales([VWCE, asset('broken', 'Broken', 26)], ledger, SEPTEMBER)!;
+    const summary = summarizePeriodSales([ORNI, asset('broken', 'Broken', 26)], ledger, SEPTEMBER)!;
 
-    expect(summary.instruments.map((row) => row.id)).toEqual(['vwce']);
+    expect(summary.instruments.map((row) => row.id)).toEqual(['orni']);
     expect(summary.brokenLedgers).toBe(1);
   });
 
@@ -205,11 +199,11 @@ describe('summarizePeriodSales', () => {
 
 describe('resolveDeclineCause', () => {
   it('should name the tax over the market when the estimated tax outweighs the market loss', () => {
-    expect(resolveDeclineCause({ marketEffect: -1078.73, ownFlows: -3859.01, salesTax: 4088.86 })).toBe('taxes-over-market');
+    expect(resolveDeclineCause({ marketEffect: -1000, ownFlows: -4000, salesTax: 4000 })).toBe('taxes-over-market');
   });
 
   it('should name both when the market lost more than the tax', () => {
-    expect(resolveDeclineCause({ marketEffect: -5000, ownFlows: -3859, salesTax: 4088.86 })).toBe('market-and-taxes');
+    expect(resolveDeclineCause({ marketEffect: -5000, ownFlows: -4000, salesTax: 4000 })).toBe('market-and-taxes');
   });
 
   it('should name the flows over the market when no tax explains them and they outweigh the market', () => {
@@ -230,63 +224,63 @@ describe('resolveDeclineCause', () => {
   });
 
   it('should name the tax when the market gained and the tax is at least half of the drop', () => {
-    // The real account, settembre 2026: +153 € of market, a 4.156 € drop, 4.089 € withheld.
-    expect(resolveDeclineCause({ marketEffect: 153, ownFlows: -4308.63, salesTax: 4088.86 })).toBe('taxes-despite-market');
+    // +150 € of market, a 3.850 € drop, 4.000 € of tax.
+    expect(resolveDeclineCause({ marketEffect: 150, ownFlows: -4000, salesTax: 4000 })).toBe('taxes-despite-market');
     // Exactly half still counts; a hair under does not.
     expect(resolveDeclineCause({ marketEffect: 0, ownFlows: -8000, salesTax: 4000 })).toBe('taxes-despite-market');
     expect(resolveDeclineCause({ marketEffect: 0, ownFlows: -8000, salesTax: 3999 })).toBe('despite-market');
   });
 
   it('should keep «despite-market» when the drop cannot be measured (the email passes no own flows)', () => {
-    expect(resolveDeclineCause({ marketEffect: 900, ownFlows: null, salesTax: 4088.86 })).toBe('despite-market');
+    expect(resolveDeclineCause({ marketEffect: 900, ownFlows: null, salesTax: 4000 })).toBe('despite-market');
   });
 
   it('should know nothing without a market effect', () => {
-    expect(resolveDeclineCause({ marketEffect: null, ownFlows: null, salesTax: 4088.86 })).toBe('unknown');
+    expect(resolveDeclineCause({ marketEffect: null, ownFlows: null, salesTax: 4000 })).toBe('unknown');
   });
 });
 
 describe('summarizePeriodSales — purchases', () => {
   it('should add up every buy of the period on any instrument, fees included, baselines excluded', () => {
     const ledger = [
-      ...VWCE_LEDGER, // its buy is the migration baseline: not a purchase
-      tx('btp', 'buy', new Date(2026, 8, 2, 12), 10, 981.6, undefined, true), // a baseline written in September: still not a purchase
-      tx('wbit', 'buy', new Date(2026, 8, 1, 12), 123, 16.23),
-      tx('ceth', 'buy', new Date(2026, 8, 1, 12), 23, 64.795, 9.5),
-      tx('xeon', 'buy', new Date(2026, 8, 1, 12), 93, 150.0519),
-      tx('xeon', 'buy', new Date(2026, 8, 7, 12), 22, 150.1239),
-      tx('xeon', 'buy', new Date(2026, 7, 28, 12), 5, 150), // August — out of range
-      tx('ceth', 'adjustment', new Date(2026, 8, 1, 12), 67, 65.7882), // moves no money
+      ...ORNI_LEDGER, // its buy is the migration baseline: not a purchase
+      tx('btp', 'buy', new Date(2026, 8, 2, 12), 10, 1000, undefined, true), // a baseline written in September: still not a purchase
+      tx('feni', 'buy', new Date(2026, 8, 1, 12), 10, 100),
+      tx('gru', 'buy', new Date(2026, 8, 1, 12), 20, 50, 5),
+      tx('airone', 'buy', new Date(2026, 8, 1, 12), 10, 200),
+      tx('airone', 'buy', new Date(2026, 8, 7, 12), 5, 200),
+      tx('airone', 'buy', new Date(2026, 7, 28, 12), 5, 200), // August — out of range
+      tx('gru', 'adjustment', new Date(2026, 8, 1, 12), 40, 50), // moves no money
     ];
-    const summary = summarizePeriodSales([VWCE], ledger, SEPTEMBER)!;
+    const summary = summarizePeriodSales([ORNI], ledger, SEPTEMBER)!;
 
-    // 1996,29 + (1490,285 + 9,5) + 13954,8267 + 3302,7258
-    expect(summary.purchases?.amount).toBeCloseTo(20753.6275, 4);
+    // 1000 + (1000 + 5) + 2000 + 1000
+    expect(summary.purchases?.amount).toBeCloseTo(5005, 9);
     expect(summary.purchases?.instrumentCount).toBe(3);
   });
 
   it('should say null, not zero, when nothing was bought beside the sale', () => {
-    expect(summarizePeriodSales([VWCE], VWCE_LEDGER, SEPTEMBER)!.purchases).toBeNull();
+    expect(summarizePeriodSales([ORNI], ORNI_LEDGER, SEPTEMBER)!.purchases).toBeNull();
   });
 });
 
 describe('resolveTaxedGrowth', () => {
   it('should call a month flat when the tax took the growth and less than half a percent is left', () => {
-    // The real account, settembre 2026: +124,32 € (+0,04%) with 4088,86 € of estimated tax.
-    expect(resolveTaxedGrowth({ delta: 124.32, deltaPct: 0.04, salesTax: 4088.86 })).toBe('flat');
+    // +120 € (+0,04%) with 4.000 € of estimated tax.
+    expect(resolveTaxedGrowth({ delta: 120, deltaPct: 0.04, salesTax: 4000 })).toBe('flat');
   });
 
   it('should call it eroded when the tax took at least half but the growth is still visible', () => {
-    expect(resolveTaxedGrowth({ delta: 3000, deltaPct: 1.02, salesTax: 4088.86 })).toBe('eroded');
+    expect(resolveTaxedGrowth({ delta: 3000, deltaPct: 1.02, salesTax: 4000 })).toBe('eroded');
     // Exactly half of the gross growth (tax = Δ) still counts; a hair under does not.
     expect(resolveTaxedGrowth({ delta: 4000, deltaPct: 1.3, salesTax: 4000 })).toBe('eroded');
     expect(resolveTaxedGrowth({ delta: 4000, deltaPct: 1.3, salesTax: 3999 })).toBeNull();
   });
 
   it('should say nothing on a falling month, without a taxed sale, or with an unknown tax', () => {
-    expect(resolveTaxedGrowth({ delta: -10, deltaPct: -0.01, salesTax: 4088.86 })).toBeNull();
-    expect(resolveTaxedGrowth({ delta: 124.32, deltaPct: 0.04, salesTax: 0 })).toBeNull();
-    expect(resolveTaxedGrowth({ delta: 124.32, deltaPct: 0.04, salesTax: null })).toBeNull();
+    expect(resolveTaxedGrowth({ delta: -10, deltaPct: -0.01, salesTax: 4000 })).toBeNull();
+    expect(resolveTaxedGrowth({ delta: 120, deltaPct: 0.04, salesTax: 0 })).toBeNull();
+    expect(resolveTaxedGrowth({ delta: 120, deltaPct: 0.04, salesTax: null })).toBeNull();
   });
 
   it('should treat a month at exactly zero as flat when a tax explains it', () => {

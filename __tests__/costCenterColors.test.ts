@@ -97,23 +97,23 @@ describe('resolveCostCenterColor', () => {
 
 // ─── Who holds which slot ─────────────────────────────────────────────────────
 
-// The owner's account on 2026-09-18: two cars saved with the SAME legacy default hex.
+// Seen on 2026-09-18: two cars saved with the SAME legacy default hex.
 const TWO_CARS = [
-  { id: 'jogger', name: 'Dacia Jogger', color: '#3b82f6' },
+  { id: 'tapiro', name: 'Auto Tapiro', color: '#3b82f6' },
   { id: 'vacanze', name: 'Vacanze', color: '#f59e0b' },
-  { id: 'corsa', name: 'Opel Corsa', color: '#3b82f6' },
+  { id: 'fenicottero', name: 'Auto Fenicottero', color: '#3b82f6' },
 ];
 
 describe('mapColorSlotUsage', () => {
   it('names every active center on a slot, a legacy hex and a slot key alike', () => {
     const usage = mapColorSlotUsage([...TWO_CARS, { id: 'bici', name: 'Bici', color: 'chart-1' }]);
-    expect(usage.get(0)).toEqual(['Dacia Jogger', 'Opel Corsa', 'Bici']);
+    expect(usage.get(0)).toEqual(['Auto Tapiro', 'Auto Fenicottero', 'Bici']);
     expect(usage.get(2)).toEqual(['Vacanze']);
     expect(usage.get(1)).toBeUndefined();
   });
 
   it('leaves out the center being edited: its own slot is not taken by another', () => {
-    expect(mapColorSlotUsage(TWO_CARS, 'corsa').get(0)).toEqual(['Dacia Jogger']);
+    expect(mapColorSlotUsage(TWO_CARS, 'fenicottero').get(0)).toEqual(['Auto Tapiro']);
     expect(mapColorSlotUsage(TWO_CARS, 'vacanze').get(2)).toBeUndefined();
   });
 

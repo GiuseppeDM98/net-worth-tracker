@@ -29,6 +29,7 @@ import {
   findIndexationCoefficient,
   latestIndexationCoefficient,
   upsertIndexationCoefficient,
+  isPendingProvisionalCoupon,
 } from '@/lib/utils/couponUtils';
 import type { CouponRateTier, BondDetails } from '@/types/assets';
 
@@ -583,5 +584,21 @@ describe('buildCouponNote — euro indexation', () => {
   it('says that no coefficient was entered when the estimate is at par', () => {
     const note = buildCouponNote(resolveCoupon(MAY_COUPON, EURO_BOND, 1), 'semiannual');
     expect(note).toContain('al coefficiente 1 (nessun coefficiente inserito)');
+  });
+});
+
+describe('isPendingProvisionalCoupon — the coupons the banner asks a coefficient for', () => {
+  // A coupon is stored at the UTC midnight of its date, as the form writes `<input type="date">`.
+  const due = (iso: string, isProvisional = true) => ({ isProvisional, paymentDate: new Date(`${iso}T00:00:00.000Z`) });
+  const now = new Date(2026, 10, 15, 12);
+
+  it('keeps a provisional coupon due TODAY by the Italian calendar, and a future one', () => {
+    expect(isPendingProvisionalCoupon(due('2026-11-15'), now)).toBe(true);
+    expect(isPendingProvisionalCoupon(due('2026-12-01'), now)).toBe(true);
+  });
+
+  it('drops a past coupon and a final one', () => {
+    expect(isPendingProvisionalCoupon(due('2026-11-14'), now)).toBe(false);
+    expect(isPendingProvisionalCoupon(due('2026-11-15', false), now)).toBe(false);
   });
 });

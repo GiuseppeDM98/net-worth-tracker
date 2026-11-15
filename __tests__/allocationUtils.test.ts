@@ -733,6 +733,11 @@ describe('buildHoldings', () => {
     expect(holding.taxableOnSale).toBe(true);
   });
 
+  it('should carry the FISCAL basis, purchase fees included: the plan taxes a sale on it', () => {
+    const asset = makeAsset({ id: 'a1', quantity: 5, currentPrice: 200, averageCost: 120, averageCostEur: 120, fiscalAverageCostEur: 121, taxRate: 26 });
+    expect(buildHoldings([asset], valueOf)[0].costBasisEur).toBe(605); // 5 × 121
+  });
+
   it('should leave the basis undefined when the asset has no comparable EUR one', () => {
     // A foreign position the ledger has not projected: its native PMC is dollars against euros.
     const asset = makeAsset({ id: 'a1', currency: 'USD', averageCost: 120, taxRate: 26 });
