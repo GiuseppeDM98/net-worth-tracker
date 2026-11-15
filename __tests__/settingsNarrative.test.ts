@@ -710,9 +710,13 @@ describe('summarizeExpenseCategories + describeExpenseCategories', () => {
   it('reads the counts with singulars where due', () => {
     expect(
       plain(describeExpenseCategories({ income: 4, fixed: 4, variable: 5, debt: 1, withSubcategories: 8 }))
-    ).toBe('14 categorie: 4 di entrate, 4 fisse, 5 variabili e 1 di debito; 8 con sottocategorie.');
+    ).toBe('14 categorie: 4 di entrate, 4 necessarie, 5 non necessarie e 1 di debito; 8 con sottocategorie.');
     expect(plain(describeExpenseCategories({ income: 0, fixed: 1, variable: 0, debt: 0, withSubcategories: 0 }))).toBe(
-      '1 categoria: 1 fissa.'
+      '1 categoria: 1 necessaria.'
+    );
+    // The types read «Spese Necessarie» / «Spese Non Necessarie» since 2026-10-20.
+    expect(plain(describeExpenseCategories({ income: 0, fixed: 0, variable: 1, debt: 0, withSubcategories: 0 }))).toBe(
+      '1 categoria: 1 non necessaria.'
     );
   });
 

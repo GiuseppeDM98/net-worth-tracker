@@ -20,14 +20,13 @@ import {
   type SpendingRolePalette,
 } from '@/lib/utils/cashflowSankey';
 import { SPENDING_BUCKET_LABELS, type SpendingBucket, type SpendingRoleSource, type SpendingRolesSummary } from '@/lib/utils/spendingRoles';
-import { buildTypeFlowBreakdown, type FlowSummary } from '@/lib/utils/analisiSummary';
+import { buildTypeFlowBreakdown, type FlowSummary, type FlussoLiftedBlock } from '@/lib/utils/analisiSummary';
 import type { ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 import { useCssColorTokens } from '@/lib/hooks/useCssColorTokens';
 import { SPENDING_ROLE_TOKEN } from '@/lib/constants/spendingRoleColors';
 import { narrativeToText } from '@/lib/utils/narrative';
 import { cn } from '@/lib/utils';
-import { Tile, type TileCollapse } from '@/components/ui/tile';
-import { ANALISI_CLOSED_ASIDES } from '@/lib/utils/analisiNarrative';
+import { Tile } from '@/components/ui/tile';
 import { AsideToggle } from '@/components/ui/aside-toggle';
 import { DrillBreadcrumb } from '@/components/ui/drill-breadcrumb';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,7 +41,7 @@ export interface SpendingRolesFlowInput {
   reading: Narrative | null;
 }
 
-interface FlussoTileProps {
+export interface FlussoTileProps {
   /** The period's rows (income + spending); transfers are not flows. */
   expenses: Expense[];
   /** In a cell narrower than a 640px phone's (and in the landscape index): a share bar and rows, never a Sankey. */
@@ -61,12 +60,6 @@ interface FlussoTileProps {
    */
   onEntityClick: (target: { expenseType: ExpenseType; categoryKey: string; subCategoryKey?: string }) => void;
   /**
-   * The row below `desktop:` (`useMobileSections().collapse(id)`). Closed it says its view in words
-   * («per ruolo» / «per tipo»), which only this tile knows; the toggle is a control, so it opens the
-   * panel. The view is the tile's own state: not in the page's memory, «Per ruolo» at every mount.
-   */
-  collapse?: TileCollapse;
-  /**
    * The strip's «Risparmio» cell prints the surplus (The Lifted-Figure Rule): in a cell narrower than
    * 608px (the share bar's drawing, since 2026-10-16) the blocks that print it again hide — the type
    * view's «Risparmio», the roles view's note (and «Risparmi» whole without a saving row). The bar
@@ -78,19 +71,12 @@ interface FlussoTileProps {
   className?: string;
 }
 
-/** The blocks of the Flusso a phone's strip repeats (since 2026-10-14). */
-export type FlussoLiftedBlock = 'risparmio';
-
-/** Narrows the `string[]` of `liftedBlocks(strip, section)` to this tile's blocks at the call site. */
-export function isFlussoLiftedBlock(block: string): block is FlussoLiftedBlock {
-  return block === 'risparmio';
-}
-
 /**
  * The Sankey (`@nivo/sankey`, d3-sankey and react-spring) is its own chunk, requested only where
  * the tile draws it — from 640px: a phone, which gets the share bar and rows, never downloads it
- * (2026-09-30; pinned by `e2e/bundle.lazy{,.mobile}.spec.ts`). Declared at MODULE level,
- * never in a render (AGENTS.md § Dynamic Imports). The wait fills the box the plot is given: the
+ * (2026-09-30; pinned by `e2e/bundle.lazy{,.mobile}.spec.ts`). The tile itself is loaded on demand
+ * inside «Dettaglio» since 2026-11-12 (`DettaglioDisclosure`), so this module is evaluated at idle.
+ * Declared at MODULE level, never in a render (AGENTS.md § Dynamic Imports). The wait fills the box the plot is given: the
  * caller wraps it in a container of the view's own height (`resolveSankeyHeight`), so the chart
  * lands in place and nothing under the tile moves.
  *
@@ -99,12 +85,11 @@ export function isFlussoLiftedBlock(block: string): block is FlussoLiftedBlock {
  * `lazyComponent`, not a `next/dynamic`: with the chunk already in memory the chart draws in the
  * same render as the figures, where a Suspense fallback held the placeholder ~275 ms longer
  * (measured on the mirror, the same day). The width test is where the Sankey is DRAWN: a cell of
- * 608px or more (AnalisiTab, `FLUSSO_SANKEY_MIN_CELL`) — from a 640px viewport up to the landscape
- * stage, which starts at a content box of 880px (a 912px viewport: there the Flusso is a row of the
- * 360px index and draws bar and rows, 2026-10-16), and again at 1440. Elsewhere nothing is fetched;
+ * 608px or more (`DettaglioDisclosure`, `FLUSSO_SANKEY_MIN_CELL`) — from a 640px viewport up: «Dettaglio»
+ * sits below the grid at the page's whole width, the landscape stage included (2026-11-12). Elsewhere nothing is fetched;
  * a rotation that brings the Sankey back downloads it at its first draw.
  */
-const SANKEY_DRAWN_QUERY = '(min-width: 640px) and (max-width: 911px), (min-width: 1440px)';
+const SANKEY_DRAWN_QUERY = '(min-width: 640px)';
 const CashflowSankeyChart = lazyComponent(() => import('@/components/cashflow/CashflowSankeyChart').then((m) => m.CashflowSankeyChart));
 if (typeof window !== 'undefined' && window.matchMedia(SANKEY_DRAWN_QUERY).matches) {
   CashflowSankeyChart.preload().catch(() => {}); // a failure is retried by the first draw
@@ -142,7 +127,7 @@ type DrillState =
  * SpendingTypesMobileFlow for the type view, both drawn by FlowShareMobile. In a narrow cell no Sankey
  * model is built at all (no view, no height, no label), and the role colours are not read.
  */
-export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, scheduled, scheduledHorizon, onEntityClick, collapse, liftedFigures = [], printedFigures, className }: FlussoTileProps) {
+export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, scheduled, scheduledHorizon, onEntityClick, liftedFigures = [], printedFigures, className }: FlussoTileProps) {
   const savingsLifted = liftedFigures.includes('risparmio');
   const [showSubcategories, setShowSubcategories] = useState(false);
   const [preferredMode, setPreferredMode] = useState<FlowMode>('roles');
@@ -233,8 +218,6 @@ export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, s
   return (
     <Tile
       eyebrow="Flusso"
-      collapse={collapse}
-      asideWhenClosed={mode === 'roles' ? ANALISI_CLOSED_ASIDES.flussoRoles : ANALISI_CLOSED_ASIDES.flussoTypes}
       aside={
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
           {view && (

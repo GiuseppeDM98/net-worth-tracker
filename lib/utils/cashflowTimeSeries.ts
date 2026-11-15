@@ -309,7 +309,7 @@ export function buildCategoryTimeSeries(
 const EXPENSE_TYPE_ORDER: ExpenseType[] = ['fixed', 'variable', 'debt'];
 
 /**
- * Build per-type multi-line series (Fisse / Variabili / Debiti) over the full history.
+ * Build per-type multi-line series (Necessarie / Non necessarie / Debiti) over the full history.
  *
  * Answers a different question than buildCategoryTimeSeries: how the spending *mix*
  * (structural vs discretionary vs debt) evolves over time. Unlike categories there is

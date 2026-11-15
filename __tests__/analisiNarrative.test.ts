@@ -34,7 +34,9 @@ import {
   describeAnalisiScope,
   describeAnalisiSubject,
   describeAnalisiScheduledHorizon,
-  describeAnomalies,
+  describeCategoryChanges,
+  describeChangesAnomalies,
+  describeChangesFooter,
   describeBaseline,
   describeComparison,
   describeComparisonSummary,
@@ -45,6 +47,8 @@ import {
   describeMissingBaseline,
   describeShareCompact,
   describePeriodScope,
+  describePeriodoSavings,
+  describeSpendingRanking,
   describeSpendingRolesBar,
   describeSpendingRolesFlow,
   describeTypeFlowBar,
@@ -55,8 +59,7 @@ import {
   describeAnalisiClosedAnswers,
   type AnalisiVerdictInput,
 } from '@/lib/utils/analisiNarrative';
-import { ANALISI_SECTION_IDS } from '@/lib/utils/analisiSummary';
-import { SPENDING_BUCKET_LABELS } from '@/lib/utils/spendingRoles';
+import { ANALISI_SECTION_IDS, summarizeCategoryChanges } from '@/lib/utils/analisiSummary';
 
 const plain = (narrative: Narrative | null) => (narrative ? narrativeToText(narrative).replace(/ /g, ' ') : null);
 /** The segment whose text prints as `text` (nbsp flattened), to assert its face and sign. */
@@ -359,18 +362,11 @@ describe('describeSpendingChartFooter', () => {
   });
 });
 
-describe('describeAnomalies', () => {
-  it('should count the categories over their own average, singular and plural, or say none', () => {
-    expect(plain(describeAnomalies(ANOMALIES))).toBe('2 categorie oltre la loro media dei 6 mesi precedenti.');
-    expect(plain(describeAnomalies([ANOMALIES[0]]))).toBe('1 categoria oltre la sua media dei 6 mesi precedenti.');
-    expect(plain(describeAnomalies([]))).toBe('Nessuna categoria oltre la sua media dei 6 mesi precedenti.');
-  });
-});
-
 describe('describeTopExpenses', () => {
   const row = (label: string, amount: number, sub: string | null = null) => ({
     key: label,
     label,
+    note: null,
     subCategoryLabel: sub,
     caption: '1 gen',
     scheduled: false,
@@ -404,8 +400,8 @@ describe('describeFlow', () => {
     expensesTotal: 31200,
     categoryCount: 10,
     typeShares: [
-      { type: 'fixed', label: 'Fisse', amount: 18100, percentage: 58, printedPercentage: 58 },
-      { type: 'variable', label: 'Variabili', amount: 11540, percentage: 37, printedPercentage: 37 },
+      { type: 'fixed', label: 'Necessarie', amount: 18100, percentage: 58, printedPercentage: 58 },
+      { type: 'variable', label: 'Non necessarie', amount: 11540, percentage: 37, printedPercentage: 37 },
       { type: 'debt', label: 'Debiti', amount: 1560, percentage: 5, printedPercentage: 5 },
     ],
   };
@@ -416,12 +412,12 @@ describe('describeFlow', () => {
       ...FLOW,
       expensesTotal: 3000,
       typeShares: [
-        { type: 'fixed', label: 'Fisse', amount: 1000, percentage: third, printedPercentage: 34 },
-        { type: 'variable', label: 'Variabili', amount: 1000, percentage: third, printedPercentage: 33 },
+        { type: 'fixed', label: 'Necessarie', amount: 1000, percentage: third, printedPercentage: 34 },
+        { type: 'variable', label: 'Non necessarie', amount: 1000, percentage: third, printedPercentage: 33 },
         { type: 'debt', label: 'Debiti', amount: 1000, percentage: third, printedPercentage: 33 },
       ],
     };
-    expect(plain(describeFlow(flow, readSavings(1000, 800)))).toContain('Fisse 34%, variabili 33%, debiti 33%.');
+    expect(plain(describeFlow(flow, readSavings(1000, 800)))).toContain('Necessarie 34%, non necessarie 33%, debiti 33%.');
   });
 
   it('should write a type that holds money but rounds to zero as «meno dell’1%», never «0%»', () => {
@@ -429,25 +425,25 @@ describe('describeFlow', () => {
       ...FLOW,
       expensesTotal: 10000,
       typeShares: [
-        { type: 'fixed', label: 'Fisse', amount: 9960, percentage: 99.6, printedPercentage: 100 },
+        { type: 'fixed', label: 'Necessarie', amount: 9960, percentage: 99.6, printedPercentage: 100 },
         { type: 'debt', label: 'Debiti', amount: 40, percentage: 0.4, printedPercentage: 0 },
       ],
     };
-    expect(plain(describeFlow(flow, readSavings(1000, 800)))).toContain("Fisse 100%, debiti meno dell'1%.");
+    expect(plain(describeFlow(flow, readSavings(1000, 800)))).toContain("Necessarie 100%, debiti meno dell'1%.");
   });
 
   it('should describe the flow from the sources to the types and categories, with the savings share', () => {
-    expect(plain(describeFlow(FLOW, readSavings(10000, 7919)))).toBe('Da 4 fonti (39.400 €) a 3 tipi di spesa e 10 categorie; il 21% resta come risparmio. Fisse 58%, variabili 37%, debiti 5%.');
+    expect(plain(describeFlow(FLOW, readSavings(10000, 7919)))).toBe('Da 4 fonti (39.400 €) a 3 tipi di spesa e 10 categorie; il 21% resta come risparmio. Necessarie 58%, non necessarie 37%, debiti 5%.');
   });
 
   it('should say when spending exceeds income, and when there is one source or one type', () => {
-    expect(plain(describeFlow({ ...FLOW, incomeSources: 1, typeShares: [FLOW.typeShares[0]] }, readSavings(1000, 1123)))).toBe('Da una fonte (39.400 €) a 1 tipo di spesa e 10 categorie; le spese superano le entrate del 12,3%. Tutte spese fisse.');
+    expect(plain(describeFlow({ ...FLOW, incomeSources: 1, typeShares: [FLOW.typeShares[0]] }, readSavings(1000, 1123)))).toBe('Da una fonte (39.400 €) a 1 tipo di spesa e 10 categorie; le spese superano le entrate del 12,3%. Tutte spese necessarie.');
     expect(plain(describeFlow({ ...FLOW, typeShares: [FLOW.typeShares[2]] }, readSavings(1000, 900)))).toContain('Tutte spese di debito.');
     expect(plain(describeFlow({ incomeTotal: 3200, incomeSources: 2, expensesTotal: 0, categoryCount: 0, typeShares: [] }, readSavings(3200, 0)))).toBe('Nessuna spesa: 3200 € da 2 fonti, tutto resta come risparmio.');
   });
 
   it('should describe spending without income, and return null with nothing', () => {
-    expect(plain(describeFlow({ ...FLOW, incomeTotal: 0, incomeSources: 0 }, readSavings(0, 31200)))).toBe('Nessuna entrata: 31.200 € di spese in 10 categorie. Fisse 58%, variabili 37%, debiti 5%.');
+    expect(plain(describeFlow({ ...FLOW, incomeTotal: 0, incomeSources: 0 }, readSavings(0, 31200)))).toBe('Nessuna entrata: 31.200 € di spese in 10 categorie. Necessarie 58%, non necessarie 37%, debiti 5%.');
     expect(describeFlow({ incomeTotal: 0, incomeSources: 0, expensesTotal: 0, categoryCount: 0, typeShares: [] }, readSavings(0, 0))).toBeNull();
   });
 
@@ -800,17 +796,17 @@ describe('the Flusso captions beside the first screen', () => {
 });
 
 /**
- * The closed rows' answers of Analisi (2026-10-16): what each row says in the landscape index, the
- * segments joined with a space as the index's gap sets them. Falsified on 2026-10-16, one at a
- * time: «the LARGEST printed share» went red with `typeShares[0]` in its place; «the roles view when
- * the setting is on» went red with the type answer always; «the Scheda keeps its scope» went red
- * with the Scheda answering the first expense category.
+ * The closed rows' answers of Analisi (2026-10-16; the rows of «Classifica» since 2026-11-12): what each
+ * row says in the landscape index, the segments joined with a space as the index's gap sets them. Seen
+ * red with the old keys (`analisi-fuori-scala`, `analisi-flusso`) still answered, with «Cosa è cambiato»
+ * answering its first row instead of its largest and with the Periodo printing a deficit as a rate.
  */
 describe('describeAnalisiClosedAnswers', () => {
-  const answer = (narrative: Narrative | null | undefined) => (narrative ? narrative.map((s) => s.text).join(' ').replace(/ /g, ' ') : null);
+  const answer = (narrative: Narrative | null | undefined) => (narrative ? narrative.map((s) => s.text).join(' ').replace(/\u00a0/g, ' ') : null);
   const topRow = (label: string, amount: number) => ({
     key: label,
     label,
+    note: null,
     subCategoryLabel: null,
     caption: '5 ago',
     scheduled: false,
@@ -822,27 +818,36 @@ describe('describeAnalisiClosedAnswers', () => {
   });
   const TOP: TopExpenses = { rows: [topRow('Vacanze', 2500), topRow('Auto', 900)], shownTotal: 3400, total: 25000, count: 40 };
   const rankRow = (category: string, amount: number, percentage: number) => ({ category, categoryKey: category, amount, percentage });
-  const EXPENSES = { rows: [rankRow('Casa', 7800, 78), rankRow('Svago', 2200, 22)], total: 10000, remainder: null };
   const INCOME = { rows: [rankRow('Stipendio', 30000, 100)], total: 30000, remainder: null };
-  // The types in the order the Sankey lists them, NOT by size: the answer must pick the largest.
-  const FLOW: FlowSummary = {
-    incomeTotal: 30000,
-    incomeSources: 1,
-    expensesTotal: 10000,
-    categoryCount: 2,
-    typeShares: [
-      { type: 'fixed', label: 'Fisse', amount: 900, percentage: 9, printedPercentage: 9 },
-      { type: 'variable', label: 'Variabili', amount: 9100, percentage: 91, printedPercentage: 91 },
-    ],
-  };
+  const delta = (label: string, value: number): CategoryDeltaRow => ({
+    key: `variable:${label}`, expenseType: 'variable', categoryKey: label, label, current: 100 + value, previous: 100, delta: value, deltaPercent: value, status: 'ongoing',
+  });
+  // Casa moved first in the list, Alimentari the most: the answer is the largest.
+  const CHANGES = summarizeCategoryChanges([delta('Casa', 40), delta('Alimentari', -100)], -60);
   const input = (overrides: Partial<Parameters<typeof describeAnalisiClosedAnswers>[0]> = {}) =>
-    describeAnalisiClosedAnswers({ anomalies: ANOMALIES, topExpenses: TOP, expenseRanking: EXPENSES, incomeRanking: INCOME, flow: FLOW, spendingRoles: null, ...overrides });
+    describeAnalisiClosedAnswers({ topExpenses: TOP, changes: CHANGES, anomalies: ANOMALIES, incomeRanking: INCOME, savings: readSavings(2000, 780), ...overrides });
 
-  it('should answer Fuori scala with the furthest category over its average, in red as its row prints it', () => {
-    const fuori = input()[ANALISI_SECTION_IDS.fuoriScala];
-    expect(answer(fuori)).toBe('Ristoranti +48%');
-    expect(fuori?.[1]).toMatchObject({ mono: true, sign: 'negative' });
-    expect(answer(input({ anomalies: [] })[ANALISI_SECTION_IDS.fuoriScala])).toBe('nessuna fuori scala');
+  it('should answer only the rows the page has', () => {
+    expect(Object.keys(input()).sort()).toEqual([ANALISI_SECTION_IDS.cambiato, ANALISI_SECTION_IDS.entrate, ANALISI_SECTION_IDS.maggiori, ANALISI_SECTION_IDS.periodo, ANALISI_SECTION_IDS.scheda].sort());
+    expect(input()).not.toHaveProperty('analisi-flusso');
+    expect(input()).not.toHaveProperty('analisi-fuori-scala');
+  });
+
+  it('should answer «Cosa è cambiato» with its largest mover, else the first anomaly, else nothing', () => {
+    const cambiato = input()[ANALISI_SECTION_IDS.cambiato];
+    expect(answer(cambiato)).toBe('Alimentari −100 €');
+    expect(cambiato?.[1]).toMatchObject({ mono: true, sign: 'positive' });
+    const anomaly = input({ changes: null })[ANALISI_SECTION_IDS.cambiato];
+    expect(answer(anomaly)).toBe('Ristoranti +48%');
+    expect(anomaly?.[1]).toMatchObject({ mono: true, sign: 'negative' });
+    expect(input({ changes: null, anomalies: [] })[ANALISI_SECTION_IDS.cambiato]).toBeNull();
+  });
+
+  it('should answer the Periodo with the rate put aside, and nothing for a deficit', () => {
+    expect(answer(input()[ANALISI_SECTION_IDS.periodo])).toBe('messo da parte 61%');
+    expect(input({ savings: readSavings(1000, 1300) })[ANALISI_SECTION_IDS.periodo]).toBeNull();
+    expect(input({ savings: readSavings(0, 500) })[ANALISI_SECTION_IDS.periodo]).toBeNull();
+    expect(input({ savings: readSavings(1000, 998) })[ANALISI_SECTION_IDS.periodo]).toBeNull();
   });
 
   it('should answer Spese maggiori with the largest expense', () => {
@@ -850,25 +855,9 @@ describe('describeAnalisiClosedAnswers', () => {
     expect(input({ topExpenses: { rows: [], shownTotal: 0, total: 0, count: 0 } })[ANALISI_SECTION_IDS.maggiori]).toBeNull();
   });
 
-  it('should answer the category rows with the first category and its share', () => {
-    expect(answer(input()[ANALISI_SECTION_IDS.spese])).toBe('Casa 78%');
+  it('should answer Entrate with the first category and its share', () => {
     expect(answer(input()[ANALISI_SECTION_IDS.entrate])).toBe('tutto da Stipendio');
-    const empty = { rows: [], total: 0, remainder: null };
-    expect(input({ expenseRanking: empty, incomeRanking: empty })).toMatchObject({ [ANALISI_SECTION_IDS.spese]: null, [ANALISI_SECTION_IDS.entrate]: null });
-  });
-
-  it('should answer the Flusso by type with the LARGEST printed share, wherever it sits', () => {
-    expect(answer(input()[ANALISI_SECTION_IDS.flusso])).toBe('Variabili 91%');
-    const one: FlowSummary = { ...FLOW, typeShares: [{ type: 'variable', label: 'Variabili', amount: 10000, percentage: 100, printedPercentage: 100 }] };
-    expect(answer(input({ flow: one })[ANALISI_SECTION_IDS.flusso])).toBe('tutte variabili');
-    expect(input({ flow: { ...FLOW, expensesTotal: 0, typeShares: [] } })[ANALISI_SECTION_IDS.flusso]).toBeNull();
-  });
-
-  it('should answer the Flusso by role when the 50/30/20 setting is on (the tile opens on that view)', () => {
-    // 3000 of income: needs 1500 (50%), wants 900 (30%), the rest saved (20%).
-    const roles = rolesSummary({ income: 3000, need: 1500, want: 900 });
-    expect(answer(input({ spendingRoles: roles })[ANALISI_SECTION_IDS.flusso])).toBe(`${SPENDING_BUCKET_LABELS.need} 50%`);
-    expect(input({ spendingRoles: rolesSummary({ income: 0, rowCount: 0 }) })[ANALISI_SECTION_IDS.flusso]).toBeNull();
+    expect(input({ incomeRanking: { rows: [], total: 0, remainder: null } })[ANALISI_SECTION_IDS.entrate]).toBeNull();
   });
 
   it('should leave the Scheda its scope (null): the entity’s name is the answer', () => {
@@ -879,5 +868,119 @@ describe('describeAnalisiClosedAnswers', () => {
     for (const narrative of Object.values(input())) {
       if (narrative) expect(answer(narrative)!.length).toBeLessThanOrEqual(22);
     }
+  });
+});
+
+/**
+ * «Dove vanno i soldi» (2026-11-12): the categories' share, then the type the ring beside it is
+ * largest by — the same sentence in both views. Seen red with the share's «.» kept («Casa.;») and
+ * with `shareInWords` at 90% («quasi tutto» on a plural subject).
+ */
+describe('describeSpendingRanking', () => {
+  const rankRow = (category: string, percentage: number) => ({ category, categoryKey: category, amount: percentage * 10, percentage });
+  const typeShare = (type: 'fixed' | 'variable' | 'debt', label: string, printedPercentage: number) => ({ type, label, amount: printedPercentage * 10, percentage: printedPercentage, printedPercentage });
+  const flow = (typeShares: FlowSummary['typeShares']): FlowSummary => ({ incomeTotal: 2000, incomeSources: 1, expensesTotal: 1000, categoryCount: 4, typeShares });
+  const RANKING = { rows: [rankRow('Casa', 40), rankRow('Cibo', 20), rankRow('Auto', 10), rankRow('Svago', 30)], total: 1000, remainder: null };
+
+  it('should say the largest category, the first three and the largest type', () => {
+    const reading = describeSpendingRanking(RANKING, flow([typeShare('fixed', 'Necessarie', 50), typeShare('variable', 'Non necessarie', 50)]));
+    expect(plain(reading)).toBe('Il 40% va in Casa; le prime tre fanno il 70%; le spese necessarie sono la metà.');
+  });
+
+  it('should say one category and one type whole', () => {
+    const reading = describeSpendingRanking({ rows: [rankRow('Casa', 100)], total: 1000, remainder: null }, flow([typeShare('fixed', 'Necessarie', 100)]));
+    expect(plain(reading)).toBe('Tutto in Casa; tutte spese necessarie.');
+  });
+
+  it('should agree «quasi tutte» with the plural subject from 85%', () => {
+    const reading = describeSpendingRanking(RANKING, flow([typeShare('fixed', 'Necessarie', 90), typeShare('debt', 'Debiti', 10)]));
+    expect(plain(reading)).toBe('Il 40% va in Casa; le prime tre fanno il 70%; le spese necessarie sono quasi tutte.');
+    const debts = describeSpendingRanking(RANKING, flow([typeShare('debt', 'Debiti', 90), typeShare('fixed', 'Necessarie', 10)]));
+    expect(plain(debts)).toBe('Il 40% va in Casa; le prime tre fanno il 70%; i debiti sono quasi tutti.');
+  });
+
+  it('should return null with no spending', () => {
+    expect(describeSpendingRanking({ rows: [], total: 0, remainder: null }, flow([]))).toBeNull();
+  });
+});
+
+/**
+ * «Cosa è cambiato» in words (2026-11-12). Seen red with the verb always plural («Casa spiegano»)
+ * and with the new categories left out of the footer.
+ */
+describe('describeCategoryChanges', () => {
+  const delta = (label: string, value: number, status: CategoryDeltaRow['status'] = 'ongoing'): CategoryDeltaRow => ({
+    key: `variable:${label}`, expenseType: 'variable', categoryKey: label, label, current: status === 'gone' ? 0 : 100 + value, previous: status === 'new' ? 0 : 100, delta: value, deltaPercent: status === 'new' ? null : value, status,
+  });
+
+  it('should name the movers that explain all of a fall', () => {
+    const changes = summarizeCategoryChanges([delta('Casa', 40), delta('Palestra', -60, 'gone'), delta('Alimentari', -100)], -120);
+    expect(plain(describeCategoryChanges(changes))).toBe('Alimentari e Palestra spiegano tutto il calo.');
+  });
+
+  it('should give the share of a rise three movers do not reach', () => {
+    const changes = summarizeCategoryChanges([delta('Viaggi', 500), delta('Casa', 400), delta('Cibo', 300), delta('Auto', 100)], 1300);
+    expect(plain(describeCategoryChanges(changes))).toBe("Viaggi, Casa e Cibo spiegano il 92% dell'aumento.");
+  });
+
+  it('should say spending in line, naming the largest mover with its sign', () => {
+    const changes = summarizeCategoryChanges([delta('Casa', 40), delta('Cibo', -30)], 0);
+    const reading = describeCategoryChanges(changes);
+    expect(plain(reading)).toBe('Spese in linea; a muoversi di più è Casa (+40 €).');
+    expect(segmentOf(reading, '+40 €')).toMatchObject({ mono: true, sign: 'negative' });
+  });
+
+  it('should take the singular with one mover', () => {
+    const changes = summarizeCategoryChanges([delta('Casa', 40)], 40);
+    expect(plain(describeCategoryChanges(changes))).toBe("Casa spiega tutto l'aumento.");
+  });
+
+  it('should say nothing moved', () => {
+    expect(plain(describeCategoryChanges(summarizeCategoryChanges([], 0)))).toBe('Nessuna categoria si è mossa.');
+  });
+
+  it('should name the new and the ceased categories in the footer', () => {
+    const changes = summarizeCategoryChanges([delta('Asilo', 300, 'new'), delta('Palestra', -60, 'gone')], 240);
+    expect(describeChangesFooter(changes, 'nel 2026')).toBe('Nuove nel 2026: Asilo. Cessate: Palestra. Tutte le voci nel Confronto annuale.');
+    expect(describeChangesFooter(summarizeCategoryChanges([delta('Casa', 40)], 40), 'nel 2026')).toBe('Tutte le voci nel Confronto annuale.');
+  });
+});
+
+/**
+ * The month's anomalies as a sentence of «Cosa è cambiato» (2026-11-12). Seen red with the month
+ * always named, also when the period IS that month.
+ */
+describe('describeChangesAnomalies', () => {
+  const anomaly = (categoryLabel: string, deltaPercent: number): SpendingAnomaly => ({
+    key: `variable:${categoryLabel}`, expenseType: 'variable', categoryKey: categoryLabel, categoryLabel, currentTotal: 180, referenceAverage: 100, deltaPercent, absoluteDelta: 80,
+  });
+  const NOVEMBER = { year: 2026, month: 11 };
+
+  it('should name the month when the period is wider than it', () => {
+    const reading = describeChangesAnomalies([anomaly('Ristoranti', 80), anomaly('Auto', 40)], NOVEMBER, { mode: 'current', year: 2026, month: null });
+    expect(plain(reading)).toBe('A novembre fuori scala sulla media dei 6 mesi precedenti: Ristoranti (+80%) e Auto (+40%).');
+    expect(segmentOf(reading, '+80%')).toMatchObject({ mono: true, sign: 'negative' });
+  });
+
+  it('should not repeat the month when the period is that month, and say nothing without anomalies', () => {
+    const reading = describeChangesAnomalies([anomaly('Ristoranti', 80)], NOVEMBER, { mode: 'current', year: 2026, month: 11 });
+    expect(plain(reading)).toBe('Fuori scala sulla media dei 6 mesi precedenti: Ristoranti (+80%).');
+    expect(describeChangesAnomalies([], NOVEMBER, CURRENT)).toBeNull();
+    expect(describeChangesAnomalies([anomaly('Ristoranti', 80)], null, CURRENT)).toBeNull();
+  });
+});
+
+/**
+ * The Periodo's reading (2026-11-12): what was put aside, below the savings floor in euros, never a
+ * percentage. Seen red with a deficit beyond the floor printed as a rate.
+ */
+describe('describePeriodoSavings', () => {
+  it('should say the share put aside, a deficit in euros or as a true rate, and the even and empty cases', () => {
+    expect(plain(describePeriodoSavings(readSavings(2000, 1400)))).toBe('Hai messo da parte il 30% delle entrate.');
+    expect(plain(describePeriodoSavings(readSavings(3, 500)))).toBe('Le spese superano le entrate di 497 €.');
+    expect(plain(describePeriodoSavings(readSavings(1000, 1300)))).toBe('Le spese superano le entrate del 30%.');
+    expect(plain(describePeriodoSavings(readSavings(1000, 1000)))).toBe('Entrate e spese si pareggiano.');
+    expect(plain(describePeriodoSavings(readSavings(0, 500)))).toBe('Nessuna entrata: 500 € di spese coperti dal patrimonio.');
+    expect(describePeriodoSavings(readSavings(0, 0))).toBeNull();
   });
 });

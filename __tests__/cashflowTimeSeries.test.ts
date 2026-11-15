@@ -191,7 +191,7 @@ describe('buildCategoryTimeSeries', () => {
 });
 
 describe('buildTypeTimeSeries', () => {
-  it('groups expenses by type in canonical order (Fisse → Variabili → Debiti)', () => {
+  it('groups expenses by type in canonical order (Necessarie → Non necessarie → Debiti)', () => {
     const expenses: Expense[] = [
       makeExpense({ type: 'debt', amount: -100, date: d(2025, 1) }),
       makeExpense({ type: 'fixed', amount: -400, date: d(2025, 1) }),

@@ -401,7 +401,7 @@ file used to carry.
 - A running year is NOT clipped (`periodExpenses` takes the whole calendar year); the pacing compares year vs year−1 on the period's own span (`resolveComparisonScope`), the running MONTH on the same days of its baseline (`throughDay`, rows through `dayOf`), plus the shared `scheduledSentence`. The history CLOSES on the current year (`availableYears`, the Storico slice, the two charts' `BucketCeiling`): a plan's rows in 2043 are a calendar, not years.
 - The Scheda is a tile of the grid; every entry point lands through `handleEntitySelect`; URL focus is three FLAT params (`?focusType&focusCat&focusSub`); closing it returns the focus to its opener. Its pace divides the LIVED total by the months lived (`computeEntityRunRate`: `livedTotal`/`livedMonths`), the projection takes the calendar as a FLOOR under the pace, and its period carries the page's `throughMonth` cut.
 - Every number has one source (`analisiSummary.ts`, `comparisonDeltas.ts`); every sentence from `analisiNarrative.ts`/`cashflowNarrative.ts`, never a component.
-- Il resto — the mobile composition (§ Composizione mobile), «Fuori scala», the Periodo pacing, `EntityDossier`, the Sankey rules, the optional Flusso by 50/30/20 role (`spendingRoles.ts`), the Flusso's drawing below 640px (a share bar and rows, a legibility threshold of the chart), Playwright — in `doc/guide/cashflow-analisi.md`.
+- Il resto — the mobile composition (§ Composizione mobile; THE tile «Dove vanno i soldi», 2026-11-12), «Cosa è cambiato» and the anomalies as its sentence, the Periodo pacing, the Flusso inside «Dettaglio», lazy (2026-11-12), `EntityDossier`, the Sankey rules, the optional Flusso by 50/30/20 role (`spendingRoles.ts`), the Flusso's drawing below 640px (a share bar and rows, a legibility threshold of the chart), Playwright — in `doc/guide/cashflow-analisi.md`.
 
 ### Cashflow › Budget → `doc/guide/cashflow-budget.md`
 - Opt-in (`reconcileBudgetItems` never auto-creates); NO period axis (always the current Italian month; annual budgets are year-to-date on their own Off-Axis tile).
@@ -720,7 +720,8 @@ file used to carry.
 - **A row's caption WRAPS, it is never truncated, and the label column never grows to make room for it** (2026-09-14,
   `RankedRows`): a cut fact is no fact («30 set · Asilo nido · in calendario»); at 4 grid columns 46% is the most the
   label can take beside the bar's 40px floor, the amount and the share (58% painted the share outside the tile,
-  measured) — the caption takes a second line (`line-clamp-2`).
+  measured) — the caption takes a second line (`line-clamp-2`). Spese maggiori lays its rows `layout="stacked"` (owner,
+  2026-11-15): the label beside the figures, the caption (category · subcategory · day) beside the bar on a line of its own.
 
 ### Accessibility
 - **`title` is not an accessible name** (VoiceOver on iOS ignores it, touch never fires it): `aria-label` on icon-only

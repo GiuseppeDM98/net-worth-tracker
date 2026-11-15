@@ -246,6 +246,13 @@ qui, la più recente in cima. Le eccezioni ammesse sono queste e nessun'altra: L
 prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la pill di `PageTabBar` portata a 44 px
 (2026-10-10), la deriva del giorno o della macchina provata sul codice di develop dello stesso giorno.
 
+- **`2026-11-12: Analisi «Classifica» …`** (NOVE-10; proprietario, 2026-11-15: registrate come misurate), le tre voci di Analisi contro la build di develop dello stesso giorno, stessa macchina,
+  `census@example.com`: a 390 `screens` 1,86 → 2,11 e `figuresOutsideVerdict` 5 → 4 (LA tessera «Dove vanno i soldi», alta 654 px con l'anello e la
+  classifica intera, contro i 392 del Periodo; una cifra in meno fuori dal verdetto perché il centro dell'anello non è una cifra sollevata), la prima riga
+  chiusa sotto la pill com'era; a 768 `screens` 1,22 → 1,27, tessere 6/6 → 5/3, cifre 9/5 → 14/11 e la prima riga chiusa SOTTO la pill (era sopra:
+  LA tessera senza una curva da cedere, l'eccezione ammessa sopra); a 1024 `screens` 1,14 → 1,43, tessere 6/6 → 5/4, cifre 11/8 → 14/10 (le risposte
+  delle righe chiuse dell'indice e la classifica). Ogni altra voce identica alla corsa di develop (la prima corsa del «dopo» aveva What If 768/1024
+  non assestata e Patrimonio 1024 12/9 → 11/8: ri-censite, uguali al «prima»).
 - **`2026-10-17: …`** (la tessera «Intestatari»; proprietario: la tessera su Panoramica e Patrimonio, a riga intera in coda), due voci a 390
   contro HEAD: `screens` sale su Panoramica 1,75 → 1,83 e su Patrimonio 1,67 → 1,75 — una riga chiusa in più (52 px) in coda alle righe,
   perché il fixture nomina un membro della famiglia tramite il fondo pensione (il suo intestatario È il membro di Previdenza,

@@ -152,7 +152,7 @@ export function CategoryLinesChart({
 }
 
 // ── TypeCompositionChart ──────────────────────────────────────────────────────
-// 100%-stacked area: the spending mix (Fisse/Variabili/Debiti) as a share of total
+// 100%-stacked area: the spending mix (Necessarie/Non necessarie/Debiti) as a share of total
 // per bucket, so diversification reads independently of the absolute spend level.
 // Module-level (React Compiler).
 

@@ -689,9 +689,9 @@ export function describeExpenseCategories(counts: ExpenseCategoryCounts): Narrat
   }
   const parts: Narrative[] = [];
   if (counts.income > 0) parts.push([figure(String(counts.income)), prose(' di entrate')]);
-  if (counts.fixed > 0) parts.push([figure(String(counts.fixed)), prose(counts.fixed === 1 ? ' fissa' : ' fisse')]);
+  if (counts.fixed > 0) parts.push([figure(String(counts.fixed)), prose(counts.fixed === 1 ? ' necessaria' : ' necessarie')]);
   if (counts.variable > 0)
-    parts.push([figure(String(counts.variable)), prose(counts.variable === 1 ? ' variabile' : ' variabili')]);
+    parts.push([figure(String(counts.variable)), prose(counts.variable === 1 ? ' non necessaria' : ' non necessarie')]);
   if (counts.debt > 0) parts.push([figure(String(counts.debt)), prose(' di debito')]);
 
   const segments: Narrative = [figure(String(total)), prose(total === 1 ? ' categoria: ' : ' categorie: ')];

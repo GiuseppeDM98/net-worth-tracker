@@ -632,7 +632,7 @@ export function describeIncomeCategoriesTile(
   ]);
 }
 
-/** Spese per tipo — the Fisse/Variabili/Debiti split, as the expense tile's footer. */
+/** Spese per tipo — the Necessarie/Non necessarie/Debiti split, as the expense tile's footer. */
 export function describeExpenseTypes(
   types: Array<{ label: string; amount: number }>,
 ): Narrative | null {

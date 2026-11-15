@@ -5,8 +5,8 @@
  * 50/30/20 roles are off: one bar of the SPENDING split by type, then each type's categories as
  * ranked rows, then what was put aside. Drawn by FlowShareMobile.
  *
- * One base on the screen: the reading above prints the types as shares of the spending («fisse
- * 53%, variabili 37%, debiti 10%»), so the bar is the spending and its legend prints those very
+ * One base on the screen: the reading above prints the types as shares of the spending («necessarie
+ * 53%, non necessarie 37%, debiti 10%»), so the bar is the spending and its legend prints those very
  * figures (`buildTypeFlowBreakdown` takes them from the reading's own FlowSummary). Savings are a
  * share of the income in that sentence, so they stay out of the bar: a closing «Risparmio» block
  * whose note is analisiNarrative's, as are the caption and the empty line. A deficit is the red
