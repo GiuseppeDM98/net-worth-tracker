@@ -34,6 +34,7 @@ import {
 import { groupFundsByFamilyMember } from '@/lib/utils/pensionFamilyMembers';
 import { getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
+import { isRingWhole, type RingSegment } from '@/lib/utils/ringChart';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
 import type { SectionSpec } from '@/lib/hooks/useMobileSections';
 
@@ -597,6 +598,24 @@ export function summarizeVersato(contributions: PensionContribution[], year: num
     previousYearTotal: previous ? previous.tfr + previous.voluntary + previous.employer : null,
     previousYearSingleNature: previousNatures.length === 1 ? previousNatures[0] : null,
   };
+}
+
+/** Each nature's colour in the Versato ring, fixed by nature (TFR wears one hue every year). */
+export const NATURE_RING_COLORS: Record<PensionContributionNature, string> = {
+  tfr: 'var(--chart-2)',
+  voluntary: 'var(--chart-7)',
+  employer: 'var(--chart-6)',
+};
+
+/** The year's natures as ring parts; null with fewer than two (one nature is the sentence). */
+export function versatoRing(versato: VersatoSummary): RingSegment[] | null {
+  const segments = versato.rows.map((row) => ({
+    key: row.nature,
+    label: row.label,
+    value: row.amount,
+    color: NATURE_RING_COLORS[row.nature],
+  }));
+  return isRingWhole(segments) ? segments : null;
 }
 
 // ─── Versamenti (the ledger of the axis year) ─────────────────────────────────

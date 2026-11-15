@@ -29,7 +29,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   abandoned are marked «superseded» in DESIGN.md, never deleted while another page still uses them.
 - **The hero tile is ONE component for two pages**: `components/dashboard/overview/PatrimonioTile.tsx` renders the
   Panoramica's hero and, with `movers`/`countLine`, Patrimonio's — a second hero would drift (the pre-v3 twin did).
-  `ComposizioneTile` likewise takes `eyebrow`/`footer`. `resolveHeroValueClass` is the one overflow step-down.
+  `ComposizioneTile` likewise takes `eyebrow`/`footer`; since 2026-11-12 it draws the classes as a ring over their
+  rows when every class is ≥ 0 (`lib/utils/compositionRing.ts`, its own module so the landing never imports `overviewSummary.ts`, «patrimonio» under the total, past six
+  classes «Altre N classi» captioned with their names — DESIGN.md → The Ring Rule), the stacked bar otherwise.
+  «Entrate per categoria» is the ring Tracciamento draws (2026-11-15, the owner's tour: `incomeRingSegments` from
+  `lib/utils/categoryRing.ts` on `rankingFromOverview`, «entrate» under the total); «Spese per categoria» stays ranked rows. `resolveHeroValueClass` is the one overflow step-down.
 - Count-up lives in `OverviewAnimatedCurrency` leaf nodes, never in the page component.
 - **No `layout` on the page root** (2026-10-08): the page sat in a `motion.div layout="position"` since
   2026-04-03 (`git log -S`: «softer reflow of conditional cards», for metric blocks that the Verdict-over-Tiles redesign
@@ -191,7 +195,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the chart reads, so no tablist; roving tabindex, 14px labels, 44px of height under `desktop:`. The primitive's
   inactive label is `text-foreground/70` since the same day — `text-muted-foreground` on `bg-muted` measured 4,34:1.
 - **`RankedRows`' label column is a share of the row (42%, floored), the bar takes the rest** (`components/ui/ranked-rows.tsx`):
-  a fixed 92px column cut «Stipendio Giuseppe» to «Stipendio Giu…» at every width while the bar grew to 210px, and
+  a fixed 92px column cut «Stipendio Paolo» to «Stipendio Pa…» at every width while the bar grew to 210px, and
   the rows of one list must share one track. The third desktop row is 4 · 4 · 4: at 3 columns the income tile could
   not hold a label, a 40px bar and two figures. Costi's «Pesano di più» follows the figures (`mt-4`), not the tile's
   bottom: pinned, it left ~110px of nothing whenever a taller tile shared the row.

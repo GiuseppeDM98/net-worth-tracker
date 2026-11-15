@@ -77,7 +77,7 @@ describe('getSettings — lettura', () => {
     expect(settings?.includePrimaryResidenceInFIRE).toBe(true);
     expect(settings?.respectPensionLockInFire).toBe(true);
     expect(settings?.cashflowHistoryStartYear).toBe(2019);
-    expect(settings?.familyMembers).toEqual([{ id: 'm1', name: 'Giuseppe' }]);
+    expect(settings?.familyMembers).toEqual([{ id: 'm1', name: 'Paolo' }]);
     expect(settings?.expenseSplitEnabled).toBe(true);
     expect(settings?.spendingRolesEnabled).toBe(true);
   });

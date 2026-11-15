@@ -22,8 +22,8 @@ import {
 
 const NOW = new Date('2026-10-20T12:00:00.000Z');
 
-const GIUSEPPE: FamilyMember = { id: 'm-1', name: 'Giuseppe', grossAnnualIncome: 40000 };
-const MARCELLA: FamilyMember = { id: 'm-2', name: 'Marcella' };
+const PAOLO: FamilyMember = { id: 'm-1', name: 'Paolo', grossAnnualIncome: 40000 };
+const ELENA: FamilyMember = { id: 'm-2', name: 'Elena' };
 
 function asset(overrides: Partial<Asset> & Pick<Asset, 'id' | 'name' | 'type' | 'assetClass' | 'quantity' | 'currentPrice'>): Asset {
   return {
@@ -180,7 +180,7 @@ function build(overrides: Partial<BuildPortfolioContextInput> = {}) {
       { goalId: 'g1', assetId: 'a-etf', percentage: 50 },
       { goalId: 'g2', assetId: 'a-bond', units: 5000 },
     ],
-    familyMembers: [GIUSEPPE, MARCELLA],
+    familyMembers: [PAOLO, ELENA],
     ownerAge: 35,
     assetValueOf: valueOf,
     now: NOW,
@@ -220,8 +220,8 @@ describe('buildAssistantPortfolioContext — holdings', () => {
 
   it('names the owner through the ownership rule and keeps the ticker only when it says more than the name', () => {
     const { holdings } = build();
-    expect(holdings.find((row) => row.name === 'ETF Mondo')).toMatchObject({ ticker: 'MONDO.MI', owner: 'di Giuseppe' });
-    expect(holdings.find((row) => row.name === 'Fondo pensione')).toMatchObject({ owner: 'di Marcella', isLiquid: false });
+    expect(holdings.find((row) => row.name === 'ETF Mondo')).toMatchObject({ ticker: 'MONDO.MI', owner: 'di Paolo' });
+    expect(holdings.find((row) => row.name === 'Fondo pensione')).toMatchObject({ owner: 'di Elena', isLiquid: false });
     expect(holdings.find((row) => row.name === 'Conto corrente')).toMatchObject({ owner: null, isLiquid: true });
     expect(holdings.find((row) => row.name === 'Conto corrente')?.ticker).toBeUndefined();
   });
@@ -354,7 +354,7 @@ describe('buildAssistantPortfolioContext — pension, loans, family', () => {
   it('rolls the contributions of each fund up by tax year and nature, the member named', () => {
     const { pension } = build();
     expect(pension).toHaveLength(1);
-    expect(pension[0]).toMatchObject({ name: 'Fondo pensione', valueEur: 30000, memberName: 'Marcella', role: 'frozen' });
+    expect(pension[0]).toMatchObject({ name: 'Fondo pensione', valueEur: 30000, memberName: 'Elena', role: 'frozen' });
     expect(pension[0].byYear).toEqual([
       { taxYear: 2025, tfr: 1500, voluntary: 500, employer: 0, total: 2000 },
       { taxYear: 2026, tfr: 0, voluntary: 0, employer: 300, total: 300 },
@@ -374,8 +374,8 @@ describe('buildAssistantPortfolioContext — pension, loans, family', () => {
     expect(family).toEqual({
       ownerAge: 35,
       members: [
-        { name: 'Giuseppe', grossAnnualIncome: 40000 },
-        { name: 'Marcella', grossAnnualIncome: null },
+        { name: 'Paolo', grossAnnualIncome: 40000 },
+        { name: 'Elena', grossAnnualIncome: null },
       ],
     });
   });

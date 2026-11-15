@@ -860,14 +860,14 @@ describe('describeBtpItalia', () => {
 
 describe('describeSharing', () => {
   it('names the member and what they can do', () => {
-    expect(plain(describeSharing({ memberNames: ['Marcella'] }))).toBe(
-      'Marcella vede e modifica tutto — spese, asset, dividendi — con le sue credenziali.'
+    expect(plain(describeSharing({ memberNames: ['Elena'] }))).toBe(
+      'Elena vede e modifica tutto — spese, asset, dividendi — con le sue credenziali.'
     );
   });
 
   it('handles more members', () => {
-    expect(plain(describeSharing({ memberNames: ['Marcella', 'Luca'] }))).toBe(
-      'Marcella e Luca vedono e modificano tutto — spese, asset, dividendi — con le loro credenziali.'
+    expect(plain(describeSharing({ memberNames: ['Elena', 'Luca'] }))).toBe(
+      'Elena e Luca vedono e modificano tutto — spese, asset, dividendi — con le loro credenziali.'
     );
   });
 

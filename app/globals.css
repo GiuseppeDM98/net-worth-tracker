@@ -508,7 +508,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --chart-1: oklch(0.5553 0.1455 48.9975);
   --chart-2: oklch(0.5830 0.1260 237.1000);
   --chart-3: oklch(0.6340 0.1180 85.6000);
-  --chart-4: oklch(0.5130 0.0120 58.0000);
+  --chart-4: oklch(0.4200 0.0800 170.0000);
   --chart-5: oklch(0.6200 0.1460 150.1000);
   --chart-6: oklch(0.4950 0.1020 100.0000);
   --chart-7: oklch(0.6300 0.1070 198.0000);
@@ -551,7 +551,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --chart-1: oklch(0.7049 0.1867 47.6044);
   --chart-2: oklch(0.6120 0.1310 237.2000);
   --chart-3: oklch(0.6760 0.1290 86.6000);
-  --chart-4: oklch(0.7830 0.0120 58.0000);
+  --chart-4: oklch(0.5300 0.1050 170.0000);
   --chart-5: oklch(0.8330 0.1700 150.0000);
   --chart-6: oklch(0.8600 0.1410 100.0000);
   --chart-7: oklch(0.8600 0.1370 198.0000);

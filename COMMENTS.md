@@ -182,7 +182,7 @@ TODO, FIXME, XXX comments accumulate and are often ignored.
 
 **Better**: Use issue tracker instead. If you must use them:
 - Include ticket number: `# TODO(#123): refactor after v2.0`
-- Add date and author: `# FIXME(2024-01-15, @giuseppe): ...`
+- Add date and author: `# FIXME(2024-01-15, @paolo): ...`
 - Be specific about what needs doing
 
 ---

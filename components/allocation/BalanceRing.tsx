@@ -3,10 +3,10 @@
 /**
  * BalanceRing — the balance score as an 84px ring with the number in the middle.
  *
- * WHY a ring, when the rule is «flat rows over donuts»: the score is ONE figure on a 0-100 scale,
+ * WHY a ring for one figure, when The Ring Rule draws parts: the score is ONE figure on a 0-100 scale,
  * and the ring is the shape that shows how far it is from 100 without a second number — a
- * part-of-whole read with a single slice — the ONE ring DESIGN.md still keeps (§5 Savings / Metric
- * Ring Chart: a bounded 0-100 score is not a rate). The number
+ * part-of-whole read with a single slice — the one ring of a SCORE DESIGN.md keeps (§5 Savings /
+ * Metric Ring Chart); rings of PARTS are `RingChart` (The Ring Rule). The number
  * carries the meaning; the arc's colour is reinforcement drawn from the action hues (OK / COMPRA /
  * VENDI through `useActionColors`), never from the sign tokens: a drift is neither a gain nor a
  * loss. The ring is the tile's only consumer of those hues, so resolving them here IS the one

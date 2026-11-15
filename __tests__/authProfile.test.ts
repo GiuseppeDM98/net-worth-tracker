@@ -7,15 +7,15 @@ import { resolveDisplayName } from '@/lib/utils/authProfile';
 
 describe('resolveDisplayName', () => {
   it('should take the Auth profile name and ask for no backfill when Auth has one', () => {
-    const result = resolveDisplayName({ displayName: 'Giuseppe Rossi' }, { displayName: 'Altro Nome' });
+    const result = resolveDisplayName({ displayName: 'Paolo Rossi' }, { displayName: 'Altro Nome' });
 
-    expect(result).toEqual({ displayName: 'Giuseppe Rossi', shouldBackfillAuthProfile: false });
+    expect(result).toEqual({ displayName: 'Paolo Rossi', shouldBackfillAuthProfile: false });
   });
 
   it('should fall back to the Firestore document and ask for the backfill when Auth has none', () => {
-    const result = resolveDisplayName({ displayName: null }, { displayName: 'Giuseppe Rossi' });
+    const result = resolveDisplayName({ displayName: null }, { displayName: 'Paolo Rossi' });
 
-    expect(result).toEqual({ displayName: 'Giuseppe Rossi', shouldBackfillAuthProfile: true });
+    expect(result).toEqual({ displayName: 'Paolo Rossi', shouldBackfillAuthProfile: true });
   });
 
   it('should answer null, without a backfill, when the document is missing', () => {

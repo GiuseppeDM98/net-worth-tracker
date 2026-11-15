@@ -22,7 +22,7 @@ export const STORED_SETTINGS = {
   pensionInpsRetirementAge: 68,
   pensionRitaLongUnemployment: true,
   cashflowHistoryStartYear: 2019,
-  familyMembers: [{ id: 'm1', name: 'Giuseppe' }],
+  familyMembers: [{ id: 'm1', name: 'Paolo' }],
   expenseSplitEnabled: true,
   spendingRolesEnabled: true,
   dividendCashAssetId: 'cash-1',
@@ -116,7 +116,7 @@ export const FULL_PAGE_SETTINGS: AssetAllocationSettings = {
   weeklyBudgetEmailEnabled: true,
   monthlyEmailRecipients: ['a@example.com', 'b@example.com'],
   familyMembers: [
-    { id: 'm1', name: 'Giuseppe', grossAnnualIncome: 42000, isFirstEmploymentPost2007: true, firstEmploymentYear: 2015 },
-    { id: 'm2', name: 'Marcella', grossAnnualIncome: 38000.5, isFirstEmploymentPost2007: false },
+    { id: 'm1', name: 'Paolo', grossAnnualIncome: 42000, isFirstEmploymentPost2007: true, firstEmploymentYear: 2015 },
+    { id: 'm2', name: 'Elena', grossAnnualIncome: 38000.5, isFirstEmploymentPost2007: false },
   ],
 };

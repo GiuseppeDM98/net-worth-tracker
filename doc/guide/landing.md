@@ -14,7 +14,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The landing renders the app's OWN tiles, not pictures of them.** `PatrimonioTile`, `CashflowTile`,
   `ComposizioneTile` and `ObiettivoTile` are imported from `components/dashboard/overview/` and fed an
   invented profile (`landingSampleData.ts`). A mock-up of the Panoramica would age the moment the
-  Panoramica changed, and the landing is the one surface where staleness is read as dishonesty.
+  Panoramica changed, and the landing is the one surface where staleness is read as dishonesty. Since 2026-11-12
+  its Composizione is the ring of the classes (DESIGN.md → The Ring Rule) on the sample profile, with the tile.
 - **The hero is ONE component for THREE surfaces now.** `PatrimonioTile` used to take the whole
   `DashboardOverviewPayload` and read five fields of it; it takes those five as props
   (`variations`, `isNewATH`, `movers`, `assetCount`, `hasCurrentMonthSnapshot`), because the landing

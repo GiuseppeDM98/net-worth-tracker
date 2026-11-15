@@ -81,7 +81,7 @@ export interface AssistantHoldingRow {
   costBasisEur?: number;
   gainEur?: number;
   gainPct?: number;
-  /** «di Marcella», «Giuseppe 273 quote, 692 in comune», null when the whole asset is in comune. */
+  /** «di Elena», «Paolo 273 quote, 692 in comune», null when the whole asset is in comune. */
   owner: string | null;
   isLiquid: boolean;
   /** A bond's redemption date (`bondDetails.maturityDate`) as an ISO day; only on a `bond` with its details (2026-11-08). */

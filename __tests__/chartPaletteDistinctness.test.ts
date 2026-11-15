@@ -19,8 +19,11 @@
  *     the slot silently falls back to the static palette (doc/guide/temi.md) — cyberpunk's
  *     light slots 3-5 sat at L 0.84–0.92 until the same day.
  *   - a slot keeps its hue across the two modes (≤ 30°), so a class does not change identity when
- *     the mode flips. A NEUTRAL slot (chroma < 0.03: solar-dusk's Immobili is a warm grey on
- *     purpose) has no hue to hold and is exempt.
+ *     the mode flips. A NEUTRAL slot (chroma < 0.03) has no hue to hold and is exempt; none is left
+ *     since 2026-11-15, when solar-dusk's grey Immobili became a pine green (below).
+ *   - every slot ΔE00 ≥ 14 from the block's `--muted-foreground`, the colour of a ring's fold
+ *     («Altre N classi», DESIGN.md → The Ring Rule): solar-dusk's grey Immobili measured ΔE00 ~1
+ *     from it, two arcs of one ring in the same grey (the tour of 2026-11-15).
  */
 
 import { readFileSync } from 'node:fs';
@@ -166,6 +169,20 @@ describe.each(BLOCKS)('the chart slots of $label', ({ selector, guard }) => {
     slots.forEach(([L], i) => {
       expect(L, `${SLOT_NAMES[i]} L=${L}`).toBeLessThanOrEqual(guard.maxL);
       expect(L, `${SLOT_NAMES[i]} L=${L}`).toBeGreaterThanOrEqual(guard.minL);
+    });
+  });
+});
+
+describe.each(BLOCKS)('the ring fold of $label', ({ selector }) => {
+  it(`keeps every slot at least ΔE00 ${MIN_DELTA_E} from --muted-foreground, the fold's colour`, () => {
+    const start = GLOBALS.indexOf(`\n${selector} {`);
+    const block = GLOBALS.slice(start, GLOBALS.indexOf('\n}', start));
+    const match = block.match(/--muted-foreground:\s*oklch\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)/);
+    expect(match, `--muted-foreground in "${selector}"`).not.toBeNull();
+    const fold = labOf([Number(match![1]), Number(match![2]), Number(match![3])]);
+    chartSlotsOf(selector).forEach((slot, i) => {
+      const deltaE = deltaE00(labOf(slot), fold);
+      expect(deltaE, `${SLOT_NAMES[i]} ↔ the fold measure ΔE00 ${deltaE.toFixed(1)}`).toBeGreaterThanOrEqual(MIN_DELTA_E);
     });
   });
 });

@@ -11,6 +11,8 @@ import {
   summarizeLedger,
   summarizePensionMembers,
   summarizeVersato,
+  versatoRing,
+  NATURE_RING_COLORS,
   hasPensionStrip,
   PENSION_SECTION_IDS,
   selectPensionStrip,
@@ -443,6 +445,21 @@ describe('summarizeVersato', () => {
     const versato = summarizeVersato(CONTRIBUTIONS, 2024);
     expect(versato.total).toBe(0);
     expect(versato.rows).toEqual([]);
+  });
+});
+
+describe('versatoRing (The Ring Rule, 2026-11-12)', () => {
+  it('P1: makes the three natures of the year a ring, each in its fixed slot; one nature is no ring', () => {
+    const ring = versatoRing(summarizeVersato(CONTRIBUTIONS, 2026));
+    expect(ring).not.toBeNull();
+    expect(ring!.map((segment) => segment.key)).toEqual(['voluntary', 'tfr', 'employer']);
+    expect(ring!.map((segment) => segment.color)).toEqual([
+      NATURE_RING_COLORS.voluntary,
+      NATURE_RING_COLORS.tfr,
+      NATURE_RING_COLORS.employer,
+    ]);
+    expect(NATURE_RING_COLORS).toEqual({ tfr: 'var(--chart-2)', voluntary: 'var(--chart-7)', employer: 'var(--chart-6)' });
+    expect(versatoRing(summarizeVersato(CONTRIBUTIONS, 2025))).toBeNull();
   });
 });
 

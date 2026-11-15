@@ -394,6 +394,10 @@
   `new Date('YYYY-MM-DD')`, UTC midnight, so every coupon derived from a local-midnight fixture reads the 14th.
   (Moved here whole from `AGENTS.md` → *Audit habits* on 2026-09-20; the rule stays there in one line.)
 - **A throwaway probe on the dev server** (2026-11-13): the Next dev overlay (`nextjs-portal`) covers the bottom-left button of the 1024×768 rail and swallows its click — the probe hides it with `nextjs-portal{display:none!important}`; the dashboard never reaches `networkidle` (Firestore listeners stay open), so a window opened for the owner waits on `domcontentloaded` and a failed `goto` is caught, or the script exits and takes the window with it.
+- **`browser.newContext()` inside a test inherits the project's `use`, `storageState` included** (2026-11-15): an
+  «anonymous» context opened that way is logged in, and `/` redirects to the Panoramica. A context for the landing
+  passes `storageState: { cookies: [], origins: [] }`. A `tile.screenshot()` taken as soon as the tile is visible can
+  come out blank (the entrance is still running): assert on the DOM, photograph after a pause.
 
 ## The suite's speed
 

@@ -54,7 +54,7 @@ function percentWithArticle(share: number): NarrativeSegment[] {
   return [prose(articleForPercent(percent, 0)), figure(formatPercentage(percent, 0))];
 }
 
-/** «Giuseppe e Marcella», «Giuseppe, Marcella e Luca» — the Italian list, never a raw join. */
+/** «Paolo e Elena», «Paolo, Elena e Luca» — the Italian list, never a raw join. */
 function joinNames(names: string[]): string {
   if (names.length === 0) return '';
   if (names.length === 1) return names[0];
@@ -116,7 +116,7 @@ export function describeBasisRemedy(basis: Extract<SplitBasis, { kind: 'unavaila
 }
 
 /**
- * "Le quote vengono dalle entrate del periodo: Giuseppe 2600 € (60%) e Marcella 1700 € (40%)."
+ * "Le quote vengono dalle entrate del periodo: Paolo 2600 € (60%) e Elena 1700 € (40%)."
  * — the Quota tile's reading. It states the base out loud, because a percentage whose origin is
  * invisible is a number the reader has to take on faith. «Entrate», not «stipendi», since
  * 2026-09-27: every income attributed to a person is in the base, whatever its category.
@@ -256,8 +256,8 @@ function poolClause(common: CommonSpending): Narrative {
 
 /**
  * "Ad agosto le spese in comune sono 2410 €, meno 300 € di entrate in comune: 2110 € da
- * dividere, 1266 € a Giuseppe (60%) e 844 € a Marcella (40%). A Giuseppe restano 754 € dei
- * 2600 € di entrate; a Marcella 436 € dei 1700 €." — without the income clause when nothing
+ * dividere, 1266 € a Paolo (60%) e 844 € a Elena (40%). A Paolo restano 754 € dei
+ * 2600 € di entrate; a Elena 436 € dei 1700 €." — without the income clause when nothing
  * was left in comune.
  *
  * The scheduled part of the pool is the verdict's `scope` since 2026-10-12 (`describeSplitScope`,
@@ -315,7 +315,7 @@ export function buildSplitVerdict({ summary, period, now }: SplitVerdictInput): 
 }
 
 /**
- * " A Giuseppe restano 754 € dei 2600 € di entrate; a Marcella 436 € dei 1700 €."
+ * " A Paolo restano 754 € dei 2600 € di entrate; a Elena 436 € dei 1700 €."
  *
  * On the BOOKED residual — what has already happened. Where the calendar takes it is
  * `calendarClause`, a separate sentence, because the two are different facts.
@@ -345,7 +345,7 @@ function remainingClause(members: MemberBalance[]): Narrative {
 }
 
 /**
- * " Con le spese in calendario, a fine periodo a Giuseppe restano 1173 € e a Marcella mancano
+ * " Con le spese in calendario, a fine periodo a Paolo restano 1173 € e a Elena mancano
  * 83 €." — where the rows still in the calendar take each residual. It names them itself since
  * 2026-10-12: until then it opened on «Con quelle», whose antecedent was the scheduled
  * sentence just before it — now the verdict's `scope`, out of the sentence (The Binding-Clause Rule).
