@@ -1,7 +1,7 @@
 # NOVE-18 — Allocazione › Accumulo: «Con vendite mirate» of PR #488, on the app's one tax rule
 
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-17** (the model's dialog, the optimizer, `roundWeights`) and
-> **NOVE-07** (the fiscal cost basis, decision 31); **NOVE-21 is implemented after it**. Written on 2026-11-12; every
+> **NOVE-07 (retired on 2026-11-15, PR #534)** (the fiscal cost basis, decision 31); **NOVE-21 is implemented after it**. Written on 2026-11-12; every
 > `file:line` is cited on `develop` @ b841cbd7, a PR line as `pr488:file:line` on the local ref `refs/tmp/pr488`
 > (head 4f1c044e, child of #487's 9449f6ce). Executes decision 26 and the adopted choices m, n (README.md § 3-4).
 
@@ -15,10 +15,10 @@ cap in euro on the tax, a «Non vendere» box per row (dialog state, never persi
 line; the optimizer minimizes the same objective subject to Σ tax(sold) ≤ cap (`solveTargetedCore` `:1108`,
 `optimizeTargeted` `:1274`).
 
-The app already has ONE estimate of a sale's tax: `estimatePlanSaleTax` (`lib/utils/allocazioneSummary.ts:790-829`)
+The app already has ONE estimate of a sale's tax: `estimatePlanSaleTax` (`lib/utils/allocazioneSummary.ts:791-830`)
 over `AllocatableHolding` (`lib/utils/allocationUtils.ts:660-698`): no tax on a holding not `taxableOnSale` (an
 account, a pension fund); unknown — never zero — without a EUR cost basis or without a `taxRate`; the gain fraction
-floored at zero, no loss compensation; the rate through `estimateSaleTax` (`lib/utils/saleTax.ts:26-29`).
+floored at zero, no loss compensation; the rate through `estimateSaleTax` (`lib/utils/saleTax.ts:25-28`).
 
 Defects of the increment, each cured in § 4:
 
@@ -72,9 +72,9 @@ Defects of the increment, each cured in § 4:
 
 - **Owner 26 (2026-11-12)**: «Con vendite mirate» stays a mode of the model's dialog, with the app's ONE tax rule
   (`estimatePlanSaleTax`: no rate → «Non vendere», `taxableOnSale`); invented fixtures.
-- **Owner 31 (2026-11-12, defined by NOVE-07)**: the tax estimates use a separate fiscal cost basis that includes
+- **Owner 31 (2026-11-12, defined by NOVE-07, retired on 2026-11-15)**: the tax estimates use a separate fiscal cost basis that includes
   the fees (purchase and sale). Here it means: this spec reads ONLY `AllocatableHolding.costBasisEur`, which NOVE-07
-  feeds with `fiscalCostPerUnitEur` at `lib/utils/allocationUtils.ts:735`, purchase fees included; a PROPOSED sale
+  feeds with `fiscalCostPerUnitEur` at `lib/utils/allocationUtils.ts:736`, purchase fees included; a PROPOSED sale
   has no fee yet, so its estimate deducts none — the sale's fee enters on the sale the owner records. Nothing here
   computes a basis.
 - **Owner 57 (2026-11-12)**: spending the liquidity is not a sale: it is out of the sold total and of the taxes,
@@ -162,7 +162,7 @@ export function candidateSaleTaxPerEuro(
 }
 ```
 
-`estimatePlanSaleTax`'s loop body (`allocazioneSummary.ts:799-820`), after the `!holding` branch:
+`estimatePlanSaleTax`'s loop body (`allocazioneSummary.ts:800-821`), after the `!holding` branch:
 
 ```ts
     const perEuro = saleTaxPerEuro(holding);
@@ -173,8 +173,8 @@ export function candidateSaleTaxPerEuro(
     if (perEuro.kind === 'taxed') tax += leaf.amount * perEuro.perEuro;
 ```
 
-The doc comment's «fees excluded» (`:780`) is NOVE-07's sentence to fix; this spec does not touch it. A composite's
-sleeves carry the asset's gain fraction (`allocationUtils.ts:750-752`), so the buyer's sleeves share one rate.
+The doc comment (`allocazioneSummary.ts:779-781`) already names the fiscal cost, purchase fees included (2026-11-12); this spec does not touch it. A composite's
+sleeves carry the asset's gain fraction (`allocationUtils.ts:751-753`), so the buyer's sleeves share one rate.
 
 In `weightOptimizer.ts`: `taxPerEuroSoldOf` and the `DEFAULT_CAPITAL_GAINS_RATE` import go. `runOptimizer`'s input and
 `buildOptimizerCandidates`' input (`pr488:weightOptimizer.ts:220-227`) gain `holdings?: readonly
@@ -450,7 +450,7 @@ One PR to `develop`. No rule, no collection, no migration. The owner closes PR #
 ## 10. Declared out of scope
 
 - **Loss compensation (minusvalenze pregresse)**: none, declared (choice n; the app models none anywhere).
-- **The fiscal cost basis with the fees**: NOVE-07 (this spec reads it through `costBasisEur`).
+- **The fiscal cost basis with the fees**: NOVE-07, retired on 2026-11-15, PR #534 — doc/guide/registro-operazioni.md § The fee as a spending row (this spec reads it through `costBasisEur`).
 - **A sale proposed by the Consulente's hand-off**: none — NOVE-21 seeds no disposal (its C3); a sale under a tax cap stays «Con vendite mirate».
 
 ## 11. The prompt that implements it

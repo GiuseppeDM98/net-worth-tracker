@@ -107,6 +107,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Rows that outlive their trades stay as plain spending**: `deleteAllAssetTransactionsForAsset` (the pensionFund
   conversion) and the asset's delete route (`app/api/assets/[assetId]/route.ts`) remove `feeOfTradeId` from each row a
   trade names, in the same transaction / batch — the money left, and an unlinked row is deletable in Cashflow again.
+- **The PMCs stored before then are re-projected once per account**, never backfilled with rows: the Patrimonio page's
+  first visit runs `backfillAverageCostEur`, which writes both PMCs and stamps `averageCostEurFeeFreeAt` on the meta
+  (§ Engine above; `assetTransactionAverageCostEurBackfill.test.ts`).
 - Pinned by `tradeFeeExpense`, `assetTransactionWriteTx` (W1–W9), `assetTransactionsRoutes` (X1, X2),
   `assetDeleteRoute` and `e2e/assets.trade-fee.spec.ts`.
 
@@ -179,6 +182,9 @@ transactions and gates chosen calls.
 - **A legacy fee has no row and stays in «mercato»** (2026-11-12): a trade saved with a fee before fees became rows keeps
   it as a figure on the trade; Storico's Driver and the Panoramica count it in the market effect (`feeOutsideCashflow`),
   where a fee with its row is in «risparmio». Not a bug: the legacy rule never backfills a past month.
+- **A trade's fee row follows the bulk paths like any row** (2026-11-12, declared): a category re-typed from Impostazioni
+  rewrites the row's category fields, never deletes it; its note
+  («Commissione su acquisto di …») is written once, so a later buy ↔ sell change of the trade leaves it as it was.
 - **A restored `null` meta asks the server before a ledger asset is created** (`fetchFreshLedgerMeta`,
   `lib/hooks/useAssetTransactions.ts`, 2026-11-12): the meta query is persisted to IndexedDB, `null` included, so on an
   account migrated from another device the cached `null` would send a new ETF down the non-ledger path. `AssetDialog`

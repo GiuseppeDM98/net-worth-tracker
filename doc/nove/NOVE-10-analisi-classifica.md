@@ -247,7 +247,7 @@ ANALISI_TRIO_BLOCK }`; «Risparmio» `opens: periodo`, `lifts: { section: flusso
 - `lib/utils/emailNarrative.ts:635` and `lib/server/monthlyEmailService.ts:151`: the two comments read
   «Necessarie/Non necessarie/Debiti»; the email's labels already come from `EXPENSE_TYPE_LABELS`
   (`monthlyEmailService.ts:1051`), so only the fixture of `__tests__/emailNarrative.test.ts:520-526` is relabelled.
-- `components/expenses/ExpenseDialog.tsx:1140`, `:1374`: the two JSX comments, same words.
+- `components/expenses/ExpenseDialog.tsx:1152`, `:1386`: the two JSX comments, same words.
 
 ### `lib/utils/analisiNarrative.ts`
 

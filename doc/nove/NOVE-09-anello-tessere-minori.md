@@ -16,11 +16,11 @@ The owner named five more homes for the ring (decision 10). What each draws toda
   or the basis is `unavailable`, `:271-276`), their sum `totalIncome` (`:278`). A `desktop:col-span-7` cell (`:310`).
 - **Patrimonio «Mutuo» / «Prestito»** — `components/assets/tiles/MutuoTile.tsx:67-78`: four KPIs, «Debito residuo»,
   «Interessi {Y}», «Capitale {Y}», «Fine prevista», no proportion drawn; one full-width tile per loan
-  (`app/dashboard/assets/page.tsx:880-894`). Parts: `MortgageSummary.yearInterest` and `yearPrincipal`
+  (`app/dashboard/assets/page.tsx:881-895`). Parts: `MortgageSummary.yearInterest` and `yearPrincipal`
   (`lib/utils/mortgageSummary.ts:70-72`, summed at `:180-181` over the year's SETTLED rows). No field holds their sum.
 - **«Intestatari», the «Valore» view** — `components/dashboard/overview/IntestatariTile.tsx:69-114`: `RankedRows` in
   `var(--chart-1)` (`:109`), the «Valore | Carico» switch (`:70-76`, `:90-97`); mounted on the Panoramica
-  (`app/dashboard/page.tsx:714-716`) and on Patrimonio (`app/dashboard/assets/page.tsx:854-856`), both
+  (`app/dashboard/page.tsx:714-716`) and on Patrimonio (`app/dashboard/assets/page.tsx:855-857`), both
   `desktop:col-span-12`. Parts: `OwnershipSummary.rows[].value` (`lib/utils/assetOwnership.ts:174-191`; members by
   value, then «In comune», then «Senza intestatario», `:207-208`), read through `ownershipRowOn`
   (`lib/utils/ownershipBasis.ts`); the net `total` (`:210`). **A row can be negative** (debts outweighing a person's
@@ -31,9 +31,9 @@ The owner named five more homes for the ring (decision 10). What each draws toda
   (`lib/utils/costCenterUtils.ts:151-161`, both magnitudes, `lib/utils/costCenterSummary.ts:287`), summing to
   `summary.total`, the hero (`CostoTile.tsx:64`). THE tile of a centre's detail, open at every width.
 - **Dividendi «Chi paga di più»** — `components/dividends/tiles/PagatoriTile.tsx:31-58`: `RankedRows` in
-  `var(--chart-2)` with one residual (`:46`); mounted `components/dividends/DividendTrackingTab.tsx:800-807`,
+  `var(--chart-2)` with one residual (`:46`); mounted `components/dividends/DividendTrackingTab.tsx:801-808`,
   `desktop:col-span-4`. Parts: `rankPayerShares` (`lib/utils/dividendAnalytics.ts:478-523`): ≤ 5 held payers
-  (`RANKED_PAYERS`, `DividendTrackingTab.tsx:198`) and a `remainder` «Altri N strumenti» / «N strumenti venduti»
+  (`RANKED_PAYERS`, `DividendTrackingTab.tsx:199`) and a `remainder` «Altri N strumenti» / «N strumenti venduti»
   (`:504-522`); rows + remainder = `total`. `net` is not clamped (`:288`).
 
 ## 2. Goal and acceptance criteria
@@ -252,7 +252,7 @@ leaves it out, `ranked-rows.tsx:131`.)
 `PagatoriTileProps` gains `ring: RingSegment[] | null`. With it, the list (`:44-47`) sits in `@container mt-3.5` ›
 `RING_LAYOUT_CLASS` beside `<RingChart segments={ring} centerValue={ranking.total} centerLabel="netti"
 ariaLabel="Chi paga di più" />`, the rows with `bars={false}` and the swatch of their key, the remainder's
-`swatch: RING_REST_COLOR`. `DividendTrackingTab.tsx:800-807` passes `ring={payerRing}` (a `useMemo` on `ranking`
+`swatch: RING_REST_COLOR`. `DividendTrackingTab.tsx:801-808` passes `ring={payerRing}` (a `useMemo` on `ranking`
 beside `:266`).
 
 ### DESIGN.md

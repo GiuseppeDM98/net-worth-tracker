@@ -206,8 +206,8 @@ a literal `className` becomes `cn(…, COSTUME_FRAME_RADIUS_CLASS)`:
   `ExpenseProposalCard.tsx:261`; `GoalProposalCard.tsx:212`.
 - **FIRE**: `components/fire-simulations/FireParametri.tsx:262`; `components/monte-carlo/tiles/ParametriTile.tsx:227`.
 - **Dialogs**: `components/performance/AIAnalysisDialog.tsx:360`, `:440`; `components/DeleteDummyDataDialog.tsx:142`;
-  `components/assets/AssetMovementsDialog.tsx:177`, `:231`, `:271`; `TaxCalculatorModal.tsx:267`;
-  `TransactionDialog.tsx:772`; `components/expenses/ExpenseDialog.tsx:1046`, `:1142`, `:1379`;
+  `components/assets/AssetMovementsDialog.tsx:177`, `:231`, `:271`; `TaxCalculatorModal.tsx:273`;
+  `TransactionDialog.tsx:821`; `components/expenses/ExpenseDialog.tsx:1058`, `:1154`, `:1391`;
   `CategoryManagementDialog.tsx:341`, `:409`.
 - **Accumulo**: `pr488:components/allocation/PlanDraftSidePanel.tsx:43`, `:64`.
 
@@ -236,7 +236,7 @@ Also: the twelve tooltips of § 1 row 10 — `GoalProjectionChart.tsx:75` `borde
 - **Assistente**: `assistant/GoalProposalCard.tsx:227`.
 - **Impostazioni**: `settings/tabs/GeneraleTab.tsx:440`; `AllocazioneTab.tsx:111`; `AspettoTab.tsx:157`, `:161`;
   `app/dashboard/settings/page.tsx:352`.
-- **Dialogs**: `assets/AssetMovementsDialog.tsx:491`, `:503`; `expenses/ExpenseDialog.tsx:1009`.
+- **Dialogs**: `assets/AssetMovementsDialog.tsx:491`, `:503`; `expenses/ExpenseDialog.tsx:1021`.
 
 `rounded-[Npx]` → `rounded-[var(--costume-control-chip-radius,Npx)]` (N kept): `rounded-[9px]` at
 `performance/tiles/RendimentoTile.tsx:81`, `history/tiles/EvoluzioneTile.tsx:74`, `pension/tiles/FondoOggiTile.tsx:74`,
@@ -250,7 +250,7 @@ Also: the twelve tooltips of § 1 row 10 — `GoalProjectionChart.tsx:75` `borde
 
 They stay as they are (each read on the code): the dots (`goals/tiles/ObiettiviTile.tsx:64`,
 `settings/page.tsx:458`, `EvoluzioneTile.tsx:215`, `AspettoTab.tsx:167`, `CompactExpenseRow.tsx:89`, `:100`,
-`TransactionFeed.tsx:73`, `GoalsDettaglio.tsx:80`, `AssegnazioniTile.tsx:63`, `:96`, `MilestoneTile.tsx:47`, `:52`,
+`TransactionFeed.tsx:74`, `GoalsDettaglio.tsx:80`, `AssegnazioniTile.tsx:63`, `:96`, `MilestoneTile.tsx:47`, `:52`,
 `CoastIpotesi.tsx:126`, `FireParametri.tsx:122`, `AfflussiTile.tsx:58`, `UnderwaterDrawdownChart.tsx:37`,
 `SpeseTab.tsx:133`, `:137`, the category dots of `CategoryDeleteConfirmDialog.tsx:421`, `CategoryMoveDialog.tsx:332`,
 `:355`), the knob `pr488:TargetTick.tsx:91`, the spinners (`GeneraleTab.tsx:711`, `RendimentoTile.tsx:148`), the count

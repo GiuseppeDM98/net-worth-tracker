@@ -28,7 +28,7 @@ domain, or it must be a figure»), `:1107` («Use Recharts `PieChart` only for s
   609-614`, `desktop:col-span-3`. Parts: `charts.assetClassData` (`prepareAssetClassDistributionData`,
   `lib/services/chartService.ts:42-71`: the NET value per class, sorted), colours remapped at `app/dashboard/page.tsx:
   280-287`.
-- **Patrimonio «Classi»** — the same tile, `app/dashboard/assets/page.tsx:815-829` (data `:406-413`). The landing
+- **Patrimonio «Classi»** — the same tile, `app/dashboard/assets/page.tsx:816-830` (data `:406-413`). The landing
   renders it too, on its sample profile (`app/page.tsx:297`): it changes with it.
 
 **A class can be negative**: a personal loan larger than the accounts turns «Liquidità» below zero on the Composizione

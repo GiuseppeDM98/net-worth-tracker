@@ -1,7 +1,7 @@
 # NOVE-16 — Allocazione › Accumulo: the PAC tab of PR #486, brought in with changes
 
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-02 (retired on 2026-11-13, PR #524)** (the Piano cell it rebases on) and reads NOVE-03's (retired on 2026-11-14, PR #526) and
-> NOVE-07's dialogs (the fresh ledger meta, the fee field); **NOVE-17, NOVE-18 and
+> NOVE-07's (retired on 2026-11-15, PR #534) dialogs (the fresh ledger meta, the fee field); **NOVE-17, NOVE-18 and
 > NOVE-21 are implemented after it** (they read the editor, the plan document and the active-plan reader defined
 > here). Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7, a PR line as `pr486:file:line` on
 > the local ref `refs/tmp/pr486` (head d1e2666d). Executes decisions 24, 25, 30 and the adopted choices f, g, l, o,
@@ -13,7 +13,7 @@
 bar (main return `:552`, `<PianoTile` `:643`, `<AllocazioneDettaglio` `:707`); `firestore.rules` has no
 `accumulationPlans`; the Consulente's «Applica» (`components/allocation/consulente/ConsulenteBookPages.tsx:270-308`)
 knows nothing of a running plan; the AI's STRUMENTI block skips every asset at quantity 0
-(`lib/utils/assistantPortfolioContext.ts:303-304`), so an instrument created for a plan and not yet bought is
+(`lib/utils/assistantPortfolioContext.ts:305-306`), so an instrument created for a plan and not yet bought is
 invisible to the Consulente; `findAssetByName` (`lib/utils/allocationAdviceApply.ts:30-53`) returns the FIRST match.
 
 **PR #486** (contributor Ciocc128; one commit d1e2666d on 54634a9 of 2026-10-21; 54 files, +12 016 / −98; 52
@@ -106,7 +106,7 @@ Defects of the PR, each cured in § 4:
   - A4. The Piano note reads through small modules so the page imports none of the editor.
   - A5. «Mai comprato» = `Asset.createdEmpty === true` (written only by `AssetDialog`'s `createEmpty`, decision 25)
     AND `quantity ≤ 0` AND no ledger row names the asset. A position sold before the ledger migration has no row
-    either (`lib/server/assetTransactionUseCase.ts:611` baselines only `quantity > 0`), and an empty account is
+    either (`lib/server/assetTransactionUseCase.ts:796` baselines only `quantity > 0`), and an empty account is
     not an instrument: neither carries the flag, both stay out as today.
   - A6. «+ Aggiungi» keeps the PR's exclusion of `assetClass === 'cash'` (money-market funds out).
   - A7. The lazy fallback is the PR's own loading branch (`pr486:components/allocation/AccumuloTab.tsx:163-173`),
@@ -401,7 +401,7 @@ PR's assertions at `pr486:__tests__/accumulationPlanRevision.test.ts:265-269` ar
 
 ### The Assistente and the Consulente (choices u, p)
 
-- `buildHoldingRows` (`lib/utils/assistantPortfolioContext.ts:292`) takes `tradedAssetIds: ReadonlySet<string>`
+- `buildHoldingRows` (`lib/utils/assistantPortfolioContext.ts:294`) takes `tradedAssetIds: ReadonlySet<string>`
   (built at `:648` from `transactions.map((t) => t.assetId)`); the skip at `:303` becomes `const neverBought =
   asset.createdEmpty === true && !(asset.quantity > 0) && !tradedAssetIds.has(asset.id); if (!(asset.quantity > 0) &&
   !isLoanAsset(asset) && !neverBought) continue;` and the kept row carries `neverBought: true` (`AssistantHoldingRow`
