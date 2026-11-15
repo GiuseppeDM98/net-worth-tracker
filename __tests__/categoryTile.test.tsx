@@ -1,7 +1,8 @@
 /**
- * `CategoryTile` (components/dashboard/overview/CategoryTile.tsx): with a `ring` (Tracciamento's
- * income, The Ring Rule, 2026-11-12) the rows are its legend, each swatch its OWN part's colour read
- * by key — never the rank's slot — and the residual in the fold's ink. Figures invented and round.
+ * `CategoryTile` (components/dashboard/overview/CategoryTile.tsx): with a `ring` (the income on
+ * Tracciamento and the Panoramica, The Ring Rule, 2026-11-12) the rows are its legend, each swatch its
+ * OWN part's colour read by key — never the rank's slot — and the residual in the fold's ink. Figures
+ * invented and round. Seen red on 2026-11-15 with the swatch taken as `RING_CATEGORY_COLORS[index]`.
  */
 
 import { describe, expect, it } from 'vitest';

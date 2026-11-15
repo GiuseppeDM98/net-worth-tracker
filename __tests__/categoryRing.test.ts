@@ -1,3 +1,9 @@
+/**
+ * `incomeRingSegments` (lib/utils/categoryRing.ts, The Ring Rule, 2026-11-12): the income ranking as
+ * ring parts, the cut's residual last as «Altre categorie». Figures invented and round. Seen red on
+ * 2026-11-15 with the residual dropped.
+ */
+
 import { describe, expect, it } from 'vitest';
 import { incomeRingSegments } from '@/lib/utils/categoryRing';
 import { RING_CATEGORY_COLORS, RING_REST_COLOR, RING_REST_KEY } from '@/lib/utils/ringChart';

@@ -2,6 +2,8 @@
  * `RingChart` (components/ui/ring-chart.tsx, DESIGN.md → The Ring Rule, 2026-11-12): the text
  * alternative, one circle per part, nothing under two parts, the figure inside the hole or above the
  * ring, and the arcs that do not draw themselves on mount. The pure module is `ringChart.test.ts`.
+ * Seen red on 2026-11-15: C1-C2 with a ring rendered for one part, C3-C4 with the figure always in
+ * the hole, C5 with `reducedMotion` ignored.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';

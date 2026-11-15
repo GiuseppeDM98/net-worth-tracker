@@ -1,7 +1,7 @@
 /**
  * `VersatoTile` (components/pension/tiles/VersatoTile.tsx): with two natures or more the rows are a
  * ring's legend (The Ring Rule, 2026-11-12), with one the ranked rows keep their bar.
- * Figures invented and round.
+ * Figures invented and round. Seen red on 2026-11-15 with the bars drawn while `ring` is set.
  */
 
 import { describe, expect, it } from 'vitest';

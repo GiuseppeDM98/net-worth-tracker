@@ -816,6 +816,9 @@ file used to carry.
   `…/app/api/<route>/route.js` in the `validator.ts` of every `.next-*` (2026-09-28), or in a production build's
   `.next/types/` (2026-10-07, after PERF-09 removed `current-yield`), cites a route that no longer exists;
   `.next-e2e/dev/types/` goes whole (2026-09-20) — it is the suite server's alone.
+- **A Node script's `execSync` on Windows runs through cmd.exe, where `^` is the escape**: `git show <sha>^:<file>`
+  loses its caret (2026-11-15: a cites-mapping script read nothing, the error swallowed by its `try`) — write the
+  parent as `<sha>~1`, which both systems read alike.
 - **Git Bash on Windows, two traps**: MSYS rewrites an argument starting with `//` or `/` (2026-10-04: `/api/cron/…`
   became a Windows path) — prefix `MSYS_NO_PATHCONV=1`; **its `sed -i` is not a falsification tool** (2026-09-28: a
   pattern with `€` matched nothing and exited 0, and a CRLF file came back LF) — swap text with a node script that

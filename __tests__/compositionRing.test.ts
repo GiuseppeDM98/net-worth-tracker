@@ -1,3 +1,9 @@
+/**
+ * `compositionRing` (lib/utils/compositionRing.ts, The Ring Rule, 2026-11-12): the asset classes as
+ * ring parts, folded past six; a class below zero makes no ring, a class at 0 € no part. Figures
+ * invented and round. Seen red on 2026-11-15 with the `isRingWhole` guard skipped.
+ */
+
 import { describe, expect, it } from 'vitest';
 import { compositionRing } from '@/lib/utils/compositionRing';
 import { RING_REST_COLOR, RING_REST_KEY } from '@/lib/utils/ringChart';

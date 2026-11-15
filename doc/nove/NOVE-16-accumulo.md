@@ -588,7 +588,7 @@ plan exists in production. The owner closes PR #486 with a link to the merge.
 - `AGENTS.md` § 3: the stub «Allocazione › Accumulo → `doc/guide/accumulo.md`» (the lock, the slim path); in the PR's
   stub the first bullet reads «ONE draft-or-active plan per account (the lock `accumulationPlanLocks/{ownerUid}`)»
   and the second ends «every write invalidates `queryKeys.accumulationPlans.all`, which the Piano's note reads too».
-  `AGENTS.md:348` («`quantity = 0` marks a sold asset») gains «— or one created empty for a plan
+  `AGENTS.md:360` («`quantity = 0` marks a sold asset») gains «— or one created empty for a plan
   (`Asset.createdEmpty`)».
 - `CLAUDE.md` › Key Features (Allocazione line) and «Latest»; `Draft Release Temp.md`; the `allocazione-accumulo`
   baseline in `doc/guide/prima-schermata-misure.md`.

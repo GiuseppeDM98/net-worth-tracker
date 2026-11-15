@@ -1,7 +1,7 @@
 # NOVE-10 — Analisi recomposed as «Classifica»: the ranking first, the Flusso in «Dettaglio»
 
 > Series `doc/nove/` (README.md § 5): **implemented after NOVE-05 (retired on 2026-11-14, PR #530)** (`readSavings`, the `describeFlow` change)
-> **and NOVE-08** (the ring: `lib/utils/ringChart.ts`, `components/ui/ring-chart.tsx`,
+> **and NOVE-08 (retired on 2026-11-15, PR #536)** (the ring: `lib/utils/ringChart.ts`, `components/ui/ring-chart.tsx`,
 > the ring rule in DESIGN.md). Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7 and moves
 > with 05 and 08 — reread by function name. Executes the owner's point 5 and decisions 5 and 6 (README.md § 1, § 3).
 
@@ -422,7 +422,7 @@ null; `periodo` = «messo da parte » + the rate's figure when the reading is a 
 
 - **One source per number, every sentence in `analisiNarrative.ts`** (AGENTS.md § Analisi): tiles format money only
   through `cachedFormatCurrencyEUR` (a ring's centre is formatted by `RingChart`); a component holds no Italian beyond the strings of § 4.
-- **A list that must add up adds up ON SCREEN** (AGENTS.md :672): both legends print `printedPercentage`.
+- **A list that must add up adds up ON SCREEN** (AGENTS.md :686): both legends print `printedPercentage`.
 - **The ring rule (decision 5)**: parts of ONE positive whole — spending by type, income by category; never «Cosa è
   cambiato» (signed) nor Periodo (README.md § 10).
 - **A spending rise is a loss** (The Sign-Color Token Rule): «Cosa è cambiato» uses `--destructive` / `--positive`,
