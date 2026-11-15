@@ -114,7 +114,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   answered 200 and moved the mtime, then a plain kill); on Windows, where only the wrapper
   can be killed, POST `http://127.0.0.1:4400/_admin/export` with `{"path": "<abs>/.emulator-data"}` (forward slashes —
   a backslashed path 400s; `/emulators/export` 404s), then terminate. **Verify the directory's mtime moved**: a 200 with
-  an unchanged mtime is the failure that looks like success — and a path that lost its slashes (`C:UsersGiuseppe…`,
+  an unchanged mtime is the failure that looks like success — and a path that lost its slashes (`C:UsersPaolo…`,
   2026-09-13) still answers 200 and writes a full export into a directory of THAT name in the repo root, which `git
   status` then shows as untracked: delete it. **Stopping a background task (`TaskStop`) kills only the npm wrapper**
   (2026-09-19): `next dev`, the `firebase` CLI and the Firestore `java` stay LISTENING on 3000/4000/4400/8080/9099 —

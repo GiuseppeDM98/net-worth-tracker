@@ -362,8 +362,8 @@ function age(value: number): NarrativeSegment {
 }
 
 /**
- * «la Pensione INPS» for a label that already says what it is, «la pensione di Giuseppe» for any
- * other (a household names a row after the person: «Giuseppe», «Marco»).
+ * «la Pensione INPS» for a label that already says what it is, «la pensione di Paolo» for any
+ * other (a household names a row after the person: «Paolo», «Marco»).
  */
 function pensionName(label: string): string {
   const trimmed = label.trim();

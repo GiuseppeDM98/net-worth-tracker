@@ -12,12 +12,14 @@ export interface RankedRow {
   amount: number;
   /** Share of the total, 0-100 — shown as the trailing figure. */
   percentage: number;
+  /** The arc's colour when the list is a ring's legend: an 8×8 swatch before the label. */
+  swatch?: string;
 }
 
 /**
  * The label column is a SHARE of the row (38%, floored), never a fixed pixel width: the rows of
  * one list must share one track for the bar's width to encode rank, and a 92px column that fit
- * «Automobili» cut «Stipendio Giuseppe» — the user's own category name — to «Stipendio Giu…» at
+ * «Automobili» cut «Stipendio Paolo» — the user's own category name — to «Stipendio Pa…» at
  * every width while the bar beside it grew to 210px. At 42% a 4-column tile at 1440 gives the
  * label 139px and a phone column 133px; the bar takes what is left, down to its 40px floor.
  * `labelClassName` raises the floor (a wider tile, a longer vocabulary), it does not fix the width.
@@ -35,6 +37,10 @@ const BAR_TRACK_CLASS = 'min-w-[40px] flex-1';
  * viewport one: the same list sits in a 3-column tile, a 4-column tile and a phone column.
  */
 const SHARE_COLUMN_CLASS = 'w-[34px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground @max-[250px]:hidden';
+/** Without a bar the floors are label 72 + amount 64 + share 34 + two 12px gaps = 194px. */
+const SHARE_COLUMN_LEGEND_CLASS = 'w-[34px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground @max-[200px]:hidden';
+/** The legend's colour key (DESIGN.md → Chart Legend Swatch): a square, carrying no text. */
+const SWATCH_CLASS = 'h-2 w-2 shrink-0 self-center rounded-[2px]';
 
 interface RankedRowsProps {
   rows: RankedRow[];
@@ -45,7 +51,9 @@ interface RankedRowsProps {
    * total: one row on most surfaces (the month total minus the rows shown), two on the
    * Esposizione («Resto letto», then «Non letto»). Omit when rows are exhaustive.
    */
-  remainders?: Array<{ label: string; amount: number; percentage: number }> | null;
+  remainders?: Array<{ label: string; amount: number; percentage: number; swatch?: string }> | null;
+  /** false when the list is a ring's legend: the ring is the bar (default true). */
+  bars?: boolean;
   /** Width reserved for the label column. */
   labelClassName?: string;
   /**
@@ -63,10 +71,13 @@ interface RankedRowsProps {
  * Flat, `divide-y` ranked rows with a 3px bar — label, bar, mono amount, share. The bar width
  * encodes RANK (the largest row fills the track), the trailing figure encodes share, so a month
  * where no category dominates still reads at a glance (the `CompositionList` rule). The list is
- * a real `<ul>`: a clickable row keeps its button semantics instead of borrowing `listitem`.
+ * a real `<ul>`: a clickable row keeps its button semantics instead of borrowing `listitem`; with
+ * `bars={false}` the list is a ring's legend: a swatch per row, no bar.
  */
-export function RankedRows({ rows, color, remainders, labelClassName, onRowClick, activeKey, ariaLabel }: RankedRowsProps) {
-  const labelWidth = cn(LABEL_COLUMN_CLASS, labelClassName);
+export function RankedRows({ rows, color, remainders, bars = true, labelClassName, onRowClick, activeKey, ariaLabel }: RankedRowsProps) {
+  // A legend has no bar to share a track with, so its label takes what the figures leave.
+  const labelWidth = bars ? cn(LABEL_COLUMN_CLASS, labelClassName) : cn('min-w-0 flex-1', labelClassName);
+  const shareClass = bars ? SHARE_COLUMN_CLASS : SHARE_COLUMN_LEGEND_CLASS;
   const maxAmount = Math.max(...rows.map((r) => r.amount), 0);
   // ONE Tab stop for the whole list, the arrows moving inside it: six clickable rows put whatever
   // follows six presses further away, on every surface this primitive serves (2026-09-21).
@@ -80,22 +91,25 @@ export function RankedRows({ rows, color, remainders, labelClassName, onRowClick
           second fact (the day, the subcategory, the calendar) and a cut fact is no fact
           (2026-09-14; the accessible name always carried it whole). */}
       <span className={cn('flex min-w-0 items-baseline gap-1.5 text-[13px] text-foreground', labelWidth, active && 'font-semibold')}>
+        {row.swatch && <span className={SWATCH_CLASS} style={{ background: row.swatch }} aria-hidden="true" />}
         <span className={cn('truncate', row.caption && 'max-w-[65%] shrink-0')}>{row.label}</span>
         {row.caption && <span className="line-clamp-2 min-w-0 break-words font-mono text-[11px] leading-[1.35] tabular-nums text-muted-foreground">{row.caption}</span>}
       </span>
-      <div className={cn('h-[3px] overflow-hidden rounded-full bg-muted', BAR_TRACK_CLASS)} role="presentation">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${maxAmount > 0 ? (row.amount / maxAmount) * 100 : 0}%`,
-            background: color,
-          }}
-        />
-      </div>
+      {bars && (
+        <div className={cn('h-[3px] overflow-hidden rounded-full bg-muted', BAR_TRACK_CLASS)} role="presentation">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${maxAmount > 0 ? (row.amount / maxAmount) * 100 : 0}%`,
+              background: color,
+            }}
+          />
+        </div>
+      )}
       <span className="w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums text-foreground">
         {cachedFormatCurrencyEUR(row.amount, true)}
       </span>
-      <span className={SHARE_COLUMN_CLASS}>
+      <span className={shareClass}>
         {Math.round(row.percentage)}%
       </span>
     </>
@@ -131,14 +145,21 @@ export function RankedRows({ rows, color, remainders, labelClassName, onRowClick
         .filter((remainder) => remainder.amount > 0)
         .map((remainder) => (
           <li key={remainder.label} className="flex items-center gap-3 py-[9px]">
-            <span className={cn('min-w-0 truncate text-[13px] text-muted-foreground', labelWidth)}>
-              {remainder.label}
-            </span>
-            <div className={BAR_TRACK_CLASS} aria-hidden="true" />
+            {bars ? (
+              <span className={cn('min-w-0 truncate text-[13px] text-muted-foreground', labelWidth)}>
+                {remainder.label}
+              </span>
+            ) : (
+              <span className={cn('flex min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground', labelWidth)}>
+                {remainder.swatch && <span className={SWATCH_CLASS} style={{ background: remainder.swatch }} aria-hidden="true" />}
+                <span className="truncate">{remainder.label}</span>
+              </span>
+            )}
+            {bars && <div className={BAR_TRACK_CLASS} aria-hidden="true" />}
             <span className="w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums text-muted-foreground">
               {cachedFormatCurrencyEUR(remainder.amount, true)}
             </span>
-            <span className={SHARE_COLUMN_CLASS}>
+            <span className={shareClass}>
               {Math.round(remainder.percentage)}%
             </span>
           </li>

@@ -65,8 +65,8 @@ export function baseOverviewPatch(): Json {
 }
 
 /**
- * Routes the overview request: the real body, the base patch, then `overrides` — `metrics` and
- * `flags` are merged one level deep so a scenario can set one field of them.
+ * Routes the overview request: the real body, the base patch, then `overrides` — `metrics`, `flags`
+ * and `charts` are merged one level deep so a scenario can set one field of them.
  */
 export async function patchOverview(page: Page, overrides: Json = {}): Promise<void> {
   await page.route('**/api/dashboard/overview*', async (route) => {
@@ -88,6 +88,7 @@ export async function patchOverview(page: Page, overrides: Json = {}): Promise<v
       ...overrides,
       metrics: { ...(body.metrics as Json), totalValue: 190000, ...((overrides.metrics as Json | undefined) ?? {}) },
       flags: { ...(body.flags as Json), hasTERTracking: true, ...((overrides.flags as Json | undefined) ?? {}) },
+      charts: { ...(body.charts as Json), ...((overrides.charts as Json | undefined) ?? {}) },
     };
     await route.fulfill({ response, json: patched });
   });

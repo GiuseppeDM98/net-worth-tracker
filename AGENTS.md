@@ -43,7 +43,7 @@ holds it): how it was learned is `git log`'s.
 
 ### Italian Localization
 - UI text Italian, code comments English. `formatCurrency()`, `formatDate()` (`DD/MM/YYYY`), `Sottocategoria` (no
-  hyphen), `Buongiorno Giuseppe` (no comma). English on purpose: `Hall of Fame`, `FIRE e Simulazioni`, `Cashflow`,
+  hyphen), `Buongiorno Paolo` (no comma). English on purpose: `Hall of Fame`, `FIRE e Simulazioni`, `Cashflow`,
   `Assistente AI` and the standard metric names; `Current Yield` → `Rendimento Corrente`.
 - **`formatPercentage` exists TWICE and the two disagree**: `lib/utils/formatters`' is `toFixed` (`40.71%`), the it-IT
   one is `Intl('it-IT')` (`40,71%`) — `formatPercentageIt`/`formatNumberIt` in `lib/utils/formatters.ts`, to which
@@ -647,6 +647,7 @@ file used to carry.
 - **`useChartColors()` for every series, once per page or tile, never once per row** (2026-10-07): a list of small charts takes the palette as a prop (`AssetSparkline`'s `colors`); the slots come from `ChartColorsProvider`, read once per theme in the dashboard layout since 2026-10-08 (`__tests__/chartColorsContext.test.ts`). Never pass it to a Nivo/react-spring component: the Sankey takes HEX.
 - **The legend is `SeriesLegend`, never Recharts' `<Legend>`** (`components/ui/series-legend.tsx`, 2026-09-20): one entry per series, one word one colour per page, a reference series that is not a part of the total in neutral ink, dashed.
 - **Accessibility and style go on the chart itself**: `role="img"` + `aria-label` + `accessibilityLayer={false}`; `contentStyle`, `labelStyle` AND `itemStyle` as module-level `as const` objects on the card tokens (without `itemStyle` the rows vanish on dark); `tick={CHART_TICK_STYLE}` on every axis (the Mono Mandate).
+- **Parts of one whole are `RingChart`** (2026-11-12, The Ring Rule): hand-written SVG, never a Recharts `<Pie>`; its figure stays inside the hole (`formatRingCenter` + `ringCenterMaxChars`, held by `__tests__/ringChart.test.ts` and `e2e/ringFit.ts`) — doc/guide/grafici.md § The ring.
 - Il resto — a series driving the page (the retired scrub, `useMorphingSeries`), `<Legend content=>` and `formatter`, negative bands and the 100% stack, `stackId`, `fontSize`/`interval`/margins, rolling charts that always render, server-cached colours remapped at render time, the sticky `<thead>` — in doc/guide/grafici.md
 
 ### Navigation → `doc/guide/shell.md`

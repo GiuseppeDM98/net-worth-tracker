@@ -491,7 +491,7 @@ describe('assistant prompt data block', () => {
             costBasisEur: 10000,
             gainEur: 2000,
             gainPct: 20,
-            owner: 'di Giuseppe',
+            owner: 'di Paolo',
             isLiquid: true,
             goalAssignedPct: 50,
             goalFreeEur: 6000,
@@ -556,10 +556,10 @@ describe('assistant prompt data block', () => {
           ],
         },
         pension: [
-          { assetId: 'p1', name: 'Fondo pensione', valueEur: 30000, memberName: 'Marcella', role: 'frozen' as const, byYear: [{ taxYear: 2025, tfr: 1500, voluntary: 500, employer: 0, total: 2000 }] },
+          { assetId: 'p1', name: 'Fondo pensione', valueEur: 30000, memberName: 'Elena', role: 'frozen' as const, byYear: [{ taxYear: 2025, tfr: 1500, voluntary: 500, employer: 0, total: 2000 }] },
         ],
         loans: [{ name: 'Mutuo casa', financedAssetName: 'Casa', residualDebtEur: 80000, interestRatePct: 3.2, lastInstalmentEur: 655, role: 'excluded' as const }],
-        family: { ownerAge: 35, members: [{ name: 'Giuseppe', grossAnnualIncome: 40000 }, { name: 'Marcella', grossAnnualIncome: null }] },
+        family: { ownerAge: 35, members: [{ name: 'Paolo', grossAnnualIncome: 40000 }, { name: 'Elena', grossAnnualIncome: null }] },
       };
     }
 
@@ -567,7 +567,7 @@ describe('assistant prompt data block', () => {
       const content = render(makeBundle({ portfolio: portfolio() }));
       expect(content).toContain('--- STRUMENTI IN PORTAFOGLIO OGGI (elenco completo, 2) ---');
       expect(content).toContain(
-        'ETF Mondo (MONDO.MI): Azioni › All World | negoziabile | 100 quote | valore 12.000 € | PMC 100,00 € | G/P 2000 € (+20.00%) | intestatario: di Giuseppe | liquido | obiettivi: assegnato 50,0%, libero 6000 €'
+        'ETF Mondo (MONDO.MI): Azioni › All World | negoziabile | 100 quote | valore 12.000 € | PMC 100,00 € | G/P 2000 € (+20.00%) | intestatario: di Paolo | liquido | obiettivi: assegnato 50,0%, libero 6000 €'
       );
       expect(content).toContain("Casa: Immobili (senza sottocategoria) | escluso dall'Allocazione | 200.000 € | valore 200.000 € | illiquido");
     });
@@ -602,11 +602,11 @@ describe('assistant prompt data block', () => {
 
     it('should describe the pension funds, the loans and the household', () => {
       const content = render(makeBundle({ portfolio: portfolio() }));
-      expect(content).toContain('Fondo pensione: valore 30.000 € | di Marcella | non negoziabile (conta nella base, i piani non lo toccano)');
+      expect(content).toContain('Fondo pensione: valore 30.000 € | di Elena | non negoziabile (conta nella base, i piani non lo toccano)');
       expect(content).toContain('  › 2025: 2000 € (TFR 1500 €, volontari 500 €, datoriali 0 €)');
       expect(content).toContain("Mutuo casa: debito residuo 80.000 € | finanzia: Casa | TAN 3,2% | ultima rata nel periodo 655 € | escluso dall'Allocazione");
       expect(content).toContain("Età dell'intestatario del conto: 35 anni.");
-      expect(content).toContain('Membri: Giuseppe (RAL 40.000 €), Marcella.');
+      expect(content).toContain('Membri: Paolo (RAL 40.000 €), Elena.');
     });
 
     it('should say each register is empty rather than leaving it out', () => {

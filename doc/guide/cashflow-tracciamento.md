@@ -179,6 +179,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   through `effectiveAccountId` (an account absent from the period is no filter) — both were `setState` in an
   effect. `filteredExpenses` is deliberately NOT wrapped in `useMemo`: the compiler could not preserve it and the
   skip un-memoized the whole component.
+- **«Entrate per categoria» is a ring of the period's income** (2026-11-12, DESIGN.md → The Ring Rule):
+  `incomeRingSegments(incomeRanking)` in `lib/utils/categoryRing.ts` — the rows coloured by rank
+  (`RING_CATEGORY_COLORS`), then what the cut left as «Altre categorie» in `RING_REST_COLOR` (the same ≥ 1 € floor as
+  the tile's residual row), «entrate» under the total; null with one category, and the rows keep their bar.
+  `CategoryTile` takes `ring` and `ringCenterLabel` (each swatch read from the ring BY KEY, never by rank); Tracciamento
+  and, since the owner's tour of 2026-11-15, the Panoramica's «Entrate per categoria» pass them (the same ring on both
+  pages); every «Spese per categoria» stays ranked rows, a ranking. A rank colour can move between periods: declared, not a defect.
 - **`CategoryTile` takes an optional `reading`** (the Panoramica passes none): the rows keep the overview payload's
   shape (`category`, `categoryKey`, `amount`, `percentage`) so `rankCategories` feeds the same component, and the
   residual row appears only when categories were cut.
@@ -213,7 +220,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   «in comune», the same contract as `expenseSplitSummary`. A selection the options no longer offer (the feature
   switched off, a member removed) is no filter — `effectiveOwnerId`, derived like `effectiveAccountId`, never reset in
   an effect. It counts in `hasActiveFilters`, the drawer badge, the feed's `filterKey` and «Ripristina»; it narrows
-  ONLY the Movimenti list, and since the tile's reading totals the rows it is handed, «Spese di Giuseppe: 522 € su
+  ONLY the Movimenti list, and since the tile's reading totals the rows it is handed, «Spese di Paolo: 522 € su
   12 voci» comes for free. **With the feature on, an attributed row also prints its owner as a chip** (feed, table,
   detail drawer: `resolveOwnerLabel` — the name, or «Senza intestatario»); a shared row prints nothing, so the default
   case stays clean. `memberNames` is `null` when the feature is off, so no row is ever labelled by a feature the

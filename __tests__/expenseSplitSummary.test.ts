@@ -20,9 +20,9 @@ import { formatStripFigure, liftedBlocks, validateStrip, type StripFigure } from
 import type { Expense, ExpenseType } from '@/types/expenses';
 import type { FamilyMember } from '@/types/assets';
 
-const GIUSEPPE: FamilyMember = { id: 'm-giuseppe', name: 'Giuseppe' };
-const MARCELLA: FamilyMember = { id: 'm-marcella', name: 'Marcella' };
-const MEMBERS = [GIUSEPPE, MARCELLA];
+const PAOLO: FamilyMember = { id: 'm-paolo', name: 'Paolo' };
+const ELENA: FamilyMember = { id: 'm-elena', name: 'Elena' };
+const MEMBERS = [PAOLO, ELENA];
 
 // Noon on purpose is NOT enough here: the scheduled split is a calendar-DAY rule, so the
 // fixtures below sit whole days either side of `NOW`.
@@ -58,7 +58,7 @@ const incomeOf = (member: FamilyMember, amount: number, overrides: Partial<Expen
 
 describe('resolveSplitBasis', () => {
   it('derives each share from the income attributed to that person', () => {
-    const basis = resolveSplitBasis([incomeOf(GIUSEPPE, 2400), incomeOf(MARCELLA, 1600)], MEMBERS);
+    const basis = resolveSplitBasis([incomeOf(PAOLO, 2400), incomeOf(ELENA, 1600)], MEMBERS);
 
     expect(basis.kind).toBe('computed');
     if (basis.kind !== 'computed') return;
@@ -68,7 +68,7 @@ describe('resolveSplitBasis', () => {
 
   it('sums several income rows for the same person', () => {
     const basis = resolveSplitBasis(
-      [incomeOf(GIUSEPPE, 1200), incomeOf(GIUSEPPE, 1200), incomeOf(MARCELLA, 1600)],
+      [incomeOf(PAOLO, 1200), incomeOf(PAOLO, 1200), incomeOf(ELENA, 1600)],
       MEMBERS
     );
 
@@ -80,8 +80,8 @@ describe('resolveSplitBasis', () => {
   // category. Until then only the labor categories counted, and a refund attributed to somebody
   // was in neither the pool nor the residual.
   it('counts attributed income of any category, not the labor categories alone', () => {
-    const refund = incomeOf(MARCELLA, 400, { categoryId: 'cat-rimborsi', categoryName: 'Rimborsi' });
-    const basis = resolveSplitBasis([incomeOf(GIUSEPPE, 2400), incomeOf(MARCELLA, 1200), refund], MEMBERS);
+    const refund = incomeOf(ELENA, 400, { categoryId: 'cat-rimborsi', categoryName: 'Rimborsi' });
+    const basis = resolveSplitBasis([incomeOf(PAOLO, 2400), incomeOf(ELENA, 1200), refund], MEMBERS);
 
     if (basis.kind !== 'computed') throw new Error('expected a computed basis');
     expect(basis.members[1].income).toBe(1600);
@@ -91,12 +91,12 @@ describe('resolveSplitBasis', () => {
   // The bug this prevents is the loud one: without the guard, the person who HAS recorded an
   // income silently carries 100% of the household's spending.
   it('refuses to compute when one person has no income yet, and names them', () => {
-    const basis = resolveSplitBasis([incomeOf(GIUSEPPE, 2400)], MEMBERS);
+    const basis = resolveSplitBasis([incomeOf(PAOLO, 2400)], MEMBERS);
 
     expect(basis).toEqual({
       kind: 'unavailable',
       reason: 'missing-income',
-      missingNames: ['Marcella'],
+      missingNames: ['Elena'],
       unattributedIncome: 0,
     });
   });
@@ -107,8 +107,8 @@ describe('resolveSplitBasis', () => {
   it('declares income left in comune as unattributed, and never as somebody else s share', () => {
     const basis = resolveSplitBasis(
       [
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
         makeRow('income', 1100),
         makeRow('income', 500, { personalMemberId: 'm-deleted' }),
       ],
@@ -124,7 +124,7 @@ describe('resolveSplitBasis', () => {
   });
 
   it('refuses with fewer than two people', () => {
-    expect(resolveSplitBasis([], [GIUSEPPE])).toMatchObject({ kind: 'unavailable', reason: 'not-enough-members' });
+    expect(resolveSplitBasis([], [PAOLO])).toMatchObject({ kind: 'unavailable', reason: 'not-enough-members' });
   });
 });
 
@@ -179,8 +179,8 @@ describe('summarizeExpenseSplit', () => {
     const summary = summarizeExpenseSplit(
       input([
         makeRow('variable', 1000),
-        makeRow('variable', 300, { personalMemberId: GIUSEPPE.id }),
-        makeRow('variable', 120, { personalMemberId: MARCELLA.id }),
+        makeRow('variable', 300, { personalMemberId: PAOLO.id }),
+        makeRow('variable', 120, { personalMemberId: ELENA.id }),
       ])
     );
 
@@ -193,7 +193,7 @@ describe('summarizeExpenseSplit', () => {
   // exactly what a couple feeding a joint account does every month.
   it('skips transfers entirely', () => {
     const summary = summarizeExpenseSplit(
-      input([makeRow('variable', 500), makeRow('transfer', 900, { personalMemberId: GIUSEPPE.id })])
+      input([makeRow('variable', 500), makeRow('transfer', 900, { personalMemberId: PAOLO.id })])
     );
 
     expect(summary.common.total).toBe(500);
@@ -203,24 +203,24 @@ describe('summarizeExpenseSplit', () => {
   it('computes the residual as income minus the common share minus own spending', () => {
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 1000),
-        makeRow('variable', 300, { personalMemberId: GIUSEPPE.id }),
+        makeRow('variable', 300, { personalMemberId: PAOLO.id }),
       ])
     );
 
-    const [giuseppe, marcella] = summary.members;
-    expect(giuseppe.share).toBe(0.6);
-    expect(giuseppe.commonShare).toBe(600);
-    expect(giuseppe.remaining).toBe(2400 - 600 - 300);
-    expect(marcella.commonShare).toBe(400);
-    expect(marcella.remaining).toBe(1200);
+    const [paolo, elena] = summary.members;
+    expect(paolo.share).toBe(0.6);
+    expect(paolo.commonShare).toBe(600);
+    expect(paolo.remaining).toBe(2400 - 600 - 300);
+    expect(elena.commonShare).toBe(400);
+    expect(elena.remaining).toBe(1200);
   });
 
   it('leaves every split-dependent figure null when the basis is unavailable', () => {
     const summary = summarizeExpenseSplit(
-      input([incomeOf(GIUSEPPE, 2400), makeRow('fixed', 1000), makeRow('variable', 300, { personalMemberId: MARCELLA.id })])
+      input([incomeOf(PAOLO, 2400), makeRow('fixed', 1000), makeRow('variable', 300, { personalMemberId: ELENA.id })])
     );
 
     expect(summary.basis.kind).toBe('unavailable');
@@ -259,62 +259,62 @@ describe('summarizeExpenseSplit', () => {
   it('keeps a residual of money that has MOVED apart from the period s', () => {
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 700, { date: new Date(2026, 7, 10, 12, 0, 0) }),
         makeRow('fixed', 300, { date: new Date(2026, 7, 28, 12, 0, 0) }),
       ])
     );
 
-    const [giuseppe, marcella] = summary.members;
+    const [paolo, elena] = summary.members;
     // 60% / 40% of 1000 booked+scheduled, and of the 700 already paid.
-    expect(giuseppe.commonShare).toBe(600);
-    expect(giuseppe.remaining).toBe(1800);
-    expect(giuseppe.remainingBooked).toBe(1980);
-    expect(marcella.remaining).toBe(1200);
-    expect(marcella.remainingBooked).toBe(1320);
+    expect(paolo.commonShare).toBe(600);
+    expect(paolo.remaining).toBe(1800);
+    expect(paolo.remainingBooked).toBe(1980);
+    expect(elena.remaining).toBe(1200);
+    expect(elena.remainingBooked).toBe(1320);
   });
 
   it('counts a person s OWN scheduled row out of their booked residual too', () => {
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
-        makeRow('variable', 200, { personalMemberId: GIUSEPPE.id, date: new Date(2026, 7, 28, 12, 0, 0) }),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
+        makeRow('variable', 200, { personalMemberId: PAOLO.id, date: new Date(2026, 7, 28, 12, 0, 0) }),
       ])
     );
 
-    const [giuseppe] = summary.members;
-    expect(giuseppe.personalSpending).toBe(200);
-    expect(giuseppe.remaining).toBe(2200);
-    expect(giuseppe.remainingBooked).toBe(2400);
+    const [paolo] = summary.members;
+    expect(paolo.personalSpending).toBe(200);
+    expect(paolo.remaining).toBe(2200);
+    expect(paolo.remainingBooked).toBe(2400);
   });
 
   // An income not yet received props a residual up exactly as an unpaid bill deflates one.
   it('leaves an income still to come out of the booked residual', () => {
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400, { date: new Date(2026, 7, 28, 12, 0, 0) }),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400, { date: new Date(2026, 7, 28, 12, 0, 0) }),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 1000, { date: new Date(2026, 7, 10, 12, 0, 0) }),
       ])
     );
 
-    const [giuseppe] = summary.members;
-    expect(giuseppe.income).toBe(2400);
-    expect(giuseppe.remaining).toBe(1800);
+    const [paolo] = summary.members;
+    expect(paolo.income).toBe(2400);
+    expect(paolo.remaining).toBe(1800);
     // Nothing of that income has arrived: 0 − 600 of the pool already paid.
-    expect(giuseppe.remainingBooked).toBe(-600);
+    expect(paolo.remainingBooked).toBe(-600);
   });
 
   // The booked shares are allocated through `allocateByShare` for the same reason the pool is:
   // subtracting one allocation from another would leave the parts short of the whole by a cent.
   it('closes the booked shares on the booked pool, to the cent', () => {
-    const THREE = [GIUSEPPE, MARCELLA, { id: 'm-luca', name: 'Luca' }];
+    const THREE = [PAOLO, ELENA, { id: 'm-luca', name: 'Luca' }];
     const summary = summarizeExpenseSplit({
       expenses: [
-        incomeOf(GIUSEPPE, 1000),
-        incomeOf(MARCELLA, 1000),
+        incomeOf(PAOLO, 1000),
+        incomeOf(ELENA, 1000),
         makeRow('income', 1000, { personalMemberId: 'm-luca' }),
         makeRow('fixed', 100.01, { date: new Date(2026, 7, 10, 12, 0, 0) }),
         makeRow('fixed', 50, { date: new Date(2026, 7, 28, 12, 0, 0) }),
@@ -342,24 +342,24 @@ describe('summarizeExpenseSplit — income left «in comune»', () => {
 
   it('subtracts the common income from the pool before splitting it', () => {
     const summary = summarizeExpenseSplit(
-      input([incomeOf(GIUSEPPE, 2400), incomeOf(MARCELLA, 1600), makeRow('fixed', 1000), commonIncome(300)])
+      input([incomeOf(PAOLO, 2400), incomeOf(ELENA, 1600), makeRow('fixed', 1000), commonIncome(300)])
     );
 
     expect(summary.common).toMatchObject({ total: 1000, rowCount: 1, income: 300, incomeRowCount: 1, toSplit: 700, surplus: 0 });
-    const [giuseppe, marcella] = summary.members;
+    const [paolo, elena] = summary.members;
     // 60/40 of 700, not of 1000 — and the shares themselves do not move.
-    expect(giuseppe.share).toBe(0.6);
-    expect(giuseppe.commonShare).toBe(420);
-    expect(marcella.commonShare).toBe(280);
-    expect(giuseppe.remaining).toBe(2400 - 420);
-    expect(giuseppe.remainingBooked).toBe(2400 - 420);
+    expect(paolo.share).toBe(0.6);
+    expect(paolo.commonShare).toBe(420);
+    expect(elena.commonShare).toBe(280);
+    expect(paolo.remaining).toBe(2400 - 420);
+    expect(paolo.remainingBooked).toBe(2400 - 420);
   });
 
   // «Tutte le entrate non intestate a qualcuno» — a salary left in comune included. It still buys
   // nobody a share, and the basis still declares it: two facts about one row, both stated.
   it('counts a salary left in comune as common income too, and still declares it in the basis', () => {
     const summary = summarizeExpenseSplit(
-      input([incomeOf(GIUSEPPE, 2400), incomeOf(MARCELLA, 1600), makeRow('income', 1000), makeRow('fixed', 1500)])
+      input([incomeOf(PAOLO, 2400), incomeOf(ELENA, 1600), makeRow('income', 1000), makeRow('fixed', 1500)])
     );
 
     expect(summary.common.income).toBe(1000);
@@ -374,20 +374,20 @@ describe('summarizeExpenseSplit — income left «in comune»', () => {
   it('declares a surplus instead of distributing it', () => {
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 1000),
         commonIncome(1300),
-        makeRow('variable', 300, { personalMemberId: GIUSEPPE.id }),
+        makeRow('variable', 300, { personalMemberId: PAOLO.id }),
       ])
     );
 
     expect(summary.common).toMatchObject({ total: 1000, income: 1300, toSplit: 0, surplus: 300 });
-    const [giuseppe, marcella] = summary.members;
-    expect(giuseppe.commonShare).toBe(0);
-    expect(marcella.commonShare).toBe(0);
-    expect(giuseppe.remaining).toBe(2400 - 300);
-    expect(marcella.remaining).toBe(1600);
+    const [paolo, elena] = summary.members;
+    expect(paolo.commonShare).toBe(0);
+    expect(elena.commonShare).toBe(0);
+    expect(paolo.remaining).toBe(2400 - 300);
+    expect(elena.remaining).toBe(1600);
   });
 
   // The booked pool is net of the income already RECEIVED, by the same calendar-day rule as the
@@ -395,26 +395,26 @@ describe('summarizeExpenseSplit — income left «in comune»', () => {
   it('nets the booked pool on the income already received, not on the income still to come', () => {
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 1000, { date: new Date(2026, 7, 10, 12, 0, 0) }),
         makeRow('fixed', 1500, { date: new Date(2026, 7, 28, 12, 0, 0) }),
         commonIncome(1000, { date: new Date(2026, 7, 10, 12, 0, 0) }),
       ])
     );
 
-    const [giuseppe, marcella] = summary.members;
+    const [paolo, elena] = summary.members;
     // Period: (2500 − 1000) × 60% = 900. Booked: max(0, 1000 − 1000) = 0.
-    expect(giuseppe.commonShare).toBe(900);
-    expect(giuseppe.remaining).toBe(1500);
-    expect(giuseppe.remainingBooked).toBe(2400);
-    expect(marcella.remaining).toBe(1000);
-    expect(marcella.remainingBooked).toBe(1600);
+    expect(paolo.commonShare).toBe(900);
+    expect(paolo.remaining).toBe(1500);
+    expect(paolo.remainingBooked).toBe(2400);
+    expect(elena.remaining).toBe(1000);
+    expect(elena.remainingBooked).toBe(1600);
 
     const scheduledIncome = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 1000, { date: new Date(2026, 7, 10, 12, 0, 0) }),
         commonIncome(400, { date: new Date(2026, 7, 28, 12, 0, 0) }),
       ])
@@ -432,25 +432,25 @@ describe('summarizeExpenseSplit — income left «in comune»', () => {
   it('counts a person s non-labor income in their share and their residual, not in the pool', () => {
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2000),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2000),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 1000),
-        commonIncome(400, { personalMemberId: GIUSEPPE.id }),
-        commonIncome(80, { personalMemberId: MARCELLA.id, date: new Date(2026, 7, 28, 12, 0, 0) }),
+        commonIncome(400, { personalMemberId: PAOLO.id }),
+        commonIncome(80, { personalMemberId: ELENA.id, date: new Date(2026, 7, 28, 12, 0, 0) }),
       ])
     );
 
-    const [giuseppe, marcella] = summary.members;
+    const [paolo, elena] = summary.members;
     expect(summary.common.income).toBe(0);
-    // 2400 / (2400 + 1680): the refund moved Giuseppe's share up from 2000 / 3600.
-    expect(giuseppe.income).toBe(2400);
-    expect(giuseppe.share).toBeCloseTo(2400 / 4080, 10);
-    expect(giuseppe.remaining).toBeCloseTo(2400 - giuseppe.commonShare!, 2);
-    expect(giuseppe.remainingBooked).toBe(giuseppe.remaining);
-    // Marcella's 80 € is dated after today: in her period residual, not in her booked one.
-    expect(marcella.income).toBe(1680);
-    expect(marcella.remaining).toBeCloseTo(1680 - marcella.commonShare!, 2);
-    expect(marcella.remainingBooked).toBeCloseTo(1600 - marcella.commonShare!, 2);
+    // 2400 / (2400 + 1680): the refund moved Paolo's share up from 2000 / 3600.
+    expect(paolo.income).toBe(2400);
+    expect(paolo.share).toBeCloseTo(2400 / 4080, 10);
+    expect(paolo.remaining).toBeCloseTo(2400 - paolo.commonShare!, 2);
+    expect(paolo.remainingBooked).toBe(paolo.remaining);
+    // Elena's 80 € is dated after today: in her period residual, not in her booked one.
+    expect(elena.income).toBe(1680);
+    expect(elena.remaining).toBeCloseTo(1680 - elena.commonShare!, 2);
+    expect(elena.remainingBooked).toBeCloseTo(1600 - elena.commonShare!, 2);
   });
 
   // The user said the row was somebody's, so it is not the household's: it reduces nothing,
@@ -458,8 +458,8 @@ describe('summarizeExpenseSplit — income left «in comune»', () => {
   it('parks income whose owner no longer exists, neither common nor anyone s', () => {
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 1000),
         commonIncome(200, { personalMemberId: 'm-deleted' }),
       ])
@@ -560,16 +560,16 @@ describe('selectSplitStrip', () => {
     const input = (expenses: Expense[]) => ({ expenses, members: MEMBERS, now: NOW });
     const summary = summarizeExpenseSplit(
       input([
-        incomeOf(GIUSEPPE, 2400),
-        incomeOf(MARCELLA, 1600),
+        incomeOf(PAOLO, 2400),
+        incomeOf(ELENA, 1600),
         makeRow('fixed', 1000),
         // Still ahead: inside the period's residual, outside the booked one.
         makeRow('fixed', 1500, { date: new Date(2026, 7, 28, 12) }),
-        makeRow('variable', 1100, { personalMemberId: MARCELLA.id }),
+        makeRow('variable', 1100, { personalMemberId: ELENA.id }),
       ])
     );
     const strip = selectSplitStrip(summary);
     expect(summary.members[1]).toMatchObject({ remaining: -500, remainingBooked: 100 });
-    expect(strip[1]).toMatchObject({ label: 'Marcella', value: 100, tone: 'positive' });
+    expect(strip[1]).toMatchObject({ label: 'Elena', value: 100, tone: 'positive' });
   });
 });

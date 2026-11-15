@@ -85,11 +85,17 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   its light slots 3-5 sat at L 0.84–0.92, above the luminance guard. Slots 2-8 of those blocks were re-pitched — slot 1
   stays the theme's primary (the hero curve wears it), 6/7/8 keep their hue, and every slot is ΔE00 ≥ 17 from the
   others, inside the sRGB gamut and ≥ 3:1 against the theme's own card. The hues per theme: solar-dusk orange · dusk
-  blue · sun yellow · a warm NEUTRAL grey for Immobili (chroma 0.012 — a neutral has no hue to hold across the modes,
-  and the test exempts it) · sage green; elegant-luxury burgundy · navy · plum · gold · deep green; retro-arcade blue ·
+  blue · sun yellow · a pine green for Immobili (a warm NEUTRAL grey until 2026-11-15, see below) · sage green; elegant-luxury burgundy · navy · plum · gold · deep green; retro-arcade blue ·
   teal · magenta · orange · violet; midnight-bloom violet · orchid · coral · blue · mint. **The values came from a
   search, not from taste** (a throwaway annealing over L, C and a few degrees of hue, maximising the closest pair under
   those constraints): re-run the idea, not the numbers, when a theme is added.
+- **No chart slot may be the fold's grey** (2026-11-15, the ring's tour; DESIGN.md → The Ring Rule): a ring's «Altre N …»
+  and its residual are drawn in `--muted-foreground`, and solar-dusk's Immobili (`--chart-4`, a warm grey of chroma
+  0.012) measured ΔE00 ~1 from it in light — Immobili and «Altre 2 classi» were one grey on the Composizione's ring.
+  The owner chose a pine green: `oklch(0.42 0.08 170)` in light (7,4:1 on the card), `oklch(0.53 0.105 170)` in dark
+  (3,05:1), ΔE00 ≥ 25 from every slot and from the fold in both modes, found by the same kind of search. Held by
+  `__tests__/chartPaletteDistinctness.test.ts` («the ring fold of …»: every slot ΔE00 ≥ 14 from the block's
+  `--muted-foreground`, all twelve blocks). No neutral slot is left, so the test's hue exemption covers nothing today.
 - **`--muted-foreground` is held to 4,5:1 on THREE surfaces, in all twelve blocks** (2026-10-08,
   `__tests__/mutedForegroundContrast.test.ts`, reading `globals.css`): `--background`, `--card` and `--muted` — the
   reading line, the eyebrow and every inactive label are printed on all three, and the pill (`bg-muted`) is where the

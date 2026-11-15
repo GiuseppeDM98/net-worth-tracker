@@ -776,7 +776,7 @@ function FinalPremiumPreview({ control, currency }: { control: AssetFormControl;
  * a joint account stays 50/50 as its balance moves, quote on a quoted instrument), the other
  * figure derived beside each row, and the LAST row the rest, computed and never typed: «In
  * comune» by default, or the last member when «Nessuna quota in comune» is on (then the rest
- * member's row moves last and reads what the others leave: «scrivo 40 a Giuseppe, Marcella legge
+ * member's row moves last and reads what the others leave: «scrivo 40 a Paolo, Elena legge
  * 60 da sola»). Under the rows the sum («50% + 50% = 100%», «40 + 60 = 100 quote»); a sum past
  * the whole is red here and a refusal in the reading line at submit (the schema's superRefine),
  * never a save. Switching the form converts what is typed, so a figure keeps its meaning. A leaf:

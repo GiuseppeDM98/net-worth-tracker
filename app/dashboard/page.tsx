@@ -65,6 +65,7 @@ import { ComposizioneTile } from '@/components/dashboard/overview/ComposizioneTi
 import { CostiTile } from '@/components/dashboard/overview/CostiTile';
 import { ObiettivoTile } from '@/components/dashboard/overview/ObiettivoTile';
 import { CategoryTile } from '@/components/dashboard/overview/CategoryTile';
+import { incomeRingSegments } from '@/lib/utils/categoryRing';
 import { AssetPrincipaliTile } from '@/components/dashboard/overview/AssetPrincipaliTile';
 import { IntestatariTile } from '@/components/dashboard/overview/IntestatariTile';
 import { OverviewTile, TILE_CELL_CLASS } from '@/components/dashboard/overview/OverviewTile';
@@ -433,9 +434,11 @@ export default function DashboardPage() {
   const expenseReading = expenseStats
     ? describeCategoryShare(rankingFromOverview(expenseStats.topExpenseCategories, expenseStats.currentMonth.expenses), 'expenses')
     : null;
-  const incomeReading = expenseStats
-    ? describeCategoryShare(rankingFromOverview(expenseStats.topIncomeCategories, expenseStats.currentMonth.income), 'income')
-    : null;
+  const incomeRanking = expenseStats ? rankingFromOverview(expenseStats.topIncomeCategories, expenseStats.currentMonth.income) : null;
+  const incomeReading = incomeRanking ? describeCategoryShare(incomeRanking, 'income') : null;
+  // The income is the ring Tracciamento draws (The Ring Rule, 2026-11-15: the owner's tour aligned the two pages);
+  // the spending stays ranked rows, a ranking on both.
+  const incomeRing = incomeRanking ? incomeRingSegments(incomeRanking) : null;
   // The two totals hold the rows still in the calendar: declared under the readings
   // (The Scheduled-Is-Not-Spent Rule, at every width — DESIGN.md → The Binding-Clause Rule).
   const expensesScheduledCaption = expenseStats ? describeScheduledCaption(expenseStats.currentMonth.expensesScheduled ?? 0, today.daysInMonth) : null;
@@ -678,6 +681,8 @@ export default function DashboardPage() {
                   reading={incomeReading}
                   scheduledCaption={incomeScheduledCaption}
                   color="var(--chart-2)"
+                  ring={incomeRing}
+                  ringCenterLabel="entrate"
                   emptyCopy="Nessuna entrata registrata questo mese."
                   onSelectCategory={openCategoryInAnalisi}
                   footer={analisiFooter}

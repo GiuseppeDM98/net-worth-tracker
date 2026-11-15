@@ -17,7 +17,7 @@ export interface CompactExpenseRowProps {
   /** The row is dated after today — listed, not yet happened. */
   scheduled?: boolean;
   /**
-   * Whose row it is («Giuseppe», «Senza intestatario»), or null for a shared one — resolved by
+   * Whose row it is («Paolo», «Senza intestatario»), or null for a shared one — resolved by
    * the parent through `resolveOwnerLabel`, only with Divisione on.
    */
   ownerLabel?: string | null;
