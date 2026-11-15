@@ -91,4 +91,8 @@
 - **No ring in the PDF and the emails** (2026-11-12, declared, no heir): out of the DOM the parts stay rows (DESIGN.md →
   The Out-Of-DOM Token Rule). **`BalanceRing` stays a score, not a `RingChart`**: one figure on a bounded domain is not
   parts (DESIGN.md → Savings / Metric Ring Chart).
+- **The minor tiles' rings have no tablet spec** (2026-11-15, declared, no heir): Divisione «Quota», «Mutuo»,
+  «Intestatari», «Costo», «Per sottocategoria» and «Chi paga di più» are proved inside their hole at 1440 and 390 only
+  (`e2e/ring-chart.{split,owners,centri,dividendi}*.spec.ts`; Mutuo and Dividendi at 1440); 768 and 1024 were looked at
+  on the tour — the split and centri accounts have no tablet project.
 - **The charts' blind spots live in each page's guide** (`doc/guide/<tema>.md` § Per-page blind spots): a chart that looks wrong on Storico, Rendimenti, Analisi, FIRE or Hall of Fame is read there first; the colour slots' open contrast entries are in `doc/guide/temi.md` § Per-page blind spots.
