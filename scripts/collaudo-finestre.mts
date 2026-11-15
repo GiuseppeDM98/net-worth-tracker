@@ -16,6 +16,7 @@
  * Or import it from a throwaway script: `await openTourWindows({ email, windows: [{ url, title }] })`.
  * Password: `test1234`, every emulator fixture's (WORKFLOW.md § 3). Emulators only: refuses a non-local base URL.
  */
+import { pathToFileURL } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright';
 
 export interface TourWindow {
@@ -97,8 +98,9 @@ export async function openTourWindows(options: TourOptions): Promise<string> {
   }
 }
 
-// CLI: run directly with tsx.
-if (import.meta.url === `file://${process.argv[1]}`) {
+// CLI: run directly with tsx. `pathToFileURL`, not `file://` + argv[1]: on Windows the URL is `file:///C:/…` and
+// the path `C:\…`, so the plain concatenation never matched and the script exited 0 with no window (2026-11-15).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const values = (name: string) =>
     process.argv.filter((a) => a.startsWith(`--${name}=`)).map((a) => a.slice(name.length + 3));
   const [email] = values('email');

@@ -25,7 +25,10 @@ import {
   summarizeDividendStats,
   selectUpcomingDividends,
   endOfServerDay,
+  payerRingSegments,
+  type PayerRanking,
 } from '@/lib/utils/dividendAnalytics';
+import { RING_REST_COLOR, RING_REST_KEY } from '@/lib/utils/ringChart';
 
 // --- Fixtures ---------------------------------------------------------------
 
@@ -717,5 +720,40 @@ describe('summarizeDividendStats / selectUpcomingDividends', () => {
     const end = endOfServerDay(routeNow);
     expect([end.getHours(), end.getMinutes(), end.getSeconds(), end.getMilliseconds()]).toEqual([23, 59, 59, 999]);
     expect(routeNow.getTime(), 'the input is not mutated').toBe(at('2026-06-15T10:00:00.000Z').getTime());
+  });
+});
+
+// «Chi paga di più» as a ring (The Ring Rule, 2026-11-12): the held payers by rank, then the remainder
+// in the neutral ink. Figures invented and round. Seen red on 2026-11-15 with the remainder dropped.
+describe('payerRingSegments', () => {
+  const rankingOf = (amounts: number[], remainder: number | null, label = 'Altri 2 strumenti'): PayerRanking => {
+    const total = amounts.reduce((sum, amount) => sum + amount, 0) + (remainder ?? 0);
+    return {
+      rows: amounts.map((amount, index) => ({ key: `asset-${index}`, label: `Strumento ${index + 1}`, amount, percentage: (amount / total) * 100 })),
+      remainder: remainder === null ? null : { label, amount: remainder, percentage: (remainder / total) * 100 },
+      total,
+      payerCount: amounts.length + 2,
+      heldPayerCount: amounts.length,
+      soldPayerCount: 0,
+      soldNet: 0,
+      top: null,
+    };
+  };
+
+  it('V1: five payers and «Altri 2 strumenti» are six parts, the remainder last and grey', () => {
+    const segments = payerRingSegments(rankingOf([500, 400, 300, 200, 100], 100));
+    expect(segments?.map((segment) => segment.color)).toEqual([
+      'var(--chart-2)', 'var(--chart-7)', 'var(--chart-6)', 'var(--chart-3)', 'var(--chart-8)', RING_REST_COLOR,
+    ]);
+    expect(segments?.at(-1)).toMatchObject({ key: RING_REST_KEY, label: 'Altri 2 strumenti', value: 100 });
+  });
+
+  it('V1: one payer and nothing else is no ring; one payer beside a sold one is a ring of two', () => {
+    expect(payerRingSegments(rankingOf([300], null))).toBeNull();
+    expect(payerRingSegments(rankingOf([300], 50, '1 strumento venduto'))).toHaveLength(2);
+  });
+
+  it('V1: a sold remainder of −50 € makes no ring', () => {
+    expect(payerRingSegments(rankingOf([300, 200], -50, '1 strumento venduto'))).toBeNull();
   });
 });

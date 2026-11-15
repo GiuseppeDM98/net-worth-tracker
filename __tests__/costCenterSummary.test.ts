@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import type { Expense } from '@/types/expenses';
 import type { CostCenter } from '@/types/costCenters';
 import {
+  COST_SPLIT_RING_COLORS,
   buildCenterMonthStack,
+  costCenterRingSegments,
+  subCategoryRingSegments,
   resolveYearCalendar,
   summarizeCenter,
   summarizeCostCenters,
@@ -218,6 +221,26 @@ describe('summarizeCenter', () => {
   });
 });
 
+// «Costo»'s footer as a ring (The Ring Rule, 2026-11-12): fixed and one-off, the two parts of the
+// booked total. Figures invented and round. Seen red on 2026-11-15 with each part only checked `>= 0`.
+describe('costCenterRingSegments', () => {
+  it('K1: 30 € fixed and 240 € one-off are two parts', () => {
+    const rows = [
+      expense({ date: day('2026-08-03'), amount: -30, isRecurring: true }),
+      expense({ date: day('2026-08-05'), amount: -240 }),
+    ];
+    expect(costCenterRingSegments(summarizeCenter(center(), rows, NOW))).toEqual([
+      { key: 'recurring', label: 'Fisso', value: 30, color: COST_SPLIT_RING_COLORS.recurring },
+      { key: 'one-off', label: 'Una tantum', value: 240, color: COST_SPLIT_RING_COLORS.oneOff },
+    ]);
+  });
+
+  it('K1: all one-off is no ring', () => {
+    const rows = [expense({ date: day('2026-08-05'), amount: -240 })];
+    expect(costCenterRingSegments(summarizeCenter(center(), rows, NOW))).toBeNull();
+  });
+});
+
 // ─── The list ─────────────────────────────────────────────────────────────────
 
 describe('summarizeCostCenters', () => {
@@ -301,5 +324,33 @@ describe('buildCenterMonthStack', () => {
     expect(stack.centers.map((c) => c.id)).toEqual(['casa', 'auto']);
     expect(stack.centers[1].color).toBe('chart-1');
     expect(stack.months[0].label).toBe('Set');
+  });
+});
+
+// «Per sottocategoria» as a ring (the owner on the mirror tour, 2026-11-15): the subcategories still
+// counted are the parts of the net total, coloured by rank; an excluded row is not a part. Seen red with
+// the excluded rows kept in the segments.
+describe('subCategoryRingSegments', () => {
+  const slice = (key: string, name: string, total: number) => ({ key, subCategoryName: name, categoryName: 'Auto', total, transactionCount: 1 });
+  const slices = [slice('man', 'Manutenzione', 500), slice('car', 'Carburante', 300), slice('ass', 'Assicurazione', 200)];
+
+  it('K3: the included subcategories in order, coloured by rank', () => {
+    expect(subCategoryRingSegments(slices, new Set())).toEqual([
+      { key: 'man', label: 'Manutenzione', value: 500, color: 'var(--chart-2)' },
+      { key: 'car', label: 'Carburante', value: 300, color: 'var(--chart-7)' },
+      { key: 'ass', label: 'Assicurazione', value: 200, color: 'var(--chart-6)' },
+    ]);
+  });
+
+  it('K3: an excluded row leaves the ring, the others keep their rank', () => {
+    expect(subCategoryRingSegments(slices, new Set(['car']))).toEqual([
+      { key: 'man', label: 'Manutenzione', value: 500, color: 'var(--chart-2)' },
+      { key: 'ass', label: 'Assicurazione', value: 200, color: 'var(--chart-7)' },
+    ]);
+  });
+
+  it('K3: one subcategory left counted is no ring', () => {
+    expect(subCategoryRingSegments(slices, new Set(['car', 'ass']))).toBeNull();
+    expect(subCategoryRingSegments([slice('man', 'Manutenzione', 500)], new Set())).toBeNull();
   });
 });

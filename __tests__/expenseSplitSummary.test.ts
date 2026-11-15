@@ -9,6 +9,7 @@ import {
   resolveSplitBasis,
   selectSplitStrip,
   splitMemberSectionId,
+  splitRingSegments,
   summarizeExpenseSplit,
   type ExpenseSplitSummary,
   type MemberBalance,
@@ -125,6 +126,24 @@ describe('resolveSplitBasis', () => {
 
   it('refuses with fewer than two people', () => {
     expect(resolveSplitBasis([], [PAOLO])).toMatchObject({ kind: 'unavailable', reason: 'not-enough-members' });
+  });
+});
+
+// The Quota's ring (The Ring Rule, 2026-11-12): the incomes the shares are measured on, in settings
+// order so a person keeps a colour whatever the period. Seen red on 2026-11-15 with the parts sorted
+// by income.
+describe('splitRingSegments', () => {
+  it('D1: one part per person in settings order, coloured by that order', () => {
+    const basis = resolveSplitBasis([incomeOf(PAOLO, 600), incomeOf(ELENA, 900)], MEMBERS);
+    expect(splitRingSegments(basis)).toEqual([
+      { key: 'm-paolo', label: 'Paolo', value: 600, color: 'var(--chart-2)' },
+      { key: 'm-elena', label: 'Elena', value: 900, color: 'var(--chart-7)' },
+    ]);
+  });
+
+  it('D1: no ring without a basis — one person, or a person with no income', () => {
+    expect(splitRingSegments(resolveSplitBasis([incomeOf(PAOLO, 600)], [PAOLO]))).toBeNull();
+    expect(splitRingSegments(resolveSplitBasis([incomeOf(PAOLO, 600)], MEMBERS))).toBeNull();
   });
 });
 

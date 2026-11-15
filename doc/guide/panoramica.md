@@ -280,6 +280,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   no-context verdict (`__tests__/assistantNarrative.test.ts`). Pinned by `__tests__/{overviewNarrative,overviewSummary,cashflowTile}.test.ts(x)`
   and the «savings floor» test of `e2e/overview.spec.ts`.
 
+- **«Intestatari» is a ring on «Valore» and on «Carico»** (2026-11-15; The Ring Rule, 2026-11-12): the tile is Patrimonio's
+  (`IntestatariTile`, its rule in doc/guide/patrimonio.md, the builder `lib/utils/ownershipRing.ts`). Here as on Patrimonio every chart slot is also a class's, so the owners share hues with «Composizione»'s ring on
+  the same page (declared). The closed row's answer and the payload are unchanged.
+
 ## Composizione mobile
 
 The second page composed for a small screen (2026-10-11, PR #452; its spec, retired the same day, is in `git log -- doc/mobile/`; the primitives and the sample page are Hall of Fame's, doc/guide/hall-of-fame.md § Composizione mobile): below `desktop:` the page is composed, at 1440 it is the page above with three declared additions. The rules are DESIGN.md's (§ 5 → Small-Screen Composition: The First-Screen, Lifted-Figure, Closed-Row and Binding-Clause Rules); here is what this page does with them.

@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { hasCostFigures, type OwnershipBasis, type OwnershipSummary } from '@/lib/utils/assetOwnership';
 import { ownershipRowOn } from '@/lib/utils/ownershipBasis';
+import { ownershipRingSegments } from '@/lib/utils/ownershipRing';
+import { ringSwatchAt } from '@/lib/utils/ringChart';
+import { RING_LAYOUT_CLASS, RING_ROWS_CLASS, RingChart } from '@/components/ui/ring-chart';
 import { describeOwnership, describeOwnershipAside, describeOwnershipFooter } from '@/lib/utils/patrimonioNarrative';
 import { cn } from '@/lib/utils';
 import type { TileCollapse } from '@/components/ui/tile';
@@ -75,7 +78,12 @@ export function IntestatariTile({ summary, collapse, asideWhenClosed, className 
     writeStoredBasis(next);
   };
 
-  const rows: RankedRow[] = summary.rows.map((row) => {
+  // A ring on both views, each on its own figures (the owner on the mirror tour, 2026-11-15: the bars on
+  // «Carico» beside the ring on «Valore» read as a different tile); a group that is a net debt keeps the
+  // bars (`isRingWhole`).
+  const ring = ownershipRingSegments(summary, basis);
+  const listLabel = basis === 'cost' ? 'Prezzo di carico per intestatario' : 'Patrimonio per intestatario';
+  const rows: RankedRow[] = summary.rows.map((row, index) => {
     const { value, sharePct } = ownershipRowOn(row, basis);
     return {
       key: row.key,
@@ -83,8 +91,17 @@ export function IntestatariTile({ summary, collapse, asideWhenClosed, className 
       caption: `${row.assetCount} asset`,
       amount: value,
       percentage: sharePct === null ? 0 : Math.max(0, sharePct),
+      swatch: ring ? ringSwatchAt(ring, index) : undefined,
     };
   });
+  const list = (
+    <RankedRows
+      rows={rows}
+      color="var(--chart-1)"
+      bars={!ring}
+      ariaLabel={listLabel}
+    />
+  );
   const footer = describeOwnershipFooter(summary, basis);
   const asideText = describeOwnershipAside(summary);
   const aside = canSwitch ? (
@@ -105,9 +122,23 @@ export function IntestatariTile({ summary, collapse, asideWhenClosed, className 
       collapse={collapse}
       className={className}
     >
-      <div className="mt-2">
-        <RankedRows rows={rows} color="var(--chart-1)" ariaLabel={basis === 'cost' ? 'Prezzo di carico per intestatario' : 'Patrimonio per intestatario'} />
-      </div>
+      {ring ? (
+        <div className="@container mt-2">
+          <div className={RING_LAYOUT_CLASS}>
+            <RingChart
+              segments={ring}
+              centerValue={basis === 'cost' ? summary.costTotal : summary.total}
+              centerLabel={basis === 'cost' ? 'carico' : 'patrimonio'}
+              ariaLabel={listLabel}
+            />
+            {/* Capped from `desktop:`: in a twelve-column tile, without the bars, a label and its figure
+                would stand a thousand pixels apart (the cap «Per anno» has on the Mutuo tile). */}
+            <div className={cn(RING_ROWS_CLASS, 'desktop:max-w-[560px]')}>{list}</div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2">{list}</div>
+      )}
       <p className={cn('mt-auto border-t border-border pt-3.5 text-[11px]', footer.tone === 'warning' ? 'text-warning-foreground' : 'text-muted-foreground')}>{footer.text}</p>
     </OverviewTile>
   );

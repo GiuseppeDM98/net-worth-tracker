@@ -43,6 +43,7 @@ import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarr
 import { PageVerdict, type PendingVerdict } from '@/components/ui/page-verdict';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { RankedRows, type RankedRow } from '@/components/ui/ranked-rows';
+import { SplitQuotaBody } from '@/components/cashflow/tiles/SplitQuotaBody';
 import { PeriodPicker } from '@/components/ui/period-picker';
 import { VerdictStrip } from '@/components/ui/verdict-strip';
 import { PageRest } from '@/components/ui/page-rest';
@@ -315,18 +316,7 @@ export function ExpenseSplitTab({ familyMembers, availableYears, active }: Expen
             collapse={sections.collapse(SPLIT_SECTION_IDS.quota)}
             asideWhenClosed={SPLIT_CLOSED_ASIDES.quota}
           >
-            {summary.basis.kind === 'computed' && (
-              <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
-                {summary.basis.members.map((entry) => (
-                  <div key={entry.member.id} className="min-w-0">
-                    <p className={TILE_SUB_EYEBROW_CLASS}>{entry.member.name}</p>
-                    <p className="mt-1 font-mono text-[22px] leading-none tracking-tight">
-                      {cachedFormatCurrencyEUR(entry.income, true)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+            <SplitQuotaBody basis={summary.basis} />
           </Tile>
         </div>
 

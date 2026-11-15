@@ -141,11 +141,29 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   a center sits in Centri AND in Dormienti when idle, so a spec scopes the locator to the tile
   (`getByRole('region', { name: 'Centri', exact: true })`) or `.first()` trips strict mode.
 
+- **«Costo»'s footer is a ring of fixed and one-off** (2026-11-15; The Ring Rule, 2026-11-12): `costCenterRingSegments(summary)`
+  in `costCenterSummary.ts` — «Fisso» `--chart-7` (caption «ricorrenti e rate») and «Una tantum» `--chart-3`
+  (`COST_SPLIT_RING_COLORS`), the two parts of the booked total, `null` when either is zero. With it the footer is the ring
+  (size 96, centre `summary.total` «in tutto», the hero's figure again — the owner's «total in the centre» wins) and two
+  legend rows, which replace the sentence (they say it with figures and shares; the tile only divides each part by
+  `summary.total` for its row); without it, today's sentence («Tutto una tantum: …»). A centre wearing slot 3 or 7 shares a
+  hue with the split on its own detail (declared). Tests `costCenterSummary.test.ts` (K1), `__tests__/costoTile.test.tsx`;
+  browser `e2e/ring-chart.centri{,.mobile}.spec.ts` («Ornitorinco» «270 €»; «Fenicottero» the sentence, skipped on 31
+  December, when its instalment is booked).
+- **«Per sottocategoria» is a ring of the subcategories still counted** (2026-11-15, added by the owner on the mirror tour;
+  The Ring Rule): `subCategoryRingSegments(slices, excludedKeys)` in `costCenterSummary.ts` — the counted rows in the tile's
+  order, `RING_CATEGORY_COLORS` by their rank among them, an excluded row NOT a part (the ring is the net total the lens
+  measures), `null` with fewer than two counted. With it the ring stands beside the toggle rows, `netTotal` in its hole —
+  «in tutto» while nothing is excluded, «al netto» after — and each counted row is led by its arc's swatch (`ringSwatchAt`)
+  in place of its bar; an excluded row keeps an empty swatch box, so the names keep one left edge. The toggle, «Reimposta»,
+  the reading and the footer are unchanged. Tests `costCenterSummary.test.ts` (K3), `__tests__/sottocategorieTile.test.tsx`
+  (K4); browser `e2e/ring-chart.centri.spec.ts` («Airone», planted and removed by the test, «300 €»).
+
 ## Composizione mobile
 
 Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log -- doc/mobile/`; the primitives in doc/guide/hall-of-fame.md § Composizione mobile): the list and the detail are each one sequence, the desktop DOM (the `order-*` of both went that day — DESIGN.md → The First-Screen Rule). The rules are DESIGN.md's (§ 5 → Small-Screen Composition: The First-Screen, Lifted-Figure, Closed-Row and Binding-Clause Rules); here is what this page does with them. Not reached, and declared: the spec's «≤ 1,5 screens» at 390 — the fixture measures 1,55 (doc/guide/prima-schermata-misure.md § Il fixture).
 
-- **THE tile**: Totale (`cdc-totale`) on the list, Costo (`cdc-centro-costo`) on the detail — open at every width (DESIGN.md → The First-Screen Rule), their charts as they are.
+- **THE tile**: Totale (`cdc-totale`) on the list, Costo (`cdc-centro-costo`) on the detail — open at every width (DESIGN.md → The First-Screen Rule), their charts as they are. Costo's footer is a 96px ring when both fixed and one-off were spent (2026-11-15, § Centri di Costo): at the bottom of THE tile, so the first screen of a detail at 390 changes only below the KPIs and the bars.
 - **The strip**: none (the owner's choice, 2026-10-10): Totale's three figures each name their own window and none is the verdict's; the verdict is whole, no cut, no axis.
 - **Lifted blocks**: none — with no strip no cell repeats a figure, so neither Totale nor Costo takes `liftedFigures`.
 - **The rows and their aside, in DOM order** (`COST_CENTERS_SECTIONS`, `DETAIL_SECTIONS` / `DETAIL_SECTIONS_WITHOUT_CATEGORIES`, module-level; ids `COST_CENTER_SECTION_IDS`, the words in `lib/utils/costCenterNarrative.ts`): the list's `cdc-centri` («in ordine di costo») and `cdc-dormienti` («senza spese da tempo»); the detail's `cdc-centro-categorie` («in totale», not rendered when one category is the hero said again), `cdc-centro-ciclo` (its own aside, «attivo» / «fermo» / «archiviato» from `describeCicloAside`, open or closed), `cdc-centro-sottocategorie` («in totale», or `describeSottocategorieClosedAside`: «2 escluse» while a lens is set), `cdc-centro-movimenti` (`describeMovimentiAside`, the count). «Apri Fenicottero» lives inside the Centri row: a spec opens the row first.

@@ -43,6 +43,7 @@ import type { FamilyMember } from '@/types/assets';
 import { isScheduledRow, summarizeScheduled, type ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 import { formatEuroMinus, isPrintedZero } from '@/lib/utils/formatters';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
+import { RING_CATEGORY_COLORS, isRingWhole, type RingSegment } from '@/lib/utils/ringChart';
 
 // ─── The phone composition: the ids and the strip (since 2026-10-12) ──────────
 
@@ -282,6 +283,21 @@ export function resolveSplitBasis(incomeRows: Expense[], members: FamilyMember[]
   });
 
   return { kind: 'computed', members: shares, totalIncome, unattributedIncome };
+}
+
+/**
+ * The people's incomes as ring parts, in settings order — the base of their shares; null without a
+ * basis. Settings order, not rank, so a person keeps a colour whatever the period (2026-11-12).
+ */
+export function splitRingSegments(basis: SplitBasis): RingSegment[] | null {
+  if (basis.kind !== 'computed') return null;
+  const segments = basis.members.map((entry, index) => ({
+    key: entry.member.id,
+    label: entry.member.name,
+    value: entry.income,
+    color: RING_CATEGORY_COLORS[index % RING_CATEGORY_COLORS.length],
+  }));
+  return isRingWhole(segments) ? segments : null;
 }
 
 /**
