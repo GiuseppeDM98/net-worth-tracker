@@ -1,7 +1,8 @@
 /**
  * `RankedRows` (components/ui/ranked-rows.tsx): with `bars={false}` the list is a ring's legend — an
  * 8×8 swatch per row and per remainder, no bar track (The Ring Rule, 2026-11-12); without the props
- * the rows are the ranked rows every other tile draws (K2 holds that shape).
+ * the rows are the ranked rows every other tile draws (K2 holds that shape). Seen red on 2026-11-15:
+ * K1 with the bar always drawn, K2 with the legend mode always on.
  */
 
 import { describe, expect, it } from 'vitest';

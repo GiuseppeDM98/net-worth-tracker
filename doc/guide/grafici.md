@@ -73,4 +73,7 @@
 ## Per-page blind spots
 - **An arc is a non-text signal beside rows that carry every figure: `--chart-3` on the default light card is 2,74:1**
   (doc/guide/temi.md § Per-page blind spots) — accepted for the ring (2026-11-12): the slots' contrast is a temi.md matter.
+- **No ring in the PDF and the emails** (2026-11-12, declared, no heir): out of the DOM the parts stay rows (DESIGN.md →
+  The Out-Of-DOM Token Rule). **`BalanceRing` stays a score, not a `RingChart`**: one figure on a bounded domain is not
+  parts (DESIGN.md → Savings / Metric Ring Chart).
 - **The charts' blind spots live in each page's guide** (`doc/guide/<tema>.md` § Per-page blind spots): a chart that looks wrong on Storico, Rendimenti, Analisi, FIRE or Hall of Fame is read there first; the colour slots' open contrast entries are in `doc/guide/temi.md` § Per-page blind spots.

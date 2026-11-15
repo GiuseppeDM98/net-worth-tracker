@@ -141,7 +141,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (`NATURE_RING_COLORS`: TFR `--chart-2`, Volontario `--chart-7`, Datoriale `--chart-6`, so TFR wears one hue every
   year), the year's total «versati» in the hole; the rows are its legend (`RankedRows bars={false}`, each with its
   nature's swatch, the «deducibile» caption kept). One nature is no ring: the bar in `--chart-2` stays
-  (`__tests__/versatoTile.test.tsx`; `e2e/ring-chart*.spec.ts` on the seed's 2026 and 2025).
+  (`__tests__/versatoTile.test.tsx`; `e2e/ring-chart*.spec.ts` on the seed's 2026 and 2025). The 1440 grid holds it
+  (`e2e/pension.spec.ts`, «Versato closes the second» row): the ring beside three rows adds at most 12px and the hero
+  spans both rows, so a taller Versato breaks that test first — run it after a change to the tile.
 - **Errors degrade per tile and the verdict says what failed** (`buildPensionLoadErrorVerdict`): a failed
   `pensionContributions` query hides the hero's reading and chips (a `[]` would say «nessun versamento registrato»)
   and replaces Rendimento, Anno fiscale, Versato and Versamenti with an `ErrorNotice`; a failed snapshots query

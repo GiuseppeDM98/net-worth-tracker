@@ -385,7 +385,7 @@ export function chooserDraftToOverride(draft: RouteChooserDraft): AssistantRoute
 - **Suggestions**: `buildEmptyChatSuggestions({ overview: overviewError ? null : overviewData, today, registerFirst
   })`; `handleSuggestionSelect(row)` → `setDraft(row.text)`, focus the composer and put the caret at the end
   (`setSelectionRange(len, len)` in a `requestAnimationFrame`), `setRegisterPrefetch(row.register || prev)`.
-- **`?mode=registra`** (`CashflowPageClient.tsx:271`, `ExpenseTrackingTab.tsx:974` keep linking it): read once at
+- **`?mode=registra`** (`CashflowPageClient.tsx:271`, `ExpenseTrackingTab.tsx:976` keep linking it): read once at
   mount into `registerFirst` and `registerPrefetch` (`useState(() => searchParams.get('mode') === 'registra')`); one
   effect, under today's gates (`!loadingThreads && !isDemo && assistantConfigured`, :535 — before them the composer
   is not mounted) and a handled ref, drops the param with `window.history.replaceState` and focuses the composer,
@@ -606,7 +606,7 @@ sending explicit modes, which NOVE-14 still serves. The two Cashflow links keep 
 - `README.md` § AI Assistant (:63): the period axis, the pencil and the day thread replaced by «a chat: write, the
   assistant reads whether it is a question, an analysis or a movement and on which period; under each answer «Ho
   letto: … · cambia»; «⋯» holds Conversazioni, Memoria, Preferenze»; :67 «opens the Assistente with the register
-  suggestions first». `doc/guide/cashflow-tracciamento.md:190`: «the bridge to the Assistente (`?mode=registra`: the
+  suggestions first». `doc/guide/cashflow-tracciamento.md:208-209`: «the bridge to the Assistente (`?mode=registra`: the
   register suggestions first)». `doc/guide/impostazioni.md`: the Assistente preferences' sentence.
 - `DESIGN.md`: § 4's four amendments. `doc/guide/e2e-playwright.md`: `assistantRegister.ts`'s helpers renamed.
 - `CLAUDE.md` › Assistente AI line («only a chat; the router reads every message, 2026-11») and › «Latest»;

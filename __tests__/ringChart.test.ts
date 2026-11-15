@@ -1,7 +1,10 @@
 /**
  * `lib/utils/ringChart.ts` (DESIGN.md → The Ring Rule, 2026-11-12): the arcs of one positive whole,
  * the fold past six parts, the figure the hole holds, and the guard that refuses a signed whole.
- * Figures invented and round.
+ * Figures invented and round. Each case seen red on 2026-11-15 with its mutation: R1 the gap taken
+ * whole (no `Math.min(RING_GAP, share / 2)`), R2 `share − RING_GAP` unclamped, R3 the parts ≤ 0 kept,
+ * R4 the fold sliced at `RING_MAX_PARTS`, R5 the full form always, R6 `ringCenterMaxChars` without the
+ * chord's `reach`, R7 `isRingWhole` testing `value < 0` (−0,40 € then refuses the ring).
  */
 
 import { describe, expect, it } from 'vitest';

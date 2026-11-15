@@ -6,7 +6,7 @@
  *
  * What only a browser can prove: the figure that really rendered stays inside its hole
  * (`expectRingFiguresInside`), at most the characters the ring declared; the words, the shares and
- * the fold are Vitest's (`ringChart.test.ts`, `overviewSummary.test.ts`, `tracciamentoSummary.test.ts`).
+ * the fold are Vitest's (`ringChart.test.ts`, `compositionRing.test.ts`, `categoryRing.test.ts`).
  *
  * The data, invented and round, never written where a patch suffices:
  * - Panoramica and Patrimonio: the overview answer PATCHED on the wire (`patchOverview`) with seven

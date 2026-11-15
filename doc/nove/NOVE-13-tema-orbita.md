@@ -12,7 +12,7 @@
 | # | Site (file:line @ b841cbd7) | What it shows |
 | --- | --- | --- |
 | 1 | `lib/constants/colorTheme.ts:15-22` | no theme with `resourceBar: true` (NOVE-11 names the flag; nothing reads it yet) |
-| 2 | `app/dashboard/page.tsx:507-529` | under the Panoramica's `PageHeader` comes `RowAnswers` and the verdict: no place for a bar of figures |
+| 2 | `app/dashboard/page.tsx:510-532` | under the Panoramica's `PageHeader` comes `RowAnswers` and the verdict: no place for a bar of figures |
 | 3 | `lib/utils/overviewSummary.ts:100-130` | `selectOverviewStrip`: the phone's three cells; no selector of the four figures the mock shows at 1440 |
 | 4 | the mock's dark slots | Azioni `0.70 0.13 225` and Trend Following `0.62 0.07 240` measure ΔE00 12,6: under the gate of 14 |
 | 5 | the mock's `--primary` light `0.48 0.12 235`, eyebrow light `0.50 0.13 60`, Immobili light `0.70 0.15 75` | outside sRGB (max chroma 0.102, 0.117, under 0.15) |
@@ -337,7 +337,7 @@ export function ResourceBar({ figures }: { figures: readonly ResourceFigure[] })
 }
 ```
 
-`app/dashboard/page.tsx:510-516`: `<ResourceBar figures={selectResourceBar(overview)} />` right after
+`app/dashboard/page.tsx:513-519`: `<ResourceBar figures={selectResourceBar(overview)} />` right after
 `<PageHeader … />`, before `<RowAnswers>` (`:520`, inside `space-y-4`); `overview` is narrowed there by the
 guard at `:411`.
 

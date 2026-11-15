@@ -2,7 +2,8 @@
  * `ComposizioneTile` (components/dashboard/overview/ComposizioneTile.tsx): every class ≥ 0 → a ring
  * over one row per part, a class at 0 € with no row (The Ring Rule, 2026-11-12); a class below zero
  * → the stacked bar and every row, as before. Figures invented and round. chartService's formatter
- * drags the Firebase chain in: mocked away, as in overviewSummary.test.ts.
+ * drags the Firebase chain in: mocked away, as in overviewSummary.test.ts. Seen red on 2026-11-15
+ * with the ring rendered always.
  */
 
 import { describe, expect, it, vi } from 'vitest';

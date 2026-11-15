@@ -448,6 +448,7 @@ describe('summarizeVersato', () => {
   });
 });
 
+// Seen red on 2026-11-15 with `versatoRing` returning its segments without `isRingWhole`.
 describe('versatoRing (The Ring Rule, 2026-11-12)', () => {
   it('P1: makes the three natures of the year a ring, each in its fixed slot; one nature is no ring', () => {
     const ring = versatoRing(summarizeVersato(CONTRIBUTIONS, 2026));

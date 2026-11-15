@@ -51,7 +51,7 @@ interface CategoryTileProps {
  * the Panoramica (the overview payload's top 5) and on Tracciamento (`rankCategories`). Only
  * the top 5 are carried, so the list closes with the residual ("Altre categorie") — a list
  * titled "per categoria" that does not add up to the total reads as missing data; with `ring`
- * (Tracciamento's income) the rows are its legend.
+ * (the income, on Tracciamento and the Panoramica) the rows are its legend.
  */
 export function CategoryTile({
   eyebrow,

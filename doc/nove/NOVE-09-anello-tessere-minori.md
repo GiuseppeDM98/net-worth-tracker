@@ -1,9 +1,11 @@
 # NOVE-09 — The ring in the minor tiles
 
-> Series `doc/nove/` (README.md § 5): **implemented after NOVE-08**, whose contract it consumes unchanged
-> (`RingChart`, `RING_LAYOUT_CLASS`, `RING_ROWS_CLASS`, `ringChart.ts`, `RankedRows`'s legend mode — README.md § 7).
-> Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7 (the NOVE-08 files do not exist there yet:
-> their names are NOVE-08 § 4's). Executes the owner's decisions 5, 6 and 10 (README.md § 3).
+> Series `doc/nove/` (README.md § 5): **implemented after NOVE-08 (retired on 2026-11-15, PR #536)**, whose contract it
+> consumes unchanged (`RingChart`, `RING_LAYOUT_CLASS`, `RING_ROWS_CLASS`, `ringChart.ts`, `RankedRows`'s legend mode —
+> README.md § 7; doc/guide/grafici.md § The ring).
+> Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7, except the lines the ring's merge moved,
+> re-pointed on 2026-11-15 to `develop` @ 25734a00, where the ring's files exist. Executes the owner's decisions 5, 6
+> and 10 (README.md § 3).
 
 ## 1. The problem today (evidence on the code)
 
@@ -20,11 +22,11 @@ The owner named five more homes for the ring (decision 10). What each draws toda
   (`lib/utils/mortgageSummary.ts:70-72`, summed at `:180-181` over the year's SETTLED rows). No field holds their sum.
 - **«Intestatari», the «Valore» view** — `components/dashboard/overview/IntestatariTile.tsx:69-114`: `RankedRows` in
   `var(--chart-1)` (`:109`), the «Valore | Carico» switch (`:70-76`, `:90-97`); mounted on the Panoramica
-  (`app/dashboard/page.tsx:714-716`) and on Patrimonio (`app/dashboard/assets/page.tsx:855-857`), both
+  (`app/dashboard/page.tsx:719-721`) and on Patrimonio (`app/dashboard/assets/page.tsx:855-857`), both
   `desktop:col-span-12`. Parts: `OwnershipSummary.rows[].value` (`lib/utils/assetOwnership.ts:174-191`; members by
   value, then «In comune», then «Senza intestatario», `:207-208`), read through `ownershipRowOn`
   (`lib/utils/ownershipBasis.ts`); the net `total` (`:210`). **A row can be negative** (debts outweighing a person's
-  assets, `doc/guide/patrimonio.md:444`).
+  assets, `doc/guide/patrimonio.md:452`).
 - **Centri di Costo «Costo», fixed vs one-off** — `components/cashflow/cost-centers/tiles/CostoTile.tsx:98-100`: the
   footer sentence «Fisso X (il N%, ricorrenti e rate) · una tantum Y.» (`describeCostoFooter`,
   `lib/utils/costCenterNarrative.ts:570-574`). Parts: `CenterSummary.recurring` = `splitRecurringVsOneOff(booked)`
@@ -248,7 +250,7 @@ export function payerRingSegments(ranking: PayerRanking): RingSegment[] | null {
 
 (`!== 0`: a remainder below zero enters the segments so that `isRingWhole` refuses the whole — the centre prints
 `ranking.total`, which counts it — and the tile keeps its bars; a remainder at zero is left out, as `RankedRows`
-leaves it out, `ranked-rows.tsx:131`.)
+leaves it out, `ranked-rows.tsx:146`.)
 `PagatoriTileProps` gains `ring: RingSegment[] | null`. With it, the list (`:44-47`) sits in `@container mt-3.5` ›
 `RING_LAYOUT_CLASS` beside `<RingChart segments={ring} centerValue={ranking.total} centerLabel="netti"
 ariaLabel="Chi paga di più" />`, the rows with `bars={false}` and the swatch of their key, the remainder's
@@ -257,10 +259,11 @@ beside `:266`).
 
 ### DESIGN.md
 
-The Ring Chart section NOVE-08 adds, its last sentence. BEFORE (NOVE-08 § 4, item 10): «Homes: Previdenza «Versato»,
-Tracciamento «Entrate per categoria», Panoramica «Composizione», Patrimonio «Classi» (a class below zero keeps the
-`CompositionBar`).» AFTER: «Homes: Previdenza «Versato», Tracciamento «Entrate per categoria», Panoramica
-«Composizione», Patrimonio «Classi» (a class below zero keeps the `CompositionBar`); and in the minor tiles (also
+The Ring Chart section, its last sentence (`DESIGN.md:1316` @ 25734a00, with the Panoramica's «Entrate per categoria»
+the owner added on the ring's tour of 2026-11-15). BEFORE: «Homes: Previdenza «Versato», «Entrate per categoria» on
+Tracciamento and the Panoramica, Panoramica «Composizione», Patrimonio «Classi» (a class below zero keeps the
+`CompositionBar`).» AFTER: «Homes: Previdenza «Versato», «Entrate per categoria» on Tracciamento and the Panoramica,
+Panoramica «Composizione», Patrimonio «Classi» (a class below zero keeps the `CompositionBar`); and in the minor tiles (also
 2026-11-12) Divisione «Quota» (the incomes the shares are measured on), «Mutuo»/«Prestito» (the year's interest and
 principal), «Intestatari» on its «Valore» view, a cost centre's «Costo» (fixed and one-off) and Dividendi «Chi paga
 di più» — each keeping today's form when its parts are not one positive whole of two or more.»
@@ -268,10 +271,10 @@ di più» — each keeping today's form when its parts are not one positive whol
 ## 5. Constraints and traps (AGENTS.md / DESIGN.md rules, «here it means that»)
 
 - **NOVE-08's contract is fixed**: no prop of `RingChart`, no export of `ringChart.ts` is renamed or added; the rows
-  past the fold take `ringSwatchAt` (NOVE-08 § 4), the one rule for a row beside a folded ring.
+  past the fold take `ringSwatchAt` (`lib/utils/ringChart.ts`), the one rule for a row beside a folded ring.
 - **«Never a signed quantity»** (The Ring Rule): Intestatari and Dividendi can hold a part below zero — `isRingWhole`
   decides, and the tile keeps its bars then; Mutuo and Centri sum magnitudes, so they are wholes by construction.
-- **The tile computes no figure** (the tiles' headers, e.g. `VersatoTile.tsx:15-16`): every segment and every
+- **The tile computes no figure** (the tiles' headers, e.g. `VersatoTile.tsx:17-18`): every segment and every
   centre comes from a pure builder in the area's module; the tiles map keys to swatches, and `CostoTile` divides a
   part by `summary.total` for its legend's share — the one division `RankedRows` needs.
 - **A builder never lands in a module a shared narrative imports** (`ownershipBasis.ts`'s own header; criterion 11).
@@ -312,7 +315,7 @@ di più» — each keeping today's form when its parts are not one positive whol
   rate.» (its instalment is dated 31 December, not booked). The «Fenicottero» test is skipped on December 31st
   (`test.skip(isLastDayOfYear, 'On December 31st the instalment is booked: fixed and one-off, a ring.')`, the guard
   of `e2e/cashflow.centri.spec.ts:30,81`).
-- `ring-chart.owners{,.mobile}.spec.ts` (base account; the fund's member and «In comune», doc/guide/patrimonio.md:444;
+- `ring-chart.owners{,.mobile}.spec.ts` (base account; the fund's member and «In comune», doc/guide/patrimonio.md:452;
   at 390 `#patrimonio-intestatari-trigger` first, the «Valore | Carico» switch then inside the open panel):
   the Patrimonio «Intestatari» on «Valore» → containment; «Carico» pressed → count 0; «Valore» pressed back (the
   memory restored for the next spec).

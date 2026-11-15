@@ -1,5 +1,5 @@
 /**
- * The ring on its four homes at 1440 (DESIGN.md → The Ring Rule, 2026-11-12): the body is
+ * The ring on its five homes at 1440 (DESIGN.md → The Ring Rule, 2026-11-12): the body is
  * `e2e/ringChartSuite.ts`, shared with the other two widths.
  */
 
