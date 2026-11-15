@@ -565,7 +565,7 @@ no longer sits in the composition. `perf/budget.json` `/dashboard/analisi` keeps
   adds up to the euro are never lifted, and THE tile's hero never is» AFTER «A reading, a ranking row, a ledger that
   adds up to the euro and a ring's centre (the total its arcs add up to — The Ring Rule) are never lifted, and THE
   tile's hero never is».
-- **DESIGN.md → Ring Chart** (NOVE-08's section, its «Homes:» sentence as NOVE-09 leaves it): one sentence is
+- **DESIGN.md → Ring Chart** (NOVE-08's section, its «Homes:» sentence as NOVE-09 — retired on 2026-11-15, PR #538 — left it, «Carico» and «Per sottocategoria» added on its tour): one sentence is
   appended after it — «Analisi draws two: «Dove vanno i soldi» (the spending by type) and «Entrate» (the first three
   categories and the rest).»
 - **AGENTS.md** § Analisi `:391` «the Flusso inside «Dettaglio», lazy (2026-11-12)»; **CLAUDE.md** the Analisi line
@@ -577,7 +577,7 @@ no longer sits in the composition. `perf/budget.json` `/dashboard/analisi` keeps
 - **The verdict's wording** (the mock's headline): none, declared — the builder is unchanged.
 - **The old type words in the AI prompts** (the periodic email's format contract, `lib/server/assistant/
   prompts.ts:844`, and the comment `:515`): heir NOVE-15 (decision 36).
-- **The other rings** (Tracciamento, Panoramica, the minor tiles): NOVE-08, NOVE-09.
+- **The other rings** (Tracciamento, Panoramica, the minor tiles): NOVE-08 and NOVE-09, both retired on 2026-11-15 (PR #536, #538).
 - **The themes' page-by-page dress of Analisi**: NOVE-11 → NOVE-20 (README.md § 5).
 
 ## 11. The prompt that implements it

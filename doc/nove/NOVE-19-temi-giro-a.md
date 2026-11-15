@@ -27,7 +27,7 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
 | 13 | `components/ui/popover.tsx:48`; `app/globals.css:785` | the popover `rounded-xl` = `--radius` + 4px: 9px Egeo, 8px Orbita today (out of scope: the palette block's `--radius`), 4px once in scope, beside 4px / 0px tiles; the phone popper sheet `10px 10px 0 0`, fixed |
 | 14 | `components/ui/choice-list.tsx:34` | `GROUP_CLASS … rounded-xl`: the same 9px / 4px (its pages, Compravendita and Consulente, are NOVE-20's; the primitive is here) |
 | 15 | `components/dividends/DividendiDettaglio.tsx:68`; `ProvisionalCouponBanner.tsx:31` | two card-like boxes `rounded-xl` beside the tiles: 9px / 4px |
-| 16 | `components/ui/composition-list.tsx:83`, `:85`; `composition-bar.tsx:85`, `:92`; `ranked-rows.tsx:99`, `:101`; `components/dashboard/overview/ObiettivoTile.tsx:40`, `:47`; `components/cashflow/budget/BudgetTrack.tsx:45`, `:47`, `:48`; `cost-centers/tiles/CentriTile.tsx:64`, `:65`, `:82`, `:83`; `SottocategorieTile.tsx:86`, `:87` | bar tracks and fills `rounded-full` (`rounded-l-full`/`rounded-r-full` at `composition-bar.tsx:92`, `BudgetTrack.tsx:48`): round ends under Orbita |
+| 16 | `components/ui/composition-list.tsx:83`, `:85`; `composition-bar.tsx:85`, `:92`; `ranked-rows.tsx:99`, `:101`; `components/dashboard/overview/ObiettivoTile.tsx:40`, `:47`; `components/cashflow/budget/BudgetTrack.tsx:45`, `:47`, `:48`; `cost-centers/tiles/CentriTile.tsx:64`, `:65`, `:82`, `:83`; `SottocategorieTile.tsx:84`, `:85` | bar tracks and fills `rounded-full` (`rounded-l-full`/`rounded-r-full` at `composition-bar.tsx:92`, `BudgetTrack.tsx:48`): round ends under Orbita |
 | 17 | `components/assets/AssetRow.tsx:78`, `:125`, `:138`, `:341`; `StrumentiTile.tsx:490`; `ExpenseTable.tsx:169`; `budget/BudgetImpostazioni.tsx:141` | pill chips (the class chip, the composite chip and its ring overlay, «Azzerato»/«Estinto», the type badge, the mono ceiling chips) `rounded-full` |
 | 18 | `components/dashboard/overview/PatrimonioTile.tsx:116`, `:197`; `components/dividends/tiles/IncassoNettoTile.tsx:105`, `:126` (9px); `components/assets/tiles/MovimentiTile.tsx:95` (7px); `components/dividends/CalendarDayCell.tsx:81` (4px); `tiles/AffidabilitaTile.tsx:94` (3px) | literal chip radii: they follow neither theme |
 | 19 | `app/dashboard/page.tsx:398`, `:513`; `app/dashboard/assets/page.tsx:607`, `:615`, `:665`; `components/cashflow/CashflowPageClient.tsx:261` | `PageHeader` without `emblem`: `resolveEmblem` falls back, so Egeo draws the temple on every page although decision 3 names «emblemi» |
@@ -62,8 +62,8 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
   `components/cashflow/analisi/tiles/FlussoTile.tsx` (Analisi, NOVE-20).
 - What 08-10, 15 and 16 add here: the ring (`components/ui/ring-chart.tsx`, doc/guide/grafici.md § The ring) is round by nature,
   `strokeLinecap="butt"`, figures in `font-mono`, colours `var(--chart-N)` and `var(--muted-foreground)`, its legend
-  `rounded-[2px]`: it needs nothing. Its homes on these pages (Composizione, Classi, Entrate on Tracciamento and the Panoramica; NOVE-09's Quota,
-  Mutuo, Intestatari, Costo, Pagatori) add no other surface. NOVE-05 and NOVE-07 add sentences and rows only;
+  `rounded-[2px]`: it needs nothing. Its homes on these pages (Composizione, Classi, Entrate on Tracciamento and the Panoramica; NOVE-09's — retired on 2026-11-15, PR #538 — Quota,
+  Mutuo, Intestatari on Valore and Carico, Costo, Per sottocategoria, Pagatori) add no other surface. NOVE-05 and NOVE-07 add sentences and rows only;
   NOVE-10, 15, 16 touch none of these pages.
 - `SavingsRateBadge.tsx:119` `text-positive` on `bg-positive/10`: 6,18:1 with NOVE-12's `--positive`. `CalendarDayCell.tsx:68-69`
   insets on tokens. `TransactionFeed.tsx:559` (card branch) has no caller: `ExpenseTrackingTab.tsx:1088` passes
