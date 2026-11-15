@@ -7,8 +7,8 @@
  * Three decisions the 2026-09-14 critique forced, each measured on the owner's mirror:
  *
  *   - The picker lists every instrument that can pay — equities AND bonds, held or sold. It
- *     used to keep `assetClass === 'equity' && quantity > 0`: the only instrument still paying
- *     on the real account (a BTP) could not be selected, and editing a dividend of a sold stock
+ *     used to keep `assetClass === 'equity' && quantity > 0`: a bond still paying coupons
+ *     (a BTP, say) could not be selected, and editing a dividend of a sold stock
  *     opened a form with the Asset field blank and «Asset non trovato» on save. A sold
  *     instrument is labelled as such; a record whose instrument is gone keeps its own option.
  *   - The withholding proposal is the instrument's OWN `taxRate` (12,5% on a BTP, 26% on a

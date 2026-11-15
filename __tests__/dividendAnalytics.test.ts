@@ -226,12 +226,12 @@ describe('computeReliability', () => {
   });
 
   it('measures only the instruments still held when given the set, on the period’s own window', () => {
-    // Saipem (sold) paid the most in May; the BTP (held) paid in June. With the held set the
+    // Tapiro (sold) paid the most in May; the BTP (held) paid in June. With the held set the
     // top payer is the BTP at 100% of the HELD income, over one month — but the window stays
     // the year’s six months, so the coverage is 1/6, not 1/1.
     const dividends = [
-      makeDividend({ assetId: 'spm', assetTicker: 'SPM', paymentDate: new Date('2026-05-20T12:00:00'), netAmount: 142, grossAmount: 142, taxAmount: 0 }),
-      makeDividend({ assetId: 'btp', assetTicker: 'BTP', paymentDate: new Date('2026-06-10T12:00:00'), netAmount: 57, grossAmount: 57, taxAmount: 0 }),
+      makeDividend({ assetId: 'tap', assetTicker: 'TAP', paymentDate: new Date('2026-05-20T12:00:00'), netAmount: 140, grossAmount: 140, taxAmount: 0 }),
+      makeDividend({ assetId: 'btp', assetTicker: 'BTP', paymentDate: new Date('2026-06-10T12:00:00'), netAmount: 60, grossAmount: 60, taxAmount: 0 }),
     ];
     const held = computeReliability(dividends, 'year', NOW, new Set(['btp']));
     expect(held.topPayerTicker).toBe('BTP');
@@ -239,8 +239,8 @@ describe('computeReliability', () => {
     expect(held.payerCount).toBe(1);
     expect(held.monthsWithIncome).toBe(1);
     expect(held.monthsInWindow).toBe(6);
-    // Without the set the registry speaks: Saipem leads.
-    expect(computeReliability(dividends, 'year', NOW).topPayerTicker).toBe('SPM');
+    // Without the set the registry speaks: Tapiro leads.
+    expect(computeReliability(dividends, 'year', NOW).topPayerTicker).toBe('TAP');
     // An empty held set: nothing to count on, and the window is still the year’s.
     const none = computeReliability(dividends, 'year', NOW, new Set());
     expect(none.payerCount).toBe(0);
@@ -667,12 +667,12 @@ describe('summarizeDividendStats / selectUpcomingDividends', () => {
   const at = (iso: string) => new Date(iso);
   const routeNow = at('2026-06-15T10:00:00.000Z');
   const list: Dividend[] = [
-    makeDividend({ id: 'd3', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2026-09-23T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'final' }),
+    makeDividend({ id: 'd3', assetId: 'orni', assetTicker: 'ORNI.MI', paymentDate: at('2026-09-23T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'final' }),
     makeDividend({ id: 'd6', assetId: 'btp', assetTicker: 'BTP', paymentDate: at('2026-09-01T00:00:00Z'), grossAmount: 62.5, taxAmount: 7.8125, dividendType: 'coupon' }),
     makeDividend({ id: 'd4', assetId: 'aapl', assetTicker: 'AAPL', paymentDate: at('2026-06-15T00:00:00Z'), grossAmount: 2.6, taxAmount: 0.39, grossAmountEur: 2.4, netAmountEur: 2.04 }),
     makeDividend({ id: 'd5', assetId: 'btp', assetTicker: 'BTP', paymentDate: at('2026-03-01T00:00:00Z'), grossAmount: 62.5, taxAmount: 7.8125, dividendType: 'coupon' }),
-    makeDividend({ id: 'd2', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2025-11-19T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'interim' }),
-    makeDividend({ id: 'd1', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2025-05-21T00:00:00Z'), grossAmount: 25, taxAmount: 6.5 }),
+    makeDividend({ id: 'd2', assetId: 'orni', assetTicker: 'ORNI.MI', paymentDate: at('2025-11-19T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'interim' }),
+    makeDividend({ id: 'd1', assetId: 'orni', assetTicker: 'ORNI.MI', paymentDate: at('2025-05-21T00:00:00Z'), grossAmount: 25, taxAmount: 6.5 }),
   ];
 
   it('sums only what was RECEIVED: the two announced payments are never in the totals', () => {

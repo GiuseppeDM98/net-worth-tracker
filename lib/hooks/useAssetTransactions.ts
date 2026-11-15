@@ -5,7 +5,8 @@
  *
  * Mutations invalidate a TRIPLE: assetTransactions.all + assets.all + dashboard.overview. The dual
  * asset/overview rule becomes a triple here because a trade's optional cash settlement moves a cash
- * asset balance, so both the hero total and the asset table change. Demo mode is gated at the UI (button
+ * asset balance, so both the hero total and the asset table change. A FOURTH key, `expenses.all`: a
+ * trade's fee is a row the server writes with it (2026-11-12). Demo mode is gated at the UI (button
  * disable), like every other mutation — not here.
  */
 
@@ -61,6 +62,8 @@ function invalidateTradeCaches(queryClient: QueryClient, ownerId: string): void 
   // assetTransactions.all is a prefix of byAsset → this also refreshes any open movements list.
   queryClient.invalidateQueries({ queryKey: queryKeys.assetTransactions.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+  // A trade's fee is a cashflow row the server writes with it.
+  queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
 }
 

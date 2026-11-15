@@ -3,17 +3,17 @@ import { resolveAutoEquityBondsSplit } from '@/lib/utils/equityBondsAutoTargets'
 
 describe('resolveAutoEquityBondsSplit', () => {
   it('should keep the bond sleeve at the formula residual when other classes are present', () => {
-    // Arrange — the owner's real account: 28 years old, BTP 10y at 3,997% → 77,02% equity
-    // from the formula, with 12,5% commodity + 2,5% real estate + 7,5% crypto beside it.
-    const formulaEquityPercentage = 77.015;
-    const otherClassesTotal = 22.5;
+    // Arrange — 72,5% equity from the formula, with 10% commodity + 5% real estate + 5% crypto
+    // beside it.
+    const formulaEquityPercentage = 72.5;
+    const otherClassesTotal = 20;
 
     // Act
     const split = resolveAutoEquityBondsSplit(formulaEquityPercentage, otherClassesTotal);
 
     // Assert — the satellites are paid for by equity, not by bonds
-    expect(split.equityPercentage).toBe(54.52);
-    expect(split.bondsPercentage).toBe(22.98);
+    expect(split.equityPercentage).toBe(52.5);
+    expect(split.bondsPercentage).toBe(27.5);
   });
 
   it('should assign the whole formula to equity when no other class is allocated', () => {

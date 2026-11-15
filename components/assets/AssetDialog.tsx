@@ -87,8 +87,13 @@ import {
   describeModalStatus,
   describeSettlementTiming,
   describeWriteError,
+  describeTradeFeeField,
+  TRADE_FEE_NEEDS_CATEGORY,
+  TRADE_FEE_NOT_WRITTEN,
   type ModalStatus,
 } from '@/lib/utils/dialogNarrative';
+import { expenseFeeCategoryLabel, normalizeExpenseFee, resolveExpenseFeeCategory } from '@/lib/utils/expenseFee';
+import { useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -412,11 +417,12 @@ const assetSchema = z.object({
   financedAssetId: z.string().optional(),
   isPrimaryResidence: z.boolean().optional(),
   allocationRole: z.enum(['tradable', 'frozen', 'excluded']).optional(),
-  // Opening-position fields (ledger create only): the first buy's date + optional settlement account.
+  // Opening-position fields (ledger create only): the first buy's date, optional settlement account and fee.
   // The opening quantity/price reuse `quantity`/`averageCost` (the price feeds both PMC and
   // the first buy). Ignored for non-ledger types and in edit mode.
   openingDate: z.string().optional(),
   openingCashAssetId: z.string().optional(),
+  openingFees: z.number().min(0, 'Le commissioni non possono essere negative').optional().or(z.nan()),
   // The cash account this instrument's dividends/coupons credit ('__none__' = the settings default).
   dividendCashAssetId: z.string().optional(),
   // Bond coupon details (optional, only shown for type=bond + assetClass=bonds)
@@ -946,7 +952,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // read only while the dialog is OPEN: Patrimonio mounts this dialog closed, and until
   // 2026-09-29 it read the targets at mount and the settings on its own key. A save in
   // Impostazioni invalidates the key, so it is picked up here too.
-  const { data: settings } = useSettings(ownerId, { enabled: open });
+  const settingsQuery = useSettings(ownerId, { enabled: open });
+  const settings = settingsQuery.data;
   // What `getTargets` used to read in a second round trip: the same document's `targets`.
   const allocationTargets = settings?.targets ?? null;
   const ledgerCashAssets = ledgerAllAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash');
@@ -988,6 +995,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       isPrimaryResidence: false,
       allocationRole: 'tradable',
       openingCashAssetId: '__none__',
+      openingFees: undefined,
       dividendCashAssetId: NO_DIVIDEND_ACCOUNT,
       ownerShares: [],
     },
@@ -1026,6 +1034,17 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const isLedgerEdit = isEdit && !!asset && isLedgerAssetType(asset.type);
   const isLedgerCreate = !isEdit && !!selectedType && isLedgerAssetType(selectedType);
   const ledgerCreateReady = isLedgerCreate && ledgerMeta != null;
+  // The opening buy's fee becomes a spending row like any trade's (2026-11-12): typed only once the
+  // fee category of Impostazioni › Spese is known — the derivation of TransactionDialog's field.
+  const feeCategoriesQuery = useExpenseCategories(ownerId, { enabled: open && isLedgerCreate });
+  const openingFeeReading = settingsQuery.isLoading || feeCategoriesQuery.isLoading;
+  const openingFeeCategory = openingFeeReading ? undefined : resolveExpenseFeeCategory(feeCategoriesQuery.data ?? [], settings);
+  const openingFeeHint = describeTradeFeeField({
+    reading: openingFeeReading,
+    categoryLabel: openingFeeCategory ? expenseFeeCategoryLabel(openingFeeCategory) : null,
+    hasRow: false,
+    legacyFee: false,
+  });
   // The opening purchase carries its real date, however old: a new asset has no baseline, so
   // nothing floors it (2026-09-13). Only the future is refused.
   const todayIso = isoDateToday();
@@ -1254,6 +1273,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         dividendCashAssetId: asset.dividendCashAssetId || NO_DIVIDEND_ACCOUNT,
         openingDate: todayIso,
         openingCashAssetId: '__none__',
+        openingFees: undefined,
         pensionProvider: asset.pensionFundDetails?.provider || undefined,
         pensionUnlockDate: asset.pensionFundDetails?.unlockDate || undefined,
         pensionFamilyMemberId: asset.pensionFundDetails?.familyMemberId || '__none__',
@@ -1308,6 +1328,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         allocationRole: 'tradable',
         openingDate: todayIso,
         openingCashAssetId: '__none__',
+        openingFees: undefined,
         dividendCashAssetId: NO_DIVIDEND_ACCOUNT,
         bondCouponRate: undefined,
         bondCouponFrequency: undefined,
@@ -1604,6 +1625,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         if (data.type === 'pensionFund' && ownerId) {
           try {
             await deleteAllAssetTransactionsForAsset(ownerId, asset.id);
+            // Their fee rows stay as plain spending, unlinked (2026-11-12): Cashflow unlocks them.
+            queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
           } catch (cleanupError) {
             console.error('Failed to clean up ledger trades after pensionFund conversion:', cleanupError);
             toast.error('Asset convertito, ma la pulizia del registro operazioni è fallita.');
@@ -1639,11 +1662,13 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
           quantity: openingQty,
           pricePerUnit: ledgerOpeningPrice, // the historical purchase price (bond/GBp-resolved in Step 1)
           linkedCashAssetId: settlement,
+          fees: normalizeExpenseFee(data.openingFees) ?? undefined,
           // A BTP€i's opening price was scaled by the form's coefficient: the trade remembers it.
           indexationCoefficient: isBondWithIsin ? bondQuoteBasisOf(data, knownCoefficient).indexationCoefficient : undefined,
         };
+        let openingFeeRow: string | undefined;
         try {
-          await createTradeMutation.mutateAsync(firstBuy);
+          openingFeeRow = (await createTradeMutation.mutateAsync(firstBuy)).feeRow;
         } catch (buyError) {
           console.error('First-buy failed after asset creation:', buyError);
           // Refresh so the qty-0 asset appears; keep the dialog open with the error for a retry.
@@ -1653,7 +1678,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
           toast.error(`Asset creato, ma l'acquisto non è stato registrato: ${message}`);
           return; // do NOT onClose — recoverable state
         }
-        toast.success('Asset creato con successo');
+        toast.success(
+          openingFeeRow === 'refused' ? `Asset creato con successo · ${TRADE_FEE_NOT_WRITTEN}` : 'Asset creato con successo'
+        );
       } else {
         // Classic create (non-ledger, or ledger without meta → writes quantity/PMC directly).
         savedAssetId = await createAsset(ownerId, formData);
@@ -2254,6 +2281,36 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                     </SelectContent>
                   </Select>
                   <SettlementTimingHint control={control} todayIso={todayIso} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="openingFees">Commissioni (€)</Label>
+                  <Input
+                    id="openingFees"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="es. 1.00"
+                    aria-describedby="opening-fees-hint"
+                    disabled={!ledgerCreateReady || !openingFeeCategory}
+                    {...register('openingFees', { valueAsNumber: true })}
+                  />
+                  {errors.openingFees && (
+                    <p className="text-sm text-destructive">{errors.openingFees.message}</p>
+                  )}
+                  <p id="opening-fees-hint" className="text-xs text-muted-foreground">
+                    {openingFeeHint ?? (
+                      <>
+                        {TRADE_FEE_NEEDS_CATEGORY}{' '}
+                        <Link href="/dashboard/settings?tab=spese" className="underline underline-offset-2 hover:text-foreground">
+                          Impostazioni › Spese
+                        </Link>
+                        .
+                      </>
+                    )}
+                  </p>
                 </div>
               </div>
               {newAsset_showCostBasis && renderTaxRateField()}

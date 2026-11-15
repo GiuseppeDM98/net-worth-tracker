@@ -93,7 +93,7 @@ const SAVINGS_NODE_COLOR = '#3b82f6';
 
 /**
  * The subcategory layer is a detail of the biggest categories, not a fifth column for every
- * one of them: on the real account (29 categories) it drew 98 nodes in 500px and no label was
+ * one of them: on a lived account with many categories it drew far too many nodes in 500px and no label was
  * readable (2026-09-14). Only the `MAX_SUBCATEGORY_CATEGORIES` largest categories, across the
  * types, open into their `MAX_SUBCATEGORIES` largest subcategories; what those leave out is
  * ONE «Altre N» node per category (it still adds up), and every other category stays a leaf.

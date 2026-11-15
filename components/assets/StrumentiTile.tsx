@@ -457,7 +457,7 @@ export function StrumentiTile({
     const gainLoss = gain?.gainLoss ?? 0;
     const gainPct = gain?.gainPercent ?? 0;
     const mortgage = resolveMortgageOf(asset, assets);
-    // The PMC cell is the EUR PMC (fees included — the one the G/P beside it uses); a foreign row
+    // The PMC cell is the EUR PMC (no fee, the G/P's basis — the one the G/P beside it uses); a foreign row
     // keeps its native PMC under it, alone when the ledger has not projected the EUR one yet.
     const pmcEur = isHandValued ? undefined : costBasisPerUnitEur(asset);
     const nativePmc = !isHandValued && !isEurNative(asset) && asset.averageCost ? asset.averageCost : undefined;
@@ -801,7 +801,7 @@ export function StrumentiTile({
             <span className="hidden desktop:inline">
               {showDeltas
                 ? 'Le colonne Δ sono variazioni del prezzo unitario nel periodo, non G/P; spegni «Andamento» per tornare a quantità, prezzo, PMC e TER.'
-                : 'Il PMC è in euro e include le commissioni d’acquisto; uno strumento in valuta mostra sotto anche il PMC nella sua valuta. «Andamento» mostra le variazioni di prezzo al posto di queste colonne.'}
+                : 'Il PMC è in euro, senza commissioni; uno strumento in valuta mostra sotto anche il PMC nella sua valuta. «Andamento» mostra le variazioni di prezzo al posto di queste colonne.'}
             </span>
             <span className="desktop:hidden">{manualCount === 0 && 'Apri una riga per i dettagli, le variazioni di prezzo e le azioni.'}</span>
           </p>

@@ -47,7 +47,7 @@ export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries
 // Bumped from 19→20: monthSales.estimatedTax is the tax WITHHELD where a sell carries it
 // (`withheldTaxEur`, `taxIsWithheld`), and the estimate stands on the gain the broker taxes —
 // the price difference, no commission on either side (`taxableGainEur`, lib/utils/saleTax.ts):
-// a stored settembre would keep 4089 €.
+// a stored month would keep the old estimate.
 // Bumped from 20→21: monthFlows (the pension contributions and the principal repaid per debt),
 // so the month's split names them instead of a «+1792 € di altre variazioni» that was the TFR.
 // Bumped from 21→22: ownership (the net worth by «Intestatario», lib/utils/assetOwnership.ts), so
@@ -60,7 +60,10 @@ export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries
 // Bumped from 24→25: ownership measures every group on the price of carry too (`costValue`,
 // `costSharePct`, `costTotal`, `withoutCostBasis` — the Intestatari tile's «Valore | Carico» switch,
 // 2026-10-18); a stored summary would offer no switch until its next recompute.
-export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 25;
+// Bumped from 25→26: every G/P stands on the fee-free PMC, every estimated tax on the fiscal cost
+// (`fiscalCostPerUnitEur`), and `monthSales.realizedGain` is fee-free while `estimatedTax` deducts both fees
+// (2026-11-12) — a stored summary would mix the two bases.
+export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 26;
 // The materialized summary is stale when invalidated, of another source version, computed on an
 // earlier Italian DAY (the payload is the day's: the current/previous month and the month-end
 // projection are read from «today»), or older than this. Every mutation of an input already

@@ -206,7 +206,7 @@ export function computeUnrealizedGain(asset: Asset): { gainLoss: number; gainPer
 }
 
 /**
- * The position's cost in EUR — quantity × the fiscal PMC (`costBasisPerUnitEur`, fees included) —
+ * The position's cost in EUR — quantity × the fee-free EUR PMC (`costBasisPerUnitEur`, 2026-11-12) —
  * the ONE figure the G/P, the Rendimento tile and the Intestatari tile's «Carico» view stand
  * against `calculateAssetValue`. Null exactly when `hasCostBasis` says there is no PMC to read:
  * an account, a hand-valued holding or a pension fund (their value IS what was put in), a foreign

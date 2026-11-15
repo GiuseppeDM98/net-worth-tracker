@@ -542,7 +542,7 @@ describe('assistant prompt data block', () => {
         },
         ledger: {
           rows: [
-            { dateIso: '2026-09-10', assetName: 'ETF Mondo', ticker: 'MONDO.MI', type: 'sell' as const, quantity: 20, priceEur: 118, feesEur: 2, amountEur: 2360, isBaseline: false },
+            { dateIso: '2026-09-10', assetName: 'ETF Mondo', ticker: 'MONDO.MI', type: 'sell' as const, quantity: 20, priceEur: 118, feesEur: 2, feeIsSpendingRow: true, amountEur: 2360, isBaseline: false },
           ],
           totalRows: 5,
           omittedRows: 4,
@@ -586,11 +586,18 @@ describe('assistant prompt data block', () => {
       const content = render(makeBundle({ portfolio: portfolio() }));
       expect(content).toContain('--- REGISTRO OPERAZIONI (acquisti, vendite, rettifiche; 5 in tutto) ---');
       expect(content).toContain('(le 4 operazioni più vecchie sono omesse; sotto le 1 più recenti)');
-      expect(content).toContain('2026-09-10 · vendita · ETF Mondo (MONDO.MI): 20 quote a 118,00 € = 2360 €, commissioni 2,00 €');
+      expect(content).toContain('2026-09-10 · vendita · ETF Mondo (MONDO.MI): 20 quote a 118,00 € = 2360 €, commissioni 2,00 € (già fra le spese)');
       expect(content).toContain('--- DIVIDENDI E CEDOLE: REGISTRO (1 incassati, 1 annunciati) ---');
       expect(content).toContain('2026-09-01 · incassato · BTP Esempio: netto 65,63 € (lordo 75,00 €)');
       expect(content).toContain('2027-03-01 · annunciato, non ancora incassato · BTP Esempio: netto 65,63 € (lordo 75,00 €) — provvisorio');
       expect(content).toContain('  BTP Esempio: tasso annuo 3,0% | semestrale | scadenza 2030-03-01 | prossima cedola 2027-03-01 (0,02 € per unità)');
+    });
+
+    it('should say a fee is already among the spending only when its row exists', () => {
+      const legacy = { dateIso: '2025-05-05', assetName: 'ETF Mondo', type: 'buy' as const, quantity: 10, priceEur: 100, feesEur: 3, feeIsSpendingRow: false, amountEur: 1000, isBaseline: false };
+      const content = render(makeBundle({ portfolio: { ...portfolio(), ledger: { rows: [legacy], totalRows: 1, omittedRows: 0 } } }));
+      expect(content).toContain('ETF Mondo: 10 quote a 100,00 € = 1000 €, commissioni 3,00 €');
+      expect(content).not.toContain('(già fra le spese)');
     });
 
     it('should describe the pension funds, the loans and the household', () => {

@@ -137,8 +137,10 @@ import {
   EXPENSE_PROPERTY_LINK_SERIES_HINT,
   EXPENSE_BUDGET_EXCLUSION_HINT,
   EXPENSE_BUDGET_EXCLUSION_SERIES_HINT,
+  TRADE_FEE_ROW_NOTE,
   type ModalStatus,
 } from '@/lib/utils/dialogNarrative';
+import { isTradeFeeRow } from '@/lib/utils/tradeFeeExpense';
 import { cn } from '@/lib/utils';
 
 
@@ -479,6 +481,11 @@ interface FormBodyProps {
   /** The row being edited IS a fee (it names the row it was charged for): it takes no fee of its own. */
   isFeeRowEdit: boolean;
   /**
+   * The row is a trade's fee (2026-11-12): its trade owns type, amount, date and account, so those
+   * fields are not rendered (they keep their loaded values) and `TRADE_FEE_ROW_NOTE` says why.
+   */
+  isTradeFeeRowEdit: boolean;
+  /**
    * Where a transfer can start and land: the cash accounts, then the properties whose value lives
    * in `quantity` (lib/utils/propertyTransfer.ts) — a deposit on a house, or a sale. Never a
    * property on both ends.
@@ -542,6 +549,7 @@ function ExpenseFormBody({
   feeEnabled,
   feeHint,
   isFeeRowEdit,
+  isTradeFeeRowEdit,
   transferEndpoints,
   originIsProperty,
   loans,
@@ -570,7 +578,7 @@ function ExpenseFormBody({
            settled and the control here would be a second way to do the same thing: a back
            link to the picker instead. Edit mode keeps the Select — it is the only place a
            saved row can change type, and `typeChangeNotice` below explains the consequences. */}
-      {onBackToTypePicker ? (
+      {isTradeFeeRowEdit ? null : onBackToTypePicker ? (
         <button
           type="button"
           onClick={onBackToTypePicker}
@@ -631,6 +639,9 @@ function ExpenseFormBody({
            so typing 100 here and 600 there saved 600 without a word. The date then takes the
            whole row. The toggle is creation-only, so an existing instalment row still edits
            its own amount here. */}
+      {isTradeFeeRowEdit ? (
+        <p className="text-sm text-muted-foreground">{TRADE_FEE_ROW_NOTE}</p>
+      ) : (
       <div className={cn('grid grid-cols-1 gap-4', !watchedIsInstallment && 'sm:grid-cols-2')}>
         {!watchedIsInstallment && (
           <div className="space-y-2 min-w-0">
@@ -677,6 +688,7 @@ function ExpenseFormBody({
           />
         </div>
       </div>
+      )}
 
       {/* ---- Categoria + Sottocategoria ---- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -853,7 +865,7 @@ function ExpenseFormBody({
         <p role="alert" className="text-sm text-destructive">
           Un trasferimento sposta soldi tra due conti correnti: crea prima i conti in Patrimonio.
         </p>
-      ) : cashAssets.length > 0 ? (
+      ) : cashAssets.length > 0 && !isTradeFeeRowEdit ? (
         <div className="space-y-2">
           <Label htmlFor="linkedCashAssetId">
             {selectedType === 'income' ? 'Conto di Accredito' : 'Conto di Prelievo'}
@@ -1521,6 +1533,8 @@ export function ExpenseDialog({ open, onClose, expense, initialValues, onSuccess
   const loans = useMemo(() => allAssets.filter((a) => isRepayableDebt(a) || a.id === expense?.debtAssetId), [allAssets, expense?.debtAssetId]);
   // A fee row names the row it was charged for and takes no fee of its own.
   const isFeeRowEdit = !!expense && isFeeRow(expense);
+  // A trade's fee row: its trade, in Patrimonio, keeps type, amount, date and account (2026-11-12).
+  const isTradeFeeRowEdit = !!expense && isTradeFeeRow(expense);
   const defaultDebitCashAssetId = settings?.defaultDebitCashAssetId || '__none__';
   const defaultCreditCashAssetId = settings?.defaultCreditCashAssetId || '__none__';
   const costCentersEnabled = settings?.costCentersEnabled ?? false;
@@ -2479,6 +2493,7 @@ export function ExpenseDialog({ open, onClose, expense, initialValues, onSuccess
     feeEnabled,
     feeHint,
     isFeeRowEdit,
+    isTradeFeeRowEdit,
     transferEndpoints,
     originIsProperty: selectedType === 'transfer' && transferEndpoints.properties.some((asset) => asset.id === watchedLinkedCashAssetId),
     loans,

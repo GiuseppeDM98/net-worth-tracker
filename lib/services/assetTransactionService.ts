@@ -37,6 +37,8 @@ export interface AssetTransactionMutationResult {
   transactionId: string;
   derived: { quantity: number; averageCost?: number; averageCostEur?: number };
   realizedPnlEur?: number;
+  /** What became of the trade's fee in the cashflow (2026-11-12); `'refused'` = no fee category document. */
+  feeRow?: 'written' | 'none' | 'refused';
 }
 
 export type AssetLedgerMigrationResult =
@@ -59,6 +61,7 @@ function docToAssetTransaction(id: string, data: Record<string, unknown>): Asset
     pricePerUnit: data.pricePerUnit as number,
     priceEur: data.priceEur as number,
     fees: data.fees as number | undefined,
+    feeExpenseId: data.feeExpenseId as string | undefined,
     linkedCashAssetId: data.linkedCashAssetId as string | undefined,
     withheldTaxEur: data.withheldTaxEur as number | undefined,
     isBaseline: data.isBaseline as boolean | undefined,
@@ -100,6 +103,8 @@ export async function getAssetLedgerMeta(ownerId: string): Promise<AssetTransact
     migratedAssetCount: data.migratedAssetCount as number,
     averageCostEurBackfilledAt:
       data.averageCostEurBackfilledAt !== undefined ? toDate(data.averageCostEurBackfilledAt as never) : undefined,
+    averageCostEurFeeFreeAt:
+      data.averageCostEurFeeFreeAt !== undefined ? toDate(data.averageCostEurFeeFreeAt as never) : undefined,
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),
   };

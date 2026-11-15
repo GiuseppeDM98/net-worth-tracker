@@ -156,7 +156,7 @@ describe('computeDividendYieldMetrics', () => {
 
 describe('computeDividendYieldMetrics — EUR denominators (costBasisEur.ts)', () => {
   it('divides a EUR dividend by the EUR PMC and the EUR price of a foreign asset', () => {
-    // 1 USD/share gross = 0,9 €/share; PMC 100 USD but 90 € (fees included); price 145 USD = 130 €.
+    // 1 USD/share gross = 0,9 €/share; PMC 100 USD but 90 € (no fee); price 145 USD = 130 €.
     const div = makeDividend('usd', new Date(2025, 2, 1), 1, 10, { grossAmountEur: 9, netAmountEur: 9 * 0.74 });
     const asset: AssetInput = {
       id: 'usd',

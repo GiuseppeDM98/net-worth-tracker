@@ -50,7 +50,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 
-/** Rows shown per «Mostra altre» press: the real account holds ~1500 candidates. */
+/** Rows shown per «Mostra altre» press: a lived account can hold thousands of candidates. */
 const PAGE_SIZE = 50;
 /** Radix reserves the empty string for «no value». */
 const ALL = '__all__';

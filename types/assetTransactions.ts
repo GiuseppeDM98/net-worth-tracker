@@ -51,9 +51,13 @@ export interface AssetTransaction {
   quantity: number;
   pricePerUnit: number;      // native currency per unit (>= 0)
   priceEur: number;          // EUR per unit at trade date (>= 0); == pricePerUnit for EUR assets
-  fees?: number;             // total EUR commissions (>= 0). buy: added to EUR cost basis;
-                             // sell: subtracted from proceeds; adjustment: not allowed
+  fees?: number;             // total EUR commissions (>= 0). Never in the PMC; in the fiscal basis; a
+                             // spending row when the trade names one (feeExpenseId). buy: debited with
+                             // the cash; sell: subtracted from proceeds; adjustment: not allowed
   linkedCashAssetId?: string; // optional settlement cash asset (buy debits, sell credits)
+  // The cashflow row the fees were written to (lib/utils/tradeFeeExpense.ts), when a fee category
+  // was set. Server-owned: the form never sends it. Absent on trades saved before 2026-11-12.
+  feeExpenseId?: string;
   // SELL only: the capital-gains tax the broker withheld at the sale, EUR (>= 0), typed from the
   // statement over a prefilled estimate. It lowers what the settlement account receives and
   // replaces the estimate in the period readings (periodSales); realized P&L and XIRR stay
@@ -96,8 +100,11 @@ export interface AssetTransactionsMeta {
   // One-shot signal for backfillAverageCostEur (assetTransactionUseCase.ts): every ledger asset's
   // averageCostEur is derivable from trades that already carry a correct per-trade priceEur, so the
   // backfill only needs to run once, after migration, to project it onto pre-existing asset docs.
-  // Absent until the backfill has run for this owner.
+  // Absent until the backfill has run for this owner. Superseded 2026-11-12 by averageCostEurFeeFreeAt.
   averageCostEurBackfilledAt?: Date;
+  // The one-shot re-projection of 2026-11-12: the PMC lost the fees and the fiscal cost was born, so
+  // every ledger asset's `averageCostEur` and `fiscalAverageCostEur` are rewritten once. Absent until it ran.
+  averageCostEurFeeFreeAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

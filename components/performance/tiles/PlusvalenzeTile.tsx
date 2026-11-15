@@ -31,7 +31,7 @@ function signedEuro(value: number): string {
  * The bar is the year's magnitude against the largest year, signed by colour.
  *
  * With ONE fiscal year there is no list (2026-09-20): the year's row, the «Totale» row and the
- * reading all printed the same figure — 15.743 four times on the owner's data. The reading is the
+ * reading all printed the same figure — one number four times. The reading is the
  * tile then. From two years the list returns WITH its total: rows that must add up add up on screen.
  *
  * The skipped-assets warning is a fact about the figure, not method: it stays on the tile, above

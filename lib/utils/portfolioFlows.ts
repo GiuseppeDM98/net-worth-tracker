@@ -7,8 +7,8 @@
  * right answer while the base IS the whole net worth. It is the wrong one as soon as the base is a
  * subset: with the cash accounts out of it («Liquidità fuori dalla base»), buying an ETF with the
  * money of an account is capital ENTERING the base — a transfer, precisely what that function
- * cannot see — and every purchase reads as return (35.208 € of buys against 659 € of neutralised
- * flows on one real account, February → August 2026: the page doubled the return).
+ * cannot see — and every purchase reads as return (on a lived account the buys were many times the
+ * neutralised flows: the page doubled the return).
  *
  * THE RULE: THE FLOWS FOLLOW THE BASE
  * Base = the whole net worth → the flows stay the cashflow's: only outside money moves the capital.

@@ -84,8 +84,8 @@ Three traps, each paid for on 2026-09-29:
 ## Per-page blind spots
 
 - **Every window of the expenses is a payload of its own in the ONE record** (2026-09-30): after a tour of
-  Tracciamento, Budget, Divisione, FIRE and Storico on the owner's mirror the record held six `expenses.*` keys, 4407
-  rows and 2,2 MB (the whole collection once, 1547 rows and 0,8 MB, before the windows), and the auth wait that
+  Tracciamento, Budget, Divisione, FIRE and Storico on the owner's mirror the record held six `expenses.*` keys and
+  close to three times the rows and the megabytes of the whole collection held once before the windows, and the auth wait that
   contains the restore rose on every page — measured on the Panoramica. The rows are the same rows several times:
   a window is a slice of the collection, not new data. Counting the keys of that record after a tour is part of
   giving a page a window (`doc/guide/cashflow.md § Expenses by window`); merging the slices into one list is not

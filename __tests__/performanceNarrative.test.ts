@@ -440,8 +440,8 @@ describe('describeContributions', () => {
   const capital = (channels: CapitalEnteredSummary['channels']): CapitalEnteredSummary => ({ channels, total: channels.reduce((sum, c) => sum + c.amount, 0) });
 
   it('gives ONE answer — what entered the base — and qualifies it when a single channel carried it', () => {
-    const measured = describeContributions({ capital: capital([{ key: 'measured', amount: 5058, months: 9 }]), totalMonths: 9 });
-    expect(plain(measured)).toBe('Nella base sono entrati 5058 €, misurati sugli strumenti in tutti i 9 mesi.');
+    const measured = describeContributions({ capital: capital([{ key: 'measured', amount: 5000, months: 9 }]), totalMonths: 9 });
+    expect(plain(measured)).toBe('Nella base sono entrati 5000 €, misurati sugli strumenti in tutti i 9 mesi.');
     // A flow is never sign-coloured: capital coming in is not a gain.
     expect(measured.every((segment) => segment.sign === undefined)).toBe(true);
 
@@ -603,17 +603,17 @@ describe('describeMeasurementBase', () => {
 
 describe('describeContributions — the pension channel', () => {
   const capital = (channels: CapitalEnteredSummary['channels']): CapitalEnteredSummary => ({ channels, total: channels.reduce((sum, c) => sum + c.amount, 0) });
-  const realAccount: CapitalEnteredSummary['channels'] = [{ key: 'measured', amount: 5058, months: 9 }, { key: 'pension', amount: 31863, months: 3 }];
+  const pensionHeavy: CapitalEnteredSummary['channels'] = [{ key: 'measured', amount: 5000, months: 9 }, { key: 'pension', amount: 30000, months: 5 }];
 
-  it('names the funds\' entry and its month when that is what makes the total — the real account\'s year-to-date', () => {
-    expect(plain(describeContributions({ capital: capital(realAccount), totalMonths: 9, pensionEntry: { flow: 31852, month: '2026-07' } }))).toBe(
-      "Nella base sono entrati 36.921 €, per la maggior parte con l'ingresso del fondo pensione nella base a luglio 2026."
+  it('names the funds\' entry and its month when that is what makes the total — a year-to-date the funds entered', () => {
+    expect(plain(describeContributions({ capital: capital(pensionHeavy), totalMonths: 9, pensionEntry: { flow: 29000, month: '2026-05' } }))).toBe(
+      "Nella base sono entrati 35.000 €, per la maggior parte con l'ingresso del fondo pensione nella base a maggio 2026."
     );
   });
 
   it('without an entry in the period the funds are a channel like the others', () => {
-    expect(plain(describeContributions({ capital: capital(realAccount), totalMonths: 9, pensionEntry: { flow: 0, month: '2026-07' } }))).toBe(
-      'Nella base sono entrati 36.921 €, per la maggior parte attraverso i fondi pensione.'
+    expect(plain(describeContributions({ capital: capital(pensionHeavy), totalMonths: 9, pensionEntry: { flow: 0, month: '2026-05' } }))).toBe(
+      'Nella base sono entrati 35.000 €, per la maggior parte attraverso i fondi pensione.'
     );
     // The entry is named only when the pension channel IS the largest.
     const small: CapitalEnteredSummary['channels'] = [{ key: 'cashflow', amount: 9000, months: 9 }, { key: 'pension', amount: 1200, months: 9 }];

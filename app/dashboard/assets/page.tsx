@@ -236,13 +236,14 @@ export default function AssetsPage() {
   // ─── averageCostEur backfill trigger ──────────────────────────────────────────
   // One-shot, post-migration: projects the EUR-side PMC onto ledger assets written before the
   // field existed, so G/P on a foreign-currency position stops comparing a native-currency PMC
-  // against a EUR value. Silent, same posture as the migration above. Gated on the demo like every
+  // against a EUR value. Re-run once on 2026-11-12: it writes the fee-free PMC and the fiscal cost
+  // beside it. Silent, same posture as the migration above. Gated on the demo like every
   // other write (useDemoMode): the demo account's docs stay as seeded.
   const averageCostEurBackfillAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!ownerId || isDemo || isLedgerMetaLoading || !ledgerMeta) return;
-    if (ledgerMeta.averageCostEurBackfilledAt) return;
+    if (ledgerMeta.averageCostEurFeeFreeAt) return; // re-run once on 2026-11-12: the PMC lost the fees
     if (averageCostEurBackfillAttemptedRef.current === ownerId) return;
     averageCostEurBackfillAttemptedRef.current = ownerId;
 

@@ -140,11 +140,15 @@ test('a BTP€i and a zero-coupon bond write what the pure layer promises', asyn
       .indexationCoefficients as Array<{ coefficient: number }>;
     expect(entries.map((e) => e.coefficient)).toEqual([1.25, 1.27]);
 
-    // «Di oggi» is the latest coefficient at or before today: the 1,27 belongs to the November
-    // coupon date, so the asset form (and the cron, same rule) still read 1,25 (owner's tour, 2026-09-11).
+    // «Di oggi» is the latest coefficient at or before today: the 1,27 belongs to the coupon date, so
+    // before it the asset form (and the cron, same rule) still read 1,25 (owner's tour, 2026-09-11);
+    // ON the coupon day it is today's (2026-11-15: the spec ran on one).
+    const couponDay = (final.paymentDate as FirebaseFirestore.Timestamp).toDate().toISOString().slice(0, 10);
+    const italyToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date());
+    const todays = italyToday >= couponDay ? '1.27' : '1.25';
     await openPatrimonio(page);
     await page.getByRole('row').filter({ hasText: 'Ornitorinco' }).getByRole('button', { name: /^Modifica / }).click();
-    await expect(dialog.locator('#bondIndexationCoefficient')).toHaveValue('1.25');
+    await expect(dialog.locator('#bondIndexationCoefficient')).toHaveValue(todays);
     // Switching the mechanism away and back keeps the coefficient (it used to be cleared).
     const mechanism = dialog.getByRole('combobox', { name: "Indicizzazione all'inflazione" });
     await mechanism.click();
@@ -152,7 +156,7 @@ test('a BTP€i and a zero-coupon bond write what the pure layer promises', asyn
     await expect(dialog.locator('#bondIndexationCoefficient')).toHaveCount(0);
     await mechanism.click();
     await page.getByRole('option', { name: /BTP€i/ }).click();
-    await expect(dialog.locator('#bondIndexationCoefficient')).toHaveValue('1.25');
+    await expect(dialog.locator('#bondIndexationCoefficient')).toHaveValue(todays);
     await dialog.getByRole('button', { name: 'Annulla' }).click();
     await expect(dialog).toBeHidden();
 

@@ -94,7 +94,7 @@ describe('summarizeClassGaps', () => {
 });
 
 describe('isDormantClass / activeClassGaps', () => {
-  // The owner's real estate: the house is `excluded`, so the class holds nothing inside the
+  // A real-estate class whose only house is `excluded`: the class holds nothing inside the
   // allocated total, and its target entry is 0% — it cannot be off target, so «OK» would be a
   // verdict on a void and it must not inflate the «N classi su M» denominator.
   const dormant = data({ currentValue: 0, targetPercentage: 0 });
@@ -279,18 +279,18 @@ describe('collapseRepeatedLevels', () => {
   });
 
   it('ignores children below the visible floor when counting them', () => {
-    const rows = collapseRepeatedLevels([node('Breve Termine', 3975, [node('CSBGE3', 3975), node('briciola', 0.2)])]);
-    expect(rows.map((row) => row.key)).toEqual(['CSBGE3']);
+    const rows = collapseRepeatedLevels([node('Breve Termine', 4000, [node('ABCD', 4000), node('briciola', 0.2)])]);
+    expect(rows.map((row) => row.key)).toEqual(['ABCD']);
   });
 
   it('carries the lifted node`s own kind, so a collapsed instrument stays an instrument', () => {
     // A row's caption follows `isInstrument`, not its depth: an ETF lifted out of the sub-category
     // that repeated it would otherwise print «→ 100,0%» — «you keep everything» — instead of the
     // position it leaves behind.
-    const instrument = { ...node('CSBGE3', 3975), isInstrument: true };
-    const [row] = collapseRepeatedLevels([node('Breve Termine', 3975, [instrument])]);
+    const instrument = { ...node('ABCD', 4000), isInstrument: true };
+    const [row] = collapseRepeatedLevels([node('Breve Termine', 4000, [instrument])]);
     expect(row.isInstrument).toBe(true);
-    const [sleeve] = collapseRepeatedLevels([node('Breve Termine', 3975, [node('senza strumenti', 3975)])]);
+    const [sleeve] = collapseRepeatedLevels([node('Breve Termine', 4000, [node('senza strumenti', 4000)])]);
     expect(sleeve.isInstrument).toBeUndefined();
   });
 });

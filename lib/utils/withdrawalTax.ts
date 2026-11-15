@@ -20,7 +20,7 @@
  */
 
 import type { Asset } from '@/types/assets';
-import { costBasisPerUnitEur } from '@/lib/utils/costBasisEur';
+import { fiscalCostPerUnitEur } from '@/lib/utils/costBasisEur';
 
 /** The capital-gains rate an instrument without one is assumed to carry (redditi diversi). */
 export const DEFAULT_CAPITAL_GAINS_RATE = 26;
@@ -100,7 +100,8 @@ export function resolvePortfolioTaxProfile(assets: Asset[], valueOf: (asset: Ass
       coveredValue += value;
       continue;
     }
-    const basisPerUnit = costBasisPerUnitEur(asset);
+    // A tax estimate: the fiscal cost, purchase fees included (owner, 2026-11-12).
+    const basisPerUnit = fiscalCostPerUnitEur(asset);
     if (basisPerUnit === undefined) {
       basisToday += value;
       uncoveredValue += value;

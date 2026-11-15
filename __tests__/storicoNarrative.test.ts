@@ -374,29 +374,29 @@ describe('describeDrivers', () => {
   });
 
   it('should close on the rest as ONE netted flow, so the sentence adds up without listing the parts', () => {
-    // The real account, gennaio–settembre 2026 (owner, 2026-09-19): 5413 + 21.916 + 8028 = 35.357, a euro of rounding.
-    const year = { ...row('2026', 5413, 21916, 13.5), baseline: { year: 2025, month: 12 }, latest: { year: 2026, month: 9 }, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7454, otherPension: 0, otherHoldings: 0, otherAccounts: 7454, netWorthGrowth: 35356 };
+    // A running year of nine months (owner, 2026-09-19): 5000 + 20.000 + 8010 = 33.010 over a 33.009 growth, a euro of rounding.
+    const year = { ...row('2026', 5000, 20000, 12.5), baseline: { year: 2025, month: 12 }, latest: { year: 2026, month: 9 }, taxes: 4000, debtRepaid: 5000, pensionContributions: 10, other: 7000, otherPension: 0, otherHoldings: 0, otherAccounts: 7000, netWorthGrowth: 33009 };
     expect(plain(describeDrivers({ row: year, isRunning: true }))).toBe(
-      'Da gennaio a settembre 2026 il patrimonio è cresciuto di 35.356 € (+13,5%): 21.916 € dal mercato e 5413 € dal risparmio. Il resto, voce per voce qui sotto, vale +8028 €.',
+      'Da gennaio a settembre 2026 il patrimonio è cresciuto di 33.009 € (+12,5%): 20.000 € dal mercato e 5000 € dal risparmio. Il resto, voce per voce qui sotto, vale +8010 €.',
     );
     // The net mixes a loss with flows: signed, never coloured.
     const net = describeDriverRest(year).find((s) => s.mono);
-    expect(net?.text.replace(/\s/g, ' ')).toBe('+8028 €');
+    expect(net?.text.replace(/\s/g, ' ')).toBe('+8010 €');
     expect(net?.sign).toBeUndefined();
-    expect(plain(describeDriverRest({ ...year, taxes: 4655, pensionContributions: 0, other: 0, otherAccounts: 0 }))).toBe(' Il resto, voce per voce qui sotto, si compensa.');
+    expect(plain(describeDriverRest({ ...year, taxes: 5000, pensionContributions: 0, other: 0, otherAccounts: 0 }))).toBe(' Il resto, voce per voce qui sotto, si compensa.');
   });
 
   it('should name a single part, the tax as a loss and a flow uncoloured', () => {
-    const year = { ...row('2026', 5413, 21916), netWorthGrowth: 23238, taxes: 4091 };
-    expect(plain(describeDriverRest(year))).toBe(' Il resto: −4091 € di tasse stimate sulle vendite.');
+    const year = { ...row('2026', 5000, 20000), netWorthGrowth: 21000, taxes: 4000 };
+    expect(plain(describeDriverRest(year))).toBe(' Il resto: −4000 € di tasse stimate sulle vendite.');
     expect(describeDriverRest(year).find((s) => s.mono)).toMatchObject({ sign: 'negative' });
-    const mortgage = describeDriverRest({ ...year, taxes: 0, debtRepaid: 4655 });
-    expect(plain(mortgage)).toBe(' Il resto: +4655 € di mutuo rimborsato.');
+    const mortgage = describeDriverRest({ ...year, taxes: 0, debtRepaid: 5000 });
+    expect(plain(mortgage)).toBe(' Il resto: +5000 € di mutuo rimborsato.');
     expect(mortgage.find((s) => s.mono)?.sign).toBeUndefined();
   });
 
   it('should leave an immaterial «altre variazioni» unsaid, and say nothing when only the engines moved', () => {
-    const year = { ...row('2026', 5413, 21916), netWorthGrowth: 27379, other: 50, otherAccounts: 50 };
+    const year = { ...row('2026', 5000, 20000), netWorthGrowth: 25050, other: 50, otherAccounts: 50 };
     expect(plain(describeDriverRest(year))).toBe('');
     expect(plain(describeDriverRest({ ...year, other: 1400, otherAccounts: 1400 }))).toBe(' Il resto: +1400 € di saldi dei conti.');
     expect(plain(describeDriverRest({ ...year, other: 0, otherAccounts: 0 }))).toBe('');
@@ -404,7 +404,7 @@ describe('describeDrivers', () => {
 });
 
 describe('buildDriverLedger', () => {
-  const year = { netSavings: 5413, market: 21916, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7453, otherPension: 0, otherHoldings: 0, otherAccounts: 7453, netWorthGrowth: 35356 };
+  const year = { netSavings: 5000, market: 20000, taxes: 4000, debtRepaid: 5000, pensionContributions: 10, other: 6999, otherPension: 0, otherHoldings: 0, otherAccounts: 6999, netWorthGrowth: 33009 };
 
   it('should list every part with its sign and close on the growth the rows add up to', () => {
     const rows = buildDriverLedger(year);
@@ -412,7 +412,7 @@ describe('buildDriverLedger', () => {
     const total = rows.at(-1)!;
     expect(rows.slice(0, -1).reduce((sum, r) => sum + r.value, 0)).toBe(total.value);
     // The tax is a magnitude in the model and a loss in the ledger.
-    expect(rows.find((r) => r.key === 'taxes')).toMatchObject({ value: -4091, kind: 'loss' });
+    expect(rows.find((r) => r.key === 'taxes')).toMatchObject({ value: -4000, kind: 'loss' });
     expect(rows.find((r) => r.key === 'debtRepaid')?.kind).toBe('flow');
     expect(rows.find((r) => r.key === 'market')?.kind).toBe('market');
   });
@@ -428,8 +428,8 @@ describe('buildDriverLedger', () => {
   });
 
   it('should hand the same remainder to any list that closes on a printed total', () => {
-    // «Lavoro e investimenti» on the real account: the six rounded rows summed to 76.886 € over a 76.885 € total.
-    expect(reconcileRemainder(76885.2, [16327.4, 12715.4, 44116.3, -4091.2, 4655.3, 10.4])).toBe(3153);
+    // «Lavoro e investimenti»: the remainder is taken against the ROUNDED rows (990), not the raw ones (989).
+    expect(reconcileRemainder(50000.4, [10000.4, 8000.4, 30000.3, -4000.2, 5000.3, 10.4])).toBe(990);
     expect(reconcileRemainder(1200, [700, 500])).toBe(0);
   });
 

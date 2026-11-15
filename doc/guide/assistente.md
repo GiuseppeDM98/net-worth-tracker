@@ -70,12 +70,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **`bundle.portfolio` is REQUIRED and built by ONE pure function**, `buildAssistantPortfolioContext`
   (`lib/utils/assistantPortfolioContext.ts`), from the documents every builder fetches beside the assets
   (`fetchPortfolioDocuments`: `assetTransactions`, `dividends`, `pensionContributions`) and the period's expenses:
-  every held instrument with class, sub-category, ROLE, quantity, value, fiscal PMC and G/P in euro, owner
-  (`describeAssetOwnerLabel`), liquidity; the allocation on the Allocazione page's base; the ledger; the dividend
+  every held instrument with class, sub-category, ROLE, quantity, value, fee-free PMC and G/P in euro, owner
+  (`describeAssetOwnerLabel`), liquidity; the allocation on the Allocazione page's base; the ledger (a fee with its
+  spending row prints «commissioni X (già fra le spese)», `feeIsSpendingRow`, 2026-11-12, so the AI never counts it
+  twice beside the cashflow block); the dividend
   registry in its two halves and the coupon of every bond held; the pension funds with their contributions by tax
   year and nature; the loans; the household (`familyMembers`, `userAge`). `formatPortfolioForPrompt` prints every
   list whole or declares the cut (`PORTFOLIO_LEDGER_ROW_CAP` 300, `PORTFOLIO_DIVIDEND_ROW_CAP` 150, the oldest rows
-  dropped, the omission written) — the silent-cap rule above. The owner's account measured ~3700 tokens.
+  dropped, the omission written) — the silent-cap rule above. A full portfolio fits in a few thousand tokens.
 - **A free question with NO context still gets the portfolio of today** (owner's run, 2026-10-20: with «Nessuno» the
   assistant answered «non c'è il blocco STRUMENTI» to «quali strumenti ho liberi da obiettivi?», because the route built
   a bundle only for a chosen period). `buildAssistantTodayContext(userId)` returns `AssistantTodayContext` — the
@@ -102,15 +104,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   («Non assegnato a nessun obiettivo: X € su Y €») — FIRE › Obiettivi' own arithmetic, a property NET of the loan that
   finances it (`lib/utils/goalAssetValue.ts`), a loan never a holding a goal can take; with the feature off nothing of
   it is printed (a feature not in use, never a zero). The free figure is printed EVEN when no goal touches the
-  instrument («libero da obiettivi (60.000 €)»): without it the model summed the gross values, found the total short
+  instrument («libero da obiettivi (50.000 €)»): without it the model summed the gross values, found the total short
   of the mortgage and called the data inconsistent (the owner's run, 2026-10-20); the coverage line says the property
   is net and tells it to sum the rows' free figures, not the values.
 - **The email gets the block too** (owner's decision): `buildEmailAiPrompt` reuses `formatBundleForPrompt`, so the
   periodic comment reads the instruments and the ledger; `__tests__/monthlyEmailService.test.ts` pins it.
 - **Every expense window is an ITALIAN calendar window** (`getItalyMonthBoundsUtc`, `getItalyMonthRangeBoundsUtc`,
   `lib/utils/dateHelpers.ts`): the rows are dated at Italian midnight and Vercel runs in UTC, so
-  `new Date(year, month - 1, 1)` filed the 1st of a month under the month before — on the owner's account 30 rows
-  of 1793 sat in the wrong month for the assistant while Tracciamento had them right. Pinned by
+  `new Date(year, month - 1, 1)` filed the 1st of a month under the month before — every row dated on
+  a 1st sat in the wrong month for the assistant while Tracciamento had them right. Pinned by
   `__tests__/assistantMonthContextService.test.ts` on ISO instants (green under `TZ=UTC` too).
 - **«Entrate» is Tracciamento's figure** (owner's decision): the prompt prints
   `Entrate: X (di cui dividendi e cedole Y; è lo stesso totale della pagina Cashflow)` and the Cashflow tile prints
@@ -236,8 +238,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `assignments` names instruments by their EXACT name from the STRUMENTI block with a percent of each; the CARD resolves
   the names to asset ids (`findAssetByName`, lib/utils/allocationAdviceApply.ts: the exact name, the printed «name
   (TICKER)» form, or the ticker alone with or without its exchange — the owner's run of 2026-10-20 had the model write
-  «… (SWDA)» for «SWDA.MI»; the `displayTicker` alias counts as a ticker, because the block prints it in its place —
-  on 2026-10-23 two ETCs ticked «ISIN.SG» reached the model by their alias and their quotas were lost) and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,
+  «… (ABCD)» for «ABCD.MI»; the `displayTicker` alias counts as a ticker, because the block prints it in its place —
+  on 2026-10-23 ETCs ticked «ISIN.SG» reached the model by their alias and their quotas were lost) and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,
   refusing a sum past 100% on one asset. On an update present quotas replace the goal's, absent ones leave them, and
   **one unmatched name keeps EVERY quota of today** (`keepQuotas`: the card sends no `assignments` and its eyebrow
   says so) — the first version wrote the resolved list, which was empty, and wiped a goal's quota of an ETF on the

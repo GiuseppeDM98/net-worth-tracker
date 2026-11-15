@@ -86,16 +86,19 @@ function localNpv(flows: XirrFlow[], r: number): number {
 
 describe('replayTransactions — position replay and PMC', () => {
   // Case 1
-  it('replays a single buy with fees in the EUR basis but NOT in the native PMC', () => {
+  it('replays a single buy with its fee in neither PMC, but in the fiscal basis and the invested capital', () => {
     const state = replayTransactions([
       tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 50, fees: 5 }),
     ]);
 
     expect(state.quantity).toBe(10);
     expect(state.averageCost).toBeCloseTo(50, 6); // native PMC excludes fees
-    expect(state.costBasisEur).toBeCloseTo(505, 6); // 10·50 + 5 fee
-    expect(state.investedEur).toBeCloseTo(505, 6);
-    expect(state.averageCostEur).toBeCloseTo(50.5, 6);
+    expect(state.costBasisEur).toBeCloseTo(500, 6); // the fee is a spending row of its own
+    expect(state.averageCostEur).toBeCloseTo(50, 6);
+    expect(state.fiscalCostBasisEur).toBeCloseTo(505, 6); // 10·50 + 5: what a tax estimate stands on
+    expect(state.fiscalAverageCostEur).toBeCloseTo(50.5, 6);
+    expect(state.investedEur).toBeCloseTo(505, 6); // the cash that left still counts it
+    expect(state.feesEur).toBeCloseTo(5, 6);
   });
 
   // Case 2
@@ -112,7 +115,7 @@ describe('replayTransactions — position replay and PMC', () => {
   });
 
   // Case 3
-  it('leaves the PMC unchanged on a partial sell and books realized P&L net of fees', () => {
+  it('leaves the PMC unchanged on a partial sell and books a fee-free realized P&L', () => {
     const state = replayTransactions([
       tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100 }),
       tx({ type: 'sell', date: day(5), quantity: 4, pricePerUnit: 150, fees: 2 }),
@@ -120,8 +123,8 @@ describe('replayTransactions — position replay and PMC', () => {
 
     expect(state.quantity).toBe(6);
     expect(state.averageCost).toBeCloseTo(100, 6); // selling never moves the PMC
-    // realized = qty·(sellEur − avgEur) − fees = 4·(150 − 100) − 2
-    expect(state.realizedPnlEur).toBeCloseTo(198, 6);
+    // realized = qty·(sellEur − avgEur) = 4·(150 − 100): the sale's fee is a spending row
+    expect(state.realizedPnlEur).toBeCloseTo(200, 6);
     expect(state.costBasisEur).toBeCloseTo(600, 6);
   });
 
@@ -283,6 +286,7 @@ describe('replayTransactions — position replay and PMC', () => {
       quantity: 10,
       averageCost: state.averageCost,
       averageCostEur: state.averageCostEur,
+      fiscalAverageCostEur: state.fiscalAverageCostEur,
       holdingStartDate: state.holdingStartDate,
     });
   });
@@ -338,30 +342,47 @@ describe('replayTransactions — position replay and PMC', () => {
 // Cash delta (case 14)
 // ===========================================================================
 
-describe('taxableGainEur — the gain the broker taxes', () => {
-  it('should be the price difference with no commission on either side', () => {
-    // The owner's Directa order of 01/09/2026: 48 units at 123,48 € with 5 € of fees are carried
-    // at 123,48 €, not at 5.932,04 / 48 = 123,58 €.
-    const buy = tx({ type: 'buy', date: day(0), quantity: 48, pricePerUnit: 123.48, fees: 5 });
-    const sell = tx({ type: 'sell', date: day(1), quantity: 48, pricePerUnit: 130, fees: 5 });
-    const { effects } = replayTransactionsWithEffects([buy, sell]);
+describe('taxableGainEur — the fiscal gain, both fees deducted', () => {
+  it('should deduct both fees from the fiscal gain and neither from the realized P&L', () => {
+    const buy = tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, fees: 5 });
+    const sell = tx({ type: 'sell', date: day(1), quantity: 10, pricePerUnit: 120, fees: 5 });
+    const { state, effects } = replayTransactionsWithEffects([buy, sell]);
     const effect = effects.find((e) => e.transactionId === sell.id)!;
 
-    expect(effect.realizedPnlEur).toBeCloseTo(302.96, 9); // 6240 − 5 − 5932,04
-    expect(effect.taxableGainEur).toBeCloseTo(312.96, 9); // 48 × (130 − 123,48)
+    expect(effect.realizedPnlEur).toBeCloseTo(200, 9); // 10 × (120 − 100): fee-free
+    expect(effect.taxableGainEur).toBeCloseTo(190, 9); // 1200 − 5 − 1005
+    expect(state.divestedEur).toBeCloseTo(1195, 9); // 1200 − 5
+    expect(state.feesEur).toBeCloseTo(10, 9);
   });
 
-  it('should follow the average price across buys, partial sells and an adjustment', () => {
+  it('should total a net return equal to the sum of its XIRR flows', () => {
     const txs = [
       tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, fees: 5 }),
-      tx({ type: 'buy', date: day(1), quantity: 10, pricePerUnit: 120, fees: 5 }), // average 110
-      tx({ type: 'sell', date: day(2), quantity: 5, pricePerUnit: 130, fees: 2, id: 'first-sell' }), // 5 × 20
-      tx({ type: 'adjustment', date: day(3), quantity: 15, pricePerUnit: 90 }), // carried at 90 from here
+      tx({ type: 'sell', date: day(1), quantity: 10, pricePerUnit: 120, fees: 5 }),
+    ];
+    const state = replayTransactions(txs);
+    const flows = buildXirrFlows({ transactions: txs, dividendsNetEur: [], currentValueEur: 0, now: day(2) });
+    const sumOfFlows = flows.reduce((sum, f) => sum + f.amountEur, 0);
+
+    const result = computeAssetTotalReturn(state, 0, 0);
+    expect(result.totalReturnEur).toBeCloseTo(190, 9); // 200 realized − 10 of fees
+    expect(result.totalReturnEur).toBeCloseTo(sumOfFlows, 9); // −1005 + 1195
+    expect(result.feesEur).toBeCloseTo(10, 9);
+  });
+
+  it('should follow the fiscal average across buys, partial sells and an adjustment', () => {
+    const txs = [
+      tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, fees: 5 }),
+      tx({ type: 'buy', date: day(1), quantity: 10, pricePerUnit: 120, fees: 5 }), // fiscal average 110,5
+      tx({ type: 'sell', date: day(2), quantity: 5, pricePerUnit: 130, fees: 2, id: 'first-sell' }), // 650 − 2 − 552,5
+      tx({ type: 'adjustment', date: day(3), quantity: 15, pricePerUnit: 90 }), // carried at 90 from here, no fee
       tx({ type: 'sell', date: day(4), quantity: 15, pricePerUnit: 100, id: 'second-sell' }), // 15 × 10
     ];
     const { effects } = replayTransactionsWithEffects(txs);
+    const first = effects.find((e) => e.transactionId === 'first-sell')!;
 
-    expect(effects.find((e) => e.transactionId === 'first-sell')!.taxableGainEur).toBeCloseTo(100, 9);
+    expect(first.taxableGainEur).toBeCloseTo(95.5, 9);
+    expect(first.realizedPnlEur).toBeCloseTo(100, 9); // 5 × (130 − 110): fee-free
     expect(effects.find((e) => e.transactionId === 'second-sell')!.taxableGainEur).toBeCloseTo(150, 9);
     expect(effects[0].taxableGainEur).toBeUndefined(); // a sell's fact only
   });
@@ -382,11 +403,10 @@ describe('computeCashDelta — signed settlement delta', () => {
   });
 
   it('should credit a sell net of the tax the broker withheld, and leave a buy alone', () => {
-    // The owner's September: 53 units at 168,25 € less 5 € of fees and the tax on the statement.
-    const sell = tx({ type: 'sell', date: day(1), quantity: 53, pricePerUnit: 168.25, fees: 5, linkedCashAssetId: 'c1', withheldTaxEur: 937.4 });
+    const sell = tx({ type: 'sell', date: day(1), quantity: 10, pricePerUnit: 150, fees: 5, linkedCashAssetId: 'c1', withheldTaxEur: 100 });
     const buy = tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, linkedCashAssetId: 'c1', withheldTaxEur: 50 });
 
-    expect(computeCashDelta(sell)).toBe(7974.85); // 8917,25 − 5 − 937,40
+    expect(computeCashDelta(sell)).toBe(1395); // 1500 − 5 − 100
     expect(computeCashDelta(buy)).toBe(-1000); // a tax is a fact of a sale only
   });
 
@@ -593,14 +613,14 @@ describe('replayTransactionsWithEffects — per-transaction P&L, sold cost basis
     expect(replayTransactions(transactions)).toEqual(state);
   });
 
-  it('reports a partial sell effect matching the existing 4·(150−100)−2 fee fixture', () => {
+  it('reports a fee-free partial sell effect on the 4·(150−100) fixture with a 2 € fee', () => {
     const { effects } = replayTransactionsWithEffects([
       tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, id: 'buy1' }),
       tx({ type: 'sell', date: day(5), quantity: 4, pricePerUnit: 150, fees: 2, id: 'sell1' }),
     ]);
 
     const sellEffect = effects.find((e) => e.transactionId === 'sell1');
-    expect(sellEffect?.realizedPnlEur).toBeCloseTo(198, 6); // 4·(150 − 100) − 2
+    expect(sellEffect?.realizedPnlEur).toBeCloseTo(200, 6); // 4·(150 − 100): the fee is a row
     expect(sellEffect?.soldCostBasisEur).toBeCloseTo(400, 6); // 4 × PMC 100
     expect(sellEffect?.averageCostEurAtTrade).toBeCloseTo(100, 6);
 

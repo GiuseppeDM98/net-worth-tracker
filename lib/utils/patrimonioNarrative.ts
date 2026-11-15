@@ -177,8 +177,8 @@ function resolveHeadline(input: PatrimonioVerdictInput): ResolvedHeadline {
     return { headline: `Il tuo portafoglio ${withPrepositionA(monthInSentence(input.month))}.`, tone: 'neutral' };
   }
   // Grown only on paper: the tax on a sale took at least half of the growth — the same rule as
-  // the Panoramica's (`resolveTaxedGrowth`). It outranks the record: on the real account settembre
-  // 2026 was a new high at +0,04%, with 4.089 € of withholding on a VWCE sale.
+  // the Panoramica's (`resolveTaxedGrowth`). It outranks the record: a month can be a new
+  // high at a near-zero change while a sale's withholding took almost all of the growth.
   const taxedGrowth = resolveTaxedGrowth({
     delta: input.monthlyVariation.value,
     deltaPct: input.monthlyVariation.percentage,

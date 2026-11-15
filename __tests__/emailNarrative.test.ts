@@ -200,56 +200,56 @@ describe('buildPeriodEmailVerdict', () => {
   });
 
   it('takes the tax on a sale out of the market and names it, in the headline and in the split', () => {
-    // September 2026 on the real account, as the email would see it: Δ −4.938 €, +988 € saved,
-    // 4.089 € of estimated tax on the Vanguard sale — the service hands a residual already net
-    // of that tax (−4.938 − 988 + 4.089 = −1.837), and the tax is its own third part.
+    // A falling month with a taxed sale, as the email sees it: Δ −5000 €, +1000 € saved, 4160 € of
+    // estimated tax — the service hands a residual already net of that tax
+    // (−5000 − 1000 + 4160 = −1840), and the tax is its own third part.
     const verdict = buildPeriodEmailVerdict({
       ...GROWING,
       period: { kind: 'monthly', year: 2026, month: 9 },
-      netWorthDelta: -4937.74,
+      netWorthDelta: -5000,
       netWorthDeltaPct: -1.66,
-      totalIncome: 2758,
-      totalExpenses: 1770,
-      marketEffect: -1837,
+      totalIncome: 2800,
+      totalExpenses: 1800,
+      marketEffect: -1840,
       sales: {
-        proceeds: 39052.45,
-        realizedGain: 15726.38,
-        estimatedTax: 4088.86,
-        instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+        proceeds: 40000,
+        realizedGain: 16000,
+        estimatedTax: 4160,
+        instruments: [{ id: 'orni', name: 'Ornitorinco World', proceeds: 40000, realizedGain: 16000, estimatedTax: 4160 }],
         brokenLedgers: 0,
       },
       rank: null,
     });
     expect(verdict.headline).toBe('Settembre è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
     expect(plain(verdict.sentence)).toBe(
-      'Il patrimonio vale 312.480 €: −4938 € (−1,66%) su agosto. ' +
-        'Di quel movimento, −1837 € viene dal mercato, +988 € da quanto hai risparmiato e −4089 € dalle tasse sulle vendite. ' +
-        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.',
+      'Il patrimonio vale 312.480 €: −5000 € (−1,66%) su agosto. ' +
+        'Di quel movimento, −1840 € viene dal mercato, +1000 € da quanto hai risparmiato e −4160 € dalle tasse sulle vendite. ' +
+        'Hai venduto Ornitorinco World per 40.000 € con una plusvalenza di 16.000 € e pagato circa 4160 € di tasse.',
     );
   });
 
   it('names the tax in the headline when it took the growth, and tells what was bought beside the sale', () => {
-    // Settembre 2026 on the real account as a monthly email would see it: +124 € (+0,04%) with
-    // 4.089 € withheld on VWCE and six instruments bought in the month.
+    // A flat month as a monthly email sees it: +120 € (+0,04%) with 4160 € withheld on ORNI and
+    // six instruments bought in the month.
     const sales = {
-      proceeds: 39052.45,
-      realizedGain: 15726.38,
-      estimatedTax: 4088.86,
-      instruments: [{ id: 'vwce', name: 'VWCE', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+      proceeds: 40000,
+      realizedGain: 16000,
+      estimatedTax: 4160,
+      instruments: [{ id: 'orni', name: 'ORNI', proceeds: 40000, realizedGain: 16000, estimatedTax: 4160 }],
       brokenLedgers: 0,
-      purchases: { amount: 34305.1, instrumentCount: 6 },
+      purchases: { amount: 34000, instrumentCount: 6 },
     };
     const flat = buildPeriodEmailVerdict({
       ...GROWING,
       period: { kind: 'monthly', year: 2026, month: 9 },
-      netWorthDelta: 124.32,
+      netWorthDelta: 120,
       netWorthDeltaPct: 0.04,
       sales,
       rank: null,
     });
-    expect(flat.headline).toBe('Settembre è in pari: le tasse sulla vendita di VWCE si sono prese la crescita.');
+    expect(flat.headline).toBe('Settembre è in pari: le tasse sulla vendita di ORNI si sono prese la crescita.');
     expect(flat.tone).toBe('warning');
-    expect(plain(flat.sentence)).toContain('pagato circa 4089 € di tasse. Nello stesso mese hai comprato 6 strumenti per 34.305 €.');
+    expect(plain(flat.sentence)).toContain('pagato circa 4160 € di tasse. Nello stesso mese hai comprato 6 strumenti per 34.000 €.');
 
     const quarter = buildPeriodEmailVerdict({
       ...GROWING,
@@ -260,7 +260,7 @@ describe('buildPeriodEmailVerdict', () => {
       rank: null,
     });
     expect(quarter.headline).toBe(
-      'Il terzo trimestre è cresciuto, ma le tasse sulla vendita di VWCE si sono prese più di metà della crescita.',
+      'Il terzo trimestre è cresciuto, ma le tasse sulla vendita di ORNI si sono prese più di metà della crescita.',
     );
     expect(plain(quarter.sentence)).toContain('Nello stesso trimestre hai comprato 6 strumenti');
   });
@@ -347,8 +347,8 @@ describe('describeMarketSplit', () => {
   });
 
   it('names the tax on the sales as its own part, as an estimate', () => {
-    expect(plain(describeMarketSplit(-1837, 988, 4088.86))).toBe(
-      'Mercato −1837 €, risparmio +988 €, tasse sulle vendite circa −4089 €. È un residuo strutturale: assorbe anche i movimenti non tracciati.',
+    expect(plain(describeMarketSplit(-1840, 1000, 4160))).toBe(
+      'Mercato −1840 €, risparmio +1000 €, tasse sulle vendite circa −4160 €. È un residuo strutturale: assorbe anche i movimenti non tracciati.',
     );
     expect(plain(describeMarketSplit(3130, 1180, 0))).not.toContain('tasse');
   });

@@ -205,14 +205,14 @@ describe('resolveHeroReturn', () => {
     expect(result.label).toBe('annualizzato');
   });
 
-  it('states the period return on the year-to-date of nine months, the real account\'s case', () => {
-    const result = resolveHeroReturn(16.0, 9);
+  it('states the period return on the year-to-date of nine months', () => {
+    const result = resolveHeroReturn(12.0, 9);
 
     expect(result.isPeriodReturn).toBe(true);
-    expect(result.value!).toBeCloseTo(11.77, 1);
+    expect(result.value!).toBeCloseTo(8.87, 1);
     expect(result.label).toBe('nei 9 mesi');
     // One month short of a year is still a period; the year itself is not.
-    expect(resolveHeroReturn(16.0, 11).isPeriodReturn).toBe(true);
+    expect(resolveHeroReturn(12.0, 11).isPeriodReturn).toBe(true);
   });
 
   it('de-annualizes below the threshold and says so', () => {
@@ -268,18 +268,18 @@ describe('resolveHeroReturn', () => {
 
 describe('deannualizeReturn / resolveCompanionReturnChip', () => {
   it('is the exact inverse of the annualisation, and the step the hero takes below a year', () => {
-    // +26,05% a year over 44 months is +133,7% cumulative (the real account's «Storico» window).
-    expect(deannualizeReturn(26.05, 44)).toBeCloseTo(133.72, 1);
+    // +20% a year over 36 months is +72,8% cumulative (a «Storico» window of three years).
+    expect(deannualizeReturn(20.0, 36)).toBeCloseTo(72.8, 1);
     expect(deannualizeReturn(12, 12)).toBeCloseTo(12, 9);
     expect(deannualizeReturn(26.5319, 2)).toBeCloseTo(resolveHeroReturn(26.5319, 2).value!, 9);
   });
 
   it('offers the OTHER basis: cumulative beside an annualised hero, annualised beside a period hero', () => {
-    const annualised = resolveHeroReturn(26.05, 44);
-    expect(resolveCompanionReturnChip(26.05, 44, annualised)).toEqual({ value: expect.closeTo(133.72, 1), label: 'cumulato in 44 mesi' });
+    const annualised = resolveHeroReturn(20.0, 36);
+    expect(resolveCompanionReturnChip(20.0, 36, annualised)).toEqual({ value: expect.closeTo(72.8, 1), label: 'cumulato in 36 mesi' });
     // Nine months: the hero is what happened, the chip is the rate per year.
-    expect(resolveCompanionReturnChip(16.0, 9, resolveHeroReturn(16.0, 9))).toEqual({ value: 16.0, label: 'annualizzato' });
-    expect(resolveCompanionReturnChip(16.0, 6, resolveHeroReturn(16.0, 6))).toEqual({ value: 16.0, label: 'annualizzato' });
+    expect(resolveCompanionReturnChip(12.0, 9, resolveHeroReturn(12.0, 9))).toEqual({ value: 12.0, label: 'annualizzato' });
+    expect(resolveCompanionReturnChip(12.0, 6, resolveHeroReturn(12.0, 6))).toEqual({ value: 12.0, label: 'annualizzato' });
   });
 
   it('prints no chip where it would extrapolate or repeat the hero', () => {
@@ -289,7 +289,7 @@ describe('deannualizeReturn / resolveCompanionReturnChip', () => {
     // Over exactly twelve months the two figures coincide.
     expect(resolveCompanionReturnChip(12.63, 12, resolveHeroReturn(12.63, 12))).toBeNull();
     expect(resolveCompanionReturnChip(null, 9, resolveHeroReturn(null, 9))).toBeNull();
-    expect(resolveCompanionReturnChip(11.47, 0, resolveHeroReturn(11.47, 44))).toBeNull();
+    expect(resolveCompanionReturnChip(11.47, 0, resolveHeroReturn(11.47, 36))).toBeNull();
   });
 });
 

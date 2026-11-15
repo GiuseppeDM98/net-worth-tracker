@@ -515,9 +515,9 @@ describe('describeSpendingRolesFlow', () => {
   });
 
   it('writes a role that holds money but rounds to zero as «meno dell’1%», never «0%»', () => {
-    // Found on the owner's tour (2026-09-27): 40 € of 10.000 printed «necessità 0%» over a role
+    // Found on a tour (2026-09-27): a few euros of the income printed «necessità 0%» over a role
     // that was not empty. The other shares still add up to 100 with this one counted as zero.
-    expect(plain(describeSpendingRolesFlow(summary({ income: 10000, need: 40, want: 1100, unclassified: 7400 })))).toBe(
+    expect(plain(describeSpendingRolesFlow(summary({ income: 10000, need: 30, want: 1100, unclassified: 7400 })))).toBe(
       "Delle entrate (10.000 €): necessità meno dell'1%, desideri 11%, da classificare 74%, risparmi 15%. Il riferimento è 50/30/20."
     );
   });

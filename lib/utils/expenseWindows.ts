@@ -11,8 +11,8 @@
  * WHO HAS NO WINDOW, by declared need, and stays on `useExpenses`: Storico (the Driver spans every
  * year), Centri di Costo (a centre is lifetime), Hall of Fame's recalculation — and Analisi. Its
  * Scheda, Confronto, Dettaglio and search span the history from the floor on, and the Andamento
- * ranks its categories on the rows after this year too: on the owner's account a window would
- * have left out 48 rows of 1547, for one more list in memory and on disk (measured 2026-09-30).
+ * ranks its categories on the rows after this year too: on a lived account a window would
+ * have left rows out, for one more list in memory and on disk (measured 2026-09-30).
  *
  * A window is the UNION of what its page reads, the readers outside the period included (the
  * savings history behind a month, a chart that draws a range's last month whole, a budget's

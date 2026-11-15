@@ -60,9 +60,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   **a falling month is blamed on the market only when `marketEffect < 0`** — when the market gained and the total
   still fell, the cause is the user's own flows and the headline says "nonostante il mercato". A missing input drops
   its clause (no prior snapshot → no monthly clause, no income → no savings clause), never a placeholder.
-- **And never on the market ALONE when something else weighed more** (2026-09-11). Why: on the real account
-  settembre 2026 fell by 4.938 € with the market at −1.079 € — the rest was the capital-gains tax the broker withheld
-  on a Vanguard sale (4.092,50 € by the snapshot note), which in regime amministrato leaves the account the day of
+- **And never on the market ALONE when something else weighed more** (2026-09-11). Why: a month of 2026-09
+  fell with the market at about a fifth of the drop — the rest was the capital-gains tax the broker withheld
+  on a sale, which in regime amministrato leaves the account the day of
   the sale with no cashflow row — and the headline said «il mercato ha pesato». The cause of a falling month is ONE
   decision for three verdicts, `resolveDeclineCause` in `lib/utils/periodSales.ts` (Panoramica, Patrimonio, the
   periodic email): `despite-market` (market ≥ 0) · `taxes-over-market` (the estimated tax on the month's sales ≥ the
@@ -95,7 +95,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `pensionContributions` only for a holder of a fund, by literal collection name because
   `pensionContributionService` top-level-imports the client SDK. Known blind spot: cash and other price-1 assets never
   show a market effect. **Real estate is measured gross of debt** (`quantity × byAsset.price`, never the net `totalValue`) — on the net value a mortgage
-  instalment read as "Immobili +1.036" on the real account with the house worth exactly the same.
+  instalment read as a gain such as "Immobili +1.000" with the house worth exactly the same.
 - **An in-flow `<svg>` with `height: 100%` inside an auto-height flex box resolves its height from its own
   viewBox ratio** (width × H/W — hundreds of pixels), which is what made the hero sparkline explode the grid row.
   Stretch a `preserveAspectRatio="none"` chart by positioning the SVG `absolute inset-0` inside a `relative flex-1
@@ -170,7 +170,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Every subject the driver clause can name is in `CLASS_SUBJECTS`, the pension band included** (`overviewNarrative.ts`).
   The market digest lists the pension funds as their own line (`PENSION_BAND_KEY`), so the top mover can be that key —
-  on the real account it was, and the verdict printed «e pension hanno fatto il grosso del lavoro». A key the map does
+  and when it was, the verdict printed «e pension hanno fatto il grosso del lavoro». A key the map does
   not know DROPS the clause (the Narrative Honesty Rule), never prints the key with a guessed verb; the test walks
   `ASSET_CLASS_SEQUENCE ∪ {PENSION_BAND_KEY}`. The Cashflow tile's «Ad agosto» / «come ad agosto» come from
   `atPreviousMonth` in the same module — no component types a preposition.
@@ -222,10 +222,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **An instrument with a BUY/SELL after the previous snapshot's month reads its market from the ledger**
   (`tradeAwarePriceEffect` in `lib/utils/dashboardOverviewUtils.ts`, fed `monthTrades` by the service's
   `tradesAfterSnapshot`, source version 19): `Δvalue − net money in − unexplained quantity × today's unit value`, with
-  money in = Σ buys (q × priceEur + fees) − Σ sells (q × priceEur − fees). A held quote gives the old `q_prev × Δu`, a
-  bought one `q × (u_now − p) − fees`, a sold one `q × (p − u_prev) − fees`, and a position closed in the month is
-  still measured. Why: `q_prev × Δu` gave 0 to the quotes bought in the month, and on the real account settembre 2026
-  parked +537,88 € in «dai tuoi movimenti», which the owner read as income − expenses. Pinned by
+  money in = Σ buys (q × priceEur + the fee no row carries) − Σ sells (q × priceEur − the fee no row carries)
+  (`tradeMoneyIn`, `feeOutsideCashflow`, 2026-11-12: a fee with its spending row is in the savings, not in the market).
+  A held quote gives the old `q_prev × Δu`, a bought one `q × (u_now − p)` less a legacy fee, a sold one
+  `q × (p − u_prev)` less a legacy fee, and a position closed in the month is
+  still measured. Why: `q_prev × Δu` gave 0 to the quotes bought in the month, and in a month of 2026-09 that
+  parked their price change in «dai tuoi movimenti», which the owner read as income − expenses. Pinned by
   `__tests__/dashboardOverviewUtils.test.ts` → *the month's trades, read from the ledger*.
 - **A quantity no BUY/SELL explains stays OUT of the market**: a migration baseline written in the month, an adjustment,
   a quantity typed by hand move no money the ledger knows, so they are valued at today's price and land in «altre
@@ -249,11 +251,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   names them between the savings and the residual: «+2100 € dal mercato, −1500 € spesi oltre le entrate, +300 € di
   debito rimborsato (Mutuo), +1800 € versati nel fondo pensione», two debts as «+450 € di debito rimborsato (Mutuo
   +300 €, Prestito auto +150 €)», a debt that went up «di nuovo debito». Both are flows: signed, never coloured. Why:
-  on the real account ottobre 2026 read «+1792 € di altre variazioni», which were exactly the month's TFR, employer and
+  a month read «+1800 € di altre variazioni», which were exactly the month's TFR, employer and
   voluntary contributions, and looked like an error. The rules are Storico's Driver's (`pensionPaidInAcross`,
   `debtRepaymentsBetween` in `lib/utils/marketEffect.ts`), measured against the LIVE portfolio like the market; a
   property's legacy debt is credited to the loan that finances it (`financedAssetId`), so the migration month of
-  2026-10-10 reads one debt that crossed from the house to its loan (0 on the real account), not −X and +X.
+  2026-10-10 reads one debt that crossed from the house to its loan (net 0), not −X and +X.
   Patrimonio's verdict and the periodic email name the same two parts (doc/guide/email-pdf.md). Pinned by
   `__tests__/{monthFlows,salesNarrative,overviewNarrative,patrimonioNarrative}.test.ts`.
 - **The verdict's savings rate is what has already happened** (owner's call): `resolveLivedCashflow` in
@@ -305,7 +307,7 @@ The second page composed for a small screen (2026-10-11, PR #452; its spec, reti
 - **`SavingsRateBadge` covers the pill and the strip's cells at 390 while it shows** (`fixed bottom-4 left-4 z-50`; owner, 2026-10-11): from the 5th of the month, once per calendar month per account, when last month's savings rate was ≥ 30%, for 3 s (`AUTO_DISMISS_MS`). Transient and rare by design, left as is; the budget's fixture keeps last month's rate under 30% on purpose, and `e2e/overview.mobile.spec.ts` reads the badge at 0 before its taps.
 - **The YTD curve starts in January, the year's percentage counts from December** (`filterSparklineByPeriod`): the curve's left label is not the base of «Da inizio anno»; in January the YTD window falls back to the last two points, so the month's and the year's cells can carry the same percentage, correctly.
 - **`expenseStats: null` is a month with no rows OR a failed read of the expenses**: the payload cannot tell them apart (the service degrades the expenses to `null` with a warn), so the Cashflow row stays closed with «nessun dato questo mese» in both cases; telling them apart is a new field of the payload, which no spec of the series schedules (2026-10-11).
-- **«Asset principali» lists a property NET of its mortgage** (owner, 2026-10-17, `rankTopAssets`): the house printed 130.000 € at 43,6% of a net total while the mortgage, a negative row, never reached the top five. Now the row is the house minus the loans that finance it, captioned «netto del mutuo di 95.000 €», the weight on the net worth, and the mortgage is no row (it would count twice); a personal loan keeps its negative value and never reaches the top; the return stays on the gross value (the mortgage is no cost of the house). The other per-asset lists — Patrimonio › Strumenti, Storico › Valore per strumento, the PDF — keep the house GROSS beside the loan as its own negative row, so their columns add up (the owner's choice: net with a caption here, gross with the loan row where the list is a ledger).
+- **«Asset principali» lists a property NET of its mortgage** (owner, 2026-10-17, `rankTopAssets`): the house printed its GROSS value as a weight on the NET total, while the mortgage, a negative row, never reached the top five. Now the row is the house minus the loans that finance it, captioned «netto del mutuo di 100.000 €» (an invented figure), the weight on the net worth, and the mortgage is no row (it would count twice); a personal loan keeps its negative value and never reaches the top; the return stays on the gross value (the mortgage is no cost of the house). The other per-asset lists — Patrimonio › Strumenti, Storico › Valore per strumento, the PDF — keep the house GROSS beside the loan as its own negative row, so their columns add up (the owner's choice: net with a caption here, gross with the loan row where the list is a ledger).
 - **Three writers still do not invalidate the summary** (2026-10-03, judged minor and left): `migrateAssetLedger`
   (once per account, its baseline BUYs move the month's market split), the coupon cleanup of `dividendService`
   (`deleteUpcomingCoupons` / `deleteFinalPremium`, which matters only for a coupon dated today) and the dummy data
@@ -342,4 +344,4 @@ The second page composed for a small screen (2026-10-11, PR #452; its spec, reti
   forces the «already exists» flag on the overview RESPONSE and never presses «Sovrascrivi». The inline footer links («Analisi», «Patrimonio») are text links inside a
   sentence, 15px tall — the house idiom, not a target.
 - **The market digest's blind spots**: a quantity no BUY/SELL explains (a baseline written in the month, an adjustment, a hand edit) and a failed ledger read keep a traded quote out of the market; a pension fund counts only from `pensionReturnStartMonth`; hand-valued assets other than funds and real estate never show a market effect; real estate is gross of debt; the email's «mercato» is a residual that also holds the page's «altre variazioni». (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
-- **The sales clause is an ESTIMATE from the ledger** (2026-09-11): the tax is `plusvalenza × taxRate` per instrument — no compensation of prior losses, no rate → «non stimate» (never zero); a sale recorded outside the ledger (a hand-edited quantity) is invisible; the AI email prompt still prints the old `Δ − risparmio` residual; and a tax the owner ALSO records as a cashflow expense is counted twice in the email's split. On the real account the estimate landed 3,64 € under the broker's withholding (4.088,86 € vs 4.092,50 €). (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **The sales clause is an ESTIMATE from the ledger** (2026-09-11): the tax is `plusvalenza × taxRate` per instrument — no compensation of prior losses, no rate → «non stimate» (never zero); a sale recorded outside the ledger (a hand-edited quantity) is invisible; the AI email prompt still prints the old `Δ − risparmio` residual; and a tax the owner ALSO records as a cashflow expense is counted twice in the email's split. On a lived sale the estimate landed a few euro under the broker's withholding. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

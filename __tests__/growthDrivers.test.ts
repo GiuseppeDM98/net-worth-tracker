@@ -284,6 +284,28 @@ describe('the three parts of «altre»', () => {
     expect(bought.other).toBeCloseTo(0, 6);
   });
 
+  // A trade's fee with its spending row (2026-11-12): «risparmio» names it, so «mercato» must not count it too.
+  it('should count a trade\'s fee once: in the savings with its row, in the market without one', () => {
+    const assets = [ACCOUNT, { id: 'etf', name: 'ETF', type: 'etf' }];
+    const july = snap(2026, 7, [row('cash', 1000, 1, 1000)]);
+    const august = snap(2026, 8, [row('cash', 795, 1, 795), row('etf', 2, 100, 200)]);
+    const buy = { ...trade('etf', 'buy', new Date(2026, 7, 5, 12), 2, 100), fees: 5 };
+    const feeRow = { ...flow('variable', -5, 2026, 8), feeOfTradeId: buy.id };
+
+    const [withRow] = buildMonthlyGrowthDrivers([july, august], bare(assets, {
+      transactions: [{ ...buy, feeExpenseId: feeRow.id }], expenses: [feeRow],
+    }));
+    expect(withRow.netSavings).toBeCloseTo(-5, 6);
+    expect(withRow.market).toBeCloseTo(0, 6);
+    expect(withRow.other).toBeCloseTo(0, 6);
+    expect(withRow.otherHoldings).toBeCloseTo(0, 6);
+
+    const [legacy] = buildMonthlyGrowthDrivers([july, august], bare(assets, { transactions: [buy] }));
+    expect(legacy.netSavings).toBeCloseTo(0, 6);
+    expect(legacy.market).toBeCloseTo(-5, 6);
+    expect(legacy.other).toBeCloseTo(0, 6);
+  });
+
   // G4
   it('should read a card as «saldi dei conti»: +400 the month of the rows, −400 the month of the debit', () => {
     const assets = [ACCOUNT];

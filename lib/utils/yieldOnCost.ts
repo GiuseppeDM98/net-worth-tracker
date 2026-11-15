@@ -25,8 +25,8 @@
  *
  * MULTI-CURRENCY: per-share EUR is derived as (grossAmountEur ?? grossAmount) / quantity
  * (net analogously), so non-EUR dividends use their EUR conversion when available — and the
- * denominators are EUR too: the PMC through `costBasisPerUnitEur` (the ledger's EUR PMC, fees
- * included; the native one only for a EUR asset) and the price through `unitPriceEur`
+ * denominators are EUR too: the PMC through `costBasisPerUnitEur` (the ledger's fee-free EUR
+ * PMC, 2026-11-12; the native one only for a EUR asset) and the price through `unitPriceEur`
  * (lib/utils/costBasisEur.ts). A foreign asset without a EUR PMC yet has no yield on cost —
  * it is left out, never measured against its dollar PMC.
  */
@@ -50,7 +50,7 @@ export interface AssetInput {
   quantity: number;
   /** Native PMC (fees excluded); the denominator only for a EUR asset without `averageCostEur`. */
   averageCost?: number;
-  /** The ledger's EUR PMC, purchase fees included — the denominator when present. */
+  /** The ledger's fee-free EUR PMC (2026-11-12) — the denominator when present. */
   averageCostEur?: number;
   currentPrice: number;
   /** The price updater's EUR price for a foreign asset. */

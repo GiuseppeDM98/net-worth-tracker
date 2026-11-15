@@ -162,8 +162,8 @@ export function describeBaseline(scope: ComparisonMonthScope, comparisonYear: nu
 /**
  * Why there is no comparison, when the baseline window exists but holds no row at all: the
  * Periodo tile prints it where the pacing caption would stand, so a dropped delta is never a
- * silent one. On the real account September 2025 was recorded in one batch from the 21st, so
- * the first fourteen days of it are empty and the running month has nothing to pace against
+ * silent one. On a lived account a month was recorded in one batch late in the month, so
+ * its first weeks are empty and the running month has nothing to pace against
  * (2026-09-14). Null when a comparison exists.
  */
 export function describeMissingBaseline(scope: ComparisonMonthScope, comparisonYear: number): string {

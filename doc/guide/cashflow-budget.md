@@ -122,7 +122,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   transfer fails it too): the ceiling, the per-category and annual items, `splitMonthlyTotalExpenses`, the dated rows
   of the crossing day, `getPeriodExpensesForItem` (the weekly email's overspend list) and `evaluateBudgetAlerts` (the
   monthly email) all read it — the two server readers spread the document, so the flag reaches them. Tracciamento,
-  Analisi, Panoramica, Storico and FIRE keep the row (the refund compensates it there). The feed and the table print
+  Analisi, Panoramica, Storico and FIRE keep the row (the refund compensates it there). A trade's fee row
+  (`feeOfTradeId`, 2026-11-12) passes the gate like any spending row: it counts in the budget of its category. The feed and the table print
   a «fuori budget» chip, the detail a «Budget» line; the words are `EXPENSE_BUDGET_EXCLUSION_*` in
   `dialogNarrative.ts`. Pinned by `__tests__/budgetUtils.test.ts` (seen red with the gate reading `type` alone).
 - **GOTCHA**: never reconcile items against `categories` while `categories.length === 0` (they load async) — every

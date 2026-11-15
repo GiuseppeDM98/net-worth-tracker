@@ -124,8 +124,8 @@ function buildBucketAxis(
     minYear = historyStartYear;
     minMonth = 1;
   }
-  // Clamp the upper bound to the ceiling: a materialised instalment plan reaching 2043 is a
-  // calendar, not history, and drew seventeen empty years on the real account (2026-09-14).
+  // Clamp the upper bound to the ceiling: a materialised instalment plan reaching decades ahead
+  // is a calendar, not history, and drew years of empty buckets (2026-09-14).
   if (ceiling && (maxYear > ceiling.year || (maxYear === ceiling.year && maxMonth > ceiling.month))) {
     maxYear = ceiling.year;
     maxMonth = granularity === 'year' ? 12 : ceiling.month;

@@ -74,6 +74,9 @@ holds it): how it was learned is `git log`'s.
   from the other reader).
 - Inclusive month upper bound: `endOfMonthBound(year, month)` — the 1st at midnight drops the whole closing month.
   `<input type="date">` defaults take `getItalyDateIso()`: `toISOString()` proposes yesterday from 22:00.
+- **A date saved from `<input type="date">` is the UTC midnight of its day: «today or later» compares Italian DAYS,
+  never instants** (2026-11-15: the provisional-coupon banner dropped a coupon on its own payment day;
+  `isPendingProvisionalCoupon`, `__tests__/couponUtils.test.ts`).
 
 ### Tailwind Breakpoints and Responsive Layout
 - `desktop:` = 1440px, never `lg:`. Dialog-internal layouts use `sm:`; portrait wrappers `max-desktop:portrait:pb-20`.
@@ -356,7 +359,7 @@ file used to carry.
 - **A debt is a `loan` ASSET worth minus its principal** (2026-10-10, `types/assets.ts` → `LOAN_ASSET_TYPE`, the sign in `calculateAssetValue`): the property stays GROSS, the loan sits in the class of what it finances (`realestate` when `financedAssetId`, else `cash` = negative liquidity), out of every Rendimenti base, out of FIRE with the primary residence it finances. **In the Allocazione a loan FOLLOWS what it finances** (2026-10-17, `resolveAllocationRoleWithin`): a mortgage takes its property's role (excluded home → nets the excluded figure; a property in the allocation → nets Immobili in the base), a personal loan nets Liquidità in the base; never a plan's leg, its stored `allocationRole` inert. **Its «Intestatari» follow the property's quotas too** (`resolveAssetOwnership`, lib/utils/assetOwnership.ts; an asset is divisible by QUOTA since 2026-10-17 — `Asset.ownerShares` in units or percent + `ownerMemberId` as the rest, the ONE slice primitive `lib/utils/assetSlice.ts` shared with the goals' quotas, units past the quantity declared «quote da riassegnare», never rescaled; since 2026-10-18 every group measured on the VALUE and on the PRICE OF CARRY — `costOf` = `costBasisOf` of `patrimonioSummary.ts` injected beside `valueOf`, the tile's «Valore | Carico» `AsideToggle` —, an asset with no PMC at its value, a quoted one declared, never left out). Where the debt lives on the document is `debtBalanceField`'s alone (a loan's `quantity`, a legacy property's `outstandingDebt`, read-only since the one-shot migration `loanMigration.ts`).
 - GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset.
 - A Borsa Italiana bond quote is `% of par`, always, and `lib/utils/bondPricing.ts` is the ONE conversion (`quote / 100 × nominal × coefficient`, nominal **1 €** by default). Never re-implement it; never guard it on `nominal > 1` again (issue #340).
-- Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts` (`costBasisPerUnitEur`, fees included); `undefined` without a EUR PMC — print nothing, never dollars against euros.
+- Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts`: `costBasisPerUnitEur` (the fee-free PMC) for every G/P, YOC and PMC cell, `fiscalCostPerUnitEur` (purchase fees included) for every tax estimate (2026-11-12); `undefined` without a EUR PMC — print nothing, never dollars against euros.
 - Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; numbers not in the payload are born in `patrimonioSummary.ts`; the page owns every dialog.
 - Il resto — the mobile composition (§ Composizione mobile), the «Mutuo» tile, one per LOAN (interest measured only from the settled instalments, `mortgageSummary.ts`), the loan migration and its blind spots, the split class chip of a composite instrument (`describeAssetClassChip`), BTP€i, the «Andamento» view, `hasCostBasis`, `MIN_ANNUALIZABLE_DAYS`, the instrument driver, `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch, the `averageCostEur` backfill — in `doc/guide/patrimonio.md`.
 
@@ -373,6 +376,7 @@ file used to carry.
 - The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`; a replay returning `holdingStartDate: undefined` means leave the doc untouched (never `deleteField()`).
 - A trade date has ONE floor — the asset's OWN baseline (`BASELINE_NOT_FIRST`) — and the future as its only ceiling (2026-09-13); `assetTransactionsMeta.baselineDate` is NOT a floor.
 - Per-transaction derived data comes from `replayTransactionsWithEffects` (one pass), never a replay per prefix.
+- The PMC is fee-free and every tax reads `fiscalCostPerUnitEur`; a trade's fee row is planned and written in the trade's transaction (2026-11-12; `assetTransactionWriteTx.test.ts` W1, X1) — `lib/utils/tradeFeeExpense.ts`, its id drawn in prepare, a fee saved before then never gets one.
 - Il resto — settlement timing, `buildDerivedAssetFields` and the `averageCostEur` backfill, `resolveBondPrice` reuse, the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
 
 ### Cashflow — expense mechanics → `doc/guide/cashflow.md`

@@ -67,7 +67,7 @@ export const ALLOCATION_ADVICE_MAX_TOKENS = 32000;
 /** An interview round is a note and at most four questions: half the strategy's budget, most of it reasoning. */
 export const ALLOCATION_ADVICE_INTERVIEW_MAX_TOKENS = 16000;
 /**
- * How many searches the instrument agent may run. Twelve ran out on the owner's thirteen sleeves
+ * How many searches the instrument agent may run. Twelve ran out on a lived portfolio
  * (2026-10-20: two left unverified «perché il limite di ricerche è finito prima»); the prompt now
  * asks for one search per instrument and the cap leaves room for a second look.
  */

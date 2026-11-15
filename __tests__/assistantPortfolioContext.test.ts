@@ -123,7 +123,7 @@ function transaction(overrides: Partial<AssetTransaction> & Pick<AssetTransactio
 }
 
 const TRANSACTIONS: AssetTransaction[] = [
-  transaction({ id: 't-2', assetId: 'a-etf', type: 'sell', date: new Date('2026-09-10T00:00:00.000Z'), quantity: 20, priceEur: 118, fees: 2 }),
+  transaction({ id: 't-2', assetId: 'a-etf', type: 'sell', date: new Date('2026-09-10T00:00:00.000Z'), quantity: 20, priceEur: 118, fees: 2, feeExpenseId: 'fee-1' }),
   transaction({ id: 't-1', assetId: 'a-etf', type: 'buy', date: new Date('2026-01-10T00:00:00.000Z'), quantity: 120, priceEur: 100, isBaseline: true }),
   transaction({ id: 't-3', assetId: 'a-gone', type: 'buy', date: new Date('2025-05-05T00:00:00.000Z'), quantity: 1, priceEur: 10 }),
 ];
@@ -309,14 +309,15 @@ describe('buildAssistantPortfolioContext — allocation on the page\'s base', ()
 });
 
 describe('buildAssistantPortfolioContext — ledger and registers', () => {
-  it('orders the ledger by date, names the asset or says it is gone, carries fees and the baseline flag', () => {
+  it('orders the ledger by date, names the asset or says it is gone, carries fees, their spending row and the baseline flag', () => {
     const { ledger } = build();
     expect(ledger.totalRows).toBe(3);
     expect(ledger.omittedRows).toBe(0);
     expect(ledger.rows.map((row) => row.dateIso)).toEqual(['2025-05-05', '2026-01-10', '2026-09-10']);
     expect(ledger.rows[0]).toMatchObject({ assetName: 'Strumento non più in portafoglio', type: 'buy' });
-    expect(ledger.rows[1]).toMatchObject({ assetName: 'ETF Mondo', ticker: 'MONDO.MI', isBaseline: true, amountEur: 12000, feesEur: 0 });
-    expect(ledger.rows[2]).toMatchObject({ type: 'sell', quantity: 20, priceEur: 118, feesEur: 2, amountEur: 2360 });
+    expect(ledger.rows[1]).toMatchObject({ assetName: 'ETF Mondo', ticker: 'MONDO.MI', isBaseline: true, amountEur: 12000, feesEur: 0, feeIsSpendingRow: false });
+    // The sale's fee has its spending row (2026-11-12): the AI must not count it twice.
+    expect(ledger.rows[2]).toMatchObject({ type: 'sell', quantity: 20, priceEur: 118, feesEur: 2, feeIsSpendingRow: true, amountEur: 2360 });
   });
 
   it('keeps the most recent rows when the ledger exceeds the cap and counts what it left out', () => {

@@ -115,30 +115,30 @@ function dividend(id: string, fields: Record<string, unknown>): Row {
 
 function seedFixture() {
   collections.set('assets', [
-    { id: 'a-eni', data: { userId: OWNER, ticker: 'ENI.MI', name: 'Eni', type: 'stock', currency: 'EUR', quantity: 100, currentPrice: 15, averageCost: 12 } },
+    { id: 'a-orni', data: { userId: OWNER, ticker: 'ORNI.MI', name: 'Ornitorinco', type: 'stock', currency: 'EUR', quantity: 100, currentPrice: 15, averageCost: 12 } },
     { id: 'a-aapl', data: { userId: OWNER, ticker: 'AAPL', name: 'Apple', type: 'stock', currency: 'USD', quantity: 10, currentPrice: 200, currentPriceEur: 180, averageCost: 150, holdingStartDate: ts('2026-01-01T00:00:00Z') } },
     { id: 'a-btp', data: { userId: OWNER, ticker: 'IT0005547408', name: 'BTP 2031', type: 'bond', currency: 'EUR', quantity: 50, currentPrice: 101, averageCost: 99 } },
-    { id: 'a-spm', data: { userId: OWNER, ticker: 'SPM.MI', name: 'Saipem', type: 'stock', currency: 'EUR', quantity: 0, currentPrice: 2, averageCost: 20 } },
+    { id: 'a-tap', data: { userId: OWNER, ticker: 'TAP.MI', name: 'Tapiro', type: 'stock', currency: 'EUR', quantity: 0, currentPrice: 2, averageCost: 20 } },
     { id: 'x-other', data: { userId: 'someone-else', ticker: 'VWCE.DE', name: 'Other', type: 'etf', currency: 'EUR', quantity: 1, currentPrice: 100, averageCost: 90 } },
   ]);
   collections.set('dividends', [
-    dividend('d1', { assetId: 'a-eni', assetTicker: 'ENI.MI', assetName: 'Eni', dividendType: 'ordinary', exDate: ts('2025-05-19T00:00:00Z'), paymentDate: ts('2025-05-21T00:00:00Z'), dividendPerShare: 0.25, quantity: 100, grossAmount: 25, taxAmount: 6.5, netAmount: 18.5, costPerShare: 12 }),
-    dividend('d2', { assetId: 'a-eni', assetTicker: 'ENI.MI', assetName: 'Eni', dividendType: 'interim', exDate: ts('2025-11-17T00:00:00Z'), paymentDate: ts('2025-11-19T00:00:00Z'), dividendPerShare: 0.26, quantity: 100, grossAmount: 26, taxAmount: 6.76, netAmount: 19.24 }),
-    dividend('d3', { assetId: 'a-eni', assetTicker: 'ENI.MI', assetName: 'Eni', dividendType: 'final', exDate: ts('2026-09-21T00:00:00Z'), paymentDate: ts('2026-09-23T00:00:00Z'), dividendPerShare: 0.26, quantity: 100, grossAmount: 26, taxAmount: 6.76, netAmount: 19.24 }),
+    dividend('d1', { assetId: 'a-orni', assetTicker: 'ORNI.MI', assetName: 'Ornitorinco', dividendType: 'ordinary', exDate: ts('2025-05-19T00:00:00Z'), paymentDate: ts('2025-05-21T00:00:00Z'), dividendPerShare: 0.25, quantity: 100, grossAmount: 25, taxAmount: 6.5, netAmount: 18.5, costPerShare: 12 }),
+    dividend('d2', { assetId: 'a-orni', assetTicker: 'ORNI.MI', assetName: 'Ornitorinco', dividendType: 'interim', exDate: ts('2025-11-17T00:00:00Z'), paymentDate: ts('2025-11-19T00:00:00Z'), dividendPerShare: 0.26, quantity: 100, grossAmount: 26, taxAmount: 6.76, netAmount: 19.24 }),
+    dividend('d3', { assetId: 'a-orni', assetTicker: 'ORNI.MI', assetName: 'Ornitorinco', dividendType: 'final', exDate: ts('2026-09-21T00:00:00Z'), paymentDate: ts('2026-09-23T00:00:00Z'), dividendPerShare: 0.26, quantity: 100, grossAmount: 26, taxAmount: 6.76, netAmount: 19.24 }),
     // Paid at UTC midnight of «today»: received for the period, never upcoming.
     dividend('d4', { assetId: 'a-aapl', assetTicker: 'AAPL', assetName: 'Apple', dividendType: 'ordinary', currency: 'USD', exDate: ts('2026-06-12T00:00:00Z'), paymentDate: ts('2026-06-15T00:00:00Z'), dividendPerShare: 0.26, quantity: 10, grossAmount: 2.6, taxAmount: 0.39, netAmount: 2.21, grossAmountEur: 2.4, taxAmountEur: 0.36, netAmountEur: 2.04, exchangeRate: 0.923, costPerShare: 150 }),
     dividend('d5', { assetId: 'a-btp', assetTicker: 'IT0005547408', assetName: 'BTP 2031', dividendType: 'coupon', exDate: ts('2026-02-27T00:00:00Z'), paymentDate: ts('2026-03-01T00:00:00Z'), dividendPerShare: 1.25, quantity: 50, grossAmount: 62.5, taxAmount: 7.8125, netAmount: 54.6875 }),
     dividend('d6', { assetId: 'a-btp', assetTicker: 'IT0005547408', assetName: 'BTP 2031', dividendType: 'coupon', exDate: ts('2026-08-28T00:00:00Z'), paymentDate: ts('2026-09-01T00:00:00Z'), dividendPerShare: 1.25, quantity: 50, grossAmount: 62.5, taxAmount: 7.8125, netAmount: 54.6875, isProvisional: true }),
-    dividend('d7', { assetId: 'a-spm', assetTicker: 'SPM.MI', assetName: 'Saipem', dividendType: 'ordinary', exDate: ts('2025-05-19T00:00:00Z'), paymentDate: ts('2025-05-21T00:00:00Z'), dividendPerShare: 0.4, quantity: 100, grossAmount: 40, taxAmount: 10.4, netAmount: 29.6 }),
+    dividend('d7', { assetId: 'a-tap', assetTicker: 'TAP.MI', assetName: 'Tapiro', dividendType: 'ordinary', exDate: ts('2025-05-19T00:00:00Z'), paymentDate: ts('2025-05-21T00:00:00Z'), dividendPerShare: 0.4, quantity: 100, grossAmount: 40, taxAmount: 10.4, netAmount: 29.6 }),
     dividend('x1', { userId: 'someone-else', assetId: 'x-other', assetTicker: 'VWCE.DE', assetName: 'Other', dividendType: 'ordinary', exDate: ts('2026-01-01T00:00:00Z'), paymentDate: ts('2026-01-05T00:00:00Z'), dividendPerShare: 1, quantity: 1, grossAmount: 1, taxAmount: 0.26, netAmount: 0.74 }),
   ]);
   collections.set('monthly-snapshots', [
-    { id: `${OWNER}-2025-12`, data: { userId: OWNER, year: 2025, month: 12, totalNetWorth: 10000, byAsset: [{ assetId: 'a-eni', quantity: 100, totalValue: 1400 }] } },
+    { id: `${OWNER}-2025-12`, data: { userId: OWNER, year: 2025, month: 12, totalNetWorth: 10000, byAsset: [{ assetId: 'a-orni', quantity: 100, totalValue: 1400 }] } },
   ]);
   collections.set('assetTransactions', [
-    { id: 't1', data: { userId: OWNER, assetId: 'a-eni', type: 'buy', date: ts('2024-01-10T00:00:00Z'), quantity: 100, pricePerUnit: 12, priceEur: 12, fees: 0, createdAt: ts('2024-01-10T00:00:00Z'), updatedAt: ts('2024-01-10T00:00:00Z') } },
-    { id: 't2', data: { userId: OWNER, assetId: 'a-spm', type: 'buy', date: ts('2024-03-01T00:00:00Z'), quantity: 100, pricePerUnit: 20, priceEur: 20, fees: 0, createdAt: ts('2024-03-01T00:00:00Z'), updatedAt: ts('2024-03-01T00:00:00Z') } },
-    { id: 't3', data: { userId: OWNER, assetId: 'a-spm', type: 'sell', date: ts('2025-09-01T00:00:00Z'), quantity: 100, pricePerUnit: 24, priceEur: 24, fees: 0, createdAt: ts('2025-09-01T00:00:00Z'), updatedAt: ts('2025-09-01T00:00:00Z') } },
+    { id: 't1', data: { userId: OWNER, assetId: 'a-orni', type: 'buy', date: ts('2024-01-10T00:00:00Z'), quantity: 100, pricePerUnit: 12, priceEur: 12, fees: 0, createdAt: ts('2024-01-10T00:00:00Z'), updatedAt: ts('2024-01-10T00:00:00Z') } },
+    { id: 't2', data: { userId: OWNER, assetId: 'a-tap', type: 'buy', date: ts('2024-03-01T00:00:00Z'), quantity: 100, pricePerUnit: 20, priceEur: 20, fees: 0, createdAt: ts('2024-03-01T00:00:00Z'), updatedAt: ts('2024-03-01T00:00:00Z') } },
+    { id: 't3', data: { userId: OWNER, assetId: 'a-tap', type: 'sell', date: ts('2025-09-01T00:00:00Z'), quantity: 100, pricePerUnit: 24, priceEur: 24, fees: 0, createdAt: ts('2025-09-01T00:00:00Z'), updatedAt: ts('2025-09-01T00:00:00Z') } },
   ]);
 }
 
@@ -148,7 +148,7 @@ const QUERIES = {
   all: `userId=${OWNER}`,
   year2025: `userId=${OWNER}&startDate=2025-01-01&endDate=2025-12-31`,
   fromOnly: `userId=${OWNER}&startDate=2026-01-01`,
-  eniOnly: `userId=${OWNER}&assetId=a-eni`,
+  eniOnly: `userId=${OWNER}&assetId=a-orni`,
 };
 
 function request(query: string, authenticated = true, path = '/api/dividends/stats'): NextRequest {

@@ -78,6 +78,14 @@ describe('resolvePortfolioTaxProfile', () => {
     expect(profile?.gainShare).toBeCloseTo(500 / 2500);
   });
 
+  it('stands the basis on the fiscal cost, purchase fees included', () => {
+    const profile = resolvePortfolioTaxProfile(
+      [makeAsset({ id: 'etf', quantity: 10, currentPrice: 100, averageCost: 60, averageCostEur: 60, fiscalAverageCostEur: 61, taxRate: 26 })],
+      valueOf,
+    );
+    expect(profile?.basisToday).toBe(610); // 10 × 61, not 10 × 60
+  });
+
   it('treats an instrument with no EUR cost basis as basis and declares it', () => {
     const profile = resolvePortfolioTaxProfile(
       [
