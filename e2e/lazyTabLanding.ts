@@ -15,11 +15,7 @@
  * the old fallbacks put back.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
-import { holdChunks, holdRequests } from './chunkProbe';
-
-/** A function only the tab's own module defines (a dev chunk keeps the names; the page's chunk names only the path). */
-const DIVIDENDS_TAB_SIGNATURE = 'function DividendTrackingTab(';
-const SPLIT_TAB_SIGNATURE = 'function ExpenseSplitTab(';
+import { DIVIDENDS_TAB_SIGNATURE, SPLIT_TAB_SIGNATURE, holdChunks, holdRequests } from './chunkProbe';
 
 /** The first cell of the tile grid inside the panel's loading state (`TileGridSkeleton`). */
 function firstSkeletonCell(panel: Locator): Locator {
@@ -63,6 +59,9 @@ export async function expectDividendsTabLandsInPlace(page: Page): Promise<void> 
   const cell = firstSkeletonCell(panel);
   await expect(cell).toBeVisible({ timeout: 60_000 });
   const placeholderTop = await settledTopOf(cell);
+  // The cell measured is the PAGE's placeholder only while the tab's chunk is stopped: since the tab's
+  // own loading state is that same element, nothing else here would tell a held chunk from none.
+  expect(tabChunk.held(), 'the Dividendi tab\'s chunk is held while the placeholder is measured').toBeGreaterThan(0);
 
   tabChunk.release();
   // The chunk is fulfilled at once; evaluating it and mounting the tab is well inside this wait,

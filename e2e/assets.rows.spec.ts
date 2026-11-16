@@ -26,14 +26,12 @@
  * for the table, not the proof that rows stopped mounting their sparkline — that one is at 390.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { probeChunks } from './chunkProbe';
+import { SPARKLINE_SIGNATURE, probeChunks } from './chunkProbe';
 
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 process.env.GCLOUD_PROJECT = 'demo-net-worth';
 
 const UID = 'test-user-1';
-/** A function only `components/assets/AssetSparkline.tsx` defines (a dev chunk keeps the names). */
-const SPARKLINE_SIGNATURE = 'function AssetSparkline';
 
 test.setTimeout(120_000);
 

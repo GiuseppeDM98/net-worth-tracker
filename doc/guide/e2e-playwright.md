@@ -128,12 +128,21 @@
 - **All six setups red at 30 s on `/login` is a COLD dev server** (2026-09-30, after an `npm ci`, CPU loaded): start
   `npm run dev:e2e` detached, request the 13 routes once, run `--project=setup`, then the suite — it reuses the server.
 - **What a page DOWNLOADS is asserted by chunk CONTENT** (`e2e/chunkProbe.ts`, 2026-09-30): chunk names change every
-  build, so `probeChunks` reads each body for a library's module path (`node_modules/d3-sankey/`) or a function only one
-  module defines — never OUR module's path, which the importer's chunk also names in its `import()` loader, and never a
-  word a comment could hold (dev chunks keep comments). To measure a placeholder against what replaces it, HOLD the
-  chunk until the test releases it (`holdChunks`) — a fixed delay loses the race to a preload — and navigate to
-  `domcontentloaded`: a held chunk requested before `load` means `load` never fires. The suite runs `next dev`, so these
-  prove an import is lazy; sizes are `perf:budget`'s. Worked example: `e2e/bundle.lazy{,.mobile}.spec.ts`.
+  build, so `probeChunks` reads each body for a STRING LITERAL of the module (`CHUNK_SIGNATURES` in `chunkProbe.ts`, since
+  2026-11-16): a minifier renames functions and drops module paths and comments, never a string, so one signature
+  holds on `next dev` and on the production build of the whole run. A literal of ONE source file of `app/`,
+  `components/`, `lib/` — a comment counts, dev chunks keep them (`circular link` is quoted by `cashflowSankey.ts`, so
+  the Sankey's signature is d3-sankey's `Error("circular link")`) —, pinned by `__tests__/chunkSignatures.test.ts`;
+  never OUR module's path, which the importer's chunk also names in its `import()` loader. To measure a placeholder
+  against what replaces it, HOLD the chunk until the test releases it (`holdChunks`) — a fixed delay loses the race to a
+  preload — and navigate to `domcontentloaded`: a held chunk requested before `load` means `load` never fires. A held
+  check that stays true with NOTHING held asserts `held() > 0` (Dividendi's landing: the tab's loading state is the
+  page's placeholder). These prove an import is lazy; sizes are `perf:budget`'s. Worked example:
+  `e2e/bundle.lazy{,.mobile}.spec.ts`. **A signature is proven by breaking it**: with every one set to a string no chunk
+  holds, the presence and hold checks go red (8 of the 11 tests on 2026-11-16, both servers; Dividendi's the ninth, once
+  it asserted `held()`); the four absence checks — two of them in tests a broken signature leaves green — by
+  putting a static import back (the PDF engine in `PDFExportDialog`, the Sankey in `FlussoTile`, the Flusso in
+  `DettaglioDisclosure`, the sparkline's preload at 1440 in `StrumentiTile`), each red at its own line on both servers.
 - **Only four lazy surfaces are held against a placeholder that moves**: Analisi's Sankey (`layout-shift` 0
   and equal heights) and Rendimenti's Dettaglio (no placeholder ever shown), both in `e2e/bundle.lazy.spec.ts`
   (2026-09-30); Cashflow's Dividendi at 390 and Divisione at 390 and 1440 (2026-10-06, `e2e/lazyTabLanding.ts`, run
@@ -214,8 +223,9 @@
 - **`workers: 1`, non-negotiable** (the specs share emulator accounts). **Give the suite its OWN fixture**, tuned so the
   thing under test is on screen at all (Analisi dates every expense to January so its figures are exact in any month;
   Coast picks the RITA long-unemployment variant because the ordinary unlock falls past the projection) and say so in
-  the file. `e2e/global-setup.ts` runs every seed, in order Previdenza → Coast → degraded → Analisi, on EVERY
-  invocation: a new fixture is an `npm run e2e:seed:*` script plus one `spawnSync` there, and a test that patches
+  the file. `e2e/global-setup.ts` runs every seed on EVERY invocation, side by side since 2026-11-16 (each writes its
+  own account; Previdenza → Coast stay a chain, Coast's inflow needs the fund): a new fixture is an `npm run e2e:seed:*`
+  script plus one `runSeed` in that `Promise.all` — after another one only if it reads what that one writes —, and a test that patches
   Firestore does it inside the test. **Re-seeding an account mid-suite logs it out** (`auth.updateUser(uid, { password })`
   revokes the refresh tokens and the parked `storageState`): creation once from `global-setup`, data-only per test.
 - **`storageState` does NOT capture IndexedDB unless asked** (`{ path, indexedDB: true }`) — the Firebase session lives
@@ -243,7 +253,8 @@
 - **Prove the test can fail before trusting it** (the 1440px assertions were re-run at 1200px, where they must fail).
 - **The full run and its known flakes** (the record of each run is in its commit message since 2026-10-19; before
   that, in `git log -- doc/guide/e2e-emulatori.md`). A full run is ~290 tests incl. 6 setups in ~12 min on the reference
-  machine (2026-10-16); 351 tests in 18,2 min on the Windows machine on 2026-11-13 (§ The suite's speed). Each flake below was red once or twice in a full run and green alone right after
+  machine (2026-10-16); 351 tests in 18,2 min on the Windows machine on 2026-11-13, 403 in 11,8 min on the production
+  build on 2026-11-16 (§ The suite's speed). Each flake below was red once or twice in a full run and green alone right after
   (`--repeat-each=3`); a second red of the same test is a pattern, not noise:
   - `cashflow.tablet.spec.ts` «the tabs are 44×44…» [tablet] (2026-10-16): 0 visible tabs 1,3 s after the verdict — the tab
     bar not yet painted when `open()` returned on the verdict and THE tile. Returned on 2026-10-20 (landscape, one full run); since then `open()` waits for the tablist and a visible tab too.
@@ -266,8 +277,13 @@
     `TransactionFeed` (doc/guide/cashflow-tracciamento.md § Files); the test polls the row's place.
   - `mobile-composition.patrimonio.mobile.spec.ts` «the DOM order is the vertical order…» (2026-10-18): the test ended while
     `patchOverview`'s route callback still had the overview refetch in flight (`route.fetch: Test ended` at
-    `overviewFixture.ts:73`) — a harness race of a 2,6 s test, not a page fact. If it returns, end that test with
-    `page.unrouteAll({ behavior: 'ignoreErrors' })`.
+    `overviewFixture.ts:73`) — a harness race of a 2,6 s test, not a page fact. Returned on 2026-11-16 on BOTH DOM-order
+    tests, Patrimonio's and Panoramica's, in one full run with the trace off (green 16/16 alone): closed in
+    `patchOverview` itself, whose route callback lets a fetch the test's end cut short go (`Test ended` / `has been
+    closed`) — every caller at once, no assertion touched.
+  - `cashflow.dividendi.spec.ts` «the form refuses…» — the BTP row detached from the picker as it was clicked (doc/guide/
+    cashflow-dividendi.md § Per-page blind spots): red again on 2026-11-16, once in the full run of the parallel seeds
+    (green ×4 alone right after) — the third time with this symptom, a pattern still open.
 - **A full run on the month's first three days reads a different Budget** (2026-11-03): `mobile-composition.cashflow.mobile.spec.ts` «the two cells open the right row» counted two lifted KPIs, one on those days (no pace, `liftedBlocks` skips «Fine mese»); it now reads the Italian day. Not a flake: a test written on a later day stays green until a run lands there. **A seed that ran before the Auth emulator was up** gave 12 red in one full run the same day (`seed exit=1`, the fixtures missing): wait on BOTH :8080 and :9099 before `emulators:seed`.
 - **`e2e/cashflow.transfer-fee.spec.ts` was red ONCE in a full run** (2026-10-07, Windows machine, the second full run
   of PR #434, which did not touch transfers): green alone and in the suite's order, cause not traced. A second red
@@ -333,7 +349,8 @@
   in the DOM**: `toContainText` on the verdict's region reads it, so «title only» is asserted with
   `getByText(/Il patrimonio vale/)` → `toBeHidden()`, never with `not.toContainText` (seen that day).
 - **A control that calls a model is pressed only on a FAKED route** (owner, 2026-11-07):
-  `npm run dev:e2e` is `next dev`, which loads `.env.local`, so the owner's real `ANTHROPIC_API_KEY` reaches the server
+  `npm run dev:e2e` is `next dev`, which loads `.env.local` — and so does the whole run's production server since
+  2026-11-16 (`perfServe.mjs --env-local`) —, so the owner's real `ANTHROPIC_API_KEY` reaches the server
   on :3100 and enables the control (the Consulente's `configured`) — the key makes it pressable, never what answers
   it. The spec installs `page.route('**/api/allocation-advice/run', …)` BEFORE the click and answers each request by
   its `stage` with an SSE body (`data: {json}\n\n`: the `stage` events, then `done` or `error`; an interview round is ONE `interview` event, `e2e/consulenteInterview.ts`); a request it must
@@ -416,40 +433,46 @@
 
 ## The suite's speed
 
-Measured on 2026-11-13 on the Windows machine (8 logical cores, 31,5 GB, Playwright 1.62.1, Next 16.4.2), one run per
-configuration, same day; two equal runs differ by about 15% (the run of that morning took 21,1 min). Nothing was
-implemented that day: the gate in two levels is WORKFLOW.md § 3, the three levers below wait for a session of their own.
+**Since 2026-11-16 the whole run is served from a production build** (`npm run test:e2e` = `npm run e2e:build`, then
+`E2E_SERVER=build playwright test`), while an area run (`npx playwright test e2e/<area>`) keeps `next dev`, which a
+change needs no build for. The three levers decided on 2026-11-13 were implemented that day, each measured alone in a
+whole run, on the Windows machine (8 logical cores, 31,5 GB, Playwright 1.62.1, Next 16.4.2), same day:
 
-| Run | Tests | Wall | Outcome |
-| --- | --- | --- | --- |
-| `next dev`, `trace: 'retain-on-failure'` (the config as it is) | 351 | 18,2 min | 349 green, 1 red (the `overview.mobile` flake above), 1 skipped |
-| production server on :3100, trace on | 351 | 18,3 min, ~6 of them the timeouts of its 7 reds | 343 green, 7 red |
-| `next dev`, `--trace=off`, 71 files of 75 | 333 | 12,5 min | 332 green |
-| production server, `--trace=off`, 71 files of 75 | 333 | 9,9 min | 332 green |
+| Run (2026-11-16) | Tests | Wall | Before the first test | Sum of the tests | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| The start: `next dev`, `trace: 'retain-on-failure'`, seeds in series | 403 | 17,1 min | 40,2 s | 965 s | 402 green, 1 skipped |
+| Lever 1 — the trace off, first run | 403 | 16,0 min | 28,3 s | 909 s | 400 green, 2 red (`patchOverview`'s race, above), 1 skipped |
+| Lever 1 — the trace off, second run | 403 | 17,8 min | 60,8 s | 986 s | 402 green, 1 skipped |
+| Lever 2 — the seeds in parallel (trace back on) | 403 | 19,5 min | 29,5 s | 1111 s | 401 green, 1 red (the Dividendi flake, above), 1 skipped |
+| Lever 3 — the production build, `npm run test:e2e` | 403 | **11,8 min** | 17,9 s | **670 s** | 402 green, 1 skipped |
+| The session's gate, `npm run test:e2e` with its rebuild (the docs had changed) | 403 | 12,3 min | — | — | 402 green, 1 skipped |
 
-On the 331 tests green in all four: 954,5 s → 680,8 s without the trace (−29%) → 643,9 s on the production server with it
-(−33%) → 528,5 s with both (−45%). The whole suite is about 13 min on `next dev` without the trace, about 10,3 min on the
-production server without it.
-
-- **The trace is the cost, not the compilation** — `retain-on-failure` records EVERY test: about 274 s of the 1001 s of
-  tests, most of it on `next dev`, whose unminified chunks go into the trace (`allocation.consulente.report` 88,2 → 29,6 s,
-  `allocation.consulente.interview` 71,1 → 20,5 s). The first visit of each page costs the server 20,6 s in a whole run
-  (49 paths, 1236 requests, one «Compiling» line): `.next-e2e/dev/cache` is Turbopack's persistent cache (1,3 GB). Not
-  measured with `.next-e2e` deleted.
-- **Every invocation pays ~40 s before its first test**: `global-setup` runs its eight seeds in series, ~5 s each, nearly
-  all of it the start of `npm run` + `tsx` — four tests alone are 41,8 s of wall. The six logins are 15,9 s on `next dev`,
-  3,7 s on the production server; worker start and the gaps between tests 51 s.
-- **What a production server breaks**: seven tests in four files go red and three stay green asserting nothing, all because
-  `e2e/chunkProbe.ts` knows a chunk by its unminified CONTENT (`node_modules/d3-sankey/`, `function AssetSparkline`) —
-  red `bundle.lazy.spec.ts` ×3, `cashflow.split.spec.ts` and `cashflow.split.mobile.spec.ts` (the lazy tab's landing),
-  `assets.rows.mobile.spec.ts` ×2; mute `bundle.lazy.mobile.spec.ts` ×2 and `assets.rows.spec.ts`'s «no sparkline». The
-  rest: `next start` refuses `output: "standalone"` (the recipe is `scripts/perfServe.mjs`'s); a standalone `server.js`
-  does not read `.env.local`, which `next dev` does — set the emulator variables first, then load the file with
-  `@next/env`, or the Consulente (a dynamic page) reads no key, while `/dashboard/assistant` and `/dashboard/cashflow` are
-  prerendered and took `assistantConfigured` at BUILD time; `perf:build` bakes the same `NEXT_PUBLIC_*` as `dev:e2e`; a
-  change to the code needs a build (44 s) and a restart, and `reuseExistingServer` would run on a stale build in silence;
-  `.next-perf` is shared with `perf:serve` and the census. Not verified: whether `shell.boot`'s hydration checks still
-  see a mismatch on a production build.
+- **Lever 1 was measured and NOT kept**: on the 400 tests green in all three, 961 s with the trace → 903 s and 982 s
+  without, inside the run-to-run noise (two equal runs differ by up to ~15%: the lever-2 run's tests took 1111 s, a
+  lever that touches no test). On 2026-11-13 the same switch measured −29%, but that day's dev runs carried first-visit
+  costs of up to 88 s per test (`allocation.consulente.report` 88,2 → 29,6 s; on 2026-11-16 it was 8,3 → 7,1 s). So
+  `trace` stays `retain-on-failure` (decided by the agent on the owner's delegation, 2026-11-16): without a gain, turning
+  it off only takes away the trace of the reds a whole run alone produces, as the two of that day. `--trace=off` still
+  turns it off for one run.
+- **Lever 2, the seeds in parallel**: `global-setup` alone went 19,7 → 7,9 s (three runs each); in a whole run the first
+  test starts at 17,9–29,5 s instead of 40,2 s. The seeds write disjoint accounts; Previdenza → Coast stay a chain, and
+  each seed's output is printed whole when it ends (`runSeed` in `e2e/global-setup.ts`).
+- **Lever 3, the production build — −31% of wall, −31% of the tests' own time** (965 → 670 s), the six logins 8,1 →
+  5,2 s. `scripts/e2eBuild.mjs` builds into `.next-e2e-build` (its own dist dir: `.next-perf` is the benchmark's and the
+  census's, built with their options) only when `scripts/buildFingerprint.mjs`'s hash of the sources differs from the
+  build's stamp — every file git sees, tracked or not, `e2e/` and `__tests__/` left out, plus `.env.local`; 51 s cold, ~20 s
+  on Turbopack's warm cache, <1 s to say «not rebuilt». `scripts/perfServe.mjs --port=3100 --dist=.next-e2e-build
+  --env-local --fresh` serves it: the emulator variables first, then `.env.local` with Next's own `@next/env` (which
+  never overrides them; without it the Consulente, a dynamic page, reads no key). **Two guards against a stale build**,
+  both seen working that day: `--fresh` refuses a build whose stamp is not the tree's («The build in .next-e2e-build is
+  not the build of the code as it stands»), and on the build `reuseExistingServer` is off — a server already on :3100
+  (a `dev:e2e`, the owner's other app) stops the run with Playwright's «already used» instead of being tested. The
+  eleven chunk tests were rewritten on signatures that survive minification (§ What a page DOWNLOADS, above), green on
+  both servers and each seen red with its mutation on both. `shell.boot`'s hydration checks pass on the build.
+- **The measures of 2026-11-13 that still hold**: the first visit of each page costs `next dev` 20,6 s in a whole run (49
+  paths, 1236 requests; `.next-e2e/dev/cache` is Turbopack's persistent cache, 1,3 GB) — gone on the build; the six logins
+  are slower on `next dev` (15,9 s against 3,7 that day); before lever 2, `global-setup`'s eight seeds were ~5 s each in
+  series, nearly all of it the start of `npm run` + `tsx`.
 - **Sharding by account does not pay as the accounts stand**: the base account is 59 files, 254 tests and 77% of the
   time (772 s; degraded 56 s, analisi 55 s, hof 44,5 s, split 44 s, centri 29 s), so the wall stays the base account's.
   Cloning it means `test-user-1` in 21 specs and 2 helpers, about 35 files that write to it, about 40 fixed ids
@@ -458,12 +481,10 @@ production server without it.
   between two projects of one account. **And the trace serialises the workers**: three accounts on three workers went
   49,3 → 40,2 s with it (the CPU at 1,7 cores of 8) and 42,1 → 21,9 s without; four workers on the base account with the
   trace made each test 3–7× slower. One port is enough on a production server.
-- **To implement, in this order** (decided 2026-11-13 on the owner's delegation): the trace off in the config, a red
-  re-run with `--trace=on`; the seeds of `global-setup` in parallel (Previdenza before Coast); then the production server
-  for the WHOLE run only — the ten chunk tests rewritten on a signature that survives minification or kept on a `next dev`
-  project, a guard against a stale build, `scripts/perfServe.mjs` parametrised by port rather than a twin. No sharding.
+- **Not done, by the decision of 2026-11-13**: no sharding (above). Left for a later session, if ever: the Dividendi
+  picker flake and the `overview.mobile` six-figure one (§ The full run and its known flakes).
 
-Time per area, `next dev` with the trace · production without it (the specs of an area: its guide's § *Files*):
+Time per area on 2026-11-13, `next dev` with the trace · production without it (the specs of an area: its guide's § *Files*):
 Consulente 207 · 73 s; Cashflow's Tracciamento, accounts, mortgage and fee 140 · 92; Patrimonio 82 · 51; Assistente 64 · 33;
 Analisi 53 · 28; Previdenza 48 · 33; FIRE 45 · 29; Divisione 42; Hall of Fame 41 · 23; Panoramica 38 · 23; Allocazione
 34 · 20; Impostazioni 34 · 18; motion 31 · 24; Centri 27 · 13; Rendimenti 27 · 17; Dividendi 16 · 10; Storico 15 · 11;

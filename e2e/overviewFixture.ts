@@ -70,7 +70,16 @@ export function baseOverviewPatch(): Json {
  */
 export async function patchOverview(page: Page, overrides: Json = {}): Promise<void> {
   await page.route('**/api/dashboard/overview*', async (route) => {
-    const response = await route.fetch();
+    let response;
+    try {
+      response = await route.fetch();
+    } catch (error) {
+      // The test ended while a refetch was still in flight («route.fetch: Test ended», the DOM-order tests of
+      // Patrimonio and Panoramica at 390: 2026-10-18 once, 2026-11-16 both in one full run with the trace off,
+      // green 16/16 alone). The page is gone and no assertion waits on this answer: nothing to fulfil.
+      if (/Test ended|has been closed/.test(String(error))) return;
+      throw error;
+    }
     let body: Json;
     try {
       body = (await response.json()) as Json;
