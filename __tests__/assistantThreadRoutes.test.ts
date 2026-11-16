@@ -5,7 +5,7 @@
  * These tests complement assistantRoutes.test.ts which covers GET/POST on /threads.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const {
@@ -179,8 +179,14 @@ describe('buildThreadTitleFromPrompt (real implementation)', () => {
 // ── The register thread's title (2026-11) ────────────────────────────────────
 
 describe('the register thread’s title (the store’s real functions)', () => {
-  // The store is mocked for the routes above: these read the real module.
-  const realStore = () => vi.importActual<typeof import('@/lib/server/assistant/store')>('@/lib/server/assistant/store');
+  // The store is mocked for the routes above: these read the real module. Its graph (the Admin
+  // SDK) is a FIXTURE, loaded once with its own timeout: inside the first case, under the whole
+  // suite's load, it overran the 5 s default (2026-11-16).
+  let store: typeof import('@/lib/server/assistant/store');
+  beforeAll(async () => {
+    store = await vi.importActual<typeof import('@/lib/server/assistant/store')>('@/lib/server/assistant/store');
+  }, 30_000);
+  const realStore = async () => store;
 
   it('defaults to «Registrazioni» in register and to «Nuova conversazione» elsewhere', async () => {
     const { getDefaultThreadTitle } = await realStore();

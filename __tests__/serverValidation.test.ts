@@ -234,8 +234,9 @@ describe('parseOr400', () => {
 describe('assistantStreamRequestSchema (2026-11)', () => {
   const base = { userId: 'u1', mode: 'chat', prompt: 'Come va?' };
 
-  it('accepts the six modes and nothing else', () => {
-    for (const mode of ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'chat', 'register']) {
+  // Seen RED with `z.string()` for the mode: «weekly» passed.
+  it("accepts the six modes and 'auto', and nothing else", () => {
+    for (const mode of ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'chat', 'register', 'auto']) {
       expect(assistantStreamRequestSchema.safeParse({ ...base, mode }).success, mode).toBe(true);
     }
     expect(assistantStreamRequestSchema.safeParse({ ...base, mode: 'weekly' }).success).toBe(false);
@@ -268,6 +269,34 @@ describe('assistantStreamRequestSchema (2026-11)', () => {
     expect(assistantStreamRequestSchema.safeParse({ ...base, threadId: 'a/b' }).success).toBe(false);
     expect(assistantStreamRequestSchema.safeParse({ ...base, chatContext: 'week' }).success).toBe(false);
     expect(assistantStreamRequestSchema.safeParse({ ...base, preferences: { responseStyle: 'verbose' } }).success).toBe(false);
+  });
+
+  // The reading chosen by the client (2026-11): only with 'auto', and 'auto' never with a period.
+  // Seen RED with the `superRefine` dropped: the three refused bodies passed.
+  describe("mode 'auto', the route and routeCarried", () => {
+    const route = { intent: 'chat', period: { kind: 'none' }, webSearch: false };
+
+    it('keeps a route and its carried flag beside auto', () => {
+      expect(assistantStreamRequestSchema.parse({ ...base, mode: 'auto', route, routeCarried: true }))
+        .toEqual({ ...base, mode: 'auto', route, routeCarried: true });
+    });
+
+    it.each([
+      [{ mode: 'chat', route }, 'Una lettura scelta vale solo con mode auto.'],
+      [{ mode: 'auto', routeCarried: true }, 'Una lettura ereditata richiede la lettura.'],
+      [{ mode: 'auto', month: { year: 2026, month: 3 } }, 'Con mode auto il periodo lo legge il server.'],
+      [{ mode: 'auto', year: 2025 }, 'Con mode auto il periodo lo legge il server.'],
+      [{ mode: 'auto', chatContext: 'none' }, 'Con mode auto il periodo lo legge il server.'],
+    ])('refuses %o: «%s»', (extra, message) => {
+      const parsed = assistantStreamRequestSchema.safeParse({ ...base, ...extra });
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues.map((issue) => issue.message)).toContain(message);
+    });
+
+    it('refuses a route of an unknown intent or a malformed period', () => {
+      expect(assistantStreamRequestSchema.safeParse({ ...base, mode: 'auto', route: { ...route, intent: 'weekly' } }).success).toBe(false);
+      expect(assistantStreamRequestSchema.safeParse({ ...base, mode: 'auto', route: { ...route, period: { kind: 'month', year: 2026 } } }).success).toBe(false);
+    });
   });
 });
 

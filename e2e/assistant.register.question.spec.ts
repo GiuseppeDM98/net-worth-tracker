@@ -1,6 +1,6 @@
 /**
  * Assistente › Registra at 1440px: the questions the Assistente asks (2026-11,
- * doc/guide/assistente.md § Registra; DESIGN.md → The Question-Card Rule).
+ * doc/guide/assistente-registra.md § Registra; DESIGN.md → The Question-Card Rule).
  *
  * WHY IT EXISTS: the parser and the card are held by Vitest; what only a browser knows is that a
  * message of two ```assistant-question blocks draws two cards and ONE «Rispondi», that «Altro…»

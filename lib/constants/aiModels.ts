@@ -17,7 +17,8 @@
  * WARNING (Checklist Comment): every call reads content blocks by `type`; the three prose
  * surfaces send `thinking: { type: 'adaptive' }` with an `effort` (`high`, Sonnet 5.5's default,
  * kept without an effort sweep: owner's decision of 2026-10-23), the memory
- * extraction sends neither and forces `tool_choice` — Haiku 5.5 accepts it and then skips
+ * extraction and the Assistente's router (`lib/server/assistant/router.ts`) send neither and force
+ * `tool_choice` — Haiku 5.5 accepts it and then skips
  * thinking, so its `max_tokens` holds the tool input alone; Sonnet 5.5 / Opus 5.5 refuse a forced
  * `tool_choice` (400), so moving the extraction up a tier means `tool_choice: 'auto'` plus
  * `strict: true` on the tool and room for thinking in `max_tokens`. A Sonnet 5.5
@@ -53,6 +54,9 @@ export const EMAIL_ANALYSIS_MODEL = 'claude-sonnet-5-5';
 
 /** Structured extraction (assistant memory): a small, fast model on purpose. */
 export const MEMORY_EXTRACTION_MODEL = 'claude-haiku-5-5';
+
+/** The Assistente's router (2026-11): one forced tool call per message — Haiku 5.5 accepts it, Sonnet and Opus 5.5 refuse it. */
+export const ASSISTANT_ROUTER_MODEL = 'claude-haiku-5-5';
 
 /**
  * The Consulente of the Allocazione page (2026-10-20, owner's decision): the strategy, the

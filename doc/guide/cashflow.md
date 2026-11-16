@@ -9,7 +9,7 @@
 > Modules and files: § *Files* below.
 >
 > The Assistente's card writes through the same services and the same field rules: every rule here holds there
-> (2026-11, doc/guide/assistente.md § Registra).
+> (2026-11, doc/guide/assistente-registra.md § Registra).
 
 ## Files
 

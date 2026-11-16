@@ -1,5 +1,5 @@
 /**
- * Assistente › Registra at 1440px, on the base account (2026-11, doc/guide/assistente.md).
+ * Assistente › Registra at 1440px, on the base account (2026-11, doc/guide/assistente-registra.md).
  *
  * WHY IT EXISTS: the protocol, the resolution and the card are held by Vitest; what only a browser
  * on the emulators knows is that «Registra» swaps the period axis for its strip and shows what the

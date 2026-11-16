@@ -1,6 +1,6 @@
 /**
  * Assistente › Registra at 1440px: the kinds of row beyond a plain expense (2026-11,
- * doc/guide/assistente.md § Registra).
+ * doc/guide/assistente-registra.md § Registra).
  *
  * WHY IT EXISTS: the resolver and the card are held by Vitest on mocked services; what only the
  * emulators know is that «Conferma» writes each kind as the expense dialog does — a transfer moves

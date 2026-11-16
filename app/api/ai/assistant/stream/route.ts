@@ -40,10 +40,19 @@ import {
 import { stripFencedBlocks } from '@/lib/utils/expenseProposal';
 import { assistantStreamRequestSchema, parseOr400 } from '@/lib/server/validation';
 import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
+import { createRouterClient, routeAssistantMessage } from '@/lib/server/assistant/router';
+import {
+  checkRouteConsistency,
+  routeToSelection,
+  type AssistantRouteSelection,
+} from '@/lib/utils/assistantRoute';
+import { getItalyDateIso, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import {
   AssistantMemoryItem,
+  AssistantMode,
   AssistantMonthContextBundle,
   AssistantRegisterSummary,
+  AssistantRouteReading,
   AssistantStreamEvent,
   AssistantTodayContext,
 } from '@/types/assistant';
@@ -197,25 +206,83 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Today on the Italian calendar: the router's date and the consistency check of an override.
+    const now = new Date();
+    const today = getItalyMonthYear(now);
+    const todayIso = getItalyDateIso(now);
+
+    let existingThread = body.threadId
+      ? await getAssistantThread(body.threadId, body.userId)
+      : null;
+
+    // Load conversation history BEFORE appending the new user message so the
+    // new message is not included. Loaded only for existing threads — a brand
+    // new thread has no prior exchange to inject. Read before the selection: the router reads
+    // the previous turn (2026-11).
+    const conversationHistory = existingThread
+      ? (await getAssistantThreadDetail(existingThread.id, body.userId)).messages
+      : [];
+
+    // The selection (2026-11): with mode 'auto' the reading — an override taken as is, or the
+    // router's — becomes today's request fields; an explicit mode is its own selection. Every read
+    // of the mode or the period below this point is `selection`'s, never `body`'s.
+    if (body.mode === 'auto' && body.route && !checkRouteConsistency(body.route, today)) {
+      return NextResponse.json({ error: 'Lettura non valida.' }, { status: 400 });
+    }
+    let reading: AssistantRouteReading | null = null;
+    let routerMs: number | null = null;
+    if (body.mode === 'auto' && body.route) {
+      reading = { route: { ...body.route, confidence: 1 }, source: body.routeCarried ? 'carried' : 'override' };
+    } else if (body.mode === 'auto') {
+      // The previous turn: the thread's LAST assistant message and the user message right before it. A failed
+      // stream leaves a user message with no answer after it, and an explicit-mode answer carries no reading.
+      const lastAssistantIndex = conversationHistory.findLastIndex((m) => m.role === 'assistant');
+      const lastAssistant = lastAssistantIndex >= 0 ? conversationHistory[lastAssistantIndex] : undefined;
+      const askedBy = lastAssistant?.routeReading
+        ? conversationHistory.slice(0, lastAssistantIndex).findLast((m) => m.role === 'user') : undefined;
+      // `elapsedMs` goes to the log, never onto the stored reading.
+      const { elapsedMs, ...outcome } = await routeAssistantMessage({
+        prompt: body.prompt.trim(), today, todayIso,
+        previous: lastAssistant?.routeReading && askedBy
+          ? { reading: lastAssistant.routeReading, userMessage: askedBy.content } : null,
+      }, createRouterClient());
+      reading = outcome;
+      routerMs = elapsedMs;
+    }
+    const selection: AssistantRouteSelection = reading ? routeToSelection(reading.route)
+      : { mode: body.mode as AssistantMode, month: body.month, year: body.year, chatContext: body.chatContext };
+
     const preferences = {
       ...getDefaultAssistantPreferences(),
       ...body.preferences,
     };
-    const enableWebSearch = resolveAssistantWebSearchPolicy(
-      body.mode,
-      body.prompt,
-      preferences
-    );
+    // Registra never searches; a reading the owner chose is taken as it is; the router (and a
+    // carried reading, already effective on its own turn) can only ADD a search to today's policy,
+    // never remove one («Contesto macro» on keeps searching).
+    const policy = resolveAssistantWebSearchPolicy(selection.mode, body.prompt, preferences);
+    const enableWebSearch = selection.mode === 'register' ? false : reading?.source === 'override'
+      ? reading.route.webSearch : (reading?.route.webSearch ?? false) || policy;
+    if (reading) reading = { ...reading, route: { ...reading.route, webSearch: enableWebSearch } };
+    // An analysis writes its macro sentence from `includeMacroContext` (prompts.ts): with a reading
+    // the sentence follows the EFFECTIVE web decision, so it and the tool always agree. For an
+    // explicit analysis the two are equal by construction; chat and Registra do not read it.
+    const isAnalysis = selection.mode !== 'chat' && selection.mode !== 'register';
+    const promptPreferences = reading && isAnalysis
+      ? { ...preferences, includeMacroContext: enableWebSearch }
+      : preferences;
 
-    // Structured server-side log: route, mode, web-search decision.
+    // Structured server-side log: route, mode, web-search decision, the reading's source.
     // Never logs prompt content or financial data — only metadata safe to write to server logs.
     console.info('[assistant/stream] request', {
       route: '/api/ai/assistant/stream',
-      mode: body.mode,
+      mode: selection.mode,
       webSearch: enableWebSearch,
-      hasMonth: Boolean(body.month),
-      hasYear: Boolean(body.year),
+      hasMonth: Boolean(selection.month),
+      hasYear: Boolean(selection.year),
       hasThreadId: Boolean(body.threadId),
+      routeSource: reading?.source ?? null,
+      routeReason: reading?.reason ?? null,
+      routerMs,
     });
 
     // Build the numeric context bundle based on mode.
@@ -230,39 +297,38 @@ export async function POST(request: NextRequest) {
     // Registra: the register block (ids, recent rows, the month so far) and no period bundle.
     let registerBlock: string | null = null;
     let registerSummary: AssistantRegisterSummary | null = null;
-    const now = new Date();
-    if (body.mode === 'register') {
+    if (selection.mode === 'register') {
       const registerContext = buildAssistantRegisterContext(await fetchRegisterInputs(body.userId, now));
       registerBlock = formatRegisterContextForPrompt(registerContext);
       registerSummary = summarizeRegisterContext(registerContext);
-    } else if (body.mode === 'year_analysis' && body.year) {
-      contextBundle = await buildAssistantYearContext(body.userId, body.year, includeDummy);
-    } else if (body.mode === 'ytd_analysis') {
+    } else if (selection.mode === 'year_analysis' && selection.year) {
+      contextBundle = await buildAssistantYearContext(body.userId, selection.year, includeDummy);
+    } else if (selection.mode === 'ytd_analysis') {
       contextBundle = await buildAssistantYtdContext(body.userId, includeDummy);
-    } else if (body.mode === 'history_analysis') {
+    } else if (selection.mode === 'history_analysis') {
       contextBundle = await buildAssistantHistoryContext(body.userId, await fetchHistoryStartYear(body.userId), includeDummy);
-    } else if (body.mode === 'chat') {
+    } else if (selection.mode === 'chat') {
       // Chat mode: build context only when chatContext is set and not 'none'
-      if (body.chatContext === 'year' && body.year) {
-        contextBundle = await buildAssistantYearContext(body.userId, body.year, includeDummy);
-      } else if (body.chatContext === 'ytd') {
+      if (selection.chatContext === 'year' && selection.year) {
+        contextBundle = await buildAssistantYearContext(body.userId, selection.year, includeDummy);
+      } else if (selection.chatContext === 'ytd') {
         contextBundle = await buildAssistantYtdContext(body.userId, includeDummy);
-      } else if (body.chatContext === 'history') {
+      } else if (selection.chatContext === 'history') {
         contextBundle = await buildAssistantHistoryContext(body.userId, await fetchHistoryStartYear(body.userId), includeDummy);
-      } else if (body.chatContext === 'month' && body.month) {
-        contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
-      } else if (!body.chatContext && body.month) {
+      } else if (selection.chatContext === 'month' && selection.month) {
+        contextBundle = await buildAssistantMonthContext(body.userId, selection.month, includeDummy);
+      } else if (!selection.chatContext && selection.month) {
         // Backwards-compat: old clients that send month without chatContext
-        contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
+        contextBundle = await buildAssistantMonthContext(body.userId, selection.month, includeDummy);
       } else {
         // No context chosen («Nessuno»): the portfolio of today still goes (2026-10-20) —
         // instruments, allocation, registers, goals do not depend on a period. No 'context'
         // SSE event: the page's tiles are a period's, and «Patrimonio oggi» already stands in.
         todayContext = await buildAssistantTodayContext(body.userId);
       }
-    } else if (body.month) {
+    } else if (selection.month) {
       // month_analysis: always use month context
-      contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
+      contextBundle = await buildAssistantMonthContext(body.userId, selection.month, includeDummy);
     }
 
     // The CASHFLOW 12 MESI block in every mode, a chat with no context included (since
@@ -275,25 +341,14 @@ export async function POST(request: NextRequest) {
     const memoryDoc = await getAssistantMemoryDocument(body.userId).catch(() => null);
     const activeMemoryItems = (memoryDoc?.items ?? []).filter((i) => i.status === 'active');
 
-    let existingThread = body.threadId
-      ? await getAssistantThread(body.threadId, body.userId)
-      : null;
-
-    // Load conversation history BEFORE appending the new user message so the
-    // new message is not included. Loaded only for existing threads — a brand
-    // new thread has no prior exchange to inject.
-    const conversationHistory = existingThread
-      ? (await getAssistantThreadDetail(existingThread.id, body.userId)).messages
-      : [];
-
     const thread =
       existingThread ??
       (await createAssistantThread({
         userId: body.userId,
-        mode: body.mode,
-        pinnedMonth: body.month ?? null,
-        pinnedYear: body.year ?? null,
-        title: buildThreadTitleFromPrompt(body.prompt, body.mode, now),
+        mode: selection.mode,
+        pinnedMonth: selection.month ?? null,
+        pinnedYear: selection.year ?? null,
+        title: buildThreadTitleFromPrompt(body.prompt, selection.mode, now),
       }));
 
     if (!existingThread) {
@@ -304,8 +359,8 @@ export async function POST(request: NextRequest) {
       userId: body.userId,
       role: 'user',
       content: body.prompt.trim(),
-      mode: body.mode,
-      monthContext: body.month ?? null,
+      mode: selection.mode,
+      monthContext: selection.month ?? null,
       webSearchUsed: false,
     });
 
@@ -321,6 +376,9 @@ export async function POST(request: NextRequest) {
               title: existingThread?.title ?? thread.title,
             })
           );
+
+          // How the message was read (mode 'auto' only), before any context, status or text.
+          if (reading) controller.enqueue(encodeAssistantEvent({ type: 'route', reading }));
 
           // Include the bundle in the SSE meta so the client can render the
           // numeric panel without a separate API round-trip
@@ -339,14 +397,14 @@ export async function POST(request: NextRequest) {
           }
 
           const result = await streamAssistantResponse({
-            mode: body.mode,
+            mode: selection.mode,
             prompt: body.prompt.trim(),
             contextBundle,
             todayContext,
             cashflowBlock,
             registerBlock,
-            month: body.month ?? null,
-            preferences,
+            month: selection.month ?? null,
+            preferences: promptPreferences,
             memoryItems: activeMemoryItems,
             enableWebSearch,
             conversationHistory,
@@ -363,9 +421,10 @@ export async function POST(request: NextRequest) {
             userId: body.userId,
             role: 'assistant',
             content: result.text,
-            mode: body.mode,
-            monthContext: body.month ?? null,
+            mode: selection.mode,
+            monthContext: selection.month ?? null,
             webSearchUsed: result.webSearchUsed,
+            ...(reading ? { routeReading: reading } : {}),
           });
 
           // Fire-and-forget memory extraction — must not block the stream close
@@ -380,14 +439,14 @@ export async function POST(request: NextRequest) {
 
           await updateAssistantThreadMetadata(thread.id, {
             // A register thread is the day's («Registrazioni · 1 nov 2026») and is never retitled.
-            title: existingThread?.lastMessagePreview || body.mode === 'register'
+            title: existingThread?.lastMessagePreview || selection.mode === 'register'
               ? (existingThread?.title ?? thread.title)
-              : buildThreadTitleFromPrompt(body.prompt, body.mode, now),
+              : buildThreadTitleFromPrompt(body.prompt, selection.mode, now),
             // A JSON block is not a preview: an answer that is only a card shows the user's sentence.
             lastMessagePreview: stripFencedBlocks(assistantText) || userMessage.content,
-            mode: body.mode,
-            pinnedMonth: body.month ?? existingThread?.pinnedMonth ?? null,
-            pinnedYear: body.year ?? existingThread?.pinnedYear ?? null,
+            mode: selection.mode,
+            pinnedMonth: selection.month ?? existingThread?.pinnedMonth ?? null,
+            pinnedYear: selection.year ?? existingThread?.pinnedYear ?? null,
           });
 
           controller.enqueue(
