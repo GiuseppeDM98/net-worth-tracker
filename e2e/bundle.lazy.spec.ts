@@ -12,8 +12,9 @@
  *   positive anchor of `bundle.lazy.mobile.spec.ts`, where it must not — and the chart replaces its
  *   placeholder without moving anything: the placeholder is the plot's own height.
  *
- * Chunks are recognised by content (`chunkProbe.ts`), and the suite runs on `next dev`: these
- * tests prove the laziness of an IMPORT; the sizes are `npm run perf:budget`'s, on the build.
+ * Chunks are recognised by a string their module carries (`chunkProbe.ts`), on `next dev` (an area
+ * run) and on the production build (the whole run, since 2026-11-16) alike: these tests prove the
+ * laziness of an IMPORT; the sizes are `npm run perf:budget`'s, on the build.
  * Seen red on 2026-09-30 by putting each static import back (doc/guide/storico.md,
  * rendimenti.md and cashflow-analisi.md say how).
  */

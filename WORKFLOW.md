@@ -212,7 +212,7 @@ changes from repo to repo and is the only part to rewrite when the tooling chang
 | Unit tests | `TZ=Europe/Rome npx vitest run` (or `npm test -- <file>`) |
 | Lint | `npm run lint` (flat ESLint config, `eslint.config.mjs`) |
 | Build | `npm run build` |
-| Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) — the whole suite once, before the commit is asked for; while working, the touched area's specs: `npx playwright test e2e/<area>` (Obligation 4, below) |
+| Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) — the whole suite once, before the commit is asked for, on a production build it makes first when the code changed (since 2026-11-16); while working, the touched area's specs on `next dev`: `npx playwright test e2e/<area>` (Obligation 4, below) |
 
 npm is the package manager (`package-lock.json`; there is no Makefile, no pnpm/yarn lockfile).
 **Phantom `tsc` errors** clustered in `e2e/` and `lib/utils/expenseImport.ts` after a branch switch
@@ -228,8 +228,9 @@ npm run emulators:seed   # once: creates test-user-1 and its data (scripts/seedE
 npm run dev:emulator     # the app on :3000 pointed at the emulators
 ```
 
-Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 (`npm run dev:e2e`, isolated
-`.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000. Port
+Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 is the Playwright server — `npm run dev:e2e`
+(isolated `.next-e2e` build dir) for an area run, the `.next-e2e-build` production build for the whole run (since
+2026-11-16, SETUP.md → Step 7); keep it separate from the tour server on :3000. Port
 3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's and the first-screen census's
 (`npm run mobile:census`, `doc/guide/prima-schermata.md`).
 
@@ -338,8 +339,8 @@ The app **is** locally runnable; there is no fallback to declare.
   must match that project's `testMatch` to be collected, and must be deleted at the end.
 - **Automated suites are yours to run, always**: `npx tsc --noEmit`, `TZ=Europe/Rome npx vitest run`
   and `npx playwright test`. **Playwright runs in two levels** (2026-11-13, decided by the agent on the owner's
-  delegation after that day's measures: a whole run 18,2 min, an area 1–4 min — doc/guide/e2e-playwright.md § The
-  suite's speed): while working, the specs of the area touched, in every project that collects them (each guide's
+  delegation after that day's measures: a whole run 18,2 min, an area 1–4 min; 11,8 min on the production build since
+  2026-11-16 — doc/guide/e2e-playwright.md § The suite's speed): while working, the specs of the area touched, in every project that collects them (each guide's
   § *Files* lists them); the WHOLE suite once, with the work finished, before the commit is asked for — and again if
   code changes after it. A change with no area (`components/ui`, `lib/hooks`, shared `lib/utils`, the shell,
   `app/globals.css`, a seed, `playwright.config.ts`, a dependency) runs the whole suite at once. § 2's obligation

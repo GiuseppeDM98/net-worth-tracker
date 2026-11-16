@@ -20,14 +20,12 @@
  * mounted closed, so the sparkline's idle preload still runs: the first test's positive anchor.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { holdChunks, probeChunks } from './chunkProbe';
+import { SPARKLINE_SIGNATURE, holdChunks, probeChunks } from './chunkProbe';
 
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 process.env.GCLOUD_PROJECT = 'demo-net-worth';
 
 const UID = 'test-user-1';
-/** A function only `components/assets/AssetSparkline.tsx` defines (a dev chunk keeps the names). */
-const SPARKLINE_SIGNATURE = 'function AssetSparkline';
 /** The base seed's VWCE: monthly snapshots give it a unit-price series, so its row has a line. */
 const VWCE_ID = 'seed-vwce';
 

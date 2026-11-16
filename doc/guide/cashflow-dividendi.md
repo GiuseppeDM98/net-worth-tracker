@@ -299,6 +299,7 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
   with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red; green in
   the evening's full run of the same day (162/162). (moved from `CLAUDE.md` → Known Issues on 2026-10-07) Returned on
   2026-11-03 (desktop project, once in 108): the BTP row detached from the picker as it was clicked; green ×3 alone.
+  Again on 2026-11-16, the same detach once in a full run of 403 on `next dev` (green ×4 alone).
 
 - **A coupon recovered the day after a missed cron is NOT credited to its account** — by the owner's rule (only a
   payment dated today or later credits, so arrears never count twice). The income row is there, without an account:

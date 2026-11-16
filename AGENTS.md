@@ -897,7 +897,10 @@ file used to carry.
   state flash, computed sizes, bounding boxes, overflow); the arithmetic stays with Vitest. A query race and an error
   branch reached by cutting the network are NOT reproducible locally.
 - **`workers: 1`, non-negotiable**, and **each suite its OWN fixture** (an `npm run e2e:seed:*` script plus one
-  `spawnSync` in `e2e/global-setup.ts`). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
+  `runSeed` in `e2e/global-setup.ts`, the seeds side by side since 2026-11-16). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
+- **The whole run is a production build, an area run `next dev`** (2026-11-16): `npm run test:e2e` builds `.next-e2e-build`
+  when the code changed, refuses a stale one or a server on :3100; a chunk is known by a STRING its module carries
+  (`CHUNK_SIGNATURES`, unique per `__tests__/chunkSignatures.test.ts`), never a name or path a minifier drops.
 - **The FILENAME chooses the account**: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` → `mobile`, `*.degraded.spec.ts` →
   degraded, `*.degraded.mobile.spec.ts` → `degraded-mobile` (2026-10-14), `*.tablet.spec.ts` → `tablet` (768×1024, two
   columns and the pill) AND `tablet-landscape` (1024×768, the stage and the icon rail — `expectLandscapeStage`,
