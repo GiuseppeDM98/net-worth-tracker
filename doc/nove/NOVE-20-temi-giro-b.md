@@ -4,7 +4,7 @@
 > and **NOVE-19**, implemented just before it, whose tools it reuses with their names: the portal mechanism
 > (`useCostumeScopeProps()`, NOVE-19 § 4.1, already spread on every dialog, drawer, sheet and alert content), the four
 > control properties and `COSTUME_FRAME_RADIUS_CLASS` / `COSTUME_PILL_RADIUS_CLASS` (§ 4.2), the emblems of Panoramica, Patrimonio and Cashflow (§ 4.5), the E2E files
-> `e2e/theme.costume{,.mobile,.tablet}.spec.ts` and `e2e/themeNeutral.ts`'s probes. It dresses NOVE-10's Analisi,
+> `e2e/theme.costume{,.mobile,.tablet}.spec.ts` and `e2e/themeNeutral.ts`'s probes. It dresses NOVE-10's (retired on 2026-11-16, PR #540) Analisi,
 > NOVE-15's Assistente, NOVE-16/17/18's Accumulo and NOVE-21's hand-off (`ConsulenteHandoff.tsx`, a
 > `ResponsiveModal`: frame and title by § 4.2; the applied book's link) as they leave them. Written on 2026-11-12; every `file:line` is
 > cited on `develop` @ b841cbd7, the Accumulo code as `pr488:file:line` (`refs/tmp/pr488`, holding #486 and #487).
@@ -27,7 +27,7 @@ After NOVE-19 every portalled content carries `data-costume-scope`. What still m
 | 8 | `app/globals.css:60` (`--radius-xl`); § 4.4's list | 36 `rounded-xl` boxes inside tiles and modals plus `card.tsx:10` and `link-banner.tsx:41` (NOVE-19 § 10) @ b841cbd7 (38), and Accumulo's two (`pr488:PlanDraftSidePanel.tsx:43`, `:64`): 40 — 9px Egeo, 4px Orbita, rounder than the tile |
 | 9 | `components/allocation/ActionChip.tsx:37` and § 4.4b's sites | `rounded-full` bars, pills and pill chips, `rounded-[Npx]` chips on the nine pages and in the Accumulo code: round or literal under Orbita, while NOVE-19 squares the same roles on its three pages |
 | 10 | `ComposizioneTile.tsx:65`, `EvoluzioneTile.tsx:110`, `ValoreStrumentoTile.tsx:90`, `StoricoDettaglio.tsx:74`, `LaborMetricsChart.tsx:34`, `FireDettaglio.tsx:53`, `RollingLineChart.tsx:19`, `AndamentoStoricoCharts.tsx:22`, `ConfrontoAnnualeCharts.tsx:23`, `EntityTrendChart.tsx:21`, `SavingsRateLineChart.tsx:65`, `components/goals/GoalProjectionChart.tsx:75` (10) | twelve Recharts tooltips `borderRadius` 8px / 10px literal (in the chart's DOM, so in scope): rounded under Orbita |
-| 11 | `lib/utils/cashflowSankey.ts:66-92` | income, type, Budget, Risparmi hexes fixed; the ring (NOVE-10 ClassificaTile) and the phone flow (`SpendingTypesMobileFlow.tsx:44`, `:52`) paint the same types by token (`expenseTypeColors.ts:30-36`, `:61-64`): under a costume the Sankey disagrees with its neighbours |
+| 11 | `lib/utils/cashflowSankey.ts:66-92` | income, type, Budget, Risparmi hexes fixed; the ring (`ClassificaTile`, since 2026-11-12) and the phone flow (`SpendingTypesMobileFlow.tsx:44`, `:52`) paint the same types by token (`expenseTypeColors.ts:30-36`, `:61-64`): under a costume the Sankey disagrees with its neighbours |
 | 12 | `components/performance/UnderwaterDrawdownChart.tsx:102-109`, `:140-142`, `:170` | the red is a `useState` seeded with the default's oklch, read once from `<html>` in a rAF (empty deps): wrong first frame, stale after a theme switch |
 | 13 | `AssistantQuestionBlock.tsx:147-148`, `:159`; `ExpenseProposalCard.tsx:261-263`; `GoalProposalCard.tsx:212-216` | the AI eyebrow on `bg-muted/40` over the card: **4,48:1** Egeo light, **4,39** Egeo dark; `DESIGN.md:70-72` promises 4,5 there |
 | 14 | `app/globals.css:854-858`; `ConsulenteBook.tsx:341-350` | the book prints with the costume's heading face (`.tile-eyebrow`, the verdict's `.costume-heading`) and its emblem (the scene card is `print:hidden`, `ConsulenteBook.tsx:217`; the sheet is `[data-book-print]`): decision 17 says never on paper |
@@ -307,7 +307,7 @@ palette.income.length]`, `:495` `palette.budget`, `:503`, `:507` `palette.types[
 `:849` `typePalette.budget`; the role builders (`:913`, `:922`) take `typePalette?` last. `buildTypeDrillDownData`
 is unchanged: a drill takes the clicked node's colour.
 
-`components/cashflow/analisi/tiles/FlussoTile.tsx`, beside `:165`:
+`components/cashflow/analisi/tiles/FlussoTile.tsx`, beside `:150`:
 
 ```tsx
 const costumed = useThemeCostume() !== null;
@@ -320,13 +320,13 @@ const typePalette = useMemo(() => (costumed ? costumeSankeyPalette(slotHex) : DE
 COLORS[0], slot2: COLORS[1], slot3: COLORS[2], slot4: COLORS[3], slot5: COLORS[4], slot6: COLORS[5], slot7:
 COLORS[6], slot8: COLORS[7], slot9: COLORS[8], positive: '#10b981' };` (`COLORS` exported from and imported from
 `@/lib/utils/cashflowSankey`). `plainView`
-(`:169-175`) passes `typePalette` to the two budget builders and lists it in its deps; `rolesView` (`:178-183`)
+(`:154-160`) passes `typePalette` to the two budget builders and lists it in its deps; `rolesView` (`:163-168`)
 passes it last. Outside a costume `typePalette` is the module constant: no memo rebuilds.
 
 The comments follow: `cashflowSankey.ts:66-68` «…stable across the palette themes; a costume theme paints the types
 with its slots (`costumeSankeyPalette`)»; `:82` «Theme-independent in the palette themes, see COLORS»; `:640-642`
 «Income and Budget keep the type view's colours (the costume's slots under a costume)»;
-`lib/hooks/useCssColorTokens.ts:24` «Used by: FlussoTile (the role colours and, under a costume, the type flow's
+`lib/hooks/useCssColorTokens.ts:25` «Used by: FlussoTile (the role colours and, under a costume, the type flow's
 slots)».
 
 ### 4.6 The drawdown's red
@@ -369,7 +369,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 | `EGEO_COLUMN` | `impostazioni` | path `M6 4 H16 M6 4 C4 4 4 7 6 7 M16 4 C18 4 18 7 16 7 M6 7 H16 M8 7 V18 M11 7 V18 M14 7 V18 M6 18 H16 M5 20 H17` |
 
 `THEME_EMBLEMS.egeo.pages` gains the nine; Orbita's `pages` stays `{}`. The ids:
-`components/cashflow/AnalisiTab.tsx:757` `analisi`; `app/dashboard/performance/page.tsx:697` `rendimenti`;
+`components/cashflow/AnalisiTab.tsx:760` `analisi`; `app/dashboard/performance/page.tsx:697` `rendimenti`;
 `app/dashboard/history/page.tsx:460` `storico`; `app/dashboard/allocation/page.tsx:461`, `ConsulenteClient.tsx:82`
 `allocazione`; `app/dashboard/pension/page.tsx:39` `previdenza`; `app/dashboard/fire-simulations/page.tsx:92`
 `fire`; `app/dashboard/hall-of-fame/page.tsx:361` `hall-of-fame`; `AssistantHeader.tsx:85` `assistente`;
@@ -396,7 +396,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
   `OptimizerPanel.tsx:162`, `QuestoMeseTile.tsx:562`, `:578`, `:688`, `:791`.
 - `CategoryManagementDialog.tsx:205` `rounded-2xl`; `CategoryDeleteConfirmDialog.tsx:391`, `CategoryMoveDialog.tsx:304`
   in-content lists `rounded-md`; `AnalisiPeriodControls.tsx:82` `max-sm:rounded-2xl`; the disclosures on the ground
-  (`DettaglioDisclosure.tsx:37-41`, `ConfrontoDisclosure.tsx:91`, `PerformanceDettaglio.tsx:294`, NOVE-12 K1).
+  (`DettaglioDisclosure.tsx:67-73`, `ConfrontoDisclosure.tsx:91`, `PerformanceDettaglio.tsx:294`, NOVE-12 K1).
 - `AssistantMemoryPanel.tsx:48` sub-tiles are `Tile`s (cap, shadow by NOVE-11). Accumulo: the tiles are `Tile`s;
   the five dialogs (`pr488:` `AccumulationCalendarDialog.tsx:127`,
   `AccumulationPlanDialog.tsx:781`, `IdealCompositionDialog.tsx:375`, `ModelEditDialog.tsx:107`,
@@ -447,7 +447,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 | E2 | `e2e/theme.costume.mobile.spec.ts` + case: criterion 2 at 390; `scrollWidth ≤ innerWidth` | `rounded-t-[10px]` restored |
 | E3 | `e2e/theme.costume.tablet.spec.ts` + case: at 1024×768 the dialog has 4px / 0px and a `linear-gradient` `background-image`; at 768×1024 the drawer 4px / 0px | drop `data-costume-frame` in `dialog.tsx` (1024×768 red); `drawer.tsx` back to `rounded-t-[10px]` (768×1024 red) |
 | E4 | `e2e/theme.costume.spec.ts` + case: the Consulente's first scene (planted document) and Compravendita's first screen in Egeo light: the section `[data-tile]` 4px with a gradient, headline `Marcellus` 34px, its `.costume-figure` mono; Compravendita's eyebrow «Passo 1 di N» holds two `.costume-figure` in `Geist Mono`; `ConsulenteWizard.tsx:301`'s list 4px; in Orbita light on `/dashboard/hall-of-fame` the first `RecordRows` bar track `0px`, in Egeo > 1000px | drop `costume-heading` from `HEADLINE_CLASS` |
-| E5 | `e2e/theme.costume.analisi.spec.ts` (new: the name matches the `analisi` project's `/analisi\.spec\.ts/` and the desktop project's ignore, so it runs on the Analisi fixture account, whose period holds expenses; the theme through that account's `userPreferences` doc, written and restored as NOVE-12's E1): `/dashboard/analisi` at 1440, «Dettaglio» opened (its trigger clicked, the Flusso chunk awaited as `e2e/analisi.spec.ts` does — after NOVE-10 the Sankey is the first tile inside the closed, lazy «Dettaglio»); the Sankey's `svg rect` fills include `colorToHex` of a probe `color: var(--chart-1)` in Egeo, `#3b82f6` in the default and never in Egeo | pass `DEFAULT_SANKEY_TYPE_PALETTE` always |
+| E5 | `e2e/theme.costume.analisi.spec.ts` (new: the name matches the `analisi` project's `/analisi\.spec\.ts/` and the desktop project's ignore, so it runs on the Analisi fixture account, whose period holds expenses; the theme through that account's `userPreferences` doc, written and restored as NOVE-12's E1): `/dashboard/analisi` at 1440, «Dettaglio» opened (its trigger clicked, the Flusso chunk awaited as `e2e/analisi.spec.ts` does — since 2026-11-12 the Sankey is the first tile inside the closed, lazy «Dettaglio»); the Sankey's `svg rect` fills include `colorToHex` of a probe `color: var(--chart-1)` in Egeo, `#3b82f6` in the default and never in Egeo | pass `DEFAULT_SANKEY_TYPE_PALETTE` always |
 | E6 | same + case: Rendimenti › Dettaglio open, the drawdown `stop` has `stop-color="var(--destructive)"`; Egeo → Default from Aspetto without reload, its computed `stop-color` equals a probe's `color: var(--destructive)` | restore the state at `:102` |
 | E7 | same + case: the book on a planted report, `page.emulateMedia({ media: 'print' })` in Egeo: `[data-book-print] h2` `font-family` starts `Geist`, `.costume-header-band` `height` `0px`, the `PageHeader`'s emblem `svg` `display: none` | drop the print block; drop `print:hidden` |
 

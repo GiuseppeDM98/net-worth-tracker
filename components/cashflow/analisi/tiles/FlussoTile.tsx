@@ -121,8 +121,8 @@ type DrillState =
  *
  * THE FLUSSO PICKS ITS DRAWING BY ITS CELL (owner's decision, 2026-09-27, at a 640px viewport; by the
  * cell since 2026-10-16): a legibility threshold of the chart, not a second composition. In a cell of
- * 608px or more (`FLUSSO_SANKEY_MIN_CELL` in AnalisiTab: a 640px viewport's cell) the Sankey; in a
- * narrower one — a phone, where a four-column flow gets ~80px a column, and the landscape index — the
+ * 608px or more (`FLUSSO_SANKEY_MIN_CELL` in DettaglioDisclosure: a 640px viewport's cell) the Sankey; in a
+ * narrower one — a phone, where a four-column flow gets ~80px a column — the
  * SAME figures as a share bar and ranked rows — SpendingRolesMobileFlow for the roles view,
  * SpendingTypesMobileFlow for the type view, both drawn by FlowShareMobile. In a narrow cell no Sankey
  * model is built at all (no view, no height, no label), and the role colours are not read.

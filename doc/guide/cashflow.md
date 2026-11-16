@@ -278,8 +278,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   type)**, never the name alone. `transfer` rows are rejected and cash balances are never touched by an import.
 
 ## Cashflow Drill-Down: One Landing Path
-- **There is ONE drill destination and ONE transaction list**: every entity entry point on Analisi (a category row, a
-  Fuori scala row, a Spese maggiori row, a Sankey node, `EntitySearch`, a Confronto row) lands through
+- **There is ONE drill destination and ONE transaction list**: every entity entry point on Analisi (a ranking row of
+  «Dove vanno i soldi», a Spese maggiori row, a row of «Cosa è cambiato», an «Entrate» legend row, a Sankey node,
+  `EntitySearch`, a Confronto row; the anomalies are a sentence since 2026-11-12, no entry point) lands through
   `handleEntitySelect` in `AnalisiTab.tsx`, which resolves labels exactly like a URL-restored focus and opens the
   Scheda tile. A new entry point calls that handler only.
 

@@ -476,7 +476,7 @@ export function describeTopExpenses(top: TopExpenses): Narrative | null {
   const shown = top.rows.length;
   const word = COUNT_WORDS[shown] ?? String(shown);
   const share = top.total > 0 ? (top.shownTotal / top.total) * 100 : 0;
-  // Decided on the printed integer: rows beyond the top five that round to 0% must not print «il 100%».
+  // Decided on the printed integer: rows beyond the ones shown that round to 0% must not print «il 100%».
   if (Math.round(share) >= 100) return [prose(`Le ${word} più grandi fanno quasi tutte le spese; `), ...largestClause, prose('.')];
   return [prose(`Le ${word} più grandi fanno `), ...percentWithArticle(share), prose(' delle spese; '), ...largestClause, prose('.')];
 }

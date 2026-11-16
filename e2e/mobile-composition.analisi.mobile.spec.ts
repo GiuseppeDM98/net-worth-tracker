@@ -96,6 +96,13 @@ test.describe('Analisi, composed for a phone', () => {
     await expect(cells.nth(0)).toContainText(/^Entrate2000\s?€/);
     await expect(cells.nth(1)).toContainText(/^Risparmio1220\s?€/);
     await expect(cells.nth(1)).toHaveAccessibleName(/, apre Periodo$/);
+    // Above the sentence, the headline and the axis; under the strip, «Il perché», closed (2026-11-12:
+    // headline · axis · first sentence · strip · scope · «Il perché» · THE tile · «Il resto della pagina»
+    // · the rows). Seen red with `PageRest` removed from AnalisiTab (no «Il resto della pagina»).
+    await expect(verdict.getByRole('heading', { level: 2 })).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'Periodo di analisi' })).toBeVisible();
+    const perche = page.getByRole('button', { name: /^Il perché/ });
+    await expect(perche).toHaveAttribute('aria-expanded', 'false');
 
     // THE tile is open, never a row: its ranking is on the first screen.
     const classifica = page.getByRole('region', { name: 'Dove vanno i soldi', exact: true });
@@ -104,6 +111,19 @@ test.describe('Analisi, composed for a phone', () => {
     for (const id of ['analisi-maggiori', 'analisi-cambiato', 'analisi-entrate', 'analisi-periodo']) {
       await expect(trigger(page, id)).toHaveAttribute('aria-expanded', 'false');
     }
+    // No focus, no Scheda row.
+    await expect(trigger(page, 'analisi-scheda')).toHaveCount(0);
+    const rest = page.getByRole('heading', { level: 2, name: 'Il resto della pagina' });
+    await expect(rest).toBeVisible();
+    const [percheTop, classificaBox, restTop, firstRowTop] = await Promise.all([
+      perche.evaluate((el) => el.getBoundingClientRect().top),
+      classifica.evaluate((el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }),
+      rest.evaluate((el) => el.getBoundingClientRect().top),
+      trigger(page, 'analisi-maggiori').evaluate((el) => el.getBoundingClientRect().top),
+    ]);
+    expect(percheTop).toBeLessThan(classificaBox.top);
+    expect(restTop).toBeGreaterThanOrEqual(classificaBox.bottom - 1);
+    expect(restTop).toBeLessThan(firstRowTop);
 
     const order = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>('main section.rounded-2xl')]
