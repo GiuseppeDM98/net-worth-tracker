@@ -187,6 +187,30 @@ export function summarizePeriodSales(
  * `ownFlows` is «Δ − market» where the caller can measure it (the Panoramica; the email has its
  * own exact split and passes null).
  */
+/** A part of a change is worth a clause from this many euro… */
+const MATERIAL_MIN_EUR = 100;
+/** …and from this share of the change, whichever is larger. */
+const MATERIAL_MIN_SHARE = 0.05;
+
+/**
+ * Whether `amount` is worth naming beside a change of `total`: at least max(100 €, 5% of the
+ * change). The ONE rule for «altre variazioni» (`isMaterialOtherChange`) and for the tax on a
+ * period's sales (`isMaterialSalesTax`).
+ */
+export function isMaterialAmount(amount: number, total: number): boolean {
+  return Math.abs(amount) >= Math.max(MATERIAL_MIN_EUR, Math.abs(total) * MATERIAL_MIN_SHARE);
+}
+
+/**
+ * Whether the tax on a period's sales is a cause the headline names, and a month worth restating
+ * without it (owner, 2026-11-16: 2 € withheld on a sale headed «il mercato ha pesato, e con lui le
+ * tasse sulle vendite»). Below the rule the tax stays a fact of the sentence — «e pagato 2 € di
+ * tasse» — and nothing more.
+ */
+export function isMaterialSalesTax(tax: number | null, delta: number): boolean {
+  return tax !== null && tax > 0 && isMaterialAmount(tax, delta);
+}
+
 export type DeclineCause =
   | 'taxes-despite-market'
   | 'despite-market'
@@ -200,9 +224,14 @@ export function resolveDeclineCause(input: {
   marketEffect: number | null;
   ownFlows: number | null;
   salesTax: number | null;
+  /** The change itself, for the tax's materiality; defaults to market + own flows (the email passes it). */
+  delta?: number;
 }): DeclineCause {
-  const { marketEffect, ownFlows, salesTax } = input;
+  const { marketEffect, ownFlows } = input;
   if (marketEffect === null) return 'unknown';
+  // An immaterial tax is no cause: the headline reads as if there were none (`isMaterialSalesTax`).
+  const delta = input.delta ?? marketEffect + (ownFlows ?? 0);
+  const salesTax = isMaterialSalesTax(input.salesTax, delta) ? input.salesTax : null;
   if (marketEffect >= 0) {
     // The whole drop is «Δ = market + own flows»; the tax explains it when it is at least half
     // of it. A caller without the own-flows half (the email) cannot measure the drop and keeps
@@ -250,6 +279,6 @@ export function resolveTaxedGrowth(input: {
   salesTax: number | null;
 }): TaxedGrowth | null {
   const { delta, deltaPct, salesTax } = input;
-  if (delta < 0 || salesTax === null || salesTax <= 0 || salesTax < delta) return null;
+  if (delta < 0 || !isMaterialSalesTax(salesTax, delta) || salesTax! < delta) return null;
   return Math.abs(deltaPct) < FLAT_PERIOD_PCT ? 'flat' : 'eroded';
 }

@@ -388,3 +388,35 @@ describe('buildAssistantPortfolioContext — pension, loans, family', () => {
     expect(empty.family).toEqual({ ownerAge: null, members: [] });
   });
 });
+
+// A contribution moves the fund's value in the month it is RECORDED (`valueEffectMonth`), not in its
+// month of competence (owner, 2026-11-16: September's contributions recorded in October read as a
+// jump of the bond class in October that the assistant could not explain).
+describe('the pension contributions with an effect on the period', () => {
+  const RECORDED: PensionContribution[] = [
+    { id: 'q-1', userId: 'u1', assetId: 'a-pension', source: 'tfr', amount: 700, date: new Date('2026-09-30T10:00:00.000Z'), taxYear: 2026, deductible: false, createdAt: new Date('2026-10-13T10:00:00.000Z') },
+    { id: 'q-2', userId: 'u1', assetId: 'a-pension', source: 'voluntary', amount: 150, date: new Date('2026-09-30T10:00:00.000Z'), taxYear: 2026, deductible: true, createdAt: new Date('2026-10-13T10:00:00.000Z') },
+    // Recorded in November: not October's.
+    { id: 'q-3', userId: 'u1', assetId: 'a-pension', source: 'employer', amount: 200, date: new Date('2026-10-31T10:00:00.000Z'), taxYear: 2026, deductible: true, createdAt: new Date('2026-11-02T10:00:00.000Z') },
+    // Recorded in September: not October's.
+    { id: 'q-4', userId: 'u1', assetId: 'a-pension', source: 'tfr', amount: 600, date: new Date('2026-06-30T10:00:00.000Z'), taxYear: 2026, deductible: false, createdAt: new Date('2026-09-10T10:00:00.000Z') },
+  ];
+
+  it("should total the contributions recorded in the period's months, each with its date and the day it was recorded", () => {
+    const fund = build({ pensionContributions: RECORDED, period: { afterKey: '2026-09', throughKey: '2026-10', label: 'ottobre 2026' } }).pension[0];
+    expect(fund.paidInPeriod).toEqual({
+      label: 'ottobre 2026',
+      total: 850,
+      rows: [
+        { source: 'tfr', amount: 700, dateIso: '2026-09-30', recordedIso: '2026-10-13' },
+        { source: 'voluntary', amount: 150, dateIso: '2026-09-30', recordedIso: '2026-10-13' },
+      ],
+    });
+  });
+
+  it('should say a period with none, and carry nothing without a period', () => {
+    const none = build({ pensionContributions: RECORDED, period: { afterKey: '2026-07', throughKey: '2026-08', label: 'agosto 2026' } }).pension[0];
+    expect(none.paidInPeriod).toEqual({ label: 'agosto 2026', total: 0, rows: [] });
+    expect(build({ pensionContributions: RECORDED }).pension[0].paidInPeriod).toBeNull();
+  });
+});

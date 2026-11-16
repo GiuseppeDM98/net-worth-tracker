@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 
 // MessageIdContext imports the authenticated fetch, which initialises Firebase.
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
@@ -23,8 +23,9 @@ vi.mock('@/components/assistant/GoalProposalCard', () => ({
 }));
 
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
+import { StreamStatusChip } from '@/components/assistant/AssistantConversazioneTile';
 import { AI_CONTROL_ACCENT_CLASS, AI_GENERATED_EYEBROW_CLASS } from '@/lib/constants/aiAccent';
-import type { AssistantMessage, AssistantMode } from '@/types/assistant';
+import type { AssistantMessage, AssistantRouteReading } from '@/types/assistant';
 
 const AT = new Date('2026-11-01T10:00:00Z');
 
@@ -41,10 +42,10 @@ function assistant(content: string, overrides: Partial<AssistantMessage> = {}): 
   return { id: 'msg-1', threadId: 'thread-1', userId: 'u1', role: 'assistant', content, createdAt: AT, mode: 'register', ...overrides };
 }
 
-function renderMessages(messages: AssistantMessage[], mode: AssistantMode = 'register', extra: Partial<Parameters<typeof AssistantStreamingResponse>[0]> = {}) {
+function renderMessages(messages: AssistantMessage[], extra: Partial<Parameters<typeof AssistantStreamingResponse>[0]> = {}) {
   const recordProposal = vi.fn();
   const view = render(
-    <AssistantStreamingResponse messages={messages} isInterrupted={false} onRetry={() => {}} mode={mode} threadId="thread-1" recordProposal={recordProposal} {...extra} />,
+    <AssistantStreamingResponse messages={messages} isInterrupted={false} onRetry={() => {}} threadId="thread-1" recordProposal={recordProposal} changeableMessageId={undefined} onChangeReading={() => {}} {...extra} />,
   );
   return { ...view, recordProposal };
 }
@@ -87,7 +88,7 @@ describe('AssistantStreamingResponse — the cards of a message', () => {
   it('keeps a goal block inside a quote or behind a list marker a card, keyed after the top-level ones', () => {
     const quoted = GOAL_BLOCK.split('\n').map((line) => `> ${line}`).join('\n');
     const listed = `- ${GOAL_BLOCK.split('\n').join('\n  ')}`;
-    const { container } = renderMessages([assistant(`${quoted}\n\n${listed}\n\nE infine:\n\n${GOAL_BLOCK}`, { mode: 'chat' })], 'chat');
+    const { container } = renderMessages([assistant(`${quoted}\n\n${listed}\n\nE infine:\n\n${GOAL_BLOCK}`, { mode: 'chat' })]);
     // Document order: the quoted and the listed block first, the top-level one last — which keeps «goal:0».
     expect(keys(container)).toEqual(['goal:1', 'goal:2', 'goal:0']);
     expect(container.querySelector('pre')).toBeNull();
@@ -101,16 +102,74 @@ describe('AssistantStreamingResponse — the cards of a message', () => {
     expect(container.querySelectorAll('pre')).toHaveLength(1);
   });
 
-  it('renders an expense block as code outside Registra, and the goal card everywhere', () => {
-    const { container } = renderMessages([assistant(`${expenseBlock(100)}\n\n${GOAL_BLOCK}`, { mode: 'chat' })], 'chat');
-    expect(keys(container)).toEqual(['goal:0']);
-    expect(container.querySelector('pre')?.textContent).toContain('"amount":100');
+  // The cards follow the MESSAGE's mode, never the page's (2026-11-12): in one list a register
+  // message's block is a card and a chat message's is code. Seen RED gated on a constant 'chat'.
+  it('renders an expense block as a card on a register message and as code on a chat message, in one list', () => {
+    const { container } = renderMessages([
+      assistant(`${expenseBlock(100)}\n\n${GOAL_BLOCK}`, { id: 'msg-chat', mode: 'chat' }),
+      assistant(expenseBlock(20), { id: 'msg-register', mode: 'register', createdAt: new Date(AT.getTime() + 1000) }),
+    ]);
+    expect(keys(container)).toEqual(['goal:0', 'expense:0']);
+    expect(container.querySelector('[data-proposal="expense:0"]')?.textContent).toBe('20');
+    const code = container.querySelectorAll('pre');
+    expect(code).toHaveLength(1);
+    expect(code[0].textContent).toContain('"amount":100');
   });
 
   it('shows the message being streamed as plain text: no card until the stream ends', () => {
-    const { container } = renderMessages([assistant(expenseBlock(100), { id: 'local-assistant-1' })], 'register', { streamingMessageId: 'local-assistant-1' });
+    const { container } = renderMessages([assistant(expenseBlock(100), { id: 'local-assistant-1' })], { streamingMessageId: 'local-assistant-1' });
     expect(keys(container)).toEqual([]);
     expect(container.textContent).toContain('expense-proposal');
+  });
+});
+
+// The line under an answer (2026-11-12): how the message was read, « · cambia» on the last answer
+// alone. Seen RED with `changeableMessageId` ignored (a «cambia» under every answer).
+describe('AssistantStreamingResponse — «Ho letto: … · cambia»', () => {
+  const OCTOBER: AssistantRouteReading = {
+    route: { intent: 'month_analysis', period: { kind: 'month', year: 2026, month: 10 }, webSearch: false, confidence: 0.9 },
+    source: 'router',
+  };
+  const older = assistant('Prima.', { id: 'msg-1', mode: 'month_analysis', routeReading: OCTOBER });
+  const last = assistant('Dopo.', { id: 'msg-2', mode: 'month_analysis', routeReading: OCTOBER, createdAt: new Date(AT.getTime() + 1000) });
+
+  it('reads the line under both answers and offers «cambia» under the last only', async () => {
+    const onChangeReading = vi.fn();
+    renderMessages([older, last], { changeableMessageId: 'msg-2', onChangeReading });
+    const lines = screen.getAllByText(/^Ho letto: analisi di ottobre 2026/);
+    expect(lines.map((line) => line.textContent)).toEqual(['Ho letto: analisi di ottobre 2026', 'Ho letto: analisi di ottobre 2026 · cambia']);
+    const change = screen.getAllByRole('button', { name: 'Cambia come ho letto la domanda' });
+    expect(change).toHaveLength(1);
+    expect(lines[1].contains(change[0])).toBe(true);
+    // The line is not model text: no accent, no `data-generated` of its own.
+    expect(lines[1].closest('[data-generated]')).not.toBeNull();
+    expect(lines[1].hasAttribute('data-generated')).toBe(false);
+    change[0].click();
+    expect(onChangeReading).toHaveBeenCalledWith(expect.objectContaining({ id: 'msg-2' }), change[0]);
+  });
+
+  it('offers no «cambia» without a changeable message', () => {
+    renderMessages([older, last]);
+    expect(screen.getAllByText(/^Ho letto:/)).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Cambia come ho letto la domanda' })).toBeNull();
+  });
+
+  it('shows no line on a message without a reading, which keeps «Ricerca web usata»', () => {
+    renderMessages([assistant('Vecchia risposta.', { mode: 'chat', webSearchUsed: true })], { changeableMessageId: 'msg-1' });
+    expect(screen.queryByText(/^Ho letto:/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cambia come ho letto la domanda' })).toBeNull();
+    expect(screen.getByText('Ricerca web usata')).not.toBeNull();
+  });
+
+  it('replaces the badge with the line on a routed message that used the web', () => {
+    renderMessages([assistant('Con il web.', { mode: 'chat', webSearchUsed: true, routeReading: { ...OCTOBER, route: { ...OCTOBER.route, intent: 'chat' } } })]);
+    expect(screen.getByText('Ho letto: domanda su ottobre 2026 · con ricerca web')).not.toBeNull();
+    expect(screen.queryByText('Ricerca web usata')).toBeNull();
+  });
+
+  it('shows no line while the message streams', () => {
+    renderMessages([assistant('In arrivo', { id: 'local-assistant-1', routeReading: OCTOBER })], { streamingMessageId: 'local-assistant-1', changeableMessageId: 'local-assistant-1' });
+    expect(screen.queryByText(/^Ho letto:/)).toBeNull();
   });
 });
 
@@ -126,7 +185,75 @@ describe('AssistantStreamingResponse — what the model wrote', () => {
   });
 
   it('accents «Rigenera» — it calls the model', () => {
-    renderMessages([assistant('Parziale')], 'register', { isInterrupted: true });
+    renderMessages([assistant('Parziale')], { isInterrupted: true });
     expect(screen.getByRole('button', { name: 'Rigenera' }).className).toContain(AI_CONTROL_ACCENT_CLASS);
+  });
+});
+
+// The answer's place while no text has arrived (owner, 2026-11-16): a pulsing mark and one phrase
+// at a time, from the reading and the server's status; gone at the first chunk.
+describe('AssistantStreamingResponse — the wait before the first word', () => {
+  const STREAMING = 'local-assistant-1';
+  const OCTOBER: AssistantRouteReading = {
+    route: { intent: 'month_analysis', period: { kind: 'month', year: 2026, month: 10 }, webSearch: false, confidence: 0.9 },
+    source: 'router',
+  };
+  const waiting = (container: HTMLElement) => container.querySelector('[data-assistant-waiting]');
+
+  it('reads the question until the reading arrives, and says so once to a screen reader', () => {
+    const { container } = renderMessages([assistant('', { id: STREAMING })], { streamingMessageId: STREAMING });
+    expect(waiting(container)?.textContent).toContain('Sto leggendo la domanda…');
+    expect(screen.getByText("L'assistente sta preparando la risposta.").className).toContain('sr-only');
+  });
+
+  it('turns the phrase every three seconds, from the reading', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = renderMessages([assistant('', { id: STREAMING, routeReading: OCTOBER })], { streamingMessageId: STREAMING });
+      expect(waiting(container)?.textContent).toContain('Apro ottobre 2026…');
+      act(() => { vi.advanceTimersByTime(3000); });
+      expect(waiting(container)?.textContent).toContain('Confronto entrate e spese…');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says the web while the server searches it', () => {
+    const { container } = renderMessages([assistant('', { id: STREAMING, routeReading: OCTOBER })], { streamingMessageId: STREAMING, streamStatus: 'searching' });
+    expect(waiting(container)?.textContent).toContain('Sto cercando sul web…');
+  });
+
+  it('leaves at the first chunk', () => {
+    const { container } = renderMessages([assistant('Ottobre', { id: STREAMING, routeReading: OCTOBER })], { streamingMessageId: STREAMING });
+    expect(waiting(container)).toBeNull();
+  });
+});
+
+describe('StreamStatusChip — the corner of the tile', () => {
+  it('shows only the web search', () => {
+    const { rerender } = render(<StreamStatusChip isStreaming streamStatus="writing" />);
+    expect(screen.queryByRole('status')).toBeNull();
+    rerender(<StreamStatusChip isStreaming streamStatus="searching" />);
+    expect(screen.getByRole('status').textContent).toContain('Sto cercando sul web…');
+    rerender(<StreamStatusChip isStreaming={false} streamStatus="searching" />);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+// An answer already begun can stand still for a minute while the server searches the web (owner,
+// 2026-11-16): the wait comes back under the text, and leaves when the text resumes.
+describe('AssistantStreamingResponse — a pause after the first words', () => {
+  const STREAMING = 'local-assistant-1';
+  const waiting = (container: HTMLElement) => container.querySelector('[data-assistant-waiting]');
+
+  it('shows the web search under the text while the server searches', () => {
+    const { container } = renderMessages([assistant('Cerco il contesto.', { id: STREAMING })], { streamingMessageId: STREAMING, streamStatus: 'searching' });
+    expect(screen.getByText(/Cerco il contesto\./)).not.toBeNull();
+    expect(waiting(container)?.textContent).toContain('Sto cercando sul web…');
+  });
+
+  it('shows nothing under the text while it is being written', () => {
+    const { container } = renderMessages([assistant('Cerco il contesto.', { id: STREAMING })], { streamingMessageId: STREAMING, streamStatus: 'writing' });
+    expect(waiting(container)).toBeNull();
   });
 });

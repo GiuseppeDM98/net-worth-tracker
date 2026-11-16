@@ -131,6 +131,39 @@ export interface AssistantRouteSelection {
   chatContext?: AssistantChatContextType;
 }
 
+/** What the chooser «cambia» opens asks (2026-11-12): what the message is, and on which period. */
+export type RouteChooserKind = 'question' | 'analysis' | 'register';
+export interface RouteChooserDraft { kind: RouteChooserKind; period: AssistantRoutePeriod['kind'];
+  month: AssistantMonthSelectorValue; year: number; webSearch: boolean }
+
+/**
+ * A reading as the chooser's draft. The month and the year are always there, so switching the
+ * period never leaves a picker empty: the reading's own, else last month and this year.
+ */
+export function routeToChooserDraft(route: AssistantRouteOverride, today: Today): RouteChooserDraft {
+  const { intent, period } = route;
+  const previous = today.month === 1 ? { year: today.year - 1, month: 12 }
+    : { year: today.year, month: today.month - 1 };
+  return {
+    kind: intent === 'register' ? 'register' : intent === 'chat' ? 'question' : 'analysis',
+    period: period.kind,
+    month: period.kind === 'month' ? { year: period.year, month: period.month } : previous,
+    year: period.kind === 'year' ? period.year : today.year,
+    webSearch: route.webSearch,
+  };
+}
+
+/** The draft as the route «Rileggi» sends. Null for an analysis without a period: «Rileggi» stays off. */
+export function chooserDraftToOverride(draft: RouteChooserDraft): AssistantRouteOverride | null {
+  if (draft.kind === 'register') return { intent: 'register', period: { kind: 'none' }, webSearch: false };
+  const period: AssistantRoutePeriod = draft.period === 'month' ? { kind: 'month', ...draft.month }
+    : draft.period === 'year' ? { kind: 'year', year: draft.year } : { kind: draft.period };
+  if (draft.kind === 'question') return { intent: 'chat', period, webSearch: draft.webSearch };
+  const intent = ({ month: 'month_analysis', year: 'year_analysis', ytd: 'ytd_analysis', history: 'history_analysis',
+    none: null } as const)[draft.period];
+  return intent ? { intent, period, webSearch: draft.webSearch } : null;
+}
+
 /** A reading as today's request fields: the pipeline after it is the one an explicit mode runs. */
 export function routeToSelection(route: AssistantRouteOverride): AssistantRouteSelection {
   const { intent, period } = route;

@@ -209,3 +209,50 @@ describe('streamAssistantResponse — Registra (2026-11)', () => {
     expect(JSON.stringify(params.system)).not.toContain('BLOCCO REGISTRA');
   });
 });
+
+// The status says what the server is doing NOW (owner, 2026-11-16: an answer stood still for a minute
+// on its first sentence while the model searched the web, and the status never came back to writing).
+describe('streamAssistantResponse — the status follows the stream', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const text = (t: string) => ({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t } });
+  const search = { type: 'content_block_start', index: 1, content_block: { type: 'server_tool_use', id: 's1', name: 'web_search', input: {} } };
+
+  async function run(chunks: unknown[]) {
+    async function* stream() { for (const chunk of chunks) yield chunk; }
+    vi.spyOn(Anthropic.Beta.Messages.prototype, 'create').mockResolvedValue(stream() as never);
+    const onStatus = vi.fn();
+    await streamAssistantResponse({
+      mode: 'chat', prompt: 'Com è andato ottobre?', contextBundle: null, preferences, enableWebSearch: true, onStatus, onText: vi.fn(),
+    });
+    return onStatus.mock.calls.map((call) => call[0]);
+  }
+
+  it('says writing until a search starts, even with the web allowed', async () => {
+    expect(await run([text('Ottobre.')])).toEqual(['writing', 'saving']);
+  });
+
+  it('starts a new paragraph where the text resumes after a search', async () => {
+    async function* stream() { for (const chunk of [text('Cerco il contesto.'), search, text('**In sintesi**')]) yield chunk; }
+    vi.spyOn(Anthropic.Beta.Messages.prototype, 'create').mockResolvedValue(stream() as never);
+    const onText = vi.fn();
+    const result = await streamAssistantResponse({
+      mode: 'chat', prompt: 'Com è andato ottobre?', contextBundle: null, preferences, enableWebSearch: true, onStatus: vi.fn(), onText,
+    });
+    expect(result.text).toBe('Cerco il contesto.\n\n**In sintesi**');
+    expect(onText.mock.calls.map((call) => call[0]).join('')).toBe(result.text);
+  });
+
+  it('logs what the web search returned, an error by its code', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const failed = { type: 'content_block_start', index: 2, content_block: { type: 'web_search_tool_result', tool_use_id: 's1', content: { type: 'web_search_tool_result_error', error_code: 'unavailable' } } };
+    await run([search, failed, text('Senza web.')]);
+    expect(warn).toHaveBeenCalledWith('[assistant] web search failed: unavailable');
+  });
+
+  it('comes back to writing when the text resumes after a search', async () => {
+    expect(await run([text('Cerco il contesto. '), search, text('Ecco ottobre.'), text(' Fine.')])).toEqual(['writing', 'searching', 'writing', 'saving']);
+  });
+});

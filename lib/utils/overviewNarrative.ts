@@ -28,6 +28,7 @@ import {
   describePurchases,
   describeSales,
   taxedGrowthHeadline,
+  saleCarriesMonthSplit,
 } from '@/lib/utils/salesNarrative';
 
 import type { Narrative, NarrativeSegment, VerdictTone } from '@/lib/utils/narrative';
@@ -446,7 +447,7 @@ export function buildOverviewVerdict(input: OverviewVerdictInput): OverviewVerdi
           flows: input.monthFlows ?? null,
         }
       : undefined;
-  const saleCarriesSplit = split !== undefined && (input.sales?.estimatedTax ?? 0) > 0;
+  const saleCarriesSplit = saleCarriesMonthSplit(input.sales, split);
   const saleClause: Narrative = [];
   if (input.sales) {
     saleClause.push(prose(' '), ...describeSales(input.sales, split));

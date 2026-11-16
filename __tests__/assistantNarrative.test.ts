@@ -45,6 +45,7 @@ import {
   toNoContextVerdictInput,
   type AssistantPeriodInput,
 } from '@/lib/utils/assistantNarrative';
+import { EMPTY_CHAT_QUESTION } from '@/lib/utils/assistantChatNarrative';
 import type { DashboardOverviewPayload } from '@/types/dashboardOverview';
 import type { AssistantRegisterSummary } from '@/types/assistant';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
@@ -332,8 +333,9 @@ describe('buildNoContextVerdict', () => {
 
     expect(verdict.headline).toBe('Una domanda libera, senza un periodo.');
     expect(verdict.tone).toBe('neutral');
+    // The page has no period to link since 2026-11-12: the period is named in the question.
     expect(plain(verdict.sentence)).toBe(
-      "L'assistente risponde sui dati di oggi; collega un periodo per ragionare sui suoi numeri.",
+      "L'assistente risponde sui dati di oggi; nomina un periodo nella domanda per ragionare sui suoi numeri.",
     );
   });
 });
@@ -509,9 +511,9 @@ describe('describeFactsTile', () => {
 });
 
 describe('describeConversation', () => {
-  it('asks the period question when the thread is empty', () => {
-    expect(plain(describeConversation({ messageCount: 0, question: 'Cosa vuoi sapere su luglio 2026?', periodLabel: null, webSearchUsed: false }))).toBe(
-      'Cosa vuoi sapere su luglio 2026? Scegli una domanda o scrivine una qui sotto.',
+  it('asks the chat’s question when the thread is empty, and points at the suggestions', () => {
+    expect(plain(describeConversation({ messageCount: 0, question: EMPTY_CHAT_QUESTION, periodLabel: null, webSearchUsed: false }))).toBe(
+      'Cosa vuoi sapere, o cosa vuoi registrare? Scegli un suggerimento o scrivi qui sotto.',
     );
   });
 

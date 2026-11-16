@@ -7,7 +7,7 @@
  */
 
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import type { DeclineCause, PeriodSalesSummary, TaxedGrowth } from '@/lib/utils/periodSales';
+import { isMaterialAmount, isMaterialSalesTax, type DeclineCause, type PeriodSalesSummary, type TaxedGrowth } from '@/lib/utils/periodSales';
 import type { DebtRepayment, MonthFlows } from '@/lib/utils/marketEffect';
 import type { Narrative, NarrativeSegment } from '@/lib/utils/narrative';
 import { isPrintedZero } from '@/lib/utils/verdictStrip';
@@ -104,11 +104,6 @@ export interface MonthSplit {
   flows?: MonthFlows | null;
 }
 
-/** «Altre variazioni» is said only from this many euro… */
-const OTHER_CHANGES_MIN_EUR = 100;
-/** …and from this share of the change being split, whichever is larger. */
-const OTHER_CHANGES_MIN_SHARE = 0.05;
-
 /**
  * Whether «altre variazioni» is worth a clause in a sentence. The residual is the gap between the
  * balances typed by hand and the cashflow rows — mostly TIMING: a credit-card expense is in the
@@ -119,7 +114,7 @@ const OTHER_CHANGES_MIN_SHARE = 0.05;
  * in the rows and tooltips that list every part. Shared by the Panoramica, Patrimonio and Storico.
  */
 export function isMaterialOtherChange(other: number, total: number): boolean {
-  return Math.abs(other) >= Math.max(OTHER_CHANGES_MIN_EUR, Math.abs(total) * OTHER_CHANGES_MIN_SHARE);
+  return isMaterialAmount(other, total);
 }
 
 /**
@@ -265,7 +260,9 @@ export function describeSales(sales: PeriodSalesSummary, split?: MonthSplit): Na
       prose(' di tasse'),
     ]),
   );
-  if (!split || sales.estimatedTax <= 0) {
+  // An immaterial tax (`isMaterialSalesTax`) stays a fact: the month without it says nothing, and
+  // the caller prints the plain split instead (`saleCarriesMonthSplit`).
+  if (!split || !isMaterialSalesTax(sales.estimatedTax, split.delta)) {
     narrative.push(prose('.'));
     return narrative;
   }
@@ -280,6 +277,11 @@ export function describeSales(sales: PeriodSalesSummary, split?: MonthSplit): Na
     ]),
   );
   return narrative;
+}
+
+/** Whether `describeSales` carries the month without the tax, so the caller drops its own split. */
+export function saleCarriesMonthSplit(sales: PeriodSalesSummary | null | undefined, split: MonthSplit | undefined): boolean {
+  return split !== undefined && isMaterialSalesTax(sales?.estimatedTax ?? null, split.delta);
 }
 
 /**

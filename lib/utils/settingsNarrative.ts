@@ -246,7 +246,7 @@ export function describeAssistantPreferences({
   if (memoryEnabled !== undefined) clauses.push(memoryEnabled ? 'apprendimento attivo' : 'apprendimento spento');
   if (macroContextEnabled !== undefined) clauses.push(macroContextEnabled ? 'ricerca web attiva' : 'ricerca web spenta');
   if (clauses.length === 0) {
-    return [prose('Preferenze non ancora sincronizzate: si leggono e modificano accanto alla conversazione.')];
+    return [prose("Preferenze non ancora sincronizzate: si leggono e modificano dall'Assistente, nel menu «⋯» → Preferenze.")];
   }
   const sentence = clauses.join(', ');
   return [prose(`${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`)];

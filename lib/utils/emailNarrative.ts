@@ -339,6 +339,7 @@ function resolveHeadline(input: PeriodEmailVerdictInput): { headline: string; to
     marketEffect: input.marketEffect,
     ownFlows: null,
     salesTax: input.sales?.estimatedTax ?? null,
+    delta: input.netWorthDelta,
   });
   return {
     headline: `${subject} è in calo${declineHeadlineTail(cause, input.sales)}`,

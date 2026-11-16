@@ -1,12 +1,9 @@
 'use client';
 
-import { Brain, MessagesSquare, PencilLine, Plus } from 'lucide-react';
-import { AssistantPreferencesPopover } from '@/components/assistant/AssistantPreferencesPopover';
+import { Brain, MessagesSquare, MoreHorizontal, Plus, Settings2 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
-import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS } from '@/lib/constants/aiAccent';
-import { cn } from '@/lib/utils';
-import { AssistantMemoryDocument, AssistantPreferences } from '@/types/assistant';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface AssistantHeaderProps {
   isDemo: boolean;
@@ -17,52 +14,26 @@ interface AssistantHeaderProps {
   activeMemoryCount: number;
   /** «6 conversazioni · 3 obiettivi e 3 fatti in memoria» — from `describeAssistantHeader`. */
   description: string;
-  memory: AssistantMemoryDocument | undefined;
-  loadingMemory: boolean;
-  isPreferencesPending: boolean;
-  onPreferencesChange: (patch: Partial<AssistantPreferences>) => void;
   onNewThread: () => void;
   onOpenThreads: () => void;
   onOpenMemory: () => void;
-  /** «Registra»: enters the mode that proposes rows (the day's register thread, the composer focused). */
-  onEnterRegister: () => void;
-  /** Registra is the open mode: the title names what it does — «Un periodo» is not its promise (2026-11-11). */
-  isRegister?: boolean;
+  onOpenPreferences: () => void;
+  /** The copy of «⋯» last pressed or focused: the modal a menu item opens returns the focus there. */
+  moreTriggerRef: React.RefObject<HTMLButtonElement | null>;
+}
+
+/** «Nuova conversazione» names why it is off in the demo. */
+export function newThreadLabel(isDemo: boolean): string {
+  return isDemo ? 'Nuova conversazione — non disponibile in modalità demo' : 'Nuova conversazione';
 }
 
 /**
- * Small count dot overlaid on an icon action — visual only, the count is in the aria-label. A
- * count that is a floor wears a «+» («50+» while a page of threads is unread, «99+» past two
- * digits): a bare «50» or «99» would be a count that stopped in silence.
- */
-function CountDot({ count, isFloor = false }: { count: number; isFloor?: boolean }) {
-  if (count === 0) return null;
-  return (
-    <span
-      aria-hidden="true"
-      className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-medium text-primary-foreground"
-    >
-      {count > 99 || isFloor ? `${Math.min(count, 99)}+` : count}
-    </span>
-  );
-}
-
-/** «Nuova conversazione» names why it is off: the demo, or Registra's one thread a day. */
-export function newThreadLabel(isDemo: boolean, isRegister: boolean): string {
-  if (isDemo) return 'Nuova conversazione — non disponibile in modalità demo';
-  if (isRegister) return 'Nuova conversazione — Registra tiene un thread al giorno';
-  return 'Nuova conversazione';
-}
-
-/**
- * The compact page header of the Assistente: eyebrow · title · a generated description that
- * carries the counts (conversations, goals, facts), and ONE primary action — «Nuova
- * conversazione». Conversazioni and Memoria are icon actions wearing their count as a dot (the
- * description says the same in words, the dot is what the eye finds); Preferenze is the third and
- * «Registra» the fourth — the way into the mode that proposes rows, a control that calls the
- * model and so the one that turns the AI accent on hover and keyboard focus. Every action is
- * 44px below `desktop:`.
- * The guide that used to open from a «?» here is the «Come funziona» disclosure below the grid.
+ * The compact page header of the Assistente as a chat (2026-11-12): eyebrow · title · a generated
+ * description that carries the counts (conversations, goals, facts), and two buttons — «⋯», a menu
+ * of Conversazioni, Memoria and Preferenze (each opens its modal: the shell's own pattern, and a
+ * bottom sheet below 769px), and the ONE primary action «Nuova conversazione». A registration is
+ * written in the composer: there is no «Registra» button. Every action is 44px below `desktop:`.
+ * Preferenze is a modal, never a menu: it holds a Select and Switches.
  */
 export function AssistantHeader({
   isDemo,
@@ -71,85 +42,61 @@ export function AssistantHeader({
   hasMoreThreads = false,
   activeMemoryCount,
   description,
-  memory,
-  loadingMemory,
-  isPreferencesPending,
-  onPreferencesChange,
   onNewThread,
   onOpenThreads,
   onOpenMemory,
-  onEnterRegister,
-  isRegister = false,
+  onOpenPreferences,
+  moreTriggerRef,
 }: AssistantHeaderProps) {
+  const threadsLabel = isDemo
+    ? 'Conversazioni — non disponibili in modalità demo'
+    : threadsCount > 0
+      ? `Conversazioni (${hasMoreThreads ? 'più di ' : ''}${threadsCount})`
+      : 'Conversazioni';
+
   return (
     <PageHeader
       label="Assistente AI"
-      title={isRegister ? 'Una frase, una riga' : 'Un periodo, una risposta'}
+      title="Una frase, una risposta"
       description={description}
       actions={
         <>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative h-11 w-11 desktop:h-9 desktop:w-9"
-            disabled={isDemo}
-            aria-label={
-              isDemo
-                ? 'Conversazioni — non disponibili in modalità demo'
-                : threadsCount > 0
-                  ? `Conversazioni (${hasMoreThreads ? 'più di ' : ''}${threadsCount})`
-                  : 'Conversazioni'
-            }
-            onClick={onOpenThreads}
-          >
-            <MessagesSquare className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <CountDot count={threadsCount} isFloor={hasMoreThreads} />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 desktop:h-9 desktop:w-9"
+                aria-label="Altre azioni dell'assistente"
+                // PageHeader renders the actions twice: the copy used records itself.
+                onPointerDown={(event) => { moreTriggerRef.current = event.currentTarget; }}
+                onFocus={(event) => { moreTriggerRef.current = event.currentTarget; }}
+              >
+                <MoreHorizontal className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuItem disabled={isDemo} onSelect={onOpenThreads}>
+                <MessagesSquare className="size-4" aria-hidden="true" />
+                {threadsLabel}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={onOpenMemory}>
+                <Brain className="size-4" aria-hidden="true" />
+                {activeMemoryCount > 0 ? `Memoria (${activeMemoryCount})` : 'Memoria'}
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={isDemo} onSelect={onOpenPreferences}>
+                <Settings2 className="size-4" aria-hidden="true" />
+                Preferenze
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative h-11 w-11 desktop:h-9 desktop:w-9"
-            aria-label={activeMemoryCount > 0 ? `Memoria (${activeMemoryCount})` : 'Memoria'}
-            onClick={onOpenMemory}
-          >
-            <Brain className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <CountDot count={activeMemoryCount} />
-          </Button>
-
-          {/* Unified behaviour preferences (style, web context, memory on/off) — a Popover,
-              never a DropdownMenu: it holds a Select and Switches. */}
-          <AssistantPreferencesPopover
-            memory={memory}
-            onChange={onPreferencesChange}
-            isLoading={loadingMemory}
-            isPending={isPreferencesPending}
-            disabled={isDemo}
-          />
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              'h-11 w-11 border border-transparent text-muted-foreground desktop:h-9 desktop:w-9',
-              AI_CONTROL_ACCENT_CLASS,
-              AI_CONTROL_ACCENT_LABEL_CLASS,
-            )}
-            disabled={isDemo || isStreaming}
-            aria-label="Registra un movimento"
-            onClick={onEnterRegister}
-          >
-            <PencilLine className="h-4 w-4" aria-hidden="true" />
-          </Button>
-
-          {/* The ONE primary action. Icon-only below desktop — the sticky navbar has no room for the label.
-              Off in Registra: its thread is the day's, so a new one would reopen the same (the owner's tour,
-              2026-11-11 — the button seemed to do nothing); «Torna all'analisi» is the way out. */}
+          {/* The ONE primary action. Icon-only below desktop — the sticky navbar has no room for the label. */}
           <Button
             onClick={onNewThread}
-            disabled={isDemo || isStreaming || isRegister}
+            disabled={isDemo || isStreaming}
             className="h-11 w-11 p-0 desktop:h-9 desktop:w-auto desktop:px-4"
-            aria-label={newThreadLabel(isDemo, isRegister)}
+            aria-label={newThreadLabel(isDemo)}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             <span className="hidden desktop:inline">Nuova conversazione</span>

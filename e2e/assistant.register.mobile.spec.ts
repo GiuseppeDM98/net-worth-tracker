@@ -10,7 +10,7 @@
 
 import { test, expect } from '@playwright/test';
 import {
-  ACCOUNT_ID, ACCOUNT_START, FOOD_ID, admin, card, enterRegister, expectDecoyUntouched, installFakeStream, openAssistant,
+  ACCOUNT_ID, ACCOUNT_START, FOOD_ID, admin, card, expectDecoyUntouched, installFakeStream, openAssistant,
   plantFixture, proposalBlock, quantityOf, removeFixture, resetFixture, send, writtenRows,
 } from './assistantRegister';
 
@@ -32,7 +32,6 @@ test('the card’s three buttons are 44px targets inside the card, nothing overf
     () => `Ti propongo questa riga.\n\n${proposalBlock({ amount: 103, note: 'Supermercato di quartiere', reason: 'Come le ultime spese al supermercato, tutte in Cibo › Spesa.' })}`,
   );
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'Ciao, ho fatto spesa per 103 euro, per favore segnalo');
 
   const proposed = card(page, 'expense:0');

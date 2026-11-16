@@ -15,8 +15,8 @@
 
 import { test, expect } from '@playwright/test';
 import {
-  UID, admin, card, enterRegister, expectDecoyUntouched, installFakeStream, openAssistant, plantFixture, proposalBlock,
-  questionBlock, questionCard, removeFixture, resetFixture, send, storedProposals,
+  UID, admin, card, expectDecoyUntouched, installFakeStream, openAssistant, plantFixture, proposalBlock,
+  questionBlock, questionCard, removeFixture, resetFixture, send, storedProposals, THREAD_ID,
 } from './assistantRegister';
 
 const ACCOUNTS = ['Uno', 'Due', 'Tre', 'Quattro', 'Cinque', 'Sei'].map((name, index) => ({ id: `e2e-reg-q-conto-${index + 1}`, name: `Conto ${name} ornitorinco` }));
@@ -54,7 +54,6 @@ test('two questions, one «Rispondi»; the answer is one request of two lines, k
   test.setTimeout(150_000);
   const recorder = await installFakeStream(page, (prompt) => (prompt.includes('→') ? QUESTION_AND_CARD : QUESTIONS));
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'Ho spostato 500 euro');
 
   const from = questionCard(page, 'account:from');
@@ -80,7 +79,8 @@ test('two questions, one «Rispondi»; the answer is one request of two lines, k
   await respond.click();
   await expect.poll(() => recorder.requests.length).toBe(2);
   expect(recorder.requests[1].prompt).toBe(`Da quale conto? → ${ACCOUNTS[1].name} [${ACCOUNTS[1].id}]\nSu quale conto? → ${ACCOUNTS[5].name} [${ACCOUNTS[5].id}]`);
-  expect(recorder.requests[1].mode).toBe('register');
+  // The answer is sent with the asking message's reading, carried (2026-11-12): read as a registration again.
+  expect(recorder.requests[1]).toMatchObject({ mode: 'auto', routeCarried: true, route: { intent: 'register', period: { kind: 'none' }, webSearch: false } });
 
   // The cards are read-only now; the next message carries a question AND a card: the card waits.
   await expect(from).toContainText(`Risposta: ${ACCOUNTS[1].name}`);
@@ -95,8 +95,8 @@ test('two questions, one «Rispondi»; the answer is one request of two lines, k
   expect(stored['question:0']?.status).toBe('answered');
   expect(stored['question:1']?.status).toBe('answered');
 
-  // A reload: the param opens the day's thread, read back from the documents.
-  await openAssistant(page, '?mode=registra');
+  // A reload: the URL's `?thread=` opens the thread, read back from the documents.
+  await openAssistant(page, `?thread=${THREAD_ID}`);
   await expect(questionCard(page, 'account:from')).toContainText(`Risposta: ${ACCOUNTS[1].name}`, { timeout: 60_000 });
   await expect(questionCard(page, 'account:to')).toContainText(`Risposta: ${ACCOUNTS[5].name}`);
   // One «Rispondi» only, under the LAST message's question; the older message has none.

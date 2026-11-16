@@ -461,3 +461,30 @@ describe('buildCashflowBreakdown', () => {
     });
   });
 });
+
+// The income categories carry their subcategories too (owner, 2026-11-16: «i rimborsi non hanno
+// sottocategorie? … a lui non arrivano?»), only where a row names one.
+describe('buildCashflowBreakdown — income subcategories', () => {
+  it('should nest the income subcategories, with the rows that name none as their own row', () => {
+    const result = buildCashflowBreakdown([
+      makeExpense({ type: 'income', amount: 400, categoryId: 'cat-rimb', categoryName: 'Rimborsi', subCategoryId: 's-san', subCategoryName: 'Sanitari' }),
+      makeExpense({ type: 'income', amount: 100, categoryId: 'cat-rimb', categoryName: 'Rimborsi', subCategoryId: 's-san', subCategoryName: 'Sanitari' }),
+      makeExpense({ type: 'income', amount: 150, categoryId: 'cat-rimb', categoryName: 'Rimborsi', subCategoryId: 's-alt', subCategoryName: 'Acquisti per altri' }),
+      makeExpense({ type: 'income', amount: 50, categoryId: 'cat-rimb', categoryName: 'Rimborsi' }),
+      makeExpense({ type: 'income', amount: 2000, categoryId: 'cat-stip', categoryName: 'Stipendio' }),
+    ], {});
+    const rimborsi = result.incomeByCategory.find((c) => c.categoryName === 'Rimborsi');
+    expect(rimborsi).toEqual({
+      categoryName: 'Rimborsi',
+      total: 700,
+      transactionCount: 4,
+      subCategories: [
+        { subCategoryName: 'Sanitari', total: 500, transactionCount: 2 },
+        { subCategoryName: 'Acquisti per altri', total: 150, transactionCount: 1 },
+        { subCategoryName: 'Senza sottocategoria', total: 50, transactionCount: 1 },
+      ],
+    });
+    // A category whose rows name no subcategory carries none.
+    expect(result.incomeByCategory.find((c) => c.categoryName === 'Stipendio')).toEqual({ categoryName: 'Stipendio', total: 2000, transactionCount: 1 });
+  });
+});

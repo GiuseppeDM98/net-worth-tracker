@@ -350,12 +350,15 @@ test('the feed’s detail arms its delete in the footer: one dialog, the consequ
  * «Chiedi all'Assistente» beside «Nuova Spesa» (2026-11, doc/guide/cashflow-tracciamento.md): the
  * bridge to Registra, shown with the key of `.env.local` on the dev:e2e server. A link, not a modal.
  */
-test('the header’s «Chiedi all’Assistente» carries the Registra href and lands in Registra', async ({ page }) => {
+test('the header’s «Chiedi all’Assistente» carries the Registra href and lands on the chat, the register rows first', async ({ page }) => {
   test.setTimeout(90_000);
   const header = page.getByRole('link', { name: "Chiedi all'Assistente" }).first();
   await expect(header).toBeVisible();
   await expect(header).toHaveAttribute('href', '/dashboard/assistant?mode=registra');
   await header.click();
-  await expect(page).toHaveURL(/\/dashboard\/assistant\?mode=registra/);
-  await expect(page.getByText("Registra · l'Assistente conosce categorie, conti e le ultime righe")).toBeVisible({ timeout: 60_000 });
+  // The page reads the param once and drops it (2026-11-12): the register suggestions lead, the composer has the focus.
+  await expect(page).toHaveURL(/\/dashboard\/assistant$/, { timeout: 60_000 });
+  const suggestions = page.getByRole('list', { name: 'Domande suggerite' });
+  await expect(suggestions.getByRole('button').first()).toContainText('Oggi ho speso…');
+  await expect(page.getByRole('textbox', { name: "Scrivi un messaggio all'assistente" })).toBeFocused();
 });

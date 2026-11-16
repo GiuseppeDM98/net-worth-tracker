@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveDeclineCause, resolveTaxedGrowth, summarizePeriodSales } from '@/lib/utils/periodSales';
+import { isMaterialSalesTax, resolveDeclineCause, resolveTaxedGrowth, summarizePeriodSales } from '@/lib/utils/periodSales';
 import type { Asset } from '@/types/assets';
 import type { AssetTransaction, AssetTransactionType } from '@/types/assetTransactions';
 
@@ -285,5 +285,37 @@ describe('resolveTaxedGrowth', () => {
 
   it('should treat a month at exactly zero as flat when a tax explains it', () => {
     expect(resolveTaxedGrowth({ delta: 0, deltaPct: 0, salesTax: 500 })).toBe('flat');
+  });
+});
+
+// A tax worth less than max(100 €, 5% of the change) is noise, not a cause: the headline never names
+// it (owner, 2026-11-16: 2 € withheld on a sale headed «il mercato ha pesato, e con lui le tasse»).
+describe('isMaterialSalesTax and the headline causes', () => {
+  it('should call a tax material from max(100 €, 5% of the change), never at zero or null', () => {
+    expect(isMaterialSalesTax(2, -877)).toBe(false);
+    expect(isMaterialSalesTax(99, -877)).toBe(false);
+    expect(isMaterialSalesTax(100, -877)).toBe(true);
+    expect(isMaterialSalesTax(900, -20000)).toBe(false);
+    expect(isMaterialSalesTax(1000, -20000)).toBe(true);
+    expect(isMaterialSalesTax(0, 0)).toBe(false);
+    expect(isMaterialSalesTax(null, -877)).toBe(false);
+  });
+
+  it('should blame the market alone when the tax is immaterial', () => {
+    // −877 € = −1941 € of market + 1064 € of own flows, 2 € withheld.
+    expect(resolveDeclineCause({ marketEffect: -1941, ownFlows: 1064, salesTax: 2 })).toBe('market');
+    // The email has no own-flows half: it passes the change itself.
+    expect(resolveDeclineCause({ marketEffect: -20000, ownFlows: null, salesTax: 500, delta: -21000 })).toBe('market');
+    expect(resolveDeclineCause({ marketEffect: -20000, ownFlows: null, salesTax: 1200, delta: -21000 })).toBe('market-and-taxes');
+  });
+
+  it('should keep the flows and the market gain readings when the tax is immaterial', () => {
+    expect(resolveDeclineCause({ marketEffect: -100, ownFlows: -3000, salesTax: 50 })).toBe('flows-over-market');
+    expect(resolveDeclineCause({ marketEffect: 10, ownFlows: -40, salesTax: 30 })).toBe('despite-market');
+  });
+
+  it('should not call a growth taken by an immaterial tax', () => {
+    expect(resolveTaxedGrowth({ delta: 1, deltaPct: 0, salesTax: 2 })).toBeNull();
+    expect(resolveTaxedGrowth({ delta: 1, deltaPct: 0, salesTax: 150 })).toBe('flat');
   });
 });

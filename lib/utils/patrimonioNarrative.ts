@@ -27,6 +27,7 @@ import {
   describePurchases,
   describeSales,
   taxedGrowthHeadline,
+  saleCarriesMonthSplit,
 } from '@/lib/utils/salesNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 import type { MonthFlows } from '@/lib/utils/marketEffect';
@@ -304,7 +305,7 @@ export function buildPatrimonioVerdict(input: PatrimonioVerdictInput): Patrimoni
     input.monthlyVariation && input.marketEffect !== null
       ? { delta: input.monthlyVariation.value, marketEffect: input.marketEffect, savings: input.savings ?? null, flows: input.monthFlows ?? null }
       : undefined;
-  const saleCarriesSplit = split !== undefined && (input.sales?.estimatedTax ?? 0) > 0;
+  const saleCarriesSplit = saleCarriesMonthSplit(input.sales, split);
   const hasSplit = split !== undefined && !saleCarriesSplit;
   if (split && !saleCarriesSplit) {
     sentence.push(prose(' '), ...describeMonthSplit(split));

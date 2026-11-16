@@ -17,8 +17,8 @@
 
 import { test, expect } from '@playwright/test';
 import {
-  UID, admin, card, composer, enterRegister, expectDecoyUntouched, installFakeStream, openAssistant, outcomeSaved,
-  plantFixture, quantityOf, rawProposalBlock, removeFixture, resetFixture, send, storedProposals,
+  UID, admin, card, composer, expectDecoyUntouched, installFakeStream, openAssistant, outcomeSaved,
+  plantFixture, quantityOf, rawProposalBlock, removeFixture, resetFixture, send, storedProposals, THREAD_ID,
 } from './assistantRegister';
 
 const ACCOUNT_A = 'e2e-reg-kinds-conto-a';
@@ -105,7 +105,6 @@ test.afterAll(async () => {
 async function proposeAndConfirm(page: import('@playwright/test').Page, content: string) {
   const recorder = await installFakeStream(page, () => content);
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'Registra questa, per favore');
   const proposed = card(page, 'expense:0');
   await expect(proposed).toBeVisible();
@@ -134,7 +133,6 @@ test('a transfer onto a house raises its value, and the card says so before «Co
   test.setTimeout(120_000);
   const recorder = await installFakeStream(page, () => rawProposalBlock({ kind: 'transfer', type: 'transfer', amount: 2000, categoryId: TRANSFERS, fromAccount: ACCOUNT_A, toAccount: HOUSE }));
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'Ho messo 2000 euro nella casa');
   const proposed = card(page, 'expense:0');
   await expect(proposed).toContainText(/verso l'immobile Casa ornitorinco: il valore della casa sale di 2\.?000,00\s€/);
@@ -213,7 +211,6 @@ test('a reload reads every written card back; «Registra un’altra» comes firs
   ].join('\n\n');
   const recorder = await installFakeStream(page, () => content);
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'Registra queste due');
   for (const key of ['expense:0', 'expense:1']) {
     const saved = outcomeSaved(page);
@@ -236,8 +233,8 @@ test('a reload reads every written card back; «Registra un’altra» comes firs
   expect(stored['expense:0']?.status).toBe('written');
   expect(stored['expense:1']?.writtenIds).toHaveLength(2);
 
-  // A reload: the param opens the day's thread, read back from the documents.
-  await openAssistant(page, '?mode=registra');
+  // A reload: the URL's `?thread=` opens the thread, read back from the documents.
+  await openAssistant(page, `?thread=${THREAD_ID}`);
   for (const key of ['expense:0', 'expense:1']) {
     await expect(card(page, key).getByText('Registrata')).toBeVisible({ timeout: 60_000 });
     await expect(card(page, key).getByRole('button', { name: 'Conferma' })).toHaveCount(0);

@@ -829,6 +829,26 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
     animation: popper-sheet-out 200ms ease-in forwards;
   }
 }
+/* The Assistente's wait before the first word (components/assistant/AssistantWaiting.tsx,
+   2026-11-16): each phrase fades in, and a light passes over it; still under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .assistant-waiting-phrase {
+    background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--muted-foreground) 40%, var(--foreground) 50%, var(--muted-foreground) 60%, var(--muted-foreground) 100%);
+    background-size: 250% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    animation: assistant-waiting-in 240ms ease-out, assistant-waiting-shimmer 2.4s linear infinite;
+  }
+}
+@keyframes assistant-waiting-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes assistant-waiting-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}
 @keyframes popper-sheet-in {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }

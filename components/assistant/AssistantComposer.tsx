@@ -5,6 +5,7 @@ import { NO_AUTOFILL_ATTRIBUTES } from '@/components/ui/autofill';
 import { Square, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
+import { CHAT_COMPOSER_PLACEHOLDER } from '@/lib/utils/assistantChatNarrative';
 import { ASSISTANT_PROMPT_MAX_LENGTH, describePromptLength } from '@/lib/utils/assistantPeriodOptions';
 import { cn } from '@/lib/utils';
 
@@ -17,21 +18,17 @@ interface AssistantComposerProps {
   onStop: () => void;
   isStreaming: boolean;
   canSubmit: boolean;
-  /** Placeholder reflecting the active period — computed by the parent, which owns the selector. */
-  placeholder?: string;
-  /** Error message shown inline above the keyboard hint (e.g. no data for selected period). */
-  errorHint?: string;
-  /** The page's ref to the textarea, when it moves the focus here (entering Registra, a prefilled row). */
+  /** The page's ref to the textarea, when it moves the focus here (a suggestion, `?mode=registra`). */
   inputRef?: RefObject<HTMLTextAreaElement | null>;
+  /** The page's ref to «Interrompi risposta», where «Rileggi» sends the focus (the textarea is disabled while streaming). */
+  stopRef?: RefObject<HTMLButtonElement | null>;
 }
 
 /**
  * Sticky composer for the assistant chat: textarea + send/stop, nothing else.
  *
- * Period selection and chat context used to live here; they now sit in the
- * AssistantPeriodSelector at the top of the column, next to the data they drive.
- * Keeping the composer to a single job (compose + send) frees the thumb zone on
- * mobile and removes the top/bottom split of the "what + when" decision.
+ * There is no period or mode to pick (2026-11-12): every message goes as `mode: 'auto'` and the
+ * router reads what it is and on which period; «cambia» under the answer changes the reading.
  *
  * The message is capped at `ASSISTANT_PROMPT_MAX_LENGTH` characters, the cap the stream route
  * enforces, and a counter appears when the cap is in sight — tied to the textarea by
@@ -44,9 +41,8 @@ export function AssistantComposer({
   onStop,
   isStreaming,
   canSubmit,
-  placeholder,
-  errorHint,
   inputRef,
+  stopRef,
 }: AssistantComposerProps) {
   const ownRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = inputRef ?? ownRef;
@@ -78,7 +74,7 @@ export function AssistantComposer({
               if (canSubmit) onSubmit();
             }
           }}
-          placeholder={placeholder ?? 'Scrivi una domanda sul tuo portafoglio…'}
+          placeholder={CHAT_COMPOSER_PLACEHOLDER}
           aria-label="Scrivi un messaggio all'assistente"
           disabled={isStreaming}
           maxLength={ASSISTANT_PROMPT_MAX_LENGTH}
@@ -99,6 +95,7 @@ export function AssistantComposer({
             At rest: send button (gated on canSubmit). */}
         {isStreaming ? (
           <Button
+            ref={stopRef}
             onClick={() => onStop()}
             size="icon"
             className="h-[44px] w-[44px] shrink-0 rounded-xl"
@@ -128,15 +125,10 @@ export function AssistantComposer({
         </p>
       )}
 
-      {/* Error hint — shown on both mobile and desktop. */}
-      {errorHint && <p className="mt-2 text-xs text-destructive">{errorHint}</p>}
-
       {/* Keyboard hint — desktop only; wastes height on mobile where it's irrelevant. */}
-      {!errorHint && (
-        <p className="hidden desktop:block mt-1.5 text-xs text-muted-foreground">
-          {'Enter per inviare · Shift+Enter per andare a capo'}
-        </p>
-      )}
+      <p className="hidden desktop:block mt-1.5 text-xs text-muted-foreground">
+        {'Enter per inviare · Shift+Enter per andare a capo'}
+      </p>
     </div>
   );
 }

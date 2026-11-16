@@ -799,7 +799,7 @@ export function GeneraleTab({
               <Link href="/dashboard/assistant" className={TILE_FOOTER_ACTION_CLASS}>
                 dall&apos;Assistente
               </Link>
-              , accanto alla conversazione.
+              , nel menu «⋯» → Preferenze.
             </div>
           </Tile>
         </div>

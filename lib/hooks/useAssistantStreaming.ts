@@ -1,21 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { describeWriteError, userFacingError } from '@/lib/utils/dialogNarrative';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { adoptStreamMessageId, applyProposalToMessages } from '@/lib/utils/assistantStreamBuffer';
+import { routeToSelection } from '@/lib/utils/assistantRoute';
 import {
-  AssistantChatContextType,
   AssistantMessage,
   AssistantMode,
   AssistantMonthContextBundle,
-  AssistantMonthSelectorValue,
   AssistantPreferences,
   AssistantProposalState,
   AssistantRegisterSummary,
+  AssistantRouteOverride,
   AssistantStreamEvent,
   AssistantThreadDetail,
 } from '@/types/assistant';
@@ -37,35 +37,46 @@ function parseSseEvent(rawChunk: string): AssistantStreamEvent | null {
 // The helpers below are module-level so `submit`'s try block holds no conditional expression and
 // no `throw`: keeps the hook compilable by the React Compiler.
 
+/**
+ * The request of every send (2026-11-12): `mode: 'auto'`, so the server's router reads intent,
+ * period and web search — the page has no mode, month, year or chat context to send. A `route`
+ * skips the router (the chooser's «Rileggi», or a reading the turn inherits with `routeCarried`).
+ */
 function buildStreamRequestBody(args: {
   ownerId: string;
-  modeToSend: AssistantMode;
   promptToSend: string;
   selectedThreadId: string | undefined;
-  selectedMonth: AssistantMonthSelectorValue;
-  selectedYear: number;
-  chatContextType: AssistantChatContextType;
   preferences: AssistantPreferences | undefined;
+  route: AssistantRouteOverride | undefined;
+  routeCarried: boolean | undefined;
 }): string {
-  const { ownerId, modeToSend, promptToSend, selectedThreadId, selectedMonth, selectedYear, chatContextType, preferences } = args;
+  const { ownerId, promptToSend, selectedThreadId, preferences, route, routeCarried } = args;
   return JSON.stringify({
     userId: ownerId,
-    mode: modeToSend,
+    mode: 'auto',
     prompt: promptToSend,
     threadId: selectedThreadId,
-    // Include period selectors based on mode
-    ...(modeToSend === 'month_analysis' ? { month: selectedMonth } : {}),
-    ...(modeToSend === 'year_analysis' ? { year: selectedYear } : {}),
-    // Libera (chat) optionally attaches a period context selected next to the axis.
-    ...(modeToSend === 'chat'
-      ? {
-          chatContext: chatContextType,
-          ...(chatContextType === 'month' ? { month: selectedMonth } : {}),
-          ...(chatContextType === 'year' ? { year: selectedYear } : {}),
-        }
-      : {}),
     preferences,
+    ...(route ? { route } : {}),
+    ...(route && routeCarried ? { routeCarried: true } : {}),
   });
+}
+
+/**
+ * The mode a turn's two placeholders are born with, until its `route` event: the passed route's,
+ * else the last answer's — so while the router reads (up to 4 s) the page never slides to a free
+ * question and back (2026-11-12). `'chat'` on a conversation with no answer yet.
+ */
+function bornMode(messages: AssistantMessage[], route: AssistantRouteOverride | undefined): AssistantMode {
+  if (route) return routeToSelection(route).mode;
+  return messages.findLast((message) => message.role === 'assistant')?.mode ?? 'chat';
+}
+
+/** How a send is read: a route the client chose or inherited, else the router's. */
+export interface AssistantSubmitOptions {
+  route?: AssistantRouteOverride;
+  /** Only beside `route`: inherited from the previous turn (a question card's answer, «Rigenera»). */
+  routeCarried?: boolean;
 }
 
 /** The response's body stream, or the route's own error as a user-facing failure. */
@@ -125,10 +136,6 @@ interface UseAssistantStreamingArgs {
   onDraftConsumed: () => void;
   /** Persisted messages of the selected thread (React Query), if any. */
   threadMessages: AssistantMessage[] | undefined;
-  mode: AssistantMode;
-  selectedMonth: AssistantMonthSelectorValue;
-  selectedYear: number;
-  chatContextType: AssistantChatContextType;
   preferences: AssistantPreferences | undefined;
 }
 
@@ -150,10 +157,6 @@ export function useAssistantStreaming({
   draft,
   onDraftConsumed,
   threadMessages,
-  mode,
-  selectedMonth,
-  selectedYear,
-  chatContextType,
   preferences,
 }: UseAssistantStreamingArgs) {
   const queryClient = useQueryClient();
@@ -164,9 +167,6 @@ export function useAssistantStreaming({
   const [streamingMessageId, setStreamingMessageId] = useState<string | undefined>();
   const [isStreaming, setIsStreaming] = useState(false);
   const [isInterrupted, setIsInterrupted] = useState(false);
-  // Shows a "taking longer than expected" nudge after SLOW_RESPONSE_MS with no text received.
-  // Cleared as soon as the first token arrives or streaming ends.
-  const [isSlowResponse, setIsSlowResponse] = useState(false);
   // Mirrors the server's SSE status event (searching | writing | saving). Drives the
   // distinct "Sto cercando sul web…" badge instead of the generic slow-response nudge.
   const [streamStatus, setStreamStatus] = useState<'searching' | 'writing' | 'saving' | null>(null);
@@ -177,9 +177,10 @@ export function useAssistantStreaming({
   // companion tile in place of the browser's own summary. Cleared at each submit and thread switch.
   const [registerSummary, setRegisterSummary] = useState<AssistantRegisterSummary | null>(null);
 
-  // Stores the last successfully submitted prompt so retry can re-send it
-  // after draft is cleared. Using a ref avoids stale closure issues.
-  const lastSentPromptRef = useRef('');
+  // The last successfully submitted prompt and the route «Rigenera» re-sends with it: the route
+  // passed, or the reading the turn's `route` event brought (never a fallback, which the router
+  // reads again). A ref avoids stale closure issues.
+  const lastSentRef = useRef<{ prompt: string; route?: AssistantRouteOverride }>({ prompt: '' });
   // Holds the AbortController for the in-flight SSE request so the stop button
   // can cancel the stream without navigating away.
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -197,25 +198,13 @@ export function useAssistantStreaming({
     return threadMessages ?? [];
   }, [streamingMessages, selectedThreadId, threadMessages]);
 
-  // Slow-response timeout: shows a gentle nudge after 15 s with no text received.
-  // Timer starts when isStreaming flips true and clears when it flips false.
-  // isSlowResponse resets on every new submission (handled in submit).
-  useEffect(() => {
-    if (!isStreaming) return;
-    const SLOW_RESPONSE_MS = 15_000;
-    const timer = setTimeout(() => setIsSlowResponse(true), SLOW_RESPONSE_MS);
-    return () => clearTimeout(timer);
-  }, [isStreaming]);
-
   /**
-   * Core streaming submit.
-   * Accepts optional overrides for prompt and mode so that chip clicks can supply
-   * both values synchronously (React state updates are async; waiting for them
-   * would require a follow-up effect or ref which is harder to reason about).
+   * Core streaming submit. `promptOverride` sends a text that is not the draft (a follow-up, an
+   * answer, «Rileggi»); `options.route` skips the router with a reading chosen or inherited.
    */
-  const submit = async (promptOverride?: string, modeOverride?: AssistantMode) => {
+  const submit = async (promptOverride?: string, options: AssistantSubmitOptions = {}) => {
     const promptToSend = (promptOverride ?? draft).trim();
-    const modeToSend = modeOverride ?? mode;
+    const { route, routeCarried } = options;
 
     if (!ownerId || !promptToSend || isStreaming) {
       return;
@@ -225,16 +214,7 @@ export function useAssistantStreaming({
     // selectedThreadId closure value when a new thread is created mid-stream via the meta event).
     let resolvedThreadId = selectedThreadId;
 
-    const userMessage: AssistantMessage = {
-      id: `local-user-${Date.now()}`,
-      threadId: selectedThreadId ?? 'pending',
-      userId: ownerId,
-      role: 'user',
-      content: promptToSend,
-      createdAt: new Date(),
-      mode: modeToSend,
-      monthContext: selectedMonth,
-    };
+    const userMessageId = `local-user-${Date.now()}`;
 
     // Allocate the assistant slot ID upfront so AssistantStreamingResponse can
     // identify which message is still streaming and render it as plain text.
@@ -246,7 +226,6 @@ export function useAssistantStreaming({
 
     setIsStreaming(true);
     setIsInterrupted(false);
-    setIsSlowResponse(false);
     setStreamStatus(null);
     setContextBundle(null);
     setRegisterSummary(null);
@@ -258,47 +237,43 @@ export function useAssistantStreaming({
     // answers, then sends (2026-11) — would otherwise drop the outcomes recorded since.
     // With an empty buffer, the cached thread: where `recordProposal` writes for a thread opened
     // from the list.
-    setStreamingMessages((current) => [
-      ...(current.length > 0
+    setStreamingMessages((current) => {
+      const base = current.length > 0
         ? current
         : selectedThreadId
           ? (queryClient.getQueryData<AssistantThreadDetail>(queryKeys.assistant.thread(selectedThreadId))?.messages ?? renderedMessages)
-          : renderedMessages),
-      userMessage,
-      {
-        id: assistantMessageId,
-        threadId: selectedThreadId ?? 'pending',
-        userId: ownerId,
-        role: 'assistant',
-        content: '',
-        createdAt: new Date(),
-        mode: modeToSend,
-        monthContext: selectedMonth,
-        webSearchUsed: false,
-      },
-    ]);
+          : renderedMessages;
+      const mode = bornMode(base, route);
+      const createdAt = new Date();
+      return [
+        ...base,
+        { id: userMessageId, threadId: selectedThreadId ?? 'pending', userId: ownerId, role: 'user', content: promptToSend, createdAt, mode, monthContext: null },
+        {
+          id: assistantMessageId,
+          threadId: selectedThreadId ?? 'pending',
+          userId: ownerId,
+          role: 'assistant',
+          content: '',
+          createdAt,
+          mode,
+          monthContext: null,
+          webSearchUsed: false,
+        },
+      ];
+    });
 
     try {
       const response = await authenticatedFetch('/api/ai/assistant/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortController.signal,
-        body: buildStreamRequestBody({
-          ownerId,
-          modeToSend,
-          promptToSend,
-          selectedThreadId,
-          selectedMonth,
-          selectedYear,
-          chatContextType,
-          preferences,
-        }),
+        body: buildStreamRequestBody({ ownerId, promptToSend, selectedThreadId, preferences, route, routeCarried }),
       });
 
       const body = await openStreamBody(response);
 
-      // Save prompt for retry before clearing draft — retry needs the original text
-      lastSentPromptRef.current = promptToSend;
+      // Save prompt and route for retry before clearing draft — retry needs the original text
+      lastSentRef.current = { prompt: promptToSend, route };
       // Clear draft only after the request succeeds to avoid losing text on network errors
       onDraftConsumed();
 
@@ -308,6 +283,24 @@ export function useAssistantStreaming({
         if (event.type === 'meta' && event.threadId) {
           onThreadIdResolved(event.threadId);
           resolvedThreadId = event.threadId;
+        }
+
+        // How the router read the message (right after `meta`): the turn takes the reading's mode —
+        // the cards and the companion follow it — and the answer keeps the reading for its line.
+        // «Rigenera» carries it, unless it is a fallback: then the router reads again.
+        if (event.type === 'route') {
+          const { mode } = routeToSelection(event.reading.route);
+          setStreamingMessages((current) =>
+            current.map((message) =>
+              message.id === assistantMessageId
+                ? { ...message, mode, routeReading: event.reading }
+                : message.id === userMessageId ? { ...message, mode } : message
+            )
+          );
+          if (event.reading.source !== 'fallback') {
+            const { intent, period, webSearch } = event.reading.route;
+            lastSentRef.current = { ...lastSentRef.current, route: { intent, period, webSearch } };
+          }
         }
 
         // Populate the context panel from the server-built bundle.
@@ -326,8 +319,6 @@ export function useAssistantStreaming({
         }
 
         if (event.type === 'text') {
-          // First token received — dismiss the slow-response nudge
-          setIsSlowResponse(false);
           setStreamingMessages((current) =>
             current.map((message) =>
               message.id === assistantMessageId
@@ -376,7 +367,6 @@ export function useAssistantStreaming({
     // After the try/catch rather than in a `finally`: keeps the hook compilable by the React Compiler.
     abortControllerRef.current = null;
     setIsStreaming(false);
-    setIsSlowResponse(false);
     setStreamStatus(null);
   };
 
@@ -386,9 +376,11 @@ export function useAssistantStreaming({
     abortControllerRef.current?.abort();
   };
 
+  // «Rigenera»: the same prompt, the reading it re-sends carried (`routeCarried`, 2026-11-12).
   const retry = () => {
-    if (!isStreaming && lastSentPromptRef.current) {
-      submit(lastSentPromptRef.current);
+    const { prompt, route } = lastSentRef.current;
+    if (!isStreaming && prompt) {
+      submit(prompt, route ? { route, routeCarried: true } : {});
     }
   };
 
@@ -423,7 +415,6 @@ export function useAssistantStreaming({
     streamingMessageId,
     isStreaming,
     isInterrupted,
-    isSlowResponse,
     streamStatus,
     contextBundle,
     setContextBundle,

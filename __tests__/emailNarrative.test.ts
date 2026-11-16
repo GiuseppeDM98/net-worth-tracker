@@ -757,3 +757,20 @@ describe('budgetWindowLabel', () => {
     expect(budgetWindowLabel('annual', 'agosto')).toBe('da inizio anno a oggi');
   });
 });
+
+describe('buildPeriodEmailVerdict — the tax weighed on the change', () => {
+  const SALE = (tax: number) => ({
+    proceeds: 9000,
+    realizedGain: 3500,
+    estimatedTax: tax,
+    instruments: [{ id: 'orni', name: 'ORNI', proceeds: 9000, realizedGain: 3500, estimatedTax: tax }],
+    brokenLedgers: 0,
+  });
+  const FALLING = { ...GROWING, netWorthDelta: -10000, netWorthDeltaPct: -3, marketEffect: -20000, rank: null };
+
+  it('should name a tax material on the period change, and drop one that is not', () => {
+    // 900 € is past max(100 €, 5% of −10.000 €); against the market's −20.000 € it would not be.
+    expect(buildPeriodEmailVerdict({ ...FALLING, sales: SALE(900) }).headline).toBe('Agosto è in calo: il mercato ha pesato, e con lui le tasse sulle vendite.');
+    expect(buildPeriodEmailVerdict({ ...FALLING, sales: SALE(2) }).headline).toBe('Agosto è in calo: il mercato ha pesato.');
+  });
+});
