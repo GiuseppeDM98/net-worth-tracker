@@ -113,7 +113,7 @@ export function buildCashflowBreakdown(
   let unclassifiedSubCategoryAbs = 0;
 
   const byCategory = new Map<string, CategoryAccumulator>();
-  const byIncomeCategory = new Map<string, { categoryName: string; total: number; count: number }>();
+  const byIncomeCategory = new Map<string, { categoryName: string; total: number; count: number; subCategories: Map<string, SubCategoryAccumulator> }>();
   const byType = new Map<ExpenseBreakdownType, number>();
   const individualExpenses: IndividualExpenseRow[] = [];
 
@@ -132,9 +132,18 @@ export function buildCashflowBreakdown(
       }
       totalIncome += expense.amount;
       const key = expense.categoryId || categoryName;
-      const entry = byIncomeCategory.get(key) ?? { categoryName, total: 0, count: 0 };
+      const entry = byIncomeCategory.get(key) ?? { categoryName, total: 0, count: 0, subCategories: new Map<string, SubCategoryAccumulator>() };
       entry.total += expense.amount;
       entry.count += 1;
+      const incomeSubKey = expense.subCategoryId?.trim() || NO_SUBCATEGORY_KEY;
+      const incomeSub = entry.subCategories.get(incomeSubKey) ?? {
+        subCategoryName: incomeSubKey === NO_SUBCATEGORY_KEY ? NO_SUBCATEGORY_LABEL : expense.subCategoryName?.trim() || NO_SUBCATEGORY_LABEL,
+        total: 0,
+        count: 0,
+      };
+      incomeSub.total += expense.amount;
+      incomeSub.count += 1;
+      entry.subCategories.set(incomeSubKey, incomeSub);
       byIncomeCategory.set(key, entry);
       continue;
     }
@@ -202,11 +211,22 @@ export function buildCashflowBreakdown(
     .sort((a, b) => a.total - b.total);
 
   const incomeByCategory: IncomeCategoryBreakdown[] = [...byIncomeCategory.values()]
-    .map((entry) => ({
-      categoryName: entry.categoryName,
-      total: entry.total,
-      transactionCount: entry.count,
-    }))
+    .map((entry) => {
+      const named = [...entry.subCategories.keys()].some((key) => key !== NO_SUBCATEGORY_KEY);
+      return {
+        categoryName: entry.categoryName,
+        total: entry.total,
+        transactionCount: entry.count,
+        // Only when a row names one: «Senza sottocategoria» alone would say nothing.
+        ...(named
+          ? {
+              subCategories: [...entry.subCategories.values()]
+                .map((sub) => ({ subCategoryName: sub.subCategoryName, total: sub.total, transactionCount: sub.count }))
+                .sort((a, b) => b.total - a.total),
+            }
+          : {}),
+      };
+    })
     .sort((a, b) => b.total - a.total);
 
   const expensesByType = EXPENSE_BREAKDOWN_TYPE_ORDER.filter((type) => (byType.get(type) ?? 0) > 0).map((type) => ({

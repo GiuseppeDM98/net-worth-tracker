@@ -19,7 +19,14 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: toastErrorMock } })
 
 import { useAssistantStreaming } from '@/lib/hooks/useAssistantStreaming';
 import { queryKeys } from '@/lib/query/queryKeys';
-import type { AssistantMessage, AssistantRegisterSummary, AssistantStreamEvent, AssistantThreadDetail } from '@/types/assistant';
+import type {
+  AssistantMessage,
+  AssistantRegisterSummary,
+  AssistantRouteOverride,
+  AssistantRouteReading,
+  AssistantStreamEvent,
+  AssistantThreadDetail,
+} from '@/types/assistant';
 
 const SUMMARY: AssistantRegisterSummary = { accounts: [], categories: 3, costCentersEnabled: false, membersEnabled: false, recent: { rows: 4, cut: 0 } };
 
@@ -49,10 +56,6 @@ function setup(overrides: Partial<Parameters<typeof useAssistantStreaming>[0]> =
         draft: 'ho fatto spesa per 103 euro',
         onDraftConsumed,
         threadMessages: undefined,
-        mode: 'register',
-        selectedMonth: { year: 2026, month: 11 },
-        selectedYear: 2026,
-        chatContextType: 'none',
         preferences: undefined,
         ...overrides,
       }),
@@ -75,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('useAssistantStreaming — a register stream', () => {
-  it('sends the mode with no period, and the assistant message ends with the server’s id and thread', async () => {
+  it('sends `auto` with no period, and the assistant message ends with the server’s id and thread', async () => {
     const { result, onThreadIdResolved, onDraftConsumed } = setup();
     await act(async () => {
       await result.current.submit();
@@ -83,7 +86,8 @@ describe('useAssistantStreaming — a register stream', () => {
 
     const [url, init] = authenticatedFetchMock.mock.calls[0];
     expect(url).toBe('/api/ai/assistant/stream');
-    expect(JSON.parse(init.body)).toEqual({ userId: 'owner-1', mode: 'register', prompt: 'ho fatto spesa per 103 euro' });
+    // Every send is read by the router (2026-11-12): no mode, month, year or chat context of the page.
+    expect(JSON.parse(init.body)).toEqual({ userId: 'owner-1', mode: 'auto', prompt: 'ho fatto spesa per 103 euro' });
 
     const [user, assistant] = result.current.renderedMessages;
     expect(result.current.renderedMessages).toHaveLength(2);
@@ -122,6 +126,122 @@ describe('useAssistantStreaming — a register stream', () => {
     expect(result.current.renderedMessages[1].content).toBe('Ti propongo');
     expect(result.current.isInterrupted).toBe(true);
     expect(toastErrorMock).toHaveBeenCalledWith('Stream interrotto');
+  });
+});
+
+// The page as only a chat (2026-11-12): every send is `auto`, the router's reading comes back as a
+// `route` event and sets the turn's mode, and a re-send carries the reading it inherits. Seen RED
+// with `chatContext: 'none'` kept in the body, with the `route` handler leaving the retry's ref
+// alone, and with the placeholders born `'chat'`.
+describe('useAssistantStreaming — the reading of a turn', () => {
+  const ROUTER: AssistantRouteReading = { route: { intent: 'month_analysis', period: { kind: 'month', year: 2026, month: 10 }, webSearch: false, confidence: 0.9 }, source: 'router' };
+  const FALLBACK: AssistantRouteReading = { route: { intent: 'chat', period: { kind: 'none' }, webSearch: false, confidence: 0 }, source: 'fallback', reason: 'timeout' };
+  const REGISTER_ROUTE: AssistantRouteOverride = { intent: 'register', period: { kind: 'none' }, webSearch: false };
+  const bodies = () => authenticatedFetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+  const stream = (reading: AssistantRouteReading | null, end: 'done' | 'error' = 'done'): AssistantStreamEvent[] => [
+    { type: 'meta', threadId: 'thread-1', title: 'x' },
+    ...(reading ? [{ type: 'route' as const, reading }] : []),
+    { type: 'text', text: 'Risposta.' },
+    end === 'done' ? { type: 'done', threadId: 'thread-1', messageId: 'msg-1', webSearchUsed: false } : { type: 'error', error: 'Stream interrotto' },
+  ];
+
+  it('posts a route and `routeCarried` only when passed', async () => {
+    authenticatedFetchMock.mockImplementation(async () => sseResponse(stream(null)));
+    const { result } = setup();
+    await act(async () => {
+      await result.current.submit('ho speso 50 euro', { route: REGISTER_ROUTE });
+    });
+    await act(async () => {
+      await result.current.submit('Da quale conto? → Conto A', { route: REGISTER_ROUTE, routeCarried: true });
+    });
+    expect(bodies()[0]).toEqual({ userId: 'owner-1', mode: 'auto', prompt: 'ho speso 50 euro', threadId: undefined, route: REGISTER_ROUTE });
+    expect(bodies()[0]).not.toHaveProperty('routeCarried');
+    expect(bodies()[1]).toMatchObject({ mode: 'auto', route: REGISTER_ROUTE, routeCarried: true });
+    for (const body of bodies()) for (const key of ['month', 'year', 'chatContext']) expect(body).not.toHaveProperty(key);
+  });
+
+  it('a `route` event sets the turn’s mode and the answer’s reading', async () => {
+    authenticatedFetchMock.mockImplementation(async () => sseResponse(stream(ROUTER)));
+    const { result } = setup();
+    await act(async () => {
+      await result.current.submit('com’è andato ottobre?');
+    });
+    const [user, assistant] = result.current.renderedMessages;
+    expect(user.mode).toBe('month_analysis');
+    expect(assistant.mode).toBe('month_analysis');
+    expect(assistant.routeReading).toEqual(ROUTER);
+    expect(user.routeReading).toBeUndefined();
+  });
+
+  it('«Rigenera» re-sends the route that was passed', async () => {
+    authenticatedFetchMock.mockImplementation(async () => sseResponse(stream(null, 'error')));
+    const { result } = setup();
+    await act(async () => {
+      await result.current.submit('ho speso 50 euro', { route: REGISTER_ROUTE });
+    });
+    await act(async () => {
+      result.current.retry();
+    });
+    await waitFor(() => expect(authenticatedFetchMock).toHaveBeenCalledTimes(2));
+    expect(bodies()[1]).toMatchObject({ prompt: 'ho speso 50 euro', route: REGISTER_ROUTE, routeCarried: true });
+  });
+
+  it('«Rigenera» after an interrupted `auto` turn carries the router’s reading, never a fallback', async () => {
+    authenticatedFetchMock.mockImplementation(async () => sseResponse(stream(ROUTER, 'error')));
+    const { result } = setup();
+    await act(async () => {
+      await result.current.submit('com’è andato ottobre?');
+    });
+    await act(async () => {
+      result.current.retry();
+    });
+    await waitFor(() => expect(authenticatedFetchMock).toHaveBeenCalledTimes(2));
+    // The reading without its confidence: an override is stamped `confidence: 1` by the server.
+    expect(bodies()[1]).toMatchObject({ prompt: 'com’è andato ottobre?', routeCarried: true, route: { intent: 'month_analysis', period: { kind: 'month', year: 2026, month: 10 }, webSearch: false } });
+    expect(bodies()[1].route).not.toHaveProperty('confidence');
+
+    authenticatedFetchMock.mockClear();
+    authenticatedFetchMock.mockImplementation(async () => sseResponse(stream(FALLBACK, 'error')));
+    const second = setup();
+    await act(async () => {
+      await second.result.current.submit('boh?');
+    });
+    await act(async () => {
+      second.result.current.retry();
+    });
+    await waitFor(() => expect(authenticatedFetchMock).toHaveBeenCalledTimes(2));
+    expect(bodies()[1]).not.toHaveProperty('route');
+    expect(bodies()[1]).not.toHaveProperty('routeCarried');
+  });
+
+  it('after a register answer the next turn is born `register` until its own reading arrives', async () => {
+    const registerReading: AssistantRouteReading = { route: { ...REGISTER_ROUTE, confidence: 0.95 }, source: 'router' };
+    authenticatedFetchMock.mockImplementationOnce(async () => sseResponse(stream(registerReading)));
+    // The second stream brings no reading: the placeholders keep the mode they were born with.
+    authenticatedFetchMock.mockImplementationOnce(async () => sseResponse(stream(null)));
+    const { result } = setup();
+    await act(async () => {
+      await result.current.submit('ho speso 50 euro');
+    });
+    await act(async () => {
+      await result.current.submit('e 20 di benzina');
+    });
+    const modes = result.current.renderedMessages.map((message) => message.mode);
+    expect(modes).toEqual(['register', 'register', 'register', 'register']);
+    expect(result.current.renderedMessages.every((message) => message.monthContext === null)).toBe(true);
+  });
+
+  it('is born `chat` on an empty conversation, and with the passed route’s mode', async () => {
+    authenticatedFetchMock.mockImplementation(async () => sseResponse(stream(null)));
+    const { result } = setup();
+    await act(async () => {
+      await result.current.submit('ciao');
+    });
+    expect(result.current.renderedMessages.map((message) => message.mode)).toEqual(['chat', 'chat']);
+    await act(async () => {
+      await result.current.submit('ho speso 50 euro', { route: REGISTER_ROUTE });
+    });
+    expect(result.current.renderedMessages.slice(2).map((message) => message.mode)).toEqual(['register', 'register']);
   });
 });
 

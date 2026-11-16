@@ -5,8 +5,10 @@
  * THE STREAM IS ALWAYS FAKED (`installFakeStream`): `dev:e2e` loads `.env.local`, so the real key
  * makes the composer usable — it is never what answers. The fake does what the route does around
  * the model: it writes the thread and the two messages in the emulator (Admin SDK), then answers
- * the SSE body — `meta` with the thread, `register` with a summary of 4 rows read, one `text`
- * with the answer, `done` with the id of the assistant message it wrote. So the card's PATCH and
+ * the SSE body — `meta` with the thread, `route` with the router's reading (a registration by
+ * default, 2026-11-12: the page is only a chat and every message goes as `mode: 'auto'`),
+ * `register` with a summary of 4 rows read, one `text` with the answer, `done` with the id of
+ * the assistant message it wrote. So the card's PATCH and
  * the thread's reload go through the REAL routes against real documents.
  *
  * The fixture lives on the base account (`test@example.com`) under ids prefixed `e2e-reg-`, absent
@@ -189,8 +191,24 @@ export function proposalBlock(row: ProposedRow): string {
 
 let messageSerial = 0;
 
-/** Writes the thread of today and one exchange in it, as the route does; returns the assistant message's id. */
-export async function plantExchange(userContent: string, assistantContent: string): Promise<string> {
+/** How the router read a message, as the `route` event carries it and the route stores it on the answer. */
+export interface FakeReading {
+  route: { intent: string; period: Record<string, unknown>; webSearch: boolean; confidence: number };
+  source: 'router' | 'override' | 'carried' | 'fallback';
+}
+export const REGISTER_READING: FakeReading = {
+  route: { intent: 'register', period: { kind: 'none' }, webSearch: false, confidence: 0.95 },
+  source: 'router',
+};
+// The intents are the modes' own names (lib/utils/assistantRoute.ts).
+const modeOf = (reading: FakeReading | null) => reading?.route.intent ?? 'register';
+
+/**
+ * Writes the thread and one exchange in it, as the route does; returns the assistant message's id.
+ * The answer stores `routeReading` like the route; `reading: null` plants a message saved before
+ * the router (no reading, the register mode).
+ */
+export async function plantExchange(userContent: string, assistantContent: string, reading: FakeReading | null = REGISTER_READING): Promise<string> {
   const db = await admin();
   const now = new Date();
   messageSerial += 1;
@@ -205,32 +223,49 @@ export async function plantExchange(userContent: string, assistantContent: strin
     { merge: true },
   );
   const assistantId = `e2e-reg-msg-${messageSerial}`;
-  await thread.collection('messages').doc(`e2e-reg-user-${messageSerial}`).set({ userId: UID, role: 'user', content: userContent, mode: 'register', monthContext: null, webSearchUsed: false, createdAt: new Date(now.getTime() - 1000) });
-  await thread.collection('messages').doc(assistantId).set({ userId: UID, role: 'assistant', content: assistantContent, mode: 'register', monthContext: null, webSearchUsed: false, createdAt: now });
+  const mode = modeOf(reading);
+  await thread.collection('messages').doc(`e2e-reg-user-${messageSerial}`).set({ userId: UID, role: 'user', content: userContent, mode, monthContext: null, webSearchUsed: false, createdAt: new Date(now.getTime() - 1000) });
+  await thread.collection('messages').doc(assistantId).set({
+    userId: UID, role: 'assistant', content: assistantContent, mode, monthContext: null, webSearchUsed: false, createdAt: now,
+    ...(reading ? { routeReading: reading } : {}),
+  });
   return assistantId;
 }
 
 export interface StreamRecorder {
   /** Every body the page posted to the stream route. */
-  requests: { mode: string; prompt: string; threadId?: string; month?: unknown; year?: unknown }[];
+  requests: {
+    mode: string; prompt: string; threadId?: string; month?: unknown; year?: unknown;
+    route?: { intent: string; period: Record<string, unknown>; webSearch: boolean }; routeCarried?: boolean;
+  }[];
   /** The ids of the assistant messages the fake wrote, in order. */
   messageIds: string[];
 }
 
 /**
- * Fakes the stream route: `reply` turns the user's prompt into the assistant's answer. Installed
+ * Fakes the stream route: `reply` turns the user's prompt into the assistant's answer — a text,
+ * read as a registration, or `{ text, reading }`. A request that carries a `route` (the chooser's
+ * «Rileggi», a question card's answer) is read as that route, as the server does. Installed
  * BEFORE the first message is sent; no request ever reaches the model.
  */
-export async function installFakeStream(page: Page, reply: (prompt: string) => string): Promise<StreamRecorder> {
+export async function installFakeStream(
+  page: Page,
+  reply: (prompt: string, body: StreamRecorder['requests'][number]) => string | { text: string; reading: FakeReading },
+): Promise<StreamRecorder> {
   const recorder: StreamRecorder = { requests: [], messageIds: [] };
   await page.route('**/api/ai/assistant/stream', async (route) => {
     const body = route.request().postDataJSON() as StreamRecorder['requests'][number];
     recorder.requests.push(body);
-    const content = reply(body.prompt);
-    const messageId = await plantExchange(body.prompt, content);
+    const answer = reply(body.prompt, body);
+    const content = typeof answer === 'string' ? answer : answer.text;
+    const reading: FakeReading = body.route
+      ? { route: { ...body.route, confidence: 1 }, source: body.routeCarried ? 'carried' : 'override' }
+      : typeof answer === 'string' ? REGISTER_READING : answer.reading;
+    const messageId = await plantExchange(body.prompt, content, reading);
     recorder.messageIds.push(messageId);
     const events = [
       { type: 'meta', threadId: THREAD_ID, title: 'Registrazioni · e2e' },
+      { type: 'route', reading },
       {
         type: 'register',
         summary: {
@@ -250,8 +285,6 @@ export async function installFakeStream(page: Page, reply: (prompt: string) => s
   return recorder;
 }
 
-/** «Registra» in the header: PageHeader draws its actions twice, one of them shown. */
-export const registerAction = (page: Page) => page.getByRole('button', { name: 'Registra un movimento' }).filter({ visible: true }).first();
 export const composer = (page: Page) => page.getByRole('textbox', { name: "Scrivi un messaggio all'assistente" });
 export const card = (page: Page, key: string) => page.locator(`[data-proposal="${key}"]`);
 
@@ -263,12 +296,6 @@ export async function openAssistant(page: Page, query = ''): Promise<void> {
     composer(page),
     'the composer is on screen: the dev:e2e server needs ANTHROPIC_API_KEY in .env.local (doc/guide/e2e-playwright.md) — the stream itself is faked',
   ).toBeVisible({ timeout: 60_000 });
-}
-
-/** Enters Registra from the header and waits for its strip. */
-export async function enterRegister(page: Page): Promise<void> {
-  await registerAction(page).click();
-  await expect(page.getByText("Registra · l'Assistente conosce categorie, conti e le ultime righe")).toBeVisible();
 }
 
 /** Types a sentence and sends it. */

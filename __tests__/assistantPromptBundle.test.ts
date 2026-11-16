@@ -556,7 +556,18 @@ describe('assistant prompt data block', () => {
           ],
         },
         pension: [
-          { assetId: 'p1', name: 'Fondo pensione', valueEur: 30000, memberName: 'Elena', role: 'frozen' as const, byYear: [{ taxYear: 2025, tfr: 1500, voluntary: 500, employer: 0, total: 2000 }] },
+          {
+            assetId: 'p1', name: 'Fondo pensione', valueEur: 30000, memberName: 'Elena', role: 'frozen' as const,
+            byYear: [{ taxYear: 2025, tfr: 1500, voluntary: 500, employer: 0, total: 2000 }],
+            paidInPeriod: {
+              label: 'ottobre 2026',
+              total: 850,
+              rows: [
+                { source: 'tfr' as const, amount: 700, dateIso: '2026-09-30', recordedIso: '2026-10-13' },
+                { source: 'voluntary' as const, amount: 150, dateIso: '2026-09-30', recordedIso: '2026-10-13' },
+              ],
+            },
+          },
         ],
         loans: [{ name: 'Mutuo casa', financedAssetName: 'Casa', residualDebtEur: 80000, interestRatePct: 3.2, lastInstalmentEur: 655, role: 'excluded' as const }],
         family: { ownerAge: 35, members: [{ name: 'Paolo', grossAnnualIncome: 40000 }, { name: 'Elena', grossAnnualIncome: null }] },
@@ -604,6 +615,9 @@ describe('assistant prompt data block', () => {
       const content = render(makeBundle({ portfolio: portfolio() }));
       expect(content).toContain('Fondo pensione: valore 30.000 € | di Elena | non negoziabile (conta nella base, i piani non lo toccano)');
       expect(content).toContain('  › 2025: 2000 € (TFR 1500 €, volontari 500 €, datoriali 0 €)');
+      // The period's contributions by the month they moved the value, with the rule that reads them.
+      expect(content).toContain('  › con effetto sul valore in ottobre 2026: 850 € — TFR 700 € (competenza 2026-09-30, registrato il 2026-10-13), volontario 150 € (competenza 2026-09-30, registrato il 2026-10-13)');
+      expect(content).toContain('Un versamento muove il valore del fondo nel mese in cui è registrato, non in quello di competenza');
       expect(content).toContain("Mutuo casa: debito residuo 80.000 € | finanzia: Casa | TAN 3,2% | ultima rata nel periodo 655 € | escluso dall'Allocazione");
       expect(content).toContain("Età dell'intestatario del conto: 35 anni.");
       expect(content).toContain('Membri: Paolo (RAL 40.000 €), Elena.');
@@ -662,6 +676,10 @@ describe('assistant prompt data block', () => {
       const block = formatTodayContextForPrompt(todayContext());
       expect(block).toContain('=== DATI FINANZIARI: PORTAFOGLIO DI OGGI (nessun periodo selezionato) ===');
       expect(block).toContain('niente entrate, uscite, snapshot o confronto tra date');
+      // The page has no period to select since 2026-11-12: the period is named in the question, or «cambia».
+      expect(block).toContain('nominarlo nella domanda');
+      expect(block).toContain('«cambia» sotto la risposta');
+      expect(block).not.toContain('selezionarlo');
       expect(block).toContain('--- STRUMENTI IN PORTAFOGLIO OGGI');
       expect(block).toContain('ETF Mondo');
       expect(block).toContain('obiettivi: assegnato 50,0%, libero 6000');
@@ -895,5 +913,59 @@ describe('the Registra prompt (2026-11)', () => {
     const { userContent } = buildRegisterPrompt('ho speso 5 euro', PREFERENCES, [], REGISTER_BLOCK, null);
     expect(userContent).not.toContain('CASHFLOW 12 MESI');
     expect(userContent).toContain(`${REGISTER_BLOCK}\n\nRichiesta utente: ho speso 5 euro`);
+  });
+});
+
+// The change of the period, split as Storico's Driver splits it (owner, 2026-11-16: the assistant
+// saw the contributions but could not say how much of the month was market).
+describe('the split of the change in the analysis data block', () => {
+  const DRIVERS = {
+    from: { year: 2026, month: 9 }, to: { year: 2026, month: 10 },
+    total: 1500, savings: 900, market: -1000, taxes: 0, debtRepaid: 0, pensionContributions: 1600,
+    other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, isMarketMeasured: true,
+  };
+
+  it('should print the six parts after the net worth, with the rule to read the market from them', () => {
+    const content = render(makeBundle({ netWorth: { start: 300_000, end: 301_500, delta: 1500, deltaPct: 0.5 }, netWorthDrivers: DRIVERS }));
+    expect(content).toContain('--- DA DOVE VIENE LA VARIAZIONE (il calcolo del Driver di Storico: le parti sommano alla variazione) ---');
+    expect(content).toContain('Risparmio dal cashflow: +900 €');
+    expect(content).toContain('Mercato: −1000 € (misurato strumento per strumento)');
+    expect(content).toContain('Versati nei fondi pensione: +1600 €');
+    expect(content).toContain('Usa queste parti per dire quanto viene dal mercato: non stimarlo per differenza.');
+    expect(content.indexOf('--- DA DOVE VIENE LA VARIAZIONE')).toBeGreaterThan(content.indexOf('--- PATRIMONIO ---'));
+  });
+
+  it('should name the rest by cause, and an estimated market as estimated', () => {
+    const content = render(makeBundle({ netWorthDrivers: { ...DRIVERS, other: 300, otherPension: 200, otherHoldings: 0, otherAccounts: 100, isMarketMeasured: false } }));
+    expect(content).toContain('Mercato: −1000 € (stimato: non ogni mese del periodo è misurato strumento per strumento)');
+    expect(content).toContain('Altre variazioni: +300 € (fondi pensione +200 €, conti +100 €)');
+  });
+
+  it('should print nothing without a split', () => {
+    expect(render(makeBundle({ netWorthDrivers: null }))).not.toContain('DA DOVE VIENE LA VARIAZIONE');
+  });
+});
+
+describe('the analysis data block — income subcategories, the funds by class, the web rule (2026-11-16)', () => {
+  it('should print the income subcategories under their category', () => {
+    const content = render(makeBundle({ incomeByCategory: [{ categoryName: 'Rimborsi', total: 700, transactionCount: 4, subCategories: [
+      { subCategoryName: 'Sanitari', total: 500, transactionCount: 2 },
+      { subCategoryName: 'Senza sottocategoria', total: 200, transactionCount: 2 },
+    ] }] }));
+    expect(content).toContain('Rimborsi: 700 € (4 transazioni)\n  › Sanitari: 500 € (2 transazioni)\n  › Senza sottocategoria: 200 € (2 transazioni)');
+  });
+
+  it('should name, in a class, the funds change and the contributions inside it', () => {
+    const content = render(makeBundle({ allocationChanges: [
+      { assetClass: 'bonds', previousValue: 30_000, currentValue: 31_300, absoluteChange: 1300, percentagePointsChange: 0.2, pension: { change: 1500, paidIn: 1100 } },
+      { assetClass: 'crypto', previousValue: 5_000, currentValue: 4_000, absoluteChange: -1000, percentagePointsChange: -0.4, pension: null },
+    ] }));
+    expect(content).toContain('  › di cui fondi pensione: Δ +1500 €, di cui versati +1100 € (ripartiti con la composizione del fondo); il resto della classe: Δ −200 €');
+    expect(content.match(/di cui fondi pensione/g)).toHaveLength(1);
+  });
+
+  it('should never let the model call a search it ran unavailable', () => {
+    const { system } = buildMonthAnalysisPrompt(makeBundle(), 'Come va?', PREFERENCES);
+    expect(system).toContain("Se la ricerca non trova eventi datati del periodo, scrivi che la ricerca non li ha trovati: non scrivere mai che la ricerca web non era disponibile quando l'hai usata.");
   });
 });

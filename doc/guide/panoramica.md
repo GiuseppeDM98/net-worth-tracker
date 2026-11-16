@@ -209,6 +209,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   vendita di VWCE si sono prese la crescita.» / «… cresce, ma … più di metà della crescita.» Tone `warning`. It needs only
   Δ and the tax, so the email reaches it too; on Patrimonio it outranks the «massimo storico» headline. The sale then
   leads the sentence (`taxIsTheStory`), exactly like `taxes-despite-market`.
+- **An immaterial tax is not named** (owner, 2026-11-16): a sale's estimated tax counts in the verdict only when
+  `isMaterialSalesTax` (`lib/utils/periodSales.ts`) — the same max(100 €, 5% of the change) as `isMaterialAmount`,
+  the one threshold `isMaterialOtherChange` now delegates to. Below it `resolveDeclineCause` and `resolveTaxedGrowth`
+  ignore the tax, `describeSales` drops «senza, il mese avrebbe fatto …» and `saleCarriesMonthSplit` tells the
+  Panoramica and Patrimonio to print the ordinary month split instead.
 - **A taxed sale carries the split itself**: `describeSales(sales, split)` closes on «: senza, il mese avrebbe fatto
   +4213 € (…)», the parts of § *The market counts the month's trades* summing to Δ + tax, and `describeMonthSplit` is
   printed only when there is no tax to take out. The email keeps its own three-part split and calls `describeSales`

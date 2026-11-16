@@ -23,7 +23,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   piano» and «Assistente» are read-only tiles: label · mono value rows (`DeclarationRow`) and a footer that LINKS the
   write surface. Two reasons, both structural: the FIRE parameters save from FIRE › Calcolatore/Coast FIRE, and a
   second surface would be a second write path (see the Dividendi Save in § Settings — the FIVE places); the assistant's preferences live in its
-  memory document and the settings doc is a MIRROR THAT LOSES ON READ (`lib/server/assistant/store.ts` prefers the
+  memory document (read and changed from the Assistente, its «⋯» menu → Preferenze, a modal since 2026-11-12) and the settings doc is a MIRROR THAT LOSES ON READ (`lib/server/assistant/store.ts` prefers the
   stored value), so an edit made here would be silently overwritten. A never-synced mirror prints no default — the
   reading says where the truth lives instead.
 - **The applicative default is named as a default**: «pensione INPS a 67 anni (predefinita)» — printing 67 like a saved

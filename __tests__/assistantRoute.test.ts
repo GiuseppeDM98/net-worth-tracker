@@ -11,7 +11,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkRouteConsistency,
+  chooserDraftToOverride,
   parseRouterToolInput,
+  routeToChooserDraft,
   routeToSelection,
 } from '@/lib/utils/assistantRoute';
 import type { AssistantRouteOverride, AssistantRoutePeriod } from '@/types/assistant';
@@ -119,5 +121,46 @@ describe('routeToSelection — a reading as today\'s request fields', () => {
     [route('chat', HISTORY), { mode: 'chat', chatContext: 'history' }],
   ])('%o → %o', (reading, selection) => {
     expect(routeToSelection(reading)).toEqual(selection);
+  });
+});
+
+// The chooser «cambia» opens (2026-11-12): a reading as the draft it edits, and back. Seen RED with
+// `none: null` written `none: 'chat'` in `chooserDraftToOverride` (an analysis on «Oggi» would be read).
+describe('routeToChooserDraft ∘ chooserDraftToOverride — the chooser round-trips every reading', () => {
+  const READINGS: AssistantRouteOverride[] = [
+    route('month_analysis', MONTH),
+    route('year_analysis', YEAR),
+    route('ytd_analysis', YTD),
+    route('history_analysis', HISTORY),
+    route('chat', NONE),
+    route('chat', MONTH),
+    route('chat', YEAR),
+    route('chat', YTD),
+    route('chat', HISTORY),
+  ];
+
+  it('gives back each of the nine questions and analyses, with and without the web', () => {
+    for (const reading of READINGS) {
+      for (const webSearch of [true, false]) {
+        const withWeb = { ...reading, webSearch };
+        expect(chooserDraftToOverride(routeToChooserDraft(withWeb, TODAY)), `${reading.intent} on ${reading.period.kind}, web ${webSearch}`).toEqual(withWeb);
+      }
+    }
+  });
+
+  it('gives back Registra with no period and no web', () => {
+    expect(chooserDraftToOverride(routeToChooserDraft(route('register', NONE), TODAY))).toEqual(route('register', NONE));
+  });
+
+  it('starts a draft without a month on last month, without a year on this year', () => {
+    expect(routeToChooserDraft(route('chat', NONE), TODAY)).toEqual({
+      kind: 'question', period: 'none', month: { year: 2026, month: 10 }, year: 2026, webSearch: false,
+    });
+    expect(routeToChooserDraft(route('chat', NONE), { year: 2027, month: 1 }).month).toEqual({ year: 2026, month: 12 });
+  });
+
+  it('is null for an analysis without a period: «Rileggi» stays off', () => {
+    const draft = routeToChooserDraft(route('chat', NONE), TODAY);
+    expect(chooserDraftToOverride({ ...draft, kind: 'analysis' })).toBeNull();
   });
 });

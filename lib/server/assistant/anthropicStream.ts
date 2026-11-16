@@ -202,9 +202,16 @@ export async function streamAssistantResponse({
   let aggregatedText = '';
   let webSearchUsed = false;
   let stopReason: string | null = null;
+  // The status says what the server is doing NOW (owner, 2026-11-16: an answer stood still for a
+  // minute on its first sentence while the model searched, and the status never came back to
+  // writing): 'searching' only from a search's start, 'writing' again at the text that follows it.
+  let status: 'searching' | 'writing' = 'writing';
+  // A search between two text blocks: the text that resumes is a new paragraph, or the two sentences
+  // run into each other («materie prime.**In sintesi**»).
+  let breakBeforeText = false;
 
   try {
-    onStatus(enableWebSearch ? 'searching' : 'writing');
+    onStatus('writing');
 
     // max_tokens is a budget for thinking AND text together: with adaptive thinking the
     // model decides how much to reason, and whatever it spends there is gone from the
@@ -257,7 +264,17 @@ export async function streamAssistantResponse({
     for await (const chunk of stream) {
       if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'server_tool_use') {
         webSearchUsed = true;
+        status = 'searching';
         onStatus('searching');
+        if (aggregatedText.length > 0) breakBeforeText = true;
+      }
+
+      // What the search returned, in the server log: an answer that says «la ricerca web non era
+      // disponibile» is otherwise impossible to tell from one that never searched.
+      if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'web_search_tool_result') {
+        const content = chunk.content_block.content;
+        if (Array.isArray(content)) console.info(`[assistant] web search returned ${content.length} results`);
+        else console.warn(`[assistant] web search failed: ${content.error_code}`);
       }
 
       // The switch point of a server-side fallback: the answer goes on, written by another model.
@@ -277,12 +294,15 @@ export async function streamAssistantResponse({
         chunk.type === 'content_block_delta' &&
         chunk.delta.type === 'text_delta'
       ) {
-        if (!aggregatedText.length) {
+        if (status !== 'writing') {
+          status = 'writing';
           onStatus('writing');
         }
 
-        aggregatedText += chunk.delta.text;
-        onText(chunk.delta.text);
+        const piece = breakBeforeText && !/\n\s*$/.test(aggregatedText) ? `\n\n${chunk.delta.text}` : chunk.delta.text;
+        breakBeforeText = false;
+        aggregatedText += piece;
+        onText(piece);
       }
     }
 

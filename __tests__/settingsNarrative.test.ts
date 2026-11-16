@@ -286,7 +286,7 @@ describe('describeAssistantPreferences', () => {
 
   it('states the never-synced state', () => {
     expect(plain(describeAssistantPreferences({}))).toBe(
-      'Preferenze non ancora sincronizzate: si leggono e modificano accanto alla conversazione.'
+      "Preferenze non ancora sincronizzate: si leggono e modificano dall'Assistente, nel menu «⋯» → Preferenze."
     );
   });
 });

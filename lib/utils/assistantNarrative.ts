@@ -338,7 +338,7 @@ export function buildNoContextVerdict(overview: OverviewVerdictInput | null): Pa
   return {
     headline: 'Una domanda libera, senza un periodo.',
     tone: 'neutral',
-    sentence: [prose("L'assistente risponde sui dati di oggi; collega un periodo per ragionare sui suoi numeri.")],
+    sentence: [prose("L'assistente risponde sui dati di oggi; nomina un periodo nella domanda per ragionare sui suoi numeri.")],
   };
 }
 
@@ -560,17 +560,17 @@ export function formatPeriodInSentence(selector: AssistantPeriodInput['selector'
 }
 
 /**
- * The Conversazione tile's reading: the period question while the thread is empty, then the
+ * The Conversazione tile's reading: the chat's question while the thread is empty, then the
  * count of messages and what the answer rests on (the period's numbers, a web search).
  */
 export function describeConversation(input: {
   messageCount: number;
-  /** The period-phrased question of the empty state («Cosa vuoi sapere su luglio 2026?»). */
+  /** The question of the empty chat (`EMPTY_CHAT_QUESTION`, lib/utils/assistantChatNarrative.ts). */
   question: string;
   /** The period the answer's numbers come from, with its preposition (`formatPeriodInSentence`); null for a free question. */
   periodLabel: string | null;
   webSearchUsed: boolean;
-  /** Registra has no period and no starter rows: its two sentences say what the mode does with a row. */
+  /** The mode the conversation is shown in (its last answer's): a registration's two sentences say what happens to a row. */
   mode?: AssistantMode;
 }): Narrative {
   const { messageCount, question, periodLabel, webSearchUsed, mode } = input;
@@ -582,7 +582,7 @@ export function describeConversation(input: {
       prose('le righe proposte si scrivono solo su Conferma.'),
     ];
   }
-  if (messageCount === 0) return [prose(`${question} Scegli una domanda o scrivine una qui sotto.`)];
+  if (messageCount === 0) return [prose(`${question} Scegli un suggerimento o scrivi qui sotto.`)];
   const narrative: Narrative = [figure(String(messageCount)), prose(plural(messageCount, ' messaggio; ', ' messaggi; '))];
   if (periodLabel) {
     narrative.push(prose(`la risposta usa i numeri ${periodLabel}${webSearchUsed ? ' e una ricerca web' : ''}.`));

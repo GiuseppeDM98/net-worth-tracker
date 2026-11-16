@@ -42,6 +42,7 @@ import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { describeAssetOwnerLabel } from '@/lib/utils/assetOwnership';
 import { getItalyDateIso, toDate } from '@/lib/utils/dateHelpers';
+import { valueEffectMonth } from '@/lib/utils/pensionReturn';
 import { instrumentTicker, isQuotedInstrument } from '@/lib/utils/exposureRequests';
 import { sliceFraction } from '@/lib/utils/assetSlice';
 import { goalAssetValue, isGoalAsset } from '@/lib/utils/goalAssetValue';
@@ -183,6 +184,18 @@ export interface AssistantCouponFact {
   nextCouponPerUnitEur: number | null;
 }
 
+/**
+ * The contributions that moved a fund's value IN the period: by the month they were recorded
+ * (`valueEffectMonth`, the rule of Previdenza and of the Panoramica's «versati nel fondo pensione»),
+ * not their month of competence — September's contributions recorded on 13 October move October.
+ */
+export interface AssistantPensionPaidIn {
+  /** The period in words, as the prompt prints it («ottobre 2026», «il 2026»). */
+  label: string;
+  total: number;
+  rows: { source: PensionContribution['source']; amount: number; dateIso: string; recordedIso: string | null }[];
+}
+
 export interface AssistantPensionFund {
   assetId: string;
   name: string;
@@ -190,6 +203,15 @@ export interface AssistantPensionFund {
   memberName: string | null;
   role: AssistantHoldingRole;
   byYear: { taxYear: number; tfr: number; voluntary: number; employer: number; total: number }[];
+  /** Null when the context has no period (a free question on today's portfolio). */
+  paidInPeriod: AssistantPensionPaidIn | null;
+}
+
+/** The months a bundle covers, as `valueEffectMonth` keys: after `afterKey`, through `throughKey`. */
+export interface AssistantPortfolioPeriod {
+  afterKey: string;
+  throughKey: string;
+  label: string;
 }
 
 export interface AssistantLoanRow {
@@ -248,6 +270,8 @@ export interface BuildPortfolioContextInput {
   ownerAge: number | null;
   assetValueOf: (asset: Asset) => number;
   now: Date;
+  /** The bundle's period, for the pension contributions that moved a fund in it; absent or null without one. */
+  period?: AssistantPortfolioPeriod | null;
 }
 
 const TRANSACTION_TYPE_LABELS: Record<AssistantLedgerRow['type'], string> = {
@@ -563,11 +587,29 @@ function buildDividendContext(dividends: Dividend[], assets: Asset[], now: Date)
 
 // ─── Pension, loans, family ───────────────────────────────────────────────────
 
+function buildPaidInPeriod(contributions: PensionContribution[], assetId: string, period: AssistantPortfolioPeriod): AssistantPensionPaidIn {
+  const inPeriod = contributions
+    .filter((contribution) => {
+      if (contribution.assetId !== assetId) return false;
+      const key = valueEffectMonth(contribution);
+      return key > period.afterKey && key <= period.throughKey;
+    })
+    .map((contribution) => ({
+      source: contribution.source,
+      amount: contribution.amount,
+      dateIso: getItalyDateIso(toDate(contribution.date)),
+      recordedIso: contribution.createdAt ? getItalyDateIso(toDate(contribution.createdAt)) : null,
+    }))
+    .sort((a, b) => a.dateIso.localeCompare(b.dateIso) || (a.recordedIso ?? '').localeCompare(b.recordedIso ?? ''));
+  return { label: period.label, total: inPeriod.reduce((sum, row) => sum + row.amount, 0), rows: inPeriod };
+}
+
 function buildPensionContext(
   assets: Asset[],
   contributions: PensionContribution[],
   memberNames: ReadonlyMap<string, string>,
-  valueOf: (asset: Asset) => number
+  valueOf: (asset: Asset) => number,
+  period: AssistantPortfolioPeriod | null
 ): AssistantPensionFund[] {
   const funds: AssistantPensionFund[] = [];
   for (const asset of assets) {
@@ -589,6 +631,7 @@ function buildPensionContext(
       byYear: [...years.entries()]
         .map(([taxYear, split]) => ({ taxYear, ...split, total: split.tfr + split.voluntary + split.employer }))
         .sort((a, b) => a.taxYear - b.taxYear),
+      paidInPeriod: period ? buildPaidInPeriod(contributions, asset.id, period) : null,
     });
   }
   return funds.sort((a, b) => b.valueEur - a.valueEur);
@@ -656,7 +699,7 @@ export function buildAssistantPortfolioContext(input: BuildPortfolioContextInput
     allocation: buildAllocationContext(assets, targets, valueOf),
     ledger: buildLedger(transactions, assets),
     dividends: buildDividendContext(dividends, assets, now),
-    pension: buildPensionContext(assets, pensionContributions, memberNames, valueOf),
+    pension: buildPensionContext(assets, pensionContributions, memberNames, valueOf, input.period ?? null),
     loans: buildLoanContext(assets, expenses),
     family: {
       ownerAge,

@@ -7,13 +7,15 @@ import { Globe, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
-import { AssistantMessage, AssistantMode, AssistantProposalState } from '@/types/assistant';
+import { AssistantMessage, AssistantProposalState } from '@/types/assistant';
 import { ExpenseProposalCard } from '@/components/assistant/ExpenseProposalCard';
 import { GoalProposalCard } from '@/components/assistant/GoalProposalCard';
 import { AssistantQuestionBlock } from '@/components/assistant/AssistantQuestionBlock';
+import { AssistantWaiting } from '@/components/assistant/AssistantWaiting';
 import { MessageIdProvider, useMessageBlocks } from '@/components/assistant/MessageIdContext';
 import { MessageQuestionsProvider } from '@/components/assistant/MessageQuestionsContext';
 import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS, AI_GENERATED_EYEBROW_CLASS } from '@/lib/constants/aiAccent';
+import { CHANGE_READING_ARIA, CHANGE_READING_LABEL, describeReadingLine, type AssistantWaitingStatus } from '@/lib/utils/assistantChatNarrative';
 import { isAnswerableQuestionMessage, readAssistantQuestionBlocks } from '@/lib/utils/assistantQuestionBlocks';
 import { EXPENSE_PROPOSAL_LANGUAGE, EXPENSE_PROPOSALS_MAX_PER_MESSAGE, parseExpenseProposal } from '@/lib/utils/expenseProposal';
 import { formatDate } from '@/lib/utils/formatters';
@@ -33,12 +35,16 @@ interface AssistantStreamingResponseProps {
    * the message renders as full markdown.
    */
   streamingMessageId?: string;
-  /** The mode the conversation is shown in: an ```expense-proposal block is a card in Registra alone. */
-  mode: AssistantMode;
+  /** The server's stream status, for the wait before the first word (the web search names itself). */
+  streamStatus?: AssistantWaitingStatus;
   /** The open thread, for a message streamed into a thread that did not exist when it was born. */
   threadId: string | undefined;
   /** Records a card's outcome on its message (`useAssistantStreaming().recordProposal`). */
   recordProposal: (messageId: string, threadId: string, key: string, state: Omit<AssistantProposalState, 'at'>) => void;
+  /** The one answer whose reading may be changed — the last, at rest, outside the demo; undefined: none. */
+  changeableMessageId: string | undefined;
+  /** «cambia» pressed: the answer whose reading changes, and the button, where the focus returns. */
+  onChangeReading: (message: AssistantMessage, opener: HTMLElement) => void;
 }
 
 /**
@@ -61,9 +67,10 @@ function extractCodeText(node: React.ReactNode): string {
 /**
  * A fenced block of an assistant message: a proposal card, or code.
  *
- * A ```goal-proposal block renders as a goal card and, in Registra, an ```expense-proposal block
- * as an expense card (the first five of a message) and an ```assistant-question block as a
- * question card (the first two; `AssistantQuestionBlock` decides, and falls back to the code). Intercepted at `pre` rather than at `code`
+ * A ```goal-proposal block renders as a goal card and, on a message read as a registration (its own
+ * `mode`, never the page's — 2026-11-12), an ```expense-proposal block as an expense card (the first
+ * five of a message) and an ```assistant-question block as a question card (the first two;
+ * `AssistantQuestionBlock` decides, and falls back to the code). Intercepted at `pre` rather than at `code`
  * because a card is block content and would otherwise be nested inside a <pre>, whose content
  * model does not allow it.
  *
@@ -89,7 +96,7 @@ function MarkdownPre({ children, node }: React.ComponentProps<'pre'> & ExtraProp
     </pre>
   );
 
-  // The question block reads its own entry (MessageQuestionsContext): no entry outside Registra.
+  // The question block reads its own entry (MessageQuestionsContext): none on a message not read as a registration.
   if (block?.language === ASSISTANT_QUESTION_LANGUAGE) return <AssistantQuestionBlock index={block.index} codeBlock={codeBlock} />;
 
   if (block && React.isValidElement(firstChild)) {
@@ -157,9 +164,11 @@ export function AssistantStreamingResponse({
   isInterrupted,
   onRetry,
   streamingMessageId,
-  mode,
+  streamStatus,
   threadId,
   recordProposal,
+  changeableMessageId,
+  onChangeReading,
 }: AssistantStreamingResponseProps) {
   const prefersReducedMotion = useReducedMotion();
   // The one message whose questions may still be answered is the thread's last assistant message.
@@ -221,7 +230,14 @@ export function AssistantStreamingResponse({
                 isActiveStream ? (
                   // Plain text during streaming — avoids ReactMarkdown re-parse on every chunk
                   <p className="whitespace-pre-wrap text-sm leading-[1.6] text-foreground">
-                    {message.content || <span className="italic text-muted-foreground">…</span>}
+                    {message.content || <AssistantWaiting reading={message.routeReading} status={streamStatus ?? null} />}
+                    {/* An answer already begun can stand still while the server searches the web
+                        (owner, 2026-11-16: a minute on the first sentence): the wait comes back under it. */}
+                    {message.content && streamStatus === 'searching' && (
+                      <span className="mt-2 flex">
+                        <AssistantWaiting reading={message.routeReading} status="searching" />
+                      </span>
+                    )}
                   </p>
                 ) : (
                   // Full markdown once the stream is complete
@@ -229,14 +245,14 @@ export function AssistantStreamingResponse({
                     {message.content ? (
                       <MessageIdProvider
                         message={message}
-                        mode={mode}
+                        mode={message.mode}
                         recordProposal={(key, state) =>
                           recordProposal(message.id, message.threadId === 'pending' ? (threadId ?? 'pending') : message.threadId, key, state)
                         }
                       >
                         <MessageQuestionsProvider
-                          // The PAGE's mode, as the expense card's gate: a question is a card in Registra alone.
-                          blocks={mode === 'register' ? readAssistantQuestionBlocks(message.content) : NO_QUESTION_BLOCKS}
+                          // The MESSAGE's mode, as the expense card's gate: a question is a card on a registration alone.
+                          blocks={message.mode === 'register' ? readAssistantQuestionBlocks(message.content) : NO_QUESTION_BLOCKS}
                           answerable={isAnswerableQuestionMessage(message, lastAssistantMessageId, streamingMessageId)}
                         >
                           <ReactMarkdown
@@ -256,7 +272,29 @@ export function AssistantStreamingResponse({
                 <p className="whitespace-pre-wrap text-sm leading-[1.55] text-foreground">{message.content}</p>
               )}
 
-              {message.webSearchUsed && (
+              {/* How the message was read (2026-11-12), once the answer is complete: «cambia» under the
+                  last answer only. Not model text — no accent. An older message without a reading
+                  keeps the badge. */}
+              {!isUser && !isActiveStream && message.routeReading && (
+                <p className="mt-2 text-[12px] leading-[1.45] text-muted-foreground">
+                  {describeReadingLine(message.routeReading, message.webSearchUsed)}
+                  {message.id === changeableMessageId && (
+                    <>
+                      {' · '}
+                      <button
+                        type="button"
+                        aria-label={CHANGE_READING_ARIA}
+                        onClick={(event) => onChangeReading(message, event.currentTarget)}
+                        className="inline-flex min-h-11 items-center rounded font-medium text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring desktop:min-h-0"
+                      >
+                        {CHANGE_READING_LABEL}
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
+
+              {!message.routeReading && message.webSearchUsed && (
                 <span className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
                   <Globe className="h-3 w-3" aria-hidden="true" />
                   Ricerca web usata

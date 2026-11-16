@@ -19,7 +19,9 @@ const {
   expenseWhereCalls,
   budgetDocGetMock,
   getDashboardOverviewMock,
+  pensionGetMock,
 } = vi.hoisted(() => ({
+  pensionGetMock: vi.fn(() => Promise.resolve({ docs: [] as unknown[] })),
   budgetDocGetMock: vi.fn(),
   getDashboardOverviewMock: vi.fn(),
   snapshotsGetMock: vi.fn(),
@@ -65,6 +67,9 @@ vi.mock('@/lib/firebase/admin', () => ({
           get: assetsGetMock,
         };
       }
+      if (name === 'pensionContributions') {
+        return { where: vi.fn().mockReturnThis(), get: pensionGetMock };
+      }
       if (name === 'budgets') {
         return { doc: vi.fn(() => ({ get: budgetDocGetMock })) };
       }
@@ -86,10 +91,12 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/services/dashboardOverviewService', () => ({ getDashboardOverview: getDashboardOverviewMock }));
 
 import {
+  buildAssistantHistoryContext,
   buildAssistantMonthContext,
   buildAssistantPeriodRangeContext,
   buildAssistantTodayContext,
   buildAssistantYearContext,
+  buildAssistantYtdContext,
   fetchCashflowBlockInputs,
   fetchRegisterInputs,
 } from '@/lib/services/assistantMonthContextService';
@@ -1056,5 +1063,135 @@ describe('fetchRegisterInputs', () => {
   it('rejects when a core read does: without the rows no proposal can be made', async () => {
     expensesGetMock.mockRejectedValue(new Error('expenses failed'));
     await expect(fetchRegisterInputs('user1', new Date('2026-11-01T10:00:00Z'))).rejects.toThrow('expenses failed');
+  });
+});
+
+// Each period builder hands its months to the portfolio block, so a fund's contributions are read by
+// the month they moved its value (owner, 2026-11-16: September's contributions recorded on 13 October).
+describe('the pension contributions of the period', () => {
+  const FUND = { id: 'fund', data: () => ({ userId: 'user1', name: 'Fondo Esempio', type: 'pensionFund', assetClass: 'bonds', currency: 'EUR', quantity: 1, currentPrice: 20_000 }) };
+  const CONTRIBUTION = {
+    id: 'c1',
+    data: () => ({ userId: 'user1', assetId: 'fund', source: 'tfr', amount: 700, taxYear: 2026, deductible: false, date: new Date('2026-09-30T10:00:00.000Z'), createdAt: new Date('2026-10-13T10:00:00.000Z') }),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSettings(undefined);
+    mockAssets([FUND] as never);
+    mockGoalData(null);
+    mockSnapshots([]);
+    mockExpenses([]);
+    pensionGetMock.mockResolvedValue({ docs: [CONTRIBUTION] });
+  });
+
+  it('should read the month by the month the contributions were recorded', async () => {
+    const october = await buildAssistantMonthContext('user1', { year: 2026, month: 10 });
+    expect(october.portfolio.pension[0].paidInPeriod).toMatchObject({ label: 'ottobre 2026', total: 700 });
+    const september = await buildAssistantMonthContext('user1', { year: 2026, month: 9 });
+    expect(september.portfolio.pension[0].paidInPeriod).toMatchObject({ label: 'settembre 2026', total: 0 });
+  });
+
+  it('should give the year, the window and the history their own months', async () => {
+    expect((await buildAssistantYearContext('user1', 2026)).portfolio.pension[0].paidInPeriod).toMatchObject({ label: 'tutto il 2026', total: 700 });
+    expect((await buildAssistantYearContext('user1', 2025)).portfolio.pension[0].paidInPeriod).toMatchObject({ total: 0 });
+    const q3 = await buildAssistantPeriodRangeContext('user1', { year: 2026, startMonth: 7, endMonth: 9, label: 'Q3 2026' });
+    expect(q3.portfolio.pension[0].paidInPeriod).toMatchObject({ label: 'luglio–settembre 2026', total: 0 });
+    const q4 = await buildAssistantPeriodRangeContext('user1', { year: 2026, startMonth: 10, endMonth: 12, label: 'Q4 2026' });
+    expect(q4.portfolio.pension[0].paidInPeriod).toMatchObject({ label: 'ottobre–dicembre 2026', total: 700 });
+    // A contribution recorded in 2025 belongs to the history, not to the running year.
+    pensionGetMock.mockResolvedValue({ docs: [CONTRIBUTION, { id: 'c0', data: () => ({ userId: 'user1', assetId: 'fund', source: 'voluntary', amount: 300, taxYear: 2025, deductible: true, date: new Date('2025-06-30T10:00:00.000Z'), createdAt: new Date('2025-07-10T10:00:00.000Z') }) }] });
+    expect((await buildAssistantHistoryContext('user1', 2020)).portfolio.pension[0].paidInPeriod).toMatchObject({ label: 'tutta la storia (dal 2020)', total: 1000 });
+  });
+
+  it('should read the running year from January to the Italian month of today', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-16T10:00:00.000Z'));
+    try {
+      expect((await buildAssistantYtdContext('user1')).portfolio.pension[0].paidInPeriod).toMatchObject({ label: 'gennaio–novembre 2026', total: 700 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should carry no period on the portfolio of today', async () => {
+    expect((await buildAssistantTodayContext('user1')).portfolio.pension[0].paidInPeriod).toBeNull();
+  });
+});
+
+// Every analysis carries the change of its period split as Storico's Driver splits it.
+describe('the split of the change in the analysis bundle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSettings(undefined);
+    mockAssets([]);
+    mockGoalData(null);
+    mockExpenses([]);
+    pensionGetMock.mockResolvedValue({ docs: [] });
+  });
+
+  it('should split the month from the snapshot before it', async () => {
+    mockSnapshots([makeSnapshotDoc(2026, 9, 10_000), makeSnapshotDoc(2026, 10, 10_500)]);
+    const bundle = await buildAssistantMonthContext('user1', { year: 2026, month: 10 });
+    expect(bundle.netWorthDrivers).toMatchObject({ from: { year: 2026, month: 9 }, to: { year: 2026, month: 10 }, total: 500 });
+  });
+
+  it('should split the year from the December before it, across its months', async () => {
+    mockSnapshots([makeSnapshotDoc(2025, 12, 9_000), makeSnapshotDoc(2026, 1, 9_500), makeSnapshotDoc(2026, 2, 10_000)]);
+    const bundle = await buildAssistantYearContext('user1', 2026);
+    expect(bundle.netWorthDrivers).toMatchObject({ from: { year: 2025, month: 12 }, to: { year: 2026, month: 2 }, total: 1000 });
+  });
+
+  it('should name the contributions recorded in the month, from the first month the fund is tracked', async () => {
+    const fundSnapshot = (month: number, value: number) => ({
+      data: () => ({ userId: 'user1', year: 2026, month, totalNetWorth: value, liquidNetWorth: 0, illiquidNetWorth: value, byAssetClass: {}, assetAllocation: {},
+        byAsset: [{ assetId: 'fund', ticker: 'fund', name: 'Fondo Esempio', quantity: value, price: 1, totalValue: value }], createdAt: new Date(2026, month - 1, 28) }),
+    });
+    mockSnapshots([fundSnapshot(9, 20_000), fundSnapshot(10, 20_700)] as never);
+    mockAssets([{ id: 'fund', data: () => ({ userId: 'user1', name: 'Fondo Esempio', type: 'pensionFund', assetClass: 'bonds', currency: 'EUR', quantity: 20_700, currentPrice: 1 }) }] as never);
+    pensionGetMock.mockResolvedValue({ docs: [{ id: 'c1', data: () => ({ userId: 'user1', assetId: 'fund', source: 'tfr', amount: 700, taxYear: 2026, deductible: false, date: new Date('2026-09-30T10:00:00.000Z'), createdAt: new Date('2026-10-13T10:00:00.000Z') }) }] });
+    const bundle = await buildAssistantMonthContext('user1', { year: 2026, month: 10 });
+    expect(bundle.netWorthDrivers).toMatchObject({ total: 700, pensionContributions: 700 });
+  });
+
+  it('should carry none without the snapshot before the period', async () => {
+    mockSnapshots([makeSnapshotDoc(2026, 10, 10_500)]);
+    expect((await buildAssistantMonthContext('user1', { year: 2026, month: 10 })).netWorthDrivers).toBeNull();
+  });
+});
+
+// Each class names what the pension funds did in it (owner, 2026-11-16: Azioni and Obbligazioni rose,
+// but the pension funds count in those classes and the assistant could not tell contributions from return).
+describe('the pension funds in the change by class', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSettings(undefined);
+    mockGoalData(null);
+    mockExpenses([]);
+  });
+
+  it('should carry, per class, the funds change from the snapshots and the contributions split by composition', async () => {
+    const snapshot = (month: number, equity: number, bonds: number, pensionEquity: number, pensionBonds: number) => ({
+      data: () => ({ userId: 'user1', year: 2026, month, totalNetWorth: equity + bonds, liquidNetWorth: 0, illiquidNetWorth: 0, byAsset: [], assetAllocation: {},
+        byAssetClass: { equity, bonds }, pension: { totalValue: pensionEquity + pensionBonds, byAssetClass: { equity: pensionEquity, bonds: pensionBonds } },
+        createdAt: new Date(2026, month - 1, 28) }),
+    });
+    mockSnapshots([snapshot(9, 50_000, 30_000, 12_000, 8_000), snapshot(10, 51_000, 31_000, 12_700, 8_500)] as never);
+    mockAssets([{ id: 'fund', data: () => ({ userId: 'user1', name: 'Fondo Esempio', type: 'pensionFund', assetClass: 'equity', currency: 'EUR', quantity: 1, currentPrice: 21_200,
+      composition: [{ assetClass: 'equity', percentage: 60 }, { assetClass: 'bonds', percentage: 40 }] }) }] as never);
+    pensionGetMock.mockResolvedValue({ docs: [{ id: 'c1', data: () => ({ userId: 'user1', assetId: 'fund', source: 'tfr', amount: 1000, taxYear: 2026, deductible: false, date: new Date('2026-09-30T10:00:00.000Z'), createdAt: new Date('2026-10-13T10:00:00.000Z') }) }] });
+
+    const bundle = await buildAssistantMonthContext('user1', { year: 2026, month: 10 });
+    const byClass = Object.fromEntries(bundle.allocationChanges.map((c) => [c.assetClass, c.pension]));
+    expect(byClass.equity).toEqual({ change: 700, paidIn: 600 });
+    expect(byClass.bonds).toEqual({ change: 500, paidIn: 400 });
+  });
+
+  it('should say nothing of the funds when a snapshot does not record them', async () => {
+    mockSnapshots([makeSnapshotDoc(2026, 9, 80_000, { equity: 50_000 }), makeSnapshotDoc(2026, 10, 81_000, { equity: 51_000 })]);
+    mockAssets([]);
+    pensionGetMock.mockResolvedValue({ docs: [] });
+    const bundle = await buildAssistantMonthContext('user1', { year: 2026, month: 10 });
+    expect(bundle.allocationChanges[0].pension).toBeNull();
   });
 });

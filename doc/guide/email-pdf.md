@@ -145,6 +145,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   still `Δ − risparmio` (the asymmetry above). Pinned by `__tests__/{emailNarrative,monthlyEmailService}.test.ts`.
 - **Every email cap is stated in the prompt**: `MAX_CATEGORY_DELTAS` (12) is named in the section header together with
   how many categories were left out. The selection is by SPEND, not by size of variation — describe it as it is.
+- **The periodic comment's contract names the spending types as the app prints them** (2026-11-12):
+  «Spese Necessarie/Spese Non Necessarie/Debiti» (`buildEmailPeriodicFormatContract`, `lib/server/assistant/prompts.ts`), never
+  the labels retired on 2026-10-20.
 - **`max_tokens` scales with the period** (6000/8000/8000/10000), and the format contract names the period in its
   length line instead of a word count. Web search is offered only when `includeMacroContext` allows it, like the
   assistant's structured analyses.

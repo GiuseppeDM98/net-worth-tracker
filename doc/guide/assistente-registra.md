@@ -17,7 +17,7 @@ and the Assistente asks what it needs with options before proposing.
 
 - **The mode** is `register`, handled EXPLICITLY at every site of the WARNING comment that opens `types/assistant.ts`
   (the true list; none falls through to chat). It has no period: the stream body carries no month, the context route
-  answers 400, `useAssistantPeriodContext` is never enabled, it is not a tab of `AssistantPeriodSelector`, web search is
+  answers 400, `useAssistantPeriodContext` is never enabled, there is no axis to show it on (2026-11-12), web search is
   off whatever the prompt says. The stream body is validated by `assistantStreamRequestSchema` (zod, every field; the
   prompt stops at 4000 characters in EVERY mode, the composer counts from 3800 by `aria-describedby`).
 - **The register block** (`buildAssistantRegisterContext` → `formatRegisterContextForPrompt`, pure, `userContent`):
@@ -105,19 +105,14 @@ and the Assistente asks what it needs with options before proposing.
   uses the same path (`goal:N`) and, since 2026-11-11, the same two rules: no button on a `local-` message, and a
   toast when the save fails after the write (`GOAL_STATE_NOT_SAVED`, beside `PROPOSAL_STATE_NOT_SAVED`). An outcome
   never scrolls the conversation (`conversationScrollSignal`, held in the browser by the two-card spec).
-- **The way in and out**: the pencil in the header («Registra un movimento», off in demo and while streaming)
-  or `?mode=registra`, once the thread list has resolved; the strip «Registra · l'Assistente conosce categorie, conti e
-  le ultime righe» stands where the period axis was (and the header's title reads «Una frase, una riga» instead of «Un periodo, una risposta», 2026-11-11), with «Torna all'analisi» — which leaves the thread FIRST (the mode
-  alone would send the next question into it) and drops the param. The thread is one per Italian day, «Registrazioni ·
-  1 nov 2026» (`buildThreadTitleFromPrompt`, `findRegisterThread`); entering reopens today's — the day is read at
-  the ENTRY (`enterRegister`), never once at mount: a page open since yesterday reopened yesterday's thread (2026-11-11). **With no thread picked, the
-  day's thread IS the open one, derived in render** (`selectedThreadId = pickedThreadId ?? the day's`, 2026-11-11): on the
-  owner's tour a sentence sent after the browser's Back from Cashflow opened a SECOND «Registrazioni» of the same day —
-  the mode had been entered while the list did not hold the thread, and a lookup made once at the entry never looked
-  again. So «Nuova conversazione» is OFF in Registra (2026-11-11, the owner's tour: it reopened the day's thread and
-  seemed to do nothing), named «Nuova conversazione — Registra tiene un thread al giorno» (`newThreadLabel`,
-  `__tests__/assistantHeader.test.tsx`); «Torna all'analisi» is the way out, and a clean register thread is had only by
-  deleting the day's.
+- **The way in** (2026-11-12): a written sentence read as a registration — the router's `register` intent, or
+  «cambia» → «Un movimento da registrare» → «Rileggi». There is no mode to enter or leave, no strip, no day thread:
+  a registration goes into the open conversation like any message, the cards follow the MESSAGE's `mode` (an answer
+  after a registration is shown as one: verdict, companion, the register reads). `?mode=registra` (the two Cashflow
+  links) is read once, after the thread list and outside the demo: it puts the three register suggestions first,
+  focuses the composer and is dropped from the URL. The open thread is `?thread=<id>`, so a Back from Cashflow
+  reopens the thread it left (the second «Registrazioni» of the same day, 2026-11-11, cannot happen: no thread is
+  looked up by day). «Nuova conversazione» is on whenever nothing streams.
 - **The answer is short, whatever the style preference** (the owner's tour, 2026-11-11): the first real answers carried
   «Ipotesi che ho fatto», «Cosa dicono i dati del mese» and «Limiti dei dati» under the cards (the «deep» style line of
   `userContent` asks for hypotheses and limits) and said «vedo solo le 300 righe più recenti su N». `REGISTER_CONTRACT`

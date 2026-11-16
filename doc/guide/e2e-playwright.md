@@ -342,7 +342,14 @@
   retried from itself». **A fake that stands for a route which WRITES does the write itself** (2026-11-10,
   `e2e/assistantRegister.ts`): the Assistente's stream route stores the thread and the two messages before it answers,
   and the card's PATCH and the reload read them — so the fake writes them with the Admin SDK and answers `done` with
-  the id it wrote; the real PATCH and thread routes then run against real documents. The Assistente page needs the key
+  the id it wrote; the real PATCH and thread routes then run against real documents. Since 2026-11-12 the
+  fake also emits the router's `route` event (`reply(prompt, body)` returns the text or `{ text, reading }`; a body
+  `route` comes back as the reading, `'carried'` or `'override'`), `plantExchange(user, assistant, reading)` writes
+  the reading (`null`: a message saved before the router), and `enterRegister`/`registerAction` are gone — a
+  sentence is read as a registration with no mode to enter. Two things the fake does NOT do: it emits no `context`
+  event, so after a faked analysis the verdict stays a skeleton (the real route sends the bundle, `stream/route.ts`);
+  and its `done` says `webSearchUsed: false`, which the line reads over the reading's `webSearch` — no « · con
+  ricerca web» on a faked answer. The Assistente page needs the key
   in `.env.local` to render its composer at all (`openAssistant` says so in its failure message). A spec with
   independent tests is NOT `serial`: the first red would skip the rest, and one mutation run could not show three reds.
 - **Locators — the controls are not buttons** (2026-08-28: read the failure's page snapshot before guessing a second

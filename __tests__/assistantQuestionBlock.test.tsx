@@ -21,6 +21,7 @@ vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch: authenticatedFetch
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: toastErrorMock } }));
 
 import { AssistantQuestionBlock } from '@/components/assistant/AssistantQuestionBlock';
+import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
 import { MessageIdProvider } from '@/components/assistant/MessageIdContext';
 import { MessageQuestionsProvider } from '@/components/assistant/MessageQuestionsContext';
 import { RegisterRefsProvider } from '@/components/assistant/RegisterRefsContext';
@@ -194,7 +195,29 @@ describe('AssistantQuestionBlock — read-only and fallbacks', () => {
     expect(screen.queryByRole('button', { name: 'Rispondi' })).toBeNull();
   });
 
-  it('gives a broken block back as code, a block past the cap as nothing, and a block outside Registra as code', () => {
+  // The gate is the MESSAGE's mode, never the page's (2026-11-12): a register message's blocks are
+  // cards, a chat message's are code, in one conversation. Seen RED reading a constant page mode.
+  it('makes a question a card on a register message and code on a chat message', () => {
+    const later = new Date(NOW.getTime() + 1000);
+    const messages: AssistantMessage[] = [
+      { id: 'msg-chat', threadId: 'thread-1', userId: 'owner-1', role: 'assistant', content: TWO_QUESTIONS, createdAt: NOW, mode: 'chat' },
+      { id: 'msg-register', threadId: 'thread-1', userId: 'owner-1', role: 'assistant', content: TWO_QUESTIONS, createdAt: later, mode: 'register' },
+    ];
+    const { container } = render(
+      <RegisterRefsProvider refs={REFS} readFailed={false} submitAnswer={async () => {}}>
+        <AssistantStreamingResponse messages={messages} isInterrupted={false} onRetry={() => {}} threadId="thread-1" recordProposal={() => {}}
+          changeableMessageId={undefined} onChangeReading={() => {}} />
+      </RegisterRefsProvider>,
+    );
+    const [chatMessage, registerMessage] = Array.from(container.querySelectorAll<HTMLElement>('[data-generated]'));
+    expect(chatMessage.querySelectorAll('pre')).toHaveLength(2);
+    expect(within(chatMessage).queryByRole('radio')).toBeNull();
+    expect(registerMessage.querySelectorAll('pre')).toHaveLength(0);
+    expect(within(registerMessage).getByText('Da quale conto?')).not.toBeNull();
+    expect(within(registerMessage).getByRole('button', { name: 'Rispondi' })).not.toBeNull();
+  });
+
+  it('gives a broken block back as code, a block past the cap as nothing, and a block with no entry as code', () => {
     const content = [
       fence(question('account:to', 'A quale conto?', [['a', '1'], ['b', '2'], ['c', '3'], ['d', '4']])),
       fence(question('q2', 'Seconda?', [['a', 'A'], ['b', 'B']])),

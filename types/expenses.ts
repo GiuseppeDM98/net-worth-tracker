@@ -226,10 +226,18 @@ export interface ExpenseCategoryBreakdown {
   subCategories: ExpenseSubCategoryBreakdown[];
 }
 
+export interface IncomeSubCategoryBreakdown {
+  subCategoryName: string; // NO_SUBCATEGORY_LABEL for the category's rows that name none
+  total: number; // positive
+  transactionCount: number;
+}
+
 export interface IncomeCategoryBreakdown {
   categoryName: string;
   total: number; // positive
   transactionCount: number;
+  /** By total desc; present only when a row of the category names a subcategory (2026-11-16). */
+  subCategories?: IncomeSubCategoryBreakdown[];
 }
 
 export interface IndividualExpenseRow {

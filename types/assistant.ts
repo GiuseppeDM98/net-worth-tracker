@@ -7,12 +7,12 @@
 // - webSearchPolicy.ts (STRUCTURED_ANALYSIS_MODES, resolveAssistantWebSearchPolicy)
 // - store.ts (getDefaultThreadTitle, buildThreadTitleFromPrompt)
 // - assistantFollowUps.ts (CURATED_FOLLOW_UPS, a Record<AssistantMode, …>)
-// - assistantPeriodOptions.ts (getActivePeriodLabel, buildComposerPlaceholder, buildEmptyStateQuestion,
-//   findThreadForPeriod, getModeBadgeLabel)
-// - AssistantPeriodSelector.tsx (PERIOD_TABS: a mode with no period is NOT a tab)
+// - assistantPeriodOptions.ts (getActivePeriodLabel, getModeBadgeLabel)
+// - lib/utils/assistantChatNarrative.ts (describeRoute)
 // - useAssistantStreaming.ts (buildStreamRequestBody) and useAssistantPeriodContext.ts (the period preview)
 // - AssistantPageClient.tsx (MODE_ORDER, shouldFetchContext) and assistantNarrative.ts (describeConversation)
-// - lib/utils/assistantRoute.ts (ASSISTANT_MODES, checkRouteConsistency, routeToSelection) and
+// - lib/utils/assistantRoute.ts (ASSISTANT_MODES, checkRouteConsistency, routeToSelection,
+//   routeToChooserDraft, chooserDraftToOverride) and
 //   lib/server/assistant/router.ts (the intents of its system prompt)
 export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'chat' | 'register';
 
@@ -45,15 +45,6 @@ export interface AssistantRegisterSummary {
   costCentersEnabled: boolean;
   membersEnabled: boolean;
   recent: { rows: number; cut: number } | null; // null: computed in the browser, before the server answered
-}
-
-export interface AssistantPromptChip {
-  id: string;
-  label: string;
-  prompt: string;
-  mode: AssistantMode;
-  requiresMonthContext: boolean;
-  webContextHint?: 'none' | 'optional' | 'macro';
 }
 
 export interface AssistantMonthSelectorValue {
@@ -288,6 +279,12 @@ export interface AssistantMonthContextBundle {
     currentValue: number | null;
     absoluteChange: number;
     percentagePointsChange: number | null;
+    /**
+     * The pension funds inside the class (2026-11-16): their change, from both snapshots'
+     * `pension.byAssetClass`, and the contributions recorded in the period split by each fund's
+     * composition. Null when a snapshot does not record the funds' part or they never touch the class.
+     */
+    pension?: { change: number; paidIn: number } | null;
   }[];
   // EXHAUSTIVE spending tree for the period: every category, every subcategory used.
   // Replaced a top-5 flat list that made the assistant answer "N/D" on subcategories
@@ -367,6 +364,11 @@ export interface AssistantMonthContextBundle {
   // contributions; the loans; the household. REQUIRED, like `goals`: every builder fills it
   // from the same documents, and the prompt prints each list whole or says what it cut.
   portfolio: import('@/lib/utils/assistantPortfolioContext').AssistantPortfolioContext;
+  /**
+   * The change of the period split as Storico's Driver splits it (2026-11-16); null without both
+   * snapshots or across a month without one; absent on a bundle with no period (today's).
+   */
+  netWorthDrivers?: import('@/lib/utils/assistantNetWorthDrivers').AssistantNetWorthDrivers | null;
   // Full category/subcategory taxonomy configured by the user (Settings → Categorie),
   // independent of the analysis period. Lets Claude suggest where to file a new
   // expense or whether a new category is warranted, instead of only seeing the

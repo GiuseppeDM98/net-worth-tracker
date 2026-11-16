@@ -803,3 +803,30 @@ describe('describeScheduledCaption', () => {
     expect(describeScheduledNetCaption(0, 0, 30)).toBeNull();
   });
 });
+
+describe('buildOverviewVerdict — an immaterial tax on a sale', () => {
+  const NOVEMBER: OverviewVerdictInput = {
+    ...AUGUST,
+    month: 11,
+    isNewATH: false,
+    monthlyVariation: { value: -877, percentage: -0.3 },
+    marketEffect: -1941,
+    topMover: { assetClass: 'crypto', delta: -1978 },
+    sales: {
+      proceeds: 3700,
+      realizedGain: 20,
+      estimatedTax: 2,
+      instruments: [{ id: 'orni', name: 'ORNI', proceeds: 3700, realizedGain: 20, estimatedTax: 2 }],
+      brokenLedgers: 0,
+    },
+  };
+
+  it('should blame the market alone and print the plain split, the tax kept as a fact', () => {
+    const verdict = buildOverviewVerdict(NOVEMBER);
+    expect(verdict.headline).toBe('Novembre è in calo: il mercato ha pesato.');
+    const text = plain(verdict.sentence);
+    expect(text).toContain('e pagato circa 2 € di tasse.');
+    expect(text).not.toContain('avrebbe fatto');
+    expect(text).toContain('Di quel movimento: −1941 € dal mercato');
+  });
+});

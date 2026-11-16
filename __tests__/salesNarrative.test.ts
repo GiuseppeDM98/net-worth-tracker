@@ -292,3 +292,18 @@ describe('taxedGrowthHeadline', () => {
     );
   });
 });
+
+describe('describeSales — an immaterial tax', () => {
+  const SMALL_SALE: PeriodSalesSummary = {
+    proceeds: 3700,
+    realizedGain: 20,
+    estimatedTax: 2,
+    instruments: [{ id: 'orni', name: 'ORNI', proceeds: 3700, realizedGain: 20, estimatedTax: 2 }],
+    brokenLedgers: 0,
+  };
+
+  it('should state the tax paid and drop the month without it', () => {
+    const split = { delta: -877, marketEffect: -1941, savings: 3692, flows: null };
+    expect(plain(describeSales(SMALL_SALE, split))).toBe('Hai venduto ORNI per 3700 € con una plusvalenza di 20 € e pagato circa 2 € di tasse.');
+  });
+});

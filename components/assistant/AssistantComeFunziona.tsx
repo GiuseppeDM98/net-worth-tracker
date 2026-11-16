@@ -6,20 +6,19 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cn } from '@/lib/utils';
 
-/** The five periods and what each one hands the model. */
-const PERIODS: ReadonlyArray<{ label: string; description: string }> = [
-  { label: 'Mese', description: 'Patrimonio netto, cashflow, dividendi e allocazione del mese selezionato.' },
-  { label: 'Anno', description: 'Andamento annuale, risparmio, crescita degli investimenti e dividendi totali.' },
-  { label: 'YTD', description: "Le stesse metriche dall'1 gennaio a oggi, per l'andamento in corso d'anno." },
-  { label: 'Storico', description: 'Evoluzione completa del patrimonio da quando hai iniziato a tracciare.' },
-  { label: 'Libera', description: 'Una domanda aperta, con o senza un periodo numerico collegato.' },
+/** How a message is read (2026-11-12): what it can be, and how to read it another way. */
+const READINGS: ReadonlyArray<{ label: string; description: string }> = [
+  { label: 'Domanda', description: 'Una domanda aperta: sui dati di oggi, o sul periodo che nomini' },
+  { label: 'Analisi', description: 'Il giudizio su un mese, un anno, da inizio anno o tutto lo storico' },
+  { label: 'Movimento', description: "Una spesa, un'entrata o uno spostamento: te lo propongo come riga" },
+  { label: 'cambia', description: 'Sotto ogni risposta: rileggo la domanda come scegli tu' },
 ];
 
 /**
  * «Come funziona», below the grid behind a disclosure — the guide that used to open from a
  * «?» in the header and push the verdict down. Closed by default: the verdict and the tiles
  * already answer the page's question, and the guide is reference, not content. Three tiles,
- * one per non-obvious behaviour (the periods, the web search, the memory).
+ * one per non-obvious behaviour (how a message is read, the web search, the memory).
  */
 export function AssistantComeFunziona() {
   const [open, setOpen] = useState(false);
@@ -33,7 +32,7 @@ export function AssistantComeFunziona() {
         <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className={TILE_EYEBROW_CLASS}>Come funziona</span>
           <span className="text-[13px] text-muted-foreground">
-            I cinque periodi, la ricerca web nel contesto macro e la memoria — come l&apos;assistente sceglie i numeri su cui risponde
+            Come leggo i messaggi, la ricerca web e la memoria — su quali numeri rispondo
           </span>
         </span>
         <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
@@ -42,11 +41,14 @@ export function AssistantComeFunziona() {
       <CollapsibleContent className="pt-1">
         <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
           <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-4')}>
-            <Tile eyebrow="Periodi di analisi" reading={[{ text: 'Un periodo per domanda: il verdetto e le tessere leggono lo stesso.' }]}>
+            <Tile
+              eyebrow="Come ti leggo"
+              reading={[{ text: "Scrivi come parleresti: capisco io se è una domanda, un'analisi o un movimento, e su quale periodo." }]}
+            >
               <dl className="mt-3 divide-y divide-border">
-                {PERIODS.map(({ label, description }) => (
+                {READINGS.map(({ label, description }) => (
                   <div key={label} className="flex gap-3 py-[9px]">
-                    <dt className="w-14 shrink-0 text-[13px] font-medium text-foreground">{label}</dt>
+                    <dt className="w-20 shrink-0 text-[13px] font-medium text-foreground">{label}</dt>
                     <dd className="text-[13px] leading-[1.45] text-muted-foreground">{description}</dd>
                   </div>
                 ))}
@@ -57,10 +59,9 @@ export function AssistantComeFunziona() {
           <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
             <Tile eyebrow="Ricerca web" reading={[{ text: 'Il contesto macro entra nella risposta solo quando serve, o quando lo chiedi.' }]}>
               <p className="mt-3 text-[13px] leading-[1.45] text-muted-foreground">
-                Nelle analisi di periodo il toggle <span className="font-medium text-foreground">Contesto macro</span> delle Preferenze
-                abilita sempre la ricerca web. In modalità Libera, se il toggle è attivo la ricerca è sempre abilitata; se è disattivo si
-                attiva solo su parole chiave macro — inflazione, tassi, dazi, BCE, recessione — o su frasi come{' '}
-                <span className="font-medium text-foreground">«cerca sul web»</span>.
+                Cerco sul web quando la domanda chiede fatti di fuori — mercati, tassi, inflazione, notizie — o quando lo chiedi; nelle
+                analisi anche quando è attivo <span className="font-medium text-foreground">Contesto macro</span> delle Preferenze. Mai
+                per un movimento da registrare.
               </p>
             </Tile>
           </div>
