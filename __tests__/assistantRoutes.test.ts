@@ -1054,7 +1054,12 @@ describe('Assistant private API routes', () => {
 
       expect(routeAssistantMessageMock).toHaveBeenCalledTimes(1);
       expect(createRouterClientMock).toHaveBeenCalledTimes(1);
-      expect(events.map((event) => event.type).filter((type) => type !== 'status')).toEqual(['meta', 'route', 'context', 'text', 'done']);
+      // Before every status (the fake stream emits two), then the order of the other events: the
+      // filtered order alone does not name the status (seen red on 2026-11-16 with the route emitted
+      // from the first `onStatus`).
+      const types = events.map((event) => event.type);
+      expect(types.indexOf('route')).toBeLessThan(types.indexOf('status'));
+      expect(types.filter((type) => type !== 'status')).toEqual(['meta', 'route', 'context', 'text', 'done']);
       expect(events[1]).toEqual({ type: 'route', reading: { route: LAST_MONTH_ROUTE, source: 'router' } });
 
       expect(buildAssistantMonthContextMock).toHaveBeenCalledWith('user-1', lastMonth, false);
@@ -1069,7 +1074,7 @@ describe('Assistant private API routes', () => {
       info.mockRestore();
     });
 
-    it('R7: hands the router today, and the previous turn — the last assistant reading with the user message before it', async () => {
+    it('R7: hands the router today, and the previous turn — the last assistant message\'s reading with the user message before it', async () => {
       const previous: AssistantRouteReading = { route: LAST_MONTH_ROUTE, source: 'router' };
       getAssistantThreadDetailMock.mockResolvedValue({
         thread: {},
@@ -1190,6 +1195,10 @@ describe('Assistant private API routes', () => {
       ['a Registra override + «petrolio»', { mode: 'auto', prompt: 'benzina 60, il petrolio sale', route: { intent: 'register', period: { kind: 'none' }, webSearch: false } }, null, false, undefined],
       ['a router chat without web + «inflazione»', { mode: 'auto', prompt: 'cosa fa l\'inflazione ai miei risparmi?' }, { intent: 'chat', period: { kind: 'none' }, webSearch: false, confidence: 0.9 }, true, undefined],
       ['an override chat without web + «inflazione»', { mode: 'auto', prompt: 'cosa fa l\'inflazione ai miei risparmi?', route: { intent: 'chat', period: { kind: 'none' }, webSearch: false } }, null, false, undefined],
+      // A CARRIED reading is not an override: like the router's, it only adds to today's policy (owner,
+      // 2026-11-16; seen red with 'carried' taken as it is, like 'override').
+      ['a carried chat without web + «inflazione»', { mode: 'auto', prompt: 'cosa fa l\'inflazione ai miei risparmi?', route: { intent: 'chat', period: { kind: 'none' }, webSearch: false }, routeCarried: true }, null, true, undefined],
+      ['a carried analysis without web with «Contesto macro» on', { mode: 'auto', preferences: MACRO_ON, route: { intent: LAST_MONTH_ROUTE.intent, period: LAST_MONTH_ROUTE.period, webSearch: false }, routeCarried: true }, null, true, true],
       ['a router analysis with «Contesto macro» on', { mode: 'auto', preferences: MACRO_ON }, LAST_MONTH_ROUTE, true, true],
       ['a router analysis with the web and «Contesto macro» off', { mode: 'auto', preferences: MACRO_OFF }, { ...LAST_MONTH_ROUTE, webSearch: true }, true, true],
       ['an explicit analysis with «Contesto macro» off', { mode: 'month_analysis', month: { year: 2026, month: 3 }, preferences: MACRO_OFF }, null, false, false],

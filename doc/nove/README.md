@@ -3,7 +3,7 @@
 > The index of the series: the owner's points, the decisions, the order, the shared contracts and the rules every
 > spec obeys. Written on 2026-11-12 on `develop` @ b841cbd7 by the planning session; **read adversarially, all
 > the specs together, on 2026-11-12** (decisions 33–63 in § 3); a spec in service is retired with
-> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524), NOVE-03 (2026-11-14, PR #526), NOVE-04 (2026-11-14, PR #528), NOVE-05 (2026-11-14, PR #530), NOVE-06 (2026-11-14, PR #532), NOVE-07 (2026-11-15, PR #534) NOVE-08 (2026-11-15, PR #536), NOVE-09 (2026-11-15, PR #538) and NOVE-10 (2026-11-16, PR #540); the next is NOVE-14. One spec = one
+> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524), NOVE-03 (2026-11-14, PR #526), NOVE-04 (2026-11-14, PR #528), NOVE-05 (2026-11-14, PR #530), NOVE-06 (2026-11-14, PR #532), NOVE-07 (2026-11-15, PR #534) NOVE-08 (2026-11-15, PR #536), NOVE-09 (2026-11-15, PR #538) NOVE-10 (2026-11-16, PR #540) and NOVE-14 (2026-11-16, PR #542); the next is NOVE-15. One spec = one
 > implementation session = one branch. A spec's NUMBER is its identity; the ORDER is § 5.
 
 ## 1. The owner's points (their words, 2026-11-12)
@@ -76,7 +76,7 @@
     on the minor tiles' tour of 2026-11-15 —, Centro di costo fixed/one-off — and «Per sottocategoria», the same tour —,
     Dividendi first payer). → NOVE-08 (retired on 2026-11-15, PR #536), NOVE-09 (retired on 2026-11-15, PR #538)
 11. Assistente: a router (Haiku 5.5: intent, period, web search) in front of today's pipeline; a line «Ho letto: … ·
-    cambia» under the answer. → NOVE-14, 15
+    cambia» under the answer. → NOVE-14 (retired on 2026-11-16, PR #542), 15
 12. Assistente: instead of the Mese / Anno / YTD / Storico selector, written suggestions on an empty chat. → NOVE-15
 13. Ledger: the migration in a transaction AND the other writes with the same defect. → NOVE-03 (retired on 2026-11-14, PR #526)
 14. Orbita: the resource bar only on desktop (≥ 1440) and only on Panoramica. → NOVE-13
@@ -141,7 +141,7 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 51. The Classifica's bars stay `--chart-1`; each row carries its type's swatch. → NOVE-10 (retired on 2026-11-16, PR #540)
 52. A «Continua con» row is sent as `'auto'`: the router reads it. → NOVE-15
 53. A turn sent with a reading it inherited (an answer to a question card, «Rigenera») is `source: 'carried'` and
-    reads «Ho letto: …»; «Hai scelto: …» only after «cambia». → NOVE-14, 15
+    reads «Ho letto: …»; «Hai scelto: …» only after «cambia». → NOVE-14 (retired on 2026-11-16, PR #542), 15
 54. Patrimonio calls an instrument created empty and never traded «Mai comprato». → NOVE-16
 55. The model's «Importo da investire» is money TAKEN FROM THE ACCOUNTS: the base is what is held, and in
     «Raggiungibile» the liquidity may go down to (liquidity − amount). → NOVE-17
@@ -205,12 +205,12 @@ by saying so before that spec is implemented.
 
 The order of implementation (each followed by its retirement session, § 8):
 
-`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
+`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
 
 - **07** (retired on 2026-11-15, PR #534) after **03** (the fee row commits inside the ledger's transaction contract) and **06** (retired on 2026-11-14, PR #532) (`tradeMoneyIn` and
   `tradeAwarePriceEffect` change together).
 - **09** (retired on 2026-11-15, PR #538) and **10** (retired on 2026-11-16, PR #540) after **08** (retired on 2026-11-15, PR #536) (the ring); **10** also after **05** (`readSavings`).
-- **15** after **14** (the router's contract).
+- **15** after **14** (retired on 2026-11-16, PR #542) (the router's contract).
 - **16** after **02** (the same grid cell), reading **03**'s and **07**'s (retired on 2026-11-15, PR #534) dialogs (the fresh ledger meta, the fee
   field), already before it in the order; **17** after **16**; **18** after **17** and **07** (retired) (the fiscal cost basis).
 - **21** after **16** and **17** (the editor's seed, the optimizer, the active-plan reader).
@@ -234,7 +234,7 @@ The order of implementation (each followed by its retirement session, § 8):
 | NOVE-11 | Themes: the mechanisms beyond colour and radius | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 27 findings, 2 owner decisions |
 | NOVE-12 | The «Egeo» theme | M | 11 | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 22 findings, 3 owner decisions |
 | NOVE-13 | The «Orbita» theme | M | 11, 12 | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 2 owner decisions |
-| NOVE-14 | The Assistente's router | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 20 findings, 1 owner decision; implemented on 2026-11-16, one PR to `develop` (branch `feat/nove-14-assistente-smistatore`; every § 6 row seen red with its mutation; no request to a model in tests or verification; `perf:budget` identical on all 17 routes, `mobile:census` identical to develop's on 57/57 entries; a carried reading's web search follows § 4 to the letter — only `'override'` is taken as it is, owner 2026-11-16; `doc/guide/assistente.md` past 500 lines, Registra split into `assistente-registra.md`) |
+| NOVE-14 | The Assistente's router | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 20 findings, 1 owner decision; implemented on 2026-11-16, PR #542 in develop since 2026-11-16 (branch `feat/nove-14-assistente-smistatore`; every § 6 row seen red with its mutation; no request to a model in tests or verification; `perf:budget` identical on all 17 routes, `mobile:census` identical to develop's on 57/57 entries; a carried reading's web search follows § 4 to the letter — only `'override'` is taken as it is, owner 2026-11-16; `doc/guide/assistente.md` past 500 lines, Registra split into `assistente-registra.md`); **retired on 2026-11-16**: the thirteen criteria, decisions 11 and 53 and every adopted choice held on the merged code (a read-only workflow of five `cercatore` and four `verificatore`: 82 items, 13 flagged, 12 held — ten text, two test gaps); the closure re-run (the Assistente suites 23 files / 830 tests, the five `e2e/assistant.register*` specs 19/19 on the emulators); `firestore.rules` and `firestore.indexes.json` untouched; `routeReading` read back by R12 on the store mock, an older message without it unchanged. Divergences written, behaviour equal: a carried reading's web search only ADDS to today's policy, like the router's (criterion 9 named the override alone; the owner's call of 2026-11-16, now in doc/guide/assistente.md § The router); `Draft Release Temp.md` took one Bug Fixes entry for the long threads' last 100 messages, where § 9 said «nothing»; the guide's split into `assistente-registra.md` (§ 9 kept one guide). Proofs fixed: R7 now pins the `route` event before every `status` (the order was compared with the statuses filtered out; red with the route emitted from the first `onStatus`), R10 gained two carried rows (red with `'carried'` taken as it is). Text fixes: doc/guide/assistente.md § The router filed `'carried'` under «An override» and gave the override's web rule to both, and read «the LAST assistant message with a reading» where the code reads the last assistant message and gives no previous turn when it has none; `aiModels.ts`'s header counted «four string literals» and one Haiku caller; the label left CLAUDE.md's Assistente line; NOVE-15 re-pointed in 24 places (its header, the guide lines moved by the split, `types/assistant.ts`, `store.ts`, and «NOVE-14» rewritten as the router in `develop`). No runtime code changed |
 | NOVE-15 | The Assistente as only a chat | L | 14 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 27 findings, 3 owner decisions |
 | NOVE-16 | Allocazione › Accumulo: the PAC tab (PR #486) | L | 02 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 33 findings, 2 owner decisions |
 | NOVE-17 | The model portfolio and the optimizer (PR #487) | L | 16 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 32 findings, 3 owner decisions |
@@ -305,7 +305,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `buildSubCategoryRanking`, `buildRingShares`, `summarizeCategoryChanges`, `ANALISI_SECTION_IDS`;
   `describePeriodoSavings(reading: SavingsReading)`.
 
-**The Assistente's router** — defined by NOVE-14, read by NOVE-15
+**The Assistente's router** — defined by NOVE-14 (retired on 2026-11-16, PR #542), read by NOVE-15
 - `types/assistant.ts`: `AssistantRoutePeriod`, `AssistantRoute{ intent: AssistantMode; period; webSearch;
   confidence }`, `AssistantRouteOverride`, `AssistantRouteReading{ route; source; reason? }`,
   `AssistantMessage.routeReading?`; the stream event `{ type: 'route'; reading }` right after `meta`; the request's
@@ -469,7 +469,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 11 12 13 14 15 16 17 18 19 20 21`
+`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 11 12 13 15 16 17 18 19 20 21`
 
 Prompt 08 (`08_CREA_RITIRO_SPEC`) was run on 2026-11-12, after the adversarial reading, in a session of its own:
 `doc/nove/PROMPT-RITIRO.md` is the prompt the owner pastes to retire ONE spec. A retirement updates its precedents

@@ -199,16 +199,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   intent (one of the six modes), period, web search, confidence; `routeToSelection` (`lib/utils/assistantRoute.ts`) turns
   the reading into today's request fields, so the pipeline after it is an explicit mode's. An explicit mode never calls it.
   The `route` event goes right after `meta`; the assistant message stores it as `routeReading` (no `elapsedMs`).
-- **An override** (`route`, only with `'auto'`, which never carries `month`/`year`/`chatContext`) skips the router: stamped
-  `confidence: 1`, `source: 'override'`, `'carried'` with `routeCarried: true`; one `checkRouteConsistency` refuses (an
+- **A route in the request** (`route`, only with `'auto'`, which never carries `month`/`year`/`chatContext`) skips the
+  router, stamped `confidence: 1`: `source: 'override'` when the owner chose it, `'carried'` with `routeCarried: true`
+  (a reading the turn inherits — an answer to a question card, «Rigenera»); one `checkRouteConsistency` refuses (an
   analysis on another period, a month or year after today, Registra with the web) is a 400 after `assertCanAccessAccount`.
 - **It never throws**: an SDK error, a timeout (4 s, no retry), no tool block, an invalid input or a confidence below 0.6
-  give the fallback — a free question with no period — with its `reason`. A Registra reading drops its period.
-- **The web**: Registra never, an override its own flag, the router only ADDS to today's policy; an analysis read with a
+  give the fallback — a free question with no period — with its `reason` (`error`, `timeout`, `invalid`,
+  `low-confidence`). A Registra reading drops its period.
+- **The web**: Registra never; an `'override'` its own flag, as it is; the router AND a `'carried'` reading only ADD to
+  today's policy (owner, 2026-11-16: «Contesto macro» on keeps searching on a carried turn); an analysis read with a
   reading gets `includeMacroContext` = the effective decision, so its macro sentence and the tool agree.
-- **Cost** ≤ $0.00047 a message, ≤ 4 s, none for an override; logged `routeSource`, `routeReason`, `routerMs`. `system` is a
-  constant; the previous turn is the LAST assistant message with a reading and the user message before it. Faked by a
-  `RouterClient` with a `vi.fn()` `create` and `vi.mock` of the module; the thread's detail is its last 100 messages.
+- **Cost** ≤ $0.00047 a message, ≤ 4 s, none for a route in the request; logged `routeSource`, `routeReason`, `routerMs`.
+  `system` is a constant; the previous turn is the thread's LAST assistant message and the user message right before it
+  — a last answer without a reading (an explicit mode) gives none, and the router is never told of an older one. Faked
+  by a `RouterClient` with a `vi.fn()` `create` and `vi.mock` of the module; the thread's detail is its last 100 messages.
 
 ### Structured goals (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts` extraction)
 - **Structure is NEVER parsed from text.** It arrives from a forced-tool-use Haiku call validated with zod. A malformed
