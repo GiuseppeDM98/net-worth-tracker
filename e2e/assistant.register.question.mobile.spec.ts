@@ -1,5 +1,5 @@
 /**
- * Assistente › Registra at 390px: the question cards on a phone (2026-11, doc/guide/assistente.md
+ * Assistente › Registra at 390px: the question cards on a phone (2026-11, doc/guide/assistente-registra.md
  * § Registra; AGENTS.md § Tailwind Breakpoints).
  *
  * WHY IT EXISTS: what only a layout engine knows — every row of the cards and «Rispondi» are 44px

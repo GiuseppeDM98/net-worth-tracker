@@ -39,6 +39,11 @@ sovrascriveva `last-run.json`; `validateSelection`, `__tests__/mobileCensusOptio
 superficie × viewport (`<viewport>/<superficie>-fold.png` e `-full.png`).
 
 **Il confronto con `develop` dello stesso giorno** (2026-11-14, decisione 33 della serie `doc/nove/`): si costruisce `develop` in un worktree (`git worktree add <cartella> develop`) con `cp -Rc node_modules <cartella>/node_modules` — un symlink fuori dalla root rompe Turbopack — più `.env.local`, si fa `perf:build` + `perf:serve` lì, si copia `.mobile-census/last-run.json`, poi lo stesso sul branch; le due corse si confrontano voce per voce (57 voci, `results`), e il worktree si rimuove con `git worktree remove --force`. Non tocca il working tree della sessione.
+**Su Windows** (2026-11-16): `node_modules` si copia con `robocopy <repo>\node_modules <cartella>\node_modules /E /MT:16`;
+`git worktree remove --force` si ferma su «Filename too long» dentro `node_modules`, quindi la cartella si cancella con
+`Remove-Item -LiteralPath '\\?\<cartella>' -Recurse -Force` e poi `git worktree prune`. In uno script PowerShell della
+catena, nessuna funzione si chiama `Measure`: l'alias di `Measure-Object` la scavalca e la catena finisce in un minuto senza
+misurare niente.
 
 **Il fixture** `census@example.com` (`scripts/seedCensusE2E.mts`, `npm run e2e:seed:census`): con `--email` uguale al
 suo, il censimento lo risemina, ristampa i profili strumento (`e2e:seed:profiles`), ricostruisce i record di Hall of Fame

@@ -12,6 +12,8 @@
 // - AssistantPeriodSelector.tsx (PERIOD_TABS: a mode with no period is NOT a tab)
 // - useAssistantStreaming.ts (buildStreamRequestBody) and useAssistantPeriodContext.ts (the period preview)
 // - AssistantPageClient.tsx (MODE_ORDER, shouldFetchContext) and assistantNarrative.ts (describeConversation)
+// - lib/utils/assistantRoute.ts (ASSISTANT_MODES, checkRouteConsistency, routeToSelection) and
+//   lib/server/assistant/router.ts (the intents of its system prompt)
 export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'chat' | 'register';
 
 /**
@@ -96,6 +98,44 @@ export interface AssistantMessage {
   // The outcome of each card of this message, keyed `proposalKey(kind, index)` — «expense:0»,
   // «goal:0» (lib/utils/expenseProposal.ts). Absent until a card is confirmed or ignored.
   proposals?: Record<string, AssistantProposalState>;
+  // How the server read the message this one answers (2026-11): only on an assistant message of a
+  // request sent with `mode: 'auto'`; absent on every older message and on an explicit mode's.
+  routeReading?: AssistantRouteReading;
+}
+
+/**
+ * The period of a reading (2026-11): the five kinds a free question can carry
+ * (`AssistantChatContextType`), each analysis owning one of them, Registra none.
+ */
+export type AssistantRoutePeriod =
+  | { kind: 'none' }
+  | { kind: 'month'; year: number; month: number }
+  | { kind: 'year'; year: number }
+  | { kind: 'ytd' }
+  | { kind: 'history' };
+
+/** How one message was read: which of today's modes, on which period, with or without the web. */
+export interface AssistantRoute {
+  intent: AssistantMode;
+  period: AssistantRoutePeriod;
+  webSearch: boolean;
+  /** 0..1; 1 for an override. */
+  confidence: number;
+}
+
+/** A reading the client sends (the request's `route`): taken as is and stamped `confidence: 1`. */
+export type AssistantRouteOverride = Omit<AssistantRoute, 'confidence'>;
+
+/** 'carried': a route the client re-sent from the previous turn's reading (the request's `routeCarried`). */
+export type AssistantRouteSource = 'router' | 'override' | 'carried' | 'fallback';
+
+export type AssistantRouteFallbackReason = 'error' | 'timeout' | 'invalid' | 'low-confidence';
+
+export interface AssistantRouteReading {
+  route: AssistantRoute;
+  source: AssistantRouteSource;
+  /** Only with `source: 'fallback'`. */
+  reason?: AssistantRouteFallbackReason;
 }
 
 export interface AssistantMemoryItem {
@@ -363,7 +403,8 @@ export type AssistantChatContextType = 'none' | 'month' | 'year' | 'ytd' | 'hist
 
 export interface AssistantStreamRequest {
   userId: string;
-  mode: AssistantMode;
+  // 'auto' (2026-11): the server reads mode, period and web search (lib/server/assistant/router.ts).
+  mode: AssistantMode | 'auto';
   prompt: string;
   threadId?: string;
   // Used for month_analysis and chat modes
@@ -373,10 +414,16 @@ export interface AssistantStreamRequest {
   // Used only in chat mode to specify the context period type
   chatContext?: AssistantChatContextType;
   preferences?: AssistantPreferences;
+  // Only with mode 'auto': a reading chosen by the client, so the router is not called.
+  route?: AssistantRouteOverride;
+  // Only beside `route`: the route was inherited from the previous turn, never picked by the owner.
+  routeCarried?: boolean;
 }
 
 export type AssistantStreamEvent =
   | { type: 'meta'; threadId?: string; title?: string }
+  // Only for mode 'auto', right after `meta`: how the server read the message.
+  | { type: 'route'; reading: AssistantRouteReading }
   // Sent once before text streaming starts, carrying the server-built context bundle.
   // Client uses this to render the numeric panel without a separate fetch.
   | { type: 'context'; bundle: AssistantMonthContextBundle }

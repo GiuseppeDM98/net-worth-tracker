@@ -1,5 +1,5 @@
 /**
- * Assistente › Registra at 390px, on the base account (2026-11, doc/guide/assistente.md).
+ * Assistente › Registra at 390px, on the base account (2026-11, doc/guide/assistente-registra.md).
  *
  * WHY IT EXISTS: what only a layout engine knows about the card on a phone — its three buttons are
  * thumb targets that WRAP instead of pushing the page sideways, nothing in `main` crosses its right
