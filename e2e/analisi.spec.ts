@@ -123,6 +123,28 @@ test('lays the tiles on the 12-column grid at 1440 with nothing scrolling sidewa
   expect(overflow).toEqual({ scroll: 0, culprits: 0 });
 });
 
+test('without «Cosa è cambiato» the second row reads Entrate 5 · Periodo 7', async ({ page }) => {
+  await gotoAnalisi(page);
+  // Storico has neither a comparison nor a month to run the anomalies on: «Cosa è cambiato» leaves
+  // the grid and its five columns go to Entrate and Periodo (2026-11-12). Seen red with Entrate held
+  // at `desktop:col-span-3` and Periodo at `desktop:col-span-4` whatever the third tile.
+  await page.getByRole('radiogroup', { name: 'Periodo di analisi' }).getByRole('radio', { name: 'Storico' }).click();
+  await expect(page.getByRole('region', { name: 'Cosa è cambiato' })).toHaveCount(0);
+  const names = ['Dove vanno i soldi', 'Spese maggiori', 'Entrate', 'Periodo'];
+  for (const name of names) await expect(page.getByRole('region', { name, exact: true })).toBeVisible();
+
+  const [classifica, maggiori, entrate, periodoBox] = await page.evaluate((labels) => labels.map((name) => {
+    const rect = document.querySelector(`section[aria-label="${name}"]`)!.getBoundingClientRect();
+    return { top: rect.top, left: rect.left, width: rect.width };
+  }), names);
+  // Entrate takes Spese maggiori's five columns, Periodo the ranking's seven, on one row under the first.
+  expect(entrate.top).toBeGreaterThan(classifica.top + 10);
+  expect(Math.abs(entrate.top - periodoBox.top)).toBeLessThan(2);
+  expect(entrate.left).toBeLessThan(periodoBox.left);
+  expect(Math.abs(entrate.width - maggiori.width)).toBeLessThan(2);
+  expect(Math.abs(periodoBox.width - classifica.width)).toBeLessThan(2);
+});
+
 test('drills category → Scheda → subcategory transactions, writing the focus to the URL', async ({ page }) => {
   await gotoAnalisi(page);
 
@@ -433,7 +455,7 @@ test.describe('the calendar at 1440', () => {
   });
 });
 
-// ── Both rings fit (criterion 7; DESIGN → The Ring Rule) ────────────────────────────────────────
+// ── Both rings fit (every centre inside its hole, owner 2026-11-12; DESIGN → The Ring Rule) ─────
 //
 // The fixture has one income category, and one category is no ring: ONE second income row is planted
 // in January of this year at noon UTC and removed after, so «Entrate» draws its ring. The LAST block

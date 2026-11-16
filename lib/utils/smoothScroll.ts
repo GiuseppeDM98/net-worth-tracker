@@ -1,5 +1,5 @@
 /**
- * A glide to an element (owner, 2026-11-15, the NOVE-10 mirror tour: the Scheda reached «non troppo
+ * A glide to an element (owner, 2026-11-15, the mirror tour of Analisi «Classifica»: the Scheda reached «non troppo
  * lenta, ma neanche istantaneamente»). The browser's own `behavior: 'smooth'` picks its duration by
  * distance and engine; this one is 450 ms on the app's ease-out-quart (`lib/utils/motionVariants.ts`)
  * whatever the distance. Reduced motion jumps. The math is pure; `glideIntoView` is the thin DOM part.

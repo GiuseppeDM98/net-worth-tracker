@@ -1,5 +1,5 @@
 /**
- * The landing on the Scheda glides (owner, 2026-11-15, the NOVE-10 mirror tour: «non troppo lenta, ma
+ * The landing on the Scheda glides (owner, 2026-11-15, the mirror tour of Analisi «Classifica»: «non troppo lenta, ma
  * neanche istantaneamente»): `lib/utils/smoothScroll.ts`. Seen red with the easing returned linear
  * (`t` itself) and with the scroll margin left out of the target.
  */

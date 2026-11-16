@@ -91,7 +91,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   dialog IS the confirmation, without them the row arms), dividend sync (`SyncDividendsButton`, armed in the primary
   tint: it writes, it does not destroy) and the revoke of an access (`MemberRow`, the row says what is taken away).
   One live region per list.
-- **The Categorie tile counts the spending categories by type in the type's own words** (`describeExpenseCategories`): «3 necessarie, 1 non necessaria» — the old «fisse / variabili» renamed on 2026-11-15 (NOVE-10, decision 36; the ids `fixed`/`variable` unchanged; test `__tests__/settingsNarrative.test.ts`).
+- **The Categorie tile counts the spending categories by type in the type's own words** (`describeExpenseCategories`): «3 necessarie, 1 non necessaria» — the old «fisse / variabili» renamed on 2026-11-15 (owner, 2026-11-12: the old type words go wherever the owner reads them; the ids `fixed`/`variable` unchanged; test `__tests__/settingsNarrative.test.ts`).
 - **«Ruoli 50/30/20» is its own tile in Spese**, under the two the expense form reads — not a row of Categorie,
   because that tile gives way to an `ErrorNotice` when the categories fail, and the switch and its reading must not.
   The reading (`describeSpendingRolesSetting`) counts the classified spending categories

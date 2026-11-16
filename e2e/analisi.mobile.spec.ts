@@ -282,7 +282,7 @@ test.describe('Flusso in deficit at 390', () => {
   });
 });
 
-// ── Both rings fit at 390 (criterion 7; DESIGN → The Ring Rule) ─────────────────────────────────
+// ── Both rings fit at 390 (every centre inside its hole, owner 2026-11-12; DESIGN → The Ring Rule) ──
 //
 // The fixture has one income category, and one category is no ring: ONE second income row is planted
 // in January of this year at noon UTC and removed after. The LAST block of the file.

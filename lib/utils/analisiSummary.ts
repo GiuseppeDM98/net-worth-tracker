@@ -59,7 +59,7 @@ export type MonthResolver = (expense: Expense) => MonthRef;
 export type DayResolver = (expense: Expense) => MonthRef & { day: number };
 
 /**
- * The single month the anomalies (and the «Fuori scala» tile) run on: an explicitly picked
+ * The single month the anomalies (the «Fuori scala» sentence of «Cosa è cambiato», since 2026-11-12) run on: an explicitly picked
  * month, or today's month for the bare running year — the only month a live check can mean.
  * A past year without a month, and the history, have no such month.
  */

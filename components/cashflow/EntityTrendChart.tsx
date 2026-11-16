@@ -55,7 +55,7 @@ export function EntityTrendChart({ data, seriesName, color, height }: EntityTren
         <XAxis dataKey="label" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         {/* «150 €», the page's own format — not «€150» with the symbol in front. The axis is as wide as
             its longest tick (`width="auto"`): a fixed 56px under a −16px margin cut «1200 €» to «200 €»
-            (owner, 2026-11-15, the NOVE-10 mirror tour; held by e2e/classifica.tablet.spec.ts). */}
+            (owner, 2026-11-15, the mirror tour of Analisi «Classifica»; held by e2e/classifica.tablet.spec.ts). */}
         <YAxis tickFormatter={(value: number) => formatCurrency(value)} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width="auto" />
         <Tooltip
           // A null baseline (pre-floor month) is a gap, not a zero — the tooltip must

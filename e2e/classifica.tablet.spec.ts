@@ -1,5 +1,5 @@
 /**
- * Analisi's two rings at a tablet's widths (NOVE-10, criterion 7; DESIGN → The Ring Rule): one spec,
+ * Analisi's two rings at a tablet's widths (every ring's centre inside its hole, owner 2026-11-12; DESIGN → The Ring Rule): one spec,
  * two projects — `tablet` (768×1024) and `tablet-landscape` (1024×768) — on the base account, because
  * the tablet projects ignore `/analisi\./` (`playwright.config.ts`). The seed's one income category
  * («Stipendio») and two spending types would draw one ring only: two rows are planted by the REST PATCH,
@@ -72,7 +72,7 @@ test.describe('Analisi «Classifica» on a tablet', () => {
     await expectRingFiguresInside(entrate);
   });
 
-  // The Scheda's «Trend mensile» prints its ticks whole (owner, 2026-11-15, the NOVE-10 mirror tour:
+  // The Scheda's «Trend mensile» prints its ticks whole (owner, 2026-11-15, the mirror tour of Analisi «Classifica»:
   // «1200 €» read «200 €» under a fixed 56px axis and a −16px margin). The planted 42.500 € puts a
   // five-digit tick on the axis. Seen red with the old width and margin.
   test('the Scheda trend axis prints every tick inside the chart', async ({ page }) => {
