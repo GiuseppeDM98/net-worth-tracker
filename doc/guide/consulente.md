@@ -203,7 +203,10 @@
   the percentages of the classes WITHOUT `fixedAmount` add up to 100 (±0,5); a class's sub-targets add up to 100 or
   are empty; a class appears once; a goal's `recommendedAllocation` adds up to 100; each `assetName`
   is the EXACT name from the STRUMENTI block (the model copies it; `findAssetByName` is case- and space-insensitive and also recognises the
-  `displayTicker` alias, which the block prints in place of the ticker: without it, on 2026-10-23 «Applica» lost the quotas of two ETCs).
+  `displayTicker` alias, which the block prints in place of the ticker: without it, on 2026-10-23 «Applica» lost the quotas of two ETCs;
+  a held instrument wins over one at quantity 0 with the same name or ticker, 2026-11-12). A row «0 quote, mai comprato» is an
+  instrument created empty for an accumulation plan (`Asset.createdEmpty`, no ledger row): the strategy's «Vincoli» sentence says it
+  is not held and weighs nothing, but a sub-target that matches it names it in `instrument` — one constant sentence of the system.
 - **The document** `allocationAdvice/{uid}` is ONE per account, rewritten whole at the start (`setAllocationAdviceAdmin`)
   and then updated per stage (`patchAllocationAdviceAdmin`, `merge: true`, `removeUndefinedDeep`); the dates travel
   as Timestamp and come back as Date field by field (`mapAllocationAdviceData`, shared by the two SDKs). States:
@@ -285,6 +288,8 @@
 - **The pager** is the card's footer on every width: «Indietro» (disabled on the first page) and, below `desktop:`,
   «Indice»; the page's own buttons — «Avanti» (absent on «Applica»), on «Chiedi una modifica» «Rivedi il report» and
   «Salta le domande» with «Avanti» as an outline, on «Applica» «Applica alle impostazioni» and «Rifai il percorso».
+  With an active accumulation plan «Applica» says once that the new targets do not change it (`APPLY_ACTIVE_PLAN_NOTE`,
+  read through `useAccumulationPlans`, 2026-11-12).
   Below `tablet:` a column, the page's buttons full width on top. From `desktop:` the rail's labels are buttons, ONE
   Tab stop (the arrows move along the rail); below it «Indice» opens «Vai a una pagina», a `ResponsiveModal` of 44px
   rows — the route's one modal. The WHOLE page slides along the turn, the leaving page `inert`; after a turn the

@@ -489,3 +489,38 @@ Consulente 207 · 73 s; Cashflow's Tracciamento, accounts, mortgage and fee 140 
 Analisi 53 · 28; Previdenza 48 · 33; FIRE 45 · 29; Divisione 42; Hall of Fame 41 · 23; Panoramica 38 · 23; Allocazione
 34 · 20; Impostazioni 34 · 18; motion 31 · 24; Centri 27 · 13; Rendimenti 27 · 17; Dividendi 16 · 10; Storico 15 · 11;
 bundle 12; Budget 10 · 8; shell 9 · 4.
+
+## In brief
+
+The core's summary of this guide, moved here whole from AGENTS.md (§ 5 → Browser-Driven E2E (Playwright)) on 2026-11-17; AGENTS.md keeps a stub.
+
+- **What belongs in a browser test**: only what needs a real layout (the `desktop:` switch at 1440px, a collapsible, a
+  state flash, computed sizes, bounding boxes, overflow); the arithmetic stays with Vitest. A query race and an error
+  branch reached by cutting the network are NOT reproducible locally.
+- **`workers: 1`, non-negotiable**, and **each suite its OWN fixture** (an `npm run e2e:seed:*` script plus one
+  `runSeed` in `e2e/global-setup.ts`, the seeds side by side since 2026-11-16). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
+- **The whole run is a production build, an area run `next dev`** (2026-11-16): `npm run test:e2e` builds `.next-e2e-build`
+  when the code changed, refuses a stale one or a server on :3100; a chunk is known by a STRING its module carries
+  (`CHUNK_SIGNATURES`, unique per `__tests__/chunkSignatures.test.ts`), never a name or path a minifier drops.
+- **The FILENAME chooses the account**: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` → `mobile`, `*.degraded.spec.ts` →
+  degraded, `*.degraded.mobile.spec.ts` → `degraded-mobile` (2026-10-14), `*.tablet.spec.ts` → `tablet` (768×1024, two
+  columns and the pill) AND `tablet-landscape` (1024×768, the stage and the icon rail — `expectLandscapeStage`,
+  `expectLandscapeShell`, `expectStickyStage` in `e2e/tabletLayout.ts`) on the base account, branching on
+  `page.viewportSize().width` (2026-10-16; `desktop` ignores `tablet.`), only `analisi.spec.ts` / `centri.spec.ts` / `split.spec.ts` / `hof.spec.ts` reach those fixtures — and each
+  is ALSO excluded from `desktop`/`mobile` by `testIgnore`. A throwaway spec gets its own `playwright.<name>.config.ts`
+  and is deleted before the full suite (2026-08-28).
+- **`localhost`, never `127.0.0.1`** (the page never hydrates and the login submits natively), and `storageState`
+  captures the Firebase session only with `{ path, indexedDB: true }`.
+- **Prove the test can fail before trusting it**, breaking ONE behaviour at a time (2026-09-18). **Assert on Firestore,
+  not on pixels**: plant a decoy word absent from the seed, and remove the fixture BY THE APP, not by `curl -X DELETE`
+  (2026-08-31). On the BASE account FIRE figures depend on the run month: assert STRUCTURE and FORMAT, never amounts.
+- **Proving a refactor changed no number** (doc/guide/e2e-emulatori.md, its own section): measure the noise floor first (two dumps of unchanged code), compare
+  old-vs-new MINUTES apart, and compare the SET of rendered values, not the page text.
+- **In the cloud container** (2026-09-25) the pinned Chromium is missing (a throwaway `playwright.local.config.ts` sets
+  `executablePath`), its own Chromium groups «1.100 €» (four base specs read red there only), and no spec can import
+  `lib/` (no `@/` alias): doc/guide/e2e-playwright.md.
+- Il resto — the page-reading traps (`addInitScript`, `innerText`, `boundingBox`, hidden mobile duplicates, hydration
+  wiping a `fill()`), the vaul drawer after Escape, locators that are not buttons and substring matching (`exact: true`),
+  the euro regex and U+202F, forcing a server flag on the response, the settings reload rule, the armed two-click
+  confirm, the three tour-spec traps, the frozen clock and the empty closed row of a phone spec, Java ≥ 21 and foreign
+  emulators on 8080/9099 — in `doc/guide/e2e-playwright.md`.

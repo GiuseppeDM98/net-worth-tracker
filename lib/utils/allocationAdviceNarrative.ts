@@ -304,6 +304,9 @@ export function reviewDueState(document: AllocationAdviceDocument | null | undef
 
 export const REVIEW_INVITE_LABEL = 'Rivedi con il Consulente';
 
+/** «Applica» with an active accumulation plan (2026-11-12): the plan keeps its own weights. */
+export const APPLY_ACTIVE_PLAN_NOTE = 'Hai un piano di accumulo attivo: i nuovi target non lo cambiano. Rivedilo in Allocazione › Accumulo.';
+
 /** The invite's sentence when the review is near or due; null otherwise. */
 export function describeReviewInvite(due: ReviewDue): string | null {
   if (due.state !== 'soon' && due.state !== 'due') return null;

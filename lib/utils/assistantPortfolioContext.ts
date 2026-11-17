@@ -87,6 +87,8 @@ export interface AssistantHoldingRow {
   isLiquid: boolean;
   /** A bond's redemption date (`bondDetails.maturityDate`) as an ISO day; only on a `bond` with its details (2026-11-08). */
   maturityIso?: string;
+  /** Created empty for a plan and never bought (`Asset.createdEmpty`, no ledger row, quantity 0): the prompt prints «0 quote, mai comprato» (2026-11-12). */
+  neverBought?: true;
   /** The property a loan finances, by name; only on a loan. */
   financedAssetName?: string;
   /**
@@ -319,21 +321,24 @@ function buildHoldingRows(
   assets: Asset[],
   valueOf: (asset: Asset) => number,
   memberNames: ReadonlyMap<string, string>,
-  goalAssignments: readonly GoalAssetAssignment[] | null
+  goalAssignments: readonly GoalAssetAssignment[] | null,
+  tradedAssetIds: ReadonlySet<string>
 ): AssistantHoldingRow[] {
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
   const rows: AssistantHoldingRow[] = [];
 
   for (const asset of assets) {
-    // A sold-out position is history, not a holding; a repaid loan likewise.
-    if (!(asset.quantity > 0) && !isLoanAsset(asset)) continue;
+    // A sold-out position is history, not a holding; a repaid loan likewise. An instrument created
+    // empty for a plan and never bought stays: the reader may name it, and a proposal may (2026-11-12).
+    const neverBought = asset.createdEmpty === true && !(asset.quantity > 0) && !tradedAssetIds.has(asset.id);
+    if (!(asset.quantity > 0) && !isLoanAsset(asset) && !neverBought) continue;
     if (isLoanAsset(asset) && !(asset.quantity > 0)) continue;
 
     const valueEur = valueOf(asset);
     // The G/P reads only where Patrimonio reads one: a quoted instrument with a EUR PMC. An
     // account, a hand-valued holding or a pension fund has no PMC to measure against.
     const measurable =
-      !isLoanAsset(asset) && asset.type !== 'pensionFund' && asset.type !== 'cash' && hasMarketPrice(asset.type, asset.subCategory);
+      !neverBought && !isLoanAsset(asset) && asset.type !== 'pensionFund' && asset.type !== 'cash' && hasMarketPrice(asset.type, asset.subCategory);
     const costPerUnitEur = measurable ? costBasisPerUnitEur(asset) : undefined;
     const costBasisEur = costPerUnitEur !== undefined ? asset.quantity * costPerUnitEur : undefined;
     const gainEur = costBasisEur !== undefined ? valueEur - costBasisEur : undefined;
@@ -364,6 +369,7 @@ function buildHoldingRows(
       owner: describeAssetOwnerLabel(asset, assets, memberNames),
       isLiquid: asset.isLiquid !== false,
       ...(financed ? { financedAssetName: financed.name.trim() } : {}),
+      ...(neverBought ? { neverBought: true as const } : {}),
       ...(assignedFraction !== null ? { goalAssignedPct: assignedFraction * 100, goalFreeEur: goalValueEur * (1 - assignedFraction), goalValueEur } : {}),
     });
   }
@@ -691,7 +697,8 @@ function buildGoalCoverage(holdings: readonly AssistantHoldingRow[]): AssistantG
 export function buildAssistantPortfolioContext(input: BuildPortfolioContextInput): AssistantPortfolioContext {
   const { assets, transactions, dividends, pensionContributions, expenses, targets, goalAssignments, familyMembers, ownerAge, assetValueOf: valueOf, now } = input;
   const memberNames = new Map(familyMembers.map((member) => [member.id, member.name]));
-  const holdings = buildHoldingRows(assets, valueOf, memberNames, goalAssignments);
+  const tradedAssetIds = new Set(transactions.map((transaction) => transaction.assetId));
+  const holdings = buildHoldingRows(assets, valueOf, memberNames, goalAssignments, tradedAssetIds);
 
   return {
     holdings,

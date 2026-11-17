@@ -323,7 +323,8 @@ export function formatPortfolioForPrompt(portfolio: AssistantPortfolioContext): 
     const parts: string[] = [];
     parts.push(`${assetClassLabel(row.assetClass)}${row.subCategory ? ` › ${row.subCategory}` : ' (senza sottocategoria)'}`);
     parts.push(HOLDING_ROLE_LABELS[row.role]);
-    parts.push(`${quantity(row.quantity)} ${quantityUnit(row.type)}`);
+    // An instrument created empty for a plan and never bought (2026-11-12): named, never read as held.
+    parts.push(row.neverBought ? `0 ${quantityUnit(row.type)}, mai comprato` : `${quantity(row.quantity)} ${quantityUnit(row.type)}`);
     parts.push(`valore ${eur(row.valueEur)}`);
     if (row.costPerUnitEur !== undefined) parts.push(`PMC ${eurCents(row.costPerUnitEur)}`);
     if (row.gainEur !== undefined && row.gainPct !== undefined) parts.push(`G/P ${eur(row.gainEur)} (${pct(row.gainPct)})`);
@@ -795,7 +796,7 @@ export const ASSISTANT_SYSTEM_CORE = [
   "Non elencare le sottocategorie quando non ti vengono chieste: l'elenco completo serve a rispondere nel dettaglio, non a riempire la risposta.",
   '',
   '# Portafoglio: strumenti, allocazione, registri',
-  "Il blocco STRUMENTI IN PORTAFOGLIO OGGI è ESAUSTIVO: ogni strumento posseduto oggi con classe, sottocategoria, ruolo in allocazione, quantità, valore, PMC e G/P (dove misurabili), intestatario e, con il Goal-Based Investing attivo, la quota assegnata agli obiettivi e quella libera («libero da obiettivi» = nessun obiettivo lo tocca). Uno strumento che l'utente nomina e che non compare non è in portafoglio.",
+  "Il blocco STRUMENTI IN PORTAFOGLIO OGGI è ESAUSTIVO: ogni strumento posseduto oggi con classe, sottocategoria, ruolo in allocazione, quantità, valore, PMC e G/P (dove misurabili), intestatario e, con il Goal-Based Investing attivo, la quota assegnata agli obiettivi e quella libera («libero da obiettivi» = nessun obiettivo lo tocca). Uno strumento che l'utente nomina e che non compare non è in portafoglio. Una riga «0 quote, mai comprato» è uno strumento già creato e mai acquistato: non è posseduto, ma per proporlo usa quel nome.",
   "Il ruolo in allocazione ha tre valori e li devi usare con questo significato: «negoziabile» entra nella base e nei piani; «non negoziabile» entra nella base (conta nelle percentuali) ma i piani non possono muoverlo (un fondo pensione, un private equity); «escluso» è fuori dalla pagina Allocazione, base compresa (la casa in cui si vive). Un mutuo segue l'immobile che finanzia; un prestito personale è liquidità negativa.",
   "Il blocco ALLOCAZIONE OGGI è la base che la pagina Allocazione misura (negoziabili + non negoziabili, netta dei debiti) e ALLOCAZIONE TARGET vs ATTUALE è calcolato su quella base: quando parli di allocazione, percentuali e scostamenti sono QUESTI. Il blocco PATRIMONIO PER CLASSE A FINE PERIODO è un'altra cosa: l'intero patrimonio fotografato dallo snapshot, casa, debiti e fondi pensione inclusi. Non confrontare mai i target con quest'ultimo.",
   "Il REGISTRO OPERAZIONI e il REGISTRO DIVIDENDI sono esaustivi salvo la riga di omissione esplicita; incassato e annunciato sono due cifre e restano tali. PREVIDENZA, MUTUI E PRESTITI e FAMIGLIA descrivono la situazione di oggi.",

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Pencil, Trash2, Calculator, ArrowLeftRight, ScrollText, PiggyBank, Info } from 'lucide-react';
 import { isLoanAsset, type Asset } from '@/types/assets';
+import { describeZeroQuantityChip } from '@/lib/utils/zeroQuantityChip';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
@@ -226,6 +227,8 @@ interface AssetRowProps {
   financedAssetName?: string | null;
   /** The owner part of the sub-line («di Marco», the quotas by name — `describeAssetOwnerLabel`); null for a shared asset. */
   ownerLabel?: string | null;
+  /** The assets the ledger names (the page's trades), null while it is not read: the chip says «Mai comprato» only with it. */
+  tradedAssetIds?: ReadonlySet<string> | null;
 }
 
 /**
@@ -255,6 +258,7 @@ export function AssetRow({
   mortgage = null,
   financedAssetName = null,
   ownerLabel = null,
+  tradedAssetIds = null,
 }: AssetRowProps) {
   const [open, setOpen] = useState(false);
   // The sparkline is born at the first opening and stays: unmounting it on close would empty the
@@ -339,7 +343,7 @@ export function AssetRow({
             <span className="truncate text-[13px] font-medium text-foreground">{asset.name}</span>
             {asset.quantity === 0 && (
               <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {isLoanAsset(asset) ? 'Estinto' : 'Azzerato'}
+                {isLoanAsset(asset) ? 'Estinto' : describeZeroQuantityChip(asset, tradedAssetIds)}
               </span>
             )}
           </span>

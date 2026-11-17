@@ -201,6 +201,8 @@ export interface Asset {
   // trade Admin API after every ledger mutation. Do NOT write them directly for ledger types; the
   // ledger is the source of truth. cash/realestate keep direct editing and have no ledger.
   quantity: number;
+  /** Created at quantity 0 for a plan (2026-11-12): with no ledger row it reads «mai comprato»; absent on every other asset. Written only by AssetDialog's empty create. */
+  createdEmpty?: true;
   averageCost?: number; // Native-currency PMC (weighted avg of trade prices, fees excluded). Derived for ledger types — see note on `quantity`.
   // EUR-equivalent PMC (costBasisEur / quantity at the trade-date FX rate), no fee (2026-11-12), same
   // derivation and lifecycle as `averageCost`. G/P math MUST compare this against the EUR value
@@ -291,6 +293,8 @@ export interface AssetFormData {
   subCategory?: string;
   currency: string;
   quantity: number;
+  /** Only AssetDialog's empty create (Accumulo → «+ Nuovo asset») sets it — see `Asset.createdEmpty`. */
+  createdEmpty?: true;
   averageCost?: number;
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)

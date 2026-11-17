@@ -33,6 +33,8 @@ export const CHUNK_SIGNATURES = {
   flussoTile: { text: 'Raggruppa il flusso', module: 'components/cashflow/analisi/tiles/FlussoTile.tsx' },
   dividendsTab: { text: 'Scarica dividendi storici per gli strumenti con ISIN', module: 'components/dividends/DividendTrackingTab.tsx' },
   splitTab: { text: 'Entrate in comune e quota da dividere', module: 'components/cashflow/ExpenseSplitTab.tsx' },
+  /** Allocazione › Accumulo, loaded on demand (2026-11-12): its verdict's accessible name. */
+  accumuloTab: { text: 'Verdetto sul piano di accumulo', module: 'components/allocation/AccumuloTab.tsx' },
   /** The shortest of them: the one string only the sparkline writes (its name's «in salita»). */
   assetSparkline: { text: 'in salita', module: 'components/assets/AssetSparkline.tsx' },
 } as const;
@@ -43,6 +45,7 @@ export const UNDERWATER_CHART_SIGNATURE = CHUNK_SIGNATURES.underwaterChart.text;
 export const FLUSSO_TILE_SIGNATURE = CHUNK_SIGNATURES.flussoTile.text;
 export const DIVIDENDS_TAB_SIGNATURE = CHUNK_SIGNATURES.dividendsTab.text;
 export const SPLIT_TAB_SIGNATURE = CHUNK_SIGNATURES.splitTab.text;
+export const ACCUMULO_TAB_SIGNATURE = CHUNK_SIGNATURES.accumuloTab.text;
 export const SPARKLINE_SIGNATURE = CHUNK_SIGNATURES.assetSparkline.text;
 
 const CHUNK_URL = /\/_next\/static\/chunks\/.+\.js(\?|$)/;

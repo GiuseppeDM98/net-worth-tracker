@@ -132,6 +132,14 @@ describe('the CASHFLOW 12 MESI block in the strategy (2026-11)', () => {
     expect(a.system).not.toContain(BLOCK);
   });
 
+  // Choice u (2026-11-12): the «mai comprato» rows arrive in the data; the system names them once, a constant.
+  it('names the «mai comprato» rows in a constant system, equal with and without such a row', () => {
+    const withRow = buildStrategyPrompt(ANSWERS, 'STRUMENTI\nETF Nuovo: Azioni | negoziabile | 0 quote, mai comprato | valore 0 €');
+    const without = buildStrategyPrompt(ANSWERS, 'STRUMENTI\nETF Mondo: Azioni | negoziabile | 100 quote | valore 12.000 €');
+    expect(withRow.system).toBe(without.system);
+    expect(withRow.system).toContain('una riga «0 quote, mai comprato» è uno strumento già creato e mai acquistato: non è posseduto e non pesa nell\'allocazione, ma un sotto-target che gli corrisponde lo nomina in "instrument" con quel nome;');
+  });
+
   it('carries the situation over the cashflow and the line that sizes the goals and the reserve on the block (owner, 2026-11-01)', () => {
     const { system } = buildStrategyPrompt(ANSWERS, 'DATI');
     expect(system).toContain('1. **La situazione** — cosa vedi nel portafoglio di oggi e nel cashflow (entrate e loro concentrazione, spesa, capacità di risparmio) rispetto a orizzonte, tolleranza e obiettivi (2-4 frasi).');

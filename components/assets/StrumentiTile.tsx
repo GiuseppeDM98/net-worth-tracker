@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { isLoanAsset, type Asset, type FamilyMember } from '@/types/assets';
+import { describeZeroQuantityChip } from '@/lib/utils/zeroQuantityChip';
 import { describeAssetOwnerLabel, listAssetOwnerFilterOptions, matchesAssetOwnerFilter } from '@/lib/utils/assetOwnership';
 import { OWNER_FILTER_ALL } from '@/lib/utils/movementsOwnerFilter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -254,6 +255,11 @@ interface StrumentiTileProps {
   members?: readonly FamilyMember[];
   /** Every asset of the account — a mortgage resolves its owner through the property it finances. */
   allAssets?: readonly Asset[];
+  /**
+   * The assets the ledger names, null while it is not read: a row created empty for a plan and never
+   * bought says «Mai comprato» (lib/utils/zeroQuantityChip.ts, the plan editor's rule); else «Azzerato».
+   */
+  tradedAssetIds?: ReadonlySet<string> | null;
   className?: string;
 }
 
@@ -278,6 +284,7 @@ export function StrumentiTile({
   asideWhenClosed,
   members = EMPTY_MEMBERS,
   allAssets,
+  tradedAssetIds = null,
   className,
 }: StrumentiTileProps) {
   const deleteAssetMutation = useDeleteAsset(ownerId || '');
@@ -488,7 +495,7 @@ export function StrumentiTile({
             </div>
             {asset.quantity === 0 && (
               <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {isLoanAsset(asset) ? 'Estinto' : 'Azzerato'}
+                {isLoanAsset(asset) ? 'Estinto' : describeZeroQuantityChip(asset, tradedAssetIds)}
               </span>
             )}
           </div>
@@ -728,6 +735,7 @@ export function StrumentiTile({
                   showLedgerActions={showLedgerActions(asset)}
                   onRegisterTrade={onRegisterTrade}
                   onMovements={onMovements}
+                  tradedAssetIds={tradedAssetIds}
                 />
               ))}
             </div>

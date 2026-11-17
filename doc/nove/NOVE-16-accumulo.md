@@ -59,7 +59,7 @@ Defects of the PR, each cured in § 4:
 
 1. `/dashboard/allocation` has the tabs «Bilanciamento» (default) and «Accumulo»; `?tab=accumulo` lands on it; a tab
    change rewrites the URL with `router.replace`. **Proof**: E1, E2.
-2. The tab's code is not in the initial graph; `perf:budget` for the route ≤ 605 KB gz. **Proof**: § 7 G, E3.
+2. The tab's code is not in the initial graph; `perf:budget` for the route ≤ 611 KB gz (corrected 2026-11-17, owner: the tab bar and the lazy load measured 610,5 against develop's 605,9 on the same machine; doc/guide/velocita.md § Registro dei tetti alzati). **Proof**: § 7 G, E3.
 3. With an active plan the Bilanciamento verdict is identical to the one without; the Piano shows one note with the
    button «Apri Accumulo». **Proof**: U1, E4.
 4. A plan whose first month is in the future: no Piano note; the tab's headline «Il piano parte a/ad {mese}[ {anno}]:

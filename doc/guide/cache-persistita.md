@@ -18,7 +18,7 @@ Moved here from `AGENTS.md` § Caching on 2026-09-30.
 
 ### What is persisted, and what is out by design
 
-- ONLY the keys of `PERSISTED_QUERY_PREFIXES` — the twelve owner collections read through the hooks of
+- ONLY the keys of `PERSISTED_QUERY_PREFIXES` — the thirteen owner collections read through the hooks of
   AGENTS.md § React Query and Derived State, plus the ledger's meta document Patrimonio gates its trades on — only
   successful reads, and NEVER the demo uid (`isDemoUid`, `lib/utils/demoAccount.ts`, the ONE rule `useDemoMode` reads
   too); out by design: the assistant, benchmarks/FX/ECB, the Esposizione's profiles, the budget history. Since

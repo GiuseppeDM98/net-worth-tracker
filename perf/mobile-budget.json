@@ -53,6 +53,11 @@
       "path": "/dashboard/allocation",
       "target": true
     },
+    "allocazione-accumulo": {
+      "path": "/dashboard/allocation?tab=accumulo",
+      "tab": "Accumulo",
+      "target": true
+    },
     "previdenza": {
       "path": "/dashboard/pension",
       "target": true
@@ -412,24 +417,24 @@
     },
     "allocazione": {
       "390": {
-        "screens": 1.59,
-        "tilesAboveFold": 2,
+        "screens": 1.71,
+        "tilesAboveFold": 1,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 17,
         "figuresOutsideVerdict": 16,
         "firstClosedRowAbovePill": false,
         "overflowX": false,
-        "raisedBy": "2026-10-15: Bilanciamento non ha una curva da cedere: la prima riga chiusa (Per classe) finisce sotto la pill a 390; 2026-10-11: deriva del giorno del mese, non del codice — il codice di develop (1629613) misurato lo stesso giorno (11, contro il 10 della prima misura del budget) dà esattamente questi valori; il fixture non è invariante al giorno come la scelta di un fixture deterministico assume (doc/guide/prima-schermata.md § Per-page blind spots)"
+        "raisedBy": "2026-11-17: la barra delle tab Bilanciamento · Accumulo (PageTabs) aggiunge 68 px sopra il verdetto; contro develop @36ac3325 lo stesso giorno, stessa build, stessa macchina — screens 1,64 → 1,71, la seconda tessera scende sotto la pill (tessere 2 → 1); proprietario 2026-11-17; 2026-10-15: Bilanciamento non ha una curva da cedere: la prima riga chiusa (Per classe) finisce sotto la pill a 390; 2026-10-11: deriva del giorno del mese, non del codice — il codice di develop (1629613) misurato lo stesso giorno (11, contro il 10 della prima misura del budget) dà esattamente questi valori; il fixture non è invariante al giorno come la scelta di un fixture deterministico assume (doc/guide/prima-schermata.md § Per-page blind spots)"
       },
       "768": {
-        "screens": 1.07,
+        "screens": 1.18,
         "tilesAboveFold": 5,
         "tilesFullyAboveFold": 5,
         "figuresAboveFold": 18,
-        "figuresOutsideVerdict": 17,
+        "figuresOutsideVerdict": 16,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-10-16: la cella «Fuori posizione» stampa lo 0,0% che la lettura stampa (sul fixture la casa e il conto stanno in classi senza target) e dal tablet il KPI resta intero accanto alla striscia: una cifra in più sopra la piega e fuori dal verdetto; a 390 il KPI è sollevato e nulla si muove"
+        "raisedBy": "2026-11-17: la barra delle tab Bilanciamento · Accumulo (PageTabs) aggiunge 68 px sopra il verdetto; contro develop @36ac3325 lo stesso giorno, stessa build, stessa macchina — screens 1,12 → 1,18; proprietario 2026-11-17; 2026-10-16: la cella «Fuori posizione» stampa lo 0,0% che la lettura stampa (sul fixture la casa e il conto stanno in classi senza target) e dal tablet il KPI resta intero accanto alla striscia: una cifra in più sopra la piega e fuori dal verdetto; a 390 il KPI è sollevato e nulla si muove"
       },
       "1024": {
         "screens": 1.16,
@@ -695,6 +700,38 @@
         "firstClosedRowAbovePill": null,
         "overflowX": false,
         "raisedBy": "2026-10-15: la macchina di riferimento è cambiata (il budget ne ha una sola): il budget era stato stretto sull'altra, che misura qualche centesimo in meno; la pill a 44 px dal 2026-10-10"
+      }
+    },
+    "allocazione-accumulo": {
+      "390": {
+        "screens": 1.56,
+        "tilesAboveFold": 1,
+        "tilesFullyAboveFold": 0,
+        "figuresAboveFold": 11,
+        "figuresOutsideVerdict": 7,
+        "firstClosedRowAbovePill": false,
+        "overflowX": false,
+        "raisedBy": "2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab; 2026-10-20: prima misura di Accumulo (piano attivo, nessun modello); l'unica riga chiusa (Classi del piano) sta sotto la pill perché Questo mese, la tessera aperta, occupa la prima schermata"
+      },
+      "768": {
+        "screens": 1.21,
+        "tilesAboveFold": 2,
+        "tilesFullyAboveFold": 1,
+        "figuresAboveFold": 13,
+        "figuresOutsideVerdict": 10,
+        "firstClosedRowAbovePill": false,
+        "overflowX": false,
+        "raisedBy": "2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab; 2026-10-20: prima misura di Accumulo (piano attivo, nessun modello); l'unica riga chiusa (Classi del piano) sta sotto la pill perché Questo mese, la tessera aperta, occupa la prima schermata"
+      },
+      "1024": {
+        "screens": 1.27,
+        "tilesAboveFold": 2,
+        "tilesFullyAboveFold": 1,
+        "figuresAboveFold": 11,
+        "figuresOutsideVerdict": 7,
+        "firstClosedRowAbovePill": true,
+        "overflowX": false,
+        "raisedBy": "2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab"
       }
     }
   }

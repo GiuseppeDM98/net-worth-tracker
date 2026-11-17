@@ -264,6 +264,8 @@ export interface ApplyPiecesInput {
   applyGoals: boolean;
   setApplyGoals: (value: boolean) => void;
   applyState: ApplyState;
+  /** `APPLY_ACTIVE_PLAN_NOTE` when an accumulation plan is active, null otherwise. */
+  activePlanNote: string | null;
 }
 
 /** «Applica»: one checkbox per thing it writes, the plans' warnings and the status line — only when ready with a proposal. */
@@ -299,6 +301,7 @@ export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
           </div>
           {goalPlan && goalPlan.unmatched.length > 0 && <p className="text-[12px] text-warning-foreground">Quote su strumenti non trovati, ignorate: {goalPlan.unmatched.join(', ')}.</p>}
           {goalPlan && goalPlan.rescaled.length > 0 && <p className="text-[12px] text-warning-foreground">Quote ridotte perché superavano il 100% dello strumento: {goalPlan.rescaled.join(', ')}.</p>}
+          {input.activePlanNote && <p className="text-[12px] text-warning-foreground">{input.activePlanNote}</p>}
           <p role="status" className={cn('min-h-[1.25rem] text-[12px]', applyState.phase === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
             {applyState.phase === 'error' ? applyState.message : applyState.phase === 'writing' ? 'Scrivo…' : applyState.phase === 'done' ? 'Applicato.' : ''}
           </p>

@@ -32,7 +32,8 @@ import type { BookPageId } from '@/lib/utils/allocationAdviceBook';
 import { buildTargetsFromProposal, currentAllocationOnBase, planGoalDocument, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
 import { runStageStates } from '@/lib/utils/allocationAdviceDocument';
 import { removedGoalIds } from '@/lib/utils/allocationAdviceDraft';
-import { buildConsulenteVerdict, buildProposalRows, describeApplySummary, describeRunHeadline } from '@/lib/utils/allocationAdviceNarrative';
+import { APPLY_ACTIVE_PLAN_NOTE, buildConsulenteVerdict, buildProposalRows, describeApplySummary, describeRunHeadline } from '@/lib/utils/allocationAdviceNarrative';
+import { selectOpenPlan, useAccumulationPlans } from '@/lib/hooks/useAccumulationPlans';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { formatDate } from '@/lib/utils/formatters';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
@@ -69,6 +70,9 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, pageId, 
   // A run still going rereads the document while it lasts.
   useAllocationAdvice(ownerId, { enabled: document.status === 'running' });
   const revision = useConsulenteRevision(ownerId);
+  // An active accumulation plan keeps its weights whatever is applied: «Applica» says so, once.
+  const plansQuery = useAccumulationPlans(ownerId);
+  const activePlanNote = selectOpenPlan(plansQuery.data ?? [])?.status === 'active' ? APPLY_ACTIVE_PLAN_NOTE : null;
   const revising = revision.state.kind === 'running';
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
   // Today's Italian day once per mount: the applied verdict says when the review is near or due.
@@ -167,6 +171,7 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, pageId, 
         applyGoals,
         setApplyGoals,
         applyState,
+        activePlanNote,
       }}
       canApply={canApply}
       onApply={() => void apply()}

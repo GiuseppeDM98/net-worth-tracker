@@ -31,6 +31,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { removeAccumuloFixture, seedAccumuloFixture } from './accumuloFixture';
 
 async function openAllocazione(page: Page) {
   await page.goto('/dashboard/allocation', { waitUntil: 'load' });
@@ -301,4 +302,68 @@ test('il Piano finisce dove finisce Per classe, in ogni modo', async ({ page }) 
   const [field, f] = await Promise.all([amount.boundingBox(), footer.boundingBox()]);
   // Ad altezza naturale il piè starebbe 14px sotto il campo (mb-3.5): più di 32px vuol dire che il Piano si è allungato.
   expect(f!.y - (field!.y + field!.height), 'senza importo il Piano è il più basso').toBeGreaterThan(32);
+});
+
+/** La scheda «Accumulo» (`?tab=accumulo`): il verdetto del piano di accumulo e lo stato vuoto. */
+async function openAccumulo(page: Page) {
+  await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'load' });
+  await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toBeVisible({ timeout: 60_000 });
+}
+
+test('a 1440 Accumulo senza piano: nessuna riga chiusa, nessuna striscia, il verdetto intero', async ({ page }) => {
+  await openAccumulo(page);
+  // Il fixture base non ha un piano: lo stato vuoto ha il suo verdetto, senza taglio («Il perché») né celle.
+  await expect(page.locator('main [id$="-trigger"]')).toHaveCount(0);
+  await expect(page.getByRole('list', { name: 'Le cifre del verdetto' })).toBeHidden();
+  await expect(page.getByRole('heading', { level: 2, name: 'Il resto della pagina' })).toBeHidden();
+  await expect(page.getByRole('button', { name: /^Il perché/ })).toHaveCount(0);
+  await expect(page.locator('section[aria-label="Accumulo"]').getByRole('button', { name: 'Crea piano' })).toBeVisible({ timeout: 30_000 });
+});
+
+test('la scheda Bilanciamento resta quella di prima: il tab è nell\'URL e Accumulo non la sostituisce', async ({ page }) => {
+  await openAllocazione(page);
+  await expect(page.getByRole('region', { name: "Verdetto sull'allocazione" })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Accumulo' }).click();
+  await expect(page).toHaveURL(/tab=accumulo/);
+  await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('region', { name: "Verdetto sull'allocazione" })).toHaveCount(0);
+});
+
+/**
+ * Con un piano di accumulo il verdetto del Bilanciamento non cambia (decisione 24): il Piano ha UNA
+ * nota con «Apri Accumulo». Il piano del fixture (`e2e/accumuloFixture.ts`) esiste solo dentro questi
+ * test, rimosso dopo ciascuno. Visti rossi: E4 con la clausola del piano rimessa nel verdetto; E5 con
+ * la guardia del mese non ancora iniziato tolta da `summarizePacMonth`.
+ */
+test.describe('il Bilanciamento con un piano di accumulo', () => {
+  test.afterEach(async () => {
+    await removeAccumuloFixture();
+  });
+
+  test('il verdetto è lo stesso con e senza un piano attivo; il Piano lo dice e apre Accumulo', async ({ page }) => {
+    await openAllocazione(page);
+    const verdict = page.getByRole('region', { name: "Verdetto sull'allocazione" });
+    const before = (await verdict.innerText()).trim();
+    await expect(page.getByRole('button', { name: 'Apri Accumulo' })).toHaveCount(0);
+
+    await seedAccumuloFixture();
+    await openAllocazione(page);
+    await expect(page.getByRole('button', { name: 'Apri Accumulo' })).toBeVisible({ timeout: 30_000 });
+    expect((await verdict.innerText()).trim()).toBe(before);
+
+    await page.getByRole('button', { name: 'Apri Accumulo' }).click();
+    await expect(page).toHaveURL(/tab=accumulo/);
+    await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('un piano che parte il mese prossimo: nessuna nota nel Piano, Accumulo dice quando parte', async ({ page }) => {
+    await seedAccumuloFixture({ startOffset: 1 });
+    await openAllocazione(page);
+    // La nota arriva con il piano letto: «Accumulo» la leggerebbe dalla stessa query, quindi prima la scheda.
+    await openAccumulo(page);
+    await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' }).getByRole('heading').first()).toHaveText(/^Il piano parte a/);
+    await openAllocazione(page);
+    await expect(page.getByRole('button', { name: 'Apri Accumulo' })).toHaveCount(0);
+  });
 });

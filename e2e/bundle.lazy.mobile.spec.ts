@@ -13,7 +13,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { SANKEY_SIGNATURE, probeChunks } from './chunkProbe';
-import { expectDividendsTabLandsInPlace } from './lazyTabLanding';
+import { expectAccumuloTabLandsInPlace, expectDividendsTabLandsInPlace } from './lazyTabLanding';
 
 test('Analisi at 390 draws the Flusso as a bar and rows and never downloads the Sankey', async ({ page }) => {
   const sankey = probeChunks(page, SANKEY_SIGNATURE);
@@ -33,4 +33,8 @@ test('Analisi at 390 draws the Flusso as a bar and rows and never downloads the 
 test('Cashflow › Dividendi at 390 lands on the placeholder the page drew for its chunk, axis row included', async ({ page }) => {
   test.setTimeout(120_000);
   await expectDividendsTabLandsInPlace(page);
+});
+
+test('Allocazione › Accumulo at 390 lands where the page drew its placeholder, the tab bar on screen', async ({ page }) => {
+  await expectAccumuloTabLandsInPlace(page);
 });
