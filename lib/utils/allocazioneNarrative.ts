@@ -27,6 +27,7 @@ import type { ExposureBucket, ExposureCoverage, ExposureNotApplicable } from '@/
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import type { OrphanedTarget, RebalanceBand, RebalanceMove } from '@/lib/utils/allocationUtils';
 import type { InstrumentTrade } from '@/lib/utils/leverageAwareAllocationUtils';
+import type { PacVerdictInput } from '@/types/accumulationPlan';
 import {
   ALLOCAZIONE_SECTION_IDS,
   isNothingOutOfPosition,
@@ -163,6 +164,35 @@ function nextMoneyClause(nextMoney: NextMoney | null): Narrative {
   if (!nextMoney || nextMoney.amount <= 0 || nextMoney.slices.length === 0) return [];
   const slices = nextMoney.slices.map((slice) => [amount(slice.amount), prose(` di ${sliceObject(slice)}`)]);
   return [prose('con '), amount(nextMoney.amount), prose(' in più compreresti '), ...joinList(slices)];
+}
+
+export interface PacSubstitutionLabels {
+  /** The instrument the Piano buys («ETF A»). */
+  replaced: string;
+  /** The one the plan buys in its place («ETF B»). */
+  buying: string;
+}
+
+/**
+ * The line above the Piano's moves while a plan is active: what the accumulation plan buys this
+ * month and that this Piano does not count it, plus, when the Piano buys an instrument the plan
+ * replaced, which one the plan buys instead. «Il piano di accumulo compra questo mese 1000 € in 2
+ * strumenti; questo piano non ne tiene conto. Il piano di accumulo compra ETF B al posto di ETF A.»
+ * With an active plan the Bilanciamento verdict does not change: this note is all the page says
+ * (owner, 2026-11-12).
+ */
+export function describePacOverlap(pac: PacVerdictInput, substitutions: PacSubstitutionLabels[] = []): Narrative {
+  const head: Narrative = pac.allClosed
+    ? [prose(`La rata di ${pac.monthLabel} del piano di accumulo è chiusa, ma questo piano non ne tiene conto.`)]
+    : [
+        prose('Il piano di accumulo compra questo mese '),
+        amount(pac.monthTotalEur),
+        prose(pac.instrumentCount === 1 ? ' in 1 strumento' : ` in ${pac.instrumentCount} strumenti`),
+        prose('; questo piano non ne tiene conto.'),
+      ];
+  if (substitutions.length === 0) return head;
+  const items = substitutions.map((item) => [figure(item.buying), prose(' al posto di '), figure(item.replaced)]);
+  return [...head, prose(' Il piano di accumulo compra '), ...joinList(items), prose('.')];
 }
 
 function leverageClause(leverage: { current: number; target: number } | null): Narrative {

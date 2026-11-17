@@ -195,6 +195,24 @@ describe('buildAssistantPortfolioContext — holdings', () => {
     expect(holdings.find((row) => row.name === 'ETF Venduto')).toBeUndefined();
   });
 
+  // Choice u (owner, 2026-11-12): an instrument created empty for a plan and never bought is a row the
+  // Assistente and the Consulente can name; one sold off (SOLD: no flag) stays history.
+  // Seen red with the createdEmpty condition dropped (SOLD becomes a row).
+  it('keeps an instrument created empty and never bought as a «mai comprato» row', () => {
+    const NEW = asset({ id: 'a-new', name: 'ETF Nuovo', type: 'etf', assetClass: 'equity', quantity: 0, currentPrice: 100, createdEmpty: true });
+    const { holdings } = build({ assets: [...ASSETS, NEW] });
+    expect(holdings.find((row) => row.assetId === 'a-new')).toMatchObject({ neverBought: true, quantity: 0, valueEur: 0 });
+    expect(holdings.find((row) => row.assetId === 'a-sold')).toBeUndefined();
+    expect(holdings.filter((row) => row.neverBought)).toHaveLength(1);
+  });
+
+  it('leaves it out once the ledger names it (bought, then sold)', () => {
+    const NEW = asset({ id: 'a-new', name: 'ETF Nuovo', type: 'etf', assetClass: 'equity', quantity: 0, currentPrice: 100, createdEmpty: true });
+    const traded = transaction({ id: 't-new', assetId: 'a-new', type: 'buy', date: new Date('2026-09-01T10:00:00.000Z'), quantity: 10, priceEur: 100 });
+    const { holdings } = build({ assets: [...ASSETS, NEW], transactions: [...TRANSACTIONS, traded] });
+    expect(holdings.find((row) => row.assetId === 'a-new')).toBeUndefined();
+  });
+
   it('resolves the role within the list: a mortgage follows the excluded home it finances', () => {
     const { holdings } = build();
     const roles = Object.fromEntries(holdings.map((row) => [row.name, row.role]));

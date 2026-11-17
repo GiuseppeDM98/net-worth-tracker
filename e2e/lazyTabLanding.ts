@@ -15,7 +15,7 @@
  * the old fallbacks put back.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
-import { DIVIDENDS_TAB_SIGNATURE, SPLIT_TAB_SIGNATURE, holdChunks, holdRequests } from './chunkProbe';
+import { ACCUMULO_TAB_SIGNATURE, DIVIDENDS_TAB_SIGNATURE, SPLIT_TAB_SIGNATURE, holdChunks, holdRequests } from './chunkProbe';
 
 /** The first cell of the tile grid inside the panel's loading state (`TileGridSkeleton`). */
 function firstSkeletonCell(panel: Locator): Locator {
@@ -43,6 +43,32 @@ async function settledTopOf(locator: Locator): Promise<number> {
     previous = current;
   }
   throw new Error('the cell never stopped moving');
+}
+
+/**
+ * Allocazione › Accumulo (2026-11-12): only the chunk is held — the plans come from the Firestore SDK,
+ * already read by the page for the Piano's note, so the tab mounts with its content, not its loading
+ * state. The check is therefore the fallback's first cell against the tab's first tile: the fallback
+ * (`AccumuloTabSkeleton`) holds the verdict's place, and the tab's first tile (`section`) starts where its
+ * grid started. The tab bar is on screen while the chunk is held. Seen red with the tab imported
+ * statically (no chunk to hold).
+ */
+export async function expectAccumuloTabLandsInPlace(page: Page): Promise<void> {
+  const tabChunk = await holdChunks(page, ACCUMULO_TAB_SIGNATURE);
+  await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'domcontentloaded' });
+
+  const panel = page.getByRole('tabpanel', { name: 'Accumulo' });
+  const cell = firstSkeletonCell(panel);
+  await expect(cell).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('tab', { name: 'Accumulo' })).toBeVisible();
+  const placeholderTop = await settledTopOf(cell);
+  expect(tabChunk.held(), 'the Accumulo tab\'s chunk is held while the placeholder is measured').toBeGreaterThan(0);
+
+  tabChunk.release();
+  // A tile is a `section` (components/ui/tile.tsx); the verdict is one too, so it is left out.
+  const firstTile = panel.locator('section:not([aria-label^="Verdetto"])').first();
+  await expect(firstTile).toBeVisible({ timeout: 30_000 });
+  expect(Math.abs((await settledTopOf(firstTile)) - placeholderTop)).toBeLessThan(1);
 }
 
 /**

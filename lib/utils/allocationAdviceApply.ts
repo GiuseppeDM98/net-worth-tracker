@@ -27,11 +27,16 @@ function assignmentPercent(assignment: GoalAssetAssignment, assets: readonly Ass
   return asset && asset.quantity > 0 ? (assignment.units / asset.quantity) * 100 : 0;
 }
 
-/** An asset by its name, case- and space-insensitively; null when nothing matches. */
+/**
+ * An asset by its name, case- and space-insensitively; null when nothing matches. A held instrument
+ * wins over one at quantity 0 with the same name or ticker (an instrument created empty for a plan,
+ * 2026-11-12): the search walks the held ones first.
+ */
 export function findAssetByName(assets: readonly Asset[], name: string): Asset | null {
   const wanted = name.trim().toLowerCase();
   if (wanted === '') return null;
-  const byName = assets.find((asset) => asset.name.trim().toLowerCase() === wanted);
+  const pool = [...assets.filter((a) => a.quantity > 0), ...assets.filter((a) => !(a.quantity > 0))];
+  const byName = pool.find((asset) => asset.name.trim().toLowerCase() === wanted);
   if (byName) return byName;
   // The prompt prints every instrument as «name (TICKER)», and the model copies it that way —
   // and shortens «SWDA.MI» to «SWDA» (the owner's run, 2026-10-20: a goal's quota went
@@ -45,11 +50,13 @@ export function findAssetByName(assets: readonly Asset[], name: string): Asset |
   const printed = /^(.*)\s\(([^()]+)\)$/.exec(wanted);
   if (printed) {
     const [, head, tail] = printed;
-    const byPrinted = assets.find((asset) => asset.name.trim().toLowerCase() === head.trim() && named(asset, tail.trim()));
+    const byPrinted = pool.find((asset) => asset.name.trim().toLowerCase() === head.trim() && named(asset, tail.trim()));
     if (byPrinted) return byPrinted;
   }
   const byTicker = assets.filter((asset) => named(asset, wanted));
-  return byTicker.length === 1 ? byTicker[0] : null;
+  if (byTicker.length === 1) return byTicker[0];
+  const heldByTicker = byTicker.filter((asset) => asset.quantity > 0);
+  return heldByTicker.length === 1 ? heldByTicker[0] : null;
 }
 
 // ─── Targets ──────────────────────────────────────────────────────────────────

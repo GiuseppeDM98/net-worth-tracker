@@ -188,3 +188,19 @@ si legge prima di stringere o allargare.
 - **Il giro di riscaldamento attende l'assestamento, non le scritture**: le migrazioni della prima visita di Patrimonio
   (registro, prestiti, `backfillAverageCostEur`) partono in quel giro e non sono attese; due corse consecutive
   identiche (2026-10-10) dicono che atterrano prima della misura, non che non possano mai arrivare dopo.
+
+## In brief
+
+The core's summary of this guide, moved here whole from AGENTS.md (§ 5 → Performance tooling) on 2026-11-17; AGENTS.md keeps a stub.
+
+- **The first-screen census shares the port** (2026-10-10; its manual is `doc/guide/prima-schermata.md`, its record —
+  baselines, the fixture table, every widened entry — `doc/guide/prima-schermata-misure.md`): `npm
+  run mobile:census` measures the composition of 19 surfaces × 390/768/1024 on the same :3200 build, re-seeding its own
+  fixture `census@example.com`; `npm run mobile:budget` holds the run against `perf/mobile-budget.json` (zero tolerance,
+  it only tightens, a widening carries `raisedBy: "<date>: …"` and KEEPS every reason the entry carried before — concatenated,
+  never overwritten (2026-10-16: a `--tighten` had replaced twelve); `--tighten` refuses a partial run and a run in which
+  Yahoo answered a profile, 2026-10-10). The fixture refuses to be measured from the 1st to the 4th and on the month's
+  last day; an unknown `--surfaces` key or `--viewports` value exits 1 with the valid ones; a figure whose unit is a
+  `[data-figure-unit]` span counts once (2026-10-10). **A change that moves what a composed page shows on its first
+  screen closes on `mobile:census` + `mobile:budget` green on the fixture** (2026-10-17: the series that measured each page
+  is closed, the budget stays; DESIGN.md → The First-Screen Rule).

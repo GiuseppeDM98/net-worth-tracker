@@ -21,7 +21,7 @@
  * the TYPE of a field in a persisted payload — everything under `PERSISTED_QUERY_PREFIXES`: an
  * asset (the mortgage instalments under its key too), an expense, a snapshot, a category, the
  * settings document, a contribution, a trade, the ledger's meta document, a cost centre, the Hall
- * of Fame rankings, a goal, a dividend receipt, the overview payload, Rendimenti's
+ * of Fame rankings, a goal, a dividend receipt, an accumulation plan, the overview payload, Rendimenti's
  * `PerformanceData` and its dividend yields. A client that restores an
  * older shape would read it as truth until the refetch lands. A new optional field whose absence means the default does not need it
  * (AGENTS.md § Caching, beside `CACHE_MATH_VERSION`).
@@ -83,6 +83,8 @@ export const PERSISTED_QUERY_PREFIXES: readonly (readonly string[])[] = [
   ['hall-of-fame'],
   ['goal-data'],
   ['dividend-receipts'],
+  // The accumulation plans: Allocazione's Piano note and the Accumulo tab never arrive after the figures.
+  ['accumulation-plans'],
   // Rendimenti: the pre-computed metrics, named by the cache key of the inputs they were computed
   // from (restored inputs resolve to the same key, so the pair is consistent), and the yields.
   ['performance', 'data'],

@@ -358,7 +358,7 @@ file used to carry.
 ### Patrimonio · Asset Pricing, FX and Assets → `doc/guide/patrimonio.md`
 - "Does this asset have a market price?" is ONE rule in `assetPricing.ts` (`hasMarketPrice`/`requiresManualPricing`); a new hand-valued type goes in `MANUALLY_VALUED_TYPES` and nowhere else.
 - **A debt is a `loan` ASSET worth minus its principal** (2026-10-10, `types/assets.ts` → `LOAN_ASSET_TYPE`, the sign in `calculateAssetValue`): the property stays GROSS, the loan sits in the class of what it finances (`realestate` when `financedAssetId`, else `cash` = negative liquidity), out of every Rendimenti base, out of FIRE with the primary residence it finances. **In the Allocazione a loan FOLLOWS what it finances** (2026-10-17, `resolveAllocationRoleWithin`): a mortgage takes its property's role (excluded home → nets the excluded figure; a property in the allocation → nets Immobili in the base), a personal loan nets Liquidità in the base; never a plan's leg, its stored `allocationRole` inert. **Its «Intestatari» follow the property's quotas too** (`resolveAssetOwnership`, lib/utils/assetOwnership.ts; an asset is divisible by QUOTA since 2026-10-17 — `Asset.ownerShares` in units or percent + `ownerMemberId` as the rest, the ONE slice primitive `lib/utils/assetSlice.ts` shared with the goals' quotas, units past the quantity declared «quote da riassegnare», never rescaled; since 2026-10-18 every group measured on the VALUE and on the PRICE OF CARRY — `costOf` = `costBasisOf` of `patrimonioSummary.ts` injected beside `valueOf`, the tile's «Valore | Carico» `AsideToggle` —, an asset with no PMC at its value, a quoted one declared, never left out). Where the debt lives on the document is `debtBalanceField`'s alone (a loan's `quantity`, a legacy property's `outstandingDebt`, read-only since the one-shot migration `loanMigration.ts`).
-- GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset.
+- GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset — or one created empty for a plan (`Asset.createdEmpty`).
 - A Borsa Italiana bond quote is `% of par`, always, and `lib/utils/bondPricing.ts` is the ONE conversion (`quote / 100 × nominal × coefficient`, nominal **1 €** by default). Never re-implement it; never guard it on `nominal > 1` again (issue #340).
 - Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts`: `costBasisPerUnitEur` (the fee-free PMC) for every G/P, YOC and PMC cell, `fiscalCostPerUnitEur` (purchase fees included) for every tax estimate (2026-11-12); `undefined` without a EUR PMC — print nothing, never dollars against euros.
 - Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; numbers not in the payload are born in `patrimonioSummary.ts`; the page owns every dialog.
@@ -462,6 +462,11 @@ file used to carry.
 - "Versa" and "Preleva" are ONE tree with the sign flipped, and Ribilancia descends to the INSTRUMENT through those same splits (`RebalanceDescent`, 2026-09-21) — never a second algorithm. «Prelevare 1000 €» means 1000 € IN HAND: `solveWithdrawalGross` is a FIXED POINT, never a division by (1 − rate), and a plan that sells prices the withholding (`estimatePlanSaleTax`), `null` WITH a reason when a leg has no EUR basis or rate.
 - Esposizione (2026-09-28): the engine runs in the BROWSER on the page's assets; the route answers only Yahoo's profiles from ONE cache per ticker, owner-scoped (`assertCanAccessAccount`), and nothing of the user's goes in a profile. Every euro of the Allocazione base has ONE of four destinies and the list adds up to 100 on screen.
 - Il resto — the mobile composition (§ Composizione mobile), THE ASYMMETRY of the two plans and the band-independent score, the dormant class (`isDormantClass`, `activeClassGaps` and never the raw `summarizeClassGaps`), `collapseRepeatedLevels` and the node's own `isInstrument`, the leverage engine and its tree, what Titoli, Settori and Emittenti weigh (`hasMarketPrice` + a ticker), the per-ticker cache and Yahoo's two modules, the Bull's formula, the six label maps, the action colours' measured lightness band and the `lab()` trap that made the old clamp dead code, the verdict-over-tiles rules — in `doc/guide/allocazione.md`.
+
+### Allocazione › Accumulo → `doc/guide/accumulo.md`
+- A plan splits a monthly inflow over instruments by target weight and PROPOSES purchases, never writing a transaction on its own («Registra» prefills `TransactionDialog` and links it). ONE draft-or-active plan per account (the lock `accumulationPlanLocks/{ownerUid}`, written in the plan's transaction) in `accumulationPlans/{id}`; both Firestore rules are published by hand. The reserve is the allocation's cash quota kept on the real accounts (`isPlanSourceAccount`), refilled by the sales and the inflows before anything is bought (`computeUsableLiquidity.refillMonths`). The tab is a `lazyComponent`; the Piano's note reads the slim path (`useAccumulationPlans`, `usePacMonth`), both importing their modules on demand, never the editor.
+- Sentences and figures live in `accumulationNarrative.ts` / `accumuloSummary.ts`; every write invalidates `queryKeys.accumulationPlans.all`, which the Piano's note reads too.
+- Il resto — the mobile composition (§ Composizione mobile), «Rivedi il piano», «Riattiva», the ledger matching — in `doc/guide/accumulo.md`.
 
 ### Allocazione › Consulente → `doc/guide/consulente.md`
 - A guided path (one question per screen, the draft on the browser), then an interview of up to three rounds of questions that writes nothing until the strategy (2026-11; `questionSet.ts` is the one question schema, shared with the Assistente); the strategy and the interview read the YTD bundle AND the cashflow block (`lib/utils/cashflowBlock.ts`), the OBBLIGAZIONI block (`lib/utils/allocationAdviceBonds.ts`: the single bonds' maturities, the bond ETFs' duration from the Esposizione's profile cache) and the previous paths (`allocationAdvice/{uid}/history`, the replaced document archived when it has a report, Admin only, the last six; 2026-11-08); the answers and the whole portfolio go to THREE model calls in series — the strategy on Opus 5.5, the instruments on Sonnet 5.5 with web search, the review on Opus 5.5 — persisted after every stage in `allocationAdvice/{uid}` (Admin writes only, `rules: write false`); ONE request per stage (`runAllocationAdviceStage`, `maxDuration = 300`: Vercel Hobby's ceiling, a whole run is about five minutes at effort `medium` (2026-10-23)), chained by the client, a failed stage retried from itself; the report is read as a book of up to ten pages, the model's text split by section onto the page of its tile, the rail its index from `desktop:` (2026-11).
@@ -833,20 +838,8 @@ file used to carry.
 - **A surface with no DOM is verified by RENDERING it** (the PDF through `renderToFile` under Vitest, the emails in
   Chromium at 390 / 600 / 1440), and a render with hand-built data proves the WORDS, not the data path (2026-09-07: run
   `fetchPDFData` itself on the emulators) — doc/guide/email-pdf.md § Verifying a surface with no DOM.
-- **A trial merge of an open PR runs in a worktree, never in the main checkout** (2026-09-07): fetch `refs/pr/<N>`,
-  `git merge --no-commit --no-ff`, `tsc` + area suites + eslint, `git merge --abort`. `node_modules` is a directory
-  junction on Windows (`New-Item -ItemType Junction`; `cmd //c mklink` is refused), a `cp -cR` clone on macOS
-  (Turbopack refuses a symlink out of the root, 2026-10-04); two at a time at most; a conflict is judged on `git
-  merge-tree --write-tree`, never guessed. **Never `git worktree remove --force` a worktree that held a junction or a
-  build** (2026-09-30: it emptied the main `node_modules`): drop the junction, check the path is gone, delete the
-  build, remove the worktree, count `ls node_modules | wc -l`.
-- **An accepted PR merged "with changes" is its diff applied, not its commits** (2026-09-07): `git apply --reject` of
-  `base...head`, the session's fixes on top, one commit with the author as `Co-authored-by`, never the PR's own
-  `CLAUDE.md` and draft hunks. **While a spec series is open** (2026-09-27; `doc/perf/` closed on 2026-10-08,
-  `doc/mobile/` on 2026-10-17) it is crossed with the open specs (a cited line that moves, a count, a baseline, a rule the new code should follow), the
-  specs amended in the same commit; it lands BEFORE a spec that rewrites the same files. Look first for the five defects
-  of that day's three PRs: a sentence or number born in a component, an overflow asserted on `document`, an absence
-  with no positive anchor, a hook running with its feature off, a write that does not invalidate its reader's key.
+- **A contributor's PR is tried in a worktree and merged as its diff applied, never its commits** (2026-09-07; never
+  `git worktree remove --force` a worktree that held a junction, 2026-09-30) — doc/guide/contributi.md.
 - **Run the suite under `TZ=Europe/Rome` too**: every date fixture sits at noon, twelve hours clear of the DST edge,
   while production dates are local midnight and the pure layer runs in the user's browser. Day-of-year from calendar
   fields in UTC (`Date.UTC(y,m,d) - Date.UTC(y,0,0)`), and one fixture built the way the dialog builds one. **A fixture
@@ -893,61 +886,24 @@ file used to carry.
   another app — in `doc/guide/e2e-emulatori.md`.
 
 ### Browser-Driven E2E (Playwright) → `doc/guide/e2e-playwright.md`
-- **What belongs in a browser test**: only what needs a real layout (the `desktop:` switch at 1440px, a collapsible, a
-  state flash, computed sizes, bounding boxes, overflow); the arithmetic stays with Vitest. A query race and an error
-  branch reached by cutting the network are NOT reproducible locally.
-- **`workers: 1`, non-negotiable**, and **each suite its OWN fixture** (an `npm run e2e:seed:*` script plus one
-  `runSeed` in `e2e/global-setup.ts`, the seeds side by side since 2026-11-16). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
-- **The whole run is a production build, an area run `next dev`** (2026-11-16): `npm run test:e2e` builds `.next-e2e-build`
-  when the code changed, refuses a stale one or a server on :3100; a chunk is known by a STRING its module carries
-  (`CHUNK_SIGNATURES`, unique per `__tests__/chunkSignatures.test.ts`), never a name or path a minifier drops.
-- **The FILENAME chooses the account**: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` → `mobile`, `*.degraded.spec.ts` →
-  degraded, `*.degraded.mobile.spec.ts` → `degraded-mobile` (2026-10-14), `*.tablet.spec.ts` → `tablet` (768×1024, two
-  columns and the pill) AND `tablet-landscape` (1024×768, the stage and the icon rail — `expectLandscapeStage`,
-  `expectLandscapeShell`, `expectStickyStage` in `e2e/tabletLayout.ts`) on the base account, branching on
-  `page.viewportSize().width` (2026-10-16; `desktop` ignores `tablet.`), only `analisi.spec.ts` / `centri.spec.ts` / `split.spec.ts` / `hof.spec.ts` reach those fixtures — and each
-  is ALSO excluded from `desktop`/`mobile` by `testIgnore`. A throwaway spec gets its own `playwright.<name>.config.ts`
-  and is deleted before the full suite (2026-08-28).
-- **`localhost`, never `127.0.0.1`** (the page never hydrates and the login submits natively), and `storageState`
-  captures the Firebase session only with `{ path, indexedDB: true }`.
-- **Prove the test can fail before trusting it**, breaking ONE behaviour at a time (2026-09-18). **Assert on Firestore,
-  not on pixels**: plant a decoy word absent from the seed, and remove the fixture BY THE APP, not by `curl -X DELETE`
-  (2026-08-31). On the BASE account FIRE figures depend on the run month: assert STRUCTURE and FORMAT, never amounts.
-- **Proving a refactor changed no number** (doc/guide/e2e-emulatori.md, its own section): measure the noise floor first (two dumps of unchanged code), compare
-  old-vs-new MINUTES apart, and compare the SET of rendered values, not the page text.
-- **In the cloud container** (2026-09-25) the pinned Chromium is missing (a throwaway `playwright.local.config.ts` sets
-  `executablePath`), its own Chromium groups «1.100 €» (four base specs read red there only), and no spec can import
-  `lib/` (no `@/` alias): doc/guide/e2e-playwright.md.
-- Il resto — the page-reading traps (`addInitScript`, `innerText`, `boundingBox`, hidden mobile duplicates, hydration
-  wiping a `fill()`), the vaul drawer after Escape, locators that are not buttons and substring matching (`exact: true`),
-  the euro regex and U+202F, forcing a server flag on the response, the settings reload rule, the armed two-click
-  confirm, the three tour-spec traps, the frozen clock and the empty closed row of a phone spec, Java ≥ 21 and foreign
-  emulators on 8080/9099 — in `doc/guide/e2e-playwright.md`.
+- **What belongs in a browser test**: only what needs a real layout; the arithmetic stays with Vitest. **`workers: 1`**,
+  each suite its OWN fixture (`npm run e2e:seed:*` + one `runSeed` in `e2e/global-setup.ts`).
+- **The whole run is a production build, an area run `next dev`** (2026-11-16); a chunk is known by a STRING its module
+  carries (`CHUNK_SIGNATURES`), never a name a minifier drops.
+- **The FILENAME chooses the project** (`*.mobile`, `*.tablet`, `*.degraded`, `*.degraded.mobile`); **`localhost`, never
+  `127.0.0.1`**; `storageState` with `{ path, indexedDB: true }`.
+- **Prove the test can fail before trusting it; assert on Firestore, not on pixels.**
+- Il resto — the rules in brief (§ In brief, moved here whole on 2026-11-17), the page-reading traps, the vaul drawer,
+  locators and `exact: true`, the euro regex, the cloud container, Java ≥ 21 — in `doc/guide/e2e-playwright.md`.
 
 ### Performance tooling → `doc/guide/velocita.md`
-- **Three tools, one port**: `npm run perf:budget` (JS per route against `perf/budget.json`, two seconds, no server),
-  `perf:bench` (cold / warm / revisit on the `.next-perf` build that `perf:serve` serves on :3200, mirror data) and
-  `perf:census` (React commits and components per keystroke, per tab change, per load, per navigation). Options ALWAYS
-  after `--`, and PowerShell 5.1 eats the `--`: use Git Bash.
-- **A ceiling only a measure may lower, and only a new feature may raise** — `raisedBy` on the route, the before/after
-  and a row in § Registro dei tetti alzati, in the same commit; `libraryCopies: { recharts: 1 }` is a rule, not a
-  measure. TIMES compare only on the same machine in the same session (±10%); COUNTS compare anywhere.
-- **`perf:census` has a scenario for the phone composition** (2026-10-10): `npm run perf:census -- --mobile
-  --scenario=hall-of-fame` taps a closed row four times; a tap re-renders that row, `PageRest` and the page, never
-  another tile nor the verdict — a new `collapse(id)` identity on every render is what it would catch.
-- **The first-screen census shares the port** (2026-10-10; its manual is `doc/guide/prima-schermata.md`, its record —
-  baselines, the fixture table, every widened entry — `doc/guide/prima-schermata-misure.md`): `npm
-  run mobile:census` measures the composition of 19 surfaces × 390/768/1024 on the same :3200 build, re-seeding its own
-  fixture `census@example.com`; `npm run mobile:budget` holds the run against `perf/mobile-budget.json` (zero tolerance,
-  it only tightens, a widening carries `raisedBy: "<date>: …"` and KEEPS every reason the entry carried before — concatenated,
-  never overwritten (2026-10-16: a `--tighten` had replaced twelve); `--tighten` refuses a partial run and a run in which
-  Yahoo answered a profile, 2026-10-10). The fixture refuses to be measured from the 1st to the 4th and on the month's
-  last day; an unknown `--surfaces` key or `--viewports` value exits 1 with the valid ones; a figure whose unit is a
-  `[data-figure-unit]` span counts once (2026-10-10). **A change that moves what a composed page shows on its first
-  screen closes on `mobile:census` + `mobile:budget` green on the fixture** (2026-10-17: the series that measured each page
-  is closed, the budget stays; DESIGN.md → The First-Screen Rule).
-- Il resto — every column, the baseline in force and the historical one of 2026-09-26, the before/after of every speed
-  session, the census scenarios, `--revisit` and what the tables do not say — in `doc/guide/velocita.md`.
+- **Three tools, one port** (:3200): `perf:budget`, `perf:bench`, `perf:census`; options ALWAYS after `--`, in Git Bash.
+- **A ceiling only a measure may lower, and only a new feature may raise** — `raisedBy`, the before/after and a row in
+  § Registro dei tetti alzati, in the same commit.
+- **A change that moves what a composed page shows on its first screen closes on `mobile:census` + `mobile:budget`
+  green on the fixture** (2026-10-17) — doc/guide/prima-schermata.md § In brief.
+- Il resto — the rules in brief (§ In brief, moved here whole on 2026-11-17), every column, the baselines, the census
+  scenarios, `--revisit` — in `doc/guide/velocita.md`.
 
 ---
 

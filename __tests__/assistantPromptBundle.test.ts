@@ -583,6 +583,20 @@ describe('assistant prompt data block', () => {
       expect(content).toContain("Casa: Immobili (senza sottocategoria) | escluso dall'Allocazione | 200.000 € | valore 200.000 € | illiquido");
     });
 
+    // Choice u (2026-11-12): an instrument created empty for a plan reaches the model as «0 quote, mai comprato»,
+    // in the user content only — the system prompt stays one constant for every user.
+    // Seen red with the row count printed in the system.
+    it('prints an instrument never bought as «0 quote, mai comprato», the system unchanged', () => {
+      const base = portfolio();
+      const withRow = { ...base, holdings: [...base.holdings, { assetId: 'a3', name: 'ETF Nuovo', type: 'etf', assetClass: 'equity', role: 'tradable' as const, quantity: 0, currency: 'EUR', valueEur: 0, owner: null, isLiquid: true, neverBought: true as const }] };
+      const content = render(makeBundle({ portfolio: withRow }));
+      expect(content).toContain('ETF Nuovo: Azioni (senza sottocategoria) | negoziabile | 0 quote, mai comprato | valore 0 €');
+      const a = buildMonthAnalysisPrompt(makeBundle({ portfolio: withRow }), '', PREFERENCES);
+      const b = buildMonthAnalysisPrompt(makeBundle({ portfolio: base }), '', PREFERENCES);
+      expect(a.system).toBe(b.system);
+      expect(a.system).toContain('Una riga «0 quote, mai comprato» è uno strumento già creato e mai acquistato: non è posseduto, ma per proporlo usa quel nome.');
+    });
+
     it("should measure the allocation and the targets on the page's base, the fixed cash amount named", () => {
       const content = render(makeBundle({ portfolio: portfolio() }));
       expect(content).toContain("Base: 67.000 € (negoziabile 37.000 €, non negoziabile 30.000 €). Fuori dall'allocazione: 120.000 €.");

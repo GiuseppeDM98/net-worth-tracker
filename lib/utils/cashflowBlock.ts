@@ -36,7 +36,7 @@
 import type { Expense, ExpenseCategory, ExpenseType, RecurrenceFrequency } from '@/types/expenses';
 import { EXPENSE_TYPE_LABELS, NO_SUBCATEGORY_KEY, NO_SUBCATEGORY_LABEL } from '@/types/expenses';
 import type { Asset, AssetAllocationSettings } from '@/types/assets';
-import { isCashAccount, isLoanAsset } from '@/types/assets';
+import { isLoanAsset } from '@/types/assets';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 import {
   getCategoryKey,
@@ -71,7 +71,9 @@ export interface CashflowBlockInput {
   assetValueOf: (asset: Asset) => number;
 }
 
-export interface CashAccountLine { id: string; name: string; balance: number; roles: ('addebito' | 'accredito')[] }
+import type { CashAccountLine } from '@/lib/utils/cashAccountLines';
+import { buildCashAccountLines } from '@/lib/utils/cashAccountLines';
+export { buildCashAccountLines, type CashAccountLine } from '@/lib/utils/cashAccountLines';
 
 export type IncomeReading = 'una fonte dominante' | 'due fonti principali' | 'fonti diversificate' | 'nessuna entrata';
 export interface IncomeSource {
@@ -191,27 +193,6 @@ function compareLabels(a: string, b: string): number {
 }
 
 // ─── Accounts ─────────────────────────────────────────────────────────────────
-
-/**
- * EVERY cash account (`isCashAccount`: a money-market ETF with `assetClass: 'cash'` is an instrument,
- * not an account), a closed one included — the register's account list names it too. The balance is
- * the Patrimonio's (`assetValueOf`), the roles are the two default accounts of the expense form.
- */
-export function buildCashAccountLines(
-  assets: readonly Asset[],
-  settings: Pick<AssetAllocationSettings, 'defaultDebitCashAssetId' | 'defaultCreditCashAssetId'> | null,
-  assetValueOf: (asset: Asset) => number,
-): CashAccountLine[] {
-  return assets
-    .filter(isCashAccount)
-    .map((asset) => {
-      const roles: CashAccountLine['roles'] = [];
-      if (settings?.defaultDebitCashAssetId === asset.id) roles.push('addebito');
-      if (settings?.defaultCreditCashAssetId === asset.id) roles.push('accredito');
-      return { id: asset.id, name: asset.name?.trim() || asset.id, balance: assetValueOf(asset), roles };
-    })
-    .sort((a, b) => b.balance - a.balance || compareLabels(a.name, b.name));
-}
 
 // ─── The builder ──────────────────────────────────────────────────────────────
 

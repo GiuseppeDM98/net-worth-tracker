@@ -19,7 +19,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import { initialAnswers } from '@/lib/utils/allocationAdviceDraft';
-import { buildConsulenteVerdict, buildProposalRows } from '@/lib/utils/allocationAdviceNarrative';
+import { APPLY_ACTIVE_PLAN_NOTE, buildConsulenteVerdict, buildProposalRows } from '@/lib/utils/allocationAdviceNarrative';
 import type { BookPageId } from '@/lib/utils/allocationAdviceBook';
 
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
@@ -27,7 +27,7 @@ vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch: vi.fn() }));
 
 import { ConsulenteBook } from '@/components/allocation/consulente/ConsulenteBook';
 import { useConsulenteRevision } from '@/components/allocation/consulente/useConsulenteRevision';
-import type { ApplyState } from '@/components/allocation/consulente/ConsulenteBookPages';
+import { applyPieces, type ApplyState } from '@/components/allocation/consulente/ConsulenteBookPages';
 
 /** The width: compact (below 1440) or not; one list per query, as framer and useMediaQuery listen to it. */
 let compact = true;
@@ -119,7 +119,7 @@ function Host({ document, initialPage = null, onPage }: { document: AllocationAd
       roles={ROLES}
       goalPlan={null}
       revision={revision}
-      apply={{ document, proposal, rows, roles: ROLES, goalPlan: null, goalsCount: 0, applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {}, applyGoals: true, setApplyGoals: () => {}, applyState }}
+      apply={{ document, proposal, rows, roles: ROLES, goalPlan: null, goalsCount: 0, applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {}, applyGoals: true, setApplyGoals: () => {}, applyState, activePlanNote: null }}
       canApply
       onApply={() => {}}
       pageId={pageId}
@@ -362,5 +362,26 @@ describe('the pages keep their figures and their author', () => {
     expect(sheet.querySelector('button')).toBeNull();
     expect(sheet.querySelector('[data-generated]')).toBeNull();
     expect(sheet.querySelector('textarea')).toBeNull();
+  });
+});
+
+describe('«Applica» with an active accumulation plan (2026-11-12)', () => {
+  const pieces = (activePlanNote: string | null) => {
+    const document = makeDocument();
+    const proposal = document.report?.proposal ?? null;
+    return applyPieces({
+      document, proposal, rows: proposal ? buildProposalRows(proposal, { equity: 60, bonds: 40 }) : [], roles: ROLES, goalPlan: null, goalsCount: 0,
+      applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {},
+      applyGoals: true, setApplyGoals: () => {}, applyState: { phase: 'idle' }, activePlanNote,
+    });
+  };
+
+  // Seen red with the note rendered whatever the input.
+  it('says once that the new targets do not change the plan, only when one is active', () => {
+    const { container, unmount } = render(<>{pieces(APPLY_ACTIVE_PLAN_NOTE).body}</>);
+    expect(container.textContent).toContain('Hai un piano di accumulo attivo: i nuovi target non lo cambiano. Rivedilo in Allocazione › Accumulo.');
+    unmount();
+    const without = render(<>{pieces(null).body}</>);
+    expect(without.container.textContent).not.toContain('piano di accumulo');
   });
 });

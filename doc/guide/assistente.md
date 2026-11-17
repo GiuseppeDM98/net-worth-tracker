@@ -294,7 +294,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   before → after, and the route rewrites that goal in place (`updateInvestmentGoal`, transactional, colour and creation
   date kept, the optional fields REPLACED — a proposal that drops the deadline removes it; 404 when the goal is gone).
   `assignments` names instruments by their EXACT name from the STRUMENTI block with a percent of each; the CARD resolves
-  the names to asset ids (`findAssetByName`, lib/utils/allocationAdviceApply.ts: the exact name, the printed «name
+  the names to asset ids (`findAssetByName`, lib/utils/allocationAdviceApply.ts — the held instruments first, so one at
+  quantity 0 with the same name or ticker never wins, 2026-11-12: the exact name, the printed «name
   (TICKER)» form, or the ticker alone with or without its exchange — the owner's run of 2026-10-20 had the model write
   «… (ABCD)» for «ABCD.MI»; the `displayTicker` alias counts as a ticker, because the block prints it in its place —
   on 2026-10-23 ETCs ticked «ISIN.SG» reached the model by their alias and their quotas were lost) and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,

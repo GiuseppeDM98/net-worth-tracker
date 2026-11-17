@@ -8,7 +8,7 @@
  * missing input drops its clause instead of printing a placeholder (The Narrative Honesty Rule).
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 vi.mock('@/lib/firebase/config', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
@@ -28,6 +28,7 @@ import {
   describeClasses,
   describeExcluded,
   describeExposure,
+  describePacOverlap,
   describeExposureBase,
   describeExposureCoverage,
   describeExposureEmpty,
@@ -123,6 +124,12 @@ describe('buildAllocazioneVerdict', () => {
     expect(plain(verdict.sentence)).toBe(
       'Le azioni pesano 3,3 pp più del target e le obbligazioni 3,3 pp meno. Con 1000 € in più compreresti 940 € di obbligazioni e 60 € di liquidità.',
     );
+  });
+
+  // The verdict never changes with an accumulation plan (decision 24): the input has no field for one.
+  // Seen red with a `pac?: PacVerdictInput` field put back on AllocazioneVerdictInput.
+  it('takes no accumulation plan', () => {
+    expectTypeOf<AllocazioneVerdictInput>().not.toHaveProperty('pac');
   });
 
   it('articulates the preposition on the score, vowel-initial numbers included', () => {
@@ -932,5 +939,26 @@ describe('describeAllocazioneClosedAnswers', () => {
     expect(answerText(describeAllocazioneClosedAnswers({ ...input, pension: mixed })[ALLOCAZIONE_SECTION_IDS.previdenza])).toBe('Obbligazioni 70%');
     expect(describeAllocazioneClosedAnswers({ ...input, pension: { ...pension, fundSlices: [] } })[ALLOCAZIONE_SECTION_IDS.previdenza]).toBeNull();
     expect(describeAllocazioneClosedAnswers({ ...input, pension: null })[ALLOCAZIONE_SECTION_IDS.previdenza]).toBeNull();
+  });
+});
+
+// The line above the Piano's moves while an accumulation plan is active.
+describe('describePacOverlap', () => {
+  const pac = { monthTotalEur: 2500, instrumentCount: 5, monthLabel: 'ottobre', allClosed: false };
+
+  it('says what the plan buys this month and that this plan does not count it', () => {
+    expect(plain(describePacOverlap(pac))).toBe('Il piano di accumulo compra questo mese 2500 € in 5 strumenti; questo piano non ne tiene conto.');
+    expect(plain(describePacOverlap({ ...pac, instrumentCount: 1 }))).toBe('Il piano di accumulo compra questo mese 2500 € in 1 strumento; questo piano non ne tiene conto.');
+  });
+
+  it('names the instrument the plan buys in place of one this Piano proposes', () => {
+    expect(plain(describePacOverlap(pac, [{ replaced: 'ETF-B', buying: 'ETF-A' }]))).toBe(
+      'Il piano di accumulo compra questo mese 2500 € in 5 strumenti; questo piano non ne tiene conto. Il piano di accumulo compra ETF-A al posto di ETF-B.',
+    );
+    expect(plain(describePacOverlap(pac, [{ replaced: 'ETF-B', buying: 'ETF-A' }, { replaced: 'AAA', buying: 'BBB' }]))).toContain('compra ETF-A al posto di ETF-B e BBB al posto di AAA.');
+  });
+
+  it('still says it when the month\'s installment is closed', () => {
+    expect(plain(describePacOverlap({ ...pac, allClosed: true }))).toBe('La rata di ottobre del piano di accumulo è chiusa, ma questo piano non ne tiene conto.');
   });
 });

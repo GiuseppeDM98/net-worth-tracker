@@ -286,6 +286,8 @@ export default function AssetsPage() {
   // invalidates this cache (doc/guide/registro-operazioni.md § Asset Trade Ledger).
   const tradesQuery = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
   const { data: trades = [], isLoading: loadingTrades, isError: tradesError } = tradesQuery;
+  // The assets the ledger names: STRUMENTI's «Mai comprato» chip reads it, «Azzerato» while unread.
+  const tradedAssetIds = useMemo(() => (tradesQuery.data ? new Set(tradesQuery.data.map((t) => t.assetId)) : null), [tradesQuery.data]);
   // A failed read of the ledger (or of its meta) is not «nessuna operazione»: Movimenti says so at
   // every width (2026-10-14) — until then the tile printed the month as empty.
   const movimentiFailed = ledgerMetaError || tradesError;
@@ -917,6 +919,7 @@ export default function AssetsPage() {
               onCalculateTaxes={setTaxAsset}
               members={familyMembers}
               allAssets={assets}
+              tradedAssetIds={tradedAssetIds}
             />
           </motion.div>
           </div>
