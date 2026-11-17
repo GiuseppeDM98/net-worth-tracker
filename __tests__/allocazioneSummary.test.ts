@@ -870,42 +870,42 @@ describe('listPlanBuyAssetIds / findPacSubstitutions', () => {
     isInstrument: true,
   });
   const klass = (key: string, children: PlanNode[]): PlanNode => ({ ...instrument(key), isInstrument: false, children });
-  const holdings = [holding({ id: 'dbmfe', assetId: 'dbmfe' }), holding({ id: 'ntsg-0', assetId: 'ntsg' })];
+  const holdings = [holding({ id: 'etf-c', assetId: 'etf-c' }), holding({ id: 'etf-e-0', assetId: 'etf-e' })];
   const positions = [
-    { id: 'p1', label: 'Managed futures', targetPercentage: 18, memberAssetIds: ['dbmfe', 'mfeh'], buyAssetId: 'mfeh' },
-    { id: 'p2', label: 'Mondo', targetPercentage: 82, memberAssetIds: ['vwce'], buyAssetId: 'vwce' },
+    { id: 'p1', label: 'Managed futures', targetPercentage: 20, memberAssetIds: ['etf-c', 'etf-d'], buyAssetId: 'etf-d' },
+    { id: 'p2', label: 'Mondo', targetPercentage: 80, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' },
   ];
 
   it('reads the instruments Versa buys, through classes, and maps a sleeve back to its asset', () => {
-    const view = { mode: 'contribute', amount: 200, nodes: [klass('trendFollowing', [instrument('dbmfe')]), klass('equity', [instrument('ntsg-0')])], trades: null, overTarget: [] } as never;
-    expect(listPlanBuyAssetIds(view, holdings).sort()).toEqual(['dbmfe', 'ntsg']);
+    const view = { mode: 'contribute', amount: 200, nodes: [klass('trendFollowing', [instrument('etf-c')]), klass('equity', [instrument('etf-e-0')])], trades: null, overTarget: [] } as never;
+    expect(listPlanBuyAssetIds(view, holdings).sort()).toEqual(['etf-c', 'etf-e']);
   });
 
   it('reads only the COMPRA legs of a rebalance, and nothing from a withdrawal', () => {
     const rebalance = {
       mode: 'rebalance',
       moves: [
-        { assetClass: 'trendFollowing', action: 'COMPRA', children: [instrument('dbmfe')] },
-        { assetClass: 'equity', action: 'VENDI', children: [instrument('ntsg-0')] },
+        { assetClass: 'trendFollowing', action: 'COMPRA', children: [instrument('etf-c')] },
+        { assetClass: 'equity', action: 'VENDI', children: [instrument('etf-e-0')] },
       ],
       trades: null,
       resultingLeverageRatio: null,
     } as never;
-    expect(listPlanBuyAssetIds(rebalance, holdings)).toEqual(['dbmfe']);
-    expect(listPlanBuyAssetIds({ mode: 'withdraw', nodes: [klass('equity', [instrument('ntsg-0')])], trades: null } as never, holdings)).toEqual([]);
+    expect(listPlanBuyAssetIds(rebalance, holdings)).toEqual(['etf-c']);
+    expect(listPlanBuyAssetIds({ mode: 'withdraw', nodes: [klass('equity', [instrument('etf-e-0')])], trades: null } as never, holdings)).toEqual([]);
   });
 
   it('uses the leverage engine\'s positive trades when it ran', () => {
-    const view = { mode: 'contribute', amount: 100, nodes: [], trades: [{ assetId: 'dbmfe', ticker: 'DBMFE', name: 'x', amount: 50 }, { assetId: 'vwce', ticker: 'VWCE', name: 'y', amount: 0 }], overTarget: [] } as never;
-    expect(listPlanBuyAssetIds(view, holdings)).toEqual(['dbmfe']);
+    const view = { mode: 'contribute', amount: 100, nodes: [], trades: [{ assetId: 'etf-c', ticker: 'ETF-C', name: 'x', amount: 50 }, { assetId: 'etf-a', ticker: 'ETF-A', name: 'y', amount: 0 }], overTarget: [] } as never;
+    expect(listPlanBuyAssetIds(view, holdings)).toEqual(['etf-c']);
   });
 
   it('flags a group member that the Piano buys although the plan buys another one', () => {
-    expect(findPacSubstitutions(positions, ['dbmfe'])).toEqual([{ replacedAssetId: 'dbmfe', buyAssetId: 'mfeh' }]);
+    expect(findPacSubstitutions(positions, ['etf-c'])).toEqual([{ replacedAssetId: 'etf-c', buyAssetId: 'etf-d' }]);
   });
 
   it('says nothing when the Piano buys the plan\'s own buyer, a single instrument or nothing', () => {
-    expect(findPacSubstitutions(positions, ['mfeh', 'vwce'])).toEqual([]);
+    expect(findPacSubstitutions(positions, ['etf-d', 'etf-a'])).toEqual([]);
     expect(findPacSubstitutions(positions, [])).toEqual([]);
   });
 });

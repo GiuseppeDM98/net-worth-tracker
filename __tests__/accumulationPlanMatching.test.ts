@@ -12,7 +12,7 @@ function makeTransaction(overrides: Partial<AssetTransaction> = {}): AssetTransa
   return {
     id: `tx${seq}`,
     userId: 'u1',
-    assetId: 'vwce',
+    assetId: 'etf-a',
     type: 'buy',
     date: new Date('2026-10-05T10:00:00Z'),
     quantity: 5,
@@ -31,7 +31,7 @@ function makeInstallment(overrides: Partial<Installment> = {}): Installment {
     lines: [
       {
         positionId: 'p1',
-        assetId: 'vwce',
+        assetId: 'etf-a',
         plannedQuantity: 5,
         priceEurAtPlan: 100,
         plannedAmountEur: 500,
@@ -52,7 +52,7 @@ function makePlan(overrides: Partial<AccumulationPlan> = {}): AccumulationPlan {
     startMonth: '2026-10',
     months: 6,
     liquidity: { sourceCashAssetIds: ['cash1'], reserveEur: 0, monthlyInflowEur: 0 },
-    positions: [{ id: 'p1', label: 'VWCE', targetPercentage: 100, memberAssetIds: ['vwce'], buyAssetId: 'vwce' }],
+    positions: [{ id: 'p1', label: 'ETF-A', targetPercentage: 100, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' }],
     disposals: [],
     installments: [makeInstallment()],
     activatedAt: new Date('2026-10-01T00:00:00Z'),
@@ -110,7 +110,7 @@ describe('matchPlanExecutions — installment lines', () => {
           lines: [
             {
               positionId: 'p1',
-              assetId: 'vwce',
+              assetId: 'etf-a',
               plannedQuantity: 5,
               priceEurAtPlan: 100,
               plannedAmountEur: 500,
@@ -134,7 +134,7 @@ describe('matchPlanExecutions — installment lines', () => {
           lines: [
             {
               positionId: 'p1',
-              assetId: 'vwce',
+              assetId: 'etf-a',
               plannedQuantity: 5,
               priceEurAtPlan: 100,
               plannedAmountEur: 500,
@@ -159,7 +159,7 @@ describe('matchPlanExecutions — installment lines', () => {
           lines: [
             {
               positionId: 'p1',
-              assetId: 'vwce',
+              assetId: 'etf-a',
               plannedQuantity: 5,
               priceEurAtPlan: 100,
               plannedAmountEur: 500,
@@ -183,7 +183,7 @@ describe('matchPlanExecutions — installment lines', () => {
           lines: [
             {
               positionId: 'p1',
-              assetId: 'vwce',
+              assetId: 'etf-a',
               plannedQuantity: 5,
               priceEurAtPlan: 100,
               plannedAmountEur: 500,
@@ -219,7 +219,7 @@ describe('matchPlanExecutions — installment lines', () => {
           lines: [
             {
               positionId: 'p1',
-              assetId: 'vwce',
+              assetId: 'etf-a',
               plannedQuantity: 5,
               priceEurAtPlan: 100,
               plannedAmountEur: 500,
@@ -259,7 +259,7 @@ describe('matchPlanExecutions — installment lines', () => {
 
   it('a buy for a different asset or a different month is never a candidate', () => {
     const plan = makePlan();
-    const wrongAsset = makeTransaction({ assetId: 'swda', linkedCashAssetId: 'cash1' });
+    const wrongAsset = makeTransaction({ assetId: 'etf-b', linkedCashAssetId: 'cash1' });
     const wrongMonth = makeTransaction({ date: new Date('2026-11-05T10:00:00Z'), linkedCashAssetId: 'cash1' });
     const { matches, lineStates } = matchPlanExecutions(plan, [wrongAsset, wrongMonth], TODAY_IN_OCTOBER);
     expect(matches).toHaveLength(0);

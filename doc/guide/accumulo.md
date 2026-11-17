@@ -11,7 +11,8 @@ weight, month by month, proposes the purchases and never writes a transaction on
   reactivate — so two concurrent creations leave one plan (2026-11-12; a client transaction cannot query, hence the
   lock document). A lock naming a plan that no longer exists reads as free: the plans' read rule allows a missing
   document (`resource == null`). Both rules are in `firestore.rules` and **must be published by hand** (`npx firebase
-  deploy --only firestore:rules`); until then the tab cannot read the collection.
+  deploy --only firestore:rules`); until then the tab cannot read the collection. Published by the owner before
+  2026-11-17, ahead of any deploy (additive: two new collections); no migration, no plan existed in production.
 - **A plan is a list of positions** (a label, a target weight, the member instruments and the one that BUYS,
   `buyAssetId`). Weights sum to 100. «Parti da» seeds them from today's tradable portfolio or from typed targets.
 - **The engine is pure** (`lib/utils/accumulationPlanUtils.ts`): `scheduleInstallments` lays the months, `matchPlanExecutions`
@@ -39,7 +40,7 @@ weight, month by month, proposes the purchases and never writes a transaction on
 - **«Rivedi il piano»** rewrites the months from the first intact one; closed installments keep their lines
   (`buildRevisedPlan`). **«Riattiva»** reopens a plan interrupted under 30 days ago while none is open.
 - **With an active plan the Bilanciamento verdict does not change**; the Piano opens with one note and «Apri Accumulo»
-  (`describePacOverlap`, `findPacSubstitutions`; owner, 2026-11-12, decision 24).
+  (`describePacOverlap`, `findPacSubstitutions`; owner, 2026-11-12).
 - **A plan not started yet** (its first month after today) is the verdict state `scheduled` («Il piano parte a …:
   prima rata di X € in n acquisti[, a <the first month that buys>].»), with no strip, and the Piano shows no note (`summarizePacMonth` is null before
   month 1, `lib/utils/accumuloMonth.ts`).
@@ -50,7 +51,7 @@ weight, month by month, proposes the purchases and never writes a transaction on
   the engine rounds what it records and keeps the month-to-month carry exact, so the plan's total is kept to the cent.
 - **The suggested instalment is the median of the monthly savings** over the last full months (3 to 12, the
   cashflow block's `volatility.savings.median`, `useMonthlySavingsMedian`), floored to the ten; none under three
-  months or on a failed read (decision 30). The expenses are FIRE's `recent` window, read only while the editor's
+  months or on a failed read (owner, 2026-11-12: the median, never annual savings / 12). The expenses are FIRE's `recent` window, read only while the editor's
   first step or the empty tile is on screen.
 - **The review date**: when the plan would end after the Consulente's «rivedi entro», «Questo mese» and the editor's
   preview say so in one note (`planEndsAfterReview`, `describePlanPastReview`).
@@ -76,10 +77,22 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
 
 `types/accumulationPlan.ts` · `lib/utils/{accumulationPlanUtils,accumulationPlanMatching,accumulationPlanSchema,accumulationNarrative,accumuloSummary,zeroQuantityChip}.ts` · the slim read path `lib/utils/{openAccumulationPlan,planMonths,accumulationPlanDoc,accumuloMonth}.ts`, `lib/services/accumulationPlanRead.ts`, `lib/hooks/{useAccumulationPlans,usePacMonth}.ts` · `lib/services/accumulationPlanService.ts` (the transactions and the lock) · `lib/hooks/{useAccumulationPlan,useOpenAccumuloPlan,useMonthlySavingsMedian}.ts` · `components/allocation/{AccumuloTab,AccumuloTabSkeleton,AccumulationPlanDialog,AccumulationCalendarDialog,ClassDriftChart,PlanDraftSidePanel}.tsx` · `components/allocation/tiles/{QuestoMese,ClassiDelPiano,AccumuloVuoto,PianiConclusi}Tile.tsx` · tests `__tests__/accumul*.test.ts`, `e2e/accumulo.{mobile,tablet}.spec.ts` (fixture `e2e/accumuloFixture.ts`).
 
+- **Suites to run after a change here — Accumulo** (2026-11-17): `accumulationPlanUtils`, `accumulationPlanMatching`,
+  `accumulationPlanSchema`, `accumulationPlanDoc`, `accumulationPlanService`, `accumulationPlanRevision`,
+  `accumulationPlanReviewFlow`, `accumulationClassTrajectory`, `accumulationNarrative`, `accumulationReactivate`,
+  `accumuloMonth`, `accumuloSummary`, `accumuloTileSentences`, `zeroQuantityChip`, `allocazioneNarrative`,
+  `allocazioneSummary`, `mirrorCollections`, `persistCache` · **dom** `accumuloVuotoTile`, `planDraftSidePanel`,
+  `assetDialogCreateEmpty`, `strumentiTile`, `consulenteBook` · **AI context** `assistantPortfolioContext`,
+  `assistantPromptBundle`, `allocationAdviceApply`, `allocationAdvicePrompts` · **Browser** `e2e/accumulo.{mobile,tablet}.spec.ts`,
+  `e2e/allocation.spec.ts` (the tab, the Piano's note), `e2e/bundle.lazy.mobile.spec.ts` (the lazy landing).
+
 ## Per-page blind spots
 
 - **Query key**: every write (create, revise, interrupt, reactivate, confirm) invalidates `queryKeys.accumulationPlans.all`,
   the one key the tab and the Piano's note both read.
 - **«Parti da» has no portfolio-model source**: today's tradable weights or typed targets only.
+- **No tab bar without a Piano**: with no assets, a failed read or no Piano (the page's `loadFailed` and `!hasAssets`
+  branches) the page draws no `PageTabs`, so `?tab=accumulo` lands on Bilanciamento's state there — declared on
+  2026-11-12, not a bug. The loading branch draws the bar.
 - **«Mai comprato»** (`describeZeroQuantityChip`) needs `Asset.createdEmpty`, written only by «+ Nuovo asset»: an asset created at 0 before 2026-11-12, or a position sold before the ledger migration, reads «Azzerato».
 - **The census fixture plants a plan and its lock** (`scripts/seedCensusE2E.mts`); the `allocazione-accumulo` entry of `perf/mobile-budget.json` is measured on this machine (doc/guide/prima-schermata-misure.md).

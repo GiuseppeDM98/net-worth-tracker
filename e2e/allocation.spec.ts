@@ -331,7 +331,7 @@ test('la scheda Bilanciamento resta quella di prima: il tab è nell\'URL e Accum
 });
 
 /**
- * Con un piano di accumulo il verdetto del Bilanciamento non cambia (decisione 24): il Piano ha UNA
+ * Con un piano di accumulo il verdetto del Bilanciamento non cambia (proprietario, 2026-11-12): il Piano ha UNA
  * nota con «Apri Accumulo». Il piano del fixture (`e2e/accumuloFixture.ts`) esiste solo dentro questi
  * test, rimosso dopo ciascuno. Visti rossi: E4 con la clausola del piano rimessa nel verdetto; E5 con
  * la guardia del mese non ancora iniziato tolta da `summarizePacMonth`.

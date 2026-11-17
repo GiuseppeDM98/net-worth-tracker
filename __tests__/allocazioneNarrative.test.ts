@@ -126,7 +126,7 @@ describe('buildAllocazioneVerdict', () => {
     );
   });
 
-  // The verdict never changes with an accumulation plan (decision 24): the input has no field for one.
+  // The verdict never changes with an accumulation plan (owner, 2026-11-12): the input has no field for one.
   // Seen red with a `pac?: PacVerdictInput` field put back on AllocazioneVerdictInput.
   it('takes no accumulation plan', () => {
     expectTypeOf<AllocazioneVerdictInput>().not.toHaveProperty('pac');
