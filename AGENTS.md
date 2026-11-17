@@ -23,7 +23,7 @@ Companion documents — do not duplicate their content into this file:
 UI patterns, testing, workflow. **A rule about one area's behaviour lives in `doc/guide/<tema>.md`**, one file per
 page, tab, integration or subsystem, read only by whoever touches that area: the pages (`panoramica`, `patrimonio`,
 `cashflow*`, `rendimenti`, …), the cross-cutting subsystems since 2026-09-06 (`stati`, `dialog`, `temi`,
-`account-condiviso-demo`, Settings inside `impostazioni`), the test harness since 2026-09-20 (`e2e-emulatori`; its Playwright half since 2026-11-11, `e2e-playwright`), the
+`account-condiviso-demo`, Settings inside `impostazioni`), the test harness since 2026-09-20 (`e2e-emulatori`; its Playwright half since 2026-11-11, `e2e-playwright`, and the whole run since 2026-11-17, `e2e-suite`), the
 shell and the persisted cache since 2026-09-30 (`shell`, `cache-persistita`), the first-screen census since 2026-10-10
 (`prima-schermata`; its record — baselines, fixture table, widened entries — since 2026-10-17, `prima-schermata-misure`), and since 2026-10-10 the charts (`grafici`) and the server layer (`server`), which left this file
 whole, the two-step dialogs and the form reset joining `dialog` the same day, the Assistente's Registra mode out of
@@ -894,7 +894,8 @@ file used to carry.
   `127.0.0.1`**; `storageState` with `{ path, indexedDB: true }`.
 - **Prove the test can fail before trusting it; assert on Firestore, not on pixels.**
 - Il resto — the rules in brief (§ In brief, moved here whole on 2026-11-17), the page-reading traps, the vaul drawer,
-  locators and `exact: true`, the euro regex, the cloud container, Java ≥ 21 — in `doc/guide/e2e-playwright.md`.
+  locators and `exact: true`, the euro regex, the cloud container, Java ≥ 21 — in `doc/guide/e2e-playwright.md`; the whole
+  run, its known flakes and its speed in `doc/guide/e2e-suite.md` (2026-11-17).
 
 ### Performance tooling → `doc/guide/velocita.md`
 - **Three tools, one port** (:3200): `perf:budget`, `perf:bench`, `perf:census`; options ALWAYS after `--`, in Git Bash.

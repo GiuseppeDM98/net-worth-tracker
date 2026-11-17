@@ -340,7 +340,7 @@ The app **is** locally runnable; there is no fallback to declare.
 - **Automated suites are yours to run, always**: `npx tsc --noEmit`, `TZ=Europe/Rome npx vitest run`
   and `npx playwright test`. **Playwright runs in two levels** (2026-11-13, decided by the agent on the owner's
   delegation after that day's measures: a whole run 18,2 min, an area 1–4 min; 11,8 min on the production build since
-  2026-11-16 — doc/guide/e2e-playwright.md § The suite's speed): while working, the specs of the area touched, in every project that collects them (each guide's
+  2026-11-16 — doc/guide/e2e-suite.md § The suite's speed): while working, the specs of the area touched, in every project that collects them (each guide's
   § *Files* lists them); the WHOLE suite once, with the work finished, before the commit is asked for — and again if
   code changes after it. A change with no area (`components/ui`, `lib/hooks`, shared `lib/utils`, the shell,
   `app/globals.css`, a seed, `playwright.config.ts`, a dependency) runs the whole suite at once. § 2's obligation

@@ -1,6 +1,6 @@
 /**
  * e2e:build — the production build the WHOLE Playwright run is served from (`npm run test:e2e`,
- * since 2026-11-16; the area runs stay on `next dev`: doc/guide/e2e-playwright.md § The suite's speed).
+ * since 2026-11-16; the area runs stay on `next dev`: doc/guide/e2e-suite.md § The suite's speed).
  *
  * Built only when the code changed since the last one: the build in `.next-e2e-build` carries the
  * fingerprint of the sources it was built from (`buildFingerprint.mjs`), and an equal fingerprint

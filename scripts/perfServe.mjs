@@ -2,7 +2,7 @@
  * perf:serve — serve a production build (standalone) against the local emulators. By default the
  * `npm run perf:build` output on :3200, for `npm run perf:bench` and the census (the manual:
  * doc/guide/velocita.md); since 2026-11-16 also the `e2e:build` output on :3100, the whole Playwright
- * run's server (`playwright.config.ts`, doc/guide/e2e-playwright.md § The suite's speed):
+ * run's server (`playwright.config.ts`, doc/guide/e2e-suite.md § The suite's speed):
  *
  *   node scripts/perfServe.mjs [--port=3200] [--dist=.next-perf] [--env-local] [--fresh]
  *

@@ -343,7 +343,7 @@ RUNTIME si corregge solo su mia decisione — tutti i trovati in UNA domanda a s
 multipla —, con la suite d'area e `npm run test:e2e` INTERO (Java ≥ 21, emulatori
 accesi, :3100 libera o tenuta dal `dev:e2e` di questo repo, `workers: 1`; la rotta del
 modello sempre finta, mai una spesa; emulatori e server avviati staccati su Windows,
-WORKFLOW.md § 3; un rosso fra i flake noti di doc/guide/e2e-playwright.md si ripete da
+WORKFLOW.md § 3; un rosso fra i flake noti di doc/guide/e2e-suite.md si ripete da
 solo con `--repeat-each=3`, un secondo rosso dello stesso test ferma), e si scrive in
 CLAUDE.md § Latest che i segnali vanno rifatti dopo il deploy. Mai `npm audit fix`, mai
 un aggiornamento di dipendenze nel ritiro (indice § 10); l'audit di inizio sessione si

@@ -79,7 +79,7 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     // Kept (2026-11-16): switched off, two whole runs gained nothing past the run-to-run noise
-    // (doc/guide/e2e-playwright.md § The suite's speed), and a red that only a whole run produces
+    // (doc/guide/e2e-suite.md § The suite's speed), and a red that only a whole run produces
     // would leave no trace to read. `--trace=off` on the command line still turns it off for one run.
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -259,7 +259,7 @@ export default defineConfig({
     },
   ],
 
-  // Two servers on the one port (2026-11-16, doc/guide/e2e-playwright.md § The suite's speed):
+  // Two servers on the one port (2026-11-16, doc/guide/e2e-suite.md § The suite's speed):
   // `npm run test:e2e`, the WHOLE run, builds first (`e2e:build`, skipped when the code has not
   // changed) and serves that production build — about a third faster, and no route compiled on its
   // first visit; `npx playwright test e2e/<area>` keeps `next dev`, which a code change needs no build for.

@@ -481,7 +481,7 @@ Cashflow and a dialog look the same as before in each of the six themes and both
 theme's real colours; nothing on the landing carries `data-costume` or `data-costume-scope`.
 
 - **A**: `tsc`, lint, Vitest (three zones), E1 in compare mode, and the full `npm run test:e2e` once after 4.1 and
-  once at the end (known flakes: doc/guide/e2e-playwright.md) — the font moves every page's text metrics; a spec
+  once at the end (known flakes: doc/guide/e2e-suite.md) — the font moves every page's text metrics; a spec
   turned red by the font is a stop-and-ask; a `mobile:budget` entry moved by the font is re-recorded (§ 8). A Vitest or Playwright test that
   queried an eyebrow or a headline holding a digit by its exact text node moves to `getByRole('heading', { name })`.
 - **B**: emulators + seed; the baseline recorded right after 4.1 (`THEME_NEUTRAL_RECORD=1`), committed.

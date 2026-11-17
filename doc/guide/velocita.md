@@ -126,7 +126,7 @@ leggendo, e da Git Bash i due comandi ricevono le opzioni. `--email=`
 `/dashboard/`, o il nome della pagina), `--warm-only`, `--cold-only`, `--mobile` (390×844 e CPU 4×), `--cpu=N`,
 `--revisit` (il secondo caricamento della route dopo una prima visita: la cache persistita, § Revisit). La porta è :3200 perché :3000 è
 il server del giro e :3100 quello di Playwright (che dal 2026-11-16 usa lo stesso script sulla sua build, `--port=3100
---dist=.next-e2e-build`: doc/guide/e2e-playwright.md § The suite's speed; senza opzioni `perf:serve` resta :3200 e
+--dist=.next-e2e-build`: doc/guide/e2e-suite.md § The suite's speed; senza opzioni `perf:serve` resta :3200 e
 `.next-perf`). `perf:serve` cerca `server.js` sotto `.next-perf/standalone/`, perché
 Next ci ricopia il percorso del progetto: su un checkout Windows sta in `Documents/GitHub/net-worth-tracker/`. Un `perf:serve`
 rimasto vivo tiene quella cartella e fa fallire il `perf:build` successivo con `EBUSY: rmdir …/standalone` (2026-10-12):

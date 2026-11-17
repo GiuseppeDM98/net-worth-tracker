@@ -1,7 +1,7 @@
 /**
  * What a production build was built FROM, as one hash — so a server never runs a build older than
  * the code beside it in silence (2026-11-16, the whole Playwright run on a production server:
- * doc/guide/e2e-playwright.md § The suite's speed).
+ * doc/guide/e2e-suite.md § The suite's speed).
  *
  * The hash covers the CONTENT of every file git would see — tracked and untracked, the ignored ones
  * left out, as Tailwind's own scan does — plus `.env.local`, which `next build` reads and bakes into
