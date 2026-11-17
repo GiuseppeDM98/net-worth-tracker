@@ -14,7 +14,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AssistantMessage, AssistantRouteReading, AssistantStreamEvent, AssistantThreadDetail } from '@/types/assistant';
@@ -420,6 +420,36 @@ describe('the Assistente page — the tile’s aside and «cambia»', () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Interrompi risposta' })));
     // The answer before stays: history is never rewritten.
     expect(screen.getByText('Fatto.')).not.toBeNull();
+  });
+
+  // The chooser's focus (2026-11-16, read against the code when the chat's spec was retired):
+  // on open the checked radio of «Cosa mi chiedi» (the dialog's own autofocus, the first tabbable
+  // in it); Esc and «Annulla» bring it back to the «cambia» that opened it, through the page's
+  // `changeOpenerRef`. «cambia» is pressed with `fireEvent.click`, which focuses nothing — Safari's
+  // click (CLAUDE.md § Known Issues): with `userEvent` the modal's own restore of the element
+  // focused at open passes the test without the ref. Seen RED with `returnFocusTo` dropped from
+  // `AssistantRouteChooser`: the focus went back to the composer, not to «cambia».
+  it('«cambia» opens on the chosen reading, and Esc or «Annulla» returns the focus to «cambia»', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const first = queueStream();
+    await send(user, 'ho fatto benzina 40');
+    await answer(first, FREE);
+    const change = await screen.findByRole('button', { name: 'Cambia come ho letto la domanda' });
+
+    fireEvent.click(change);
+    let dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole('radio', { name: /^Una domanda/ })));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(change));
+
+    fireEvent.click(change);
+    dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Annulla' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(change));
+    expect(streamCalls()).toHaveLength(1);
   });
 });
 

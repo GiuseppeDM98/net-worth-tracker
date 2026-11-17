@@ -3,7 +3,7 @@
 > The index of the series: the owner's points, the decisions, the order, the shared contracts and the rules every
 > spec obeys. Written on 2026-11-12 on `develop` @ b841cbd7 by the planning session; **read adversarially, all
 > the specs together, on 2026-11-12** (decisions 33–63 in § 3); a spec in service is retired with
-> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524), NOVE-03 (2026-11-14, PR #526), NOVE-04 (2026-11-14, PR #528), NOVE-05 (2026-11-14, PR #530), NOVE-06 (2026-11-14, PR #532), NOVE-07 (2026-11-15, PR #534) NOVE-08 (2026-11-15, PR #536), NOVE-09 (2026-11-15, PR #538) NOVE-10 (2026-11-16, PR #540) and NOVE-14 (2026-11-16, PR #542); the next is NOVE-15. One spec = one
+> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524), NOVE-03 (2026-11-14, PR #526), NOVE-04 (2026-11-14, PR #528), NOVE-05 (2026-11-14, PR #530), NOVE-06 (2026-11-14, PR #532), NOVE-07 (2026-11-15, PR #534) NOVE-08 (2026-11-15, PR #536), NOVE-09 (2026-11-15, PR #538) NOVE-10 (2026-11-16, PR #540), NOVE-14 (2026-11-16, PR #542) and NOVE-15 (2026-11-16, PR #544); the next is NOVE-16. One spec = one
 > implementation session = one branch. A spec's NUMBER is its identity; the ORDER is § 5.
 
 ## 1. The owner's points (their words, 2026-11-12)
@@ -76,12 +76,12 @@
     on the minor tiles' tour of 2026-11-15 —, Centro di costo fixed/one-off — and «Per sottocategoria», the same tour —,
     Dividendi first payer). → NOVE-08 (retired on 2026-11-15, PR #536), NOVE-09 (retired on 2026-11-15, PR #538)
 11. Assistente: a router (Haiku 5.5: intent, period, web search) in front of today's pipeline; a line «Ho letto: … ·
-    cambia» under the answer. → NOVE-14 (retired on 2026-11-16, PR #542), 15
-12. Assistente: instead of the Mese / Anno / YTD / Storico selector, written suggestions on an empty chat. → NOVE-15
+    cambia» under the answer. → NOVE-14 (retired on 2026-11-16, PR #542), NOVE-15 (retired on 2026-11-16, PR #544)
+12. Assistente: instead of the Mese / Anno / YTD / Storico selector, written suggestions on an empty chat. → NOVE-15 (retired on 2026-11-16, PR #544)
 13. Ledger: the migration in a transaction AND the other writes with the same defect. → NOVE-03 (retired on 2026-11-14, PR #526)
 14. Orbita: the resource bar only on desktop (≥ 1440) and only on Panoramica. → NOVE-13
 15. Assistente, header: in sight only «Nuova conversazione» and a «⋯» menu (Conversazioni, Memoria, Preferenze); the
-    «Registra» button disappears, the router recognises a written expense. → NOVE-15
+    «Registra» button disappears, the router recognises a written expense. → NOVE-15 (retired on 2026-11-16, PR #544)
 16. DESIGN.md: the amendments (themes beyond palette and radius; the pie rule) live in the specs as before / after
     sentences, applied to the letter and approved in the implementation's diff. → NOVE-08 (retired on 2026-11-15, PR #536), 11
 17. The themes' costume: everywhere in the dashboard and its dialogs; never outside (emails, PDF, landing, access).
@@ -115,7 +115,7 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 35. One spec = one session = one commit, also for the largest: 16, 17 and 20 are «one long session, ~8 h», resumed
     on the same branch without committing when the context runs out. → NOVE-16, 17, 20
 36. The old words «Fisse / Variabili» outside Analisi: NOVE-10 renames the three UI and email sites through
-    `SPENDING_TYPE_LABELS`, NOVE-15 the Assistente's system prompt. → NOVE-10 (retired on 2026-11-16, PR #540), 15
+    `SPENDING_TYPE_LABELS`, NOVE-15 the Assistente's system prompt. → NOVE-10 (retired on 2026-11-16, PR #540), NOVE-15 (retired on 2026-11-16, PR #544)
 37. The old product name on surfaces outside the repo (the Firebase project's public name, the OAuth consent
     screen, the sender in Vercel's env): out of scope, declared. → NOVE-01 (retired on 2026-11-13, PR #522)
 38. The page's meta description stays as it is. → NOVE-01 (retired on 2026-11-13, PR #522)
@@ -139,9 +139,9 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 50. A «senza sottocategoria» row opens the CATEGORY's Scheda; two categories with one name are qualified in the
     caption. → NOVE-10 (retired on 2026-11-16, PR #540)
 51. The Classifica's bars stay `--chart-1`; each row carries its type's swatch. → NOVE-10 (retired on 2026-11-16, PR #540)
-52. A «Continua con» row is sent as `'auto'`: the router reads it. → NOVE-15
+52. A «Continua con» row is sent as `'auto'`: the router reads it. → NOVE-15 (retired on 2026-11-16, PR #544)
 53. A turn sent with a reading it inherited (an answer to a question card, «Rigenera») is `source: 'carried'` and
-    reads «Ho letto: …»; «Hai scelto: …» only after «cambia». → NOVE-14 (retired on 2026-11-16, PR #542), 15
+    reads «Ho letto: …»; «Hai scelto: …» only after «cambia». → NOVE-14 (retired on 2026-11-16, PR #542), NOVE-15 (retired on 2026-11-16, PR #544)
 54. Patrimonio calls an instrument created empty and never traded «Mai comprato». → NOVE-16
 55. The model's «Importo da investire» is money TAKEN FROM THE ACCOUNTS: the base is what is held, and in
     «Raggiungibile» the liquidity may go down to (liquidity − amount). → NOVE-17
@@ -205,12 +205,12 @@ by saying so before that spec is implemented.
 
 The order of implementation (each followed by its retirement session, § 8):
 
-`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
+`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 (retired on 2026-11-16) → 16 → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
 
 - **07** (retired on 2026-11-15, PR #534) after **03** (the fee row commits inside the ledger's transaction contract) and **06** (retired on 2026-11-14, PR #532) (`tradeMoneyIn` and
   `tradeAwarePriceEffect` change together).
 - **09** (retired on 2026-11-15, PR #538) and **10** (retired on 2026-11-16, PR #540) after **08** (retired on 2026-11-15, PR #536) (the ring); **10** also after **05** (`readSavings`).
-- **15** after **14** (retired on 2026-11-16, PR #542) (the router's contract).
+- **15** (retired on 2026-11-16, PR #544) after **14** (retired on 2026-11-16, PR #542) (the router's contract).
 - **16** after **02** (the same grid cell), reading **03**'s and **07**'s (retired on 2026-11-15, PR #534) dialogs (the fresh ledger meta, the fee
   field), already before it in the order; **17** after **16**; **18** after **17** and **07** (retired) (the fiscal cost basis).
 - **21** after **16** and **17** (the editor's seed, the optimizer, the active-plan reader).
@@ -235,7 +235,7 @@ The order of implementation (each followed by its retirement session, § 8):
 | NOVE-12 | The «Egeo» theme | M | 11 | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 22 findings, 3 owner decisions |
 | NOVE-13 | The «Orbita» theme | M | 11, 12 | Sonnet 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 2 owner decisions |
 | NOVE-14 | The Assistente's router | L | — | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 20 findings, 1 owner decision; implemented on 2026-11-16, PR #542 in develop since 2026-11-16 (branch `feat/nove-14-assistente-smistatore`; every § 6 row seen red with its mutation; no request to a model in tests or verification; `perf:budget` identical on all 17 routes, `mobile:census` identical to develop's on 57/57 entries; a carried reading's web search follows § 4 to the letter — only `'override'` is taken as it is, owner 2026-11-16; `doc/guide/assistente.md` past 500 lines, Registra split into `assistente-registra.md`); **retired on 2026-11-16**: the thirteen criteria, decisions 11 and 53 and every adopted choice held on the merged code (a read-only workflow of five `cercatore` and four `verificatore`: 82 items, 13 flagged, 12 held — ten text, two test gaps); the closure re-run (the Assistente suites 23 files / 830 tests, the five `e2e/assistant.register*` specs 19/19 on the emulators); `firestore.rules` and `firestore.indexes.json` untouched; `routeReading` read back by R12 on the store mock, an older message without it unchanged. Divergences written, behaviour equal: a carried reading's web search only ADDS to today's policy, like the router's (criterion 9 named the override alone; the owner's call of 2026-11-16, now in doc/guide/assistente.md § The router); `Draft Release Temp.md` took one Bug Fixes entry for the long threads' last 100 messages, where § 9 said «nothing»; the guide's split into `assistente-registra.md` (§ 9 kept one guide). Proofs fixed: R7 now pins the `route` event before every `status` (the order was compared with the statuses filtered out; red with the route emitted from the first `onStatus`), R10 gained two carried rows (red with `'carried'` taken as it is). Text fixes: doc/guide/assistente.md § The router filed `'carried'` under «An override» and gave the override's web rule to both, and read «the LAST assistant message with a reading» where the code reads the last assistant message and gives no previous turn when it has none; `aiModels.ts`'s header counted «four string literals» and one Haiku caller; the label left CLAUDE.md's Assistente line; NOVE-15 re-pointed in 24 places (its header, the guide lines moved by the split, `types/assistant.ts`, `store.ts`, and «NOVE-14» rewritten as the router in `develop`). No runtime code changed |
-| NOVE-15 | The Assistente as only a chat | L | 14 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 27 findings, 3 owner decisions; implemented on 2026-11-16 (branch `feat/nove-15-assistente-solo-chat`; every unit criterion seen red with its mutation; Vitest 332 files / 6804 tests in three zones; the eight Assistente and Tracciamento E2E files 32/32 on the emulators, the count at rest 11; no request to a model; `mobile:census` identical to develop's on 57/57 entries; `perf:budget`: the Assistente 755,3 → 753,5, nine ceilings raised by the shell's Radix menu split into a shared chunk, Hall of Fame and Storico past 1 KB with the owner's OK, doc/guide/velocita.md § Registro; phase F, the router's first real calls, on the owner's mirror in the same session; three changes the owner asked during it landed in the same commit: the pension contributions with effect on the period and the Driver's split of the change, the funds' part of each class and the income subcategories in the AI's context, an immaterial sales tax no longer named in the verdicts, the animated wait in the answer's place, the stream's status after a web search — doc/guide/assistente.md, panoramica.md) |
+| NOVE-15 | The Assistente as only a chat | L | 14 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 27 findings, 3 owner decisions; implemented on 2026-11-16 (branch `feat/nove-15-assistente-solo-chat`; every unit criterion seen red with its mutation; Vitest 332 files / 6804 tests in three zones; the eight Assistente and Tracciamento E2E files 32/32 on the emulators, the count at rest 11; no request to a model; `mobile:census` identical to develop's on 57/57 entries; `perf:budget`: the Assistente 755,3 → 753,5, nine ceilings raised by the shell's Radix menu split into a shared chunk, Hall of Fame and Storico past 1 KB with the owner's OK, doc/guide/velocita.md § Registro; phase F, the router's first real calls, on the owner's mirror in the same session; three changes the owner asked during it landed in the same commit: the pension contributions with effect on the period and the Driver's split of the change, the funds' part of each class and the income subcategories in the AI's context, an immaterial sales tax no longer named in the verdicts, the animated wait in the answer's place, the stream's status after a web search — doc/guide/assistente.md, panoramica.md); PR #544 in develop since 2026-11-16; **retired on 2026-11-16**: the eleven criteria, decisions 11, 12, 15, 36, 52 and 53 and every adopted choice held on the merged code (a read-only workflow of five `cercatore` and four `verificatore`: 129 items, 15 flagged, 12 held — eleven text, one test gap); the closure re-run (the Assistente suites and the spec's test files 37 files / 1146 tests, § 6's Playwright files with `cashflow.tracciamento` and `allocation.consulente` 36/36 on the emulators); `firestore.rules` and `firestore.indexes.json` untouched; `routeReading` read back by the page tests on the faked stream, a thread saved before the spec opening as stored (E5). Divergences written, behaviour equal: criterion 11 named a 754 ceiling the ring's retirement had raised to 756 on 2026-11-15 — the Assistente went 755,3 → 753,5 under it, unraised; the changes the owner asked during phase F (the AI context's pension contributions, the Driver's split and the income subcategories; an immaterial sales tax unnamed in the verdicts; the animated wait; the stream's status after a web search; the companion's clip) landed in the implementation's commit outside § 4, each written in doc/guide/assistente.md or panoramica.md with its test. Proof fixed: the chooser's focus — on the chosen reading at open, back on «cambia» after Esc and «Annulla» — pinned in `assistantCompanionScene.test.tsx` with a click that focuses nothing, Safari's (red with `returnFocusTo` dropped; with `userEvent`'s focusing click it stayed green, the modal's own restore covering it). Text fixes: doc/guide/assistente.md's header, § Files and «Suites to run» line took the chat's modules, tests and E2E files, the header's «50+» dot and «Registra» among the hover accents left it; assistente-registra.md's way in; seven comments (the day thread in `store.ts` and the stream route, the period selector in `types/assistant.ts` and the route, the Preferenze popover in `GeneraleTab.tsx` twice and `AssistantMemoryPanel.tsx`); the spec's branch left nine `raisedBy` and doc/guide/velocita.md's row (#544 in its place), the label CLAUDE.md's Assistente line; NOVE-20's Assistente line cites re-pointed (eight, all moved by 675100d9). No runtime code changed |
 | NOVE-16 | Allocazione › Accumulo: the PAC tab (PR #486) | L | 02 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 33 findings, 2 owner decisions |
 | NOVE-17 | The model portfolio and the optimizer (PR #487) | L | 16 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 32 findings, 3 owner decisions |
 | NOVE-18 | «Con vendite mirate» (PR #488) | M | 17, 07 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 1 owner decision |
@@ -305,7 +305,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `buildSubCategoryRanking`, `buildRingShares`, `summarizeCategoryChanges`, `ANALISI_SECTION_IDS`;
   `describePeriodoSavings(reading: SavingsReading)`.
 
-**The Assistente's router** — defined by NOVE-14 (retired on 2026-11-16, PR #542), read by NOVE-15
+**The Assistente's router** — defined by NOVE-14 (retired on 2026-11-16, PR #542), read by NOVE-15 (retired on 2026-11-16, PR #544)
 - `types/assistant.ts`: `AssistantRoutePeriod`, `AssistantRoute{ intent: AssistantMode; period; webSearch;
   confidence }`, `AssistantRouteOverride`, `AssistantRouteReading{ route; source; reason? }`,
   `AssistantMessage.routeReading?`; the stream event `{ type: 'route'; reading }` right after `meta`; the request's
@@ -469,7 +469,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 11 12 13 15 16 17 18 19 20 21`
+`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 11 12 13 16 17 18 19 20 21`
 
 Prompt 08 (`08_CREA_RITIRO_SPEC`) was run on 2026-11-12, after the adversarial reading, in a session of its own:
 `doc/nove/PROMPT-RITIRO.md` is the prompt the owner pastes to retire ONE spec. A retirement updates its precedents

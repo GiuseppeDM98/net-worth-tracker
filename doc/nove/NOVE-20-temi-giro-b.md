@@ -5,7 +5,7 @@
 > (`useCostumeScopeProps()`, NOVE-19 § 4.1, already spread on every dialog, drawer, sheet and alert content), the four
 > control properties and `COSTUME_FRAME_RADIUS_CLASS` / `COSTUME_PILL_RADIUS_CLASS` (§ 4.2), the emblems of Panoramica, Patrimonio and Cashflow (§ 4.5), the E2E files
 > `e2e/theme.costume{,.mobile,.tablet}.spec.ts` and `e2e/themeNeutral.ts`'s probes. It dresses NOVE-10's (retired on 2026-11-16, PR #540) Analisi,
-> NOVE-15's Assistente, NOVE-16/17/18's Accumulo and NOVE-21's hand-off (`ConsulenteHandoff.tsx`, a
+> NOVE-15's (retired on 2026-11-16, PR #544) Assistente, NOVE-16/17/18's Accumulo and NOVE-21's hand-off (`ConsulenteHandoff.tsx`, a
 > `ResponsiveModal`: frame and title by § 4.2; the applied book's link) as they leave them. Written on 2026-11-12; every `file:line` is
 > cited on `develop` @ b841cbd7, the Accumulo code as `pr488:file:line` (`refs/tmp/pr488`, holding #486 and #487).
 > Executes decisions 3, 4, 16, 17 and the adopted choice (a) (README.md § 3-4) on what NOVE-19 § 10 hands over;
@@ -199,10 +199,10 @@ a literal `className` becomes `cn(…, COSTUME_FRAME_RADIUS_CLASS)`:
 - **Shared, in my surfaces**: `components/ui/question-card.tsx:95`.
 - **Consulente**: `ConsulenteInterviewScene.tsx:47`, `ConsulenteRun.tsx:66`, `ConsulenteWizard.tsx:301`.
 - **Compravendita**: `CompravenditaScreens.tsx:83`, `:267`, `:314`, `:393`, `:413`; `CompravenditaWizard.tsx:142`.
-- **Assistente**: `AssistantComposer.tsx:88`, `:104`, `:117`; `AssistantConversazioneTile.tsx:155` and NOVE-15's
-  suggestion Skeleton rows in the same file (`h-11 rounded-xl` → `cn('h-11', COSTUME_FRAME_RADIUS_CLASS)`: the only
-  `rounded-xl` an earlier spec of the series adds, grep of `doc/nove/` on 2026-11-12);
-  `AssistantQuestionBlock.tsx:147`, `:159`; `AssistantStreamingResponse.tsx:87`, `:208`, `:271`;
+- **Assistente**: `AssistantComposer.tsx:84`, `:101`, `:114`; `AssistantConversazioneTile.tsx:130` and NOVE-15's
+  (retired on 2026-11-16, PR #544) suggestion Skeleton rows in the same file (`:124`, `h-11 rounded-xl` →
+  `cn('h-11', COSTUME_FRAME_RADIUS_CLASS)`: the only `rounded-xl` an earlier spec of the series adds, grep of
+  `doc/nove/` on 2026-11-12); `AssistantQuestionBlock.tsx:147`, `:159`; `AssistantStreamingResponse.tsx:94`, `:217`, `:309`;
   `ExpenseProposalCard.tsx:261`; `GoalProposalCard.tsx:212`.
 - **FIRE**: `components/fire-simulations/FireParametri.tsx:262`; `components/monte-carlo/tiles/ParametriTile.tsx:227`.
 - **Dialogs**: `components/performance/AIAnalysisDialog.tsx:360`, `:440`; `components/DeleteDummyDataDialog.tsx:142`;
@@ -372,7 +372,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 `components/cashflow/AnalisiTab.tsx:760` `analisi`; `app/dashboard/performance/page.tsx:697` `rendimenti`;
 `app/dashboard/history/page.tsx:460` `storico`; `app/dashboard/allocation/page.tsx:461`, `ConsulenteClient.tsx:82`
 `allocazione`; `app/dashboard/pension/page.tsx:39` `previdenza`; `app/dashboard/fire-simulations/page.tsx:92`
-`fire`; `app/dashboard/hall-of-fame/page.tsx:361` `hall-of-fame`; `AssistantHeader.tsx:85` `assistente`;
+`fire`; `app/dashboard/hall-of-fame/page.tsx:361` `hall-of-fame`; `AssistantHeader.tsx:58` `assistente`;
 `CompravenditaClient.tsx:68` `patrimonio`;
 `app/dashboard/settings/page.tsx:94` `PAGE_HEADER` gains `emblem: 'impostazioni'` (spread at `:303`, `:323`, `:343`).
 
@@ -385,7 +385,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
   `useChartColors` has fewer slots. The tooltip divs `rounded-lg` (FireDettaglio:100, CoastFireProjectionChart:102,
   FIREProjectionChart:87, FireFanChart:84, WhatIfProjectionChart:57, MonteCarloFanChart:60, ScenarioOverlayChart:43,
   UnderwaterDrawdownChart:34) follow `--radius`.
-- `AssistantComposer.tsx:66` dock (an opaque bar); `settings/page.tsx:452-455` save bar (`rounded-2xl`, a Float);
+- `AssistantComposer.tsx:62` dock (an opaque bar); `settings/page.tsx:452-455` save bar (`rounded-2xl`, a Float);
   `GeneraleTab.tsx:811-857` the dev-only `Card` (frame by § 4.4); `types/goals.ts:93`,
   `CategoryManagementDialog.tsx:74-82` (the user's colours).
 - `rounded-lg`/`rounded-md` boxes of `AssetDialog`, `CreateManualSnapshotModal`, `CreateDummySnapshotModal`,
