@@ -2,12 +2,13 @@
 
 > **When to open this guide** — whoever touches `app/dashboard/assistant/*`, `components/assistant/*`,
 > `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`,
-> `lib/utils/{assistantNarrative,assistantPeriodOptions,assistantQuestionBlocks,assistantRegisterContext,assistantRoute,assistantStreamBuffer,cashflowBlock,expenseBreakdown,expenseProposal,goalProposal}.ts`,
+> `lib/utils/{assistantChatNarrative,assistantNarrative,assistantNetWorthDrivers,assistantPeriodOptions,assistantQuestionBlocks,assistantRegisterContext,assistantRoute,assistantStreamBuffer,cashflowBlock,expenseBreakdown,expenseProposal,goalProposal}.ts`,
 > `lib/hooks/useAssistantStreaming.ts`, `app/api/ai/assistant/*`, `app/api/goals/route.ts`. In
 > `AGENTS.md` the stub with the essentials stays; here is the full rule. Modules and files: § *Files* below.
-> E2E: `e2e/assistant.register.spec.ts`, `e2e/assistant.register.mobile.spec.ts`, `e2e/assistant.register.{kinds,question}.spec.ts`
-> and `e2e/assistant.register.question.mobile.spec.ts` (Registra, the stream always
-> faked with `page.route`, helper `e2e/assistantRegister.ts`); the analysis modes have no Playwright spec.
+> E2E: `e2e/assistant.chat.spec.ts` and `e2e/assistant.chat.mobile.spec.ts` (the page as a chat, 2026-11-16),
+> `e2e/assistant.register.spec.ts`, `e2e/assistant.register.mobile.spec.ts`, `e2e/assistant.register.{kinds,question}.spec.ts`
+> and `e2e/assistant.register.question.mobile.spec.ts` (Registra) — the stream always faked with `page.route`, helper
+> `e2e/assistantRegister.ts`; no spec asserts an analysis's answer.
 > **Registra** (the `register` mode: card, questions, write, outcome) has its own guide since 2026-11-16:
 > doc/guide/assistente-registra.md.
 
@@ -15,9 +16,9 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `router.ts` — the router of `mode: 'auto'` —, `store.ts` → `mergeMemoryItem`), pure `lib/utils/assistantRoute.ts` (the reading's contract), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`) and `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, its rules in doc/guide/consulente.md § The run); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
+- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `router.ts` — the router of `mode: 'auto'` —, `store.ts` → `mergeMemoryItem`), pure `lib/utils/assistantRoute.ts` (the reading's contract), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria · Preferenze, the fields in `AssistantPreferencesFields.tsx`), the chat (2026-11-16): `components/assistant/AssistantRouteChooser.tsx` («cambia»), `AssistantWaiting.tsx` (the wait), pure `lib/utils/assistantChatNarrative.ts` (the reading line, the suggestions, the wait's phrases), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`) and `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, its rules in doc/guide/consulente.md § The run); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
 - **The portfolio block** (2026-10-20): pure `lib/utils/assistantPortfolioContext.ts` (`buildAssistantPortfolioContext`, `emptyAssistantPortfolioContext` for the fixtures), printed by `formatPortfolioForPrompt` in `prompts.ts`; the Italian month bounds `getItalyMonthBoundsUtc`/`getItalyMonthRangeBoundsUtc` in `lib/utils/dateHelpers.ts`. The Consulente of Allocazione is its own guide: doc/guide/consulente.md.
-- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantRouter`, `assistantRoute`, `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `dateHelpers`, `cashflowBlock`, `anthropicStream` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
+- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantRouter`, `assistantRoute`, `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `dateHelpers`, `cashflowBlock`, `anthropicStream`, `assistantNetWorthDrivers` · **The page as a chat** `assistantChatNarrative`, `assistantPeriodOptions`, `assistantRouteChooser`, `assistantHeader`, `assistantCompanionScene`, `assistantStreamingResponse`, `assistantQuestionBlock`, `useAssistantStreaming` (the `.tsx` ones on the `dom` project; `AssistantWaiting` has no suite of its own) · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
 
 ## Assistant
 
@@ -172,8 +173,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `useInfiniteQuery` whose `select` flattens the pages, on the same key every writer invalidates (an invalidation
   re-reads every loaded page from the fresh cursors). **Nothing hides in silence** (owner's wording, 2026-10-05):
   while a page is unread the list closes on «Mostra altre», the header says «Più di 50 conversazioni»
-  (`describeAssistantHeader` `moreThreads`), its icon «Conversazioni (più di 50)» with a «50+» dot (`CountDot`'s
-  `isFloor`; past two digits it reads «99+», where it printed a bare «99» until 2026-10-05) and the modal «Le 50
+  (`describeAssistantHeader` `moreThreads`), the «⋯» menu's item «Conversazioni (più di 50)» (`threadsLabel` in
+  `AssistantHeader.tsx`; an icon with a «50+» dot until 2026-11-16, when the header became «⋯») and the modal «Le 50
   conversazioni più recenti: premine una per riprenderla; «Mostra altre» legge le precedenti.»
   (`describeThreadsReading` `hasMore`). Seen in the browser on 60 planted threads (2026-10-05, a throwaway spec):
   50 rows, the three sentences, «Mostra altre» → 60 rows, none twice, the button gone.
@@ -349,7 +350,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   placeholders are born with the last answer's mode, so a turn never slides to a free question while the router
   reads. Under a complete answer with a reading the line «Ho letto: … · cambia» (`describeReadingLine`; «Hai scelto»
   for an override, «Non ne sono sicuro: l'ho letta come …» for a fallback, « · con ricerca web» from `webSearchUsed`);
-  «cambia» on the last answer only, at rest, outside the demo, opens `AssistantRouteChooser` and «Rileggi» re-sends the
+  «cambia» on the last answer only, at rest, outside the demo, opens `AssistantRouteChooser` (the focus on the chosen reading; Esc and «Annulla» bring it back to «cambia» through the
+  page's `changeOpenerRef`, Safari's click included) and «Rileggi» re-sends the
   last prompt as a new turn with the chosen route (no `routeCarried`), the focus on «Interrompi risposta». A question
   card's answer and «Rigenera» carry the reading (`routeCarried: true`). The open thread is `?thread=<id>`, written
   with `history.replaceState` at a new thread's `meta` and removed by «Nuova conversazione». Testing the page
@@ -391,10 +393,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 The whole page follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen by the owner on 2026-11-06 among three
 drawn concepts, archived in `git log -- doc/ai/reference/`): **The AI-Accent Rule** (the accent on the «Assistente» sub-eyebrow of a model's message, on
-proposal and question cards, and on the hover of «Invia messaggio», «Registra», «Rigenera», «Rispondi» and the suggestion rows;
-never on the verdict, the companion column, the thread list or the user's messages), **The Question-Card Rule** (the
+proposal and question cards, and on the hover of «Invia messaggio», «Rileggi», «Rigenera», «Rispondi» and the suggestion rows;
+never on the verdict, the companion column, the thread list, the «Ho letto» line or the user's messages), **The Question-Card Rule** (the
 cards inside a message, ONE «Rispondi» under the last) and the paragraph «The Assistente page» (the conversation stays
-still, the companion column's content slides with the mode). The code follows it from the Registra mode on (2026-11): the companion slides with `sceneVariants`, the cards enter with `cardEnterVariants`.
+still, the companion column's content slides when the reading changes). The code follows it since 2026-11: the companion slides with `sceneVariants`, the cards enter with `cardEnterVariants`.
 
 ## Registra (2026-11)
 

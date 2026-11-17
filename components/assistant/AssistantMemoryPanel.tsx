@@ -54,7 +54,7 @@ const MODAL_SUB_TILE_CLASS = 'border-transparent bg-muted shadow-none';
  * «Riattiva») and «Fatti» (rischio, preferenze, fatti utili as flat rows) — with the archived
  * items behind an «Archiviati» disclosure and the reset as its one destructive action.
  *
- * The on/off control of the automatic learning lives in the Preferences popover; this panel
+ * The on/off control of the automatic learning lives in the Preferenze modal; this panel
  * manages stored items only.
  */
 export function AssistantMemoryPanel({ userId, memory, isLoading }: AssistantMemoryPanelProps) {

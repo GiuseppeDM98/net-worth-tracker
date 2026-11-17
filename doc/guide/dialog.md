@@ -204,7 +204,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the fallback removed). `returnFocusTo` still wins and is still needed where the opener NEVER held the focus: Safari
   does not focus a clicked button, and a row opened from a window event or a non-focusable cell leaves `body` focused at
   open. Fed from `event.currentTarget` at the click (a `PageHeader` action is mounted twice; only `currentTarget` is the
-  copy that was pressed). Pinned by `e2e/performance.degraded.spec.ts`. **`ExpenseDialog` takes `returnFocusTo` and
+  copy that was pressed). Pinned by `e2e/performance.degraded.spec.ts`. **A jsdom test of `returnFocusTo` opens with
+  `fireEvent.click`, never `userEvent.click`** (2026-11-17): `userEvent` focuses the opener, so the fallback covers it and
+  the test stays green with the prop removed; `fireEvent` focuses nothing, as Safari's click
+  (`__tests__/assistantCompanionScene.test.tsx`, seen red without the prop). **`ExpenseDialog` takes `returnFocusTo` and
   answers `onSuccess(saved)`** (2026-10-12): `saved` is `{ id, row }` — on a create the first parent row written
   (`createExpenseSettledOnDate().parents`, fees excluded), on an edit the row rebuilt from the form's data with plain
   values; the type admits `null`, which no path produces today — and Tracciamento on a phone points `returnFocusTo` at the saved row's

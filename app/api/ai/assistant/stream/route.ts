@@ -287,7 +287,8 @@ export async function POST(request: NextRequest) {
 
     // Build the numeric context bundle based on mode.
     // For structured analysis modes the server always rebuilds from Firestore —
-    // client-supplied numbers are never trusted; only the period selector is used.
+    // client-supplied numbers are never trusted; only the period selector is used (the client's on an
+    // explicit mode, the router's reading on mode 'auto', the only mode the page sends since 2026-11-16).
     // For chat mode, chatContext determines which builder to use (or none).
 
     const includeDummy = preferences.includeDummySnapshots ?? false;
@@ -438,7 +439,7 @@ export async function POST(request: NextRequest) {
           ).catch((err) => console.error('[stream] extractAndSaveMemory uncaught:', err));
 
           await updateAssistantThreadMetadata(thread.id, {
-            // A register thread is the day's («Registrazioni · 1 nov 2026») and is never retitled.
+            // A thread opened by a registration keeps its day title («Registrazioni · 1 nov 2026») and is never retitled.
             title: existingThread?.lastMessagePreview || selection.mode === 'register'
               ? (existingThread?.title ?? thread.title)
               : buildThreadTitleFromPrompt(body.prompt, selection.mode, now),

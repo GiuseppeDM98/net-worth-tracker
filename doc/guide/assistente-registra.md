@@ -79,8 +79,9 @@ and the Assistente asks what it needs with options before proposing.
   member only when the user names it» and «fuori budget only when the user says it» contradicted them; the account is
   now the one named or picked in an answer, else the default when QUANDO CHIEDERE does not ask, the centre and the
   member the named or picked one, «fuori budget» what QUANDO CHIEDERE applies, and the opening names transfers and
-  instalments — every sentence held whole in `assistantPromptBundle`, each seen red. The way in reads «Registra un
-  movimento» and the composer «Scrivi cosa hai speso, incassato o spostato…» since the same day.
+  instalments — every sentence held whole in `assistantPromptBundle`, each seen red. There is no way in since
+  2026-11-16 (§ The way in and out): the composer reads «Chiedi del tuo patrimonio o scrivi una spesa…»
+  (`CHAT_COMPOSER_PLACEHOLDER`), and «Registra un movimento.» is only the register verdict's headline.
 - **The card** (`ExpenseProposalCard`): `resolveExpenseProposal` checks every id against the browser's own reads
   (`RegisterRefsContext`: categories, assets, settings, centres) and names what it cannot find — a problem closes
   «Conferma», never «Modifica»; a failed read closes all writing. States (`describeExpenseProposalState`): idle ·

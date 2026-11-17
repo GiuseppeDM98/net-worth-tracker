@@ -247,7 +247,8 @@ export interface AssistantCreateThreadInput {
 }
 
 // Full numeric context bundle for a selected period, built server-side.
-// Client sends the period selector; server regenerates this from Firestore — never trust client-supplied numbers.
+// The period selector comes from the client on an explicit mode and from the router's reading on mode 'auto' (the
+// page's only mode since 2026-11-16); the server regenerates this from Firestore — never trust client-supplied numbers.
 //
 // The `selector.month` field encodes the period type:
 //   month > 0  → monthly analysis (standard)

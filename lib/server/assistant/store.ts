@@ -53,7 +53,8 @@ function formatRegisterTitleDate(now: Date): string {
 }
 
 function buildThreadTitleFromPrompt(prompt: string, mode: AssistantMode, now: Date = new Date()): string {
-  // Registra keeps one thread per Italian day, named by the day and never by a row's sentence.
+  // A thread that opens with a registration is named by its Italian day («Registrazioni · 1 nov 2026»), never by a
+  // row's sentence; since 2026-11-16 no thread is looked up by day, so one day may hold several of them.
   if (mode === 'register') {
     return `${getDefaultThreadTitle(mode)} · ${formatRegisterTitleDate(now)}`;
   }
