@@ -293,6 +293,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   block carries `goalId` (the id the OBIETTIVI block prints): the card reads «Modifica di un obiettivo», every row
   before → after, and the route rewrites that goal in place (`updateInvestmentGoal`, transactional, colour and creation
   date kept, the optional fields REPLACED — a proposal that drops the deadline removes it; 404 when the goal is gone).
+  The STRUMENTI block leaves out every asset at quantity 0 but a loan and an instrument created empty for a plan and
+  never traded (`Asset.createdEmpty`, no ledger row), printed «0 quote, mai comprato» (`neverBought`,
+  `lib/utils/assistantPortfolioContext.ts`; what that row means is one constant sentence of the system prompt; a
+  position sold to 0 has no flag and stays out; 2026-11-12).
   `assignments` names instruments by their EXACT name from the STRUMENTI block with a percent of each; the CARD resolves
   the names to asset ids (`findAssetByName`, lib/utils/allocationAdviceApply.ts — the held instruments first, so one at
   quantity 0 with the same name or ticker never wins, 2026-11-12: the exact name, the printed «name

@@ -1,6 +1,6 @@
 # NOVE-17 — Allocazione › Accumulo: the model portfolio and the optimizer of PR #487, brought in with changes
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-16** (the tab, the editor, the plan document); **NOVE-18 and
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-16 (retired on 2026-11-17, PR #547)** (the tab, the editor, the plan document); **NOVE-18 and
 > NOVE-21 are implemented after it** (they read the optimizer, the editor's seed and the model's fingerprint defined
 > here). Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7, a PR line as `pr487:file:line` on
 > the local ref `refs/tmp/pr487` (head 9449f6ce, child of #486's d1e2666d). Executes the adopted choices g, h, j, k,
@@ -154,7 +154,7 @@ Expected conflicts, each resolved toward develop's file with the increment's hun
 `isCashAccount` and `createdEmpty`), `e2e/accumulo.mobile.spec.ts`, `doc/guide/accumulo.md`, `AGENTS.md`,
 `firestore.rules` (the rule of § Firestore below), `__tests__/accumuloSummary.test.ts`,
 `__tests__/accumulationPlanUtils.test.ts`. New files of the increment that import moved names are fixed after the
-pick: `useAccumulationPlans` / `selectOpenPlan` from `lib/hooks/useAccumulationPlans.ts`, `toMonthKey` / `addMonths` /
+pick: `useAccumulationPlans` from `lib/hooks/useAccumulationPlans.ts` and `selectOpenPlan` from `lib/utils/openAccumulationPlan.ts` (the hook re-exports it), `toMonthKey` / `addMonths` /
 `monthIndexOf` from `lib/utils/planMonths.ts`. Then the changes; one commit, trailer of B1.
 
 ### M1 — the page stays the page
@@ -462,7 +462,7 @@ export function isModelStale(model: Pick<ModelPortfolio, 'fingerprint'>, basis: 
 ```
 
 The page builds `const modelBasis = useMemo(() => buildModelBasis(settings, goalData?.goals), [settings, goalData])`
-beside its effective targets (`app/dashboard/allocation/page.tsx:222-230`) and passes `modelBasis` to the tab, which
+beside its effective targets (`app/dashboard/allocation/page.tsx`, `targets` / `usingGoalTargets` at `:299-301` @ c2430d72) and passes `modelBasis` to the tab, which
 hands it to the tile, the two dialogs and the editor; the optimizer keeps running on the effective `targets`.
 
 `ModelPortfolio` gains `fingerprint?: string`; `getModelPortfolio` reads it (a string or absent) and never validates
@@ -478,8 +478,8 @@ model.fingerprint` to its input, B6) and `AccumulationPlanDialog` (`writeModelFr
 prop `basis: ModelBasis`). `PortafoglioModelloTile`: `const stale = model ? isModelStale(model, modelBasis, allAssets) : false;` — the
 aside is `MODEL_STALE_ASIDE` = «superato», the reading's first sentence `MODEL_STALE_READING` = «I target, i criteri o
 i ruoli sono cambiati dopo il salvataggio: ricalcola il modello.»; «Ricalcola» stays the tile's one primary button (it
-already is, `PortafoglioModelloTile.tsx:279`). The tile's reading moves out of the component (the analogue of
-NOVE-16's D8): `describeModelTileReading({ readFailed, instrumentCount, origin, updatedAt, snapshot, toBuyEur,
+already is, `PortafoglioModelloTile.tsx:279`). The tile's reading moves out of the component (the rule the
+Accumulo tab follows: sentences in the narrative module, never in a component — doc/guide/accumulo.md): `describeModelTileReading({ readFailed, instrumentCount, origin, updatedAt, snapshot, toBuyEur,
 stale }): Narrative` in `weightOptimizerNarrative.ts` holds the sentences of `PortafoglioModelloTile.tsx:131-140`
 («{n} {strumento|strumenti}. {origine} Per portare il portafoglio sul modello servono {€} di acquisti.» / «Il
 portafoglio è già sul modello.»), with `MODEL_STALE_READING` first when `stale`; `MODEL_STALE_ASIDE` and
@@ -572,12 +572,13 @@ The increment's tests rewritten here: `weightOptimizer.test.ts` › the 50-case 
 grid instead of «multiples of 0.5»; the `buildStandaloneCandidates` describe (`:559-650`) moves to the new
 signature, «leaves a liquidity account out» becomes «the accounts are ONE candidate «Liquidità»» and «does not fix
 bounds when B is not > 0» keeps its case with `investEur` 0 and no holdings; `modelPortfolioGroups.test.ts:117`,
-`:123` move to `(assets, value, 0, evaluate, groups)`; every fixture of the increment follows NOVE-16's D11 (round
-invented figures, generic tickers).
+`:123` move to `(assets, value, 0, evaluate, groups)`; every fixture of the increment takes round
+invented figures and generic tickers (`ETF-A`, `'etf-a'`), as the Accumulo import did (WORKFLOW.md § 1 rule 6).
 
 The grep of criterion 11, empty on the branch: `git grep -nE "taxCapEur|lockedKeys|seedDisposalsFromSale" -- lib
-components types __tests__`; and NOVE-16 § 6's grep on the lines THIS branch adds (the same command: its pattern
-already holds `[ABMR][0-9]`, `D[0-9]{1,2}`, `S[0-9]`), with `|G[0-9]|O4|D-CU[0-9]+|§ ?[0-9]` appended to the pattern.
+components types __tests__`; and, on the lines THIS branch adds, the fork-reference grep that closed the Accumulo
+import (2026-11-17): `git diff develop...HEAD -U0 -- app components lib e2e __tests__ types scripts | grep -E "^[+]" |
+grep -nwE "pac-ate|pac-ottimizzatore|render-accumulo|contributi-upstream|fork-scelte|PR #4|(AL|RV|RP|PO|PP|PT|RM|PZ|RO|D-AL)[0-9]+|D[0-9]{1,2}|S[0-9]|[ABMR][0-9]|G[0-9]|O4|D-CU[0-9]+|§ ?[0-9]"`.
 
 ## 7. Guided verification (WORKFLOW.md § 2)
 

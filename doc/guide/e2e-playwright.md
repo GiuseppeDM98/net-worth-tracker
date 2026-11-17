@@ -284,6 +284,9 @@
   - `cashflow.dividendi.spec.ts` «the form refuses…» — the BTP row detached from the picker as it was clicked (doc/guide/
     cashflow-dividendi.md § Per-page blind spots): red again on 2026-11-16, once in the full run of the parallel seeds
     (green ×4 alone right after) — the third time with this symptom, a pattern still open.
+  - `assets.trade-fee.spec.ts` «a trade’s fee becomes a locked spending row…» [desktop] (2026-11-17): after the trade's
+    removal its fee row was still in Firestore at the 30 s poll (1 where 0) — once in a full run on the production build
+    (16,9 min, 421 green), green ×3 alone right after; the first time.
 - **A full run on the month's first three days reads a different Budget** (2026-11-03): `mobile-composition.cashflow.mobile.spec.ts` «the two cells open the right row» counted two lifted KPIs, one on those days (no pace, `liftedBlocks` skips «Fine mese»); it now reads the Italian day. Not a flake: a test written on a later day stays green until a run lands there. **A seed that ran before the Auth emulator was up** gave 12 red in one full run the same day (`seed exit=1`, the fixtures missing): wait on BOTH :8080 and :9099 before `emulators:seed`.
 - **`e2e/cashflow.transfer-fee.spec.ts` was red ONCE in a full run** (2026-10-07, Windows machine, the second full run
   of PR #434, which did not touch transfers): green alone and in the suite's order, cause not traced. A second red

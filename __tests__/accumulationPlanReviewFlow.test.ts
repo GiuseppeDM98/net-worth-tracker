@@ -40,7 +40,7 @@ const nameOf = (assets: Map<string, Asset>) => (id: string) => assets.get(id)?.n
 
 const etfA = (quantity = 100) => makeAsset({ id: 'etf-a', name: 'Mondo Azionario', ticker: 'ETFA', quantity, currentPrice: 120 });
 const old = (quantity = 100) => makeAsset({ id: 'old', name: 'Trend Fenicottero', ticker: 'FNC', quantity, currentPrice: 50 });
-// Created empty for a plan («+ Nuovo asset»): the flag «mai comprato» reads (decision 54).
+// Created empty for a plan («+ Nuovo asset»): the flag «mai comprato» reads (owner, 2026-11-12).
 const fresh = (quantity = 0) => makeAsset({ id: 'fresh', name: 'Trend Ornitorinco coperto', ticker: 'ORN', quantity, currentPrice: 60, createdEmpty: true });
 const conto = (value = 30000) => makeAsset({ id: 'conto', name: 'Conto', type: 'cash', assetClass: 'cash', quantity: value, currentPrice: 1 });
 const conto2 = (value = 5000) => makeAsset({ id: 'conto2', name: 'Conto 2', type: 'cash', assetClass: 'cash', quantity: value, currentPrice: 1 });

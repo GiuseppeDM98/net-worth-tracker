@@ -50,32 +50,32 @@ describe('validateDraftAgainstAssets — one case per code', () => {
   });
 
   it('weights_sum', () => {
-    const vwce = makeAsset({ id: 'vwce', name: 'VWCE' });
+    const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A' });
     const draft = baseDraft({
-      positions: [{ id: 'p1', label: 'VWCE', targetPercentage: 90, memberAssetIds: ['vwce'], buyAssetId: 'vwce' }],
+      positions: [{ id: 'p1', label: 'ETF-A', targetPercentage: 90, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' }],
     });
-    const issues = validateDraftAgainstAssets(draft, byId(vwce));
+    const issues = validateDraftAgainstAssets(draft, byId(etfA));
     const issue = issues.find((i) => i.code === 'weights_sum');
     expect(issue).toBeDefined();
     expect(issue!.message).toContain('90');
   });
 
   it('weight_negative', () => {
-    const vwce = makeAsset({ id: 'vwce', name: 'VWCE' });
+    const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A' });
     const draft = baseDraft({
-      positions: [{ id: 'p1', label: 'VWCE', targetPercentage: -10, memberAssetIds: ['vwce'], buyAssetId: 'vwce' }],
+      positions: [{ id: 'p1', label: 'ETF-A', targetPercentage: -10, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' }],
     });
-    const issues = validateDraftAgainstAssets(draft, byId(vwce));
+    const issues = validateDraftAgainstAssets(draft, byId(etfA));
     expect(issues.some((i) => i.code === 'weight_negative' && i.positionId === 'p1')).toBe(true);
   });
 
   it('buy_not_member', () => {
-    const vwce = makeAsset({ id: 'vwce', name: 'VWCE' });
-    const swda = makeAsset({ id: 'swda', name: 'SWDA' });
+    const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A' });
+    const etfB = makeAsset({ id: 'etf-b', name: 'ETF-B' });
     const draft = baseDraft({
-      positions: [{ id: 'p1', label: 'Gruppo', targetPercentage: 100, memberAssetIds: ['vwce'], buyAssetId: 'swda' }],
+      positions: [{ id: 'p1', label: 'Gruppo', targetPercentage: 100, memberAssetIds: ['etf-a'], buyAssetId: 'etf-b' }],
     });
-    const issues = validateDraftAgainstAssets(draft, byId(vwce, swda));
+    const issues = validateDraftAgainstAssets(draft, byId(etfA, etfB));
     expect(issues.some((i) => i.code === 'buy_not_member')).toBe(true);
   });
 
@@ -89,17 +89,17 @@ describe('validateDraftAgainstAssets — one case per code', () => {
   });
 
   it('source_not_cash', () => {
-    const vwce = makeAsset({ id: 'vwce', name: 'VWCE' });
-    const draft = baseDraft({ liquidity: { sourceCashAssetIds: ['vwce'], reserveEur: 0, monthlyInflowEur: 0 } });
-    const issues = validateDraftAgainstAssets(draft, byId(vwce));
+    const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A' });
+    const draft = baseDraft({ liquidity: { sourceCashAssetIds: ['etf-a'], reserveEur: 0, monthlyInflowEur: 0 } });
+    const issues = validateDraftAgainstAssets(draft, byId(etfA));
     expect(issues.some((i) => i.code === 'source_not_cash')).toBe(true);
   });
 
   it('unassigned_tradable', () => {
-    const vwce = makeAsset({ id: 'vwce', name: 'VWCE', quantity: 5 });
+    const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A', quantity: 5 });
     const draft = baseDraft();
-    const issues = validateDraftAgainstAssets(draft, byId(vwce));
-    expect(issues.some((i) => i.code === 'unassigned_tradable' && i.assetId === 'vwce')).toBe(true);
+    const issues = validateDraftAgainstAssets(draft, byId(etfA));
+    expect(issues.some((i) => i.code === 'unassigned_tradable' && i.assetId === 'etf-a')).toBe(true);
   });
 
   it('unassigned_tradable exempts cash accounts', () => {
@@ -122,14 +122,14 @@ describe('validateDraftAgainstAssets — one case per code', () => {
   });
 
   it('duplicate_asset', () => {
-    const vwce = makeAsset({ id: 'vwce', name: 'VWCE' });
+    const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A' });
     const draft = baseDraft({
       positions: [
-        { id: 'p1', label: 'VWCE', targetPercentage: 50, memberAssetIds: ['vwce'], buyAssetId: 'vwce' },
-        { id: 'p2', label: 'VWCE2', targetPercentage: 50, memberAssetIds: ['vwce'], buyAssetId: 'vwce' },
+        { id: 'p1', label: 'ETF-A', targetPercentage: 50, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' },
+        { id: 'p2', label: 'ETF-A2', targetPercentage: 50, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' },
       ],
     });
-    const issues = validateDraftAgainstAssets(draft, byId(vwce));
+    const issues = validateDraftAgainstAssets(draft, byId(etfA));
     expect(issues.some((i) => i.code === 'duplicate_asset')).toBe(true);
   });
 

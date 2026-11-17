@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { describeZeroQuantityChip } from '@/lib/utils/zeroQuantityChip';
 
 // «Mai comprato» = created empty for a plan (`createdEmpty`, written only by AssetDialog's empty
-// create) AND quantity 0 AND no ledger row (decision 54, owner 2026-11-12). Invented ids.
+// create) AND quantity 0 AND no ledger row (owner, 2026-11-12). Invented ids.
 const etf = (quantity: number, createdEmpty?: true) => ({ id: 'etf-a', type: 'etf' as const, quantity, ...(createdEmpty ? { createdEmpty } : {}) });
 
 describe('describeZeroQuantityChip', () => {

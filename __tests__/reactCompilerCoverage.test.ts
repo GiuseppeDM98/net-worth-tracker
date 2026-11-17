@@ -16,7 +16,9 @@
  * `try … finally` put back in a component, and with an `eslint-disable-next-line
  * react-hooks/exhaustive-deps`.
  *
- * ~12 s for ~700 files, so it runs once, in `beforeAll`, with its own timeout.
+ * ~12 s for ~700 files when it was written; on 2026-11-17, ~840 files, 58 s alone on Windows and past 120 s inside the
+ * whole `TZ=Europe/Rome` run (three times in a row, green in UTC), so it runs once, in `beforeAll`, with a timeout of
+ * 300 s — a slow hook, not a skipped component.
  */
 // @vitest-environment node
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -82,7 +84,7 @@ describe('React Compiler coverage', () => {
       compiled += result.compiled;
       skips = skips.concat(result.skips);
     }
-  }, 120_000);
+  }, 300_000);
 
   it('compiles the components it finds (the logger is wired)', () => {
     // A positive anchor: a logger that never fires would make the next case pass on nothing.

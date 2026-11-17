@@ -1,5 +1,5 @@
 /**
- * `AssetDialog` with `createEmpty` (Allocazione › Accumulo → «+ Nuovo asset», decision 25): the
+ * `AssetDialog` with `createEmpty` (Allocazione › Accumulo → «+ Nuovo asset», owner 2026-11-12): the
  * instrument is created at quantity 0, with no opening trade, and marked `createdEmpty` — the flag
  * «mai comprato» reads (lib/utils/zeroQuantityChip.ts). Only this path writes the flag. The reads, the
  * writes and the quote are mocked; the account is migrated to the ledger (a meta document), so the

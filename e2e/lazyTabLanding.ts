@@ -1,18 +1,19 @@
 /**
- * «Nothing moves when a lazy Cashflow tab's chunk lands» (2026-10-06): the placeholder the page
+ * «Nothing moves when a lazy tab's chunk lands» (2026-10-06, Cashflow; Allocazione › Accumulo since 2026-11-17): the placeholder the page
  * draws while the chunk is on its way (`components/cashflow/CashflowTabSkeletons.tsx`) must have
  * the geometry of what the tab draws first — its own loading state. Until that day the fallback of
  * Dividendi lacked the phone's toolbar row and Divisione's lacked the period picker rows, so on a
  * deep link the grid jumped down when the tab mounted.
  *
- * Both routines hold the tab's chunk, measure the first cell of the placeholder grid, then put the
+ * The Cashflow routines hold the tab's chunk, measure the first cell of the placeholder grid, then put the
  * tab itself in its loading state and measure the same cell again. A helper, not a spec: the
  * FILENAME chooses the account (AGENTS.md § 5), so each spec that runs one sits on the right
  * fixture — Dividendi on the base account at 390 (`bundle.lazy.mobile.spec.ts`; at 1440 the
  * phone's axis row is not drawn — since 2026-10-12 the period pill and the «+» sit in the
  * verdict's `axis` slot, and the fallback draws them in `VerdictSkeleton.axis`), Divisione on the
  * split account at 390 and 1440 (`cashflow.split{,.mobile}.spec.ts`). Seen red on 2026-10-06 with
- * the old fallbacks put back.
+ * the old fallbacks put back. The Accumulo routine (below, its own header) runs from
+ * `bundle.lazy.mobile.spec.ts` on the base account.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
 import { ACCUMULO_TAB_SIGNATURE, DIVIDENDS_TAB_SIGNATURE, SPLIT_TAB_SIGNATURE, holdChunks, holdRequests } from './chunkProbe';

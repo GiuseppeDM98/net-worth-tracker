@@ -58,8 +58,8 @@ describe('Questo mese', () => {
 
 describe('Questo mese reading and price notice', () => {
   it('reads the open purchases in words, singular and plural, and nothing when none is open', () => {
-    expect(flat(narrativeToText(describeMonthReading(4, 3134) ?? []))).toBe(
-      "Quattro acquisti per 3134 €. Registrali da qui: l'operazione va nel Registro e la riga si chiude da sola.",
+    expect(flat(narrativeToText(describeMonthReading(4, 3000) ?? []))).toBe(
+      "Quattro acquisti per 3000 €. Registrali da qui: l'operazione va nel Registro e la riga si chiude da sola.",
     );
     expect(flat(narrativeToText(describeMonthReading(1, 500) ?? []))).toContain('Un acquisto per 500 €. Registralo da qui');
     expect(describeMonthReading(0, 0)).toBeNull();
@@ -70,15 +70,15 @@ describe('Questo mese reading and price notice', () => {
       narrativeToText(
         describePriceChangeNotice({
           lines: [
-            { label: 'VWCE', plannedQuantity: 10, suggestedQuantity: 9 },
-            { label: 'AVWS', plannedQuantity: 0, suggestedQuantity: 2 },
+            { label: 'ETF-A', plannedQuantity: 10, suggestedQuantity: 9 },
+            { label: 'ETF-B', plannedQuantity: 0, suggestedQuantity: 2 },
           ],
           plannedTotalEur: 1000,
-          suggestedTotalEur: 904.8,
+          suggestedTotalEur: 900,
         }),
       ),
     );
-    expect(text).toMatch(/^I prezzi sono cambiati dall'attivazione: con quelli di oggi la rata compra 2 AVWS in più e 9 VWCE invece di 10 \(.*95,20 €\)\.$/);
+    expect(text).toBe("I prezzi sono cambiati dall'attivazione: con quelli di oggi la rata compra 2 ETF-B in più e 9 ETF-A invece di 10 (−100,00 €).");
   });
 });
 

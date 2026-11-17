@@ -1,5 +1,5 @@
 /**
- * STRUMENTI's zero-quantity chip (decision 54, 2026-11-12): ONE rule with the plan editor's —
+ * STRUMENTI's zero-quantity chip (owner, 2026-11-12): ONE rule with the plan editor's —
  * «Mai comprato» only for an instrument created empty for a plan (`createdEmpty`) at quantity 0 with
  * no ledger row; with the ledger not read yet (`tradedAssetIds: null`) the chip stays «Azzerato»,
  * never a guess. Both the desktop table row and the phone row (`AssetRow`) are rendered. Invented

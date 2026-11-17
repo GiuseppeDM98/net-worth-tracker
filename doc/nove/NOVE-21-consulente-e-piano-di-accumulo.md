@@ -1,6 +1,6 @@
 # NOVE-21 — The Consulente and the plan of accumulation: a hand-off after «Applica», a plan in its data
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-16** (the plan document, the lock, `describeOpenPlanForAdvice`,
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-16 (retired on 2026-11-17, PR #547)** (the plan document, the lock, `describeOpenPlanForAdvice`,
 > `APPLY_ACTIVE_PLAN_NOTE`, `isPlanBuyable`, «+ Nuovo asset» at quantity 0) **and NOVE-17** (`runOptimizer`,
 > `buildStandaloneCandidates` with `assetsById`, `valueOf`, `baseEur`, `fixBounds`, `negativeFixedKeys`,
 > `LIQUIDITY_CANDIDATE_KEY`, `roundWeights`, `toModelWeights`, `describeNegativeFixed`, `PlanSeedDraft`, `ModelBasis`, the
@@ -40,8 +40,8 @@ at all — the answers, the interview, the strategy and the instruments only (`p
   read only on the Accumulo tab (choice l). The editor therefore opens on the tab, never on the Consulente route.
 - `AssetDialog` opens a create on step 1 with empty fields (`components/assets/AssetDialog.tsx:1184`, the create
   branch `:1306-1348`); no caller can hand it a name, an ISIN or a sub-category.
-- NOVE-16's `APPLY_ACTIVE_PLAN_NOTE` is rendered inside the ready body only (NOVE-16 § 4 «The Assistente and the
-  Consulente»): after «Applica» the line disappears with the body.
+- NOVE-16's `APPLY_ACTIVE_PLAN_NOTE` is rendered inside the ready body only (`applyPieces`, `activePlanNote`,
+  `components/allocation/consulente/ConsulenteBookPages.tsx:304` @ c2430d72; doc/guide/consulente.md): after «Applica» the line disappears with the body.
 
 ## 2. Goal and acceptance criteria
 
@@ -147,7 +147,8 @@ at all — the answers, the interview, the strategy and the instruments only (`p
 ```ts
 import 'server-only';
 import { adminDb } from '@/lib/firebase/admin';
-import { ACCUMULATION_PLANS_COLLECTION, docToAccumulationPlan, selectOpenPlan } from '@/lib/utils/accumulationPlanDoc';
+import { ACCUMULATION_PLANS_COLLECTION, docToAccumulationPlan } from '@/lib/utils/accumulationPlanDoc';
+import { selectOpenPlan } from '@/lib/utils/openAccumulationPlan';
 import { describeOpenPlanForAdvice, type OpenPlanForAdvice } from '@/lib/utils/accumuloMonth';
 import { toMonthKey } from '@/lib/utils/planMonths';
 

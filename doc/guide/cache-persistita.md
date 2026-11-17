@@ -41,7 +41,8 @@ Moved here from `AGENTS.md` § Caching on 2026-09-30.
 - **Bump `PERSIST_CACHE_VERSION` (the `buster`) on any change that RENAMES, REMOVES or retypes a field of a persisted
   payload** — everything under `PERSISTED_QUERY_PREFIXES`: an asset (the mortgage instalments under its key too), an
   expense, a snapshot, a category, the settings document, a contribution, a trade, the ledger's meta document, a cost
-  centre, the Hall of Fame rankings, a goal, a receipt, the overview, Rendimenti's `PerformanceData` and its yields —
+  centre, the Hall of Fame rankings, a goal, a receipt, an accumulation plan (`accumulation-plans`, persisted since 2026-11-17 so the Piano's note is on a
+  warm load's first paint), the overview, Rendimenti's `PerformanceData` and its yields —
   or a client restores the old shape and reads it
   as truth until the refetch lands; a new optional field whose absence means the default does not need it.
 
