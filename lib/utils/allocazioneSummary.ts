@@ -36,7 +36,7 @@ import {
   type LeveragePlanInputs,
 } from '@/lib/utils/leverageAwareAllocationUtils';
 import { assetClassLegs } from '@/lib/utils/assetDisplayClass';
-import { estimateSaleTax } from '@/lib/utils/saleTax';
+import { saleTaxPerEuro } from '@/lib/utils/saleTax';
 import type { PlanPosition } from '@/types/accumulationPlan';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
 import type { SectionSpec } from '@/lib/hooks/useMobileSections';
@@ -806,18 +806,12 @@ export function estimatePlanSaleTax(nodes: PlanNode[], holdings: AllocatableHold
       unknownReason ??= 'cost-basis';
       continue;
     }
-    if (!holding.taxableOnSale || holding.value <= 0) continue;
-    if (holding.costBasisEur === undefined) {
-      unknownReason ??= 'cost-basis';
+    const perEuro = saleTaxPerEuro(holding);
+    if (perEuro.kind === 'unknown') {
+      unknownReason ??= perEuro.reason;
       continue;
     }
-    if (holding.taxRate === undefined) {
-      unknownReason ??= 'rate';
-      continue;
-    }
-    const gainFraction = (holding.value - holding.costBasisEur) / holding.value;
-    const taxableGain = leaf.amount * Math.max(0, gainFraction);
-    tax += estimateSaleTax(taxableGain, holding.taxRate) ?? 0;
+    if (perEuro.kind === 'taxed') tax += leaf.amount * perEuro.perEuro;
   }
 
   if (unknownReason) return { gross, tax: null, net: null, unknownReason };

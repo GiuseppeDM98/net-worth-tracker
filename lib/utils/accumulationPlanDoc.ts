@@ -81,6 +81,9 @@ function toOptimizerSnapshot(data: Record<string, unknown> | undefined): Optimiz
     weights: (data.weights ?? []) as OptimizerSnapshot['weights'],
     objectives: (data.objectives ?? []) as OptimizerSnapshot['objectives'],
     ...(Array.isArray(data.conflicts) ? { conflicts: data.conflicts as NonNullable<OptimizerSnapshot['conflicts']> } : {}),
+    // «Con vendite mirate» only: the cap and the locks the run was computed with.
+    ...(typeof data.taxCapEur === 'number' ? { taxCapEur: data.taxCapEur } : {}),
+    ...(Array.isArray(data.lockedKeys) ? { lockedKeys: data.lockedKeys as string[] } : {}),
   };
 }
 

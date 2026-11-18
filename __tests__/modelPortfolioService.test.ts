@@ -8,15 +8,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const setDocMock = vi.fn();
+const getDocMock = vi.fn();
 vi.mock('@/lib/firebase/config', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn((_db: unknown, collection: string, id: string) => ({ path: `${collection}/${id}` })),
-  getDoc: vi.fn(),
+  getDoc: (...args: unknown[]) => getDocMock(...args),
   setDoc: (...args: unknown[]) => setDocMock(...args),
   deleteDoc: vi.fn(),
 }));
 
-import { saveModelPortfolio } from '@/lib/services/modelPortfolioService';
+import { getModelPortfolio, saveModelPortfolio } from '@/lib/services/modelPortfolioService';
 import { buildModelBasis, modelFingerprint } from '@/lib/utils/modelPortfolio';
 import type { Asset } from '@/types/assets';
 import type { ModelPortfolioInput } from '@/types/modelPortfolio';
@@ -66,5 +67,28 @@ describe('saveModelPortfolio — the fingerprint', () => {
   it('a kept fingerprint that is undefined leaves the field out (an old model stays stale)', async () => {
     await saveModelPortfolio('owner-1', { ...input, keepFingerprint: undefined }, assets, basis);
     expect('fingerprint' in written()).toBe(false);
+  });
+});
+
+describe('getModelPortfolio — the optimizer snapshot', () => {
+  const stored = (snapshot: Record<string, unknown>) =>
+    getDocMock.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ userId: 'owner-1', weights: input.weights, origin: 'optimizer', updatedAt: new Date(0), optimizerSnapshot: snapshot }),
+    });
+  const base = { computedAt: new Date(0), mode: 'targeted', settingsUsed: {}, weights: [], objectives: [] };
+
+  it('reads back the tax cap and the «Non vendere» locks of a targeted run', async () => {
+    stored({ ...base, taxCapEur: 500, lockedKeys: ['etf-b'] });
+    const model = await getModelPortfolio('owner-1');
+    expect(model?.optimizerSnapshot?.taxCapEur).toBe(500);
+    expect(model?.optimizerSnapshot?.lockedKeys).toEqual(['etf-b']);
+  });
+
+  it('leaves both out of a run of the other modes', async () => {
+    stored({ ...base, mode: 'ideal' });
+    const snapshot = (await getModelPortfolio('owner-1'))?.optimizerSnapshot;
+    expect(snapshot && 'taxCapEur' in snapshot).toBe(false);
+    expect(snapshot && 'lockedKeys' in snapshot).toBe(false);
   });
 });

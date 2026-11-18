@@ -16,8 +16,9 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
   chains of `assetAllocationService` keep it — an «Applica» of the Consulente that writes only the targets leaves it.
 - **The engine is pure** (`lib/utils/weightOptimizer.ts`, its types in `types/optimizer.ts`): `runOptimizer` builds
   the candidates and objective rows, `optimizeWeights` solves a convex quadratic program by an exact active-set
-  method (`activeSetQP.ts`, box projection in `boxProjection.ts`). Two modes: **Raggiungibile col PAC** never goes
-  below what is held (the PAC does not sell), **Ideale** ignores what is held. An objective that cannot be met is
+  method (`activeSetQP.ts`, box projection in `boxProjection.ts`). Three modes: **Raggiungibile col PAC** never goes
+  below what is held (the PAC does not sell), **Ideale** ignores what is held, **Con vendite mirate** sells under a
+  tax cap (below; only in the model's dialog, never in the PAC editor). An objective that cannot be met is
   reported as a conflict (`computeConflicts`), never silently dropped; caps that cannot reach 100 are
   `infeasible_bounds`, said before the solver runs. The run happens on «Calcola» / «Prova», in the handler: the
   result is stored with the key of its inputs and shown only while they match — no memo, no effect.
@@ -35,6 +36,32 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
   grid cannot hold the bounds (a frozen 7,3%). A fixed share is put on the nearest hundredth, a «Raggiungibile»
   floor DOWN to the hundredth — the proposal can sit under today's share by less than 0,01 points, never more.
   A fixed row's difference is that rounding only, so the dialog prints «—» there, never euro (owner, 2026-11-17).
+- **«Con vendite mirate»** (`mode: 'targeted'`, 2026-11-18, from PR #488): the same `J(w)` under a cap in euro of
+  tax («Tasse massime (€)») and a «Non vendere» box per row; the rows (name, current weight — the builder's value,
+  never the 1 € stand-in of «Liquidità» — and the box) are on screen before «Calcola». Each sale is priced by the app's
+  ONE rule, `saleTaxPerEuro` (`lib/utils/saleTax.ts`): not taxable → exempt, no EUR basis or no rate → unknown and
+  never sold, the gain fraction floored at 0 (a loss pays nothing and offsets nothing: the losses note is the first
+  line under the table), no sale fee (a proposed sale has none yet). A group is priced at its BUYER, the only member a
+  plan sells (`candidateSaleTaxPerEuro`; a composite buyer's most-taxed sleeve). Where the cap does not bind the
+  result IS «Ideale», at cap 0 it IS «Raggiungibile»; between them a tax-multiplier search (`searchTaxMultiplier`) on the
+  same solver. The tax the Impostazioni limits force (a max below the held weight) is the cap when above it, and the
+  total line says so; a search that does not finish falls back to the least-tax point, never over the cap
+  (`not_converged`). Held weights stay off the half-point grid and the rounding only ever shrinks a sale, inside every
+  bound. **A forced lock** (ticked, disabled, the reason under the name — «Aliquota non impostata», «Costo fiscale
+  sconosciuto», «Bloccato in Impostazioni», «Immobile: resta com’è», «Non si vende sul mercato» for a pension fund)
+  reaches the optimizer as a lock too: a pension fund costs no tax, yet is never sold (2026-11-18). A locked fixed share
+  (a property, a frozen asset) is held at its value, with no `bound_conflict`. **Spending the liquidity is not a
+  sale** (decision 57): `sale.liquiditySpentEur`, out of `soldEur` and `taxEur`, «—» in its «Tasse» cell, «, usi X €
+  di liquidità» in the total line, which is the dialog's reading (four-digit euros ungrouped, «8000 €», as everywhere,
+  owner 2026-11-18). **The cash quota** (owner, 2026-11-18, found at the tour): the accounts and the money-market
+  funds together never go under the allocation's cash quota — the plan's own, `resolvePlanReserve(...).quotaEur`, as
+  `sale.cashFloorEur` — nor under today's level when already below (`applyCashFloor`: every cash row keeps the same
+  share of what it holds as a lower bound; a max in Impostazioni wins), so the PAC made from the run refills no reserve
+  the run spent. The cap and a box clear the result; the snapshot keeps `taxCapEur` and `lockedKeys` (the ticks
+  and the forced locks). At 390 the € difference column yields to «Tasse» (`TARGETED_DIFF_CLASS`), the rows are 44px,
+  the mode pill is three cells. **«Crea un PAC con questi pesi»** seeds the sales (`seedDisposalsFromSale`): sold
+  whole only what the run brings to 0% — then no position —, every other sale in whole shares, a money-market fund
+  too (doc/guide/accumulo.md).
 - **The model** lives in `modelPortfolios/{ownerUid}` (`types/modelPortfolio.ts`): weights per instrument (a group
   of equivalent instruments buys with its first member), an origin (`manual` | `optimizer`), the snapshot of the
   calculation it started from and its **fingerprint**. «Liquidità», a property, a money-market fund and a pension
@@ -63,9 +90,9 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
 
 ## Files
 
-`types/{optimizer,modelPortfolio}.ts` · `lib/constants/idealAllocation.ts` · `lib/utils/{weightOptimizer,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,idealAllocationEditor,runGuarded}.ts` · `lib/services/modelPortfolioService.ts` · `lib/hooks/useModelPortfolio.ts` · `components/allocation/{OptimizerPanel,OptimizerReport,IdealCompositionDialog,ObiettiviDialog,ModelEditDialog}.tsx` · `components/allocation/tiles/{ObiettiviTile,PortafoglioModelloTile}.tsx` · `components/settings/{IdealAllocationTile,IdealAllocationSummary}.tsx` · tests `__tests__/{weightOptimizer,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,modelPortfolioGroups,modelPortfolioService,idealAllocationEditor}.test.ts`, `__tests__/{idealCompositionDialog,obiettiviDialog,portafoglioModelloTile}.test.tsx` · E2E `e2e/accumulo.spec.ts` (the criteria planted and restored by `e2e/accumuloFixture.ts`).
+`types/{optimizer,modelPortfolio}.ts` · `lib/constants/idealAllocation.ts` · `lib/utils/{weightOptimizer,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,idealAllocationEditor,runGuarded,saleTax}.ts` · `lib/services/modelPortfolioService.ts` · `lib/hooks/useModelPortfolio.ts` · `components/allocation/{OptimizerPanel,OptimizerReport,IdealCompositionDialog,ObiettiviDialog,ModelEditDialog}.tsx` · `components/allocation/tiles/{ObiettiviTile,PortafoglioModelloTile}.tsx` · `components/settings/{IdealAllocationTile,IdealAllocationSummary}.tsx` · tests `__tests__/{weightOptimizer,weightOptimizerTargeted,saleTax,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,modelPortfolioGroups,modelPortfolioService,idealAllocationEditor}.test.ts`, `__tests__/{idealCompositionDialog,obiettiviDialog,portafoglioModelloTile}.test.tsx` · E2E `e2e/accumulo.spec.ts` (the criteria and, for «Con vendite mirate», `taxRate` on two seed ETFs planted and restored by `e2e/accumuloFixture.ts`).
 
-- **Suites to run after a change here — Portafoglio modello** (2026-11-18): `weightOptimizer`, `weightOptimizerNarrative`,
+- **Suites to run after a change here — Portafoglio modello** (2026-11-18): `weightOptimizer`, `weightOptimizerTargeted`, `saleTax`, `allocazioneSummary`, `accumulationPlanUtils`, `weightOptimizerNarrative`,
   `activeSetQP`, `boxProjection`, `modelPortfolio`, `modelPortfolioGroups`, `modelPortfolioService`, `idealAllocationEditor`,
   `settingsDraft` (the module hygiene), `settingsRoundTrip`, `settingsNarrative`, `allocazioneNarrative` (the page reads no
   model), `accumuloSummary`, `accumuloTileSentences`, `mirrorCollections` · **dom** `idealCompositionDialog`, `obiettiviDialog`,
@@ -77,7 +104,12 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
   editor read.
 - **The optimizer weighs class, leverage, factor, instrument and group objectives only**; a class objective and a
   leverage objective can disagree, and the report then names the conflict instead of picking a side.
-- **The model never sells**: an instrument above its model weight stays above it, and the tile says so.
+- **The model never sells**: an instrument above its model weight stays above it, and the tile says so — then points
+  at «Ricalcola», whose «Con vendite mirate» sells under a tax cap (`MODEL_TARGETED_HINT`, always under the table).
+- **«Crea un PAC» filters the liquidity and a property out of the sales even though the optimizer already sells
+  neither** (the liquidity's row sells 0, a locked fixed share is held): a guard, so mutating the filter alone stays
+  green.
+- **A sale at a loss counts 0,00 € in «Tasse»**, never a credit; the estimate takes no past losses either.
 - **In the model's dialog «Liquidità» always takes the rest**: caps that cannot reach 100 show up only in the PAC
   editor's «Ottimizzato» path, where the candidates are the plan's instruments.
 - **The census fixture and the mobile budget have no model**: the tab with a model is measured by hand.

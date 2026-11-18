@@ -88,6 +88,17 @@ describe('validateDraftAgainstAssets — one case per code', () => {
     expect(issues.some((i) => i.code === 'position_not_tradable')).toBe(true);
   });
 
+  // A money-market fund (cash class): a plan may SELL it (owner, 2026-11-18), never buy it.
+  it('position_not_tradable: a money-market fund may be sold, never bought', () => {
+    const monetario = makeAsset({ id: 'mm', name: 'Monetario', assetClass: 'cash', quantity: 10, currentPrice: 100 });
+    const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A' });
+    const position = { id: 'p1', label: 'ETF-A', targetPercentage: 100, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' };
+    const selling = baseDraft({ positions: [position], disposals: [{ assetId: 'mm', quantity: 4, estimatedProceedsEur: 400, status: 'planned' }] });
+    expect(validateDraftAgainstAssets(selling, byId(monetario, etfA)).filter((i) => i.assetId === 'mm')).toEqual([]);
+    const buying = baseDraft({ positions: [{ id: 'p2', label: 'Monetario', targetPercentage: 100, memberAssetIds: ['mm'], buyAssetId: 'mm' }] });
+    expect(validateDraftAgainstAssets(buying, byId(monetario)).some((i) => i.code === 'position_not_tradable')).toBe(true);
+  });
+
   it('source_not_cash', () => {
     const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A' });
     const draft = baseDraft({ liquidity: { sourceCashAssetIds: ['etf-a'], reserveEur: 0, monthlyInflowEur: 0 } });

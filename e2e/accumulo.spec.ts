@@ -16,7 +16,17 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { plantCriteria, plantModel, readCriteriaEnabled, readModel, removeModel, restoreCriteria, type StoredCriteria } from './accumuloFixture';
+import {
+  plantCriteria,
+  plantModel,
+  plantTaxRates,
+  readCriteriaEnabled,
+  readModel,
+  removeModel,
+  removeTaxRates,
+  restoreCriteria,
+  type StoredCriteria,
+} from './accumuloFixture';
 
 let stored: StoredCriteria = null;
 
@@ -76,5 +86,29 @@ test.describe('Portafoglio modello', () => {
     await plantModel('00000000');
     await openAccumulo(page);
     await expect(tileOf(page)).toContainText('superato', { timeout: 30_000 });
+  });
+});
+
+// «Con vendite mirate» (2026-11-18): the rows before «Calcola», a forced lock said in words, the cap, the total line
+// and the «Tasse» column. The seed rates only seed-btp: the two instruments it may sell get 26% for this test.
+test.describe('Con vendite mirate', () => {
+  test.beforeAll(plantTaxRates);
+  test.afterAll(removeTaxRates);
+
+  test('Bitcoin bloccato con «Aliquota non impostata»; un blocco, un tetto, «Calcola»: la riga del totale e la colonna «Tasse»', async ({ page }) => {
+    await openAccumulo(page);
+    await tileOf(page).getByRole('button', { name: 'Ricalcola' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: 'Con vendite mirate' }).click();
+    const bitcoin = dialog.getByRole('checkbox', { name: 'Bitcoin' });
+    await expect(bitcoin).toBeChecked();
+    await expect(bitcoin).toBeDisabled();
+    await expect(dialog.getByRole('row').filter({ hasText: 'Bitcoin' })).toContainText('Aliquota non impostata');
+    await dialog.getByRole('checkbox', { name: 'Vanguard FTSE All-World' }).click();
+    await dialog.getByLabel('Tasse massime (€)').fill('500');
+    await dialog.getByRole('button', { name: 'Calcola', exact: true }).click();
+    await expect(dialog.getByRole('status')).toContainText(/Vendi|Nessuna vendita/);
+    await expect(dialog.getByRole('columnheader', { name: 'Tasse' })).toBeVisible();
+    await expect(dialog.getByText('Le stime non compensano le minusvalenze')).toBeVisible();
   });
 });

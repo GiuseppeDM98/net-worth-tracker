@@ -278,9 +278,7 @@ export function PortafoglioModelloTile({
                 <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(comparison.outside.valueEur, true)}</span>
               </p>
             )}
-            {overweightLabels.length > 0 && (
-              <p className="mt-2 text-[11px] text-muted-foreground">{describeModelSalesHint(overweightLabels)}</p>
-            )}
+            <p className="mt-2 text-[11px] text-muted-foreground">{describeModelSalesHint(overweightLabels)}</p>
             {debtNote && <p className="mt-1 text-[11px] text-muted-foreground">{debtNote}</p>}
           </div>
         )}

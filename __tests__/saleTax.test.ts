@@ -1,11 +1,81 @@
 /**
- * Tests for lib/utils/saleTax.ts — the estimate of a sale's capital-gains tax and what the sale
- * form sends for «Tasse trattenute».
+ * Tests for lib/utils/saleTax.ts — the estimate of a sale's capital-gains tax, the per-euro rule every
+ * PROPOSED sale reads (a plan's legs, «Con vendite mirate»), and what the sale form sends for «Tasse
+ * trattenute».
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { estimateSaleTax, prefillWithheldTax, resolveWithheldTaxToSend } from '@/lib/utils/saleTax';
+import type { AllocatableHolding } from '@/lib/utils/allocationUtils';
+import {
+  candidateSaleTaxPerEuro,
+  estimateSaleTax,
+  prefillWithheldTax,
+  resolveWithheldTaxToSend,
+  saleTaxPerEuro,
+} from '@/lib/utils/saleTax';
+
+const holding = (overrides: Partial<AllocatableHolding>): AllocatableHolding => ({
+  id: 'h',
+  label: 'Holding',
+  assetClass: 'equity',
+  value: 10000,
+  tradable: true,
+  taxableOnSale: true,
+  ...overrides,
+});
+
+describe('saleTaxPerEuro', () => {
+  it('should exempt a holding that cannot be taxed on sale (an account, a pension fund)', () => {
+    expect(saleTaxPerEuro(holding({ taxableOnSale: false, costBasisEur: 2000, taxRate: 26 }))).toEqual({ kind: 'exempt' });
+  });
+
+  it('should be unknown — never zero — without a EUR cost basis or without a rate', () => {
+    expect(saleTaxPerEuro(holding({ taxRate: 26 }))).toEqual({ kind: 'unknown', reason: 'cost-basis' });
+    expect(saleTaxPerEuro(holding({ costBasisEur: 8000 }))).toEqual({ kind: 'unknown', reason: 'rate' });
+  });
+
+  it('should tax the gain share of each euro at the rate: 10.000 € on a basis of 8.000 € at 26% → 0,052', () => {
+    const tax = saleTaxPerEuro(holding({ value: 10000, costBasisEur: 8000, taxRate: 26 }));
+    expect(tax.kind).toBe('taxed');
+    expect(tax.kind === 'taxed' && tax.perEuro).toBeCloseTo(0.052, 12);
+  });
+
+  it('should charge nothing on a position at a loss, and never a negative rate', () => {
+    expect(saleTaxPerEuro(holding({ value: 10000, costBasisEur: 12000, taxRate: 26 }))).toEqual({ kind: 'taxed', perEuro: 0 });
+  });
+});
+
+describe('candidateSaleTaxPerEuro', () => {
+  it("should price a composite buyer's two sleeves at its one rate", () => {
+    const sleeves = [
+      holding({ id: 'buyer#0', assetId: 'buyer', value: 6000, costBasisEur: 4800, taxRate: 26 }),
+      holding({ id: 'buyer#1', assetId: 'buyer', assetClass: 'bonds', value: 4000, costBasisEur: 3200, taxRate: 26 }),
+    ];
+    const tax = candidateSaleTaxPerEuro('buyer', sleeves);
+    expect(tax.kind === 'taxed' && tax.perEuro).toBeCloseTo(0.052, 12);
+  });
+
+  it("should read only the buyer: another member's unknown basis neither locks nor raises it", () => {
+    const holdings = [
+      holding({ id: 'buyer', value: 10000, costBasisEur: 8000, taxRate: 26 }),
+      holding({ id: 'member', value: 10000, taxRate: 26 }),
+    ];
+    const tax = candidateSaleTaxPerEuro('buyer', holdings);
+    expect(tax.kind === 'taxed' && tax.perEuro).toBeCloseTo(0.052, 12);
+  });
+
+  it("should be unknown when the buyer's own basis is", () => {
+    expect(candidateSaleTaxPerEuro('buyer', [holding({ id: 'buyer', taxRate: 26 })])).toEqual({
+      kind: 'unknown',
+      reason: 'cost-basis',
+    });
+  });
+
+  it('should be exempt when the buyer has no holding (the liquidity, a candidate held at zero)', () => {
+    expect(candidateSaleTaxPerEuro('buyer', [holding({ id: 'other', costBasisEur: 8000, taxRate: 26 })])).toEqual({ kind: 'exempt' });
+  });
+});
 
 describe('estimateSaleTax', () => {
   it('should apply the rate to the taxable gain, unrounded', () => {
