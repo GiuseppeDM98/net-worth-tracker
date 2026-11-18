@@ -89,3 +89,29 @@ describe('AssetDialog — createEmpty', () => {
     }
   });
 });
+
+describe('AssetDialog — prefill (the Consulente\'s hand-off, 2026-11-12)', () => {
+  const PREFILL = { name: 'ETF ornitorinco', ticker: 'ORNI.MI', isin: 'IE00AAAAAAA1', type: 'etf' as const, assetClass: 'equity' as const, subCategory: 'Mondo' };
+
+  // Seen red with `prefill` dropped from the step the open settles (the create lands on the type picker).
+  it('opens on step 2 with name, ticker and ISIN filled, and creates at quantity 0 with the sub-category, no trade', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AssetDialog open onClose={() => {}} createEmpty prefill={PREFILL} />
+      </QueryClientProvider>,
+    );
+    const name = await waitFor(() => {
+      const input = document.getElementById('name') as HTMLInputElement | null;
+      expect(input).not.toBeNull();
+      return input!;
+    });
+    expect(name.value).toBe('ETF ornitorinco');
+    expect((document.getElementById('ticker') as HTMLInputElement).value).toBe('ORNI.MI');
+    expect((document.getElementById('isin') as HTMLInputElement).value).toBe('IE00AAAAAAA1');
+    fireEvent.click(screen.getByRole('button', { name: /^Crea/ }));
+    await waitFor(() => expect(writes.createAsset).toHaveBeenCalledTimes(1));
+    const [, data] = writes.createAsset.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(data).toMatchObject({ name: 'ETF ornitorinco', ticker: 'ORNI.MI', isin: 'IE00AAAAAAA1', type: 'etf', assetClass: 'equity', subCategory: 'Mondo', quantity: 0, createdEmpty: true });
+    expect(writes.createTrade).not.toHaveBeenCalled();
+  });
+});

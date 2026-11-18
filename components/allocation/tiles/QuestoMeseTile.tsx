@@ -574,12 +574,12 @@ export function QuestoMeseTile({
       >
         {pastReviewNote}
         {belowReserve && !refilling && (
-          <p className="mt-2 text-[12px] text-warning-foreground">
+          <div className="mt-2 text-[12px] text-warning-foreground">
             <NarrativeText
               segments={describeReserveWarning({ sourceCashEur: planSourceCashEur, reserveEur: plan.liquidity.reserveEur, belowReserve: true }) ?? []}
               className="inline"
             />
-          </p>
+          </div>
         )}
 
         {proposal && (

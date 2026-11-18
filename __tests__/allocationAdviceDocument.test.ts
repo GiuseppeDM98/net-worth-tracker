@@ -4,8 +4,12 @@
  * always an array.
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS, runStageStates, stageOfRunStage } from '@/lib/utils/allocationAdviceDocument';
+import type { AccumulationPlan } from '@/types/accumulationPlan';
+import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
+import { applyHandoffOf, CONSULENTE_HANDOFF_HREF, handoffProposalOf, isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS, runStageStates, stageOfRunStage } from '@/lib/utils/allocationAdviceDocument';
 
 const AT = new Date('2026-10-20T10:00:00.000Z');
 
@@ -127,5 +131,47 @@ describe('the interview on the document (2026-11-08: null when absent)', () => {
     const document = mapAllocationAdviceData('u1', { status: 'ready', answers: {}, stage: 'review', createdAt: AT, updatedAt: AT });
     expect(document.interview).toBeNull();
     expect(document.revisionInterview).toBeNull();
+  });
+});
+
+// ── The hand-off after «Applica» (owner, 2026-11-12) ──────────────────────────────────────────
+describe('applyHandoffOf: what «Applica» offers after the write', () => {
+  const proposal = { summary: 'S.', classes: [], assetRoles: [], goals: [], reviewByIso: '2027-11-18', reviewReason: '', risks: [] };
+  const applied = (targetsWritten: boolean) => ({
+    ...mapAllocationAdviceData('u1', { status: 'applied', answers: {}, createdAt: AT, updatedAt: AT }),
+    report: { markdown: 'r', proposal, model: 'o', finishedAt: AT },
+    applied: { at: AT, targetsWritten, rolesChanged: 0, goalsWritten: 0 },
+  }) as AllocationAdviceDocument;
+  const plan = (status: AccumulationPlan['status']) => ({ status }) as AccumulationPlan;
+
+  // Mutation: 'offer' while the plans load → red.
+  it('offers the link only on an applied document that wrote the targets, with no open plan or a failed read', () => {
+    const ready = { ...applied(true), status: 'ready' } as AllocationAdviceDocument;
+    expect(applyHandoffOf(ready, { open: undefined })).toBe('none');
+    expect(applyHandoffOf(applied(false), { open: undefined })).toBe('none');
+    expect(applyHandoffOf(applied(true), 'loading')).toBe('none');
+    expect(applyHandoffOf(applied(true), 'failed')).toBe('offer');
+    expect(applyHandoffOf(applied(true), { open: plan('draft') })).toBe('draft');
+    expect(applyHandoffOf(applied(true), { open: plan('active') })).toBe('none');
+    expect(applyHandoffOf(applied(true), { open: undefined })).toBe('offer');
+  });
+
+  it('the proposal is the report\'s, then the strategy\'s; none unless applied with the targets written', () => {
+    expect(handoffProposalOf(applied(true))).toBe(proposal);
+    expect(handoffProposalOf({ ...applied(true), report: null, strategy: { markdown: 's', proposal, model: 'o', finishedAt: AT } })).toBe(proposal);
+    expect(handoffProposalOf(applied(false))).toBeNull();
+    expect(handoffProposalOf(null)).toBeNull();
+    expect(CONSULENTE_HANDOFF_HREF).toBe('/dashboard/allocation?tab=accumulo&da=consulente');
+  });
+
+  // Mutation: the hand-off imported into `ConsulenteReport` → red. The Consulente's route never loads the optimizer.
+  it('the Consulente\'s components import neither the hand-off module nor the optimizer', () => {
+    const dir = join(process.cwd(), 'components/allocation/consulente');
+    const sources = readdirSync(dir).filter((name) => name.endsWith('.tsx'));
+    expect(sources.length).toBeGreaterThan(0);
+    for (const name of sources) {
+      const text = readFileSync(join(dir, name), 'utf8');
+      expect(text, name).not.toMatch(/allocationAdviceHandoff|weightOptimizer/);
+    }
   });
 });

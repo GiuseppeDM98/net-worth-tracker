@@ -22,8 +22,10 @@ import {
   plantTaxRates,
   readCriteriaEnabled,
   readModel,
+  removeAccumuloFixture,
   removeModel,
   removeTaxRates,
+  seedAccumuloFixture,
   restoreCriteria,
   type StoredCriteria,
 } from './accumuloFixture';
@@ -110,5 +112,35 @@ test.describe('Con vendite mirate', () => {
     await expect(dialog.getByRole('status')).toContainText(/Vendi|Nessuna vendita/);
     await expect(dialog.getByRole('columnheader', { name: 'Tasse' })).toBeVisible();
     await expect(dialog.getByText('Le stime non compensano le minusvalenze')).toBeVisible();
+  });
+});
+
+// The two columns end on one line at 1440 (owner, 2026-11-18, as Bilanciamento's Piano and Per classe — NOVE-02):
+// the bottom tile of the shorter column is stretched to the other's bottom edge — Portafoglio modello on the
+// left, Criteri del modello on the right. Seen red with `desktop:self-start` back on the model's cell.
+test.describe('le due colonne finiscono sulla stessa riga', () => {
+  const bottom = async (page: Page, label: string) => {
+    const box = await page.locator(`section[aria-label="${label}"]`).boundingBox();
+    return box!.y + box!.height;
+  };
+  const expectOneLine = async (page: Page, label: string) => {
+    const [model, criteria] = await Promise.all([bottom(page, 'Portafoglio modello'), bottom(page, 'Criteri del modello')]);
+    expect(Math.abs(model - criteria), `${label}: i bordi inferiori`).toBeLessThanOrEqual(1);
+  };
+
+  test('senza piano', async ({ page }) => {
+    await openAccumulo(page);
+    await expectOneLine(page, 'senza piano');
+  });
+
+  test('con un piano attivo', async ({ page }) => {
+    await seedAccumuloFixture();
+    try {
+      await openAccumulo(page);
+      await expect(page.locator('section[aria-label="Classi del piano"]')).toBeVisible({ timeout: 60_000 });
+      await expectOneLine(page, 'con un piano');
+    } finally {
+      await removeAccumuloFixture();
+    }
   });
 });

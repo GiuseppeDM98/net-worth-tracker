@@ -11,7 +11,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdviceProposal';
 
 let firstWrite: unknown = null;
-const { setMock, patchMock, getMock, ytdMock, cashflowMock, profilesMock, archiveMock, historyMock } = vi.hoisted(() => ({
+const { setMock, patchMock, getMock, ytdMock, cashflowMock, profilesMock, archiveMock, historyMock, planMock } = vi.hoisted(() => ({
+  // The plan of accumulation's read (owner, 2026-11-12): «no active plan» unless a test says otherwise.
+  // Without this mock the real reader would meet `adminDb: {}` and every run would take its failed path.
+  planMock: vi.fn(),
   setMock: vi.fn(),
   patchMock: vi.fn(),
   getMock: vi.fn(),
@@ -33,6 +36,7 @@ vi.mock('@/lib/server/allocationAdvice/store', () => ({
   archiveAllocationAdviceAdmin: archiveMock,
   listAllocationAdviceHistoryAdmin: historyMock,
 }));
+vi.mock('@/lib/server/allocationAdvice/accumulationPlan', () => ({ readAccumulationPlanForAdvice: planMock }));
 vi.mock('@/lib/services/assistantMonthContextService', () => ({ buildAssistantYtdContext: ytdMock, fetchCashflowBlockInputs: cashflowMock }));
 vi.mock('@/lib/server/exposure/instrumentProfileService', () => ({ resolveInstrumentProfiles: profilesMock }));
 // Partial: the strategy prints the cashflow block through the real `formatCashflowBlockSection`.
@@ -148,6 +152,7 @@ describe('runAllocationAdvice', () => {
     historyMock.mockResolvedValue([]);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('runs the three stages in order, on their models, efforts and formats, with web search only for the instruments, and persists each', async () => {
@@ -253,6 +258,7 @@ describe('runAllocationAdviceStage', () => {
     historyMock.mockResolvedValue([]);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('the strategy creates the document and stops there; the instruments continue the persisted one from the store', async () => {
@@ -390,7 +396,7 @@ describe('runAllocationAdviceStage', () => {
     expect(cashflowMock).toHaveBeenCalledWith('u1', NOW);
     const [strategy, instruments, review] = calls.mock.calls.map(userTurn);
     expect(strategy).toContain('--- CASHFLOW 12 MESI (');
-    expect(strategy).toContain('FAMIGLIA, OBBLIGAZIONI e CASHFLOW 12 MESI sono esaustivi');
+    expect(strategy).toContain('OBBLIGAZIONI, PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi');
     expect(instruments).not.toContain('CASHFLOW 12 MESI');
     expect(review).not.toContain('CASHFLOW 12 MESI');
   });
@@ -419,6 +425,39 @@ describe('runAllocationAdviceStage', () => {
     expect(calls).not.toHaveBeenCalled();
     expect(patchMock.mock.calls.at(-1)?.[1]).toMatchObject({ status: 'failed', stage: 'context' });
   });
+  // ── The PIANO DI ACCUMULO block (owner, 2026-11-12): read by the strategy and the review, never by the instruments ──
+  // Mutation that turns it red: the block skipped in `runReview`.
+  it('a whole run prints the plan block to the strategy and the review, never to the instruments, read with the owner and the run clock', async () => {
+    const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(PROPOSAL), 'end_turn', 'opus'));
+    await runAllocationAdvice({ userId: 'u1', answers: ANSWERS, onStage: vi.fn(), now: NOW });
+    const [strategy, instruments, review] = calls.mock.calls.map(userTurn);
+    expect(strategy).toContain('--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.');
+    expect(review).toContain('--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.\n\nScrivi il report finale come descritto.');
+    expect(instruments).not.toContain('PIANO DI ACCUMULO');
+    expect(planMock).toHaveBeenCalledTimes(2);
+    for (const call of planMock.mock.calls) expect(call).toEqual(['u1', NOW]);
+  });
+
+  it('a plan that was not read still completes the run, and the block says so', async () => {
+    planMock.mockResolvedValue({ read: false });
+    const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(PROPOSAL), 'end_turn', 'opus'));
+    const document = await runAllocationAdvice({ userId: 'u1', answers: ANSWERS, onStage: vi.fn(), now: NOW });
+    expect(document.status).toBe('ready');
+    expect(userTurn(calls.mock.calls[2])).toContain("Il piano di accumulo non è stato letto in questa corsa: non so se ce n'è uno.");
+  });
+
+  it('a revision and an interview round carry the block too', async () => {
+    const withReport = { ...afterStrategy(), instruments: { markdown: '- trovato.', candidates: null, model: 'sonnet', webSearchUsed: true, finishedAt: NOW }, report: { markdown: 'r', proposal: PROPOSAL as never, model: 'o', finishedAt: NOW } };
+    const revise = answerWith(message(reviewText(PROPOSAL)));
+    await runAllocationAdviceStage({ userId: 'u1', stage: 'revise', document: withReport, request: 'meno cripto', onStage: vi.fn(), now: NOW });
+    expect(userTurn(revise.mock.calls[0])).toContain("--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.\n\nRiscrivi il report intero");
+    expect(planMock).toHaveBeenCalledWith('u1', NOW);
+    vi.restoreAllMocks();
+    getMock.mockResolvedValue(null);
+    const round = answerWith(message(JSON.stringify({ note: 'n', satisfied: true, questions: [] })));
+    await runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn(), now: NOW });
+    expect(userTurn(round.mock.calls[0])).toContain('--- PIANO DI ACCUMULO ---');
+  });
 });
 
 // ── The interview round (2026-11-08: no write, the format, the revision mode) ──────────────
@@ -438,6 +477,7 @@ describe('runInterviewRound', () => {
     getMock.mockResolvedValue(null);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('calls the strategy model ONCE with its effort, the interview budget and the round\'s schema, writes nothing, and hands the round on', async () => {
@@ -554,6 +594,7 @@ describe('the interview on the run (the IL COLLOQUIO block and the document, 202
     getMock.mockResolvedValue(null);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('the strategy writes the interview on the new document and prints it; the review prints it too, the instruments never', async () => {
@@ -629,6 +670,7 @@ describe('the bond block in the Consulente context', () => {
     historyMock.mockResolvedValue([]);
     getMock.mockResolvedValue(null);
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('with no bond in the portfolio the block says so, under the data, and no profile is asked', async () => {
@@ -692,6 +734,7 @@ describe('the previous paths: the archive and the block', () => {
     historyMock.mockResolvedValue([]);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('the strategy archives the replaced document when it has a report, BEFORE writing the new one, and lists it with the archive, the most recent first', async () => {

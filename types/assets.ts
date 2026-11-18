@@ -179,6 +179,17 @@ export type AssetOwnerShare =
   | { memberId: string; units: number } // > 0
   | { memberId: string; percent: number }; // 0-100
 
+// What a create of `AssetDialog` may start from (2026-11-12): the Consulente's hand-off prefills an
+// instrument it proposes and the owner does not hold yet (`planConsulenteHandoff`), created at 0 quotes.
+export interface AssetPrefill {
+  name: string;
+  ticker: string;
+  isin?: string;
+  type: AssetType;
+  assetClass: AssetClass;
+  subCategory: string;
+}
+
 // Core asset model representing a single financial holding.
 // Supports stocks, ETFs, bonds, crypto, real estate, cash, commodities.
 // Includes automatic price updates via Yahoo Finance (unless autoUpdatePrice=false).

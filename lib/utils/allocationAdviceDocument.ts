@@ -7,7 +7,8 @@
  */
 
 import { toDate } from '@/lib/utils/dateHelpers';
-import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdviceProposal';
+import type { AllocationAdviceAnswers, AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
+import type { AccumulationPlan } from '@/types/accumulationPlan';
 import {
   ALLOCATION_ADVICE_STAGES,
   type AllocationAdviceDocument,
@@ -63,6 +64,31 @@ export function pageShowsReport(args: { document: AllocationAdviceDocument | nul
 }
 
 // ─── The run's stage rows (2026-11-07) ────────────────────────────────────────
+
+/** The proposal a plan may be built toward: an applied document that wrote the targets (2026-11-12). */
+export function handoffProposalOf(
+  document: AllocationAdviceDocument | null | undefined,
+): AllocationAdviceProposal | null {
+  if (!document || document.status !== 'applied' || !document.applied?.targetsWritten) return null;
+  return document.report?.proposal ?? document.strategy?.proposal ?? null;
+}
+
+export type ApplyHandoff = 'offer' | 'draft' | 'none';
+/** Where «Crea un piano di accumulo verso questa allocazione» lands: the Accumulo tab opens «Dal Consulente». */
+export const CONSULENTE_HANDOFF_HREF = '/dashboard/allocation?tab=accumulo&da=consulente';
+
+/**
+ * What «Applica» offers after the write (2026-11-12): the link, the draft's note, or nothing — an
+ * active plan has its own note. Nothing while the plans load, rather than a link it may withdraw;
+ * a failed read keeps the link (the plan's lock refuses a second open plan).
+ */
+export function applyHandoffOf(document: AllocationAdviceDocument,
+  plans: 'loading' | 'failed' | { open: AccumulationPlan | undefined }): ApplyHandoff {
+  if (!handoffProposalOf(document) || plans === 'loading') return 'none';
+  if (plans === 'failed') return 'offer';
+  if (plans.open?.status === 'active') return 'none';
+  return plans.open?.status === 'draft' ? 'draft' : 'offer';
+}
 
 export type StageRowState = 'done' | 'active' | 'pending' | 'failed';
 

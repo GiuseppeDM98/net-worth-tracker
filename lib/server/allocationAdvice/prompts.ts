@@ -30,6 +30,9 @@ import {
 import { formatQuestionAnswersForPrompt } from '@/lib/utils/questionSet';
 import { describeRoundCount } from '@/lib/utils/allocationAdviceNarrative';
 import { formatCashflowBlockSection, type AssistantPromptParts } from '@/lib/server/assistant/prompts';
+// Types only: the prompts' tests never load `server-only` nor the Admin SDK through the reader.
+import type { AccumulationPlanRead } from './accumulationPlan';
+import type { InstallmentLineStatus } from '@/types/accumulationPlan';
 
 function eur(value: number): string {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
@@ -153,7 +156,7 @@ const STRATEGY_CONTRACT = [
   "2. **L'allocazione proposta** — ogni classe con la percentuale e il perché; per ogni classe i sotto-target (nome e % della classe); la liquidità come percentuale o come riserva fissa in euro, dicendo quale e perché.",
   '3. **Casa, fondi pensione e illiquidi** — il ruolo scelto dall\'utente e il tuo giudizio su di esso.',
   '4. **Obiettivi** — per ogni obiettivo tenuto o nuovo: a quali strumenti POSSEDUTI legarlo e con quale quota (percentuale dello strumento), coerente con la sua scadenza e priorità; le quote dello stesso strumento su più obiettivi non superano il 100%; un obiettivo che l\'utente ha segnato da eliminare non compare.',
-  '5. **Cosa cambia rispetto a oggi** — le differenze principali con i target attuali e con le classi attuali, in punti percentuali.',
+  "5. **Cosa cambia rispetto a oggi** — le differenze principali con i target attuali e con le classi attuali, in punti percentuali; poi come arrivarci: accumulando con il risparmio mensile (un piano di accumulo che compra le classi sotto target) o vendendo, e in quanto tempo all'incirca, con la rata mensile come ordine di grandezza (una cifra tonda), dalla mediana del risparmio mensile del blocco CASHFLOW 12 MESI (senza quel blocco non stimare né il tempo né la rata); se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va già in quella direzione o va rivisto. Nessuna tabella di rate o di quote per strumento: le cifre esatte le calcola l'app dopo «Applica».",
   '6. **Rischi e revisione** — i rischi del piano e quando rivederlo (una data, motivata: di norma fra 1 e 3 anni, o prima se un obiettivo scade).',
   '',
   "Se i dati contengono il blocco IL PIANO IN VIGORE E IL PERCHÉ, è il piano che l'utente segue oggi e le ragioni di allora: non ripartire da zero. Tieni ciò che regge ancora, cambia ciò che i dati nuovi o le risposte nuove contraddicono, e aggiungi la sezione **Rispetto al piano precedente** (fra «Cosa cambia rispetto a oggi» e «Rischi e revisione») che dice cosa confermi, cosa cambi e perché, richieste di modifica di allora comprese.",
@@ -189,9 +192,9 @@ export function formatPriorPlanForPrompt(plan: AllocationAdvicePriorPlan): strin
 
 /** The data intro of a run WITH the cashflow block, shared by the strategy and the interview so they never drift (2026-11-08). */
 const DATA_INTRO =
-  "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI e CASHFLOW 12 MESI sono esaustivi. Il blocco CASHFLOW del periodo copre solo l'anno in corso: per entrate, spesa e risparmio usa il blocco CASHFLOW 12 MESI.";
+  "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI, PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi. Il blocco CASHFLOW del periodo copre solo l'anno in corso: per entrate, spesa e risparmio usa il blocco CASHFLOW 12 MESI.";
 const DATA_INTRO_WITHOUT_CASHFLOW =
-  "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA e OBBLIGAZIONI sono esaustivi.";
+  "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI e PIANO DI ACCUMULO sono esaustivi.";
 
 /** One path's answers in a line: what the comparison with today needs, the rest stays in the archive. */
 function formatPathAnswersLine(answers: AllocationAdviceAnswers): string {
@@ -265,6 +268,35 @@ export function formatPreviousPathsForPrompt(previous: AllocationAdvicePreviousP
     }
   });
   return lines.join('\n');
+}
+
+const PLAN_SALE_STATUS: Record<InstallmentLineStatus, string> = {
+  planned: 'da fare', executed: 'fatta', skipped: 'saltata',
+};
+
+/**
+ * The PIANO DI ACCUMULO block (owner, 2026-11-12): the active plan in one line (month k of N, the
+ * instalment, the end month), what it buys with its quotas and what it sells — or which absence
+ * it is: «nessun piano» and «non letto» are two different facts (The Absence-Has-Three-Names
+ * Rule). Never the model nor its criteria. Read by the strategy, the interview, the review and
+ * the revision; the instruments stage does not get it.
+ */
+export function formatAccumulationPlanForPrompt(state: AccumulationPlanRead): string {
+  const header = '--- PIANO DI ACCUMULO ---';
+  if (!state.read) return `${header}\nIl piano di accumulo non è stato letto in questa corsa: non so se ce n'è uno.`;
+  const plan = state.plan;
+  if (!plan) return `${header}\nNessun piano di accumulo attivo.`;
+  const head = plan.monthIndex === 0
+    ? `Piano attivo, non ancora partito: parte a ${plan.startMonth}, ${plan.months} mesi fino a ${plan.endMonth}, `
+      + `prima rata ${eur(plan.instalmentEur)}.`
+    : `Piano attivo: mese ${plan.monthIndex} di ${plan.months}, rata del mese ${eur(plan.instalmentEur)}, `
+      + `ultimo mese ${plan.endMonth}.`;
+  const buys = plan.buys.map((buy) => `${buy.name} ${buy.targetPercentage}%`).join(' · ');
+  // An absent month is month 1, as the plan's own sales read it.
+  const sells = plan.sells.length === 0 ? 'niente' : plan.sells.map((sell) =>
+    `${sell.name}, ${sell.quantity === null ? 'tutte le quote' : `${sell.quantity} quote`}, al mese `
+    + `${sell.monthIndex ?? 1} (${PLAN_SALE_STATUS[sell.status]})`).join(' · ');
+  return [header, head, `Compra, con le quote del piano: ${buys}.`, `Vende: ${sells}.`].join('\n');
 }
 
 /**
@@ -425,7 +457,7 @@ const REVIEW_CONTRACT = [
   "3. **Gli strumenti** — per ogni sotto-target lo strumento consigliato (ISIN e borsa), perché lui, e se è già in portafoglio; per gli obbligazionari la duration e l'orizzonte (l'obiettivo) che coprono; se la ricerca non ha verificato qualcosa, dillo.",
   '4. **Gli obiettivi** — ogni obiettivo con gli strumenti legati e le quote.',
   '5. **Casa, fondi pensione e illiquidi** — il ruolo e il giudizio.',
-  '6. **Cosa fare adesso** — i passi concreti, in ordine, con i costi fiscali di un eventuale cambio di strumento.',
+  "6. **Cosa fare adesso** — i passi concreti, in ordine, con i costi fiscali di un eventuale cambio di strumento; poi la strada che la strategia indica per arrivare ai target — accumulare con il risparmio mensile o vendere, il tempo indicativo e la rata come la strategia li stima, senza ricalcolarli — e, se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va verso i nuovi target o va rivisto. Il piano esatto lo calcola l'app dopo «Applica» («Crea un piano di accumulo verso questa allocazione»): niente tabelle di rate né quote mensili per strumento.",
   '7. **Rischi e revisione** — e la data entro cui rivedere il piano.',
   '',
   'In `proposal` la proposta con gli stessi campi della strategia (il suo blocco `allocation-proposal` nei dati qui sotto), rivista alla luce degli strumenti: in ogni sotto-target "instrument" nomina lo strumento scelto (nome e ISIN); le percentuali, i ruoli, gli obiettivi e la data di revisione restano coerenti con il testo. Se non cambi nulla della strategia, ricopia la sua proposta.',
@@ -450,7 +482,7 @@ export function buildRevisionPrompt(
   candidates: InstrumentCandidates | null,
   previousReport: string,
   requests: readonly string[],
-  opts: { interview?: AllocationAdviceInterview | null } = {}
+  opts: { interview?: AllocationAdviceInterview | null; accumulationPlan?: string } = {}
 ): AssistantPromptParts {
   // The REVISION's round (asked on the written request, 2026-11-08), never the path's: that one
   // reached the revision through the strategy and the previous report it already carries.
@@ -478,6 +510,7 @@ export function buildRevisionPrompt(
           '',
         ]
       : []),
+    ...(opts.accumulationPlan ? [opts.accumulationPlan, ''] : []),
     "Riscrivi il report intero applicando l'ultima richiesta, come descritto.",
   ].join('\n');
   return { system: `${CONSULENTE_CORE}\n${REVIEW_CONTRACT}${REVISION_CONTRACT}`, userContent };
@@ -488,7 +521,7 @@ export function buildReviewPrompt(
   strategyMarkdown: string,
   instrumentsMarkdown: string,
   candidates: InstrumentCandidates | null,
-  opts: { interview?: AllocationAdviceInterview | null } = {}
+  opts: { interview?: AllocationAdviceInterview | null; accumulationPlan?: string } = {}
 ): AssistantPromptParts {
   const userContent = [
     formatAnswersForPrompt(answers),
@@ -500,6 +533,7 @@ export function buildReviewPrompt(
     instrumentsMarkdown,
     candidates ? '' : 'NOTA: il secondo agente non ha prodotto un blocco strutturato valido; usa solo il suo testo.',
     '',
+    ...(opts.accumulationPlan ? [opts.accumulationPlan, ''] : []),
     'Scrivi il report finale come descritto.',
   ].join('\n');
   return { system: `${CONSULENTE_CORE}\n${REVIEW_CONTRACT}`, userContent };

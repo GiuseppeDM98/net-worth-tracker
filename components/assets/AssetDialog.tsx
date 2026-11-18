@@ -42,7 +42,7 @@ import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
-import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetComposition, CouponFrequency, BondDetails, BondInflationIndexation, type AssetOwnerShare, type FamilyMember } from '@/types/assets';
+import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetComposition, CouponFrequency, BondDetails, BondInflationIndexation, type AssetOwnerShare, type AssetPrefill, type FamilyMember } from '@/types/assets';
 import type { PensionFundDetails } from '@/types/pension';
 import { createAsset, updateAsset, updateAssetMetadata } from '@/lib/services/assetService';
 import { isLedgerAssetType, type AssetTransactionFormData } from '@/types/assetTransactions';
@@ -530,6 +530,11 @@ interface AssetDialogProps {
   createEmpty?: boolean;
   /** Called with the new asset id after a successful create. */
   onCreated?: (assetId: string) => void;
+  /**
+   * Create mode only: the fields to start from (the Consulente's hand-off, 2026-11-12) — opens on
+   * step 2 like `initialType`. The host keeps the object in state, so it is stable across renders.
+   */
+  prefill?: AssetPrefill;
 }
 
 /**
@@ -937,7 +942,7 @@ function SettlementTimingHint({ control, todayIso }: { control: AssetFormControl
   return <p className="text-xs text-muted-foreground">{describeSettlementTiming(openingDate ?? '', todayIso)}</p>;
 }
 
-export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType, returnFocusTo, onExitComplete, createEmpty, onCreated }: AssetDialogProps) {
+export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType, returnFocusTo, onExitComplete, createEmpty, onCreated, prefill }: AssetDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
@@ -1189,7 +1194,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       setStatus({ phase: 'idle' });
       // A caller that already knows the type (the Liquidità tile's «Aggiungi conto») lands on
       // the form; the type is set by the reset effect below, from the same prop.
-      setStep(asset || initialType ? 2 : 1);
+      setStep(asset || initialType || prefill ? 2 : 1);
       setAllocationRoleTouched(false);
       setIsLiquidTouched(false);
       // Reset calculator on every open to avoid stale data from previous session
@@ -1312,13 +1317,13 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       }
     } else {
       reset({
-        ticker: '',
+        ticker: prefill?.ticker ?? '',
         displayTicker: undefined,
-        name: '',
-        isin: undefined,
-        type: initialType ?? 'etf',
-        assetClass: TYPE_TO_CLASS[initialType ?? 'etf'],
-        subCategory: '',
+        name: prefill?.name ?? '',
+        isin: prefill?.isin,
+        type: prefill?.type ?? initialType ?? 'etf',
+        assetClass: prefill?.assetClass ?? TYPE_TO_CLASS[initialType ?? 'etf'],
+        subCategory: prefill?.subCategory ?? '',
         currency: 'EUR',
         quantity: 0,
         manualPrice: undefined,
@@ -1356,7 +1361,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       });
       replaceTiers([]);
     }
-  }, [asset, reset, open, setValue, replaceTiers, initialType]);
+  }, [asset, reset, open, setValue, replaceTiers, initialType, prefill]);
 
   // Selects the asset type in step 1, auto-derives the class, and advances to step 2
   const handleTypeSelect = (type: AssetType) => {

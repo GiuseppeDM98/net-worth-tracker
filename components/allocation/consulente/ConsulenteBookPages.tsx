@@ -18,7 +18,8 @@ import { Globe } from 'lucide-react';
 import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import type { GoalPlan, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
-import { BOOK_COPY, describeProposalReading, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
+import { BOOK_COPY, describeProposalReading, HANDOFF_DRAFT_NOTE, HANDOFF_READING, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
+import type { ApplyHandoff } from '@/lib/utils/allocationAdviceDocument';
 import { formatCurrency, formatDate, formatNumberIt, formatPercentageIt, formatSignedPoints } from '@/lib/utils/formatters';
 import type { Narrative } from '@/lib/utils/narrative';
 import { useCountUp } from '@/lib/utils/useCountUp';
@@ -266,6 +267,8 @@ export interface ApplyPiecesInput {
   applyState: ApplyState;
   /** `APPLY_ACTIVE_PLAN_NOTE` when an accumulation plan is active, null otherwise. */
   activePlanNote: string | null;
+  /** After the write: the link to a plan toward the new targets, a draft's note, or nothing (`applyHandoffOf`). */
+  handoff: ApplyHandoff;
 }
 
 /** «Applica»: one checkbox per thing it writes, the plans' warnings and the status line — only when ready with a proposal. */
@@ -273,7 +276,7 @@ export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
   const { document, proposal, rows, roles, goalPlan, goalsCount, applyState } = input;
   return {
     aside: document.status === 'applied' && document.applied ? `applicato il ${formatDate(document.applied.at)}` : 'niente è scritto finché non confermi',
-    reading: [{ text: document.status === 'applied' ? 'Il piano è già nelle impostazioni: rifai il percorso per cambiarlo.' : input.applySummary }],
+    reading: [{ text: document.status === 'applied' ? "L'allocazione è già nelle impostazioni: rifai il percorso per cambiarla." : input.applySummary }],
     body:
       document.status === 'ready' && proposal ? (
         <div className="mt-3 flex flex-col gap-3">
@@ -305,6 +308,15 @@ export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
           <p role="status" className={cn('min-h-[1.25rem] text-[12px]', applyState.phase === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
             {applyState.phase === 'error' ? applyState.message : applyState.phase === 'writing' ? 'Scrivo…' : applyState.phase === 'done' ? 'Applicato.' : ''}
           </p>
+        </div>
+      ) : document.status === 'applied' && (input.activePlanNote || input.handoff !== 'none') ? (
+        // After the write the page keeps one line on the plan: an active plan's note, the offer's reading, a draft's note.
+        <div className="mt-3 flex flex-col gap-3">
+          {input.activePlanNote && <p className="text-[12px] text-warning-foreground">{input.activePlanNote}</p>}
+          {input.handoff === 'offer' && (
+            <p className="text-[13px] leading-[1.45] text-muted-foreground">{HANDOFF_READING}</p>
+          )}
+          {input.handoff === 'draft' && <p className="text-[12px] text-warning-foreground">{HANDOFF_DRAFT_NOTE}</p>}
         </div>
       ) : null,
     footnote: null,

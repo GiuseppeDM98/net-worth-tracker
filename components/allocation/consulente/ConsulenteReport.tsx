@@ -30,7 +30,7 @@ import { ConsulenteBook } from './ConsulenteBook';
 import type { ApplyState } from './ConsulenteBookPages';
 import type { BookPageId } from '@/lib/utils/allocationAdviceBook';
 import { buildTargetsFromProposal, currentAllocationOnBase, planGoalDocument, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
-import { runStageStates } from '@/lib/utils/allocationAdviceDocument';
+import { applyHandoffOf, runStageStates } from '@/lib/utils/allocationAdviceDocument';
 import { removedGoalIds } from '@/lib/utils/allocationAdviceDraft';
 import { APPLY_ACTIVE_PLAN_NOTE, buildConsulenteVerdict, buildProposalRows, describeApplySummary, describeRunHeadline } from '@/lib/utils/allocationAdviceNarrative';
 import { selectOpenPlan, useAccumulationPlans } from '@/lib/hooks/useAccumulationPlans';
@@ -73,6 +73,8 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, pageId, 
   // An active accumulation plan keeps its weights whatever is applied: «Applica» says so, once.
   const plansQuery = useAccumulationPlans(ownerId);
   const activePlanNote = selectOpenPlan(plansQuery.data ?? [])?.status === 'active' ? APPLY_ACTIVE_PLAN_NOTE : null;
+  // After the write, a plan toward the new targets: the plans' STATE only, never their weights nor the model.
+  const handoff = applyHandoffOf(document, plansQuery.isPending ? 'loading' : plansQuery.isError ? 'failed' : { open: selectOpenPlan(plansQuery.data) });
   const revising = revision.state.kind === 'running';
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
   // Today's Italian day once per mount: the applied verdict says when the review is near or due.
@@ -172,6 +174,7 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, pageId, 
         setApplyGoals,
         applyState,
         activePlanNote,
+        handoff,
       }}
       canApply={canApply}
       onApply={() => void apply()}

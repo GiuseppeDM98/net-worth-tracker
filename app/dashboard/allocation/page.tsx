@@ -811,6 +811,7 @@ export default function AllocationPage() {
                 reviewByIso={reviewDue.state === 'none' ? null : reviewDue.reviewByIso}
                 settings={settings}
                 goals={goalData?.goals}
+                advice={adviceQuery.isError ? null : adviceQuery.data}
               />
             )}
           </TabsContent>

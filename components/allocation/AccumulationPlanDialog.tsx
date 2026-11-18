@@ -75,6 +75,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AssetDialog } from '@/components/assets/AssetDialog';
+import { KeptSalesNote } from '@/components/allocation/KeptSalesNote';
 import { PlanDraftSidePanel } from '@/components/allocation/PlanDraftSidePanel';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { OptimizerPanel } from '@/components/allocation/OptimizerPanel';
@@ -212,6 +213,8 @@ interface AccumulationPlanDialogProps {
   reviewByIso: string | null;
   /** What the model rests on: «aggiorna anche il portafoglio modello» stamps it. */
   basis: ModelBasis;
+  /** The instruments the Consulente proposed to keep — only the hand-off passes them: a month-1 sale of one is named (2026-11-12). */
+  advisorKeepAssetIds?: readonly string[];
 }
 
 const DEPS: PlanDeps = { valueOf: calculateAssetValue, priceOf: unitPriceEur };
@@ -284,6 +287,7 @@ export function AccumulationPlanDialog({
   reviewByIso,
   basis,
   reviseFromModel = false,
+  advisorKeepAssetIds,
 }: AccumulationPlanDialogProps) {
   const isDemo = useDemoMode();
   const chartColors = useChartColors();
@@ -657,9 +661,12 @@ export function AccumulationPlanDialog({
     }
   };
 
+  // A draft writes the model too when its box is on, as «Attiva» does (owner, 2026-11-18): the box is on the
+  // step the draft is saved from, and a ticked box that writes nothing read as a broken promise.
   const handleSaveDraft = async () => {
     const planId = await saveDraft();
-    if (planId) {
+    if (!planId) return;
+    if (await finishWithModel()) {
       onSaved(planId);
       onClose();
     }
@@ -1404,6 +1411,7 @@ export function AccumulationPlanDialog({
             weightsSum={weightsSum}
             targetLeverageRatio={targetLeverageRatio}
           />
+          <KeptSalesNote disposals={draft.disposals} keepAssetIds={advisorKeepAssetIds ?? []} nameOf={labelOfAsset} />
           </div>
         )}
 
@@ -1605,6 +1613,7 @@ export function AccumulationPlanDialog({
                 </table>
               </div>
             </div>
+            <KeptSalesNote disposals={draft.disposals} keepAssetIds={advisorKeepAssetIds ?? []} nameOf={labelOfAsset} />
           </div>
         )}
       </ResponsiveModal>

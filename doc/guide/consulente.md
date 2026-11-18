@@ -161,6 +161,16 @@
   question (interview) or a sentence of «La situazione» (strategy); fear, haste or euphoria read in the words — of
   then or of today — are said with the sentence that shows them, never judged. A failed archive read never fails a
   path: the block says it and lists the live one alone.
+- **The PIANO DI ACCUMULO block** (2026-11-12): `readAccumulationPlanForAdvice(userId, now)`
+  (`lib/server/allocationAdvice/accumulationPlan.ts`, Admin SDK) + `formatAccumulationPlanForPrompt` (`prompts.ts`),
+  printed after OBBLIGAZIONI in `userContent` of the interview and the strategy (through `buildConsulenteContext`), of
+  the review and of the revision (`opts.accumulationPlan`); never the instruments' stage. Three states: not read (a
+  failed read logs and never fails the run), no active plan (a draft or a completed one count as none), an active
+  plan — month k of n («non ancora partito: parte a …» before its start), the instalment, the weights by name, the
+  sales with their month and status. Sections 5 and 6 of the contracts carry the path in words: what to accumulate or
+  sell, an indicative time, the monthly instalment as an order of magnitude, and with an active plan whether it goes
+  toward the targets — never a table, never the plan's figures recomputed; the review names «Crea un piano di
+  accumulo verso questa allocazione» (decision 28).
 - **The CASHFLOW 12 MESI block** (2026-11): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
   `formatCashflowBlockForPrompt`) over `fetchCashflowBlockInputs(userId, now)` (lib/services/assistantMonthContextService.ts),
   ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
@@ -365,6 +375,12 @@
   goals leave, and the plan says so, never silently). Then `POST /api/allocation-advice/applied` records what was
   written and the document moves to `applied`; every key of the readers is invalidated (settings, assets, overview,
   goals, allocationAdvice).
+- **After «Applica», a plan of accumulation** (owner, 2026-11-12): with the targets written and no open plan the page
+  offers «Crea un piano di accumulo verso questa allocazione», a link to Accumulo `?da=consulente` (`applyHandoffOf`,
+  `CONSULENTE_HANDOFF_HREF`; nothing while the plans load, the link on a failed read); a draft gets a note
+  (`HANDOFF_DRAFT_NOTE`), an active plan the line of before (`APPLY_ACTIVE_PLAN_NOTE`). A link, not an AI control (The
+  AI-Accent Rule lists it). The Consulente's components import neither the hand-off nor the optimizer (a test reads
+  their sources): the hand-off is Accumulo's, doc/guide/accumulo.md § Dal Consulente.
 - **The review date** (`reviewByIso`) lives in the document, not in the settings: the Allocazione page prints it in
   its header (`describeReviewBy` → `describeAllocazioneHeader.reviewBy`) only when the plan has been applied — no
   sixth place in the FIVE places.
