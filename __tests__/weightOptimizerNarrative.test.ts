@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Asset } from '@/types/assets';
 import type { ConflictReport, ObjectiveReport, OptimizerSaleReport, OptimizerWarning, SecondLevelGap } from '@/lib/utils/weightOptimizer';
 import {
+  OPTIMIZER_IDEAL_BELOW_HELD_CONFIRM,
   describeConflict,
   describeModelDebtNote,
   describeObjectiveLabel,
@@ -142,11 +143,22 @@ describe('describeOptimizerWarning', () => {
 });
 
 describe('describeOptimizerMode', () => {
-  it('names both modes distinctly', () => {
+  it('names every mode distinctly', () => {
     expect(OPTIMIZER_MODE_LABELS.reachable).toBe('Raggiungibile col PAC');
     expect(OPTIMIZER_MODE_LABELS.ideal).toBe('Ideale');
     expect(describeOptimizerMode('reachable')).not.toBe(describeOptimizerMode('ideal'));
     expect(describeOptimizerMode('reachable').length).toBeGreaterThan(0);
+  });
+
+  // A plan may carry planned sales since «Con vendite mirate» (2026-11-18): what never sells is the
+  // INSTALMENT, so the sentences say that — never «il PAC non vende» (owner, 2026-11-18; red on that wording).
+  it('says the instalments only buy, never that the PAC does not sell', () => {
+    expect(describeOptimizerMode('reachable')).toBe(
+      'Raggiungibile non scende sotto ciò che possiedi, perché le rate del PAC comprano soltanto.'
+    );
+    expect(OPTIMIZER_IDEAL_BELOW_HELD_CONFIRM).toBe(
+      'In modalità Ideale alcuni pesi sono sotto ciò che possiedi: le rate del PAC comprano soltanto, quindi quelle posizioni riceveranno zero acquisti.'
+    );
   });
 });
 

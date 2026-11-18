@@ -35,7 +35,7 @@ const top = (count: number): TopExpenses => {
 const asideOf = (container: HTMLElement) => container.querySelector('section > div > div')?.textContent;
 
 describe('SpeseMaggioriTile', () => {
-  it('T4: shows ten of fourteen, unfolds to fourteen, and labels a row by its note', () => {
+  it('shows ten of fourteen, unfolds to fourteen, and labels a row by its note', () => {
     const { container } = render(<SpeseMaggioriTile top={top(14)} onSelect={vi.fn()} />);
     const list = screen.getByRole('list', { name: 'Spese maggiori del periodo' });
     expect(within(list).getAllByRole('button')).toHaveLength(10);
@@ -64,7 +64,7 @@ describe('SpeseMaggioriTile', () => {
     expect(sub?.querySelector('[role="presentation"]')).not.toBeNull();
   });
 
-  it('T4: has no toggle when every row is shown', () => {
+  it('has no toggle when every row is shown', () => {
     render(<SpeseMaggioriTile top={top(7)} onSelect={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /Mostra/ })).toBeNull();
   });

@@ -4,9 +4,9 @@
 > `APPLY_ACTIVE_PLAN_NOTE`, `isPlanBuyable`, «+ Nuovo asset» at quantity 0) **and NOVE-17 (retired on 2026-11-18, PR #549)** (`runOptimizer`,
 > `buildStandaloneCandidates` with `assetsById`, `valueOf`, `baseEur`, `fixBounds`, `negativeFixedKeys`,
 > `LIQUIDITY_CANDIDATE_KEY`, `roundWeights`, `toModelWeights`, `describeNegativeFixed`, `PlanSeedDraft`, `ModelBasis`, the
-> editor's `seedDraft` and `basis`); implemented after NOVE-18, whose `runOptimizer` input `holdings?` and snapshot fields it leaves
-> unset; after its retirement NOVE-22 is WRITTEN (§ 8), the guided path where its hand-off lands. Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7, a PR line as
-> `pr488:file:line` on the local ref `refs/tmp/pr488` (the head of #488, which carries #486 and #487). Executes
+> editor's `seedDraft` and `basis`); implemented after NOVE-18 (retired on 2026-11-18, PR #551), whose `runOptimizer` input `holdings?` and snapshot fields it leaves
+> unset; after its retirement NOVE-22 is WRITTEN (§ 8), the guided path where its hand-off lands. Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7; the PR lines once cited as
+> `pr488:file:line` were re-pointed to `develop` @ 1e580c7b when #488 was retired (2026-11-18). Executes
 > decisions 27, 28, 29 and the adopted choices i, r, t (README.md § 3-4).
 
 ## 1. The problem today (evidence on the code)
@@ -16,7 +16,7 @@
 «Il piano è già nelle impostazioni: rifai il percorso per cambiarlo.» (`:274`) and its footer holds «Rifai il
 percorso» alone (`components/allocation/consulente/ConsulenteBook.tsx:270-281`). Nothing turns the new targets into
 monthly purchases; after NOVE-16 the one seeder of a new plan is the model's dialog
-(`pr488:components/allocation/IdealCompositionDialog.tsx:240-253`, `handleCreatePac`).
+(`components/allocation/IdealCompositionDialog.tsx:294-313` @ 1e580c7b, `handleCreatePac`: since «Con vendite mirate» it also seeds `disposals` and drops the positions sold whole).
 
 **The Consulente never reasons about accumulating.** The strategy's section 5 is «Cosa cambia rispetto a oggi — le
 differenze principali … in punti percentuali» (`lib/server/allocationAdvice/prompts.ts:156`); the review's section 6
@@ -36,7 +36,7 @@ at all — the answers, the interview, the strategy and the instruments only (`p
   `subTarget`, `candidates[]` with `name`, `isin?`, `ticker?`, `alreadyHeld?`); a class without sub-targets is
   searched under the class's label (`prompts.ts:395-398`), not under a sub-target's name.
 - The editor's «Aggiorna anche il portafoglio modello» is ON whenever no model is passed
-  (`pr488:components/allocation/AccumulationPlanDialog.tsx:607-608`, `modelDiffers = !model || …`); the model is
+  (`components/allocation/AccumulationPlanDialog.tsx:615-616` @ 1e580c7b, `modelDiffers = !model || …`); the model is
   read only on the Accumulo tab (choice l). The editor therefore opens on the tab, never on the Consulente route.
 - `AssetDialog` opens a create on step 1 with empty fields (`components/assets/AssetDialog.tsx:1184`, the create
   branch `:1306-1348`); no caller can hand it a name, an ISIN or a sub-category.
@@ -132,7 +132,7 @@ at all — the answers, the interview, the strategy and the instruments only (`p
     alone reads; the review's «Cosa fare adesso» copies the strategy's estimates without recomputing them (it has
     no cashflow block, and `CONSULENTE_CORE` forbids a number that is not in the data).
   - C14. Saving the hand-off's draft keeps the editor's default for «Aggiorna anche il portafoglio modello» (on
-    when the plan differs from the model, `pr488:AccumulationPlanDialog.tsx:607-608`): after «Applica» the model
+    when the plan differs from the model, `AccumulationPlanDialog.tsx:615-616` @ 1e580c7b): after «Applica» the model
     is stale by design (choice h) and the seed is computed under the owner's own criteria; the owner can untick it.
   - C15. The kept-sale warning is its own component, `KeptSalesNote`, tested alone; the editor's wiring is
     proven in the browser (§ 7 E).
@@ -324,7 +324,7 @@ plansQuery.isError ? 'failed' : { open: selectOpenPlan(plansQuery.data) })`. `Ap
 `app/dashboard/allocation/page.tsx` passes `advice={adviceQuery.isError ? null : adviceQuery.data}` to the tab (the
 query already read at `:182` @ b841cbd7): a failed read is «no advice», so the landing only cleans the URL —
 with `data` left `undefined` the effect below would wait for ever and `?da=consulente` would stay. `AccumuloTab` gains `advice: AllocationAdviceDocument | null | undefined` and, beside the
-`?obiettivi=1` effect (`pr488:components/allocation/AccumuloTab.tsx:105-114`):
+`?obiettivi=1` effect (`components/allocation/AccumuloTab.tsx:124-133` @ 1e580c7b):
 
 ```tsx
   const [handoffOpen, setHandoffOpen] = useState(false);
@@ -596,8 +596,8 @@ stable across renders.
 ### 4.8 The kept-sale warning (choice t)
 
 `AccumulationPlanDialog` gains `advisorKeepAssetIds?: readonly string[]` (absent everywhere but the hand-off). In
-the component, at the end of the `step === 2` block (`pr488:components/allocation/AccumulationPlanDialog.tsx:989`)
-and of the `step === 3` block (`:1375`): `<KeptSalesNote disposals={draft.disposals} keepAssetIds={advisorKeepAssetIds
+the component, before the closing `</div>` of the `step === 2` block (`components/allocation/AccumulationPlanDialog.tsx:1018-1408` @ 1e580c7b, the `</div>` at `:1407`)
+and at the end of the `step === 3` block (`:1410-1609`, before `:1609`): `<KeptSalesNote disposals={draft.disposals} keepAssetIds={advisorKeepAssetIds
 ?? []} nameOf={(id) => assetsById.get(id)?.name ?? id} />`. `components/allocation/KeptSalesNote.tsx` (new):
 `const kept = findKeptSales(disposals, keepAssetIds);`, `null` when empty, else `<p role="status"
 className="text-[12px] text-warning-foreground">{describeKeptSales(kept.map((d) => nameOf(d.assetId)))}</p>`.
@@ -621,7 +621,7 @@ colloquio», …»
   plans' STATE only (NOVE-16's `useAccumulationPlans`), never the model — which is why the editor opens on the tab.
 - **The Modal-Is-A-Tile Rule** (`DESIGN.md:262`) and one modal at a time: here it means the hand-off, `AssetDialog`
   and the editor are three views of one state, as `PortafoglioModelloTile` does
-  (`pr488:components/allocation/tiles/PortafoglioModelloTile.tsx:110`).
+  (`components/allocation/tiles/PortafoglioModelloTile.tsx:123` @ 1e580c7b, the one `view` state).
 - **The AI-Accent Rule** (`DESIGN.md:579`): the link asks no model, so it is a plain primary (§ 4.9).
 - **The React Compiler**: no `try/finally` in a component; the clock is `useState(() => new Date())`; the landing
   effect is deferred like `?obiettivi=1`; `buildHandoffSeed` runs in a `useMemo` on inputs that change only on open
@@ -633,7 +633,7 @@ colloquio», …»
   «Fuori dal piano», never a position.
 - **A `list` carries `userId`**: both Admin queries filter on it (the Admin SDK bypasses the rules; the shape is the
   client's, and the mirror's).
-- **The factor row reads the asset's `subCategory`** (`pr488:lib/utils/weightOptimizer.ts:151-162`): an instrument
+- **The factor row reads the asset's `subCategory`** (`factorPerEuroOf`, `lib/utils/weightOptimizer.ts:134-153` after the retirement of «Con vendite mirate», 2026-11-18): an instrument
   whose sub-category the targets do not list is pushed toward 0 by an added factor objective — hence C11.
 - **Dynamic imports**: `allocationAdviceHandoff.ts` (the optimizer, `accumulationPlanUtils`) is imported only by
   `ConsulenteHandoff`, under the lazy tab; the Consulente route imports `allocationAdviceDocument.ts` and three
@@ -749,8 +749,8 @@ landing in it (doc/nove/README.md § 5-6).
   exactly as «Ricalcola» and the editor already do.
 - **Changing the type of a prefilled instrument**: none, declared — the prefill opens `AssetDialog` on step 2; an
   instrument C6 types wrongly is created from Patrimonio's «Aggiungi asset» and matched by name at the next open.
-- **Sales seeded from the Consulente's «vendi»** (C3): none, declared — a sale under a tax cap stays NOVE-18's
-  «Con vendite mirate», in the model's dialog.
+- **Sales seeded from the Consulente's «vendi»** (C3): none, declared — a sale under a tax cap stays
+  «Con vendite mirate», in the model's dialog (retired on 2026-11-18, PR #551).
 - **A hand-off from a report not yet applied** (decision 27 says «after»): none, declared.
 - **Re-labelling a held instrument's sub-category to the Consulente's sleeve**: none, declared (C11 says it).
 - **Revising an active plan from the Consulente**: none, declared — the note sends the owner to Accumulo's own
