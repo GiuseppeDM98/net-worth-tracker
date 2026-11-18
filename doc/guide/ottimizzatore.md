@@ -24,7 +24,8 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
 - **The base is Bilanciamento's** (2026-11-12): `buildStandaloneCandidates` makes every asset of the base a
   candidate — the accounts are ONE candidate «Liquidità» (key `liquidita`) net of the personal loans, a property
   counts net of the loans that finance it (`resolveAllocationRoleWithin`), a loan is never a candidate. Σ of the
-  candidates = `compareAllocations(...).marketValue`. A property below its mortgage stops «Calcola» with the
+  candidates = `compareAllocations(...).marketValue`. Besides the base, `StandaloneCandidates` names the fixed rows
+  (`fixedKeys`, whose difference prints «—») and the instrument count (`instrumentCount`, the reading's «n strumenti»). A property below its mortgage stops «Calcola» with the
   sentence; a liquidity below zero is declared and the run proceeds (its floor at 0 proposes to bring it back).
 - **«Importo da investire» is money taken from the accounts** (owner, 2026-11-12): it never grows the base. In
   «Raggiungibile» every candidate keeps today's share as its floor except «Liquidità», whose floor goes down to
@@ -39,14 +40,16 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
   calculation it started from and its **fingerprint**. «Liquidità», a property, a money-market fund and a pension
   fund are candidates (they are in the base) and never a weight of the model — a model seeds a plan, which cannot
   buy them; the instruments' weights are renormalized to 100. The Firestore rule is in `firestore.rules` and **is
-  published by hand**; the mirror and the census fixture own the collection (`scripts/mirrorCollections.ts`).
+  published by hand** (`npx firebase deploy --only firestore:rules`): published by the owner before 2026-11-18, ahead
+  of any deploy (additive, a new collection; no migration); the mirror and the census fixture own the collection (`scripts/mirrorCollections.ts`).
 - **«Superato»** (owner, 2026-11-12): the fingerprint is FNV-1a 32-bit over a key-sorted JSON of the STORED targets,
   the criteria, with goal-driven allocation on each goal's `id`, `targetAmount`, `priority` and
   `recommendedAllocation`, and the `assetId:role` of every asset whose role is not `tradable` (`modelFingerprint`).
   Targets, criteria and roles stale the model; a price, a new tradable asset and an «Applica» that writes the same
   targets do not — it reads values, never a date. The targets are hashed as they weigh (`weighingTargets`): a class at
   0% with nothing else, a switched-off sub-category block and a switched-off fixed amount count as absent, since
-  Impostazioni writes them on a save that changes nothing (owner, 2026-11-17). A model without a fingerprint is stale. A save that sets the
+  Impostazioni writes them on a save that changes nothing (owner, 2026-11-17). A model without a fingerprint is stale. The basis is built by `AccumuloTab` (`buildModelBasis`
+  from the settings and the goals the page hands it), never by the page: its first chunk does not carry the model's module. A save that sets the
   weights («Salva come portafoglio modello», «Modifica a mano», «Usa i pesi del piano», the editor's «Aggiorna anche
   il portafoglio modello») records the fingerprint of that moment; «Aggiungi strumento da valutare» keeps the stored
   one, so a stale model stays stale. The tile, its closed row and the editor's «Parti da: modello» say «superato».
@@ -61,6 +64,12 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
 ## Files
 
 `types/{optimizer,modelPortfolio}.ts` · `lib/constants/idealAllocation.ts` · `lib/utils/{weightOptimizer,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,idealAllocationEditor,runGuarded}.ts` · `lib/services/modelPortfolioService.ts` · `lib/hooks/useModelPortfolio.ts` · `components/allocation/{OptimizerPanel,OptimizerReport,IdealCompositionDialog,ObiettiviDialog,ModelEditDialog}.tsx` · `components/allocation/tiles/{ObiettiviTile,PortafoglioModelloTile}.tsx` · `components/settings/{IdealAllocationTile,IdealAllocationSummary}.tsx` · tests `__tests__/{weightOptimizer,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,modelPortfolioGroups,modelPortfolioService,idealAllocationEditor}.test.ts`, `__tests__/{idealCompositionDialog,obiettiviDialog,portafoglioModelloTile}.test.tsx` · E2E `e2e/accumulo.spec.ts` (the criteria planted and restored by `e2e/accumuloFixture.ts`).
+
+- **Suites to run after a change here — Portafoglio modello** (2026-11-18): `weightOptimizer`, `weightOptimizerNarrative`,
+  `activeSetQP`, `boxProjection`, `modelPortfolio`, `modelPortfolioGroups`, `modelPortfolioService`, `idealAllocationEditor`,
+  `settingsDraft` (the module hygiene), `settingsRoundTrip`, `settingsNarrative`, `allocazioneNarrative` (the page reads no
+  model), `accumuloSummary`, `accumuloTileSentences`, `mirrorCollections` · **dom** `idealCompositionDialog`, `obiettiviDialog`,
+  `obiettiviTile`, `portafoglioModelloTile`, `accumuloVuotoTile` · **Browser** `e2e/accumulo{,.mobile,.tablet}.spec.ts`.
 
 ## Per-page blind spots
 

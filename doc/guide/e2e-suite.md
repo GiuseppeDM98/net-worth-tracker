@@ -30,7 +30,11 @@
   - `overview.mobile.spec.ts` «a cell with a six-figure variation…» (2026-10-16, twice): the strip's second row 1,3–1,6 px
     apart where the cells share a line. Fixed: the test polls until the two cells share their line before reading the boxes.
     Red again on 2026-11-13 (once in a full run: 212,55 against 213,57 px at the `toBe` of the shared line; green ×3 alone
-    and in the three runs after it): the poll did not close it — a pattern, still open.
+    and in the three runs after it): the poll did not close it — a pattern. **Closed on 2026-11-18**: red once in a full
+    run and twice in six alone (0,36 px), the cause was the READ — separate `boundingBox()` calls land in different
+    frames while the page above the strip still settles; the three boxes are now read in one `evaluate` (one frame)
+    and polled. Green ×15 alone on the production build; seen red with every cell `basis-full` in `verdict-strip.tsx`.
+    The rule for any «two boxes share a line» check: one evaluate, never two `boundingBox()`.
   - The «remembered across a reload» tests of `mobile-composition.patrimonio.mobile.spec.ts` and `overview.mobile.spec.ts`
     (2026-10-15/16): `apiResponse.json: Response has been disposed` — the response a probe holds across `page.reload()`,
     the shape of the `holdChunks` entry below. Closed on 2026-10-16: `patchOverview` reads the body in a `try` and lets a
@@ -122,7 +126,7 @@ whole run, on the Windows machine (8 logical cores, 31,5 GB, Playwright 1.62.1, 
   49,3 → 40,2 s with it (the CPU at 1,7 cores of 8) and 42,1 → 21,9 s without; four workers on the base account with the
   trace made each test 3–7× slower. One port is enough on a production server.
 - **Not done, by the decision of 2026-11-13**: no sharding (above). Left for a later session, if ever: the Dividendi
-  picker flake and the `overview.mobile` six-figure one (§ The full run and its known flakes).
+  picker flake (§ The full run and its known flakes; the `overview.mobile` six-figure one closed on 2026-11-18).
 
 Time per area on 2026-11-13, `next dev` with the trace · production without it (the specs of an area: its guide's § *Files*):
 Consulente 207 · 73 s; Cashflow's Tracciamento, accounts, mortgage and fee 140 · 92; Patrimonio 82 · 51; Assistente 64 · 33;

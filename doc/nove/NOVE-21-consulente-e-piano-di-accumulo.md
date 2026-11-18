@@ -1,7 +1,7 @@
 # NOVE-21 — The Consulente and the plan of accumulation: a hand-off after «Applica», a plan in its data
 
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-16 (retired on 2026-11-17, PR #547)** (the plan document, the lock, `describeOpenPlanForAdvice`,
-> `APPLY_ACTIVE_PLAN_NOTE`, `isPlanBuyable`, «+ Nuovo asset» at quantity 0) **and NOVE-17** (`runOptimizer`,
+> `APPLY_ACTIVE_PLAN_NOTE`, `isPlanBuyable`, «+ Nuovo asset» at quantity 0) **and NOVE-17 (retired on 2026-11-18, PR #549)** (`runOptimizer`,
 > `buildStandaloneCandidates` with `assetsById`, `valueOf`, `baseEur`, `fixBounds`, `negativeFixedKeys`,
 > `LIQUIDITY_CANDIDATE_KEY`, `roundWeights`, `toModelWeights`, `describeNegativeFixed`, `PlanSeedDraft`, `ModelBasis`, the
 > editor's `seedDraft` and `basis`); implemented after NOVE-18, whose `runOptimizer` input `holdings?` and snapshot fields it leaves

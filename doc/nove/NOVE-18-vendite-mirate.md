@@ -1,6 +1,6 @@
 # NOVE-18 — Allocazione › Accumulo: «Con vendite mirate» of PR #488, on the app's one tax rule
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-17** (the model's dialog, the optimizer, `roundWeights`) and
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-17 (retired on 2026-11-18, PR #549)** (the model's dialog, the optimizer, `roundWeights`) and
 > **NOVE-07 (retired on 2026-11-15, PR #534)** (the fiscal cost basis, decision 31); **NOVE-21 is implemented after it**. Written on 2026-11-12; every
 > `file:line` is cited on `develop` @ b841cbd7, a PR line as `pr488:file:line` on the local ref `refs/tmp/pr488`
 > (head 4f1c044e, child of #487's 9449f6ce). Executes decision 26 and the adopted choices m, n (README.md § 3-4).

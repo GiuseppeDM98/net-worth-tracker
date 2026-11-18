@@ -315,7 +315,8 @@ describe('revealTargetProblem — where «Salva» takes the reader', () => {
 // The Settings bundle and the type files stay light (2026-11-12): Impostazioni shows «Criteri del modello»
 // read-only, so it must never pull the 900-line optimizer nor its narrative (which imports the plan's words);
 // a type file imports nothing from lib/. Seen red with DEFAULT_IDEAL_ALLOCATION imported from the optimizer,
-// with a constant read back from the narrative, and with runGuarded's body kept in shared.tsx.
+// with a constant read back from the narrative, and with runGuarded's body kept in shared.tsx; the type-file
+// check reads a relative path into lib/ too since 2026-11-18, seen red with `../lib/utils/runGuarded`.
 describe('module hygiene of the model portfolio', () => {
   const source = (path: string) => readFileSync(path, 'utf8');
   const importsOf = (text: string) => [...text.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
@@ -329,7 +330,7 @@ describe('module hygiene of the model portfolio', () => {
 
   it('the optimizer, plan and model types import nothing from lib/', () => {
     for (const path of ['types/optimizer.ts', 'types/accumulationPlan.ts', 'types/modelPortfolio.ts']) {
-      expect(importsOf(source(path)).filter((spec) => spec.startsWith('@/lib')), path).toEqual([]);
+      expect(importsOf(source(path)).filter((spec) => spec.startsWith('@/lib') || /(^|\/)lib\//.test(spec)), path).toEqual([]);
     }
   });
 
