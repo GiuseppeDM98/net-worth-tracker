@@ -23,7 +23,7 @@ Companion documents — do not duplicate their content into this file:
 UI patterns, testing, workflow. **A rule about one area's behaviour lives in `doc/guide/<tema>.md`**, one file per
 page, tab, integration or subsystem, read only by whoever touches that area: the pages (`panoramica`, `patrimonio`,
 `cashflow*`, `rendimenti`, …), the cross-cutting subsystems since 2026-09-06 (`stati`, `dialog`, `temi`,
-`account-condiviso-demo`, Settings inside `impostazioni`), the test harness since 2026-09-20 (`e2e-emulatori`; its Playwright half since 2026-11-11, `e2e-playwright`, and the whole run since 2026-11-17, `e2e-suite`), the
+`account-condiviso-demo`, Settings inside `impostazioni`), the test harness since 2026-09-20 (`e2e-emulatori`; its Playwright half since 2026-11-11, `e2e-playwright`, and the whole run since 2026-11-17, `e2e-suite`; the guided tour's why and history since 2026-11-18, `collaudo`), the
 shell and the persisted cache since 2026-09-30 (`shell`, `cache-persistita`), the first-screen census since 2026-10-10
 (`prima-schermata`; its record — baselines, fixture table, widened entries — since 2026-10-17, `prima-schermata-misure`), and since 2026-10-10 the charts (`grafici`) and the server layer (`server`), which left this file
 whole, the two-step dialogs and the form reset joining `dialog` the same day, the Assistente's Registra mode out of
@@ -867,6 +867,10 @@ file used to carry.
 - `npx knip` uses the root `knip.json` (`components/ui/**` and `public/sw.js` ignored, `firebase-tools` an ignored
   dependency, `ignoreExportsUsedInFile: true`): remaining EXPORT_ONLY findings are deliberate prop surface.
 - Emulators, Playwright, production-build verification and their environment traps: **SETUP.md → Steps 6-7**.
+
+### Guided verification (*collaudo*) → `doc/guide/collaudo.md`
+- WORKFLOW.md § 3 holds the commands, the gates and each tour rule in one line; the why, the history and the measures
+  of each rule (the windows, the mirror, the evidence without Chrome, the spec retirements, the critiques) are the guide (2026-11-18).
 
 ### Emulator Exercise Scripts → `doc/guide/e2e-emulatori.md`
 - A collection whose value is in the *wiring* gets an exercise: the unit suites mock Firestore away, so only an exercise
