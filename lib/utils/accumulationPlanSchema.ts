@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import type { Asset } from '@/types/assets';
 import type { AccumulationPlanDraft } from '@/types/accumulationPlan';
-import { isPlanBuyable } from './accumulationPlanUtils';
+import { isPlanBuyable, isPlanCashFund } from './accumulationPlanUtils';
 import { unitPriceEur } from './costBasisEur';
 import { describeDraftIssue, type DraftIssueCode } from './accumulationNarrative';
 
@@ -137,7 +137,8 @@ export function validateDraftAgainstAssets(
   const positionMembers = new Set(draft.positions.flatMap((p) => p.memberAssetIds));
   for (const disposal of draft.disposals) {
     const asset = assetsById.get(disposal.assetId);
-    if (asset && !isPlanBuyable(asset, assets)) {
+    // A money-market fund may be sold, never bought (owner, 2026-11-18).
+    if (asset && !isPlanBuyable(asset, assets) && !isPlanCashFund(asset, assets)) {
       issues.push({
         code: 'position_not_tradable',
         message: describeDraftIssue({ code: 'position_not_tradable', label: labelOf(disposal.assetId, assetsById) }),

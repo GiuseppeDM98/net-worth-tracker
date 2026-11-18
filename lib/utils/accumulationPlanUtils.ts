@@ -757,8 +757,14 @@ export function resolvePlanReserveEur(targets: AssetAllocationTarget | null, mar
  * accounts (owner, 2026-11-17): the accounts keep the quota minus the cash held outside them.
  * `cashClassEur` is `compareAllocations(...).byAssetClass.cash.currentValue`, `accountsEur` the cash accounts.
  */
-export function resolveAccountReserveEur(input: { quotaEur: number; cashClassEur: number; accountsEur: number }): { reserveEur: number; otherCashEur: number } {
-  const otherCashEur = Math.max(0, input.cashClassEur - input.accountsEur);
+export function resolveAccountReserveEur(input: {
+  quotaEur: number;
+  cashClassEur: number;
+  accountsEur: number;
+  /** The plan's money-market sales (`planCashFundSaleEur`): cash moved onto the accounts, so the reserve rises by it. */
+  cashFundSoldEur?: number;
+}): { reserveEur: number; otherCashEur: number } {
+  const otherCashEur = Math.max(0, input.cashClassEur - input.accountsEur - (input.cashFundSoldEur ?? 0));
   return { reserveEur: Math.max(0, input.quotaEur - otherCashEur), otherCashEur };
 }
 
@@ -772,7 +778,8 @@ export function resolvePlanReserve(
   allAssets: Asset[],
   targets: AssetAllocationTarget | null,
   compare: AllocationCompare,
-  deps: PlanDeps
+  deps: PlanDeps,
+  cashFundSoldEur = 0
 ): { reserveEur: number; otherCashEur: number; quotaEur: number } {
   if (!targets) return { reserveEur: 0, otherCashEur: 0, quotaEur: 0 };
   const result = compare(allAssets, targets);
@@ -784,6 +791,7 @@ export function resolvePlanReserve(
     quotaEur,
     cashClassEur: result.byAssetClass.cash?.currentValue ?? accountsEur,
     accountsEur,
+    cashFundSoldEur,
   });
   return { reserveEur: Math.ceil(reserveEur - 1e-9), otherCashEur, quotaEur };
 }
@@ -1145,6 +1153,35 @@ export function seedPositionsFromAssets(
 }
 
 /**
+ * The sales «Con vendite mirate» chose, as the fresh draft's disposals. A candidate the proposal brings to
+ * 0% (`soldOutKeys`) is sold whole; any other sells `floor(€ / price)` shares, never all of them, and
+ * nothing when that is 0 — being out of the model (a money-market fund no plan buys) is not being sold
+ * out (collaudo 2026-11-18). Amounts in cents.
+ */
+export function seedDisposalsFromSale(
+  sold: Array<{ key: string; soldEur: number }>,
+  soldOutKeys: Set<string>,
+  assetsById: Map<string, Asset>,
+  deps: PlanDeps
+): PlanDisposal[] {
+  const disposals: PlanDisposal[] = [];
+  for (const { key, soldEur } of sold) {
+    const asset = assetsById.get(key);
+    if (!asset || soldEur <= 0) continue;
+    if (soldOutKeys.has(key)) {
+      disposals.push({ assetId: key, estimatedProceedsEur: roundToCents(deps.valueOf(asset)), status: 'planned' });
+      continue;
+    }
+    const price = deps.priceOf(asset);
+    if (price <= 0) continue;
+    const quantity = Math.min(Math.floor(soldEur / price + 1e-9), Math.ceil(asset.quantity) - 1);
+    if (quantity <= 0) continue;
+    disposals.push({ assetId: key, quantity, estimatedProceedsEur: roundToCents(quantity * price), status: 'planned' });
+  }
+  return disposals;
+}
+
+/**
  * Weights per instrument as freshly-seeded PAC positions: one position per instrument, target = the
  * weight (a group's members ride along when `memberAssetIds` is given). `generateId` is injected
  * (never `crypto.randomUUID()` called inline) so the conversion stays deterministic under test.
@@ -1437,6 +1474,25 @@ export function listAddableAssets(
 export function isPlanBuyable(asset: Asset, allAssets: readonly Asset[]): boolean {
   if (!isLedgerAssetType(asset.type) || asset.assetClass === 'cash') return false;
   return resolveAllocationRoleWithin(asset, allAssets) === 'tradable';
+}
+
+/**
+ * A money-market fund (a ledger instrument of the cash class, never an account): a plan may SELL it, never buy it
+ * (owner, 2026-11-18). Its sale only moves cash onto the accounts — the reserve rises by it (`planCashFundSaleEur`).
+ */
+export function isPlanCashFund(asset: Asset, allAssets: readonly Asset[]): boolean {
+  if (!isLedgerAssetType(asset.type) || asset.type === 'cash' || asset.assetClass !== 'cash') return false;
+  return resolveAllocationRoleWithin(asset, allAssets) === 'tradable';
+}
+
+/** The euros a draft's pending money-market sales move onto the accounts. */
+export function planCashFundSaleEur(disposals: readonly PlanDisposal[], assetsById: Map<string, Asset>, allAssets: readonly Asset[]): number {
+  return disposals
+    .filter((d) => d.status !== 'executed' && d.status !== 'skipped')
+    .reduce((sum, d) => {
+      const asset = assetsById.get(d.assetId);
+      return asset && isPlanCashFund(asset, allAssets) ? sum + d.estimatedProceedsEur : sum;
+    }, 0);
 }
 
 /** Classes of a trajectory point worth showing: with a weight or a target (|x| ≥ 0,05%), as the target step's table. */

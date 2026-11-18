@@ -5,7 +5,7 @@
  */
 import type { IdealAllocationSettings, ObjectivePriority } from './assets';
 
-export type OptimizerMode = 'reachable' | 'ideal';
+export type OptimizerMode = 'reachable' | 'ideal' | 'targeted';
 
 export interface ObjectiveReport {
   id: string; // e.g. 'class:equity', 'factor:equity:Momentum', 'leverage', 'group:<id>'
@@ -33,4 +33,7 @@ export interface OptimizerSnapshot {
   objectives: ObjectiveReport[];
   /** The calculation's conflicts: the Obiettivi tile quotes the first. Absent on older snapshots. */
   conflicts?: ConflictReport[];
+  /** «Con vendite mirate» only: the tax cap in euro and the «Non vendere» boxes of the run. */
+  taxCapEur?: number;
+  lockedKeys?: string[];
 }

@@ -18,7 +18,16 @@ weight, month by month, proposes the purchases and never writes a transaction on
   Step 2 also has an «Ottimizzato» view (`OptimizerPanel`, doc/guide/ottimizzatore.md): it runs on «Calcola» only and
   «Usa questi pesi» hands the weights and the calculation's snapshot to the draft. A plan started from outside the
   editor — «Crea un PAC con questi pesi» in the model's dialog — arrives as ONE `PlanSeedDraft` (`positions`,
-  `disposals?`, `optimizerSnapshot?`, 2026-11-17), never a second seed shape.
+  `disposals?`, `optimizerSnapshot?`, 2026-11-17), never a second seed shape. «Con vendite mirate» seeds its
+  `disposals` (`seedDisposalsFromSale`, 2026-11-18): the whole position of an instrument out of the model or brought
+  to 0% (`soldOutKeys`: never one merely out of the model, like a money-market fund — found at the tour), and then no
+  position; whole shares
+  (never the last) of one kept, `estimatedProceedsEur` in cents; never the liquidity nor a property.
+- **A money-market fund may be SOLD, never bought** (`isPlanCashFund`, owner 2026-11-18): a disposal, never a
+  position. Its sale only moves cash onto the accounts, so the reserve rises by it (`planCashFundSaleEur` →
+  `resolvePlanReserve(…, cashFundSoldEur)` → `resolveAccountReserveEur`): only the euros above the quota become the
+  plan's. The editor's reserve is proposed with the seeded sales; a money-market sale added by hand at step 2 moves
+  the «Proposta:» line under the field, not the value already in it.
 - **The engine is pure** (`lib/utils/accumulationPlanUtils.ts`): `scheduleInstallments` lays the months, `matchPlanExecutions`
   (`accumulationPlanMatching.ts`) pairs the registry's BUY transactions with the planned lines, a late month carries
   its shortfall into the next. Sentences live in `accumulationNarrative.ts` and `accumuloSummary.ts`, never in a

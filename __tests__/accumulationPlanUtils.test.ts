@@ -17,6 +17,7 @@ import {
   addMonths,
   monthIndexOf,
   weightsToSeedPositions,
+  seedDisposalsFromSale,
   selectClassStripRows,
   type ClassTrajectoryPoint,
   type PlanDeps,
@@ -27,6 +28,7 @@ import {
   proceedsOfDisposal,
   resolvePlanReserveEur,
   resolveAccountReserveEur,
+  planCashFundSaleEur,
   isPlanSourceAccount,
 } from '@/lib/utils/accumulationPlanUtils';
 import type { AccumulationPlan, PlanPosition, PlanLiquidity, PlanDisposal } from '@/types/accumulationPlan';
@@ -393,6 +395,49 @@ describe('weightsToSeedPositions', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// seedDisposalsFromSale («Con vendite mirate»'s sales → the fresh draft's disposals)
+// ---------------------------------------------------------------------------
+
+describe('seedDisposalsFromSale', () => {
+  const kept = makeAsset({ id: 'kept', quantity: 10, currentPrice: 100 });
+  const dropped = makeAsset({ id: 'dropped', quantity: 5, currentPrice: 200 });
+  const odd = makeAsset({ id: 'odd', quantity: 10, currentPrice: 10.004 });
+  const byId = new Map([kept, dropped, odd].map((a) => [a.id, a]));
+  const deps: PlanDeps = { valueOf: (a) => a.quantity * a.currentPrice + 0.004, priceOf: unitPriceEur };
+
+  // The second argument names what the proposal brings to 0%: only those are sold whole (collaudo 2026-11-18).
+  it('should sell whole shares of an instrument the proposal keeps above zero, never its last one', () => {
+    expect(seedDisposalsFromSale([{ key: 'kept', soldEur: 450 }], new Set(), byId, deps)).toEqual([
+      { assetId: 'kept', quantity: 4, estimatedProceedsEur: 400, status: 'planned' },
+    ]);
+    expect(seedDisposalsFromSale([{ key: 'kept', soldEur: 1000 }], new Set(), byId, deps)[0].quantity).toBe(9);
+    expect(seedDisposalsFromSale([{ key: 'kept', soldEur: 50 }], new Set(), byId, deps)).toEqual([]);
+  });
+
+  it('should sell the whole position of an instrument the proposal brings to 0%', () => {
+    expect(seedDisposalsFromSale([{ key: 'dropped', soldEur: 1000 }], new Set(['dropped']), byId, deps)).toEqual([
+      { assetId: 'dropped', estimatedProceedsEur: 1000, status: 'planned' },
+    ]);
+  });
+
+  it('should trim, never empty, an instrument kept above zero even when no plan buys it', () => {
+    // At the tour a money-market fund only trimmed went whole: being out of the model is not being sold out.
+    expect(seedDisposalsFromSale([{ key: 'dropped', soldEur: 450 }], new Set(), byId, deps)).toEqual([
+      { assetId: 'dropped', quantity: 2, estimatedProceedsEur: 400, status: 'planned' },
+    ]);
+  });
+
+  it('should write every amount in cents', () => {
+    const [disposal] = seedDisposalsFromSale([{ key: 'odd', soldEur: 30.02 }], new Set(), byId, deps);
+    expect(disposal).toEqual({ assetId: 'odd', quantity: 3, estimatedProceedsEur: 30.01, status: 'planned' });
+  });
+
+  it('should skip a row that sells nothing or names no asset', () => {
+    expect(seedDisposalsFromSale([{ key: 'kept', soldEur: 0 }, { key: 'missing', soldEur: 500 }], new Set(['missing']), byId, deps)).toEqual([]);
+  });
+});
+
 describe('selectClassStripRows', () => {
   type ClassData = NonNullable<ClassTrajectoryPoint['byClass']['equity']>;
   const cls = (currentPct: number, targetPct: number, outOfBand = false): ClassData => ({
@@ -649,6 +694,21 @@ describe('resolveAccountReserveEur', () => {
   });
   it('outside cash above the quota: nothing to keep on the accounts', () => {
     expect(resolveAccountReserveEur({ quotaEur: 10000, cashClassEur: 30000, accountsEur: 5000 })).toEqual({ reserveEur: 0, otherCashEur: 25000 });
+  });
+  // A money-market sale moves cash onto the accounts: the reserve rises by it, so only the euros above the quota
+  // become the plan's (owner, 2026-11-18). Quota 10.000, accounts 15.000, fund 12.000: 17.000 above the quota.
+  it('a money-market sale raises the reserve by what it moves: the plan gets only the cash above the quota', () => {
+    const account = makeAsset({ id: 'acc', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 15000 });
+    const fund = makeAsset({ id: 'mm', assetClass: 'cash', quantity: 120, currentPrice: 100 });
+    const byId = new Map([account, fund].map((a) => [a.id, a]));
+    for (const quantity of [80, 120]) {
+      const disposals: PlanDisposal[] = [{ assetId: 'mm', quantity, estimatedProceedsEur: quantity * 100, status: 'planned' }];
+      const cashFundSoldEur = planCashFundSaleEur(disposals, byId, [account, fund]);
+      expect(cashFundSoldEur).toBe(quantity * 100);
+      const { reserveEur } = resolveAccountReserveEur({ quotaEur: 10000, cashClassEur: 27000, accountsEur: 15000, cashFundSoldEur });
+      const usable = computeUsableLiquidity({ sourceCashAssetIds: ['acc'], reserveEur, monthlyInflowEur: 0 }, byId, disposals, 12, deps);
+      expect(usable.L).toBeCloseTo(17000, 6);
+    }
   });
   it('only accounts: the whole quota', () => {
     expect(resolveAccountReserveEur({ quotaEur: 10000, cashClassEur: 8000, accountsEur: 8000 })).toEqual({ reserveEur: 10000, otherCashEur: 0 });

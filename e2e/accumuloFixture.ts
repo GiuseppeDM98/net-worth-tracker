@@ -209,3 +209,15 @@ export async function readModel(): Promise<{ fingerprint: string | null; assetId
 export async function removeModel(): Promise<void> {
   await remove(MODEL_PATH);
 }
+
+/** The seed gives a rate only to `seed-btp` (scripts/seedEmulator.ts): «Con vendite mirate» needs it on what it sells. */
+const TAXED_ASSETS = ['seed-vwce', 'seed-aapl'];
+
+/** Plants `taxRate: 26` on the two instruments «Con vendite mirate» may sell; `removeTaxRates` deletes the field. */
+export async function plantTaxRates(): Promise<void> {
+  for (const id of TAXED_ASSETS) await patchMasked(`assets/${id}`, 'taxRate', toValue(26));
+}
+
+export async function removeTaxRates(): Promise<void> {
+  for (const id of TAXED_ASSETS) await patchMasked(`assets/${id}`, 'taxRate', null);
+}

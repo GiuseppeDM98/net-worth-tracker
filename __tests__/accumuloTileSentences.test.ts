@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import type { Asset } from '@/types/assets';
 import { redistributeRemainder } from '@/lib/utils/accumulationPlanUtils';
 import { seedModelFromToday } from '@/lib/utils/modelPortfolio';
-import { describeModelOrigin, describeModelSalesHint } from '@/lib/utils/weightOptimizerNarrative';
+import { describeModelOrigin, describeModelSalesHint, MODEL_TARGETED_HINT } from '@/lib/utils/weightOptimizerNarrative';
 import {
   describeAccumuloPreview,
   describeAccumuloIntro,
@@ -55,12 +55,12 @@ describe('seedModelFromToday', () => {
 });
 
 describe('model tile sentences', () => {
-  it('names who stays above the model', () => {
-    expect(describeModelSalesHint(['ETF-A', 'ETF-B', 'ETF-C'])).toBe('Senza vendere, ETF-A, ETF-B e ETF-C restano sopra il modello.');
+  it('names who stays above the model, then points at «Ricalcola»', () => {
+    expect(describeModelSalesHint(['ETF-A', 'ETF-B', 'ETF-C'])).toBe(`Senza vendere, ETF-A, ETF-B e ETF-C restano sopra il modello. ${MODEL_TARGETED_HINT}`);
     expect(describeModelSalesHint(['ETF-C'])).toContain('ETF-C resta sopra il modello.');
   });
-  it('says nothing when nobody is above the model', () => {
-    expect(describeModelSalesHint([])).toBeNull();
+  it('is the fixed hint when nobody is above the model', () => {
+    expect(describeModelSalesHint([])).toBe(MODEL_TARGETED_HINT);
   });
   it('names the mode and the manual change of a model that started from a calculation', () => {
     const snapshot = { computedAt: new Date('2026-10-02T12:00:00'), mode: 'reachable' as const };

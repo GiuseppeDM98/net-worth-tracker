@@ -17,7 +17,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { removeAccumuloFixture, seedAccumuloFixture } from './accumuloFixture';
+import { plantCriteria, plantTaxRates, removeAccumuloFixture, removeTaxRates, restoreCriteria, seedAccumuloFixture } from './accumuloFixture';
 
 const TOUCH_FLOOR = 44;
 const STORAGE_KEY = 'mobile-sections:allocation:accumulo';
@@ -164,5 +164,44 @@ test.describe('Accumulo, composto per un telefono', () => {
     });
     expect(desktop.classi.left, 'Classi del piano nella colonna destra').toBeGreaterThan(desktop.mese.right - 1);
     expect(Math.abs(desktop.classi.top - desktop.mese.top), 'Classi del piano alla quota di Questo mese').toBeLessThanOrEqual(1);
+  });
+});
+
+// «Con vendite mirate» a 390 (2026-11-18): la colonna «Tasse» prende il posto della differenza in euro, nulla sfora
+// il dialogo, e ogni riga «Non vendere» è un bersaglio da pollice.
+test.describe('Con vendite mirate, a 390', () => {
+  test('nessuno sforamento nel dialogo, righe «Non vendere» ≥ 44px', async ({ page }) => {
+    const stored = await plantCriteria();
+    await plantTaxRates();
+    try {
+      await openAccumulo(page);
+      await trigger(page, 'acc-modello').click();
+      await panel(page, 'acc-modello').getByRole('button', { name: 'Ricalcola' }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('radio', { name: 'Con vendite mirate' }).click();
+      await dialog.getByLabel('Tasse massime (€)').fill('500');
+      await dialog.getByRole('button', { name: 'Calcola', exact: true }).click();
+      await expect(dialog.getByRole('columnheader', { name: 'Tasse' })).toBeVisible();
+
+      const rows = dialog.locator('tbody tr');
+      expect(await rows.count()).toBeGreaterThan(0);
+      for (const height of await rows.evaluateAll((trs) => trs.map((tr) => tr.getBoundingClientRect().height))) {
+        expect(height).toBeGreaterThanOrEqual(TOUCH_FLOOR);
+      }
+      const overflow = await dialog.evaluate((root) => {
+        const limit = root.getBoundingClientRect().right + 1;
+        return Array.from(root.querySelectorAll<HTMLElement>('*'))
+          .filter((el) => el.offsetWidth > 0 && !el.closest('.sr-only') && el.getBoundingClientRect().right > limit)
+          .slice(0, 5)
+          .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)}`);
+      });
+      expect(overflow).toEqual([]);
+      // The sheet is the screen's width, its body 32px narrower: six columns measured 367px in a 356px body.
+      const table = await dialog.locator('table').evaluate((t) => ({ width: t.scrollWidth, room: t.parentElement!.clientWidth }));
+      expect(table.width).toBeLessThanOrEqual(table.room);
+    } finally {
+      await removeTaxRates();
+      await restoreCriteria(stored);
+    }
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Asset } from '@/types/assets';
-import type { ConflictReport, ObjectiveReport, OptimizerWarning, SecondLevelGap } from '@/lib/utils/weightOptimizer';
+import type { ConflictReport, ObjectiveReport, OptimizerSaleReport, OptimizerWarning, SecondLevelGap } from '@/lib/utils/weightOptimizer';
 import {
   describeConflict,
   describeModelDebtNote,
@@ -10,6 +10,8 @@ import {
   describeOptimizerSnapshot,
   describeOptimizerWarning,
   describeSecondLevelGaps,
+  describeTargetedSaleTotal,
+  formatSaleTaxCell,
   formatObjectiveAchieved,
   formatObjectiveGap,
   formatObjectiveTarget,
@@ -148,6 +150,77 @@ describe('describeOptimizerMode', () => {
   });
 });
 
+describe('the targeted mode, «Con vendite mirate»', () => {
+  const NBSP = /[\u00A0\u202F]/g;
+  const plain = (text: string) => text.replace(NBSP, ' ');
+  // Four-digit euros print ungrouped («8000 €»), as every other figure of the app (owner, 2026-11-18).
+  const sale = (overrides: Partial<OptimizerSaleReport> = {}): OptimizerSaleReport => ({
+    taxCapEur: 500,
+    minTaxEur: 0,
+    soldEur: 8000,
+    taxEur: 400,
+    liquiditySpentEur: 0,
+    idealTaxEur: 900,
+    capBinding: true,
+    perCandidate: [],
+    ...overrides,
+  });
+
+  it('has its own label and description', () => {
+    expect(OPTIMIZER_MODE_LABELS.targeted).toBe('Con vendite mirate');
+    expect(describeOptimizerMode('targeted')).toBe(
+      'Con vendite mirate vende solo ciò che conviene di più, finché le tasse restano sotto il tetto; gli strumenti spuntati non si vendono.'
+    );
+  });
+
+  it('says the sale and the cap when the cap binds', () => {
+    expect(plain(describeTargetedSaleTotal(sale()))).toBe('Vendi 8000 €, paghi circa 400 € di tasse (tetto 500 €).');
+  });
+
+  it('says it is Ideale when the cap does not bind', () => {
+    expect(plain(describeTargetedSaleTotal(sale({ capBinding: false, soldEur: 20000, taxEur: 900, taxCapEur: 10000 })))).toBe(
+      "Vendi 20.000 €, paghi circa 900 € di tasse: è l'Ideale, il tetto di 10.000 € non serve."
+    );
+  });
+
+  it('says nothing is sold — the reachable weights — when nothing is sold nor spent', () => {
+    expect(plain(describeTargetedSaleTotal(sale({ soldEur: 0, taxEur: 0, taxCapEur: 0 })))).toBe(
+      'Nessuna vendita: i pesi sono quelli raggiungibili col PAC.'
+    );
+  });
+
+  it('names the liquidity it spends apart from the sale', () => {
+    expect(plain(describeTargetedSaleTotal(sale({ liquiditySpentEur: 3000 })))).toBe(
+      'Vendi 8000 €, paghi circa 400 € di tasse, usi 3000 € di liquidità (tetto 500 €).'
+    );
+    expect(plain(describeTargetedSaleTotal(sale({ soldEur: 0, taxEur: 0, liquiditySpentEur: 3000 })))).toBe(
+      'Nessuna vendita: usi 3000 € di liquidità.'
+    );
+  });
+
+  it('names the tax the Impostazioni limits force when it exceeds the cap', () => {
+    expect(plain(describeTargetedSaleTotal(sale({ taxCapEur: 0, minTaxEur: 100, taxEur: 100, soldEur: 10000 })))).toBe(
+      'I limiti in Impostazioni obbligano a pagare almeno 100 € di tasse, oltre il tetto di 0 €: vendi 10.000 €, paghi circa 100 € di tasse.'
+    );
+  });
+
+  it('prints the tax on a row in sale, 0,00 € on a sale at a loss, — on a row that sells nothing', () => {
+    expect(plain(formatSaleTaxCell(2000, 250))).toBe('250,00 €');
+    expect(plain(formatSaleTaxCell(1000, 0))).toBe('0,00 €');
+    expect(plain(formatSaleTaxCell(0, 0))).toBe('—');
+  });
+
+  it("makes the total line the dialog's reading once the targeted mode has a result", () => {
+    const run = { status: 'ok' as const, sale: sale({ liquiditySpentEur: 3000 }) };
+    const reading = describeIdealCompositionStatus(run, [], 5000, { instrumentCount: 3, baseEur: 100000 });
+    expect(plain(textOf(reading.narrative))).toBe('Vendi 8000 €, paghi circa 400 € di tasse, usi 3000 € di liquidità (tetto 500 €).');
+    expect(reading.tone).toBe('neutral');
+    expect(plain(textOf(describeIdealCompositionStatus(run, [], -2000, { instrumentCount: 3, baseEur: 100000 }).narrative))).toBe(
+      `Vendi 8000 €, paghi circa 400 € di tasse, usi 3000 € di liquidità (tetto 500 €). ${NEGATIVE_LIQUIDITY_NOTE}`
+    );
+  });
+});
+
 describe('describeOptimizerSnapshot', () => {
   const snapshot = {
     computedAt: new Date(2026, 8, 18), // 18/09
@@ -187,11 +260,11 @@ describe('describeSecondLevelGaps', () => {
   });
 
   it('names the class, the count and the instruments, capped at 5 with the rest counted', () => {
-    const gaps = ['ETFMONDO', 'ETFSVIL', 'ETFEM', 'ETFMOM', 'AVWS', 'CL2'].map((name, i) =>
+    const gaps = ['ETFMONDO', 'ETFSVIL', 'ETFEM', 'ETFMOM', 'ETFVAL', 'ETFUSA'].map((name, i) =>
       gap({ assetId: `a${i}`, assetName: name })
     );
     expect(describeSecondLevelGaps(gaps)).toEqual([
-      '6 strumenti nella classe Azioni senza sottocategoria: ETFMONDO, ETFSVIL, ETFEM, ETFMOM, AVWS e altri 1.',
+      '6 strumenti nella classe Azioni senza sottocategoria: ETFMONDO, ETFSVIL, ETFEM, ETFMOM, ETFVAL e altri 1.',
     ]);
   });
 

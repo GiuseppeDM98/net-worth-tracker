@@ -13,6 +13,7 @@
  */
 
 import { roundToCents } from '@/lib/utils/cents';
+import type { AllocatableHolding } from '@/lib/utils/allocationUtils';
 
 /**
  * Loss → no tax; missing rate → unknown (`null`), never zero. Unrounded.
@@ -25,6 +26,44 @@ import { roundToCents } from '@/lib/utils/cents';
 export function estimateSaleTax(taxableGain: number, taxRate: number | undefined | null): number | null {
   if (taxRate === undefined || taxRate === null) return null;
   return taxableGain > 0 ? (taxableGain * taxRate) / 100 : 0;
+}
+
+/** What one euro sold of a holding costs in tax today. */
+export type SaleTaxPerEuro =
+  | { kind: 'exempt' }
+  | { kind: 'taxed'; perEuro: number }
+  | { kind: 'unknown'; reason: 'cost-basis' | 'rate' };
+
+/**
+ * The rule of every PROPOSED sale's estimate (`estimatePlanSaleTax`, the targeted optimizer), on
+ * `estimateSaleTax`: not taxable → exempt; no EUR basis or no rate → unknown, never zero; the gain
+ * fraction floored at zero — a loss pays nothing and offsets nothing; no sale fee (a proposed sale
+ * has none yet).
+ */
+export function saleTaxPerEuro(holding: AllocatableHolding): SaleTaxPerEuro {
+  if (!holding.taxableOnSale || holding.value <= 0) return { kind: 'exempt' };
+  if (holding.costBasisEur === undefined) return { kind: 'unknown', reason: 'cost-basis' };
+  if (holding.taxRate === undefined) return { kind: 'unknown', reason: 'rate' };
+  const gainFraction = Math.max(0, (holding.value - holding.costBasisEur) / holding.value);
+  return { kind: 'taxed', perEuro: estimateSaleTax(gainFraction, holding.taxRate) ?? 0 };
+}
+
+/**
+ * A candidate's rate: its BUYER's — the only member a plan sells; a composite buyer's sleeves give the
+ * most taxed, unknown if any is (2026-11-12).
+ */
+export function candidateSaleTaxPerEuro(
+  buyAssetId: string,
+  holdings: readonly AllocatableHolding[],
+): SaleTaxPerEuro {
+  let worst: SaleTaxPerEuro = { kind: 'exempt' };
+  for (const holding of holdings) {
+    if ((holding.assetId ?? holding.id) !== buyAssetId) continue;
+    const own = saleTaxPerEuro(holding);
+    if (own.kind === 'unknown') return own;
+    if (own.kind === 'taxed' && (worst.kind === 'exempt' || own.perEuro > worst.perEuro)) worst = own;
+  }
+  return worst;
 }
 
 /**

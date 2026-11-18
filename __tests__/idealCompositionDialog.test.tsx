@@ -11,6 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { Asset, AssetAllocationTarget } from '@/types/assets';
+import type { PlanSeedDraft } from '@/types/accumulationPlan';
 
 const { saveSpy } = vi.hoisted(() => ({ saveSpy: vi.fn(async () => undefined) }));
 
@@ -28,9 +29,20 @@ vi.mock('@/lib/utils/weightOptimizer', async (importOriginal) => {
 });
 
 import { IdealCompositionDialog } from '@/components/allocation/IdealCompositionDialog';
-import { buildStandaloneCandidates, DEFAULT_IDEAL_ALLOCATION, LIQUIDITY_CANDIDATE_KEY, runOptimizer } from '@/lib/utils/weightOptimizer';
+import { buildStandaloneCandidates, DEFAULT_IDEAL_ALLOCATION, LIQUIDITY_CANDIDATE_KEY, runOptimizer, type OptimizerResult } from '@/lib/utils/weightOptimizer';
+import { formatPercentageIt } from '@/lib/utils/formatters';
 import { buildModelBasis } from '@/lib/utils/modelPortfolio';
-import { IDEAL_COMPOSITION_FIXED_DIFF, MODEL_TILE_EYEBROW, NEGATIVE_LIQUIDITY_NOTE, OPTIMIZER_MODE_LABELS } from '@/lib/utils/weightOptimizerNarrative';
+import {
+  describeTargetedSaleTotal,
+  IDEAL_COMPOSITION_FIXED_DIFF,
+  IDEAL_COMPOSITION_LOCK_NOT_TRADED,
+  IDEAL_COMPOSITION_LOCK_UNKNOWN_RATE,
+  IDEAL_COMPOSITION_LOSSES_NOTE,
+  IDEAL_COMPOSITION_TAX_CAP_LABEL,
+  MODEL_TILE_EYEBROW,
+  NEGATIVE_LIQUIDITY_NOTE,
+  OPTIMIZER_MODE_LABELS,
+} from '@/lib/utils/weightOptimizerNarrative';
 
 function makeAsset(id: string, overrides: Partial<Asset> = {}): Asset {
   return {
@@ -193,5 +205,114 @@ describe('IdealCompositionDialog — a base the model cannot run on', () => {
     renderDialog([account, etfA, etfB, loan('prestito', 12000)]);
     expect((calcola() as HTMLButtonElement).disabled).toBe(false);
     expect(flat(screen.getByRole('status').textContent).endsWith(NEGATIVE_LIQUIDITY_NOTE)).toBe(true);
+  });
+});
+
+// «Con vendite mirate» (2026-11-18): the rows and the cap before «Calcola», the forced locks said in words, the
+// total line as the reading, a new cap or box clears the result, the seed sells only instruments.
+describe('IdealCompositionDialog — «Con vendite mirate»', () => {
+  // Base 100.000 €: the accounts 20.000 (20%), ETF-A at a 20.000 € gain (26%), ETF-B at par (12,5%), BTC with no rate, a pension fund.
+  const conto = makeAsset('conto', { type: 'cash', assetClass: 'cash', currentPrice: 20000 });
+  const gainer = makeAsset('etf-a', { quantity: 100, currentPrice: 500, averageCost: 300, taxRate: 26 });
+  const atPar = makeAsset('etf-b', { assetClass: 'bonds', quantity: 100, currentPrice: 200, averageCost: 200, taxRate: 12.5 });
+  const btc = makeAsset('btc', { type: 'crypto', currentPrice: 5000, averageCost: 1000, name: 'BTC' });
+  const fondo = makeAsset('fondo', { type: 'pensionFund', assetClass: 'bonds', currentPrice: 5000, name: 'FONDO' });
+  const assets = [conto, gainer, atPar, btc, fondo];
+
+  const chooseTargeted = () => fireEvent.click(screen.getByRole('radio', { name: OPTIMIZER_MODE_LABELS.targeted }));
+  const capField = () => screen.getByLabelText(IDEAL_COMPOSITION_TAX_CAP_LABEL) as HTMLInputElement;
+  const rowOf = (label: string) => screen.getByRole('rowheader', { name: new RegExp(`^${label}`) }).closest('tr')!;
+  const saveButton = () => screen.queryByRole('button', { name: 'Salva come portafoglio modello' });
+
+  it('shows the rows and «Tasse massime (€)» before «Calcola», the liquidity at its share of the base', () => {
+    renderDialog(assets);
+    chooseTargeted();
+    expect(runOptimizer).toHaveBeenCalledTimes(0);
+    expect(capField()).toBeTruthy();
+    const cells = rowOf('Liquidità').querySelectorAll('td');
+    // The box, then the current weight: the builder's 20.000 €, never the 1 € stand-in.
+    expect(flat(cells[1].textContent)).toBe(flat(formatPercentageIt(20, 1)));
+    expect(flat(rowOf('ETF-A').querySelectorAll('td')[1].textContent)).toBe(flat(formatPercentageIt(50, 1)));
+  });
+
+  it('ticks and disables a row with no rate or not traded, says why in words, leaves the liquidity free', () => {
+    renderDialog(assets);
+    chooseTargeted();
+    const box = (label: string) => screen.getByRole('checkbox', { name: label });
+    expect(box('BTC').getAttribute('data-state')).toBe('checked');
+    expect(box('BTC').hasAttribute('disabled')).toBe(true);
+    expect(rowOf('BTC').textContent).toContain(IDEAL_COMPOSITION_LOCK_UNKNOWN_RATE);
+    expect(box('FONDO').hasAttribute('disabled')).toBe(true);
+    expect(rowOf('FONDO').textContent).toContain(IDEAL_COMPOSITION_LOCK_NOT_TRADED);
+    expect(box('Liquidità').hasAttribute('disabled')).toBe(false);
+    expect(box('ETF-A').hasAttribute('disabled')).toBe(false);
+  });
+
+  it('makes the total line the reading, and the losses note the first line under the table', () => {
+    renderDialog(assets);
+    chooseTargeted();
+    fireEvent.change(capField(), { target: { value: '100000' } });
+    fireEvent.click(calcola());
+    const result = vi.mocked(runOptimizer).mock.results[0].value as OptimizerResult;
+    expect(result.status).toBe('ok');
+    expect(flat(screen.getByRole('status').textContent)).toBe(flat(describeTargetedSaleTotal(result.sale!)));
+    expect(flat(screen.getByRole('table').nextElementSibling?.textContent)).toBe(IDEAL_COMPOSITION_LOSSES_NOTE);
+  });
+
+  it('clears the result on a cap keystroke and on a box tick, with no extra run', () => {
+    renderDialog(assets);
+    chooseTargeted();
+    fireEvent.click(calcola());
+    expect(saveButton()).toBeTruthy();
+    fireEvent.change(capField(), { target: { value: '200' } });
+    expect(saveButton()).toBeNull();
+    fireEvent.click(calcola());
+    expect(saveButton()).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ETF-A' }));
+    expect(saveButton()).toBeNull();
+    expect(runOptimizer).toHaveBeenCalledTimes(2);
+  });
+
+  it('seeds the PAC with the instruments’ sales only, never the liquidity nor a property, and keeps the cap', () => {
+    // A property off the hundredth grid: 130.000 € of 230.000 is 56,5217%, fixed at 56,52% — locked, it is held
+    // exactly (no 4 € «sale»); the dialog's filter keeps it out of the seed even so.
+    const casa = makeAsset('casa', { type: 'realestate', assetClass: 'realestate', currentPrice: 130000, allocationRole: 'frozen', name: 'Casa' });
+    // A money-market fund at par: in the base, out of the model (no plan buys it), so the optimizer may trim it.
+    const monetario = makeAsset('monetario', { assetClass: 'cash', quantity: 400, currentPrice: 100, averageCost: 50, taxRate: 26, name: 'MONETARIO' });
+    const { onCreatePac } = renderDialog([...assets, casa, monetario]);
+    chooseTargeted();
+    fireEvent.change(capField(), { target: { value: '500' } });
+    fireEvent.click(calcola());
+    const result = vi.mocked(runOptimizer).mock.results[0].value as OptimizerResult;
+    expect(result.sale!.liquiditySpentEur).toBeGreaterThan(0);
+    expect(result.sale!.perCandidate.find((p) => p.key === 'casa')!.soldEur).toBe(0);
+    expect(result.warnings).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Crea un PAC con questi pesi' }));
+    const seed = onCreatePac.mock.calls[0][0] as PlanSeedDraft;
+    const sold = (seed.disposals ?? []).map((d) => d.assetId);
+    expect(sold).toContain('etf-b');
+    // Brought to 0%, ETF-B leaves the plan: sold whole (no `quantity`), never down to its last share (collaudo 2026-11-18).
+    expect(result.weights.find((w) => w.key === 'etf-b')!.proposedPct).toBe(0);
+    expect(seed.disposals!.find((d) => d.assetId === 'etf-b')).toEqual({ assetId: 'etf-b', estimatedProceedsEur: 20000, status: 'planned' });
+    // Sold whole only what the proposal brings to 0% — never one it keeps above zero, even out of the model
+    // (the tour, 2026-11-18: a money-market fund only trimmed was sold whole).
+    for (const disposal of seed.disposals!) {
+      const proposedPct = result.weights.find((w) => w.key === disposal.assetId)!.proposedPct;
+      expect({ assetId: disposal.assetId, whole: disposal.quantity === undefined }).toEqual({ assetId: disposal.assetId, whole: proposedPct === 0 });
+    }
+    // The run keeps the accounts and the money-market fund at the plan's cash quota (owner, 2026-11-18).
+    const sale = vi.mocked(runOptimizer).mock.calls[0][0].sale!;
+    expect(sale.cashFloorEur).toBeGreaterThan(0);
+    const liquidity = result.weights.find((w) => w.key === LIQUIDITY_CANDIDATE_KEY)!;
+    const baseEur = 20000 / (liquidity.currentPct / 100);
+    const cashPct = liquidity.proposedPct + result.weights.find((w) => w.key === 'monetario')!.proposedPct;
+    expect(cashPct).toBeGreaterThanOrEqual((sale.cashFloorEur! / baseEur) * 100 - 0.01);
+    // Sold whole, it is no position: a plan never sells a position of its own whole («Attiva piano» stayed off).
+    expect(seed.positions.map((p) => p.buyAssetId)).not.toContain('etf-b');
+    expect(sold).not.toContain(LIQUIDITY_CANDIDATE_KEY);
+    expect(sold).not.toContain('casa');
+    // A forced lock is a lock to the optimizer too: the pension fund costs no tax, yet is never sold.
+    expect(seed.optimizerSnapshot).toMatchObject({ mode: 'targeted', taxCapEur: 500 });
+    expect(seed.optimizerSnapshot?.lockedKeys).toEqual(expect.arrayContaining(['btc', 'fondo']));
   });
 });

@@ -49,6 +49,7 @@ import {
   proceedsOfDisposal,
   isPlanSourceAccount,
   resolvePlanReserve,
+  planCashFundSaleEur,
   resolvePositionStates,
   toMonthKey,
   unitPriceEur,
@@ -339,7 +340,14 @@ export function AccumulationPlanDialog({
                       (id) => allAssets.find((a) => a.id === id)?.name ?? id
                     )),
               seedDraft?.disposals ?? [],
-              resolvePlanReserve(allAssets, targets, compareAllocations, DEPS).reserveEur,
+              // A seeded money-market sale moves cash onto the accounts: the reserve rises by it (owner, 2026-11-18).
+              resolvePlanReserve(
+                allAssets,
+                targets,
+                compareAllocations,
+                DEPS,
+                planCashFundSaleEur(seedDraft?.disposals ?? [], new Map(allAssets.map((a) => [a.id, a])), allAssets)
+              ).reserveEur,
               seedDraft?.optimizerSnapshot ?? (fromModel ? model?.optimizerSnapshot : undefined)
             )
       );
@@ -370,9 +378,10 @@ export function AccumulationPlanDialog({
   // Only the real accounts: a money-market fund is part of the quota, never a source (owner, 2026-11-17).
   const cashAccounts = useMemo(() => allAssets.filter(isPlanSourceAccount), [allAssets]);
   const reserveOrigin = useMemo(() => {
-    const { quotaEur, otherCashEur } = resolvePlanReserve(allAssets, targets, compareAllocations, DEPS);
+    const soldEur = planCashFundSaleEur(draft.disposals, assetsById, allAssets);
+    const { quotaEur, otherCashEur } = resolvePlanReserve(allAssets, targets, compareAllocations, DEPS, soldEur);
     return describeReserveOrigin({ quotaEur, otherCashEur });
-  }, [allAssets, targets]);
+  }, [allAssets, targets, draft.disposals, assetsById]);
 
   // Every tradable holding with a value, plus any asset created empty in THIS session — the
   // moment it exists it must be classified.
