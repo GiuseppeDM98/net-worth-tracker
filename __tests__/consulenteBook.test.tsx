@@ -19,7 +19,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import { initialAnswers } from '@/lib/utils/allocationAdviceDraft';
-import { APPLY_ACTIVE_PLAN_NOTE, buildConsulenteVerdict, buildProposalRows } from '@/lib/utils/allocationAdviceNarrative';
+import { APPLY_ACTIVE_PLAN_NOTE, buildConsulenteVerdict, buildProposalRows, HANDOFF_DRAFT_NOTE, HANDOFF_READING } from '@/lib/utils/allocationAdviceNarrative';
+import { CONSULENTE_HANDOFF_HREF, type ApplyHandoff } from '@/lib/utils/allocationAdviceDocument';
 import type { BookPageId } from '@/lib/utils/allocationAdviceBook';
 
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
@@ -103,7 +104,7 @@ function makeDocument(overrides: Partial<AllocationAdviceDocument> = {}): Alloca
 
 const ROLES = { changes: [{ assetId: 'a1', assetName: 'Fondo fenicottero', from: 'tradable' as const, to: 'excluded' as const, reason: 'Un fondo pensione.' }], unmatched: [] };
 
-function Host({ document, initialPage = null, onPage }: { document: AllocationAdviceDocument; initialPage?: string | null; onPage?: (id: BookPageId) => void }) {
+function Host({ document, initialPage = null, onPage, handoff = 'none', activePlanNote = null }: { document: AllocationAdviceDocument; initialPage?: string | null; onPage?: (id: BookPageId) => void; handoff?: ApplyHandoff; activePlanNote?: string | null }) {
   const [pageId, setPageId] = useState<string | null>(initialPage);
   const revision = useConsulenteRevision('u1');
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
@@ -119,7 +120,7 @@ function Host({ document, initialPage = null, onPage }: { document: AllocationAd
       roles={ROLES}
       goalPlan={null}
       revision={revision}
-      apply={{ document, proposal, rows, roles: ROLES, goalPlan: null, goalsCount: 0, applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {}, applyGoals: true, setApplyGoals: () => {}, applyState, activePlanNote: null }}
+      apply={{ document, proposal, rows, roles: ROLES, goalPlan: null, goalsCount: 0, applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {}, applyGoals: true, setApplyGoals: () => {}, applyState, activePlanNote, handoff }}
       canApply
       onApply={() => {}}
       pageId={pageId}
@@ -132,11 +133,11 @@ function Host({ document, initialPage = null, onPage }: { document: AllocationAd
   );
 }
 
-function renderBook(document = makeDocument(), initialPage: string | null = null) {
+function renderBook(document = makeDocument(), initialPage: string | null = null, extra: { handoff?: ApplyHandoff; activePlanNote?: string | null } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <Host document={document} initialPage={initialPage} />
+      <Host document={document} initialPage={initialPage} {...extra} />
     </QueryClientProvider>
   );
   const rerenderWith = (next: AllocationAdviceDocument) =>
@@ -372,7 +373,7 @@ describe('«Applica» with an active accumulation plan (2026-11-12)', () => {
     return applyPieces({
       document, proposal, rows: proposal ? buildProposalRows(proposal, { equity: 60, bonds: 40 }) : [], roles: ROLES, goalPlan: null, goalsCount: 0,
       applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {},
-      applyGoals: true, setApplyGoals: () => {}, applyState: { phase: 'idle' }, activePlanNote,
+      applyGoals: true, setApplyGoals: () => {}, applyState: { phase: 'idle' }, activePlanNote, handoff: 'none',
     });
   };
 
@@ -383,5 +384,37 @@ describe('«Applica» with an active accumulation plan (2026-11-12)', () => {
     unmount();
     const without = render(<>{pieces(null).body}</>);
     expect(without.container.textContent).not.toContain('piano di accumulo');
+  });
+});
+
+describe('«Applica» after the write: the hand-off to a plan of accumulation (2026-11-12)', () => {
+  const applied = () => makeDocument({ status: 'applied', applied: { at: NOW, targetsWritten: true, rolesChanged: 0, goalsWritten: 0 } });
+  const link = () => within(card()).queryByRole('link', { name: 'Crea un piano di accumulo verso questa allocazione' });
+
+  // Mutation: the link rendered on `ready` → red.
+  it('an applied document with the offer: the reading and the primary link to Accumulo, «Rifai il percorso» beside it', () => {
+    renderBook(applied(), 'applica', { handoff: 'offer' });
+    expect(card().textContent).toContain(HANDOFF_READING);
+    // Phase F (owner, 2026-11-18): «piano» is the plan of accumulation alone on this page.
+    expect(card().textContent).toContain("L'allocazione è già nelle impostazioni: rifai il percorso per cambiarla.");
+    expect(link()?.getAttribute('href')).toBe(CONSULENTE_HANDOFF_HREF);
+    expect(button('Rifai il percorso')).not.toBeNull();
+  });
+
+  it('a draft gets its note and no link; an active plan its note in the applied body, no link', () => {
+    const { unmount } = renderBook(applied(), 'applica', { handoff: 'draft' });
+    expect(card().textContent).toContain(HANDOFF_DRAFT_NOTE);
+    expect(link()).toBeNull();
+    unmount();
+    renderBook(applied(), 'applica', { handoff: 'none', activePlanNote: APPLY_ACTIVE_PLAN_NOTE });
+    expect(card().textContent).toContain(APPLY_ACTIVE_PLAN_NOTE);
+    expect(card().textContent).not.toContain(HANDOFF_READING);
+    expect(link()).toBeNull();
+  });
+
+  it('a ready document never shows the link, whatever the offer says', () => {
+    renderBook(makeDocument(), 'applica', { handoff: 'offer' });
+    expect(link()).toBeNull();
+    expect(card().textContent).not.toContain(HANDOFF_READING);
   });
 });

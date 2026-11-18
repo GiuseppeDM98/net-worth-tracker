@@ -80,8 +80,9 @@ should look like and the plan is how the monthly inflow gets closer.
   Impostazioni writes them on a save that changes nothing (owner, 2026-11-17). A model without a fingerprint is stale. The basis is built by `AccumuloTab` (`buildModelBasis`
   from the settings and the goals the page hands it), never by the page: its first chunk does not carry the model's module. A save that sets the
   weights («Salva come portafoglio modello», «Modifica a mano», «Usa i pesi del piano», the editor's «Aggiorna anche
-  il portafoglio modello») records the fingerprint of that moment; «Aggiungi strumento da valutare» keeps the stored
-  one, so a stale model stays stale. The tile, its closed row and the editor's «Parti da: modello» say «superato».
+  il portafoglio modello» — on «Attiva», on the revision and, since 2026-11-18 (owner, NOVE-21's tour), on «Salva
+  bozza» too: a ticked box that wrote nothing read as a broken promise) records the fingerprint of that moment; «Aggiungi strumento da valutare» keeps the stored
+  one, so a stale model stays stale. A plan's weights become the model's with every row above 0 AND every row at 0 the owner holds (`planPositionsToModelWeights`, owner 2026-11-18, NOVE-21's tour): out of the model a held instrument left the base of «Oggi», which read a weight four times its share of the portfolio. The tile, its closed row and the editor's «Parti da: modello» say «superato».
 - **Where it is used**: `PortafoglioModelloTile` compares today with the model; the PAC editor's step 2 has an
   «Ottimizzato» view (`OptimizerPanel`) and a «Parti da» seed from the model; «Ricalcola» (`IdealCompositionDialog`,
   a tile-shaped modal: eyebrow, title, the status as the reading, the actions in the footer) runs the optimizer,

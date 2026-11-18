@@ -13,6 +13,7 @@
  * no action in the tile — only `toConfirm`/`executed`/`late`/`lostLink` do.
  */
 import type { MonthKey } from '@/types/accumulationPlan';
+import type { AssetClass } from '@/types/assets';
 import type { LineUiState } from './accumulationPlanMatching';
 import type { Narrative, PageVerdictModel } from './narrative';
 import type { RowAnswerMap } from '@/components/ui/row-answers';
@@ -21,6 +22,8 @@ import { ASSET_CLASS_LABELS, bandForTarget, type RebalanceBand } from './allocat
 import { cachedFormatCurrencyEUR, formatDate, formatNumberIt, formatPercentageIt } from './formatters';
 import { monthLabelLong, parseMonthKey } from './planMonths';
 import { monthWithPrepositionA } from './patrimonioNarrative';
+import { describeNegativeFixed } from './weightOptimizerNarrative';
+import type { ConsulenteHandoffPlan, HandoffSeedOutcome } from './allocationAdviceHandoff';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Month labels — DESIGN.md: abbreviated lowercase on a label, full name in a reading.
@@ -1391,4 +1394,70 @@ export function describeAccumuloClosedAnswers(input: AccumuloClosedAnswersInput)
     [ACCUMULO_SECTION_IDS.criteri]: input.criteriaCount > 0 ? [{ text: `${input.criteriaCount} ${input.criteriaCount === 1 ? 'criterio' : 'criteri'}` }] : null,
     [ACCUMULO_SECTION_IDS.conclusi]: input.lastClosedMonth ? [{ text: `ultimo a ${monthLabelLong(input.lastClosedMonth, false)}` }] : null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// «Dal Consulente» — the hand-off after «Applica» (owner, 2026-11-12)
+// ---------------------------------------------------------------------------
+
+export const HANDOFF_EYEBROW = 'Dal Consulente';
+export const HANDOFF_TITLE = 'Un piano verso la nuova allocazione';
+/** Under a row to create with no ticker (and not a bond): `AssetDialog` quotes by ticker, without one the price is 0. */
+export const HANDOFF_NO_TICKER = 'senza ticker: inseriscilo per il prezzo';
+/** A row just created, until the assets' re-read moves it among the matched ones. */
+export const HANDOFF_CREATED_PENDING = 'creato, in aggiornamento';
+
+/** Inside a class without sub-targets a new instrument starts at 0 %: no rule invents a share the targets do not state. */
+export function describeHandoffZero(classLabels: string[]): string {
+  return `Dentro ${listInItalian(classLabels)} lo strumento nuovo parte da 0%: dagli tu una quota nell'editor.`;
+}
+
+/** The seed holds every tradable instrument held; these are the ones the Consulente did not name. */
+export function describeHandoffExtra(names: string[]): string {
+  const [verb, pronoun, suffix] = names.length > 1 ? ['restano', 'li', 'li'] : ['resta', 'lo', 'lo'];
+  return `Il Consulente non cita ${listInItalian(names)}, che tieni oggi: ${verb} nel piano a 0%, il piano non ${pronoun} compra più. Se vuoi continuare a comprar${suffix}, dagli una quota nell'editor.`;
+}
+
+export function describeHandoffUnnamed(subTargets: string[]): string {
+  return `Senza uno strumento indicato: ${listInItalian(subTargets)}.`;
+}
+
+export function describeHandoffNotBuyable(names: string[]): string {
+  return `Fuori dal piano (un conto, un immobile, un prestito o un ruolo non negoziabile): ${listInItalian(names)}.`;
+}
+
+/**
+ * The hand-off dialog's reading, which IS its status (The Modal-Is-A-Tile Rule): how the quotas
+ * were made — or why they start at 0 % — then what to create, the classes whose split follows the
+ * whole class, the classes where a new instrument starts at 0 %, the held instruments it also buys.
+ */
+export function describeHandoffReading(handoff: ConsulenteHandoffPlan, outcome: HandoffSeedOutcome): string {
+  const n = outcome.seed.positions.length;
+  const lead = n === 0
+    ? "Nessuno strumento del piano è ancora fra i tuoi asset: crea almeno uno di quelli proposti per aprire l'editor."
+    : outcome.kind === 'computed'
+      ? `Quote calcolate dall'app sui nuovi target e sul patrimonio di oggi, per ${n} ${n === 1 ? 'strumento' : 'strumenti'}: le confermi o le cambi nell'editor.`
+      : outcome.reason === 'negative_fixed'
+        ? `${describeNegativeFixed(outcome.negativeFixedLabels)} Nell'editor gli strumenti partono da 0%: le quote le scegli tu.`
+        : "L'app non riesce a calcolare le quote su questi target: nell'editor gli strumenti partono da 0%, le quote le scegli tu.";
+  const parts = [lead];
+  const toCreate = handoff.toCreate.length;
+  if (toCreate === 1) parts.push('Uno strumento proposto non è ancora fra i tuoi asset: «Crea» lo aggiunge a 0 quote e le quote si ricalcolano.');
+  if (toCreate > 1) parts.push(`${toCreate} strumenti proposti non sono ancora fra i tuoi asset: «Crea» li aggiunge a 0 quote e le quote si ricalcolano.`);
+  if (outcome.kind === 'computed') {
+    const label = (c: AssetClass) => ASSET_CLASS_LABELS[c] ?? c;
+    if (outcome.unmappedClasses.length > 0) {
+      parts.push(`Dentro ${listInItalian(outcome.unmappedClasses.map(label))} le quote seguono la classe intera: qualche strumento ha una sottocategoria che i nuovi target non elencano.`);
+    }
+    if (outcome.zeroClasses.length > 0) parts.push(describeHandoffZero(outcome.zeroClasses.map(label)));
+    if (outcome.extraNames.length > 0) parts.push(describeHandoffExtra(outcome.extraNames));
+  }
+  return parts.join(' ');
+}
+
+/** The editor's warning: the plan sells in month 1 an instrument the Consulente proposes to keep. */
+export function describeKeptSales(names: string[]): string {
+  return names.length === 1
+    ? `${names[0]} è fra gli strumenti che il Consulente propone di tenere: il piano lo vende al primo mese.`
+    : `${listInItalian(names)} sono fra gli strumenti che il Consulente propone di tenere: il piano li vende al primo mese.`;
 }

@@ -11,7 +11,8 @@ import {
 import { buildAssistantYtdContext } from '@/lib/services/assistantMonthContextService';
 import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import { formatBundleForPrompt, formatPortfolioForPrompt } from '@/lib/server/assistant/prompts';
-import { buildInstrumentsPrompt, buildInterviewPrompt, buildReviewPrompt, buildRevisionPrompt, buildStrategyPrompt } from './prompts';
+import { buildInstrumentsPrompt, buildInterviewPrompt, buildReviewPrompt, buildRevisionPrompt, buildStrategyPrompt, formatAccumulationPlanForPrompt } from './prompts';
+import { readAccumulationPlanForAdvice } from './accumulationPlan';
 import { archiveAllocationAdviceAdmin, getAllocationAdviceAdmin, listAllocationAdviceHistoryAdmin, patchAllocationAdviceAdmin, setAllocationAdviceAdmin } from './store';
 import {
   ALLOCATION_PROPOSAL_BLOCK,
@@ -316,12 +317,17 @@ async function archivePreviousPath(previous: AllocationAdviceDocument | null): P
  * block (2026-11-08); beside them the CASHFLOW 12 MESI block (2026-11), on its own read of the
  * whole history. Shared by the strategy and the interview (2026-11-08), so a round reads exactly
  * the strategy's data. A failed read rejects here and fails the caller, retryable: never a
- * strategy on a silent empty cashflow.
+ * strategy on a silent empty cashflow. The PIANO DI ACCUMULO block (2026-11-12) is the one read
+ * that never fails the caller: a failed read prints its own sentence.
  */
 async function buildConsulenteContext(userId: string, now: Date): Promise<{ dataBlock: string; cashflowBlock: string }> {
-  const [bundle, cashflowBlock] = await Promise.all([buildAssistantYtdContext(userId), readCashflowBlockForPrompt(userId, now)]);
+  const [bundle, cashflowBlock, planRead] = await Promise.all([
+    buildAssistantYtdContext(userId),
+    readCashflowBlockForPrompt(userId, now),
+    readAccumulationPlanForAdvice(userId, now),
+  ]);
   const bondBlock = await readBondTermsBlock(bundle.portfolio, now);
-  return { dataBlock: `${formatBundleForPrompt(bundle)}\n\n${bondBlock}`, cashflowBlock };
+  return { dataBlock: `${formatBundleForPrompt(bundle)}\n\n${bondBlock}\n\n${formatAccumulationPlanForPrompt(planRead)}`, cashflowBlock };
 }
 
 /** The stage begins: the document says so before the model is called, so a cut leaves it there. */
@@ -386,9 +392,11 @@ async function runInstruments(document: AllocationAdviceDocument, onStage: (stag
   await patchAllocationAdviceAdmin(document.userId, { instruments: document.instruments });
 }
 
-async function runReview(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void): Promise<void> {
+async function runReview(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, now: Date): Promise<void> {
   const { strategy, instruments } = document;
   if (!strategy?.proposal || !instruments) throw new AllocationAdviceStageError('review', 'Mancano strategia o strumenti da rivedere. Avvia di nuovo la ricerca.', false);
+  // The review reads no data block, but it judges whether the active plan goes toward the new targets.
+  const accumulationPlan = formatAccumulationPlanForPrompt(await readAccumulationPlanForAdvice(document.userId, now));
   await enterStage(document, 'review', onStage);
   const answer = await callModel('review', {
     model: ALLOCATION_ADVICE_STRATEGY_MODEL,
@@ -397,7 +405,7 @@ async function runReview(document: AllocationAdviceDocument, onStage: (stage: Al
       withBlock(strategy.markdown, ALLOCATION_PROPOSAL_BLOCK, strategy.proposal),
       withBlock(instruments.markdown, INSTRUMENT_CANDIDATES_BLOCK, instruments.candidates),
       instruments.candidates,
-      { interview: document.interview }
+      { interview: document.interview, accumulationPlan }
     ),
     effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
     format: ALLOCATION_ANSWER_FORMAT,
@@ -416,10 +424,11 @@ async function runReview(document: AllocationAdviceDocument, onStage: (stage: Al
  * with the previous report and every request so far — a couple of minutes on Opus 5.5 instead
  * of a whole new run. The report and its proposal are replaced; the requests stay on the document.
  */
-async function runRevise(document: AllocationAdviceDocument, request: string, interview: AllocationAdviceInterview | null, onStage: (stage: AllocationAdviceStage) => void): Promise<void> {
+async function runRevise(document: AllocationAdviceDocument, request: string, interview: AllocationAdviceInterview | null, onStage: (stage: AllocationAdviceStage) => void, now: Date): Promise<void> {
   const { strategy, instruments, report } = document;
   if (!strategy?.proposal || !instruments || !report) throw new AllocationAdviceStageError('review', "Non c'è un report finito da rivedere. Avvia la ricerca.");
   const requests = [...(document.revisions ?? []).map((row) => row.request), request];
+  const accumulationPlan = formatAccumulationPlanForPrompt(await readAccumulationPlanForAdvice(document.userId, now));
   await enterStage(document, 'review', onStage);
   const answer = await callModel('review', {
     model: ALLOCATION_ADVICE_STRATEGY_MODEL,
@@ -430,7 +439,7 @@ async function runRevise(document: AllocationAdviceDocument, request: string, in
       instruments.candidates,
       withBlock(report.markdown, ALLOCATION_PROPOSAL_BLOCK, report.proposal),
       requests,
-      { interview }
+      { interview, accumulationPlan }
     ),
     effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
     format: ALLOCATION_ANSWER_FORMAT,
@@ -532,10 +541,10 @@ export async function runAllocationAdviceStage({ userId, stage, answers, documen
   try {
     if (stage === 'strategy') await runStrategy(document, onStage, priorPlan, now, previousPaths);
     else if (stage === 'instruments') await runInstruments(document, onStage, now);
-    else if (stage === 'review') await runReview(document, onStage);
+    else if (stage === 'review') await runReview(document, onStage, now);
     else {
       if (!request) throw new AllocationAdviceStageError('review', 'Scrivi cosa vuoi cambiare nel report.');
-      await runRevise(document, request, interview, onStage);
+      await runRevise(document, request, interview, onStage, now);
     }
     return document;
   } catch (error) {

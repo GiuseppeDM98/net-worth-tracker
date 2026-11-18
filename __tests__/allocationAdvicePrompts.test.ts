@@ -12,6 +12,7 @@ import {
   buildReviewPrompt,
   buildRevisionPrompt,
   buildStrategyPrompt,
+  formatAccumulationPlanForPrompt,
   formatAnswersForPrompt,
   formatInterviewForPrompt,
   formatPreviousPathsForPrompt,
@@ -119,9 +120,9 @@ describe('the CASHFLOW 12 MESI block in the strategy (2026-11)', () => {
   it('names the block among the exhaustive ones only when it is there, and points income, spending and savings at it', () => {
     const withBlock = buildStrategyPrompt(ANSWERS, 'DATI', { cashflowBlock: BLOCK });
     const without = buildStrategyPrompt(ANSWERS, 'DATI');
-    expect(withBlock.userContent).toContain('PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI e CASHFLOW 12 MESI sono esaustivi. Il blocco CASHFLOW del periodo copre solo l\'anno in corso: per entrate, spesa e risparmio usa il blocco CASHFLOW 12 MESI.');
+    expect(withBlock.userContent).toContain('PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI, PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi. Il blocco CASHFLOW del periodo copre solo l\'anno in corso: per entrate, spesa e risparmio usa il blocco CASHFLOW 12 MESI.');
     expect(without.userContent).not.toContain('CASHFLOW 12 MESI');
-    expect(without.userContent).toContain('PREVIDENZA, MUTUI, FAMIGLIA e OBBLIGAZIONI sono esaustivi.');
+    expect(without.userContent).toContain('PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI e PIANO DI ACCUMULO sono esaustivi.');
   });
 
   it('keeps system byte-identical with and without the block, and across users', () => {
@@ -310,7 +311,7 @@ describe('buildInterviewPrompt (the round\'s user turn and system, 2026-11-08)',
       expect(index, needle).toBeGreaterThanOrEqual(0);
       return index;
     };
-    expect(at('--- RISPOSTE DEL PERCORSO ---')).toBeLessThan(at('OBBLIGAZIONI e CASHFLOW 12 MESI sono esaustivi'));
+    expect(at('--- RISPOSTE DEL PERCORSO ---')).toBeLessThan(at('PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi'));
     expect(at('sono esaustivi')).toBeLessThan(at('\nDATI\n'));
     expect(at('\nDATI\n')).toBeLessThan(at(CASHFLOW));
     expect(at(CASHFLOW)).toBeLessThan(at('Questa è la tornata 1 di 3.'));
@@ -355,8 +356,8 @@ describe('the OBBLIGAZIONI block in the four contracts', () => {
   });
 
   it('the data intro names OBBLIGAZIONI among the exhaustive blocks, with and without the cashflow block', () => {
-    expect(buildStrategyPrompt(ANSWERS, 'DATI', { cashflowBlock: '--- CASHFLOW 12 MESI (x) ---\nX' }).userContent).toContain('MUTUI, FAMIGLIA, OBBLIGAZIONI e CASHFLOW 12 MESI sono esaustivi');
-    expect(buildStrategyPrompt(ANSWERS, 'DATI').userContent).toContain('MUTUI, FAMIGLIA e OBBLIGAZIONI sono esaustivi.');
+    expect(buildStrategyPrompt(ANSWERS, 'DATI', { cashflowBlock: '--- CASHFLOW 12 MESI (x) ---\nX' }).userContent).toContain('MUTUI, FAMIGLIA, OBBLIGAZIONI, PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi');
+    expect(buildStrategyPrompt(ANSWERS, 'DATI').userContent).toContain('FAMIGLIA, OBBLIGAZIONI e PIANO DI ACCUMULO sono esaustivi.');
   });
 });
 
@@ -438,5 +439,79 @@ describe('formatPreviousPathsForPrompt', () => {
   it('the interview and the strategy contracts carry the reading rule: a change since then is a question, an emotion in the words is said with its sentence, never judged', () => {
     expect(INTERVIEW_CONTRACT).toContain("- Se ci sono PERCORSI PRECEDENTI, confronta le risposte di oggi con quelle di allora — tolleranza, orizzonte, obiettivi, strumenti da tenere: un cambiamento che i dati non spiegano è una domanda, e nel `why` citi la risposta di allora e quella di oggi. Se nelle parole dell'utente, di allora o di oggi, leggi paura, fretta o euforia, dillo nella `note` con la frase che te lo fa pensare, senza giudicare, e chiedi se è il momento giusto per cambiare piano.");
     expect(buildStrategyPrompt(ANSWERS, 'DATI').system).toContain("Se ci sono PERCORSI PRECEDENTI, «La situazione» dice cosa è cambiato rispetto ad allora — tolleranza, orizzonte, obiettivi, strumenti da tenere — e se il cambiamento nasce dai fatti (reddito, patrimonio, famiglia, obiettivi) o dalle parole dell'utente: se nelle sue parole, di allora o di oggi, leggi paura, fretta o euforia, nominale citando la frase che te lo fa pensare, senza giudicare; un piano che cambia direzione per emozione lo dice e propone il passo più piccolo che la rispetta.");
+  });
+});
+
+// ── The PIANO DI ACCUMULO block and the path in words (owner, 2026-11-12) ──────────────────────
+describe('the PIANO DI ACCUMULO block', () => {
+  const nbsp = (text: string) => text.replace(/ /g, ' ');
+  const RUNNING = {
+    monthIndex: 3, months: 12, instalmentEur: 500, startMonth: '2026-09', endMonth: '2027-08',
+    buys: [{ assetId: 'a', name: 'ETF ornitorinco', targetPercentage: 70 }, { assetId: 'b', name: 'ETF fenicottero', targetPercentage: 30 }],
+    sells: [{ assetId: 'c', name: 'Fondo vecchio', quantity: null, monthIndex: null, status: 'planned' as const }],
+  };
+
+  // Mutation: the not-started branch dropped → «mese 0 di 12».
+  it('tells the three states apart: not read, no active plan, an active plan before its start and while it runs', () => {
+    expect(formatAccumulationPlanForPrompt({ read: false })).toBe("--- PIANO DI ACCUMULO ---\nIl piano di accumulo non è stato letto in questa corsa: non so se ce n'è uno.");
+    expect(formatAccumulationPlanForPrompt({ read: true, plan: null })).toBe('--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.');
+    const notStarted = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: { ...RUNNING, monthIndex: 0, startMonth: '2027-01', endMonth: '2027-12', sells: [] } }));
+    expect(notStarted).toContain('Piano attivo, non ancora partito: parte a 2027-01, 12 mesi fino a 2027-12, prima rata 500 €.');
+    expect(notStarted).not.toContain('mese 0 di');
+    expect(notStarted).toContain('Vende: niente.');
+    const running = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: RUNNING }));
+    expect(running).toBe([
+      '--- PIANO DI ACCUMULO ---',
+      'Piano attivo: mese 3 di 12, rata del mese 500 €, ultimo mese 2027-08.',
+      'Compra, con le quote del piano: ETF ornitorinco 70% · ETF fenicottero 30%.',
+      'Vende: Fondo vecchio, tutte le quote, al mese 1 (da fare).',
+    ].join('\n'));
+    const sale = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: { ...RUNNING, sells: [{ ...RUNNING.sells[0], quantity: 10, monthIndex: 2, status: 'executed' as const }] } }));
+    expect(sale).toContain('Vende: Fondo vecchio, 10 quote, al mese 2 (fatta).');
+  });
+
+  it('names the block among the exhaustive ones in both data intros', () => {
+    expect(buildStrategyPrompt(ANSWERS, 'DATI').userContent).toContain('OBBLIGAZIONI e PIANO DI ACCUMULO sono esaustivi.');
+    expect(buildInterviewPrompt(ANSWERS, 'DATI', { cashflowBlock: 'X', priorPlan: null, previousRounds: [], roundNumber: 1 }).userContent)
+      .toContain('OBBLIGAZIONI, PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi.');
+  });
+
+  it('rides in the review and the revision right before their last line, only when given', () => {
+    const block = '--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.';
+    const review = buildReviewPrompt(ANSWERS, 'S', 'I', null, { accumulationPlan: block });
+    expect(review.userContent.endsWith(`${block}\n\nScrivi il report finale come descritto.`)).toBe(true);
+    expect(buildReviewPrompt(ANSWERS, 'S', 'I', null).userContent).not.toContain('PIANO DI ACCUMULO');
+    const revision = buildRevisionPrompt(ANSWERS, 'S', 'I', null, 'R', ['meno cripto'], { accumulationPlan: block });
+    expect(revision.userContent.endsWith(`${block}\n\nRiscrivi il report intero applicando l'ultima richiesta, come descritto.`)).toBe(true);
+  });
+
+  // Mutation: the plan line put in `system`.
+  it('keeps system byte-identical across users and with or without the block (strategy, review, revision)', () => {
+    const block = formatAccumulationPlanForPrompt({ read: true, plan: RUNNING });
+    const other = { ...ANSWERS, age: 60 };
+    expect(buildStrategyPrompt(ANSWERS, `DATI\n\n${block}`).system).toBe(buildStrategyPrompt(other, 'DATI').system);
+    const review = buildReviewPrompt(ANSWERS, 'S', 'I', null, { accumulationPlan: block });
+    expect(review.system).toBe(buildReviewPrompt(other, 'S2', 'I2', null).system);
+    expect(review.system).not.toContain('ETF ornitorinco');
+    const revision = buildRevisionPrompt(ANSWERS, 'S', 'I', null, 'R', ['x'], { accumulationPlan: block });
+    expect(revision.system).toBe(buildRevisionPrompt(other, 'S2', 'I2', null, 'R2', ['y']).system);
+  });
+
+  it('the strategy\'s section 5 and the review\'s section 6 carry the path in words, from the cashflow, with no table', () => {
+    const strategy = buildStrategyPrompt(ANSWERS, 'DATI').system;
+    expect(strategy).toContain("5. **Cosa cambia rispetto a oggi** — le differenze principali con i target attuali e con le classi attuali, in punti percentuali; poi come arrivarci: accumulando con il risparmio mensile (un piano di accumulo che compra le classi sotto target) o vendendo, e in quanto tempo all'incirca, con la rata mensile come ordine di grandezza (una cifra tonda), dalla mediana del risparmio mensile del blocco CASHFLOW 12 MESI (senza quel blocco non stimare né il tempo né la rata); se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va già in quella direzione o va rivisto. Nessuna tabella di rate o di quote per strumento: le cifre esatte le calcola l'app dopo «Applica».");
+    expect(strategy).toContain('poi come arrivarci');
+    expect(strategy).toContain('con la rata mensile come ordine di grandezza');
+    const review = buildReviewPrompt(ANSWERS, 'S', 'I', null).system;
+    expect(review).toContain("6. **Cosa fare adesso** — i passi concreti, in ordine, con i costi fiscali di un eventuale cambio di strumento; poi la strada che la strategia indica per arrivare ai target — accumulare con il risparmio mensile o vendere, il tempo indicativo e la rata come la strategia li stima, senza ricalcolarli — e, se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va verso i nuovi target o va rivisto. Il piano esatto lo calcola l'app dopo «Applica» («Crea un piano di accumulo verso questa allocazione»): niente tabelle di rate né quote mensili per strumento.");
+    expect(review).toContain('senza ricalcolarli');
+    expect(review).toContain('Crea un piano di accumulo verso questa allocazione');
+  });
+
+  // Mutation: an eighth section added.
+  it('the review keeps seven sections', () => {
+    const review = buildReviewPrompt(ANSWERS, 'S', 'I', null).system;
+    expect(review).toContain('7. **Rischi e revisione**');
+    expect(review).not.toContain('8. **');
   });
 });

@@ -320,7 +320,11 @@ export function planPositionsToModelWeights(
 ): ReturnType<typeof proposalToModelWeights> {
   return proposalToModelWeights(
     positions
-      .filter((position) => position.targetPercentage > 0)
+      // A held position at 0 stays in at 0: out of the model it would leave the base of «Oggi» (owner, 2026-11-18).
+      .filter((position) => position.targetPercentage > 0 || position.memberAssetIds.some((id) => {
+        const asset = assetsById.get(id);
+        return !!asset && quantityOf(asset) > 0;
+      }))
       .map((position) => ({
         assetId: position.buyAssetId,
         pct: position.targetPercentage,

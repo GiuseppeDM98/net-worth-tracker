@@ -307,6 +307,14 @@ export const REVIEW_INVITE_LABEL = 'Rivedi con il Consulente';
 /** «Applica» with an active accumulation plan (2026-11-12): the plan keeps its own weights. */
 export const APPLY_ACTIVE_PLAN_NOTE = 'Hai un piano di accumulo attivo: i nuovi target non lo cambiano. Rivedilo in Allocazione › Accumulo.';
 
+/** After «Applica», with the targets written and no open plan (2026-11-12): the link to the hand-off and its reading. */
+export const HANDOFF_ACTION_LABEL = 'Crea un piano di accumulo verso questa allocazione';
+export const HANDOFF_READING =
+  "Il passo dopo: un piano di accumulo che compra verso questi target con i versamenti dei prossimi mesi. Le quote le calcola l'app; le confermi tu nell'editor.";
+/** The same moment with a draft open: one plan at a time (the plans' lock). */
+export const HANDOFF_DRAFT_NOTE =
+  'Hai una bozza di piano di accumulo: completala o eliminala in Allocazione › Accumulo, poi torna qui per crearne una verso questa allocazione.';
+
 /** The invite's sentence when the review is near or due; null otherwise. */
 export function describeReviewInvite(due: ReviewDue): string | null {
   if (due.state !== 'soon' && due.state !== 'due') return null;

@@ -10,6 +10,8 @@
  * By default the plan started two months before the day of the run: the open installment is the third
  * whatever the day, the first two executed (no late line), the third with nothing registered — «Rata 3
  * di 12». `startOffset: 1` makes a plan that starts next month (the `scheduled` verdict): no line executed.
+ * `status: 'draft'` writes a draft instead (2026-11-12, the Consulente's hand-off): no installments, no
+ * baseline, no `activatedAt`; the lock is written either way.
  * Instruments are the base seed's (`seed-vwce`, `seed-aapl`, `seed-btp`, scripts/seedEmulator.ts), at
  * the prices the seed stamps; round invented figures (WORKFLOW.md § 1 rule 7). The spec asserts the
  * STRUCTURE, never a figure: the euro amounts follow the seed's prices.
@@ -63,7 +65,7 @@ const WEIGHTS = [
 ];
 
 /** Writes the active plan (by default installment 3 of 12 open) and its lock. */
-export async function seedAccumuloFixture({ startOffset = -2 }: { startOffset?: number } = {}): Promise<void> {
+export async function seedAccumuloFixture({ startOffset = -2, status = 'active' }: { startOffset?: number; status?: 'active' | 'draft' } = {}): Promise<void> {
   const now = new Date();
   const positionId = (assetId: string) => `e2e-pos-${assetId.replace('seed-', '')}`;
   const installments = Array.from({ length: 12 }, (_, k) => {
@@ -88,10 +90,22 @@ export async function seedAccumuloFixture({ startOffset = -2 }: { startOffset?: 
   });
   // Two months ago: the seed's portfolio minus the two installments' purchases, the cash back.
   const baselineClasses = { equity: 14940, bonds: 303, crypto: 27500, cash: 9212 };
+  const activeOnly = status === 'active'
+    ? {
+        baseline: {
+          capturedAt: now,
+          positionValuesEur: { [positionId('seed-vwce')]: 1540, [positionId('seed-aapl')]: 1400, [positionId('seed-btp')]: 303 },
+          sourceCashEur: 9212,
+          pricesEur: { 'seed-vwce': 110, 'seed-aapl': 175, 'seed-btp': 101 },
+          measurement: { measuredAt: now, classNotionalEur: baselineClasses, marketBaseEur: 51955 },
+        },
+        activatedAt: now,
+      }
+    : {};
   await write(`accumulationPlans/${PLAN_ID}`, {
     userId: OWNER,
     name: 'Piano E2E',
-    status: 'active',
+    status,
     startMonth: monthKeyAt(startOffset),
     months: 12,
     liquidity: { sourceCashAssetIds: ['seed-cash'], reserveEur: 2000, monthlyInflowEur: 0 },
@@ -103,18 +117,12 @@ export async function seedAccumuloFixture({ startOffset = -2 }: { startOffset?: 
       buyAssetId: weight.assetId,
     })),
     disposals: [],
-    baseline: {
-      capturedAt: now,
-      positionValuesEur: { [positionId('seed-vwce')]: 1540, [positionId('seed-aapl')]: 1400, [positionId('seed-btp')]: 303 },
-      sourceCashEur: 9212,
-      pricesEur: { 'seed-vwce': 110, 'seed-aapl': 175, 'seed-btp': 101 },
-      measurement: { measuredAt: now, classNotionalEur: baselineClasses, marketBaseEur: 51955 },
-    },
-    installments,
+    // A draft (NOVE-16's shape) has no installments, no baseline and no activation.
+    installments: status === 'active' ? installments : [],
     residualEur: 0,
     createdAt: now,
     updatedAt: now,
-    activatedAt: now,
+    ...activeOnly,
   });
   await write(`accumulationPlanLocks/${OWNER}`, { userId: OWNER, openPlanId: PLAN_ID, updatedAt: now });
 }

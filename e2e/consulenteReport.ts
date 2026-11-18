@@ -7,7 +7,8 @@
  * emulator: two classes at 70 and 30, the goal «Fondo fenicottero» on «ETF ornitorinco», an
  * interview of two rounds with one decline, the request «meno cripto» with the round asked before
  * it. The `headings` variant writes the review's seven sections, so the book has its ten pages; the
- * `plain` variant a text without headings, so the book has one text page «Il report».
+ * `plain` variant a text without headings, so the book has one text page «Il report». The `applied`
+ * status is `ready` after «Applica» with the targets written (2026-11-12: the hand-off's link).
  * `rememberHeld` / `restoreHeld` put back what the account held, or delete the document.
  *
  * No run is started: every spec that reads a report fakes the run route (`installFakeRun`).
@@ -20,7 +21,7 @@ process.env.GCLOUD_PROJECT = 'demo-net-worth';
 
 const UID = 'test-user-1';
 
-export type ReportStatus = 'ready' | 'failed' | 'running';
+export type ReportStatus = 'ready' | 'failed' | 'running' | 'applied';
 export type ReportVariant = 'headings' | 'plain';
 
 async function admin() {
@@ -117,6 +118,9 @@ export async function plant(status: ReportStatus, variant: ReportVariant = 'head
   const document =
     status === 'ready'
       ? { ...base, status, stage: 'review', strategy, instruments, report, error: null }
+      : status === 'applied'
+        // «Applica» done with the targets written (2026-11-12): the page offers the plan of accumulation.
+        ? { ...base, status, stage: 'review', strategy, instruments, report, error: null, applied: { at: now, targetsWritten: true, rolesChanged: 0, goalsWritten: 0 } }
       : status === 'failed'
         ? { ...base, status, stage: 'instruments', strategy, instruments: null, report: null, error: 'Ricerca finta interrotta: ornitorinco.' }
         : { ...base, status, stage: 'instruments', strategy, instruments: null, report: null, error: null };

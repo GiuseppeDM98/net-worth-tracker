@@ -154,6 +154,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The picker exists because the type is not one field among many** — it decides which categories/classes exist, which
   accounts are asked for, and how many balances move. Step 1 turns *one form with N conditional shapes* into *N plain
   forms*; a discriminant that only re-labels things does NOT earn a step.
+- **`AssetDialog`'s `prefill`** (`AssetPrefill`: name, ticker, ISIN, type, class, sub-category; the Consulente's hand-off,
+  2026-11-12) opens the create on step 2, like `initialType`; the reset effect reads it and lists it in its deps — the
+  one host keeps the object in state, so it is stable across renders.
 - **Create opens on step 1 — on step 2 when `initialValues.categoryId` names a category (`ExpenseDialog`, the Assistente's «Modifica», 2026-11) — edit skips to step 2** — changing a saved record's type is a different act, with
   reconciliation consequences the in-form notice must explain, so the `Select` stays there and only there.
 - **`setStep(record ? 2 : 1)` is settled during render on the `(open, record, initialValues)` subject**, never in `useState`'s

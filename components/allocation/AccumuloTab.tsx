@@ -30,6 +30,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { Asset, AssetAllocationSettings, AssetAllocationTarget, IdealAllocationSettings } from '@/types/assets';
 import type { InvestmentGoal } from '@/types/goals';
+import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
+import { handoffProposalOf } from '@/lib/utils/allocationAdviceDocument';
 import type { RebalanceBand } from '@/lib/utils/allocationUtils';
 import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import { compareAllocations } from '@/lib/services/assetAllocationService';
@@ -85,6 +87,7 @@ import { PortafoglioModelloTile } from '@/components/allocation/tiles/Portafogli
 import { PianiConclusiTile } from '@/components/allocation/tiles/PianiConclusiTile';
 import { ObiettiviTile } from '@/components/allocation/tiles/ObiettiviTile';
 import { ObiettiviDialog } from '@/components/allocation/ObiettiviDialog';
+import { ConsulenteHandoff } from '@/components/allocation/ConsulenteHandoff';
 import { DEPS } from '@/components/allocation/tiles/accumuloShared';
 
 interface AccumuloTabProps {
@@ -104,9 +107,15 @@ interface AccumuloTabProps {
    */
   settings: AssetAllocationSettings | null | undefined;
   goals: readonly InvestmentGoal[] | undefined;
+  /**
+   * The Consulente's document — `?da=consulente` (the «Applica» page's link, 2026-11-12) opens «Dal Consulente»
+   * when it is applied with the targets written and no plan is open. `undefined` while it loads; a failed read
+   * is `null`, so the landing only cleans the URL.
+   */
+  advice: AllocationAdviceDocument | null | undefined;
 }
 
-export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageRatio, idealAllocation, onAssetsChanged, reviewByIso, settings, goals }: AccumuloTabProps) {
+export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageRatio, idealAllocation, onAssetsChanged, reviewByIso, settings, goals, advice }: AccumuloTabProps) {
   // What the model portfolio rests on, without a price in it (2026-11-12).
   const modelBasis = useMemo(() => buildModelBasis(settings, goals), [settings, goals]);
   const { plansQuery, plan, today, currentIndex } = useOpenAccumuloPlan(ownerId);
@@ -131,6 +140,21 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
     }, 0);
     return () => clearTimeout(timer);
   }, [wantsObjectives, pathname, router]);
+
+  // The Consulente's hand-off: opened once by `?da=consulente`, only with no open plan and an applied proposal.
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const handoffProposal = handoffProposalOf(advice);
+  const wantsHandoff = searchParams.get('da') === 'consulente';
+  const plansSettled = !plansQuery.isPending;
+  useEffect(() => {
+    if (!wantsHandoff || !plansSettled || advice === undefined) return;
+    // Deferred like `?obiettivi=1`: the effect body itself sets no state (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
+      if (!plan && handoffProposal) setHandoffOpen(true);
+      router.replace(`${pathname}?tab=accumulo`, { scroll: false });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [wantsHandoff, plansSettled, advice, plan, handoffProposal, pathname, router]);
 
   const matchResult = useMemo(
     () =>
@@ -264,9 +288,10 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
             <div className={composed ? COMPACT_GRID_WRAPPER_CLASS : undefined}>
               {/* At 1440 the left column is placed on the grid, not wrapped, and the right one is a box across
                   the rows, so «Il resto» and the rows are ONE index on a tablet in landscape: with a plan
-                  Questo mese on row 1, the model under it on row 2, both at their natural height; the `1fr`
-                  second row takes the right box's extra height, so the shorter column leaves the void under
-                  it, as the two stacks did. */}
+                  Questo mese on row 1 at its natural height, the model under it on row 2; the `1fr` second
+                  row takes the right box's extra height. The two columns end on one line (owner, 2026-11-18, as
+                  Bilanciamento's Piano — NOVE-02): the model stretches to the box's bottom edge when the box is
+                  the taller, the box's last tile (Criteri, `desktop:flex-1`) when the model's column is. */}
               <div className={cn(composed ? COMPACT_GRID_CLASS : PLAIN_GRID_CLASS, plan && 'desktop:grid-rows-[auto_1fr]')}>
                 {!plan && (
                   <div data-stage="lead" className={cn(TILE_CELL_CLASS, leadCellClass(composed), 'desktop:col-span-12 desktop:row-start-1')}>
@@ -314,7 +339,7 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
                 <div className={composed ? INDEX_CLASS : 'contents'}>
                   {composed && <PageRest sections={sections} className={REST_CELL_CLASS} />}
 
-                  <div id={COMPOSITION_ANCHOR_ID} className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ACCUMULO_SECTION_IDS.modello), 'scroll-mt-4 desktop:col-span-7 desktop:col-start-1 desktop:self-start', modelRow)}>
+                  <div id={COMPOSITION_ANCHOR_ID} className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ACCUMULO_SECTION_IDS.modello), 'scroll-mt-4 desktop:col-span-7 desktop:col-start-1', modelRow)}>
                     <PortafoglioModelloTile
                       ownerId={ownerId}
                       allAssets={allAssets}
@@ -337,8 +362,9 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
 
                   <div
                     className={cn(
-                      'contents desktop:col-span-5 desktop:col-start-8 desktop:row-span-2 desktop:flex desktop:min-w-0 desktop:flex-col desktop:gap-3',
-                      plan ? 'desktop:row-start-1' : modelRow,
+                      'contents desktop:col-span-5 desktop:col-start-8 desktop:flex desktop:min-w-0 desktop:flex-col desktop:gap-3',
+                      // With a plan the box spans Questo mese's row and the model's; without one it is the model's row alone.
+                      plan ? 'desktop:row-span-2 desktop:row-start-1' : modelRow,
                       INDEX_GROUP_CLASS,
                     )}
                   >
@@ -355,7 +381,7 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
                       </div>
                     )}
 
-                    <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ACCUMULO_SECTION_IDS.criteri))}>
+                    <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ACCUMULO_SECTION_IDS.criteri), 'desktop:flex-1')}>
                       <ObiettiviTile
                         idealAllocation={idealAllocation}
                         targetLeverageRatio={targetLeverageRatio}
@@ -405,6 +431,24 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
           plan={isActive && !done ? plan : null}
           onSaved={onAssetsChanged}
           returnFocusTo={editRef}
+        />
+      )}
+
+      {handoffOpen && handoffProposal && advice && (
+        <ConsulenteHandoff
+          ownerId={ownerId}
+          basis={modelBasis}
+          proposal={handoffProposal}
+          candidates={advice.instruments?.candidates ?? null}
+          keepAssets={advice.answers.keepAssets}
+          allAssets={allAssets}
+          targets={targets}
+          band={band}
+          targetLeverageRatio={targetLeverageRatio}
+          idealAllocation={idealAllocation}
+          model={model}
+          onAssetsChanged={onAssetsChanged}
+          onClose={() => setHandoffOpen(false)}
         />
       )}
     </div>
