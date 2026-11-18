@@ -14,6 +14,7 @@
  * and from `composeSettingsDocument` (the identity on both fixtures); `spendingRolesEnabled`
  * removed from the spese slice (idem).
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   cleanAllocazioneSlice,
@@ -26,8 +27,8 @@ import {
   targetFieldId,
   type SettingsSlices,
 } from '@/lib/utils/settingsDraft';
-import type { AssetAllocationTarget } from '@/types/assets';
-import { FULL_PAGE_SETTINGS, STORED_SETTINGS } from './fixtures/storedSettings';
+import type { AssetAllocationSettings, AssetAllocationTarget } from '@/types/assets';
+import { FULL_PAGE_SETTINGS, STORED_IDEAL_ALLOCATION, STORED_SETTINGS } from './fixtures/storedSettings';
 
 /** `getDefaultTargets()` of the service, without the service (its module loads the SDK). */
 const DEFAULT_TARGETS: AssetAllocationTarget = {
@@ -107,6 +108,15 @@ describe('sliceSettings ∘ composeSettingsDocument — the identity', () => {
 
     expect(slices.allocazione.classes.equity.targetPercentage).toBe(43.25);
     expect(slices.allocazione.classes.bonds.targetPercentage).toBe(32.25);
+  });
+
+  it('carries the model portfolio criteria through from the document read just before «Salva»', () => {
+    const slices = sliceSettings(STORED_SETTINGS, DEFAULT_TARGETS);
+    // The page loaded another copy; the document now holds the criteria saved from Allocazione › Accumulo.
+    const stale = { ...STORED_SETTINGS, idealAllocation: undefined } as AssetAllocationSettings;
+    expect(composeOk(slices, stale).document).not.toHaveProperty('idealAllocation');
+
+    expect(composeOk(slices, STORED_SETTINGS).document.idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
   });
 
   it('writes an emptied select or input as undefined, never as its sentinel', () => {
@@ -299,5 +309,32 @@ describe('revealTargetProblem — where «Salva» takes the reader', () => {
   it('points at the first editable class when the total is short', () => {
     expect(revealTargetProblem({ kind: 'total-below-100', total: 80 }, slice).fieldId).toBe('equity');
     expect(revealTargetProblem({ kind: 'total-below-100', total: 80 }, { ...slice, autoCalculate: true }).fieldId).toBe('commodity');
+  });
+});
+
+// The Settings bundle and the type files stay light (2026-11-12): Impostazioni shows «Criteri del modello»
+// read-only, so it must never pull the 900-line optimizer nor its narrative (which imports the plan's words);
+// a type file imports nothing from lib/. Seen red with DEFAULT_IDEAL_ALLOCATION imported from the optimizer,
+// with a constant read back from the narrative, and with runGuarded's body kept in shared.tsx.
+describe('module hygiene of the model portfolio', () => {
+  const source = (path: string) => readFileSync(path, 'utf8');
+  const importsOf = (text: string) => [...text.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
+
+  it('settingsDraft and IdealAllocationSummary import neither the optimizer nor its narrative', () => {
+    for (const path of ['lib/utils/settingsDraft.ts', 'components/settings/IdealAllocationSummary.tsx']) {
+      const imports = importsOf(source(path));
+      expect(imports.filter((spec) => /weightOptimizer(Narrative)?$/.test(spec)), path).toEqual([]);
+    }
+  });
+
+  it('the optimizer, plan and model types import nothing from lib/', () => {
+    for (const path of ['types/optimizer.ts', 'types/accumulationPlan.ts', 'types/modelPortfolio.ts']) {
+      expect(importsOf(source(path)).filter((spec) => spec.startsWith('@/lib')), path).toEqual([]);
+    }
+  });
+
+  it('runGuarded lives once, in lib/utils/runGuarded.ts', () => {
+    expect(source('components/settings/tabs/shared.tsx')).not.toContain('async function runGuarded');
+    expect(source('lib/utils/runGuarded.ts')).toContain('export async function runGuarded');
   });
 });

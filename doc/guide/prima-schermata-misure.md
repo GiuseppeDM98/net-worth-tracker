@@ -246,6 +246,13 @@ qui, la più recente in cima. Le eccezioni ammesse sono queste e nessun'altra: L
 prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la pill di `PageTabBar` portata a 44 px
 (2026-10-10), la deriva del giorno o della macchina provata sul codice di develop dello stesso giorno.
 
+- **`2026-11-17: …`** (il portafoglio modello, branch `feat/portafoglio-modello`; proprietario, 2026-11-17: Impostazioni registrata come misurata), Next 16.4.6, due corse (Patrimonio 1024 12/9 nella prima, 11/8 nella seconda: il flip noto), stessa
+  macchina, `perf:build` su :3200, `census@example.com`. **Accumulo** (`allocazione-accumulo`, riregistrata come la spec chiede): le righe chiuse
+  «Portafoglio modello» e «Criteri del modello» entrano in «Il resto della pagina» — 390 `screens` 1,56 → 1,72, 768 1,21 → 1,27 e tessere 2/1 → 3/1,
+  1024 1,27 invariato e tessere 2/1 → 4/3 (le due righe nell'indice); cifre e prima riga chiusa invariate. **Impostazioni** (la voce che la spec non
+  nominava): la tessera in sola lettura «Criteri del modello» in fondo alla scheda Allocazione — 390 2,10 → 2,27, 768 1,38 → 1,50, 1024 1,56 → 1,75,
+  la prima schermata identica. Restano rosse come su develop Centri 1024, Analisi 768 e 1024, Bilanciamento 1024; develop non rimisurato sulla
+  stessa build (le altre voci uguali al registro).
 - **`2026-11-17: …`** (Allocazione › Accumulo, branch `feat/accumulo`; proprietario, 2026-11-17: riregistrate come misurate), contro la build di
   develop @36ac3325 dello stesso giorno, stessa macchina, `census@example.com`. **Bilanciamento** (`allocazione`, la voce che la spec non nominava):
   la barra delle tab Bilanciamento · Accumulo aggiunge 68 px sopra il verdetto — a 390 `screens` 1,64 → 1,71 e la seconda tessera sotto la pill

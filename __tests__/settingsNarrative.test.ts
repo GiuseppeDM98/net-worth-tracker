@@ -36,6 +36,9 @@ import {
   describeEmails,
   describeFamily,
   describeFireToggles,
+  buildIdealAllocationInput,
+  describeIdealAllocation,
+  describeIdealComposition,
   describeImport,
   describePerformanceBase,
   describePlanParameters,
@@ -47,6 +50,9 @@ import {
   describeSpendingRolesSetting,
   describeUnsavedChanges,
   summarizeExpenseCategories,
+  describeLeverageRowLabel,
+  IDEAL_CLASS_ROW_LABEL,
+  IDEAL_PRIORITY_PREFIX,
 } from '@/lib/utils/settingsNarrative';
 
 const plain = (n: Narrative | null) => (n ? narrativeToText(n).replace(/ /g, ' ') : null);
@@ -661,6 +667,111 @@ describe('describeTargetProblem', () => {
     expect(plain(describeTargetProblem({ kind: 'specific-total', ...where, total: 99.5 }))).toBe(
       'Gli asset specifici di «ETF» (Azioni) sommano 99,5% invece del 100%.'
     );
+  });
+});
+
+describe('describeIdealAllocation', () => {
+  it('states the off state without touching the PAC', () => {
+    expect(
+      plain(
+        describeIdealAllocation({
+          enabled: false,
+          classPriority: 'essential',
+          leveragePriority: 'high',
+          targetLeverageRatio: 1,
+          factorObjectives: [],
+        })
+      )
+    ).toBe('Spenta: nel portafoglio modello e nel PAC i pesi si inseriscono solo a mano.');
+  });
+
+  it('names the only active objective when just the classes are on', () => {
+    expect(
+      plain(
+        describeIdealAllocation({
+          enabled: true,
+          classPriority: 'essential',
+          leveragePriority: 'off',
+          targetLeverageRatio: 1,
+          factorObjectives: [],
+        })
+      )
+    ).toBe('Il portafoglio modello e il PAC possono proporre i pesi da 1 criterio: classi (priorità essenziale).');
+  });
+
+  it('lists the three objectives with their priorities', () => {
+    expect(
+      plain(
+        describeIdealAllocation({
+          enabled: true,
+          classPriority: 'essential',
+          leveragePriority: 'high',
+          targetLeverageRatio: 1.23,
+          factorObjectives: [{ classLabel: 'Azioni (Equity)', priority: 'high' }],
+        })
+      )
+    ).toBe(
+      'Il portafoglio modello e il PAC possono proporre i pesi da 3 criteri: classi (priorità essenziale), leva 1,23× (priorità alta), secondo livello di Azioni (Equity) (priorità alta).'
+    );
+  });
+});
+
+describe('buildIdealAllocationInput', () => {
+  const saved = {
+    enabled: true,
+    classPriority: 'essential' as const,
+    leveragePriority: 'high' as const,
+    factorObjectives: [{ assetClass: 'equity' as const, priority: 'high' as const }],
+    instrumentLimits: [],
+    groupLimits: [],
+  };
+
+  it('labels the classes in Italian and carries the leverage the targets imply', () => {
+    const input = buildIdealAllocationInput(saved, 1.3);
+
+    expect(input.factorObjectives).toEqual([{ classLabel: 'Azioni', priority: 'high' }]);
+    expect(input.targetLeverageRatio).toBe(1.3);
+  });
+});
+
+describe('describeIdealComposition', () => {
+  it('reads the objectives as the portfolio they describe, not as what the PAC can do', () => {
+    expect(
+      plain(
+        describeIdealComposition({
+          enabled: true,
+          classPriority: 'essential',
+          leveragePriority: 'high',
+          targetLeverageRatio: 1.3,
+          factorObjectives: [{ classLabel: 'Azioni', priority: 'high' }],
+        })
+      )
+    ).toBe(
+      'Il portafoglio che rispetta meglio i tuoi 3 criteri, strumento per strumento: classi (priorità essenziale), leva 1,3× (priorità alta), secondo livello di Azioni (priorità alta).'
+    );
+  });
+
+  // «Leva · Alta» read as a high leverage (owner, tour of 2026-11-17): the rows name what is respected, the
+  // select names the priority. Seen red with the old «Classi» / «Leva» rows.
+  it('the criteria rows name what is respected, never «Leva» alone', () => {
+    expect(IDEAL_CLASS_ROW_LABEL).toBe('Rispetto dei target di classe');
+    expect(describeLeverageRowLabel(1)).toBe('Rispetto della leva 1,00×');
+    expect(describeLeverageRowLabel(1.3)).toBe('Rispetto della leva 1,30×');
+    expect(IDEAL_PRIORITY_PREFIX).toBe('Priorità');
+  });
+
+  it('speaks of ONE objective in the singular', () => {
+    expect(
+      plain(
+        describeIdealComposition({
+          enabled: true,
+          classPriority: 'low',
+          leveragePriority: 'off',
+          targetLeverageRatio: 1,
+          factorObjectives: [],
+        })
+      )
+    ).toBe('Il portafoglio che rispetta meglio il tuo criterio, strumento per strumento: classi (priorità bassa).');
   });
 });
 

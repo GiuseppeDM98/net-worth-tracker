@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import type { RebalanceBand } from '@/lib/utils/allocationUtils';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
-import type { buildDraftPreview } from '@/lib/utils/accumulationPlanUtils';
+import { onlyTargetedClasses, type buildDraftPreview } from '@/lib/utils/accumulationPlanUtils';
 import { getAssetClassCssVar } from '@/lib/constants/colors';
 import { cachedFormatCurrencyEUR, formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
@@ -67,7 +67,8 @@ export function PlanDraftSidePanel({ preview, months, startMonth, reviewByIso, b
     );
   }
 
-  const { liquidity, outcome, trajectory } = preview;
+  const { liquidity, outcome } = preview;
+  const trajectory = onlyTargetedClasses(preview.trajectory);
   const installments = preview.schedule.installments;
   // The first months may only refill the reserve (2026-11-17): the rate shown is the first that buys.
   const buyingInstallments = installments.slice(liquidity.refillMonths);

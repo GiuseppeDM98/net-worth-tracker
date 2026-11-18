@@ -258,7 +258,8 @@ describe('Piani conclusi', () => {
   });
 });
 
-import { applyWeightsToPositions, marketWeights } from '@/lib/utils/accumulationPlanUtils';
+import { applyWeightsToPositions, marketWeights, modelWeightMap } from '@/lib/utils/accumulationPlanUtils';
+import type { ModelPortfolio } from '@/types/modelPortfolio';
 
 describe('«Parti da»', () => {
   const weightMap = { 'etf-a': 60, 'etf-b': 40 };
@@ -287,6 +288,20 @@ describe('«Parti da»', () => {
   it('a sold instrument never becomes a new position', () => {
     const out = applyWeightsToPositions([], { 'etf-a': 100 }, new Set(['etf-a']), label);
     expect(out).toEqual([]);
+  });
+
+  it('«Parti da: modello» reads the model\'s positive weights only', () => {
+    const model: ModelPortfolio = {
+      userId: 'u1',
+      origin: 'manual',
+      updatedAt: new Date(0),
+      weights: [
+        { assetId: 'etf-a', targetPercentage: 60 },
+        { assetId: 'etf-b', targetPercentage: 40 },
+        { assetId: 'etf-c', targetPercentage: 0 },
+      ],
+    };
+    expect(modelWeightMap(model)).toEqual({ 'etf-a': 60, 'etf-b': 40 });
   });
 });
 

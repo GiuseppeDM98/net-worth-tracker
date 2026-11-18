@@ -54,7 +54,7 @@ function activePlan(lines: InstallmentLine[]): AccumulationPlan {
   return plan({ installments });
 }
 
-const base = { currentIndex: 3, sourceCashEur: 40000, reserveEur: 0, lineStates: {}, draftTotalEur: 0, reentry: '', today: new Date('2026-11-12T12:00:00') };
+const base = { currentIndex: 3, sourceCashEur: 40000, reserveEur: 0, hasModel: false, lineStates: {}, draftTotalEur: 0, reentry: '', today: new Date('2026-11-12T12:00:00') };
 
 describe('buildAccumuloVerdict', () => {
   it('no plan', () => {
@@ -62,6 +62,11 @@ describe('buildAccumuloVerdict', () => {
     expect(verdict.headline).toBe('Nessun piano di accumulo aperto.');
     expect(verdict.tone).toBe('neutral');
     expect(flat(narrativeToText(verdict.sentence))).toBe('Nei conti di liquidità hai 40.000 €: un piano li spende in rate mensili verso i pesi che scegli.');
+  });
+
+  it('no plan, with a saved model: the plan would spend toward it', () => {
+    const verdict = buildAccumuloVerdict({ ...base, plan: undefined, hasModel: true });
+    expect(flat(narrativeToText(verdict.sentence))).toBe('Nei conti di liquidità hai 40.000 €: un piano li spende in rate mensili verso il portafoglio modello.');
   });
 
   // The allocation's cash quota is not spendable (owner, 2026-11-17). Seen red with the gross cash printed.
@@ -256,13 +261,18 @@ describe('resolveAccumuloSections', () => {
   const ids = (input: Parameters<typeof resolveAccumuloSections>[0]) => resolveAccumuloSections(input).map((section) => section.id);
 
   it('should list the rows in the DOM order, the subset on the page', () => {
-    expect(ids({ hasClasses: true, hasClosedPlans: true })).toEqual(['acc-classi', 'acc-conclusi']);
-    expect(ids({ hasClasses: false, hasClosedPlans: true })).toEqual(['acc-conclusi']);
-    expect(ids({ hasClasses: false, hasClosedPlans: false })).toEqual([]);
+    expect(ids({ hasClasses: true, hasClosedPlans: true, modelFailed: false })).toEqual(['acc-modello', 'acc-classi', 'acc-criteri', 'acc-conclusi']);
+    expect(ids({ hasClasses: false, hasClosedPlans: false, modelFailed: false })).toEqual(['acc-modello', 'acc-criteri']);
+  });
+
+  it('should flag the model row when its read failed, and no other', () => {
+    const failed = resolveAccumuloSections({ hasClasses: true, hasClosedPlans: true, modelFailed: true });
+
+    expect(failed.filter((section) => section.failed).map((section) => section.id)).toEqual(['acc-modello']);
   });
 
   it('should never put THE tile among the rows', () => {
-    expect(ids({ hasClasses: true, hasClosedPlans: true })).not.toContain(ACCUMULO_SECTION_IDS.mese);
+    expect(ids({ hasClasses: true, hasClosedPlans: true, modelFailed: false })).not.toContain(ACCUMULO_SECTION_IDS.mese);
   });
 });
 
@@ -273,23 +283,40 @@ describe('the closed rows words', () => {
 
   it('should answer in the landscape index with at most one figure, or nothing', () => {
     const answers = describeAccumuloClosedAnswers({
+      modelDifferenceCount: 3,
       classRows: [
         { outOfBandNow: true, reentryMonth: '2026-11' },
         { outOfBandNow: true, reentryMonth: '2027-01' },
       ],
       planStartMonth: '2026-08',
+      criteriaCount: 2,
       lastClosedMonth: '2026-06',
     });
     const text = (id: string) => narrativeToText(answers[id] ?? []);
 
+    expect(text('acc-modello')).toBe('differisce su 3 strumenti');
     expect(text('acc-classi')).toBe('rientro a gennaio');
+    expect(text('acc-criteri')).toBe('2 criteri');
     expect(text('acc-conclusi')).toBe('ultimo a giugno');
   });
 
   it('should answer nothing where the row has nothing to add', () => {
-    const answers = describeAccumuloClosedAnswers({ classRows: [{ outOfBandNow: true }], planStartMonth: null, lastClosedMonth: null });
+    const answers = describeAccumuloClosedAnswers({ modelDifferenceCount: null, classRows: [{ outOfBandNow: true }], planStartMonth: null, criteriaCount: 0, lastClosedMonth: null });
 
     expect(Object.values(answers).every((answer) => answer === null)).toBe(true);
+  });
+
+  it('should say «allineato al piano» with no difference', () => {
+    const answers = describeAccumuloClosedAnswers({ modelDifferenceCount: 0, classRows: [], planStartMonth: null, criteriaCount: 0, lastClosedMonth: null });
+
+    expect(narrativeToText(answers['acc-modello'] ?? [])).toBe('allineato al piano');
+  });
+
+  // A stale model keeps its row's words («superato») in landscape too (2026-11-12). Seen red without the check.
+  it('should answer nothing for a stale model, so the row reads «superato»', () => {
+    const answers = describeAccumuloClosedAnswers({ modelDifferenceCount: 3, modelStale: true, classRows: [], planStartMonth: null, criteriaCount: 0, lastClosedMonth: null });
+
+    expect(answers['acc-modello']).toBeNull();
   });
 });
 

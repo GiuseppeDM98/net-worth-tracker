@@ -28,6 +28,7 @@ vi.mock('@/lib/utils/cashflowBlock', () => ({
   }),
 }));
 
+import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import { AccumuloVuotoTile } from '@/components/allocation/tiles/AccumuloVuotoTile';
 
 const props = {
@@ -39,6 +40,9 @@ const props = {
   today: new Date('2026-11-12T12:00:00'),
   onAssetsChanged: () => {},
   reviewByIso: null,
+  idealAllocation: null,
+  model: null,
+  modelBasis: { targets: null, criteria: DEFAULT_IDEAL_ALLOCATION, goals: null },
 };
 
 const flat = (text: string | null) => (text ?? '').replace(/[  ]/g, ' ');

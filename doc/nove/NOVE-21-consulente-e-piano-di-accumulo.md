@@ -5,7 +5,7 @@
 > `buildStandaloneCandidates` with `assetsById`, `valueOf`, `baseEur`, `fixBounds`, `negativeFixedKeys`,
 > `LIQUIDITY_CANDIDATE_KEY`, `roundWeights`, `toModelWeights`, `describeNegativeFixed`, `PlanSeedDraft`, `ModelBasis`, the
 > editor's `seedDraft` and `basis`); implemented after NOVE-18, whose `runOptimizer` input `holdings?` and snapshot fields it leaves
-> unset; nothing is implemented after it that reads what it defines. Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7, a PR line as
+> unset; after its retirement NOVE-22 is WRITTEN (§ 8), the guided path where its hand-off lands. Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7, a PR line as
 > `pr488:file:line` on the local ref `refs/tmp/pr488` (the head of #488, which carries #486 and #487). Executes
 > decisions 27, 28, 29 and the adopted choices i, r, t (README.md § 3-4).
 
@@ -715,6 +715,11 @@ SDK; the client already reads it under NOVE-16's rule). After the deploy the own
 production, with his key: «Chiedi una modifica» on his current report reruns the review only — expected: «Cosa fare
 adesso» names accumulating or selling, an indicative time and an instalment as an order of magnitude, no table, and,
 with his plan active, whether it goes toward the targets. The strategy's sentence is read at his next full path.
+
+**Then NOVE-22** (owner, 2026-11-17, on NOVE-17's tour): once this spec is retired, the next session WRITES
+NOVE-22 — a guided path to create a plan of accumulation by hand, one question per screen and a summary before
+«Conferma», as Compravendita and the Consulente — on the editor this spec and NOVE-18 leave, with this hand-off
+landing in it (doc/nove/README.md § 5-6).
 
 ## 9. Documentation
 

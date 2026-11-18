@@ -18,9 +18,11 @@
  * recording the trade in the Registro rather than pre-empting it by hand. The same vocabulary
  * covers the disposals («Vendite fuori piano»).
  */
+import type { ModelBasis } from '@/lib/utils/modelPortfolio';
 import { useMemo, useRef, useState } from 'react';
-import type { Asset, AssetAllocationTarget } from '@/types/assets';
+import type { Asset, AssetAllocationTarget, IdealAllocationSettings } from '@/types/assets';
 import type { AccumulationPlan } from '@/types/accumulationPlan';
+import type { ModelPortfolio } from '@/types/modelPortfolio';
 import type { RebalanceBand } from '@/lib/utils/allocationUtils';
 import {
   computeUsableLiquidity,
@@ -109,7 +111,10 @@ import {
   describeRegisterNote,
   describeRegisterSaleNote,
   describeReserveWarning,
+  describePlanModelDivergence,
+  ACCUMULO_ACTION_REVIEW_FROM_MODEL,
 } from '@/lib/utils/accumulationNarrative';
+import { comparePlanToModel } from '@/lib/utils/modelPortfolio';
 
 interface QuestoMeseTileProps {
   ownerId: string;
@@ -118,15 +123,21 @@ interface QuestoMeseTileProps {
   allAssets: Asset[];
   targets: AssetAllocationTarget;
   band: RebalanceBand;
-  /** deriveTargetLeverageRatio(targets) — threaded to the editor's preview. */
+  /** deriveTargetLeverageRatio(targets) — threaded to the editor's Ottimizzato view. */
   targetLeverageRatio: number;
+  /** The owner's "Allocazione ideale" objectives, or `null` when not yet loaded. */
+  idealAllocation: IdealAllocationSettings | null;
   /** `monthIndexOf(plan, today)`, from `useOpenAccumuloPlan`. */
   currentIndex: number;
   /** The ledger matching of the plan, computed once by the tab (its verdict reads the same states). */
   matchResult: { matches: LineMatch[]; lineStates: Record<string, LineUiState> };
+  /** The model portfolio: the editor's «Parti da» offers it. */
+  model?: ModelPortfolio | null;
   onAssetsChanged: () => void;
   /** The Consulente's «rivedi entro» date: a plan ending after it says so (2026-11-12); null without one. */
   reviewByIso: string | null;
+  /** What the model rests on: the plan editor's «aggiorna anche il modello» stamps it. */
+  modelBasis: ModelBasis;
 }
 
 export function QuestoMeseTile({
@@ -136,10 +147,13 @@ export function QuestoMeseTile({
   targets,
   band,
   targetLeverageRatio,
+  idealAllocation,
   currentIndex,
   matchResult,
+  model = null,
   onAssetsChanged,
   reviewByIso,
+  modelBasis,
 }: QuestoMeseTileProps) {
   const isDemo = useDemoMode();
   const pastReviewNote = reviewByIso && planEndsAfterReview(plan, reviewByIso) ? (
@@ -148,6 +162,7 @@ export function QuestoMeseTile({
 
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [reviseOpen, setReviseOpen] = useState(false);
+  const [reviseFromModel, setReviseFromModel] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarFocusIndex, setCalendarFocusIndex] = useState<number | undefined>(undefined);
   const [registerTarget, setRegisterTarget] = useState<
@@ -337,8 +352,11 @@ export function QuestoMeseTile({
       targets={targets}
       band={band}
       targetLeverageRatio={targetLeverageRatio}
+      idealAllocation={idealAllocation}
+      model={model}
       onAssetsChanged={onAssetsChanged}
       reviewByIso={reviewByIso}
+      basis={modelBasis}
       onSaved={() => setPlanDialogOpen(false)}
     />
   );
@@ -350,12 +368,16 @@ export function QuestoMeseTile({
       ownerId={ownerId}
       plan={plan}
       revise
+      reviseFromModel={reviseFromModel}
       allAssets={allAssets}
       targets={targets}
       band={band}
       targetLeverageRatio={targetLeverageRatio}
+      idealAllocation={idealAllocation}
+      model={model}
       onAssetsChanged={onAssetsChanged}
       reviewByIso={reviewByIso}
+      basis={modelBasis}
       onSaved={() => setReviseOpen(false)}
     />
   );
@@ -531,6 +553,8 @@ export function QuestoMeseTile({
     const state = effectiveLineState(matchResult.lineStates[`${currentIndex}:${line.positionId}`] ?? 'todo', `${currentIndex}:${line.positionId}`, ignoredMatches, false);
     return state === 'todo' || state === 'toConfirm' || state === 'late';
   });
+  // Does the plan still say what the model says?
+  const divergence = model ? comparePlanToModel(plan.positions, model) : null;
   // A month with no line and nothing late: the reserve refilling, or a share below one quota (2026-11-17).
   const quietMonth = !!currentInstallment && currentInstallment.lines.length === 0 && lateLines.length === 0;
   const refilling = quietMonth && (plan.baseline?.sourceCashEur ?? Infinity) < plan.liquidity.reserveEur - 0.005;
@@ -570,6 +594,25 @@ export function QuestoMeseTile({
                   {ACCUMULO_ACTION_KEEP_AS_IS}
                 </Button>
               </div>
+            )}
+          </div>
+        )}
+
+        {divergence && divergence.count > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-muted/40 p-3">
+            <p className="text-[12px] leading-[1.5] text-foreground">{describePlanModelDivergence(divergence.count)}</p>
+            {!isDemo && (
+              <Button
+                variant="outline"
+                className={ROW_ACTION_CLASS}
+                disabled={!findFirstIntactInstallment(plan)}
+                onClick={() => {
+                  setReviseFromModel(true);
+                  setReviseOpen(true);
+                }}
+              >
+                {ACCUMULO_ACTION_REVIEW_FROM_MODEL}
+              </Button>
             )}
           </div>
         )}
@@ -820,7 +863,7 @@ export function QuestoMeseTile({
             <Button variant="outline" className={TILE_ACTION_CLASS} onClick={() => { setCalendarFocusIndex(undefined); setCalendarOpen(true); }}>
               {ACCUMULO_ACTION_CALENDAR}
             </Button>
-            <Button variant="outline" className={TILE_ACTION_CLASS} disabled={isDemo || !findFirstIntactInstallment(plan)} onClick={() => setReviseOpen(true)}>
+            <Button variant="outline" className={TILE_ACTION_CLASS} disabled={isDemo || !findFirstIntactInstallment(plan)} onClick={() => { setReviseFromModel(false); setReviseOpen(true); }}>
               {ACCUMULO_ACTION_REVISE}
             </Button>
             <Button

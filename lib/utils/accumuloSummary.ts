@@ -25,6 +25,8 @@ import {
   type AllocationCompare,
   type PlanDeps,
 } from './accumulationPlanUtils';
+import { toModelWeights } from './modelPortfolio';
+import type { ModelPortfolioWeight } from '@/types/modelPortfolio';
 import { ASSET_CLASS_LABELS, type RebalanceBand } from './allocationUtils';
 import type { StripFigure } from './verdictStrip';
 import { VERDICT_REST_SECTION } from './mobileSections';
@@ -47,6 +49,8 @@ export interface AccumuloVerdictContext {
   reserveEur: number;
   /** The cash class held outside the accounts (a money-market fund), part of the quota. */
   otherCashEur?: number;
+  /** A saved model portfolio exists; false until then. */
+  hasModel: boolean;
   /** The ledger matching's state per `${index}:${positionId}`. */
   lineStates: Record<string, LineUiState>;
   /** Draft: Σ of the whole plan's purchases (`computeTotalPurchases`). */
@@ -65,7 +69,7 @@ export interface AccumuloVerdictContext {
  */
 export function resolveAccumuloVerdictInput(context: AccumuloVerdictContext): AccumuloVerdictInput {
   const { plan, currentIndex } = context;
-  if (!plan) return { state: 'none', sourceCashEur: context.sourceCashEur, reserveEur: context.reserveEur, otherCashEur: context.otherCashEur ?? 0 };
+  if (!plan) return { state: 'none', sourceCashEur: context.sourceCashEur, reserveEur: context.reserveEur, otherCashEur: context.otherCashEur ?? 0, hasModel: context.hasModel };
 
   if (plan.status === 'draft') {
     return {
@@ -94,7 +98,7 @@ export function resolveAccumuloVerdictInput(context: AccumuloVerdictContext): Ac
   }
 
   const installment = findOpenInstallment(plan, currentIndex);
-  if (!installment) return { state: 'none', sourceCashEur: context.sourceCashEur, reserveEur: context.reserveEur, otherCashEur: context.otherCashEur ?? 0 };
+  if (!installment) return { state: 'none', sourceCashEur: context.sourceCashEur, reserveEur: context.reserveEur, otherCashEur: context.otherCashEur ?? 0, hasModel: context.hasModel };
 
   // A month with no line (the reserve refilling, or a price above the month's share): nothing to buy,
   // the next instalment named (2026-11-17). Late lines keep the active reading.
@@ -149,15 +153,20 @@ export interface ResolveAccumuloSectionsInput {
   hasClasses: boolean;
   /** Piani conclusi is on the page: at least one plan closed or interrupted. */
   hasClosedPlans: boolean;
+  /** The model portfolio's read failed: the row opens by itself (`failed`). */
+  modelFailed: boolean;
 }
 
 /**
- * The rows below `desktop:`, in the DOM's order: Classi del piano, Piani conclusi — the subset on the
- * page (none at all with no trajectory and no closed plan: «Il resto della pagina» is then not drawn).
+ * The rows below `desktop:`, in the DOM's order: Portafoglio modello, Classi del piano, Criteri
+ * del modello, Piani conclusi — the subset on the page. Portafoglio modello and Criteri are always there
+ * (an empty model is a row with its own words).
  */
 export function resolveAccumuloSections(input: ResolveAccumuloSectionsInput): readonly SectionSpec[] {
   return [
+    { id: ACCUMULO_SECTION_IDS.modello, eyebrow: 'Portafoglio modello', failed: input.modelFailed },
     ...(input.hasClasses ? [{ id: ACCUMULO_SECTION_IDS.classi, eyebrow: 'Classi del piano' }] : []),
+    { id: ACCUMULO_SECTION_IDS.criteri, eyebrow: 'Criteri del modello' },
     ...(input.hasClosedPlans ? [{ id: ACCUMULO_SECTION_IDS.conclusi, eyebrow: 'Piani conclusi' }] : []),
   ];
 }
@@ -172,7 +181,7 @@ export interface AccumuloStripInput {
 }
 
 /**
- * The cells of a phone's first screen (D-CU16), only with an active plan on its open month — a draft, a
+ * The cells of a phone's first screen, only with an active plan on its open month — a draft, a
  * finished plan and the empty state have a headline with one figure and no strip:
  *   - «Rata di {mese}» — the headline's amount, opening Questo mese (THE tile);
  *   - «Investito» — the first sentence's «investiti finora», opening Classi del piano; without a
@@ -233,6 +242,8 @@ export interface AccumuloPreview {
   inflowEur: number;
   /** Where the classes would stand today and at the end of the plan, on today's prices. */
   classes: { assetClass: AssetClass; currentPct: number; targetPct: number; finalPct: number }[];
+  /** The saved model portfolio when there is one, else today's holdings. */
+  weightsFrom: 'today' | 'model';
   /** The cash in the liquidity accounts the preview spends from. */
   cashEur: number;
 }
@@ -272,6 +283,8 @@ export function buildAccumuloPreview(input: {
   compare: AllocationCompare;
   deps: PlanDeps;
   today: Date;
+  /** The saved model's weights: the preview starts from them instead of today's holdings. */
+  model?: ModelPortfolioWeight[] | null;
   /** The entry the editor suggests (the median of the monthly savings); 0 or absent = no inflow. */
   monthlyInflowEur?: number;
   /** The reserve on the accounts (`resolveAccountReserveEur`), the one the editor starts from. */
@@ -279,7 +292,7 @@ export function buildAccumuloPreview(input: {
   /** The cash class outside the accounts, printed with the quota. */
   otherCashEur?: number;
 }): AccumuloPreview | null {
-  const { allAssets, targets, band, compare, deps, today } = input;
+  const { allAssets, targets, band, compare, deps, today, model } = input;
   const inflowEur = Math.max(0, input.monthlyInflowEur ?? 0);
   const cashIds = allAssets.filter(isPlanSourceAccount).map((asset) => asset.id);
   const cashEur = allAssets.filter((asset) => cashIds.includes(asset.id)).reduce((sum, asset) => sum + deps.valueOf(asset), 0);
@@ -288,13 +301,20 @@ export function buildAccumuloPreview(input: {
   if (cashEur <= reserveEur && inflowEur <= 0) return null;
 
   const assetsById = new Map(allAssets.map((asset) => [asset.id, asset]));
-  const weights = tradableWeights(
-    allAssets
-      .filter((asset) => asset.assetClass !== 'cash' && asset.assetClass !== 'realestate')
-      .map((asset) => ({ assetId: asset.id, pct: deps.valueOf(asset) }))
-      .filter((entry) => entry.pct > 0),
-    assetsById,
-  );
+  // The saved model's weights when there is one (they already left out what a plan cannot buy), else today's.
+  const useModel = !!model && model.length > 0;
+  const weights = useModel
+    ? toModelWeights(
+        model.map((weight) => ({ assetId: weight.assetId, pct: weight.targetPercentage })).filter((entry) => entry.pct > 0),
+        assetsById,
+      ).weights
+    : tradableWeights(
+        allAssets
+          .filter((asset) => asset.assetClass !== 'cash' && asset.assetClass !== 'realestate')
+          .map((asset) => ({ assetId: asset.id, pct: deps.valueOf(asset) }))
+          .filter((entry) => entry.pct > 0),
+        assetsById,
+      );
   if (weights.length === 0) return null;
 
   let n = 0;
@@ -333,7 +353,17 @@ export function buildAccumuloPreview(input: {
     if (Math.abs(entry.currentPct) < 0.05 && Math.abs(entry.targetPct) < 0.05 && Math.abs(final.currentPct) < 0.05) return [];
     return [{ assetClass: assetClass as AssetClass, currentPct: entry.currentPct, targetPct: entry.targetPct, finalPct: final.currentPct }];
   });
-  return { months: buyingMonths, refillMonths, otherCashEur: Math.max(0, input.otherCashEur ?? 0), reserveEur, monthlyEur: totalEur / buyingMonths, inflowEur, classes, cashEur };
+  return {
+    months: buyingMonths,
+    refillMonths,
+    otherCashEur: Math.max(0, input.otherCashEur ?? 0),
+    reserveEur,
+    monthlyEur: totalEur / buyingMonths,
+    inflowEur,
+    classes,
+    weightsFrom: useModel ? 'model' : 'today',
+    cashEur,
+  };
 }
 
 /**

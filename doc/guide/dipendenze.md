@@ -114,6 +114,10 @@ exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslin
   `firebase-tools` 15.33.0 → 15.34.2 (dry run of 2026-11-03: 85 package changes). Its output is not pure JSON: text lines
   come first.
 - **`npm audit fix --dry-run` crashes on npm 10.9.2** («Cannot read properties of null (reading 'edgesOut')»); npm 11 runs it.
+- **`node_modules` can lag the lock without a word** (2026-11-17): `npm audit` reads the lock, so the morning audit of
+  NOVE-17 read «invariate» while this machine still ran Next 16.4.2 under a lock at 16.4.6 (the move of 2026-11-16 was
+  made on another branch, and nothing reinstalled): every build stopped on `SecurityFatalError`. Since that day a
+  session opens with `npm ci`, servers stopped, before the audit (WORKFLOW.md rule 8).
 - **npm 11 prints `allow-scripts` warnings on `npm ci`** (2026-11-03): the install scripts of `esbuild`, `re2`,
   `protobufjs`, `@firebase/util`, `unrs-resolver` stay pending and are not run; every gate was green that way. Not
   approved: nothing asked for it.

@@ -205,7 +205,7 @@ by saying so before that spec is implemented.
 
 The order of implementation (each followed by its retirement session, § 8):
 
-`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 (retired on 2026-11-16) → 16 (retired on 2026-11-17) → 17 → 18 → 21 → 11 → 12 → 13 → 19 → 20`
+`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 (retired on 2026-11-16) → 16 (retired on 2026-11-17) → 17 → 18 → 21 → 22 → 11 → 12 → 13 → 19 → 20`
 
 - **07** (retired on 2026-11-15, PR #534) after **03** (the fee row commits inside the ledger's transaction contract) and **06** (retired on 2026-11-14, PR #532) (`tradeMoneyIn` and
   `tradeAwarePriceEffect` change together).
@@ -214,7 +214,8 @@ The order of implementation (each followed by its retirement session, § 8):
 - **16** (retired on 2026-11-17, PR #547) after **02** (the same grid cell), reading **03**'s and **07**'s (retired on 2026-11-15, PR #534) dialogs (the fresh ledger meta, the fee
   field), already before it in the order; **17** after **16** (retired); **18** after **17** and **07** (retired) (the fiscal cost basis).
 - **21** after **16** and **17** (the editor's seed, the optimizer, the active-plan reader).
-- **11 → 12 → 13 → 19 → 20** come LAST (13 extends 12's contrast test): the page-by-page pass dresses pages that 08–10, 15, 16, 17, 18 and 21 change.
+- **22** after **18** and **21** (the editor it guides holds their disposals and hand-off), before **11** (the costume dresses its screens).
+- **11 → 12 → 13 → 19 → 20** come LAST (13 extends 12's contrast test): the page-by-page pass dresses pages that 08–10, 15, 16, 17, 18, 21 and 22 change.
 - 01, 02, 03, 04, 05, 06, 08, 14 and 11 depend on nothing.
 
 ## 6. Status
@@ -242,6 +243,7 @@ The order of implementation (each followed by its retirement session, § 8):
 | NOVE-19 | The costume, first pass: shell, portals, controls, Panoramica, Patrimonio, Cashflow | L | 11, 12, 13 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 1 owner decision |
 | NOVE-20 | The costume, round B: every dialog and the other nine pages | L | 19 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 23 findings, 1 owner decision |
 | NOVE-21 | The Consulente and the plan of accumulation | L | 16, 17 (after 18) | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 2 owner decisions |
+| NOVE-22 | Allocazione › Accumulo: a guided path to create a PAC by hand — one question per screen, a summary before «Conferma», as Compravendita and the Consulente; also where the Consulente's hand-off lands | — | 18, 21 | — | **to write** (owner, 2026-11-17, on the NOVE-17 tour: the PAC is complex to set up; the UX and UI of its creation optimised for whoever builds it by hand) |
 
 The transversal reading of the same day (the 21 specs against each other and against this index): 21 findings;
 decisions 33, 34, 35 and 62 hold for every spec.

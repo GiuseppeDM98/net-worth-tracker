@@ -156,6 +156,7 @@ export async function createDraftPlan(ownerId: string, draft: AccumulationPlanDr
       liquidity: draft.liquidity,
       positions: draft.positions,
       disposals: draft.disposals,
+      optimizerSnapshot: draft.optimizerSnapshot,
       installments: [] as Installment[],
       createdAt: now,
       updatedAt: now,
@@ -185,6 +186,7 @@ export async function updateDraftPlan(planId: string, draft: AccumulationPlanDra
         liquidity: draft.liquidity,
         positions: draft.positions,
         disposals: draft.disposals,
+        optimizerSnapshot: draft.optimizerSnapshot,
         updatedAt: new Date(),
       })
     );
