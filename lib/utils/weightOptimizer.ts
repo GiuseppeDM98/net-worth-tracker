@@ -16,8 +16,9 @@
  *
  * Third mode, `'targeted'` («Con vendite mirate»): the same `J(w)` under a tax cap in euro plus
  * per-instrument «Non vendere» locks, each sale priced by the app's one rule (`candidateSaleTaxPerEuro`,
- * `./saleTax`). Where the cap does not bind (or is 0) it runs the Ideale / Raggiungibile pipeline
- * itself — same `solveQP`, same bits — and only where it binds the tax-multiplier search
+ * `./saleTax`). Where the cap does not bind it runs the Ideale pipeline inside the locks and
+ * the cash floor; at cap 0 no taxed candidate goes below its held weight (Raggiungibile's floor, the untaxed rows
+ * and the liquidity still free) — same `solveQP`, same bits — and only where it binds the tax-multiplier search
  * (`searchTaxMultiplier`) on the same solver.
  */
 import type {
@@ -525,9 +526,9 @@ function evaluateRowRaw(row: ObjectiveRow, x: number[]): number {
 // Regularisation reference
 // ---------------------------------------------------------------------------
 
-/** `'targeted'` takes the `ideal` branch: the asks for the reachable reference
- *  (current weight on B, normalised), which is the same vector — (v/B)/Σ(v/B) = v/Σv — and this
- *  spelling keeps the cap-not-binding path bit-identical to Ideale (T6). */
+/** `'targeted'` takes the `ideal` branch although it asks for the reachable reference (current
+ *  weight on B, normalised): the vector is the same — (v/B)/Σ(v/B) = v/Σv — and this spelling keeps
+ *  the cap-not-binding path bit-identical to Ideale. */
 function computeWRef(candidates: OptimizerCandidate[], mode: OptimizerMode, baseEur: number): number[] {
   const n = candidates.length;
   const raw = candidates.map((c) => (mode === 'reachable' && baseEur > 0 ? c.currentValueEur / baseEur : c.currentValueEur));
@@ -1179,7 +1180,8 @@ function solveTargetedCore(input: OptimizerInput, solverOptions?: SolverOptions)
     converged = ideal.result.converged;
     capBinding = false;
   } else if (capEur <= TAX_EPSILON_EUR) {
-    // Path 2 — cap 0 and nothing forced: no taxed candidate below its weight, which is Raggiungibile.
+    // Path 2 — cap 0 and nothing forced: no taxed candidate below its weight (Raggiungibile's floor; the
+    // untaxed rows and the liquidity may still move).
     const loForced = leastTaxLowerBounds(cur, lo, hiInit, rate);
     const untaxed = applyMinWeightHeuristic(rows, n, wRef, loForced, hiInit, solverOptions);
     x = untaxed.result.x;

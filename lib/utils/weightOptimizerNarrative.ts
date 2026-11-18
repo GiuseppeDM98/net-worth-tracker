@@ -194,7 +194,7 @@ export const OPTIMIZER_MODE_LABELS: Record<OptimizerMode, string> = {
 export function describeOptimizerMode(mode: OptimizerMode): string {
   switch (mode) {
     case 'reachable':
-      return 'Raggiungibile non scende sotto ciò che possiedi, perché il PAC non vende.';
+      return 'Raggiungibile non scende sotto ciò che possiedi, perché le rate del PAC comprano soltanto.';
     case 'targeted':
       return 'Con vendite mirate vende solo ciò che conviene di più, finché le tasse restano sotto il tetto; gli strumenti spuntati non si vendono.';
     case 'ideal':
@@ -204,7 +204,7 @@ export function describeOptimizerMode(mode: OptimizerMode): string {
 
 /** Shown before applying Ideale weights that would sell nothing but ask for it. */
 export const OPTIMIZER_IDEAL_BELOW_HELD_CONFIRM =
-  'In modalità Ideale alcuni pesi sono sotto ciò che possiedi: il PAC non vende, quindi quelle posizioni riceveranno zero acquisti.';
+  'In modalità Ideale alcuni pesi sono sotto ciò che possiedi: le rate del PAC comprano soltanto, quindi quelle posizioni riceveranno zero acquisti.';
 
 /** The panel's whole content when `idealAllocation` is off or unset. */
 export const OPTIMIZER_DISABLED_READING = 'Nessuna allocazione ideale impostata: definiscila in Allocazione › Accumulo.';

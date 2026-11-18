@@ -62,7 +62,7 @@
     (16,9 min, 421 green), green ×3 alone right after; the first time.
   - `bundle.lazy.mobile.spec.ts` «Allocazione › Accumulo at 390 lands where the page drew its placeholder…» [mobile]
     (2026-11-18, `next dev`): the first tile's box `null` at `e2e/lazyTabLanding.ts:72` — red 1 in 11 alone, then 1 in 7
-    after the NOVE-18 tour; not the branch's (the same red with the Portafoglio modello tile's hunk reverted). A
+    after the «Con vendite mirate» tour (PR #551); not the branch's (the same red with the Portafoglio modello tile's hunk reverted). A
     pattern on the dev server, not yet run on the production build.
 - **A full run on the month's first three days reads a different Budget** (2026-11-03): `mobile-composition.cashflow.mobile.spec.ts` «the two cells open the right row» counted two lifted KPIs, one on those days (no pace, `liftedBlocks` skips «Fine mese»); it now reads the Italian day. Not a flake: a test written on a later day stays green until a run lands there. **A seed that ran before the Auth emulator was up** gave 12 red in one full run the same day (`seed exit=1`, the fixtures missing): wait on BOTH :8080 and :9099 before `emulators:seed`.
 - **`e2e/cashflow.transfer-fee.spec.ts` was red ONCE in a full run** (2026-10-07, Windows machine, the second full run

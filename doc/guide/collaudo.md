@@ -136,7 +136,7 @@ The app **is** locally runnable; there is no fallback to declare.
   document with side effects — a transaction or trade, whose deletion re-runs the replay — is
   deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
   A PAC saved on a fixture during a collaudo is a plan AND its lock: delete `accumulationPlans/<id>` and
-  `accumulationPlanLocks/<uid>` both, or every «senza piano» spec of Accumulo turns red (2026-11-18, NOVE-18).
+  `accumulationPlanLocks/<uid>` both, or every «senza piano» spec of Accumulo turns red (2026-11-18, the «Con vendite mirate» tour).
 - **A mock page published as an Artifact inherits the host skeleton's `body{color:#000}`** (2026-11-06, the concept
   pages of the AI surfaces' visual direction): the Artifact host prepends `:root{color-scheme:light} body{background:#fff;color:#000}` and nests the
   page inside its body, so a text colour declared on `html` is overridden for every descendant and a dark page shows

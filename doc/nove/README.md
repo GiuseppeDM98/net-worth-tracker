@@ -3,7 +3,7 @@
 > The index of the series: the owner's points, the decisions, the order, the shared contracts and the rules every
 > spec obeys. Written on 2026-11-12 on `develop` @ b841cbd7 by the planning session; **read adversarially, all
 > the specs together, on 2026-11-12** (decisions 33–63 in § 3); a spec in service is retired with
-> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524), NOVE-03 (2026-11-14, PR #526), NOVE-04 (2026-11-14, PR #528), NOVE-05 (2026-11-14, PR #530), NOVE-06 (2026-11-14, PR #532), NOVE-07 (2026-11-15, PR #534) NOVE-08 (2026-11-15, PR #536), NOVE-09 (2026-11-15, PR #538) NOVE-10 (2026-11-16, PR #540), NOVE-14 (2026-11-16, PR #542), NOVE-15 (2026-11-16, PR #544), NOVE-16 (2026-11-17, PR #547) and NOVE-17 (2026-11-18, PR #549); the next is NOVE-18. One spec = one
+> `doc/nove/PROMPT-RITIRO.md` (2026-11-12). NOVE-01 is retired (2026-11-13, PR #522), and so are NOVE-02 (2026-11-13, PR #524), NOVE-03 (2026-11-14, PR #526), NOVE-04 (2026-11-14, PR #528), NOVE-05 (2026-11-14, PR #530), NOVE-06 (2026-11-14, PR #532), NOVE-07 (2026-11-15, PR #534) NOVE-08 (2026-11-15, PR #536), NOVE-09 (2026-11-15, PR #538) NOVE-10 (2026-11-16, PR #540), NOVE-14 (2026-11-16, PR #542), NOVE-15 (2026-11-16, PR #544), NOVE-16 (2026-11-17, PR #547), NOVE-17 (2026-11-18, PR #549) and NOVE-18 (2026-11-18, PR #551); the next is NOVE-21. One spec = one
 > implementation session = one branch. A spec's NUMBER is its identity; the ORDER is § 5.
 
 ## 1. The owner's points (their words, 2026-11-12)
@@ -91,9 +91,9 @@
 21. PR #489: the past is not backfilled with rows; the average costs are re-projected. → NOVE-07 (retired on 2026-11-15, PR #534)
 22. PR #489: with no fee category the field is disabled, with a link to Impostazioni. → NOVE-07 (retired on 2026-11-15, PR #534)
 23. PR #489: in Rendimenti the fee stays a cost of the portfolio (net return; the row is not a withdrawal). → NOVE-07 (retired on 2026-11-15, PR #534)
-24. PR #486: with an active plan the Bilanciamento verdict does NOT change; only a note in the Piano tile. → NOVE-16 (retired on 2026-11-17, PR #547) (retired on 2026-11-17, PR #547)
-25. PR #486: «+ Nuovo asset» creates a real asset at quantity 0, without an opening trade. → NOVE-16 (retired on 2026-11-17, PR #547) (retired on 2026-11-17, PR #547)
-26. PR #488: «Con vendite mirate» stays a mode of the model's dialog, with the app's ONE tax rule. → NOVE-18
+24. PR #486: with an active plan the Bilanciamento verdict does NOT change; only a note in the Piano tile. → NOVE-16 (retired on 2026-11-17, PR #547)
+25. PR #486: «+ Nuovo asset» creates a real asset at quantity 0, without an opening trade. → NOVE-16 (retired on 2026-11-17, PR #547)
+26. PR #488: «Con vendite mirate» stays a mode of the model's dialog, with the app's ONE tax rule. → NOVE-18 (retired on 2026-11-18, PR #551)
 27. Consulente ↔ PAC: a hand-off after «Applica» («Crea un piano di accumulo verso questa allocazione»), computed by
     code, confirmed by the owner in the plan's editor. → NOVE-21
 28. The Consulente REASONS about a PAC in words in «Cosa fare adesso» (accumulate or sell, an indicative horizon,
@@ -101,9 +101,9 @@
 29. With an active PAC the Consulente reads one line (month k of N, instalment, end month) plus the instruments the
     plan buys and sells with their quotas; never the model nor its criteria. → NOVE-21
 30. The PAC editor's suggested instalment is the MEDIAN of the last twelve months' savings (the cashflow block's
-    measure), not annual savings / 12. → NOVE-16 (retired on 2026-11-17, PR #547) (retired on 2026-11-17, PR #547)
+    measure), not annual savings / 12. → NOVE-16 (retired on 2026-11-17, PR #547)
 31. PR #489: the tax estimates use a SEPARATE fiscal cost basis that includes the fees (purchase and sale); the PMC
-    shown stays without them. → NOVE-07 (retired on 2026-11-15, PR #534), read by NOVE-18
+    shown stays without them. → NOVE-07 (retired on 2026-11-15, PR #534), read by NOVE-18 (retired on 2026-11-18, PR #551)
 Decided at the adversarial reading of the whole series (2026-11-12, numbered on from the list above):
 
 33. `mobile:budget` closes on a COMPARISON: `mobile:census` + `mobile:budget` on `develop` and on the branch the same
@@ -142,13 +142,13 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 52. A «Continua con» row is sent as `'auto'`: the router reads it. → NOVE-15 (retired on 2026-11-16, PR #544)
 53. A turn sent with a reading it inherited (an answer to a question card, «Rigenera») is `source: 'carried'` and
     reads «Ho letto: …»; «Hai scelto: …» only after «cambia». → NOVE-14 (retired on 2026-11-16, PR #542), NOVE-15 (retired on 2026-11-16, PR #544)
-54. Patrimonio calls an instrument created empty and never traded «Mai comprato». → NOVE-16 (retired on 2026-11-17, PR #547) (retired on 2026-11-17, PR #547)
+54. Patrimonio calls an instrument created empty and never traded «Mai comprato». → NOVE-16 (retired on 2026-11-17, PR #547)
 55. The model's «Importo da investire» is money TAKEN FROM THE ACCOUNTS: the base is what is held, and in
     «Raggiungibile» the liquidity may go down to (liquidity − amount). → NOVE-17 (retired on 2026-11-18, PR #549)
 56. The model is «superato» when the targets, the roles OR the criteria change; an «Applica» that writes the same
     targets does not. → NOVE-17 (retired on 2026-11-18, PR #549)
 57. Spending the liquidity is not a sale: out of the sold total and of the taxes, its «Tasse» cell «—», the total
-    line adds «, usi X € di liquidità». → NOVE-18
+    line adds «, usi X € di liquidità». → NOVE-18 (retired on 2026-11-18, PR #551)
 58. The hand-off accepts that a new instrument at 0 quotes in a class without sub-targets starts near 0 % and says
     so. → NOVE-21
 59. The hand-off's seed holds EVERY tradable instrument held; the reading names the ones the Consulente did not
@@ -163,10 +163,10 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 64. (2026-11-13) The first purchase of a new instrument takes its fee, with the field and rules of «Registra
     operazione»; it travels on the first buy. → NOVE-07 (retired on 2026-11-15, PR #534)
 65. (2026-11-18, the NOVE-18 tour) A plan may sell a money-market fund, as long as the allocation's cash quota holds:
-    only the euros above the quota become the plan's. → NOVE-18
+    only the euros above the quota become the plan's. → NOVE-18 (retired on 2026-11-18, PR #551)
 66. (2026-11-18, the NOVE-18 tour) «Con vendite mirate» keeps the accounts and the money-market funds at or above the
     allocation's cash quota (or today's level, when already below), so the PAC made from it refills no reserve the
-    run spent. → NOVE-18
+    run spent. → NOVE-18 (retired on 2026-11-18, PR #551)
 
 ## 4. The adopted choices (reversible before the implementation; each is repeated in the spec that uses it)
 
@@ -187,8 +187,8 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 - l. Model and plans are read only on the Accumulo tab, except the Piano's note, the Consulente's «Applica» page
   (the active-plan note, choice p, and the hand-off's offer or draft, NOVE-21: the plans' state only, never their
   weights) and the Consulente's server read of the active plan (decision 29). (NOVE-16, retired on 2026-11-17, PR #547)
-- m. Limits that force a tax above the cap: the forced tax becomes the cap, and the UI says so. (NOVE-18)
-- n. Losses are not counted in the tax estimate, declared in the text. (NOVE-18)
+- m. Limits that force a tax above the cap: the forced tax becomes the cap, and the UI says so. (NOVE-18, retired on 2026-11-18, PR #551)
+- n. Losses are not counted in the tax estimate, declared in the text. (NOVE-18, retired on 2026-11-18, PR #551)
 - o. Loans and properties are never offered in «+ Aggiungi». (NOVE-16, retired on 2026-11-17, PR #547)
 - p. The Consulente's «Applica» page warns in one line when a plan is active. (NOVE-16, retired on 2026-11-17, PR #547)
 - q. «superato» fires on targets, roles AND criteria (decision 56): the fingerprint saved with the model covers the
@@ -210,16 +210,16 @@ by saying so before that spec is implemented.
 
 The order of implementation (each followed by its retirement session, § 8):
 
-`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 (retired on 2026-11-16) → 16 (retired on 2026-11-17) → 17 (retired on 2026-11-18) → 18 → 21 → 22 → 11 → 12 → 13 → 19 → 20`
+`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 (retired on 2026-11-16) → 16 (retired on 2026-11-17) → 17 (retired on 2026-11-18) → 18 (retired on 2026-11-18) → 21 → 22 → 11 → 12 → 13 → 19 → 20`
 
 - **07** (retired on 2026-11-15, PR #534) after **03** (the fee row commits inside the ledger's transaction contract) and **06** (retired on 2026-11-14, PR #532) (`tradeMoneyIn` and
   `tradeAwarePriceEffect` change together).
 - **09** (retired on 2026-11-15, PR #538) and **10** (retired on 2026-11-16, PR #540) after **08** (retired on 2026-11-15, PR #536) (the ring); **10** also after **05** (`readSavings`).
 - **15** (retired on 2026-11-16, PR #544) after **14** (retired on 2026-11-16, PR #542) (the router's contract).
 - **16** (retired on 2026-11-17, PR #547) after **02** (the same grid cell), reading **03**'s and **07**'s (retired on 2026-11-15, PR #534) dialogs (the fresh ledger meta, the fee
-  field), already before it in the order; **17** (retired on 2026-11-18, PR #549) after **16** (retired); **18** after **17** and **07** (both retired) (the fiscal cost basis).
+  field), already before it in the order; **17** (retired on 2026-11-18, PR #549) after **16** (retired); **18** (retired on 2026-11-18, PR #551) after **17** and **07** (both retired) (the fiscal cost basis).
 - **21** after **16** and **17** (both retired) (the editor's seed, the optimizer, the active-plan reader).
-- **22** after **18** and **21** (the editor it guides holds their disposals and hand-off), before **11** (the costume dresses its screens).
+- **22** after **18** (retired) and **21** (the editor it guides holds their disposals and hand-off), before **11** (the costume dresses its screens).
 - **11 → 12 → 13 → 19 → 20** come LAST (13 extends 12's contrast test): the page-by-page pass dresses pages that 08–10, 15, 16, 17, 18, 21 and 22 change.
 - 01, 02, 03, 04, 05, 06, 08, 14 and 11 depend on nothing.
 
@@ -244,10 +244,10 @@ The order of implementation (each followed by its retirement session, § 8):
 | NOVE-15 | The Assistente as only a chat | L | 14 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 27 findings, 3 owner decisions; implemented on 2026-11-16 (branch `feat/nove-15-assistente-solo-chat`; every unit criterion seen red with its mutation; Vitest 332 files / 6804 tests in three zones; the eight Assistente and Tracciamento E2E files 32/32 on the emulators, the count at rest 11; no request to a model; `mobile:census` identical to develop's on 57/57 entries; `perf:budget`: the Assistente 755,3 → 753,5, nine ceilings raised by the shell's Radix menu split into a shared chunk, Hall of Fame and Storico past 1 KB with the owner's OK, doc/guide/velocita.md § Registro; phase F, the router's first real calls, on the owner's mirror in the same session; three changes the owner asked during it landed in the same commit: the pension contributions with effect on the period and the Driver's split of the change, the funds' part of each class and the income subcategories in the AI's context, an immaterial sales tax no longer named in the verdicts, the animated wait in the answer's place, the stream's status after a web search — doc/guide/assistente.md, panoramica.md); PR #544 in develop since 2026-11-16; **retired on 2026-11-16**: the eleven criteria, decisions 11, 12, 15, 36, 52 and 53 and every adopted choice held on the merged code (a read-only workflow of five `cercatore` and four `verificatore`: 129 items, 15 flagged, 12 held — eleven text, one test gap); the closure re-run (the Assistente suites and the spec's test files 37 files / 1146 tests, § 6's Playwright files with `cashflow.tracciamento` and `allocation.consulente` 36/36 on the emulators); `firestore.rules` and `firestore.indexes.json` untouched; `routeReading` read back by the page tests on the faked stream, a thread saved before the spec opening as stored (E5). Divergences written, behaviour equal: criterion 11 named a 754 ceiling the ring's retirement had raised to 756 on 2026-11-15 — the Assistente went 755,3 → 753,5 under it, unraised; the changes the owner asked during phase F (the AI context's pension contributions, the Driver's split and the income subcategories; an immaterial sales tax unnamed in the verdicts; the animated wait; the stream's status after a web search; the companion's clip) landed in the implementation's commit outside § 4, each written in doc/guide/assistente.md or panoramica.md with its test. Proof fixed: the chooser's focus — on the chosen reading at open, back on «cambia» after Esc and «Annulla» — pinned in `assistantCompanionScene.test.tsx` with a click that focuses nothing, Safari's (red with `returnFocusTo` dropped; with `userEvent`'s focusing click it stayed green, the modal's own restore covering it). Text fixes: doc/guide/assistente.md's header, § Files and «Suites to run» line took the chat's modules, tests and E2E files, the header's «50+» dot and «Registra» among the hover accents left it; assistente-registra.md's way in; seven comments (the day thread in `store.ts` and the stream route, the period selector in `types/assistant.ts` and the route, the Preferenze popover in `GeneraleTab.tsx` twice and `AssistantMemoryPanel.tsx`); the spec's branch left nine `raisedBy` and doc/guide/velocita.md's row (#544 in its place), the label CLAUDE.md's Assistente line; NOVE-20's Assistente line cites re-pointed (eight, all moved by 675100d9). No runtime code changed |
 | NOVE-16 | Allocazione › Accumulo: the PAC tab (PR #486) | L | 02 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 33 findings, 2 owner decisions; implemented on 2026-11-17, PR #547 in develop since 2026-11-17 (branch `feat/accumulo`; PR #486 cherry-picked with D1–D11 and the choices u, v, p, the contributor's trailer in 96383413; `perf:budget` Allocazione 605,9 → 610,5 KB gz, its ceiling 606 → 611 with the owner's OK and criterion 2 corrected that day; tour A–G done and closed, F on the mirror; the owner's changes on the tour: the reserve is the allocation's cash quota kept on the real accounts, refilled by the sales and the inflows before anything is bought); **retired on 2026-11-17**: the sixteen criteria, decisions 24, 25, 30 and 54, choices f, g, l, o, p, s, u, v and A1–A10 held on the merged code (a read-only workflow of five `cercatore` and four `verificatore`: 114 items, 26 flagged, 23 held — all text, one of them D11 left in four test files); the closure re-run (the area and spec Vitest 30 files / 753 tests, `e2e/allocation e2e/accumulo e2e/bundle.lazy` 76/76 on the emulators); `firestore.rules` gained the two blocks, published by the owner before the retirement, `firestore.indexes.json` untouched; `Asset.createdEmpty` read by R2 and U8 on mocks, an asset without it reading «Azzerato» as before (R1b); PR #486 closed that day with the link to #547. Divergences written, behaviour equal: the tour's reserve refill gave the verdict a state `quiet` (a month with no line) and `scheduled` the fields `firstMonth` / `todayYear` — its headline names the first month that buys when it is not the start —, and `summarizePacMonth` is null on such a month (doc/guide/accumulo.md); `selectOpenPlan` lives in `openAccumulationPlan.ts`, `accumuloMonth.ts` imports no `accumulationPlanDoc`, `usePacMonth` and `summarizePacMonthOn` added to the slim path (§ 7 below aligned); `listAddableAssets` also takes `tradedAssetIds` and `alsoAllow`; `roundPlanEuros` also in `dismissRecalibration`, generic on the field names; `ACCUMULO_TAB_SIGNATURE` is a module string in `e2e/chunkProbe.ts` («Verdetto sul piano di accumulo», a function name dies in the minified build); the figures print «1200 €», the app's format, where U7 and R1 wrote «1.200 €». Text fixes: D11 finished — real tickers and two non-round amounts in `accumulationPlanMatching`, `accumulationPlanSchema`, `accumuloTileSentences` and the plan block of `allocazioneSummary` replaced by `ETF-A`… and round figures, the expected values recomputed; ten «decision N» in code, tests and guides rewritten as the owner's rule and date; doc/guide/accumulo.md gained its «Suites to run» line and the no-tab-bar blind spot (§ 10), assistente.md the «mai comprato» row, cache-persistita.md the plans in the bump list; `e2e/lazyTabLanding.ts`'s header counted two Cashflow routines; NOVE-17's and NOVE-21's pointers re-pointed (`selectOpenPlan`, the effective targets, the § 6 grep and the § 4 rendering written out). Outside the spec: `reactCompilerCoverage`'s hook went past its 120 s three times in the whole `TZ=Europe/Rome` run on Windows (58 s alone, ~840 files), its timeout raised to 300 s with the measure in its header. No runtime code changed |
 | NOVE-17 | The model portfolio and the optimizer (PR #487) | L | 16 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 32 findings, 3 owner decisions; implemented on 2026-11-18, PR #549 in develop since 2026-11-18 (branch `feat/portafoglio-modello`; PR #487 cherry-picked with M1–M14, the contributor's trailer in f476ce98; tour A–G, F on the mirror, five owner changes from it; `perf:budget` Allocazione 610,7/611, Impostazioni 723,8/724 with its ceiling raised by 1); **retired on 2026-11-18** (the rule of `modelPortfolios` published by the owner before that day, PR #487 closed with the link to #549; a read-only workflow, 112 items, 18 flagged, no runtime defect. Divergences written: the fingerprint hashes the stored targets as they weigh (`weighingTargets`, owner 2026-11-17); `buildModelBasis` runs in `AccumuloTab`, not on the page; `StandaloneCandidates` also carries `fixedKeys` and `instrumentCount`; `describeNegativeFixed` has a plural; `fingerprint` is optional on the document (absent = stale); `restoreCriteria(stored)`; below `desktop:` the first screen holds at 390, while at 768 / 1024 `tilesAboveFold` grows with the two rows in the index (2 → 3, 2/1 → 4/3) and the Impostazioni entry was re-measured, both registered in doc/guide/prima-schermata-misure.md; U4's fixture adds a money-market fund (base 103.000). Fixed: the page-reads-no-model and the type-files-import-no-lib source tests widened, each seen red; two closed counts opened. Lessons in doc/guide/ottimizzatore.md, with its «Suites to run» line) |
-| NOVE-18 | «Con vendite mirate» (PR #488) | M | 17 (retired), 07 (retired) | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 1 owner decision; implemented on 2026-11-18 (branch `feat/vendite-mirate`, PR #488 cherry-picked with Giorgio Trentadue as co-author; every test of § 6 seen red with its mutation; `estimatePlanSaleTax` unchanged on its 62 cases and on 20.002 random legs; `perf:budget` against develop on the same build and day ±0,2 KB gz, Analisi 658,0 → 658,1 raised 658 → 659; `mobile:budget` identical to develop, 60 entries; collaudo A–E on the emulators, F on the mirror with the owner). Divergences: U5 runs on DELTA, not ALFA (on ALFA the PR's fallback stayed green); the total line prints «8000 €» as the rest of the app (owner); the forced locks reach the optimizer as locks (a pension fund was sellable at zero tax while its box read ticked); a locked fixed share is held at its value, with no `bound_conflict`; below `desktop:` the mode pill is a three-cell grid; the seed sells whole only what the run brings to 0% (then no position), never a fund merely out of the model; found at the tour, two owner decisions (65, 66): a plan may sell a money-market fund, the reserve rising by the sale, and the run keeps the cash at the allocation's quota |
+| NOVE-18 | «Con vendite mirate» (PR #488) | M | 17 (retired), 07 (retired) | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 1 owner decision; implemented on 2026-11-18 (branch `feat/vendite-mirate`, PR #488 cherry-picked with Giorgio Trentadue as co-author; every test of § 6 seen red with its mutation; `estimatePlanSaleTax` unchanged on its 62 cases and on 20.002 random legs; `perf:budget` against develop on the same build and day ±0,2 KB gz, Analisi 658,0 → 658,1 raised 658 → 659; `mobile:budget` identical to develop, 60 entries; collaudo A–E on the emulators, F on the mirror with the owner). Divergences: U5 runs on DELTA, not ALFA (on ALFA the PR's fallback stayed green); the total line prints «8000 €» as the rest of the app (owner); the forced locks reach the optimizer as locks (a pension fund was sellable at zero tax while its box read ticked); a locked fixed share is held at its value, with no `bound_conflict`; below `desktop:` the mode pill is a three-cell grid; the seed sells whole only what the run brings to 0% (then no position), never a fund merely out of the model; found at the tour, two owner decisions (65, 66): a plan may sell a money-market fund, the reserve rising by the sale, and the run keeps the cash at the allocation's quota; PR #551 in develop since 2026-11-18; **retired on 2026-11-18**: the ten criteria, decisions 26, 31, 57, 65 and 66 and choices m, n and C1–C7 held on the merged code (a read-only workflow of five `cercatore` and four `verificatore`: 91 items, 15 flagged, 12 held — all text); the closure re-run (the area and spec Vitest 25 files / 658 tests, `e2e/accumulo` 21/21 on the emulators); `firestore.rules` and `firestore.indexes.json` untouched; the contributor's trailer in 779b87d3, PR #488 closed that day with the link to #551. Divergence written, behaviour equal: the fallback's and Path 2's lower bounds, two inline lines in § 4, live in one helper, `leastTaxLowerBounds`. Fixed at the owner's call (2026-11-18): the two UI sentences «il PAC non vende» (the «Raggiungibile» description, the «Ideale» confirm) read «le rate del PAC comprano soltanto», a plan carrying planned sales since this spec — a test seen red on the old wording. Text fixes: «(T6)» left a comment of `weightOptimizer.ts`, «T4:» two older test names of `speseMaggioriTile` (the same class); the closed «at cap 0 it IS Raggiungibile» / «IS Ideale» and «the PAC never sells» opened in doc/guide/ottimizzatore.md and three comments; the label left collaudo.md, e2e-suite.md, velocita.md and a `raisedBy`, decision 57 there the owner's rule and date; NOVE-21's eight `pr488:` cites re-pointed to `develop` @ 1e580c7b. Lessons in doc/guide/ottimizzatore.md and accumulo.md |
 | NOVE-19 | The costume, first pass: shell, portals, controls, Panoramica, Patrimonio, Cashflow | L | 11, 12, 13 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 1 owner decision |
 | NOVE-20 | The costume, round B: every dialog and the other nine pages | L | 19 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 23 findings, 1 owner decision |
-| NOVE-21 | The Consulente and the plan of accumulation | L | 16, 17 (both retired; after 18) | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 2 owner decisions |
+| NOVE-21 | The Consulente and the plan of accumulation | L | 16, 17 (both retired; after 18, retired) | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 2 owner decisions |
 | NOVE-22 | Allocazione › Accumulo: a guided path to create a PAC by hand — one question per screen, a summary before «Conferma», as Compravendita and the Consulente; also where the Consulente's hand-off lands | — | 18, 21 | — | **to write** (owner, 2026-11-17, on the NOVE-17 tour: the PAC is complex to set up; the UX and UI of its creation optimised for whoever builds it by hand) |
 
 The transversal reading of the same day (the 21 specs against each other and against this index): 21 findings;
@@ -269,7 +269,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `personalMemberId`); `isFeeRow` recognises `feeOfTradeId`; `TradeMutationResult.feeRow: 'written' | 'none' |
   'refused'` (NOVE-07, retired on 2026-11-15).
 
-**The cost basis** — defined by NOVE-07 (retired on 2026-11-15, PR #534), read by NOVE-18
+**The cost basis** — defined by NOVE-07 (retired on 2026-11-15, PR #534), read by NOVE-18 (retired on 2026-11-18, PR #551)
 - `fiscalCostPerUnitEur` in `lib/utils/costBasisEur.ts`; `Asset.fiscalAverageCostEur`;
   `LedgerPositionState.fiscalCostBasisEur / .fiscalAverageCostEur / .feesEur`; `AssetTotalReturn.feesEur`;
   `AssetTransactionsMeta.averageCostEurFeeFreeAt`; `AssistantLedgerRow.feeIsSpendingRow`;
@@ -328,7 +328,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `lib/utils/assistantChatNarrative.ts` (NOVE-15): `describeRoute`, `describeReadingLine`,
   `buildEmptyChatSuggestions`.
 
-**The plan of accumulation** — defined by NOVE-16 (retired on 2026-11-17, PR #547), read by NOVE-17 (retired on 2026-11-18, PR #549), NOVE-18 and NOVE-21
+**The plan of accumulation** — defined by NOVE-16 (retired on 2026-11-17, PR #547), read by NOVE-17 (retired on 2026-11-18, PR #549), NOVE-18 (retired on 2026-11-18, PR #551) and NOVE-21
 - Collections `accumulationPlans` (query `where('userId', '==', uid)`) and `accumulationPlanLocks/{ownerUid}`
   `{ userId, openPlanId: string | null, updatedAt }`, written in the plan's transaction.
 - `lib/utils/accumulationPlanDoc.ts`: `docToAccumulationPlan(id, data)`, `openPlanHeldBy(lockOpenPlanId,
@@ -348,7 +348,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `seedAccumuloFixture({ startOffset, status })` (NOVE-21 adds `status?: 'active' | 'draft'`), `plantCriteria()` /
   `restoreCriteria(stored)` (NOVE-17 (retired on 2026-11-18, PR #549); `stored` is what `plantCriteria()` returned); `APPLY_ACTIVE_PLAN_NOTE` in `allocationAdviceNarrative.ts`.
 
-**The optimizer and the model** — defined by NOVE-17 (retired on 2026-11-18, PR #549), extended by NOVE-18, read by NOVE-21
+**The optimizer and the model** — defined by NOVE-17 (retired on 2026-11-18, PR #549), extended by NOVE-18 (retired on 2026-11-18, PR #551), read by NOVE-21
 - `types/optimizer.ts`: `OptimizerMode = 'reachable' | 'ideal'` (NOVE-18 adds `'targeted'`), `OptimizerSnapshot`
   (NOVE-18 adds `taxCapEur?`, `lockedKeys?`). `types/accumulationPlan.ts`: `PlanSeedDraft { positions:
   PlanPosition[]; disposals?: PlanDisposal[]; optimizerSnapshot?: OptimizerSnapshot }`, the editor's one seed
@@ -363,7 +363,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
   assets)`; `saveModelPortfolio(ownerId, input, allAssets, basis)`, `ModelPortfolioInput.keepFingerprint?`;
   `StandaloneCandidates.liquidityEur`, `.fixedKeys`, `.instrumentCount`; `LIQUIDITY_CANDIDATE_KEY` defined in `lib/constants/idealAllocation.ts`.
 
-**The sale's tax** — defined by NOVE-18 — `lib/utils/saleTax.ts`
+**The sale's tax** — defined by NOVE-18 (retired on 2026-11-18, PR #551) — `lib/utils/saleTax.ts`
 - `SaleTaxPerEuro` = `exempt | taxed{perEuro} | unknown{reason: 'cost-basis' | 'rate'}`;
   `saleTaxPerEuro(holding)`; `candidateSaleTaxPerEuro(buyAssetId, holdings)` (a group is priced at its buyer);
   `estimatePlanSaleTax` calls `saleTaxPerEuro`, the targeted optimizer and the dialog's locks call
@@ -430,7 +430,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
 - NOVE-13 only: `selectResourceBar(overview): ResourceFigure[]` in `lib/utils/overviewSummary.ts`,
   `ResourceBar({ figures })` in `components/dashboard/overview/ResourceBar.tsx`.
 
-**The contributor's credit** (NOVE-07 — retired on 2026-11-15, PR #534, its PR #489 closed that day —, NOVE-16 — retired on 2026-11-17, PR #547, its PR #486 closed that day —, NOVE-17 — retired on 2026-11-18, PR #549, its PR #487 closed that day —, 18): `Co-authored-by: Giorgio Trentadue
+**The contributor's credit** (NOVE-07 — retired on 2026-11-15, PR #534, its PR #489 closed that day —, NOVE-16 — retired on 2026-11-17, PR #547, its PR #486 closed that day —, NOVE-17 — retired on 2026-11-18, PR #549, its PR #487 closed that day —, NOVE-18 — retired on 2026-11-18, PR #551, its PR #488 closed that day): `Co-authored-by: Giorgio Trentadue
 <148712309+Ciocc128@users.noreply.github.com>`, the form already in the repo's history.
 
 ## 8. The rules that bind every spec
@@ -481,7 +481,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 11 12 13 18 19 20 21`
+`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 11 12 13 19 20 21`
 
 Prompt 08 (`08_CREA_RITIRO_SPEC`) was run on 2026-11-12, after the adversarial reading, in a session of its own:
 `doc/nove/PROMPT-RITIRO.md` is the prompt the owner pastes to retire ONE spec. A retirement updates its precedents

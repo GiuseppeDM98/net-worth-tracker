@@ -2,8 +2,9 @@
 
 *The question it answers: «quali pesi dovrei avere, dati i miei criteri, e quanto me ne separa?»* A saved **portfolio
 model** (target weights per instrument) and the **weight optimizer** that proposes it, both on Allocazione › Accumulo
-(2026-11-17, from Giorgio Trentadue's PR #487). The PAC never sells, so the model is where the app says what the
-portfolio should look like and the plan is how the monthly inflow gets closer.
+(2026-11-17, from Giorgio Trentadue's PR #487). A PAC's instalments only buy (its sales are the planned
+`disposals`, seeded by «Con vendite mirate» or added by hand), so the model is where the app says what the portfolio
+should look like and the plan is how the monthly inflow gets closer.
 
 ## Rules
 
@@ -17,7 +18,7 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
 - **The engine is pure** (`lib/utils/weightOptimizer.ts`, its types in `types/optimizer.ts`): `runOptimizer` builds
   the candidates and objective rows, `optimizeWeights` solves a convex quadratic program by an exact active-set
   method (`activeSetQP.ts`, box projection in `boxProjection.ts`). Three modes: **Raggiungibile col PAC** never goes
-  below what is held (the PAC does not sell), **Ideale** ignores what is held, **Con vendite mirate** sells under a
+  below what is held (a PAC's instalments only buy), **Ideale** ignores what is held, **Con vendite mirate** sells under a
   tax cap (below; only in the model's dialog, never in the PAC editor). An objective that cannot be met is
   reported as a conflict (`computeConflicts`), never silently dropped; caps that cannot reach 100 are
   `infeasible_bounds`, said before the solver runs. The run happens on «Calcola» / «Prova», in the handler: the
@@ -42,8 +43,9 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
   ONE rule, `saleTaxPerEuro` (`lib/utils/saleTax.ts`): not taxable → exempt, no EUR basis or no rate → unknown and
   never sold, the gain fraction floored at 0 (a loss pays nothing and offsets nothing: the losses note is the first
   line under the table), no sale fee (a proposed sale has none yet). A group is priced at its BUYER, the only member a
-  plan sells (`candidateSaleTaxPerEuro`; a composite buyer's most-taxed sleeve). Where the cap does not bind the
-  result IS «Ideale», at cap 0 it IS «Raggiungibile»; between them a tax-multiplier search (`searchTaxMultiplier`) on the
+  plan sells (`candidateSaleTaxPerEuro`; a composite buyer's most-taxed sleeve). Where the cap does not bind it
+  runs Ideale's pipeline, inside the locks and the cash quota (below); at cap 0 no TAXED candidate goes below its held
+  weight, as in «Raggiungibile», while the liquidity and an exempt or at-a-loss row may still move; between them a tax-multiplier search (`searchTaxMultiplier`) on the
   same solver. The tax the Impostazioni limits force (a max below the held weight) is the cap when above it, and the
   total line says so; a search that does not finish falls back to the least-tax point, never over the cap
   (`not_converged`). Held weights stay off the half-point grid and the rounding only ever shrinks a sale, inside every
@@ -51,7 +53,7 @@ portfolio should look like and the plan is how the monthly inflow gets closer.
   sconosciuto», «Bloccato in Impostazioni», «Immobile: resta com’è», «Non si vende sul mercato» for a pension fund)
   reaches the optimizer as a lock too: a pension fund costs no tax, yet is never sold (2026-11-18). A locked fixed share
   (a property, a frozen asset) is held at its value, with no `bound_conflict`. **Spending the liquidity is not a
-  sale** (decision 57): `sale.liquiditySpentEur`, out of `soldEur` and `taxEur`, «—» in its «Tasse» cell, «, usi X €
+  sale** (owner, 2026-11-12): `sale.liquiditySpentEur`, out of `soldEur` and `taxEur`, «—» in its «Tasse» cell, «, usi X €
   di liquidità» in the total line, which is the dialog's reading (four-digit euros ungrouped, «8000 €», as everywhere,
   owner 2026-11-18). **The cash quota** (owner, 2026-11-18, found at the tour): the accounts and the money-market
   funds together never go under the allocation's cash quota — the plan's own, `resolvePlanReserve(...).quotaEur`, as

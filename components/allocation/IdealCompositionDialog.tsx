@@ -14,7 +14,7 @@
  * only the model, through «Salva come portafoglio modello»; «Crea un PAC» hands the seed to the CALLER, which
  * opens `AccumulationPlanDialog` itself (never two modals stacked).
  *
- * Third mode «Con vendite mirate» lives only here — the PAC does not sell: a tax cap in euro, a «Non vendere»
+ * Third mode «Con vendite mirate» lives only here — a PAC's instalments only buy: a tax cap in euro, a «Non vendere»
  * box per row (dialog state, saved only in the run's snapshot), the estimated tax per row in sale, and the total
  * line as the reading. In that mode the rows (name, current weight, box) are on screen BEFORE «Calcola», so the
  * locks can be set first; a row the app cannot sell is ticked, disabled, and says why under its name.
