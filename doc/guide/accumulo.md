@@ -15,6 +15,10 @@ weight, month by month, proposes the purchases and never writes a transaction on
   2026-11-17, ahead of any deploy (additive: two new collections); no migration, no plan existed in production.
 - **A plan is a list of positions** (a label, a target weight, the member instruments and the one that BUYS,
   `buyAssetId`). Weights sum to 100. «Parti da» seeds them from today's tradable portfolio or from typed targets.
+  Step 2 also has an «Ottimizzato» view (`OptimizerPanel`, doc/guide/ottimizzatore.md): it runs on «Calcola» only and
+  «Usa questi pesi» hands the weights and the calculation's snapshot to the draft. A plan started from outside the
+  editor — «Crea un PAC con questi pesi» in the model's dialog — arrives as ONE `PlanSeedDraft` (`positions`,
+  `disposals?`, `optimizerSnapshot?`, 2026-11-17), never a second seed shape.
 - **The engine is pure** (`lib/utils/accumulationPlanUtils.ts`): `scheduleInstallments` lays the months, `matchPlanExecutions`
   (`accumulationPlanMatching.ts`) pairs the registry's BUY transactions with the planned lines, a late month carries
   its shortfall into the next. Sentences live in `accumulationNarrative.ts` and `accumuloSummary.ts`, never in a
@@ -90,9 +94,10 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
 
 - **Query key**: every write (create, revise, interrupt, reactivate, confirm) invalidates `queryKeys.accumulationPlans.all`,
   the one key the tab and the Piano's note both read.
-- **«Parti da» has no portfolio-model source**: today's tradable weights or typed targets only.
+- **«Parti da»** seeds from today's tradable weights, typed targets or, when one is saved, the model portfolio (doc/guide/ottimizzatore.md); on a «superato» model the option stays and the tile's stale sentence shows under it.
 - **No tab bar without a Piano**: with no assets, a failed read or no Piano (the page's `loadFailed` and `!hasAssets`
   branches) the page draws no `PageTabs`, so `?tab=accumulo` lands on Bilanciamento's state there — declared on
   2026-11-12, not a bug. The loading branch draws the bar.
+- **A class at 0% target is not drawn** (owner, 2026-11-17): `onlyTargetedClasses` takes it out of the editor's panel, the chart, the calendar and the re-entry sentence — Impostazioni saves every class, the empty ones at 0, and «Immobili 78,6% → 0%» squashed the chart. The filter is the VIEWS' only: `projectClassTrajectory` keeps every class, its cash class proves the money conserved (`__tests__/accumulationClassTrajectory.test.ts`).
 - **«Mai comprato»** (`describeZeroQuantityChip`) needs `Asset.createdEmpty`, written only by «+ Nuovo asset»: an asset created at 0 before 2026-11-12, or a position sold before the ledger migration, reads «Azzerato».
 - **The census fixture plants a plan and its lock** (`scripts/seedCensusE2E.mts`); the `allocazione-accumulo` entry of `perf/mobile-budget.json` is measured on this machine (doc/guide/prima-schermata-misure.md).

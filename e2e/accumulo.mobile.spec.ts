@@ -1,7 +1,6 @@
 /**
  * Allocazione › Accumulo a 390px — la composizione per il telefono (2026-10-18; le regole in
- * doc/guide/accumulo.md § Composizione mobile e in DESIGN.md → Small-Screen Composition; le specifiche in
- *).
+ * doc/guide/accumulo.md § Composizione mobile e in DESIGN.md → Small-Screen Composition).
  *
  * PERCHÉ ESISTE: la pagina era una pila di sei tessere aperte; ora ha il verdetto tagliato dopo la prima
  * frase («Il perché · il rientro nella banda»), una striscia di celle da pollice, LA tessera Questo mese
@@ -22,8 +21,8 @@ import { removeAccumuloFixture, seedAccumuloFixture } from './accumuloFixture';
 
 const TOUCH_FLOOR = 44;
 const STORAGE_KEY = 'mobile-sections:allocation:accumulo';
-/** Le righe con un piano attivo e nessun piano concluso: soltanto Classi del piano. */
-const ROW_IDS = ['acc-classi'] as const;
+/** Le righe con un piano attivo e nessun piano concluso, nell'ordine del DOM (il portafoglio modello, 2026-11-17). */
+const ROW_IDS = ['acc-modello', 'acc-classi', 'acc-criteri'] as const;
 
 const trigger = (page: Page, id: string) => page.locator(`#${id}-trigger`);
 const panel = (page: Page, id: string) => page.locator(`#${id}-panel`);
@@ -53,7 +52,7 @@ async function measureOverflow(page: Page) {
 }
 
 test.describe('Accumulo, composto per un telefono', () => {
-  test('la prima schermata: tre celle da pollice, Questo mese aperta, una riga chiusa e vuota', async ({ page }) => {
+  test('la prima schermata: tre celle da pollice, Questo mese aperta, le righe chiuse e vuote', async ({ page }) => {
     await openAccumulo(page);
 
     // Le tre celle: la rata, l'investito e la classe più lontana dalla banda (o «tutte in soglia»).
@@ -81,7 +80,7 @@ test.describe('Accumulo, composto per un telefono', () => {
       expect(box.height, name).toBeGreaterThanOrEqual(TOUCH_FLOOR);
     }
 
-    // «Il resto della pagina», poi la riga chiusa di Classi del piano.
+    // «Il resto della pagina», poi le righe chiuse: Portafoglio modello sotto LA tessera, chiusa (mai aperta di default).
     await expect(page.getByRole('heading', { level: 2, name: 'Il resto della pagina' })).toBeVisible();
     const triggers = page.locator('main [id$="-trigger"]');
     await expect(triggers).toHaveCount(ROW_IDS.length);
@@ -139,14 +138,14 @@ test.describe('Accumulo, composto per un telefono', () => {
       );
     expect(await orderClasses()).toEqual([]);
 
-    // L'ordine verticale è quello del DOM: Questo mese, poi Classi del piano.
+    // L'ordine verticale è quello del DOM: Questo mese, poi le righe.
     const names = await page.evaluate(() => {
       const main = document.querySelector('main')!;
       return [...main.querySelectorAll<HTMLElement>('section.rounded-2xl')]
         .filter((el) => el.checkVisibility())
         .map((el) => ({ name: el.getAttribute('aria-label'), top: Math.round(el.getBoundingClientRect().top) }));
     });
-    expect(names.map((s) => s.name)).toEqual(['Questo mese', 'Classi del piano']);
+    expect(names.map((s) => s.name)).toEqual(['Questo mese', 'Portafoglio modello', 'Classi del piano', 'Criteri del modello']);
     expect(names.every((s, i) => i === 0 || s.top >= names[i - 1].top - 1), JSON.stringify(names)).toBe(true);
 
     await page.getByRole('button', { name: 'Apri tutte' }).click();

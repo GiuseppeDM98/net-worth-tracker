@@ -21,6 +21,8 @@ import type {
 import { splitTowardTarget, bandForTarget, resolveAllocationRoleWithin, type RebalanceBand } from './allocationUtils';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { roundToCents } from './cents';
+import type { ModelPortfolio } from '@/types/modelPortfolio';
+import { modelGroups } from '@/lib/utils/modelPortfolio';
 import { unitPriceEur } from './costBasisEur';
 import { addMonths } from './planMonths';
 import { describeZeroQuantityChip, NEVER_BOUGHT_CHIP } from './zeroQuantityChip';
@@ -951,6 +953,18 @@ export function projectClassTrajectory(input: {
   return points;
 }
 
+/**
+ * The trajectory as the plan's views show it: a class at 0% target (a house, the accounts, saved as 0 by
+ * Impostazioni) is no direction of the plan — kept, it filled the panel and squashed the chart's scale
+ * (owner, 2026-11-17). The full trajectory stays the engine's: its cash class proves the money conserved.
+ */
+export function onlyTargetedClasses(points: ClassTrajectoryPoint[]): ClassTrajectoryPoint[] {
+  return points.map((point) => ({
+    ...point,
+    byClass: Object.fromEntries(Object.entries(point.byClass).filter(([, data]) => data && data.targetPct > 0)),
+  }));
+}
+
 /** Below this share (pp) a class counts as empty on the strip — rounding noise, never a position. */
 const DORMANT_CLASS_EPSILON_PP = 0.05;
 
@@ -1099,6 +1113,13 @@ export function buildDraftPreview(input: {
 // separately for a `PlanDeps.priceOf` implementation.
 export { unitPriceEur };
 
+// ---------------------------------------------------------------------------
+// The weight optimizer's standalone tool: converts its proposed weights into freshly-seeded PAC positions,
+// the same shape `seedPositionsFromAssets` builds in `AccumulationPlanDialog.tsx` — one position
+// per single instrument, target = the proposed weight. `generateId` is injected (never
+// `crypto.randomUUID()` called inline) so the conversion stays deterministic under test.
+// ---------------------------------------------------------------------------
+
 /**
  * The editor's second step starts on ONE singleton position per buyable, valued holding — every euro
  * the page knows about needs a bucket the moment the editor opens, never only once the reader has
@@ -1129,7 +1150,7 @@ export function seedPositionsFromAssets(
  * (never `crypto.randomUUID()` called inline) so the conversion stays deterministic under test.
  */
 export function weightsToSeedPositions(
-  weights: Array<{ key: string; label: string; proposedPct: number; memberAssetIds?: string[] }>,
+  weights: Array<{ key: string; label: string; proposedPct: number; /** A group's members, the buyer (`key`) included. */ memberAssetIds?: string[] }>,
   generateId: () => string = () => crypto.randomUUID()
 ): PlanPosition[] {
   return weights.map((w) => ({
@@ -1164,7 +1185,8 @@ export function marketWeights(assets: Asset[], deps: PlanDeps): Record<string, n
 }
 
 /**
- * Sets the positions' target weights from a per-instrument map (today's market weights): a position takes the sum of its members' weights (none = 0); an instrument of the map
+ * Sets the positions' target weights from a per-instrument map (the model portfolio, today's market
+ * weights): a position takes the sum of its members' weights (none = 0); an instrument of the map
  * that no position holds and that is not being sold becomes a new single-instrument position.
  */
 export function applyWeightsToPositions(
@@ -1189,6 +1211,45 @@ export function applyWeightsToPositions(
       buyAssetId: assetId,
     }));
   return [...updated, ...added];
+}
+
+/**
+ * The model portfolio onto the positions: its groups of equivalent instruments become ONE
+ * position that buys the group's buyer (a position keeps its id when it already was that group), then
+ * the weights (`applyWeightsToPositions`). A group whose members sit in a position that reaches outside
+ * the group is left to the per-instrument weights: it never splits a position the user built.
+ */
+export function applyModelToPositions(
+  positions: PlanPosition[],
+  model: ModelPortfolio,
+  soldAssetIds: Set<string>,
+  labelOf: (assetId: string) => string,
+  generateId: () => string = () => crypto.randomUUID()
+): PlanPosition[] {
+  let next = positions;
+  for (const group of modelGroups(model.weights)) {
+    const members = new Set(group.memberAssetIds);
+    const overlapping = next.filter((position) => position.memberAssetIds.some((id) => members.has(id)));
+    if (overlapping.length === 0 || overlapping.some((position) => position.memberAssetIds.some((id) => !members.has(id)))) continue;
+    const first = next.indexOf(overlapping[0]);
+    const kept = overlapping.find((position) => position.buyAssetId === group.buyAssetId);
+    const grouped: PlanPosition = {
+      id: kept?.id ?? generateId(),
+      label: kept?.label ?? labelOf(group.buyAssetId),
+      targetPercentage: 0,
+      memberAssetIds: orderGroupMembers({ memberAssetIds: group.memberAssetIds, buyAssetId: group.buyAssetId }),
+      buyAssetId: group.buyAssetId,
+    };
+    next = next.flatMap((position, index) => (index === first ? [grouped] : overlapping.includes(position) ? [] : [position]));
+  }
+  return applyWeightsToPositions(next, modelWeightMap(model), soldAssetIds, labelOf, generateId);
+}
+
+/** The model portfolio as a per-instrument weight map (candidates at 0 are left out). */
+export function modelWeightMap(model: ModelPortfolio): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const weight of model.weights) if (weight.targetPercentage > 0) map[weight.assetId] = weight.targetPercentage;
+  return map;
 }
 
 /**
@@ -1324,8 +1385,8 @@ export function installmentLineLabel(
 }
 
 /**
- * the instruments of an open plan — also those at 0 shares (a plan can buy an instrument
- * nobody holds yet).
+ * the instruments of an open plan, for the optimizers' «to evaluate» set — also those at 0 shares
+ * (a plan can buy an instrument nobody holds yet), which a model portfolio may not carry.
  */
 export function planMemberAssetIds(plan: Pick<AccumulationPlan, 'positions'> | null | undefined): Set<string> {
   return new Set((plan?.positions ?? []).flatMap((position) => position.memberAssetIds));

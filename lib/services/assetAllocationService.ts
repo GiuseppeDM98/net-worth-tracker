@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc, deleteField } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
-import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, AllocationData } from '@/types/assets';
+import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, IdealAllocationSettings, AllocationResult, AllocationData } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { expandAssetExposure } from '@/lib/utils/assetExposureUtils';
 import { calculateFormulaEquityPercentage } from '@/lib/utils/equityBondsAutoTargets';
@@ -53,6 +53,39 @@ function serializeFamilyMembers(
       : {}),
     ...(member.firstEmploymentYear !== undefined ? { firstEmploymentYear: member.firstEmploymentYear } : {}),
   }));
+}
+
+/**
+ * Whitelisting serializer for `idealAllocation`: Firestore rejects `undefined` inside an array
+ * element, and `instrumentLimits[].minPct/maxPct` are optional, so each entry is rebuilt with a
+ * conditional spread rather than copied as-is (same pattern as `serializeFamilyMembers` above).
+ */
+function serializeIdealAllocation(
+  settings: IdealAllocationSettings | undefined
+): IdealAllocationSettings | undefined {
+  if (!settings) return settings;
+
+  return {
+    enabled: settings.enabled,
+    classPriority: settings.classPriority,
+    leveragePriority: settings.leveragePriority,
+    factorObjectives: settings.factorObjectives.map((objective) => ({
+      assetClass: objective.assetClass,
+      priority: objective.priority,
+    })),
+    instrumentLimits: settings.instrumentLimits.map((limit) => ({
+      assetId: limit.assetId,
+      ...(limit.minPct !== undefined ? { minPct: limit.minPct } : {}),
+      ...(limit.maxPct !== undefined ? { maxPct: limit.maxPct } : {}),
+    })),
+    groupLimits: settings.groupLimits.map((group) => ({
+      id: group.id,
+      label: group.label,
+      assetIds: group.assetIds,
+      maxPct: group.maxPct,
+      priority: group.priority,
+    })),
+  };
 }
 
 /** Firestore refuses `undefined` inside an array element: a default without a subcategory omits the key. */
@@ -140,6 +173,7 @@ export async function getSettings(
       performanceIncludesExcludedAssets: data.performanceIncludesExcludedAssets,
       performanceExcludesCash: data.performanceExcludesCash,
       pensionReturnStartMonth: data.pensionReturnStartMonth,
+      idealAllocation: data.idealAllocation,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -394,6 +428,15 @@ export async function setSettings(
           delete docData.pensionReturnStartMonth;
         }
       }
+      // The model portfolio's criteria: this branch writes WITHOUT merge, so a caller that omits the
+      // key must not have it silently dropped from the rebuilt document.
+      if ('idealAllocation' in settings) {
+        if (settings.idealAllocation !== undefined) {
+          docData.idealAllocation = serializeIdealAllocation(settings.idealAllocation);
+        } else {
+          delete docData.idealAllocation;
+        }
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -579,6 +622,14 @@ export async function setSettings(
         docData.pensionReturnStartMonth =
           settings.pensionReturnStartMonth !== undefined
             ? settings.pensionReturnStartMonth
+            : deleteField();
+      }
+      // Same shape as pensionReturnStartMonth above — this branch merges, so omitting the key
+      // would leave a stale idealAllocation in place; an explicit deleteField() is required.
+      if ('idealAllocation' in settings) {
+        docData.idealAllocation =
+          settings.idealAllocation !== undefined
+            ? serializeIdealAllocation(settings.idealAllocation)
             : deleteField();
       }
 

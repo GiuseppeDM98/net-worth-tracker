@@ -1,9 +1,12 @@
 /**
- * Accumulo's pure sentences: the empty-state preview with the suggested inflow, the Questo mese aside /
- * match note / reserve footer.
+ * Accumulo's pure sentences: the model written by hand starts from what is held, the empty-state preview
+ * with the suggested inflow, the model tile's sentences and the Questo mese aside / match note / reserve footer.
  */
 import { describe, it, expect } from 'vitest';
+import type { Asset } from '@/types/assets';
 import { redistributeRemainder } from '@/lib/utils/accumulationPlanUtils';
+import { seedModelFromToday } from '@/lib/utils/modelPortfolio';
+import { describeModelOrigin, describeModelSalesHint } from '@/lib/utils/weightOptimizerNarrative';
 import {
   describeAccumuloPreview,
   describeAccumuloIntro,
@@ -22,6 +25,51 @@ import {
 import { narrativeToText } from '@/lib/utils/narrative';
 
 const flat = (text: string) => text.replace(/[  ]/g, ' ');
+
+function asset(id: string, overrides: Partial<Asset> = {}): Asset {
+  return { id, name: id, ticker: id, type: 'etf', assetClass: 'equity', quantity: 1, currentPrice: 100, ...overrides } as Asset;
+}
+const valueOf = (a: Asset) => a.quantity * (a.currentPrice ?? 0);
+
+describe('seedModelFromToday', () => {
+  it('weights the held tradable instruments by value, Σ = 100, leaving out accounts, frozen and empty ones', () => {
+    const weights = seedModelFromToday(
+      [
+        asset('A', { quantity: 3 }),
+        asset('B', { quantity: 1 }),
+        asset('EMPTY', { quantity: 0 }),
+        asset('FROZEN', { allocationRole: 'frozen' } as Partial<Asset>),
+        asset('CONTO', { type: 'cash', assetClass: 'cash' }),
+      ],
+      valueOf,
+    );
+    expect(weights).toEqual([
+      { assetId: 'A', targetPercentage: 75 },
+      { assetId: 'B', targetPercentage: 25 },
+    ]);
+  });
+
+  it('is empty when nothing tradable is held', () => {
+    expect(seedModelFromToday([asset('CONTO', { type: 'cash', assetClass: 'cash' })], valueOf)).toEqual([]);
+  });
+});
+
+describe('model tile sentences', () => {
+  it('names who stays above the model', () => {
+    expect(describeModelSalesHint(['ETF-A', 'ETF-B', 'ETF-C'])).toBe('Senza vendere, ETF-A, ETF-B e ETF-C restano sopra il modello.');
+    expect(describeModelSalesHint(['ETF-C'])).toContain('ETF-C resta sopra il modello.');
+  });
+  it('says nothing when nobody is above the model', () => {
+    expect(describeModelSalesHint([])).toBeNull();
+  });
+  it('names the mode and the manual change of a model that started from a calculation', () => {
+    const snapshot = { computedAt: new Date('2026-10-02T12:00:00'), mode: 'reachable' as const };
+    const updatedAt = new Date('2026-10-05T12:00:00');
+    expect(describeModelOrigin('optimizer', updatedAt, snapshot)).toBe("Proposto dall'ottimizzatore il 02/10/2026 (Raggiungibile col PAC).");
+    expect(describeModelOrigin('manual', updatedAt, snapshot)).toBe("Proposto dall'ottimizzatore il 02/10/2026 (Raggiungibile col PAC), poi cambiato a mano.");
+    expect(describeModelOrigin('manual', updatedAt)).toBe('Scritto a mano il 05/10/2026.');
+  });
+});
 
 describe('describeAccumuloPreview', () => {
   // The reason names the reserve actually used, the allocation's cash quota (2026-11-17). Seen red with 10.000 € fixed.

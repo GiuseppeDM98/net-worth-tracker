@@ -672,66 +672,66 @@
     },
     "impostazioni": {
       "390": {
-        "screens": 2.1,
+        "screens": 2.27,
         "tilesAboveFold": 2,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 2,
         "figuresOutsideVerdict": 2,
         "firstClosedRowAbovePill": null,
         "overflowX": false,
-        "raisedBy": "2026-10-10: pill a 44 px"
+        "raisedBy": "2026-11-17: la tessera in sola lettura «Criteri del modello» in fondo alla scheda Allocazione (il portafoglio modello, branch feat/portafoglio-modello; proprietario, 2026-11-17: registrata come misurata), la prima schermata identica; 2026-10-10: pill a 44 px"
       },
       "768": {
-        "screens": 1.38,
+        "screens": 1.5,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 2,
         "figuresAboveFold": 4,
         "figuresOutsideVerdict": 4,
         "firstClosedRowAbovePill": null,
         "overflowX": false,
-        "raisedBy": "2026-10-15: la macchina di riferimento è cambiata (il budget ne ha una sola): il budget era stato stretto sull'altra, che misura qualche centesimo in meno; la pill a 44 px dal 2026-10-10"
+        "raisedBy": "2026-11-17: la tessera in sola lettura «Criteri del modello» in fondo alla scheda Allocazione (il portafoglio modello, branch feat/portafoglio-modello; proprietario, 2026-11-17: registrata come misurata), la prima schermata identica; 2026-10-15: la macchina di riferimento è cambiata (il budget ne ha una sola): il budget era stato stretto sull'altra, che misura qualche centesimo in meno; la pill a 44 px dal 2026-10-10"
       },
       "1024": {
-        "screens": 1.56,
+        "screens": 1.75,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 2,
         "figuresAboveFold": 4,
         "figuresOutsideVerdict": 4,
         "firstClosedRowAbovePill": null,
         "overflowX": false,
-        "raisedBy": "2026-10-15: la macchina di riferimento è cambiata (il budget ne ha una sola): il budget era stato stretto sull'altra, che misura qualche centesimo in meno; la pill a 44 px dal 2026-10-10"
+        "raisedBy": "2026-11-17: la tessera in sola lettura «Criteri del modello» in fondo alla scheda Allocazione (il portafoglio modello, branch feat/portafoglio-modello; proprietario, 2026-11-17: registrata come misurata), la prima schermata identica; 2026-10-15: la macchina di riferimento è cambiata (il budget ne ha una sola): il budget era stato stretto sull'altra, che misura qualche centesimo in meno; la pill a 44 px dal 2026-10-10"
       }
     },
     "allocazione-accumulo": {
       "390": {
-        "screens": 1.56,
+        "screens": 1.72,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 11,
         "figuresOutsideVerdict": 7,
         "firstClosedRowAbovePill": false,
         "overflowX": false,
-        "raisedBy": "2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab; 2026-10-20: prima misura di Accumulo (piano attivo, nessun modello); l'unica riga chiusa (Classi del piano) sta sotto la pill perché Questo mese, la tessera aperta, occupa la prima schermata"
+        "raisedBy": "2026-11-17: le righe chiuse «Portafoglio modello» e «Criteri del modello» (il portafoglio modello, branch feat/portafoglio-modello, riregistrata come la spec chiede); cifre e prima riga chiusa invariate, le tessere sopra la piega crescono a 768 e 1024 perché le due righe stanno nell'indice; 2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab; 2026-10-20: prima misura di Accumulo (piano attivo, nessun modello); l'unica riga chiusa (Classi del piano) sta sotto la pill perché Questo mese, la tessera aperta, occupa la prima schermata"
       },
       "768": {
-        "screens": 1.21,
-        "tilesAboveFold": 2,
+        "screens": 1.27,
+        "tilesAboveFold": 3,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 13,
         "figuresOutsideVerdict": 10,
         "firstClosedRowAbovePill": false,
         "overflowX": false,
-        "raisedBy": "2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab; 2026-10-20: prima misura di Accumulo (piano attivo, nessun modello); l'unica riga chiusa (Classi del piano) sta sotto la pill perché Questo mese, la tessera aperta, occupa la prima schermata"
+        "raisedBy": "2026-11-17: le righe chiuse «Portafoglio modello» e «Criteri del modello» (il portafoglio modello, branch feat/portafoglio-modello, riregistrata come la spec chiede); cifre e prima riga chiusa invariate, le tessere sopra la piega crescono a 768 e 1024 perché le due righe stanno nell'indice; 2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab; 2026-10-20: prima misura di Accumulo (piano attivo, nessun modello); l'unica riga chiusa (Classi del piano) sta sotto la pill perché Questo mese, la tessera aperta, occupa la prima schermata"
       },
       "1024": {
         "screens": 1.27,
-        "tilesAboveFold": 2,
-        "tilesFullyAboveFold": 1,
+        "tilesAboveFold": 4,
+        "tilesFullyAboveFold": 3,
         "figuresAboveFold": 11,
         "figuresOutsideVerdict": 7,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab"
+        "raisedBy": "2026-11-17: le righe chiuse «Portafoglio modello» e «Criteri del modello» (il portafoglio modello, branch feat/portafoglio-modello, riregistrata come la spec chiede); cifre e prima riga chiusa invariate, le tessere sopra la piega crescono a 768 e 1024 perché le due righe stanno nell'indice; 2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab"
       }
     }
   }

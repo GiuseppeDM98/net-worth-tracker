@@ -15,6 +15,7 @@ import type {
   ClassMeasurement,
   Installment,
   InstallmentLine,
+  OptimizerSnapshot,
   PlanBaseline,
   PlanDisposal,
   PlanLiquidity,
@@ -70,6 +71,19 @@ function toPlanBaseline(data: Record<string, unknown> | undefined): PlanBaseline
   };
 }
 
+/** The optimizer's run a plan was seeded from, as stored with the plan. */
+function toOptimizerSnapshot(data: Record<string, unknown> | undefined): OptimizerSnapshot | undefined {
+  if (!data) return undefined;
+  return {
+    computedAt: toDate(data.computedAt as never),
+    mode: data.mode as OptimizerSnapshot['mode'],
+    settingsUsed: data.settingsUsed as OptimizerSnapshot['settingsUsed'],
+    weights: (data.weights ?? []) as OptimizerSnapshot['weights'],
+    objectives: (data.objectives ?? []) as OptimizerSnapshot['objectives'],
+    ...(Array.isArray(data.conflicts) ? { conflicts: data.conflicts as NonNullable<OptimizerSnapshot['conflicts']> } : {}),
+  };
+}
+
 /** A plan document as the domain type. */
 export function docToAccumulationPlan(id: string, data: Record<string, unknown>): AccumulationPlan {
   return {
@@ -85,6 +99,7 @@ export function docToAccumulationPlan(id: string, data: Record<string, unknown>)
     baseline: toPlanBaseline(data.baseline as Record<string, unknown> | undefined),
     installments: ((data.installments ?? []) as Record<string, unknown>[]).map(toInstallment),
     residualEur: data.residualEur as number | undefined,
+    optimizerSnapshot: toOptimizerSnapshot(data.optimizerSnapshot as Record<string, unknown> | undefined),
     revisions: toRevisions(data.revisions),
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),

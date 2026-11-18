@@ -63,7 +63,10 @@
    fixes to apply and in what order (through rule 5).
 
 8. **Dependencies: compare at session start, upgrade in a session of their own** (2026-10-26). If
-   the repo has a lockfile, the first thing a session does is run the package manager's audit
+   the repo has a lockfile, the first thing a session does is install from it with every server
+   stopped (`npm ci`; owner, 2026-11-17: the audit reads the lock, not what is installed, and
+   that morning Next 16.4.2 was still installed under a lock already at 16.4.6), then run the
+   package manager's audit
    (`npm audit --json`, `pnpm audit --json`, …) and compare it with `doc/guide/dipendenze.md`,
    which records the date of the last audit, the framework version and every open advisory with
    the owner's decision (accepted because dev-only, waiting for version X, to upgrade). The answer

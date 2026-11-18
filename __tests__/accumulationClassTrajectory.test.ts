@@ -22,6 +22,7 @@ import { compareAllocations } from '@/lib/services/assetAllocationService';
 import { DEFAULT_REBALANCE_BAND, bandForTarget, type RebalanceBand } from '@/lib/utils/allocationUtils';
 import {
   projectClassTrajectory,
+  onlyTargetedClasses,
   buildClassMeasurement,
   resolvePositionStates,
   computeUsableLiquidity,
@@ -130,6 +131,30 @@ describe('projectClassTrajectory — point 0 with currentIndex = 0', () => {
         data.currentPercentage,
         6
       );
+    }
+  });
+});
+
+// A class saved at 0% in Impostazioni — the house, the accounts — is not a direction of the plan: on the
+// collaudo of 2026-11-17 it filled the PAC panel («Immobili 78,6% → 0,0%») and squashed the chart (owner:
+// out of the panel and the chart). Seen red with the filter returning the points unchanged; the engine's own
+// trajectory keeps the cash class, which the money-conservation tests below read.
+describe('projectClassTrajectory — a class at 0% target', () => {
+  it('stays out of every point the views read, the targeted classes stay in', () => {
+    const equity = makeAsset({ id: 'equity1', assetClass: 'equity', quantity: 60 });
+    const house = makeAsset({ id: 'house1', type: 'realestate', assetClass: 'realestate', quantity: 300 });
+    const tgts = targets({ equity: 100, realestate: 0 });
+    const points = onlyTargetedClasses(projectClassTrajectory({
+      plan: basePlan(),
+      allAssets: [equity, house],
+      installments: [],
+      targets: tgts,
+      band: DEFAULT_REBALANCE_BAND,
+      compare: compareAllocations,
+      currentIndex: 0,
+    }));
+    for (const point of points) {
+      expect(Object.keys(point.byClass)).toEqual(['equity']);
     }
   });
 });

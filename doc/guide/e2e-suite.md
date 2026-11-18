@@ -104,7 +104,8 @@ whole run, on the Windows machine (8 logical cores, 31,5 GB, Playwright 1.62.1, 
   --env-local --fresh` serves it: the emulator variables first, then `.env.local` with Next's own `@next/env` (which
   never overrides them; without it the Consulente, a dynamic page, reads no key). **Two guards against a stale build**,
   both seen working that day: `--fresh` refuses a build whose stamp is not the tree's («The build in .next-e2e-build is
-  not the build of the code as it stands»), and on the build `reuseExistingServer` is off — a server already on :3100
+  not the build of the code as it stands» — a doc edited WHILE `test:e2e` builds changes the hash too, and the run
+  stops before its first test: touch nothing until the server is up, 2026-11-17), and on the build `reuseExistingServer` is off — a server already on :3100
   (a `dev:e2e`, the owner's other app) stops the run with Playwright's «already used» instead of being tested. The
   eleven chunk tests were rewritten on signatures that survive minification (doc/guide/e2e-playwright.md § What a page DOWNLOADS), green on
   both servers and each seen red with its mutation on both. `shell.boot`'s hydration checks pass on the build.

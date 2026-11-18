@@ -1,4 +1,7 @@
 import type { AssetClass } from './assets';
+import type { OptimizerSnapshot } from './optimizer';
+
+export type { OptimizerSnapshot } from './optimizer';
 
 export type AccumulationPlanStatus = 'draft' | 'active' | 'completed' | 'cancelled';
 export type InstallmentLineStatus = 'planned' | 'executed' | 'skipped';
@@ -79,6 +82,13 @@ export interface PlanBaseline {
   measurement: ClassMeasurement;             // month 0 of the trajectory
 }
 
+/** What a caller hands the editor to start a NEW plan from: the model's dialog today, the Consulente tomorrow. */
+export interface PlanSeedDraft {
+  positions: PlanPosition[];
+  disposals?: PlanDisposal[];
+  optimizerSnapshot?: OptimizerSnapshot;
+}
+
 export interface AccumulationPlan {
   id: string;
   userId: string;               // ownerId (shared-account convention)
@@ -92,6 +102,7 @@ export interface AccumulationPlan {
   baseline?: PlanBaseline;      // present from 'active'
   installments: Installment[];  // empty in 'draft', the calendar from 'active'
   residualEur?: number;         // planned leftover after the last month (< one share)
+  optimizerSnapshot?: OptimizerSnapshot;
   revisions?: PlanRevision[];
   createdAt: Date;
   updatedAt: Date;
@@ -114,5 +125,5 @@ export interface PacVerdictInput {
 /** Draft input edited by the dialog (no system fields). */
 export type AccumulationPlanDraft = Pick<
   AccumulationPlan,
-  'name' | 'startMonth' | 'months' | 'liquidity' | 'positions' | 'disposals'
+  'name' | 'startMonth' | 'months' | 'liquidity' | 'positions' | 'disposals' | 'optimizerSnapshot'
 >;

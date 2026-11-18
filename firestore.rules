@@ -169,6 +169,13 @@ service cloud.firestore {
       allow delete: if canAccess(ownerUid);
     }
 
+    // Portafoglio modello (doc id = ownerUid)
+    match /modelPortfolios/{ownerUid} {
+      allow read: if canAccess(ownerUid);
+      allow create, update: if canAccess(ownerUid) && request.resource.data.userId == ownerUid;
+      allow delete: if canAccess(ownerUid);
+    }
+
     // Collezione hall-of-fame - ranking dell'account (doc id = ownerUid)
     match /hall-of-fame/{userId} {
       // Lettura: proprietario o membro delegato

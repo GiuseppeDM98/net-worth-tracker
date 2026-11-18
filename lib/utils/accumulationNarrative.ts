@@ -630,15 +630,19 @@ export const ACCUMULO_STEP2_TOGGLE_SELL = 'Vendi';
 export const ACCUMULO_STEP2_SELL_SHARES = 'Vendi quote';
 export const ACCUMULO_STEP2_ALREADY_SELLING = 'già in vendita';
 export const ACCUMULO_STEP2_FROM_LABEL = 'Parti da';
+export const ACCUMULO_STEP2_FROM_MODEL = 'Portafoglio modello';
 export const ACCUMULO_STEP2_FROM_PLAN = 'Piano attuale';
 /** One line under «Parti da»: what the active source put in the Target column. «Oggi» is the share
  *  among the plan's instruments, so «Pesi di oggi» reads as target = oggi. */
-export const ACCUMULO_STEP2_FROM_HINT: Record<'plan' | 'today', string> = {
+export const ACCUMULO_STEP2_FROM_HINT: Record<'plan' | 'model' | 'today' | 'optimizer', string> = {
   plan: 'I pesi salvati nel piano, com’erano quando l’hai aperto.',
+  model: 'I pesi del portafoglio modello.',
   today: 'Target = Oggi: i nuovi soldi mantengono le proporzioni di adesso tra gli strumenti del piano.',
+  optimizer: 'I pesi che l’ottimizzatore propone dai criteri del modello.',
 };
 export const ACCUMULO_STEP2_FROM_TODAY = 'Pesi di oggi';
 export const ACCUMULO_STEP2_REDISTRIBUTE = 'Distribuisci il resto';
+export const ACCUMULO_STEP2_FROM_OPTIMIZER = 'Ricalcola';
 export const ACCUMULO_ACTION_GROUP_PROXY = 'Raggruppa due strumenti';
 export const ACCUMULO_ACTION_GROUP_CANCEL = 'Annulla raggruppamento';
 export const ACCUMULO_STEP2_GROUP_NO_BUY = 'non riceve acquisti';
@@ -689,7 +693,18 @@ export function describeWeightsTotal(sum: number): string {
 export const ACCUMULO_STEP3_COL_MONTH = 'Mese';
 export const ACCUMULO_STEP3_COL_TOTAL = 'Totale €';
 export const ACCUMULO_STEP3_SECTION_WEIGHTS = 'Pesi a fine piano';
+/** Step 3 writes the plan's weights into the model portfolio in the same action. */
+export const ACCUMULO_STEP3_UPDATE_MODEL = 'Aggiorna anche il portafoglio modello';
 export const ACCUMULO_ACTION_CLOSE_EDITOR = 'Chiudi';
+/** The plan is written, the model's write failed — the error row says both. */
+export function describeModelWriteAfterPlan(reason: string): string {
+  return `Il piano è salvato, ma il portafoglio modello non si è aggiornato: ${reason}`;
+}
+/** The plan and the model no longer say the same (the row in Questo mese). */
+export function describePlanModelDivergence(count: number): string {
+  return `Il piano differisce dal portafoglio modello su ${count} strument${count === 1 ? 'o' : 'i'}.`;
+}
+export const ACCUMULO_ACTION_REVIEW_FROM_MODEL = 'Rivedi dal modello';
 export const ACCUMULO_STEP3_SECTION_EXPOSURE = 'Esposizione implicita';
 export const ACCUMULO_STEP3_SECTION_CLASSES = 'Classi mese per mese';
 export const ACCUMULO_ELLIPSIS = '…';
@@ -937,7 +952,7 @@ export function describeDriftReading(
 
 export type AccumuloVerdictInput =
   /** `reserveEur` is kept on the accounts; `otherCashEur` is the cash class outside them (a money-market fund). */
-  | { state: 'none'; sourceCashEur: number; reserveEur: number; otherCashEur?: number }
+  | { state: 'none'; sourceCashEur: number; reserveEur: number; otherCashEur?: number; hasModel: boolean }
   | { state: 'draft'; months: number; monthlyEur: number; startMonth: MonthKey }
   /** Active, before its first month (2026-11-12): nothing to buy yet. `todayYear` is the Italian year of today. */
   | { state: 'scheduled'; startMonth: MonthKey; firstMonth: MonthKey; firstInstalmentEur: number; lineCount: number; months: number; todayYear: number }
@@ -978,18 +993,19 @@ function cutAtFirstSentence(sentence: Narrative, restLabel: string | null): Pick
 /** The Accumulo tab's verdict: one headline, one sentence, a tone. */
 export function describeAccumuloVerdict(input: AccumuloVerdictInput): PageVerdictModel {
   if (input.state === 'none') {
+    const target = input.hasModel ? 'verso il portafoglio modello' : 'verso i pesi che scegli';
     // The allocation's cash quota is not spendable (owner, 2026-11-17): the sentence names what is beyond it.
     // The figures printed are the whole cash class and the quota; the difference is the same on the accounts.
     const beyondEur = input.sourceCashEur - input.reserveEur;
     const other = input.otherCashEur ?? 0;
     const sentence: Narrative =
       input.sourceCashEur <= 0.005
-        ? [{ text: `Non hai liquidità nei conti: un piano la spende in rate mensili verso i pesi che scegli.` }]
+        ? [{ text: `Non hai liquidità nei conti: un piano la spende in rate mensili ${target}.` }]
         : input.reserveEur <= 0
           ? [
               { text: 'Nei conti di liquidità hai ' },
               mono(cachedFormatCurrencyEUR(input.sourceCashEur, true)),
-              { text: `: un piano li spende in rate mensili verso i pesi che scegli.` },
+              { text: `: un piano li spende in rate mensili ${target}.` },
             ]
           : beyondEur > 0.005
             ? [
@@ -997,7 +1013,7 @@ export function describeAccumuloVerdict(input: AccumuloVerdictInput): PageVerdic
                 mono(cachedFormatCurrencyEUR(input.reserveEur + other, true)),
                 { text: '), nella liquidità hai ' },
                 mono(cachedFormatCurrencyEUR(beyondEur, true)),
-                { text: `: un piano li spende in rate mensili verso i pesi che scegli.` },
+                { text: `: un piano li spende in rate mensili ${target}.` },
               ]
             : [
                 ...withinQuotaHead(input.sourceCashEur + other, input.reserveEur + other),
@@ -1092,15 +1108,16 @@ export const ACCUMULO_EMPTY_DOESNT: readonly string[] = [
   'Non vende gli strumenti del piano per ribilanciare: per quello c’è Ribilancia.',
   'Non manda ordini al broker e non conta le commissioni.',
   'Un piano alla volta, al massimo 60 mesi.',
-  'Non sceglie strumenti che non hai indicato: puoi aggiungerli tu, anche senza quote.',
+  'Non sceglie strumenti che non hai indicato: puoi aggiungerli da valutare.',
 ];
 export const ACCUMULO_EMPTY_PREVIEW_TITLE = 'Anteprima sui tuoi numeri';
 export const ACCUMULO_EMPTY_ASIDE = 'nessun piano aperto';
 export const ACCUMULO_EMPTY_PREVIEW_CLASSES = 'oggi → a fine piano';
+export const ACCUMULO_ACTION_OPEN_MODEL = 'Apri il portafoglio modello';
 
 /** «12 rate da 3208 € con 10.000 € di riserva, dai pesi di oggi.» — or why there is nothing to show. */
 export function describeAccumuloPreview(
-  preview: { months: number; reserveEur: number; monthlyEur: number; inflowEur?: number } | null,
+  preview: { months: number; reserveEur: number; monthlyEur: number; inflowEur?: number; weightsFrom?: 'today' | 'model' } | null,
   /** The reserve the preview used (the allocation's cash quota): named when there is no preview. */
   reserveEur = 0,
 ): Narrative {
@@ -1119,7 +1136,7 @@ export function describeAccumuloPreview(
     { text: cachedFormatCurrencyEUR(preview.monthlyEur, true), mono: true },
     { text: ' con ' },
     { text: cachedFormatCurrencyEUR(preview.reserveEur, true), mono: true },
-    { text: ` di riserva, dai pesi di oggi` },
+    { text: ` di riserva, ${preview.weightsFrom === 'model' ? 'dal portafoglio modello' : 'dai pesi di oggi'}` },
     ...((preview.inflowEur ?? 0) > 0
       ? ([{ text: ' e ' }, { text: cachedFormatCurrencyEUR(preview.inflowEur as number, true), mono: true }, { text: ' al mese di entrate.' }] as Narrative)
       : ([{ text: ' e senza entrate mensili.' }] as Narrative)),
@@ -1145,7 +1162,7 @@ function withinQuotaHead(cashEur: number, quotaEur: number): Narrative {
  * `context` reads the case with no preview (nothing would be bought in the preview's months).
  */
 export function describeAccumuloIntro(
-  preview: { cashEur: number; reserveEur: number; refillMonths?: number; otherCashEur?: number } | null,
+  preview: { cashEur: number; reserveEur: number; refillMonths?: number; otherCashEur?: number; weightsFrom?: 'today' | 'model' } | null,
   context?: { reserveEur: number; cashEur: number; inflowEur: number; otherCashEur?: number },
 ): Narrative {
   if (!preview) {
@@ -1166,6 +1183,7 @@ export function describeAccumuloIntro(
     return describeAccumuloPreview(null, (context?.reserveEur ?? 0) + otherCtx);
   }
   const other = preview.otherCashEur ?? 0;
+  const toward = preview.weightsFrom === 'model' ? 'verso il portafoglio modello' : 'verso i pesi di oggi';
   if (preview.reserveEur > 0 && preview.cashEur - preview.reserveEur <= 0.005) {
     const refill = preview.refillMonths ?? 0;
     return [
@@ -1173,7 +1191,7 @@ export function describeAccumuloIntro(
       {
         text:
           (refill > 0 ? (refill === 1 ? 'le entrate del primo mese' : 'le entrate dei primi ' + refill + ' mesi') + ' la riportano alla quota, poi ' : '') +
-          'un piano di accumulo investe il resto verso i pesi di oggi, a quote intere, e ti dice ogni mese cosa comprare.',
+          'un piano di accumulo investe il resto ' + toward + ', a quote intere, e ti dice ogni mese cosa comprare.',
       },
     ];
   }
@@ -1183,14 +1201,14 @@ export function describeAccumuloIntro(
       { text: cachedFormatCurrencyEUR(preview.reserveEur + other, true), mono: true },
       { text: ') hai ' },
       { text: cachedFormatCurrencyEUR(preview.cashEur - preview.reserveEur, true), mono: true },
-      { text: `. Un piano di accumulo li spende in rate mensili verso i pesi di oggi, a quote intere, e ti dice ogni mese cosa comprare.` },
+      { text: `. Un piano di accumulo li spende in rate mensili ${toward}, a quote intere, e ti dice ogni mese cosa comprare.` },
     ];
   }
   return [
     { text: 'Nei conti di liquidità hai ' },
     { text: cachedFormatCurrencyEUR(preview.cashEur, true), mono: true },
     {
-      text: `. Un piano di accumulo li spende in rate mensili verso i pesi di oggi, a quote intere, e ti dice ogni mese cosa comprare.`,
+      text: `. Un piano di accumulo li spende in rate mensili ${toward}, a quote intere, e ti dice ogni mese cosa comprare.`,
     },
   ];
 }
@@ -1311,7 +1329,7 @@ export function describeWeightsSum(weightsSum: number): string {
 export const ACCUMULO_USE_SUGGESTED_INFLOW = 'Usa';
 
 // ─────────────────────────────────────────────────────────────────────────
-// La composizione sul telefono (2026-10-18;)
+// La composizione sul telefono
 // ─────────────────────────────────────────────────────────────────────────
 
 /**
@@ -1321,21 +1339,34 @@ export const ACCUMULO_USE_SUGGESTED_INFLOW = 'Usa';
  */
 export const ACCUMULO_SECTION_IDS = {
   mese: 'acc-mese',
+  modello: 'acc-modello',
   classi: 'acc-classi',
+  criteri: 'acc-criteri',
   conclusi: 'acc-conclusi',
 } as const;
 
 /** What a CLOSED row says beside its eyebrow: words, never a figure (The Closed-Row Rule). */
 export const ACCUMULO_CLOSED_ASIDES = {
+  [ACCUMULO_SECTION_IDS.modello]: 'pesi per strumento',
   [ACCUMULO_SECTION_IDS.classi]: 'scostamento mese per mese',
+  [ACCUMULO_SECTION_IDS.criteri]: 'cosa chiedi al modello',
   [ACCUMULO_SECTION_IDS.conclusi]: 'piani chiusi e interrotti',
 } as const;
 
+/** The Portafoglio modello row with no saved model says so beside its eyebrow instead of the usual words. */
+export const ACCUMULO_MODEL_MISSING_ASIDE = 'nessun modello salvato';
+
 export interface AccumuloClosedAnswersInput {
+  /** `comparePlanToModel(...).count` with an active plan and a saved model; `null` otherwise. */
+  modelDifferenceCount: number | null;
+  /** The saved model rests on another basis: its row keeps the words «superato». Absent = fresh. */
+  modelStale?: boolean;
   /** `selectClassStripRows(...)` at the cursor's month, `[]` without a trajectory. */
   classRows: { outOfBandNow: boolean; reentryMonth?: MonthKey | 'baseline' }[];
   /** The plan's first month: where a `baseline` re-entry reads. */
   planStartMonth: MonthKey | null;
+  /** The number of criteria the saved objectives ask the model, `0` when off. */
+  criteriaCount: number;
   /** The most recently closed plan's last month, `null` without a closed plan. */
   lastClosedMonth: MonthKey | null;
 }
@@ -1352,7 +1383,12 @@ export function describeAccumuloClosedAnswers(input: AccumuloClosedAnswersInput)
     ? outNow.map((row) => (row.reentryMonth === 'baseline' ? input.planStartMonth : (row.reentryMonth as MonthKey))).filter((month): month is MonthKey => !!month).sort().pop()
     : undefined;
   return {
+    [ACCUMULO_SECTION_IDS.modello]:
+      input.modelDifferenceCount === null || input.modelStale
+        ? null
+        : [{ text: input.modelDifferenceCount === 0 ? 'allineato al piano' : `differisce su ${input.modelDifferenceCount} ${input.modelDifferenceCount === 1 ? 'strumento' : 'strumenti'}` }],
     [ACCUMULO_SECTION_IDS.classi]: lastReentry ? [{ text: `rientro a ${monthLabelLong(lastReentry, false)}` }] : null,
+    [ACCUMULO_SECTION_IDS.criteri]: input.criteriaCount > 0 ? [{ text: `${input.criteriaCount} ${input.criteriaCount === 1 ? 'criterio' : 'criteri'}` }] : null,
     [ACCUMULO_SECTION_IDS.conclusi]: input.lastClosedMonth ? [{ text: `ultimo a ${monthLabelLong(input.lastClosedMonth, false)}` }] : null,
   };
 }

@@ -6,7 +6,7 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Impostazioni**: `app/dashboard/settings/page.tsx` (the orchestrator, under 500 lines since 2026-10-08: the draft's `useReducer`, the observed read, the one «Salva», the bar, the tab), the six views `components/settings/tabs/{Generale,Allocazione,Spese,Dividendi,Condivisione,Aspetto}Tab.tsx` (+ `shared.tsx`: `SettingsTabPanel`, `DeclarationRow`, `runGuarded`, `INTERACTIVE_CONTROL_CLASS`; `CategoryRow` lives in `SpeseTab`, `SyncDividendsButton` in `DividendiTab`, the theme swatches in `AspettoTab`), `components/settings/allocation/{AllocationClassEditor,SubTargetEditor}.tsx`, `components/settings/{ExpenseImportSection,AccountSharingSection}.tsx`, pure `lib/utils/settingsDraft.ts` (the reducer, `sliceSettings`, `composeSettingsDocument`, `isSliceDirty`, `revealTargetProblem`, `targetFieldId`, `SETTINGS_CLASS_ORDER`) and `lib/utils/{settingsNarrative,spendingRoles,equityBondsAutoTargets,allocationTargetValidation}.ts`, `lib/services/assetAllocationService.ts` (`getSettings`/`setSettings`, the FIVE places); browser `e2e/settings{,.mobile,.roles,.draft}.spec.ts`
+- **Impostazioni**: `app/dashboard/settings/page.tsx` (the orchestrator, under 500 lines since 2026-10-08: the draft's `useReducer`, the observed read, the one «Salva», the bar, the tab), the six views `components/settings/tabs/{Generale,Allocazione,Spese,Dividendi,Condivisione,Aspetto}Tab.tsx` (+ `shared.tsx`: `SettingsTabPanel`, `DeclarationRow`, `runGuarded` re-exported from `lib/utils/runGuarded.ts`, `INTERACTIVE_CONTROL_CLASS`; `CategoryRow` lives in `SpeseTab`, `SyncDividendsButton` in `DividendiTab`, the theme swatches in `AspettoTab`), `components/settings/allocation/{AllocationClassEditor,SubTargetEditor}.tsx`, `components/settings/{ExpenseImportSection,AccountSharingSection}.tsx`, pure `lib/utils/settingsDraft.ts` (the reducer, `sliceSettings`, `composeSettingsDocument`, `isSliceDirty`, `revealTargetProblem`, `targetFieldId`, `SETTINGS_CLASS_ORDER`) and `lib/utils/{settingsNarrative,spendingRoles,equityBondsAutoTargets,allocationTargetValidation}.ts`, `lib/services/assetAllocationService.ts` (`getSettings`/`setSettings`, the FIVE places); browser `e2e/settings{,.mobile,.roles,.draft}.spec.ts`
 - **Suites to run after a change here — Impostazioni** (moved from `AGENTS.md` § Commands on 2026-09-30): **Bozza** `settingsDraft` (the identity `compose ∘ slice`, on the fixtures of `__tests__/fixtures/storedSettings.ts`) · **Letture** `settingsNarrative` · **Round-trip** `settingsRoundTrip` · **Formula** `equityBondsAutoTargets` · **Sblocco** `pensionUnlock` · and the compiler map `reactCompilerCoverage`
 
 ## Impostazioni — tessere senza verdetto (`app/dashboard/settings/page.tsx`, `lib/utils/settingsNarrative.ts`)
@@ -25,7 +25,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   second surface would be a second write path (see the Dividendi Save in § Settings — the FIVE places); the assistant's preferences live in its
   memory document (read and changed from the Assistente, its «⋯» menu → Preferenze, a modal since 2026-11-12) and the settings doc is a MIRROR THAT LOSES ON READ (`lib/server/assistant/store.ts` prefers the
   stored value), so an edit made here would be silently overwritten. A never-synced mirror prints no default — the
-  reading says where the truth lives instead.
+  reading says where the truth lives instead. «Criteri del modello» (`idealAllocation`, 2026-11-17) is the third: a
+  read-only summary on the Allocazione tab (`IdealAllocationSummary`) linking Allocazione › Accumulo, where the
+  criteria are edited; the field is carried through `composeSettingsDocument` untouched, its default from
+  `lib/constants/idealAllocation.ts` (doc/guide/ottimizzatore.md).
 - **The applicative default is named as a default**: «pensione INPS a 67 anni (predefinita)» — printing 67 like a saved
   choice tells the reader they decided something they did not. The RITA age is never derived here: it comes from
   `resolveRitaUnlockAge`, the app's one unlock rule.

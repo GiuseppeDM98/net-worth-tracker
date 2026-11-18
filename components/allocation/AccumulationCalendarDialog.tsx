@@ -16,7 +16,7 @@ import type { Asset, AssetAllocationTarget } from '@/types/assets';
 import type { AccumulationPlan, Installment, InstallmentLine } from '@/types/accumulationPlan';
 import { ASSET_CLASS_LABELS, type RebalanceBand } from '@/lib/utils/allocationUtils';
 import { compareAllocations } from '@/lib/services/assetAllocationService';
-import { installmentLineLabel, liveClassEntries, monthIndexOf, projectClassTrajectory, toMonthKey } from '@/lib/utils/accumulationPlanUtils';
+import { installmentLineLabel, liveClassEntries, monthIndexOf, onlyTargetedClasses, projectClassTrajectory, toMonthKey } from '@/lib/utils/accumulationPlanUtils';
 import { useSetInstallmentLine } from '@/lib/hooks/useAccumulationPlan';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
@@ -79,7 +79,7 @@ export function AccumulationCalendarDialog({ open, onClose, plan, ownerId, allAs
   const trajectory = useMemo(
     () =>
       open
-        ? projectClassTrajectory({
+        ? onlyTargetedClasses(projectClassTrajectory({
             plan,
             allAssets,
             installments: plan.installments,
@@ -87,7 +87,7 @@ export function AccumulationCalendarDialog({ open, onClose, plan, ownerId, allAs
             band,
             compare: compareAllocations,
             currentIndex,
-          })
+          }))
         : [],
     [open, plan, allAssets, targets, band, currentIndex],
   );

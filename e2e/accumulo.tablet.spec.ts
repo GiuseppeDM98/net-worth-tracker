@@ -2,7 +2,8 @@
  * Allocazione › Accumulo composta per un tablet (2026-10-18; doc/guide/accumulo.md § Composizione mobile):
  * un file, due progetti — `tablet` (768×1024) e `tablet-landscape` (1024×768) — che si ramifica sulla
  * larghezza, sull'account base con il fixture di `e2e/accumuloFixture.ts` (UN piano attivo, la terza
- * rata aperta). Una riga chiusa, Classi del piano; in orizzontale nell'indice accanto al verdetto e a Questo mese. Solo geometria: le parole sono dei file phone e di
+ * rata aperta). Tre righe chiuse — Portafoglio modello, Classi del piano, Criteri del modello (2026-11-17); in
+ * orizzontale nell'indice accanto al verdetto e a Questo mese. Solo geometria: le parole sono dei file phone e di
  * Vitest (`__tests__/tabletComposition.test.ts` tiene dove va ogni riga a 768 e l'aritmetica dello stage).
  *
  * LA tessera (Questo mese) è alta: non si asserisce che la prima riga chiusa stia sopra la piega (si
@@ -25,8 +26,10 @@ import {
 } from './tabletLayout';
 
 const LEAD_ID = 'acc-mese';
-/** The one row of an active plan with no closed plan. */
-const ROW_IDS = ['acc-classi'] as const;
+/** The rows of an active plan with no closed plan, in the DOM's order. */
+const ROW_IDS = ['acc-modello', 'acc-classi', 'acc-criteri'] as const;
+/** Without a plan only the model's two rows are left. */
+const NO_PLAN_ROW_IDS = ['acc-modello', 'acc-criteri'] as const;
 
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
 test.beforeAll(() => seedAccumuloFixture());
@@ -53,7 +56,7 @@ test.describe('Allocazione › Accumulo, composta per un tablet', () => {
       expect((await gridTracks(grid)).columns).toBe(2);
       const [gridRect, theTile] = await Promise.all([rectOf(grid), rectOf(lead(page))]);
       expect(Math.abs(theTile.width - gridRect.width), 'THE tile across the grid').toBeLessThanOrEqual(1);
-      // One closed row: no half-empty cell.
+      // The closed rows: no half-empty cell.
       await expectNoHalfCells(page, grid, ROW_IDS);
     }
     expect((await rectOf(lead(page))).y, 'THE tile starts above the fold').toBeLessThan(fold);
@@ -75,9 +78,9 @@ test.describe('Allocazione › Accumulo, composta per un tablet', () => {
   });
 
   // Senza un piano non c'è riga: niente «Il resto della pagina» e la griglia di prima, la tessera vuota per
-  // tutta la larghezza — in orizzontale non una colonna destra vuota (collaudo, 2026-11-17).
-  // Visto rosso con l'indice e lo stage disegnati anche senza righe.
-  test('senza un piano: nessun indice, la tessera vuota per tutta la larghezza', async ({ page }) => {
+  // tutta la larghezza — in orizzontale non una colonna destra vuota (collaudo, 2026-11-17). Dal portafoglio
+  // modello (2026-11-17) le sue due righe restano anche senza piano: l'indice c'è e ha soltanto quelle.
+  test('senza un piano: l\'indice ha solo le righe del modello, la tessera vuota parte dal verdetto', async ({ page }) => {
     await removeAccumuloFixture();
     try {
       await page.goto('/dashboard/allocation?tab=accumulo');
@@ -85,9 +88,10 @@ test.describe('Allocazione › Accumulo, composta per un tablet', () => {
       await expect(verdict).toBeVisible({ timeout: 60_000 });
       const empty = page.locator('[data-stage="lead"]');
       await expect(empty.getByRole('button', { name: 'Crea piano' })).toBeVisible();
-      await expect(page.getByText('Il resto della pagina')).toHaveCount(0);
-      const [main, tile, verdictRect] = await Promise.all([rectOf(page.locator('#page-main')), rectOf(empty), rectOf(verdict)]);
-      expect(tile.right, 'la tessera vuota arriva al bordo destro della pagina').toBeGreaterThan(main.right - 48);
+      const triggers = page.locator('main [id$="-trigger"]');
+      expect(await triggers.evaluateAll((els) => els.map((el) => el.id))).toEqual(NO_PLAN_ROW_IDS.map((id) => `${id}-trigger`));
+      if (isLandscape(page)) await expectLandscapeStage(page, page.locator('#page-main'), NO_PLAN_ROW_IDS);
+      const [tile, verdictRect] = await Promise.all([rectOf(empty), rectOf(verdict)]);
       expect(Math.abs(verdictRect.x - tile.x), 'la tessera parte dove parte il verdetto').toBeLessThanOrEqual(1);
     } finally {
       await seedAccumuloFixture();

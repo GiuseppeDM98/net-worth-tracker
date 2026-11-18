@@ -806,8 +806,11 @@ export default function AllocationPage() {
                 targets={targets}
                 band={band}
                 targetLeverageRatio={targetLeverageRatio}
+                idealAllocation={settings?.idealAllocation ?? null}
                 onAssetsChanged={retryLoad}
                 reviewByIso={reviewDue.state === 'none' ? null : reviewDue.reviewByIso}
+                settings={settings}
+                goals={goalData?.goals}
               />
             )}
           </TabsContent>

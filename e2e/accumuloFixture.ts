@@ -124,3 +124,88 @@ export async function removeAccumuloFixture(): Promise<void> {
   await remove(`accumulationPlans/${PLAN_ID}`);
   await remove(`accumulationPlanLocks/${OWNER}`);
 }
+
+// ─── The model portfolio's criteria and document (2026-11-17) ──────────────────────────────────────
+// «Ricalcola» stays off until the criteria are on, and the base account has none: a spec that needs it
+// switches them on in `beforeAll` and puts back what it read in `afterAll` (a spec that edits a document
+// another fixture writes restores it, doc/guide/e2e-playwright.md).
+
+const TARGETS_PATH = `assetAllocationTargets/${OWNER}`;
+const MODEL_PATH = `modelPortfolios/${OWNER}`;
+
+/** The criteria the specs switch on: the class targets essential, nothing else asked. */
+const CRITERIA = {
+  enabled: true,
+  classPriority: 'essential',
+  leveragePriority: 'high',
+  factorObjectives: [],
+  instrumentLimits: [],
+  groupLimits: [],
+};
+
+/** The stored `idealAllocation`, as the REST value it was read in; `null` when absent. */
+export type StoredCriteria = Json | null;
+
+async function patchMasked(path: string, field: string, value: Json | null): Promise<void> {
+  const body = value ? { fields: { [field]: value } } : { fields: {} };
+  const res = await fetch(`${FIRESTORE}/${path}?updateMask.fieldPaths=${field}`, { method: 'PATCH', headers: HEADERS, body: JSON.stringify(body) });
+  expect(res.ok, `${path}.${field}: ${res.status}`).toBe(true);
+}
+
+/** Switches the criteria on and returns what was stored before. */
+export async function plantCriteria(): Promise<StoredCriteria> {
+  const res = await fetch(`${FIRESTORE}/${TARGETS_PATH}`, { headers: HEADERS });
+  expect(res.ok, `${TARGETS_PATH}: ${res.status}`).toBe(true);
+  const doc = (await res.json()) as { fields?: Record<string, Json> };
+  const stored = doc.fields?.idealAllocation ?? null;
+  await patchMasked(TARGETS_PATH, 'idealAllocation', toValue(CRITERIA));
+  return stored;
+}
+
+/** Puts back the criteria `plantCriteria` read (absent → the field deleted) and removes the model. */
+export async function restoreCriteria(stored: StoredCriteria): Promise<void> {
+  await patchMasked(TARGETS_PATH, 'idealAllocation', stored);
+  await remove(MODEL_PATH);
+}
+
+/** Whether the stored criteria are on (`false` when absent). */
+export async function readCriteriaEnabled(): Promise<boolean> {
+  const res = await fetch(`${FIRESTORE}/${TARGETS_PATH}`, { headers: HEADERS });
+  const doc = (await res.json()) as { fields?: Record<string, { mapValue?: { fields?: Record<string, { booleanValue?: boolean }> } }> };
+  return doc.fields?.idealAllocation?.mapValue?.fields?.enabled?.booleanValue === true;
+}
+
+/** Writes a model portfolio with the given fingerprint. */
+export async function plantModel(fingerprint: string): Promise<void> {
+  await write(MODEL_PATH, {
+    userId: OWNER,
+    weights: [
+      { assetId: 'seed-vwce', targetPercentage: 70 },
+      { assetId: 'seed-btp', targetPercentage: 30 },
+    ],
+    origin: 'manual',
+    fingerprint,
+    updatedAt: new Date(),
+  });
+}
+
+/** The stored model's fingerprint and weights, or `null` without a model. */
+export async function readModel(): Promise<{ fingerprint: string | null; assetIds: string[]; sum: number } | null> {
+  const res = await fetch(`${FIRESTORE}/${MODEL_PATH}`, { headers: HEADERS });
+  if (res.status === 404) return null;
+  expect(res.ok, `${MODEL_PATH}: ${res.status}`).toBe(true);
+  type Value = { stringValue?: string; integerValue?: string; doubleValue?: number; mapValue?: { fields: Record<string, Value> }; arrayValue?: { values?: Value[] } };
+  const doc = (await res.json()) as { fields: Record<string, Value> };
+  const rows = (doc.fields.weights?.arrayValue?.values ?? []).map((row) => row.mapValue!.fields);
+  const pct = (v: Value | undefined) => Number(v?.integerValue ?? v?.doubleValue ?? 0);
+  return {
+    fingerprint: doc.fields.fingerprint?.stringValue ?? null,
+    assetIds: rows.map((row) => row.assetId?.stringValue ?? ''),
+    sum: rows.reduce((total, row) => total + pct(row.targetPercentage), 0),
+  };
+}
+
+/** Removes the model; safe when there is none. */
+export async function removeModel(): Promise<void> {
+  await remove(MODEL_PATH);
+}

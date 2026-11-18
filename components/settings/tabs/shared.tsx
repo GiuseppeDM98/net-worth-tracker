@@ -14,25 +14,7 @@ import { cn } from '@/lib/utils';
 import { formatPercentage } from '@/lib/services/chartService';
 import type { SettingsTabId } from '@/lib/utils/settingsDraft';
 
-/**
- * A try/catch/finally at module level, for the page's and the views' async handlers: the React
- * Compiler refuses a `finally`, a `throw` and any conditional expression inside a component's own
- * try block, and these handlers have all three. `work` is the try block (its `return` is the
- * handler's), `onError` the catch, `onSettled` the finally — same order, same propagation.
- */
-export async function runGuarded<T>(
-  work: () => Promise<T>,
-  onError: (error: unknown) => T,
-  onSettled?: () => void,
-): Promise<T> {
-  try {
-    return await work();
-  } catch (error) {
-    return onError(error);
-  } finally {
-    onSettled?.();
-  }
-}
+export { runGuarded } from '@/lib/utils/runGuarded';
 
 /** The `layoutId` of the page's tab pill — the panel ids derive from it. */
 export const SETTINGS_TABS_LAYOUT_ID = 'settings-tab-pill';

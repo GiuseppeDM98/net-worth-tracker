@@ -18,7 +18,7 @@
  * per row — max(current, target) × 1.12 — so the fill and the marker stay legible for a tiny
  * sleeve, with the headroom keeping the marker off the right edge.
  *
- * `projectedPercentage` (optional, the Accumulo tab's class strip) adds a THIRD fact: a hollow
+ * `projectedPercentage` (optional, the Accumulo tile's class strip) adds a THIRD fact: a hollow
  * ring where the plan leaves the class. Fill = today, hairline = target, ring = end of the plan —
  * the reader sees whether the plan closes the gap without reading two pp figures. The scale takes
  * it into account; without the prop the track is exactly the Per classe one.
@@ -30,16 +30,25 @@ import { cn } from '@/lib/utils';
 import { formatPercentage } from '@/lib/services/chartService';
 
 interface TargetTickProps {
-  /** The fill's colour; the theme's primary data hue by default. */
+  /** The fill's colour; the row's class colour, behind the theme's --allocation-row-bar. */
   color?: string;
   currentPercentage: number;
   targetPercentage: number;
   /** Where a plan leaves the class (end of the PAC); drawn as a hollow ring when given. */
   projectedPercentage?: number;
+  /** Replaces the percentage wording (a leverage objective reads in ×). */
+  ariaLabel?: string;
   className?: string;
 }
 
-export function TargetTick({ color = 'var(--chart-1)', currentPercentage, targetPercentage, projectedPercentage, className }: TargetTickProps) {
+export function TargetTick({
+  color = 'var(--allocation-row-bar, var(--chart-1))',
+  currentPercentage,
+  targetPercentage,
+  projectedPercentage,
+  ariaLabel,
+  className,
+}: TargetTickProps) {
   const reducedMotion = useReducedMotion();
 
   const scaleMax = Math.max(currentPercentage, targetPercentage, projectedPercentage ?? 0, 1) * 1.12;
@@ -50,15 +59,15 @@ export function TargetTick({ color = 'var(--chart-1)', currentPercentage, target
 
   return (
     <div
-      className={cn('relative h-[9px] w-full', className)}
+      className={cn('relative h-[10px] w-full', className)}
       role="progressbar"
       aria-valuenow={Math.round(currentPercentage)}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-label={`Allocazione corrente ${formatPercentage(currentPercentage, 1)}, target ${formatPercentage(targetPercentage, 0)}${projectedClause}`}
+      aria-label={ariaLabel ?? `Allocazione corrente ${formatPercentage(currentPercentage, 1)}, target ${formatPercentage(targetPercentage, 0)}${projectedClause}`}
     >
-      {/* The 3px track, centred in the 9px root so the marker has 3px on each side. */}
-      <div className="absolute inset-x-0 top-[3px] h-[3px] overflow-hidden rounded-full bg-muted">
+      {/* The 4px track, centred in the 10px root so the marker has 3px on each side. */}
+      <div className="absolute inset-x-0 top-[3px] h-1 overflow-hidden rounded-full bg-muted">
         <motion.div
           className="absolute inset-y-0 left-0 rounded-full"
           style={{
