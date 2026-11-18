@@ -51,9 +51,10 @@
    fixture, an E2E decoy or a seed carries amounts like 2500, 1120, 50: the owner's real data never
    enters the repo, not even as an expected value. If § 3 provides a copy of real data for the
    guided tour, it serves the tour only and phase G removes it.
-   **Nothing of the owner's real data in a tracked file** (2026-09-20, 2026-10-15): a draft, a
-   critique, a screenshot, a fixture or an example sentence takes invented figures and generic
-   names, never an amount, an account or a family detail copied from the real data. In a public
+   **Nothing of the owner's real data in a tracked file** (2026-09-20, 2026-10-15; code comments
+   too since 2026-11-15): a draft, a code comment, a critique, a screenshot, a fixture or an example sentence takes
+   invented figures and generic names, never an amount, a holding, an account, a date the data
+   starts or a family detail copied from the real data — «seen live» and the lesson, not the figure. In a public
    repo this has no exception. A private repo may waive it, or narrow it, only by saying so in § 3
    with the owner's decision and its date; public data that is not the owner's (a listed company's
    published accounts) is not the owner's data.
@@ -64,10 +65,8 @@
 
 8. **Dependencies: compare at session start, upgrade in a session of their own** (2026-10-26). If
    the repo has a lockfile, the first thing a session does is install from it with every server
-   stopped (`npm ci`; owner, 2026-11-17: the audit reads the lock, not what is installed, and
-   that morning Next 16.4.2 was still installed under a lock already at 16.4.6), then run the
-   package manager's audit
-   (`npm audit --json`, `pnpm audit --json`, …) and compare it with `doc/guide/dipendenze.md`,
+   stopped (`npm ci`, `pnpm install --frozen-lockfile`; 2026-11-17: the audit reads the lock, not
+   what is installed), then run the package manager's audit (`npm audit --json`, `pnpm audit --json`, …) and compare it with `doc/guide/dipendenze.md`,
    which records the date of the last audit, the framework version and every open advisory with
    the owner's decision (accepted because dev-only, waiting for version X, to upgrade). The answer
    is one line: «dipendenze: invariate dal <data>» or «N avvisi nuovi: …». A new advisory is
@@ -87,6 +86,12 @@
    line). The closing prompt writes every entry into its destination and deletes the file before
    the single commit; a note that names no destination is lost. A `SESSION_NOTES.md` still on the
    remote means a session was not closed.
+
+10. **The commit's «Model: … · effort …» line is read from the spec, never asked** (2026-11-18). A
+    session that implements a spec writes the model and the effort the spec names (its prompt, or its
+    row in the series index); the session that retires it writes the SAME pair as the implementation
+    (its commit's line, `git log`). The owner is asked only when there is no spec behind the session,
+    or when the session ran at a model or effort other than the spec's.
 
 ---
 
@@ -124,7 +129,9 @@ disappear. The verification is done together, in chat, one phase at a time.
    the OK and then walk the owner onto the dev server **with the fixtures still alive**: exact URLs,
    under which identity, and at most **five** things to look at — for each one, what must happen and
    what would be the bug. **The tour starts at the owner's go, not when the work is ready**
-   (2026-10-05): finish everything that needs no eyes, say it is ready, and wait. Where obligation 4
+   (2026-10-05): finish everything that needs no eyes, say it is ready, and wait. **A tour the spec
+   plans is always done, and before the commit** (2026-11-14): never offered as optional, never
+   traded for green tests, and never begun without the owner's go. Where obligation 4
    allows it, **open the page for the owner, already authenticated** — but one item per message and
    one page at a time, waiting for the outcome before opening the next; two pages together only
    when the item is a comparison (the same URL under two identities), saying which window is which.
@@ -145,16 +152,14 @@ headless screenshot of the same page. The message says «Comparison N of M», wh
 side is which; the window rules of obligation 5 apply (one item per message, closed and counted before
 the next).
 
-**A window ends by itself, and is closed by its tree** (2026-11-09, after sixteen collaudo scripts of two
-closed sessions were found alive hours later, about a hundred Chromium). The script that opens a visible
+**A window ends by itself, and is closed by its tree** (2026-11-09). The script that opens a visible
 browser for the owner exits when the owner closes the **page** — closing a driven window closes the page,
 not the browser, so `browser.on("disconnected")` alone never fires —, when the browser goes, or after a
 time limit; never an endless wait. The repo writes that wait **once**, in a helper the throwaway scripts
 import, never again in each script. And stopping the background task kills the shell, not the tree
 beneath it (`npx → tsx → node → Chromium`): a window is closed by its root with the whole tree, then the
 count says zero.
-**Once the owner confirms an item, the agent closes its windows** (2026-11-13, «after my confirmation of a
-test the windows of that case you close them yourself»): the owner never has to close a window to move on.
+**Once the owner confirms an item, the agent closes its windows** (2026-11-13): the owner never has to close a window to move on.
 The helper closes its browser on SIGTERM, so the agent stops it by its root, checks the count at zero and
 only then opens the next item; the owner closing a window by hand still ends the helper, never an error.
 
