@@ -288,16 +288,26 @@ test.describe('Panoramica, composed for a phone', () => {
     await openOverview(page);
     const first = cell(page, /^Questo mese/);
     await expect(first).toContainText(/\+123\.456,78\s?€/);
-    const cells = stripOf(page).getByRole('button');
-    // The count-up of the second row settles a frame apart (1,3–1,6 px, two full runs on 2026-10-16): read the
-    // boxes once the two cells share their line, and fail only if they never do.
+    // The page above the strip still settles after the figures show (1,3–1,6 px on 2026-10-16, 1,02 px on
+    // 2026-11-13, 0,36 px twice on 2026-11-18): separate boundingBox() calls read the cells in different frames,
+    // so two cells on one line read apart. The three boxes are read in ONE evaluate — one frame, one layout —
+    // and polled until the second row shares its line; the test fails only if it never does.
+    const readBoxes = () =>
+      stripOf(page).evaluate((list) =>
+        Array.from(list.querySelectorAll('button, [role="button"]'))
+          .slice(0, 3)
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            return { y: r.y, width: r.width, height: r.height };
+          }),
+      );
+    let boxes = await readBoxes();
     await expect
       .poll(async () => {
-        const [a, b] = await Promise.all([cells.nth(1).boundingBox(), cells.nth(2).boundingBox()]);
-        return a!.y === b!.y;
+        boxes = await readBoxes();
+        return boxes.length === 3 && boxes[1].y === boxes[2].y;
       })
       .toBe(true);
-    const boxes = await Promise.all([0, 1, 2].map((i) => cells.nth(i).boundingBox()));
     expect(boxes[0]!.width).toBeGreaterThan(boxes[1]!.width * 1.8);
     expect(boxes[1]!.y).toBeGreaterThan(boxes[0]!.y + boxes[0]!.height - 1);
     expect(boxes[1]!.y).toBe(boxes[2]!.y);

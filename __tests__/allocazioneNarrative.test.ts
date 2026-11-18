@@ -258,13 +258,15 @@ describe('describeAllocazioneHeader', () => {
 
   // The model portfolio and the plans' weights are read only on the Accumulo tab (2026-11-12): the page
   // header names the settings or the goals, never the model. Seen red with the union widened to
-  // 'model' | 'plan' (tsc on the line below) and with useModelPortfolio back on the page.
+  // 'model' | 'plan' (tsc on the line below) and with useModelPortfolio back on the page; the page check
+  // widened on 2026-11-18 to any «modelPortfolio» (the service, the save hook), seen red with
+  // saveModelPortfolio imported from the service, which the earlier list of names let through.
   it('takes only the settings or the goals as the source of the targets, and the page reads no model', () => {
     // @ts-expect-error — the header never reads the model portfolio
     describeAllocazioneHeader({ marketValue: 1000, classCount: 1, targetSource: 'model' });
     const page = readFileSync('app/dashboard/allocation/page.tsx', 'utf8');
     // The page hands the settings and the goals to the lazy tab, which builds the model's basis; it never reads the model.
-    expect(page).not.toMatch(/useModelPortfolio|getModelPortfolio|modelPortfolio.byOwner|utils\/modelPortfolio'/);
+    expect(page).not.toMatch(/modelPortfolio/i);
   });
 });
 

@@ -6,10 +6,10 @@
  * per instrument, with its date and origin — and a PAC starts from it. A model saved on another basis (the
  * targets, the criteria or the roles moved since, 2026-11-12) reads «superato» and asks to be recalculated.
  *
- * The tile shows «oggi · modello · differenza» (`describeModelVsToday`) and owns the four ways to
- * change it: «Ricalcola» (`IdealCompositionDialog`, which saves its result), «Modifica a mano»
- * (`ModelEditDialog`), «Aggiungi strumento da valutare» (`AssetDialog` in the empty mode) and, from
- * the calculation, «Crea un PAC con questi pesi» — it chooses between that dialog and
+ * The tile shows «oggi · modello · differenza» (`describeModelVsToday`) and owns the ways to change
+ * it — among them «Ricalcola» (`IdealCompositionDialog`, which saves its result), «Modifica a mano»
+ * (`ModelEditDialog`), «Usa i pesi del piano» and «Aggiungi strumento da valutare» (`AssetDialog` in
+ * the empty mode) — and, from the calculation, «Crea un PAC con questi pesi»: it chooses between that dialog and
  * `AccumulationPlanDialog` so two modals are never stacked. No calculation and no network call before
  * the reader asks.
  */

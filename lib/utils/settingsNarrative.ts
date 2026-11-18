@@ -585,8 +585,9 @@ export interface IdealAllocationInput {
 
 /**
  * The ONE translation of a saved `IdealAllocationSettings` into the words the readings print: class
- * labels from `ASSET_CLASS_LABELS`. Four surfaces read the criteria (Impostazioni, the PAC's
- * Ottimizzato step, the model portfolio and its dialog) and each would otherwise build this by hand.
+ * labels from `ASSET_CLASS_LABELS`. Every surface that reads the criteria calls it (among them
+ * Impostazioni, the criteria tile, the PAC's Ottimizzato step, the model portfolio's dialog and the tab's
+ * criteria count), and each would otherwise build this by hand.
  */
 export function buildIdealAllocationInput(value: IdealAllocationSettings, targetLeverageRatio: number): IdealAllocationInput {
   return {
