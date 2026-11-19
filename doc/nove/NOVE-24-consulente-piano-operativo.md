@@ -7,8 +7,8 @@
 > again — as ONE structured object, and shows it in the report. It creates no plan of accumulation: NOVE-25's click
 > does, from this object. Between the two, NOVE-21's hand-off («Dal Consulente») stays as it is.
 > Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c. Executes decisions 67, 69, 70, 74, 78,
-> 81, 82, 84, 85 (README.md § 3); overturns decision 28 and README § 10's «no section with the Consulente's own
-> figures».
+> 81, 82, 84, 85 (README.md § 3) and tells the model decision 93; overturns decision 28 and README § 10's «no
+> section with the Consulente's own figures».
 
 ## 1. The problem today (evidence on the code)
 
@@ -54,7 +54,8 @@ report behind its own failure.
 4. The plan is checked by `reconcileOperatingPlan`: sum 100, known keys, buyable, the limits, the «da tenere», the
    quantities held; every correction is one Italian sentence stored with the plan. **Proof**: U5–U9.
 5. A failed or unreadable plan leaves the report readable and applicable: `operatingPlan.status: 'failed'` with its
-   sentence, the document still `ready`; the run ends on the report. **Proof**: U10, E2.
+   sentence, the document still `ready` with its `updatedAt`; the run ends on the report, also when the plan's
+   request is refused (the hourly limit) or cut. **Proof**: U10, U17, E2.
 6. The book has the page «Il piano operativo» after «Cosa fare adesso», only when the plan is ready and usable; it
    draws ONLY from the stored object. **Proof**: U11, R1, E1.
 7. «Chiedi una modifica» reruns the review and then the plan; the old plan is dropped with the old report.
@@ -74,8 +75,15 @@ report behind its own failure.
   operating plan; the app checks them with rules (sum 100, buyable, the limits of «Criteri del modello») and says
   every correction in one sentence. Overturns decision 27's «computed by code» for this path.
 - **Owner 69**: a review month indicated by the Consulente. **Owner 70**: a NEW stage «Piano» after the review
-  (Opus 5.5): «Riprova» repeats only it; «Chiedi una modifica» reruns review + plan; all the plan's figures live in
-  ONE structured object.
+  (Opus 5.5): a failed «Piano» stage is rerun ALONE by «Scrivi il piano operativo» on «Applica» (the stage never
+  fails the run, so the run's «Riprova» never meets it); «Chiedi una modifica» reruns review + plan; all the plan's
+  figures live in ONE structured object.
+- **Owner 99 (2026-11-19, the adversarial reading)**: the plan's duration is NOT asked to the user: the «Piano»
+  stage chooses it, by a criterion the contract writes — the months needed to cover the gap to the report's
+  targets with the instalment the user can sustain — and says why in `summary` (§ 4.4). The user changes it with
+  «Chiedi una modifica» before the click, with «Rivedi il piano» after.
+- **Owner 93 (2026-11-19, the adversarial reading; NOVE-23)**: a sale in a later month refills the reserve first —
+  the contract says so (§ 4.4).
 - **Owner 74**: the instruments search writes up to three Yahoo symbols per instrument, the user's exchange first.
 - **Owner 78**: the «da tenere» of the answers wins: the contract forbids selling such an instrument; if the plan
   does, the app removes the sale and says so; «smetti di comprare» stays allowed.
@@ -95,7 +103,9 @@ report behind its own failure.
   - P2. The model addresses instruments by a key the app prints (S = held and buyable, N = new from the report, M =
     money-market fund); the stored plan carries the key's legend with the asset id.
   - P3. A quota is the instrument's target weight in the plan (the engine's `targetPercentage`): the «buy» rows sum
-    to 100, «hold» and «sell» rows carry 0.
+    to 100, «hold» and «sell» rows carry 0. The per-instrument limits of «Criteri del modello» are in the SAME
+    unit — a weight among the plan's instruments, as the model's weights that `applyModelToPositions` copies into
+    a plan's positions — so they apply to the quotas as they are (decision 67).
   - P4. The stage gives the unit price and the estimated tax in euros of the HELD instruments (a plan in quotes
     cannot be written without them); still never an id, a rate or a held ISIN.
   - P5. The plan stage counts one slot of the hourly limit (12), like a revision.
@@ -107,6 +117,9 @@ report behind its own failure.
   - P9. The plan stage reads the per-instrument LIMITS of «Criteri del modello» (a quota the app would correct is
     better not written) — nothing else of the criteria, never the model: choice i of the index is amended to say
     so, and README § 10's sentence with it.
+  - P10. `document.updatedAt` is the REPORT's clock («Rifai il percorso» and a restored interview compare it):
+    the plan stage's patches do not move it.
+  - P11. The stage runs only on a finished report with no run in flight (`status` `ready` or `applied`).
 
 ## 4. Solution
 
@@ -153,7 +166,7 @@ export interface OperatingPlanRow {
   ref: string;
   action: OperatingPlanAction;
   targetPercentage: number;                     // the target weight in the plan: 'buy' rows sum to 100
-  sellQuantity?: number;                        // absent on a sale = every share
+  sellQuantity?: number;                        // 'sell' only; absent on a sale = every share
   sellMonth?: number;                           // 1..months; absent = 1
   reason: string;
   /** Sales only, the app's figures at writing time. */
@@ -179,6 +192,7 @@ export interface OperatingPlan {
 /** What a reconcile needs to know of today's portfolio, by key. */
 export interface OperatingPlanFacts {
   instruments: OperatingPlanInstrument[];
+  /** One entry per `held` and per `cashFund` key (never a `new` one). */
   held: Record<string, {
     quantity: number; priceEur: number; valueEur: number; keep: boolean;
     tax: SaleTaxPerEuro; minPct?: number; maxPct?: number;
@@ -196,7 +210,10 @@ export function operatingPlanOf(document: Pick<AllocationAdviceDocument, 'operat
 `mapAllocationAdviceData` (`lib/utils/allocationAdviceDocument.ts:126-146`) maps `operatingPlan` with its three
 dates (`toDate`), `null` when absent.
 
-### 4.2 The facts (`lib/utils/operatingPlan.ts`)
+### 4.2 The facts (`lib/utils/operatingPlanFacts.ts`, new)
+
+`operatingPlan.ts` (types, `operatingPlanOf`, the reconcile) imports neither the hand-off nor the optimizer; the
+facts live in their own module, which no component of `components/allocation/consulente/` imports (§ 5).
 
 ```ts
 export function buildOperatingPlanFacts(input: {
@@ -212,13 +229,20 @@ export function buildOperatingPlanFacts(input: {
 
 - `handoff = planConsulenteHandoff(proposal, candidates, keepNames, assets)` (NOVE-21's matcher, unchanged,
   `lib/utils/allocationAdviceHandoff.ts:57`).
-- **S**: every asset with `isPlanBuyable(asset, assets)` and (`valueOf(asset) > 0` or `asset.createdEmpty`), in
-  the order of `assets` sorted by class sequence then name: `S1…`.
-- **M**: every `isPlanCashFund(asset, assets)` with value: `M1…`.
-- **N**: `handoff.toCreate`, `N1…`, with its `prefill`; `symbols` = the candidate's `yahooSymbols` (§ 4.6) found by
-  the prefill's ISIN or name among `candidates`, else `prefill.ticker ? [prefill.ticker] : []`.
-- `held[ref]`: quantity, `priceOf`, `valueOf`, `keep` (`handoff.keepAssetIds.includes(asset.id)`), `tax = candidateSaleTaxPerEuro(asset.id, buildHoldings(assets, valueOf))`, and the asset's
-  entry in `limits`.
+- **S** (`kind: 'held'`): every asset with `isPlanBuyable(asset, assets)` and (`valueOf(asset) > 0`,
+  `asset.createdEmpty`, or its id among `handoff.matched` — an instrument sold down to 0 quotes that the report
+  chooses again is matched by the hand-off, never in `toCreate`), sorted by class sequence
+  (`ASSET_CLASS_SEQUENCE`), then name, then asset id: `S1…`.
+- **M** (`kind: 'cashFund'`): every `isPlanCashFund(asset, assets)` with value, in the same order: `M1…`.
+- **N** (`kind: 'new'`): `handoff.toCreate`, `N1…`, with its `prefill`; `symbols` = the candidate's `yahooSymbols`
+  (§ 4.6) found by the prefill's ISIN or name among `candidates`, else `prefill.ticker ? [prefill.ticker] : []`.
+- `held[ref]`, for every S and M key: quantity, `priceOf`, `valueOf`, `tax = candidateSaleTaxPerEuro(asset.id,
+  buildHoldings(assets, valueOf))`, the asset's entry in `limits`, and `keep` — true ONLY when the answers' «da
+  tenere» name the asset: `keepNames.some((name) => findAssetByName(assets, name)?.id === asset.id)`. Never
+  `handoff.keepAssetIds`: it also holds every instrument the report matched
+  (`allocationAdviceHandoff.ts:100-101`), and decision 78 protects the interview's «da tenere» alone.
+
+Every rule of § 4.3 and every later reader (NOVE-25) reads `instrument.kind`, never the letter of the `ref`.
 
 ### 4.3 The reconcile (`lib/utils/operatingPlan.ts`)
 
@@ -238,25 +262,30 @@ tests):
 | # | Rule | Sentence |
 | --- | --- | --- |
 | 1 | `months` outside 1..60 is clamped | «La durata indicata non è fra 1 e 60 mesi: il piano dura {n} mesi.» |
-| 2 | `monthlyInflowEur` negative or not finite → 0 | — (silent) |
+| 2 | `monthlyInflowEur` negative or not finite → 0 (a plan at 0 € a month stays `usable`: whether there is money to invest is the click's check, NOVE-25) | — (silent) |
 | 3 | A row whose `ref` is not in `facts.instruments`, or a second row for a key, is dropped | «Il piano citava uno strumento che non è fra i tuoi né fra quelli del report: la riga non entra.» (once) |
-| 4 | N key with `hold`/`sell` → dropped (silent); M key with `buy` → `hold` | «{nome} è un fondo monetario: il piano non lo compra.» |
-| 5 | `sell` on a `keep` instrument → `hold` when its quota is 0, else `buy`; the sale is removed | «Hai indicato di tenere {nome}: la vendita non entra nel piano.» |
-| 6 | `sellQuantity`: floored; ≤ 0 → the sale is removed (silent); ≥ the quantity held → absent (every share), and when it was ABOVE: | «Il Consulente indicava {n} quote di {nome}: il piano ne vende {held}, quelle che possiedi.» |
-| 7 | A sale of every share of an S instrument forces its quota to 0 | — (silent) |
+| 4 | A `new` instrument with `hold`/`sell` → dropped (silent); a `cashFund` with `buy` → `hold` with `targetPercentage: 0` | «{nome} è un fondo monetario: il piano non lo compra.» |
+| 5 | `sell` on a `keep` instrument → the sale is removed (`sellQuantity` and `sellMonth` deleted); the row becomes `buy` when its quota is above 0, else `hold` | «Hai indicato di tenere {nome}: la vendita non entra nel piano.» |
+| 6 | `sellQuantity`: floored; ≤ 0, or a quantity held of 0 → the sale is removed as in rule 5 (silent); ≥ the quantity held → absent (every share), and when it was ABOVE: | «Il Consulente indicava {n} quote di {nome}: il piano ne vende {held}, quelle che possiedi.» |
+| 7 | Every `sell` row carries `targetPercentage: 0` (P3): a partial sale keeps the rest where it is and the plan does not buy it | — (silent) |
 | 8 | `sellMonth` outside 1..`months` → clamped | «La vendita di {nome} era fissata fuori dal piano: va al mese {m}.» |
-| 9 | Every S key without a row gets `{ action: 'hold', targetPercentage: 0, reason: '' }` | «{nomi}: il piano non li cita. Restano dove sono e il piano non li compra.» (once, names joined) |
-| 10 | Quotas: negative → 0; a `buy` at 0 → `hold`; a `hold`/`sell` above 0 with no partial sale → `buy` (silent) | — |
-| 11 | Limits: a `buy` above its `maxPct` is lowered, below its `minPct` raised; the difference goes to (comes from) the other `buy` rows in proportion to their quotas, never past their own limits | «{nome}: quota portata dal {a}% al {b}%, il limite dei tuoi Criteri del modello.» |
-| 12 | Σ of the `buy` quotas off 100 by more than `PROPOSAL_SUM_TOLERANCE` (0,5) → scaled in proportion | «Le quote sommavano a {s}%: riportate a 100 in proporzione.» |
-| 13 | Quotas rounded to two decimals, the largest remainder absorbs the cents so that Σ = 100,00 | — (silent) |
+| 9 | Every `held` instrument without a row gets `{ action: 'hold', targetPercentage: 0, reason: '' }` | «{nomi}: il piano non li cita. Restano dove sono e il piano non li compra.» (once, names joined) |
+| 10 | Quotas: negative → 0; a `buy` at 0 → `hold` on a `held` instrument, dropped on a `new` one; a `hold` above 0 → `buy` on a `held` instrument; a `cashFund` row always carries 0 | — (silent) |
+| 11 | Σ of the `buy` quotas different from 100 → scaled in proportion; the sentence only when the sum was off by more than `PROPOSAL_SUM_TOLERANCE` (0,5) | «Le quote sommavano a {s}%: riportate a 100 in proporzione.» |
+| 12 | Limits, AFTER the scaling: a `buy` above its `maxPct` is lowered, below its `minPct` raised (one sentence per instrument); the difference goes to (comes from) the other `buy` rows in proportion to their quotas, never past their own limits, and the pass repeats on the rows a redistribution pushed to a limit (no sentence for those) until every row is within its limits. When the rows cannot absorb the difference — Σ still differs from 100 by more than 0,005 — the plan is `usable: false` | «{nome}: quota portata dal {a}% al {b}%, il limite dei tuoi Criteri del modello.»; unusable: «I limiti dei tuoi Criteri del modello non lasciano arrivare al 100%: il piano non può diventare un piano di accumulo.» |
+| 13 | Quotas rounded to two decimals; the missing or extra cents go to the largest quota its limits leave room on (ties: the first in the order of `facts.instruments`), so that Σ = 100,00 | — (silent) |
 | 14 | `reviewMonth` outside 1..`months` → dropped | — (silent) |
 | 15 | No `buy` row above 0 → `usable: false` | «Il piano non compra niente: non può diventare un piano di accumulo.» |
 
-Then, for every row that still sells: `estimatedProceedsEur = roundToCents(quantitySold × priceEur)`;
+A `hold` row is never raised to a `minPct`: «smetti di comprare» is the Consulente's choice (decision 78); the
+limits bind what the plan buys. After the rules a `sell` row always carries a sale — `sellQuantity` absent means
+every share, never a removed sale — and no other row carries `sellQuantity` or `sellMonth`.
+
+Then, for every `sell` row: `estimatedProceedsEur = roundToCents(quantitySold × priceEur)`;
 `estimatedTaxEur` = `roundToCents(estimatedProceedsEur × perEuro)` when `tax.kind === 'taxed'`, `0` when `exempt`,
 `null` with `taxUnknownReason` when `unknown`. The rows are returned in the order of `facts.instruments` (S, N, M).
-The function is idempotent: `reconcile(reconcile(raw))` adds no sentence (U9).
+The function is idempotent: `reconcile(reconcile(raw))` adds no sentence (U9) — which is why the scaling runs
+before the limits: a quota clamped and THEN scaled would leave its limit again.
 
 ### 4.4 The data block and the contract (`lib/server/allocationAdvice/prompts.ts`)
 
@@ -266,7 +295,7 @@ export function formatOperatingPlanFacts(input: {
   firstMonthLabel: string;                      // «dicembre 2026»: the month after `now`, Italian
   investmentAccount: { name: string; balanceEur: number } | null;
   accountsEur: number;                          // Σ of the source accounts
-  reserveEur: number;                           // the proposal's cash quota on today's base
+  reserveEur: number;                           // the reserve the click will use (§ 4.5 step 3)
 }): string
 ```
 
@@ -275,7 +304,7 @@ prints, one fact per line:
 ```
 --- DATI PER IL PIANO OPERATIVO ---
 Mese 1 del piano: dicembre 2026.
-Conto per gli investimenti: Conto Arancio, saldo €12.000.            | «non impostato: i conti liquidi sommano €18.000.»
+Conto per gli investimenti: Conto ornitorinco, saldo €12.000.        | «non impostato: i conti liquidi sommano €18.000.»
 Riserva di liquidità dell'allocazione proposta: €10.000. Sopra la riserva ci sono €2.000.   | «Mancano €3.000 alla riserva.»
 Strumenti posseduti che un piano può comprare (chiave · nome · classe › sotto-categoria · quote · prezzo · valore · tasse stimate se venduto tutto):
 S1 · ETF Mondo · Azioni › Mondo · 120 quote · €100,00 · €12.000 · tasse stimate €520 · DA TENERE
@@ -286,6 +315,12 @@ M1 · Fondo Monetario Euro · 300 quote · €10,00 · €3.000 · esente
 Strumenti nuovi indicati dal report (0 quote, da creare):
 N1 · ETF Obbligazioni Euro 1-3 (IE00AAAAAAA1) · Obbligazioni › Euro 1-3 anni
 ```
+
+«Sopra la riserva ci sono» / «Mancano … alla riserva» compare `reserveEur` with the investment account's balance
+when it is set, else with `accountsEur`. Per held instrument the tax printed is `roundToCents(valueEur × perEuro)`
+(«tasse stimate €520»), «esente» for `exempt`, «tasse non stimabili (manca l'aliquota)» for `unknown` with reason
+`rate` and «tasse non stimabili (manca il costo fiscale)» with reason `cost-basis`; a limit prints «limite: minimo
+{a}%», «limite: massimo {b}%» or both, joined by « · ».
 
 A section with no row prints «nessuno». `buildPlanPrompt(answers, reportMarkdown, instrumentsMarkdown, candidates,
 { factsBlock, cashflowBlock, accumulationPlan })` returns `{ system: CONSULENTE_CORE + '\n' + PLAN_CONTRACT,
@@ -301,8 +336,8 @@ La risposta è UN oggetto JSON: il PIANO OPERATIVO, cioè il piano di accumulo m
 Campi:
 {
   "summary": string (2-3 frasi: il piano in breve, a parole),
-  "monthlyInflowEur": number (quanto l'utente versa nel piano ogni mese, in euro: dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI; se la superi, dillo in "departures" con il perché),
-  "months": number (la durata in mesi, da 1 a 60),
+  "monthlyInflowEur": number (quanto l'utente versa nel piano ogni mese, in euro: dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI; se la superi, dillo in "departures" con il perché; se il blocco non dà una mediana, usa la rata che il report indica come ordine di grandezza e dillo in "departures"),
+  "months": number (la durata in mesi, da 1 a 60: quella che serve a coprire lo scarto dai target del report con il versamento che l'utente può sostenere — non più lunga del necessario, non così corta da chiedere un versamento sopra la mediana; in "summary" scrivi perché dura così),
   "rows": [ { "ref": chiave copiata ESATTAMENTE dal blocco DATI PER IL PIANO OPERATIVO (S…, N…, M…), "action": "buy" | "hold" | "sell", "targetPercentage": number, "sellQuantity"?: number (quote intere da vendere; assente = tutte), "sellMonth"?: number (il mese del piano in cui vendere, da 1 a "months"; assente = 1), "reason": string (una frase: perché) } ],
   "reviewMonth"?: number (il mese del piano in cui riguardare quote e rata, se ha senso riguardarle prima della fine),
   "reviewReason": string,
@@ -313,6 +348,7 @@ Regole:
 - "targetPercentage" è il peso a cui il piano porta lo strumento fra gli strumenti che compra: le righe "buy" sommano esattamente a 100; "hold" e "sell" hanno 0. I pesi seguono l'allocazione e i sotto-target del report; rispetta i limiti scritti accanto a uno strumento.
 - Vendi solo quando serve ad arrivare ai target in un tempo ragionevole o a uscire da uno strumento che il report sostituisce: ogni vendita ha un costo fiscale, scritto nel blocco («tasse stimate»), e la sua ragione lo pesa. Non vendere MAI uno strumento segnato DA TENERE: puoi solo smettere di comprarlo.
 - Una vendita in un mese successivo al primo fa entrare il suo ricavato nelle rate da quel mese: usala per diluire le tasse o per non restare fuori dal mercato.
+- Il piano compra dal conto per gli investimenti e non scende mai sotto la riserva scritta nel blocco: se alla riserva manca qualcosa, le vendite e i primi versamenti la ricostituiscono prima che il piano compri (lo fa l'app, anche con una vendita in un mese successivo). Tienine conto nella durata e nel versamento, e non proporre di spendere la riserva.
 - Le quote da vendere non superano quelle possedute. Non scrivere prezzi né importi che non siano nei campi: gli importi delle rate li calcola l'app dai tuoi campi.
 - Usa esclusivamente i numeri dei blocchi: non ricalcolarli e non inventarne.
 ```
@@ -344,8 +380,12 @@ The bounds are loose on purpose: the API guarantees the shape, `reconcileOperati
 **The review's section 6** (`prompts.ts:460`) — before: «… Il piano esatto lo calcola l'app dopo «Applica» («Crea un
 piano di accumulo verso questa allocazione»): niente tabelle di rate né quote mensili per strumento.» After: «… Le
 cifre del piano — versamento, mesi, quote, vendite — le scrive il passo successivo, nella pagina «Il piano
-operativo»: qui ragiona a parole, niente tabelle di rate né quote per strumento.» The strategy's section 5 is
-unchanged.
+operativo»: qui ragiona a parole, niente tabelle di rate né quote per strumento.»
+
+**The strategy's section 5** (`prompts.ts:159`) — its last sentence, before: «Nessuna tabella di rate o di quote
+per strumento: le cifre esatte le calcola l'app dopo «Applica».» After: «Nessuna tabella di rate o di quote per
+strumento: le cifre esatte le scrive il piano operativo, dopo il report.» Its assertion in
+`__tests__/allocationAdvicePrompts.test.ts` is edited with it.
 
 ### 4.5 The stage on the server (`lib/server/allocationAdvice/run.ts`, the route)
 
@@ -353,30 +393,61 @@ unchanged.
 async function runPlan(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, now: Date): Promise<void>
 ```
 
-1. `report?.proposal` and `instruments` are required, else `AllocationAdviceStageError('plan', 'Non c'è un report
-   finito su cui scrivere il piano. Avvia la ricerca.', false)`.
-2. Reads, in parallel: `getUserAssetsAdmin(userId)`, the settings (the Admin mapper of
-   `lib/services/assistantMonthContextService.ts:196-212`, which gains `investmentCashAssetId` and
-   `idealAllocation`), `readCashflowBlockForPrompt`, `readAccumulationPlanForAdvice`.
-3. `facts = buildOperatingPlanFacts({ assets, proposal: report.proposal, candidates: instruments.candidates,
-   keepNames: answers.keepAssets, limits: settings.idealAllocation?.instrumentLimits ?? [], valueOf:
-   calculateAssetValue, priceOf: unitPriceEur })` — `calculateAssetValue` is the function
-   `lib/services/assistantMonthContextService.ts:282` already injects on the server.
+1. The document's `status` is `ready` or `applied` (P11), and `report?.proposal` and `instruments` are there; else
+   `AllocationAdviceStageError('plan', 'Non c'è un report finito su cui scrivere il piano. Avvia la ricerca.',
+   false)` — nothing is patched. In a full run the review has just set `ready`; a document left `failed` by a
+   revision, or `running`, is refused.
+2. Reads, in parallel: `getUserAssetsAdmin(userId)`, the settings through `fetchSettings`
+   (`lib/services/assistantMonthContextService.ts:180`, private today: this spec exports it, and its mapper gains
+   `investmentCashAssetId` and `idealAllocation` — the SIXTH place of doc/guide/impostazioni.md),
+   `readCashflowBlockForPrompt`, `readAccumulationPlanForAdvice`.
+3. The facts and the block's figures:
+   - `facts = buildOperatingPlanFacts({ assets, proposal: report.proposal, candidates: instruments.candidates,
+     keepNames: answers.keepAssets, limits: settings?.idealAllocation?.instrumentLimits ?? [], valueOf:
+     calculateAssetValue, priceOf: unitPriceEur })` — `calculateAssetValue` is the function
+     `lib/services/assistantMonthContextService.ts:282` already injects on the server; `unitPriceEur` is
+     `lib/utils/costBasisEur.ts:66`.
+   - `firstMonthLabel = monthLabelLong(addMonths(toMonthKey(now), 1))` (`lib/utils/planMonths.ts`: the Italian
+     month, never UTC).
+   - `accountId = resolveInvestmentAccountId(settings, assets)` (NOVE-23); `investmentAccount` = that asset's name
+     and `calculateAssetValue`, `null` when `accountId` is null; `accountsEur` = Σ `calculateAssetValue` of the
+     assets of `isPlanSourceAccount`.
+   - `reserveEur = resolvePlanReserve(assets, buildTargetsFromProposal(report.proposal), compareAllocations, {
+     valueOf: calculateAssetValue, priceOf: unitPriceEur }, 0, accountId ? [accountId] : undefined).reserveEur` —
+     the reserve the click will use (NOVE-25's K7). **`resolvePlanReserve` gains here its optional last parameter
+     `sourceIds?: readonly string[]`** (`lib/utils/accumulationPlanUtils.ts:777`): when given, `accountsEur` inside
+     it sums those accounts only, so the cash on the other accounts counts as cash outside the plan (`otherCashEur`);
+     absent, the function is today's (U16). `compareAllocations` is imported from
+     `lib/services/assetAllocationService.ts`, as `app/api/portfolio/snapshot/route.ts:12` already imports that
+     module on the server. With goal-driven targets (the Allocazione page derives them from the goals) the figure is
+     indicative: the click recomputes it on the targets the page measures (NOVE-25).
 4. Patches `operatingPlan: { status: 'running', plan: null, error: null, model: null, startedAt: now, finishedAt:
    null, reportFinishedAt: report.finishedAt }` and calls `onStage('plan')` — never `enterStage` (P1).
 5. `callModel('plan', { model: ALLOCATION_ADVICE_STRATEGY_MODEL, effort: ALLOCATION_ADVICE_STRATEGY_EFFORT, format:
-   OPERATING_PLAN_FORMAT, prompt: buildPlanPrompt(…), maxTokens: ALLOCATION_ADVICE_PLAN_MAX_TOKENS /* 16000 */ })`.
+   OPERATING_PLAN_FORMAT, prompt: buildPlanPrompt(answers, report.markdown, instruments.markdown,
+   instruments.candidates, { factsBlock: formatOperatingPlanFacts({ facts, firstMonthLabel, investmentAccount,
+   accountsEur, reserveEur }), cashflowBlock, accumulationPlan }), maxTokens: ALLOCATION_ADVICE_PLAN_MAX_TOKENS
+   /* 16000 */ })`.
 6. `raw = parseOperatingPlanAnswer(answer.text)`; `null` → the failure of step 8 with «Il Consulente non ha
-   scritto un piano leggibile. Riprova: di norma la seconda volta rientra.»
+   scritto un piano leggibile. Premi «Scrivi il piano operativo»: di norma la seconda volta rientra.»
 7. `plan = reconcileOperatingPlan(raw, facts)`; patches `operatingPlan: { status: 'ready', plan, error: null, model:
    answer.model, startedAt, finishedAt: new Date(), reportFinishedAt }`.
-8. Any failure: patches `operatingPlan: { status: 'failed', plan: null, error: <sentence>, … }` and throws
-   `AllocationAdviceStageError('plan', <sentence>, true)`.
+8. Any failure after step 4: patches `operatingPlan: { status: 'failed', plan: null, error: <sentence>, … }` and
+   throws `AllocationAdviceStageError('plan', <sentence>, true)`; an unexpected error's sentence is «Il piano
+   operativo si è interrotto per un errore imprevisto. Premi «Scrivi il piano operativo».».
 
-`runAllocationAdviceStage` dispatches `stage === 'plan'` to `runPlan`, and its catch returns BEFORE the
-document-level patch when `stage === 'plan'` (the failure is already on `operatingPlan`; `document.status` stays).
-`runRevise`'s final patch adds `operatingPlan: null`. `runAllocationAdvice` (the three stages in sequence) runs the
-plan fourth and swallows its failure. `CallStage` already unions `AllocationAdviceStage`.
+The three `operatingPlan` patches go through `patchAllocationAdviceAdmin(userId, patch, { keepUpdatedAt: true })`:
+the store's patch (`lib/server/allocationAdvice/store.ts:56-61`) gains that option and skips the `updatedAt` it
+otherwise stamps (P10) — `pageShowsReport`'s `redoAt` and `reopenStoredDraft`
+(`lib/utils/allocationAdviceDraft.ts:253`) compare `updatedAt`, and a plan landing after «Rifai il percorso» must
+neither bring the hidden document back nor drop an interview in progress.
+
+`runAllocationAdviceStage` dispatches `stage === 'plan'` to `runPlan`, and its catch (`run.ts:550-560`), when
+`stage === 'plan'`, RETHROWS the failure before touching `document.status`, `document.error` or the store (the
+failure is already on `operatingPlan`; U10 asserts the patch keys and that the thrown error is retryable).
+`runRevise`'s final patch adds `operatingPlan: null` (it moves `updatedAt`, as today: it is a new report).
+`runAllocationAdvice` (the three stages in sequence) runs the plan fourth and swallows its failure. `CallStage`
+already unions `AllocationAdviceStage`.
 
 The route (`app/api/allocation-advice/run/route.ts`): `'plan'` passes the stage check through
 `ALLOCATION_ADVICE_RUN_STAGES`; the rate limit counts `strategy`, `revise`, `interview` and `plan` (P5).
@@ -396,14 +467,19 @@ The route (`app/api/allocation-advice/run/route.ts`): `'plan'` passes the stage 
 ### 4.7 The run on the client
 
 - `useConsulenteRun` (`components/allocation/consulente/useConsulenteRun.ts`): the loop already walks
-  `ALLOCATION_ADVICE_RUN_STAGES`; a failed `plan` does not fail the run —
-  `if (!result.ok) { if (stage === 'plan') break; outcome = { kind: 'failed', … }; break; }` — so the state ends
-  `done` and the page shows the report.
-- `useConsulenteRevision`: after a `revise` that ended ok it requests `{ stage: 'plan' }`; whatever the plan's
-  outcome the state returns `idle` and `onDone` runs (the absence row tells a failed plan).
+  `ALLOCATION_ADVICE_RUN_STAGES`. The stage `plan` NEVER fails the run, whether its outcome is an error event or a
+  thrown request (the hourly limit's 429, the network: `openRunBody` throws, `:35-40`): the loop wraps the plan's
+  `requestStage` in its own `try/catch` and, on a `!result.ok` or a throw, breaks with the outcome `done` — so the
+  state ends `done`, `onFinished` runs and the page shows the report; the catch of `run()` (`:104-108`) is never
+  reached from the plan stage.
+- `useConsulenteRevision`: after a `revise` that ended ok it requests `{ stage: 'plan' }` inside a `try/catch`;
+  whatever the plan's outcome — ok, an error event, a throw — the state returns `idle` and `onDone` runs (the
+  absence row tells a failed plan).
 - A new hook `useConsulentePlan(ownerId)` in `components/allocation/consulente/`: `{ state: 'idle' | 'running' |
-  'failed', write() }` — `requestStage(ownerId, { stage: 'plan' }, () => {})`, then invalidates
-  `queryKeys.allocationAdvice.all(ownerId)`.
+  'failed'; error: string | null; write(): void }` — `write()` does nothing while a request is in flight (a ref, as
+  `useConsulenteRun`'s `inFlight`: a double click sends one request); it calls `requestStage(ownerId, { stage:
+  'plan' }, () => {})`, then invalidates `queryKeys.allocationAdvice.all(ownerId)`. `error` is the outcome's
+  sentence or the thrown one (a 429 or a network failure writes nothing on the document), `null` otherwise.
 - Copy (`lib/utils/allocationAdviceNarrative.ts`): `STAGE_COPY.plan = { label: 'Scrivo il piano operativo', detail:
   'Opus 5.5 traduce il report in versamento, mesi, quote e vendite.' }`; `STAGE_TYPICAL_MINUTES.plan = 1`.
   `runStageStates` needs no change (it maps `ALLOCATION_ADVICE_STAGES`); the run screen and the rail show five rows.
@@ -427,32 +503,49 @@ The route (`app/api/allocation-advice/run/route.ts`): `'plan'` passes the stage 
   - **footnote**: «Le rate esatte le calcola l'app quando crei il piano: dipendono dai prezzi di quel giorno.»
   - The names come from `plan.instruments` by `ref`; no asset is read.
 - `piecesOf` gains `case 'piano'`. The page's accent follows The AI-Accent Rule as the other generated pages do
-  (`generated: true`).
+  (`generated: true`): the border and the eyebrow are the page's; no group inside takes the accent — the sales'
+  euros and taxes are the app's figures in mono, and «Corretto dall'app» says in its own name whose words they
+  are, under the plain sub-eyebrow of the other groups.
 - The «Applica» page (`applyPieces`): a new input `planRow: { state: 'absent' | 'running' | 'failed' | 'unusable';
   message: string | null; onWrite: () => void; disabled: boolean } | null` (null when `operatingPlanOf(document)`
-  is not null). Rendered in BOTH bodies (`ready` and `applied`), after the three ticks / the applied lines:
-  «Il piano operativo non c'è ancora.» (absent), «Scrivo il piano operativo…» (running), the stored error (failed)
-  or the last correction sentence (unusable), and the button «Scrivi il piano operativo» (`variant="outline"`,
-  the book's `BUTTON_CLASS` with `AI_CONTROL_ACCENT_CLASS` and `AI_CONTROL_ACCENT_LABEL_CLASS`,
-  `lib/constants/aiAccent.ts:21-25`), hidden while running. `ConsulenteReport.tsx` owns `useConsulentePlan` and
-  builds the row.
+  is not null). Rendered in BOTH bodies (`ready` and `applied`), after the three ticks / the applied lines — the
+  applied body, today rendered only with a note or a hand-off (`ConsulenteBookPages.tsx:312`), renders also when
+  `planRow !== null`: «Il piano operativo non c'è ancora.» (absent), «Scrivo il piano operativo…» (running), the
+  failure's sentence (failed) or the last correction sentence (unusable), and the button «Scrivi il piano
+  operativo» (`variant="outline"`, `BUTTON_CLASS` with `AI_CONTROL_ACCENT_CLASS` and
+  `AI_CONTROL_ACCENT_LABEL_CLASS`, `lib/constants/aiAccent.ts:21-25`), hidden while running. `BUTTON_CLASS`, today
+  private to `ConsulenteBook.tsx:69`, moves to `ConsulenteBookPages.tsx` and is exported (`ConsulenteBook` imports
+  it). `ConsulenteReport.tsx` owns `useConsulentePlan` and builds the row: `running` while the hook runs or the
+  document's plan is `running` and not stale (§ 5); `failed` with the hook's `error` while the hook's state is
+  `failed`, else with the document's stored error when its plan is `failed`; `unusable` when the stored plan is
+  `ready` with `usable: false`; `absent` otherwise. `disabled` in demo. A plan started in another tab reads
+  «Scrivo il piano operativo…» until the document is read again — no polling, declared.
 
-### 4.9 DESIGN.md (The AI-Accent Rule, `DESIGN.md:579`)
+### 4.9 DESIGN.md (The AI-Accent Rule `DESIGN.md:579`, The Path-Scene Rule `:589`)
 
 «Scrivi il piano operativo» asks a model: it joins the list of **A control that asks a model** (the accent on
-hover and focus-visible only) after «Rivedi il report»; the page «Il piano operativo» is a page «whose body is the
-model's» and takes the border and the eyebrow as the others do — no new sentence for it. One clause added, the
-before/after quoted in the commit.
+hover and focus-visible only); the page «Il piano operativo» is a page «whose body is the model's» and takes the
+border and the eyebrow as the others do — no new sentence for it. Two amendments, as before / after:
+
+- The AI-Accent Rule — before: «… «Riprova», «Rivedi il report», «Rileggi», …»; after: «… «Riprova», «Rivedi il
+  report», «Scrivi il piano operativo», «Rileggi», …».
+- The Path-Scene Rule — before: «**The run** turns the rail into the four stages»; after: «**The run** turns the
+  rail into the five stages».
 
 ## 5. Constraints and traps (AGENTS.md / DESIGN.md, «here it means that»)
 
 - **`system` is byte-identical for every user** (README § 8): `PLAN_CONTRACT` is a constant; every fact — the keys,
   the month, the account — sits in `userContent`. U3 is `expect(a.system).toBe(b.system)` on two different
   portfolios.
-- **A probe never runs the Consulente's model** (AGENTS.md § Allocazione › Consulente): the unit tests inject
-  `callModel`'s fake as the existing run tests do; the E2E specs extend `installFakeRun`
-  (`e2e/consulenteInterview.ts`) with the `plan` stage and `plant()` (`e2e/consulenteReport.ts`) with an
-  `operatingPlan` option; § 7 launches no run.
+- **A probe never runs the Consulente's model** (AGENTS.md § Allocazione › Consulente): the unit tests answer the
+  SDK's `beta.messages.stream(...).finalMessage()` by hand, as the existing run tests do (`callModel` is private,
+  `run.ts:156`), and mock `@/lib/server/assetAdminRepository` and the exported `fetchSettings` for the plan's
+  reads. The E2E fakes answer SSE and write nothing (`e2e/consulenteInterview.ts:151-181`): `installFakeRun` gains
+  an option `plan?: 'ready' | 'failed'` (default `'ready'`) and a `plan` branch that, BEFORE answering, writes
+  `operatingPlan` to the emulator through `e2e/consulenteReport.ts` (Admin SDK) — `ready` with an invented plan
+  built by `reconcileOperatingPlan`, or `failed` with its sentence and an error event; its `revise` branch writes
+  a new `report.finishedAt` and `operatingPlan: null`. `plant()` (`e2e/consulenteReport.ts`) gains an
+  `operatingPlan` option. § 7 launches no run.
 - **The document's status is the report's** (P1): no code path of the plan stage calls `enterStage` or writes
   `status`, `stage`, `error`; U10 asserts the patch keys.
 - **A stale run** (`isRunStale`, `RUN_STALE_AFTER_MS`): an `operatingPlan.status: 'running'` older than 20 minutes
@@ -461,13 +554,20 @@ before/after quoted in the commit.
   stage order and the patch sequence), `allocationAdviceDocument.test.ts:89-108` (four stages → five),
   `allocationAdvicePrompts.test.ts:500-510` (the review's section 6 text) and `:512-516`,
   `allocationAdviceRoutes.test.ts` (the stage list, the rate limit), `e2e/allocation.consulente.spec.ts:133-160`
-  (the run screen's rows), `e2e/allocation.consulente.report.spec.ts:146-158` (the shortest page: still `passi`).
+  (the run screen's rows), `e2e/allocation.consulente.report.spec.ts:146-158` (the shortest page: still `passi`),
+  `useConsulenteRun.test.tsx` (the chain gains the plan request), `consulenteRun.test.tsx` (five rows),
+  `allocationAdviceNarrative.test.ts` (`STAGE_TYPICAL_MINUTES`), `allocationAdviceRun.test.ts` (every count of
+  reads and calls of `runAllocationAdvice`, which now runs the plan), `consulenteBook.test.tsx` and
+  `allocationAdviceBook.test.ts` (the new `planRow` / `hasPlan` fields), the strategy's section 5 assertion in
+  `allocationAdvicePrompts.test.ts` (§ 4.4).
 - **The Consulente route's weight** (690,1 KB gz, no budget entry): `operatingPlan.ts` is zod-free and imports
-  `planConsulenteHandoff` only inside `buildOperatingPlanFacts`, which the route never calls — keep
-  `buildOperatingPlanFacts` in its own module `lib/utils/operatingPlanFacts.ts` so the route's bundle does not pull
-  the hand-off and the optimizer. The guard `__tests__/allocationAdviceDocument.test.ts:167-176` (no
-  `allocationAdviceHandoff|weightOptimizer` under `components/allocation/consulente/`) gains
-  `operatingPlanFacts|operatingPlanSchema`.
+  neither the hand-off nor the optimizer; `buildOperatingPlanFacts` lives in `lib/utils/operatingPlanFacts.ts`
+  (§ 4.2), which the Consulente's components never import, so the route's bundle does not pull them. The guard
+  `__tests__/allocationAdviceDocument.test.ts:167-176` (no `allocationAdviceHandoff|weightOptimizer` under
+  `components/allocation/consulente/`) gains `operatingPlanFacts|operatingPlanSchema`.
+- **The settings' sixth place**: `fetchSettings`' mapper is a place a new settings field must be added to
+  (doc/guide/impostazioni.md § Settings — the FIVE places becomes SIX, § 9); `investmentCashAssetId` (NOVE-23) and
+  `idealAllocation` are read there, never written.
 - **Structured outputs** (`ALLOCATION_ANSWER_FORMAT`, `run.ts:122`): only `type` and `schema` go out
   (`betaZodOutputFormat(operatingPlanAnswerSchema).schema`); optional keys only, no record.
 - **The Path-Scene Rule / The Conversation-Is-Content Rule**: the run screen's fifth row follows the existing rows;
@@ -483,21 +583,23 @@ before/after quoted in the commit.
 | U2 | `__tests__/allocationAdvicePrompts.test.ts` › `buildPlanPrompt`: the five blocks in order, the report's `allocation-proposal` block present | drop the cashflow block |
 | U3 | same: `system` equal for two portfolios; it `endsWith` the contract | interpolate the month in the contract |
 | U4 | same › `formatOperatingPlanFacts`: the lines of § 4.4 on the invented portfolio; no asset id, no «26», no held ISIN in the text | print `asset.isin` |
-| U5 | `__tests__/operatingPlan.test.ts` › reconcile: quotas 50/30/30 → 45,45/27,27/27,28 with the sentence; 60/40 untouched, no sentence | skip the scaling |
-| U6 | same: a sale of a «da tenere» → `hold`, the sentence; a sale of 40 with 38 held → every share, the sentence; a sale in month 14 of 12 → month 12 | drop rule 5 |
-| U7 | same: a forgotten S key → a `hold` row and the sentence naming it; an unknown key dropped | drop rule 9 |
-| U8 | same: a quota of 40 on a `maxPct` 15 → 15, the 25 spread on the others in proportion; a plan of only `hold` rows → `usable: false` | clamp without redistributing |
+| U5 | `__tests__/operatingPlan.test.ts` › reconcile: quotas 50/30/30 → 45,46/27,27/27,27 with the sentence; 60/40 untouched, no sentence; a money-market fund with `buy` at 10 → `hold` at 0, never bought | skip the scaling |
+| U6 | same: a sale of a «da tenere» → `hold`, the sentence, no `sellQuantity`; a sale of 40 with 38 held → every share, the sentence; a sale with `sellQuantity: 0` → `hold`, no sale; a partial sale with quota 20 → quota 0; a sale in month 14 of 12 → month 12 | drop rule 5 |
+| U7 | same: a forgotten held instrument → a `hold` row and the sentence naming it; an unknown key dropped; a `new` instrument with `buy` at 0 dropped | drop rule 9 |
+| U8 | same: a quota of 40 on a `maxPct` 15 with 60 on another → 15 and 85; a raw 36/54 (Σ 90) with `maxPct` 15 on the first → 15/85, still 15 after a second reconcile; two rows both `maxPct` 40 → `usable: false` with the limits' sentence; a plan of only `hold` rows → `usable: false` | clamp without redistributing |
 | U9 | same: `reconcile(reconcile(raw))` equals `reconcile(raw)` but for the sentences, which are not repeated; proceeds and taxes: taxed, exempt, unknown (`null` + reason) | compute the tax on the raw quantity |
-| U10 | `allocationAdviceRun.test.ts`: an unreadable answer → `operatingPlan.status: 'failed'`, the document's `status` still `ready`, the thrown error retryable | let the generic catch patch `status` |
+| U10 | `allocationAdviceRun.test.ts`: an unreadable answer → `operatingPlan.status: 'failed'`, the document's `status` still `ready`, the thrown error retryable; every plan patch is sent with `keepUpdatedAt` and carries no `updatedAt`; a document `running` or `failed` is refused with nothing patched | let the generic catch patch `status` |
 | U11 | `__tests__/allocationAdviceBook.test.ts`: the page `piano` between `passi` and `rischi` only with `hasPlan`; `operatingPlanOf` null on a plan of another report | compare nothing in `operatingPlanOf` |
 | U12 | `allocationAdviceRun.test.ts`: `runRevise`'s patch carries `operatingPlan: null` | omit it |
-| U13 | `__tests__/allocationAdviceProposal.test.ts`: a candidate with three symbols parses; four → that sleeve is refused and the others kept (the lenient parser); none → parses | `.max(2)` |
-| U14 | `allocationAdvicePrompts.test.ts:500-510`: the new text of section 6 | — (the edited assertion) |
-| U15 | `__tests__/operatingPlanFacts.test.ts`: S/N/M keys and order; `keep` by name; the limit; an asset `createdEmpty` at 0 quotes is an S key; a property and a loan get no key | key every asset |
+| U13 | `__tests__/allocationAdviceProposal.test.ts`: a candidate with three symbols parses; four → that candidate is dropped, its sleeve and the other candidates kept (the lenient parser); none → parses | `.max(2)` |
+| U14 | `allocationAdvicePrompts.test.ts:500-510`: the new text of section 6, and of the strategy's section 5 | — (the edited assertions) |
+| U15 | `__tests__/operatingPlanFacts.test.ts`: S/N/M keys and order; `keep` by the answers' name, and a held instrument the report names but the answers do not keep is NOT `keep`; the limit; an asset `createdEmpty` at 0 quotes is an S key, and so is one at 0 quotes the report matches; a money-market fund has its `held` entry; a property and a loan get no key | take `keep` from `handoff.keepAssetIds` |
+| U16 | `__tests__/accumulationPlanUtils.test.ts` › `resolvePlanReserve`: with `sourceIds` of one account out of two, the other account's cash lowers the reserve the plan's account keeps; without the parameter the result is today's | ignore `sourceIds` |
+| U17 | `__tests__/useConsulenteRun.test.tsx`: the plan request answers 429 → the state ends `done` and `onFinished` runs; `__tests__/useConsulentePlan.test.tsx` (new): two `write()` in a row send one request; a thrown request → `failed` with its sentence | let the plan's throw reach `run()`'s catch |
 | R1 | `__tests__/consulenteBookPlan.test.tsx` (new, `dom`): `planPieces` on an invented plan — the three groups, «tasse non stimabili: manca l'aliquota», the total, the corrections | render the sell group without the month |
-| R2 | same: the «Applica» row in the four states, on a `ready` and on an `applied` document; the button calls `onWrite` | hide the row on `applied` |
-| E1 | `e2e/allocation.consulente.spec.ts`: the fake run shows five rows and lands on a report with the page «Il piano operativo» | — |
-| E2 | `e2e/allocation.consulente.report.spec.ts`: a planted report without a plan → the row and the button; the fake plan stage fails → the stored sentence, the report still there; succeeds → the page appears | — |
+| R2 | same: the «Applica» row in the four states, on a `ready` and on an `applied` document with no note and no hand-off; the button calls `onWrite` | hide the row on `applied` |
+| E1 | `e2e/allocation.consulente.spec.ts`: the fake run shows five rows and, the fake having written the plan (§ 5), the document read after it carries `operatingPlan.status: 'ready'` | — |
+| E2 | `e2e/allocation.consulente.report.spec.ts`: a planted report without a plan → the row and the button; the fake plan stage fails (`plan: 'failed'`) → the stored sentence, the report still there; succeeds → the page «Il piano operativo» appears | — |
 | E3 | same: «Chiedi una modifica» (fake) → the plan is rewritten (a planted marker in the fake's summary changes) | — |
 
 ## 7. Guided verification (WORKFLOW.md § 2)
@@ -517,8 +619,8 @@ fake stage writes a plan and the page appears; a planted failure leaves the repo
   390 without a horizontal scroll), the index with eleven pages, the «Applica» row in its four states, the run
   screen with five rows (the fake run).
 - **D (data)**: `allocationAdvice/<uid>.operatingPlan` after the fake stage: `status: 'ready'`, quotas summing to
-  100,00, `corrections`; `status` of the document unchanged; after the fake revision `operatingPlan` was null
-  between the two requests (the script reads it in between through a paused fake).
+  100,00, `corrections`; `status` and `updatedAt` of the document unchanged (the plan's patches keep it, P10).
+  That a revision drops the plan is U12's: the fake revision runs no `runRevise`.
 - **E (edges)**: a planted plan whose `reportFinishedAt` is not the report's → the row, not the page; a planted
   `running` older than 20 minutes → the row with the button; a plan with `usable: false` → the row with its
   sentence.
@@ -526,9 +628,9 @@ fake stage writes a plan and the page appears; a planted failure leaves the repo
   `userContent` for his data and he reads the facts block (the keys, the taxes, «DA TENERE»); a plan built by
   `reconcileOperatingPlan` from a `RawOperatingPlan` written by hand in the script (two buys, one hold, one sale)
   is planted on his mirrored report and he reads the page. No model runs. `npm run mirror:remove`.
-- **G**: `npm run perf:budget` (no entry for the Consulente route: record its weight before and after in
-  doc/guide/velocita.md § Registro, README § 8); no first screen of a composed page changes; stop the servers, delete
-  the scripts, remove the mirror.
+- **G**: `npm run perf:budget`, every route green (no entry for the Consulente route: record its weight before and
+  after in doc/guide/velocita.md § Registro dei tetti alzati, README § 8); no first screen of a composed page
+  changes; stop the servers, delete the scripts, remove the mirror.
 
 ## 8. Putting it into service
 
@@ -540,18 +642,36 @@ instruments stage's symbols are read at his next full path. Then NOVE-25.
 
 ## 9. Documentation
 
-- `doc/guide/consulente.md`: § the stages — five, the plan stage's inputs and its own status (P1); § prompts — the
-  DATI PER IL PIANO OPERATIVO block, the keys (P2), what the model may now see (P4), the contract; § the book — the
-  page `piano`; § «Applica» — the absence row and «Scrivi il piano operativo»; § «Chiedi una modifica» — review +
-  plan; § Per-page blind spots: «a plan stage that fails leaves the report `ready`»; § Files the three new modules.
+- **A new guide `doc/guide/consulente-piano.md`** (consulente.md is 504 lines on 2026-11-19, past the ~500 a guide
+  holds): it receives, MOVED from `doc/guide/consulente.md`, the two bullets «**«Applica» shows the plans BEFORE
+  writing, one tick per item**» and «**After «Applica», a plan of accumulation**» (`:368-381`), and, new: the plan
+  stage (its inputs, its own status P1, `updatedAt` kept P10, the refusal P11), the DATI PER IL PIANO OPERATIVO
+  block and the keys (P2, P4), the contract, the reconcile's fifteen rules in one paragraph, the page `piano`, the
+  absence row and «Scrivi il piano operativo», «Chiedi una modifica» = review + plan, its § Files (the three new
+  modules, `useConsulentePlan`) and its blind spots («a plan stage that fails leaves the report `ready`»; «a plan
+  started in another tab reads «Scrivo…» until a reload»). `doc/guide/consulente.md` keeps one stub line in § The
+  run and one in § The report as a book pointing to it, and its blind spot `:489` becomes «a run with three rounds
+  is five, a revision with its round three». `AGENTS.md` § 3 gains the guide's stub («### Allocazione › Consulente,
+  il piano operativo → `doc/guide/consulente-piano.md`»: five stages; the plan stage reads its own facts block and
+  never changes the document's status or `updatedAt`).
+- `doc/guide/velocita.md` (518 lines): § «Baseline storica (2026-09-26 …)» (`:294-356`) MOVES to a new
+  `doc/guide/velocita-storico.md`, one pointer line left in its place; then the Consulente route's weight, before
+  and after, in § Registro dei tetti alzati.
+- `doc/guide/impostazioni.md` § Settings — the FIVE places: the sixth, `fetchSettings`' server mapper
+  (`lib/services/assistantMonthContextService.ts`), with the title's count.
 - `doc/guide/accumulo.md` § Dal Consulente: one sentence — the hand-off still seeds from the optimizer until
-  NOVE-25.
-- `AGENTS.md` § 3 Allocazione › Consulente: the stub's first bullet («five stages; the plan stage reads its own
-  facts block and never changes the document's status»).
-- `DESIGN.md` § 4.9; `CLAUDE.md` «Latest», the Consulente line of Key Features («…a fifth stage writes the
-  operating plan») and Data & Integrations if the model list changes (it does not: Opus 5.5 + Sonnet 5.5);
-  `Draft Release Temp.md`: the new page and the button, in the user's words.
-- `doc/nove/README.md`: § 6 the row; § 10 the overturned sentence.
+  NOVE-25; `resolvePlanReserve`'s `sourceIds`.
+- `DESIGN.md`: the two amendments of § 4.9.
+- `CLAUDE.md`: «Latest» is REPLACED, not extended; the Consulente line of Key Features is rewritten at equal or
+  shorter length with «a fifth stage writes the operating plan (doc/guide/consulente-piano.md)»; Data &
+  Integrations unchanged (Opus 5.5 + Sonnet 5.5). The file stays under 20.000 characters, measured with the
+  command of README § 8.
+- `Draft Release Temp.md`: the new page and the button, in the user's words.
+- `doc/nove/NOVE-20-temi-giro-b.md` (written before this one, implemented after): this spec moves lines in three
+  files it cites by number — `ConsulenteBook.tsx` (`:223`, `:229`, `:238`, `:341-350`), `ConsulenteBookPages.tsx`
+  (`:41-43`, `:150`) and `ConsulenteReport.tsx` (`:133`). In the same commit each of those citations is re-read on
+  the new code and rewritten with its new line; no file it names is deleted here.
+- `doc/nove/README.md`: § 6 the row (choice i and § 10 were amended when this spec was written).
 
 ## 10. Declared out of scope
 
@@ -565,6 +685,9 @@ instruments stage's symbols are read at his next full path. Then NOVE-25.
 - **The strategy or the review reading the facts block**: none, declared — one stage owns the figures (decision
   70).
 - **Removing «Dal Consulente»** → NOVE-25.
+- **A plan stage on a document left `failed` by a revision**: refused (P11), declared — the report on screen is
+  the old one and its revision is what the user retries.
+- **Polling a plan another tab is writing**: none, declared (§ 4.8).
 
 ## 11. The prompt that implements it
 
@@ -580,8 +703,9 @@ Contesto, prima di toccare qualsiasi file (le regole del repo cambiano il modo d
 - Leggi la spec doc/nove/NOVE-24-consulente-piano-operativo.md e l'indice della serie
   doc/nove/README.md (§ 3 decisioni, § 4 scelte adottate, § 7 contratti condivisi, § 8 regole)
 - Leggi doc/guide/consulente.md, doc/guide/accumulo.md, doc/guide/assistente.md,
-  doc/guide/server.md, doc/guide/velocita.md, doc/guide/e2e-emulatori.md e
-  doc/guide/e2e-playwright.md PRIMA di scrivere codice in quei domini
+  doc/guide/impostazioni.md, doc/guide/server.md, doc/guide/velocita.md,
+  doc/guide/e2e-emulatori.md e doc/guide/e2e-playwright.md PRIMA di scrivere codice in quei
+  domini
 - Leggi DESIGN.md (The AI-Accent Rule, The Path-Scene Rule, The Conversation-Is-Content Rule,
   The Absence-Has-Three-Names Rule) e PRODUCT.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md: il codice che scrivi li segue
@@ -604,16 +728,19 @@ nel riassunto. Se serve un comando che solo io posso lanciare (produzione, un lo
 interattivo), dammelo una riga alla volta con l'esito atteso.
 
 Implementa la spec così com'è scritta, nell'ordine: i tipi (§ 4.1); i fatti e la
-riconciliazione, puri (§ 4.2-4.3), con U5-U9 e U15; il blocco dati, il contratto e lo schema
-(§ 4.4), con le asserzioni sul testo; lo stadio sul server e la route (§ 4.5); i simboli
-Yahoo nella ricerca strumenti (§ 4.6); la corsa sul client (§ 4.7); la pagina del libro e la
-riga su «Applica» (§ 4.8); la frase di DESIGN.md (§ 4.9). I test PRIMA del codice, ciascuno
-visto rosso con la sua mutazione; cifre inventate e tonde. Nessun controllo che spende:
-nessuna corsa del Consulente, né in test né nel collaudo; il documento si pianta con
-e2e/consulenteReport.ts e la corsa resta finta. Fermati e chiedimi se: lo stadio «Piano»
-tocca status, stage o error del documento in un qualunque percorso; diventa rosso un test
-del Consulente che la § 5 non nomina; il peso della route del Consulente cresce di più di
-5 KB gz; `system` di un prompt cambia fra due utenti.
+riconciliazione, puri (§ 4.2-4.3), con U5-U9 e U15; il parametro sourceIds di
+resolvePlanReserve con U16; il blocco dati, il contratto e lo schema (§ 4.4), con le
+asserzioni sul testo; lo stadio sul server e la route (§ 4.5); i simboli Yahoo nella ricerca
+strumenti (§ 4.6); la corsa sul client (§ 4.7), con U17; la pagina del libro e la riga su
+«Applica» (§ 4.8); i due emendamenti di DESIGN.md (§ 4.9); le guide (§ 9: la guida nuova
+consulente-piano.md e lo spostamento della baseline storica di velocita.md). I test PRIMA
+del codice, ciascuno visto rosso con la sua mutazione; cifre inventate e tonde. Nessun
+controllo che spende: nessuna corsa del Consulente, né in test né nel collaudo; il documento
+si pianta con e2e/consulenteReport.ts e la corsa resta finta. Fermati e chiedimi se: lo
+stadio «Piano» tocca status, stage, error o updatedAt del documento in un qualunque percorso;
+diventa rosso un test del Consulente che la § 5 non nomina; il peso della route del
+Consulente, misurato prima e dopo, non è scritto in doc/guide/velocita.md § Registro dei
+tetti alzati; `system` di un prompt cambia fra due utenti.
 Collaudo: § 7, la F sul mirror al mio «pronto» (leggo il blocco dei fatti stampato dallo
 script e la pagina con un piano piantato); il controllo in produzione lo faccio io dopo il
 deploy (§ 8). Un branch, un commit, solo dopo il mio OK con il riassunto del diff.
@@ -622,5 +749,5 @@ SESSION_NOTES.md non si committa.
 
 Model: **Opus 5.5**, effort **medium** — an L spec with shared contracts (`OperatingPlan`,
 `reconcileOperatingPlan`, `operatingPlanOf`, the fifth stage read by the run, the route, the book and the «Applica»
-page) across the server pipeline and the Consulente route. Estimated size: 1 session, ~6 h; ~330 lines pure, ~170
-of server, ~220 across components, ~550 of tests, three E2E tests.
+page) across the server pipeline and the Consulente route. Estimated size: 1 session, ~6 h; ~350 lines pure, ~190
+of server, ~230 across components, ~620 of tests (U1–U17, R1–R2), three E2E tests.
