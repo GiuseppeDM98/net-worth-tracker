@@ -117,7 +117,7 @@ export async function seedAccumuloFixture({ startOffset = -2, status = 'active' 
       buyAssetId: weight.assetId,
     })),
     disposals: [],
-    // A draft (NOVE-16's shape) has no installments, no baseline and no activation.
+    // A draft (the editor's draft shape since 2026-11-17) has no installments, no baseline and no activation.
     installments: status === 'active' ? installments : [],
     residualEur: 0,
     createdAt: now,

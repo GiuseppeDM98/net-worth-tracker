@@ -115,7 +115,7 @@ test.describe('Con vendite mirate', () => {
   });
 });
 
-// The two columns end on one line at 1440 (owner, 2026-11-18, as Bilanciamento's Piano and Per classe — NOVE-02):
+// The two columns end on one line at 1440 (owner, 2026-11-18, as Bilanciamento's Piano and Per classe since 2026-11-13):
 // the bottom tile of the shorter column is stretched to the other's bottom edge — Portafoglio modello on the
 // left, Criteri del modello on the right. Seen red with `desktop:self-start` back on the model's cell.
 test.describe('le due colonne finiscono sulla stessa riga', () => {

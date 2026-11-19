@@ -17,7 +17,7 @@ weight, month by month, proposes the purchases and never writes a transaction on
   `buyAssetId`). Weights sum to 100. «Parti da» seeds them from today's tradable portfolio or from typed targets.
   Step 2 also has an «Ottimizzato» view (`OptimizerPanel`, doc/guide/ottimizzatore.md): it runs on «Calcola» only and
   «Usa questi pesi» hands the weights and the calculation's snapshot to the draft. A plan started from outside the
-  editor — «Crea un PAC con questi pesi» in the model's dialog — arrives as ONE `PlanSeedDraft` (`positions`,
+  editor — «Crea un PAC con questi pesi» in the model's dialog, «Apri l'editor» in «Dal Consulente» (below) — arrives as ONE `PlanSeedDraft` (`positions`,
   `disposals?`, `optimizerSnapshot?`, 2026-11-17), never a second seed shape. «Con vendite mirate» seeds its
   `disposals` (`seedDisposalsFromSale`, 2026-11-18): the whole position of an instrument out of the model or brought
   to 0% (`soldOutKeys`: never one merely out of the model, like a money-market fund — found at the tour), and then no
@@ -79,7 +79,7 @@ weight, month by month, proposes the purchases and never writes a transaction on
 
 ## Dal Consulente
 
-The plan toward the targets «Applica» just wrote (owner, 2026-11-12; spec doc/nove/NOVE-21). The «Applica» page
+The plan toward the targets «Applica» just wrote (owner, 2026-11-12; in `develop` since 2026-11-18, PR #553). The «Applica» page
 links to `?tab=accumulo&da=consulente` (`CONSULENTE_HANDOFF_HREF`) when the document is applied with the targets
 written and no plan is open (`applyHandoffOf`); the tab opens «Dal Consulente» once, only then, and cleans the URL
 whatever it finds (a failed read of the advice is «no advice»). No model is called: the weights are the app's.
@@ -100,8 +100,8 @@ whatever it finds (a failed read of the advice is «no advice»). No model is ca
   sub-target; a sub-category the targets do not list, or a class without sub-targets: any named one of the class);
   until then it holds the place, so the share does not fall on the class's other instruments (`unnamedHeld`,
   `extraNames`, `describeHandoffExtra`; owner 2026-11-18, phase F: before, the plan kept buying it); **a new instrument in a
-  class without sub-targets starts at 0 %** — its bounds are fixed at 0 (`startsAtZero`, owner 2026-11-18, decision
-  58: with the spec's code the optimizer still gave it a share, 33,5 % alone in its class, so «parte da 0%» never
+  class without sub-targets starts at 0 %** — its bounds are fixed at 0 (`startsAtZero`, owner 2026-11-12 and
+  2026-11-18: with the first code the optimizer still gave it a share alone in its class, so «parte da 0%» never
   fired) and the reading names the class (`zeroClasses`, `describeHandoffZero`) — only for an instrument with no value yet: a held one the optimizer leaves at 0 % is a row at 0 % and no sentence (phase F, 2026-11-18). A property under its mortgage
   (`negative_fixed`), bounds that cannot hold or nothing matched fall back to `manual`: the matched instruments at 0 %,
   and the reading says why. The snapshot's clock is the dialog's opening.
@@ -128,13 +128,15 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
 
 `types/accumulationPlan.ts` · `lib/utils/{accumulationPlanUtils,accumulationPlanMatching,accumulationPlanSchema,accumulationNarrative,accumuloSummary,zeroQuantityChip}.ts` · the slim read path `lib/utils/{openAccumulationPlan,planMonths,accumulationPlanDoc,accumuloMonth}.ts`, `lib/services/accumulationPlanRead.ts`, `lib/hooks/{useAccumulationPlans,usePacMonth}.ts` · `lib/services/accumulationPlanService.ts` (the transactions and the lock) · `lib/hooks/{useAccumulationPlan,useOpenAccumuloPlan,useMonthlySavingsMedian}.ts` · `components/allocation/{AccumuloTab,AccumuloTabSkeleton,AccumulationPlanDialog,AccumulationCalendarDialog,ClassDriftChart,PlanDraftSidePanel,ConsulenteHandoff,KeptSalesNote}.tsx` · the Consulente's hand-off `lib/utils/allocationAdviceHandoff.ts` (tests `allocationAdviceHandoff`, `consulenteHandoff`, `keptSalesNote`, `e2e/accumulo.consulente.spec.ts`) · `components/allocation/tiles/{QuestoMese,ClassiDelPiano,AccumuloVuoto,PianiConclusi}Tile.tsx` · tests `__tests__/accumul*.test.ts`, `e2e/accumulo.{mobile,tablet}.spec.ts` (fixture `e2e/accumuloFixture.ts`).
 
-- **Suites to run after a change here — Accumulo** (2026-11-17): `accumulationPlanUtils`, `accumulationPlanMatching`,
+- **Suites to run after a change here — Accumulo** (2026-11-17; the Consulente's hand-off since 2026-11-18): `accumulationPlanUtils`, `accumulationPlanMatching`,
   `accumulationPlanSchema`, `accumulationPlanDoc`, `accumulationPlanService`, `accumulationPlanRevision`,
   `accumulationPlanReviewFlow`, `accumulationClassTrajectory`, `accumulationNarrative`, `accumulationReactivate`,
   `accumuloMonth`, `accumuloSummary`, `accumuloTileSentences`, `zeroQuantityChip`, `allocazioneNarrative`,
-  `allocazioneSummary`, `mirrorCollections`, `persistCache` · **dom** `accumuloVuotoTile`, `planDraftSidePanel`,
-  `assetDialogCreateEmpty`, `strumentiTile`, `consulenteBook` · **AI context** `assistantPortfolioContext`,
-  `assistantPromptBundle`, `allocationAdviceApply`, `allocationAdvicePrompts` · **Browser** `e2e/accumulo.{mobile,tablet}.spec.ts`,
+  `allocazioneSummary`, `mirrorCollections`, `persistCache`, `allocationAdviceHandoff`, `allocationAdviceDocument`,
+  `modelPortfolioGroups`, `narrativeTextNesting` · **dom** `accumuloVuotoTile`, `planDraftSidePanel`,
+  `assetDialogCreateEmpty`, `strumentiTile`, `consulenteBook`, `consulenteHandoff`, `keptSalesNote` · **AI context** `assistantPortfolioContext`,
+  `assistantPromptBundle`, `allocationAdviceApply`, `allocationAdvicePrompts`, `allocationAdvicePlanRead`, `allocationAdviceRun` · **Browser** `e2e/accumulo.spec.ts`,
+  `e2e/accumulo.consulente.spec.ts`, `e2e/accumulo.{mobile,tablet}.spec.ts`,
   `e2e/allocation.spec.ts` (the tab, the Piano's note), `e2e/bundle.lazy.mobile.spec.ts` (the lazy landing).
 
 ## Per-page blind spots
@@ -148,10 +150,20 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
 - **A class at 0% target is not drawn** (owner, 2026-11-17): `onlyTargetedClasses` takes it out of the editor's panel, the chart, the calendar and the re-entry sentence — Impostazioni saves every class, the empty ones at 0, and «Immobili 78,6% → 0%» squashed the chart. The filter is the VIEWS' only: `projectClassTrajectory` keeps every class, its cash class proves the money conserved (`__tests__/accumulationClassTrajectory.test.ts`).
 - **«Mai comprato»** (`describeZeroQuantityChip`) needs `Asset.createdEmpty`, written only by «+ Nuovo asset»: an asset created at 0 before 2026-11-12, or a position sold before the ledger migration, reads «Azzerato».
 - **The census fixture plants a plan and its lock** (`scripts/seedCensusE2E.mts`); the `allocazione-accumulo` entry of `perf/mobile-budget.json` is measured on this machine (doc/guide/prima-schermata-misure.md).
-- **«Dal Consulente»: a limit bounds the weight in the portfolio, not the quota in the plan** (C12, 2026-11-12): an
+- **«Dal Consulente»: a limit bounds the weight in the portfolio, not the quota in the plan** (2026-11-12): an
   instrument's `instrumentLimits` in the criteria hold for the optimizer's portfolio weights, which the seed turns into
   the plan's quotas — a quota above the limit is not a bug.
-- **«Dal Consulente»: a held instrument keeps its own sub-category** (C11): the hand-off never re-labels it to the
+- **«Dal Consulente»: a held instrument keeps its own sub-category** (2026-11-12): the hand-off never re-labels it to the
   Consulente's sleeve; a sub-category the targets do not list makes its class `unmappedClasses` (the class whole).
 - **«Dal Consulente»: dropping the `isPlanBuyable` filter in `buildHandoffSeed` stays green** (2026-11-18):
   `toModelWeights` already drops the money-market fund, the accounts and «Liquidità» — the filter is a guard.
+- **«Dal Consulente»: a held instrument that holds the place is not named** (owner, 2026-11-19): until the instrument
+  the Consulente names in its slot is created, the held one keeps its share and the reading does not name it —
+  `describeHandoffExtra` names only the ones brought to 0 % (`unnamedHeld`); the «Crea» row already says the quotas are
+  recomputed. The spec's sentence «Il piano compra anche {nomi}…» was replaced on the tour of 2026-11-18.
+- **«Dal Consulente»: what it does not do** (declared on 2026-11-12): a prefilled instrument typed wrongly (`bond` /
+  `crypto` / `etf`) is not retyped in the window — created from Patrimonio's «Aggiungi asset», it is matched by name at
+  the next open; no sale is seeded from the Consulente's «vendi» (a sale under a tax cap is «Con vendite mirate»,
+  doc/guide/ottimizzatore.md); no hand-off from a report not yet applied; an active plan is revised from Accumulo's
+  «Rivedi il piano», never from the Consulente; the month-1 warning's wiring in the editor (`KeptSalesNote` on steps 2
+  and 3) was proven on the tour, the component alone by `keptSalesNote`.

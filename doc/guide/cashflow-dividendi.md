@@ -11,7 +11,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility}.ts` (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` (`useDividendRegistry` for the page's list, `useDividendStats` for the tab's measures: ONE request) → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
 - **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendAccount`, `dividendIncomeService`, `floatNoise` · **Email** `monthlyEmailService`
-- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles), `pagatoriTile` · **Browser** `e2e/cashflow.dividendi{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts` · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
+- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles), `pagatoriTile`, `searchableComboboxRefocus` (the picker after a refusal) · **Browser** `e2e/cashflow.dividendi{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts` · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
 
 ## Cashflow › Dividendi (`components/dividends/DividendTrackingTab.tsx`, `components/dividends/tiles/*`)
 - **RECEIVED AND ANNOUNCED ARE NEVER ONE FIGURE.** A dividend whose `paymentDate` is in the future is
@@ -294,12 +294,11 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 
 - **No strip on a phone** (2026-10-12): under the title there is the period pill and the «+», then the verdict's one sentence — received and announced are never one figure, and the two already open THE tile; a reader looking for the three cells the other tabs show finds none here, by design. Not proven in a browser: Pagamenti open by default while a provisional coupon asks for its rate, and the «nothing recorded» state on a phone (no axis, no rows, no memory) — the fixtures' coupons are past and not provisional.
 - **Rendimento's failure is spoken once, by the page** (2026-10-12): on a phone the row's notice and the Dettaglio's are silent (`live={false}`), `PageRest`'s one sentence says «1 sezione non è stata letta: Rendimento.»; a reader who closed the row sees the red eyebrow and nothing else until the next visit, when it opens again.
-- **`e2e/cashflow.dividendi.spec.ts` › «the form refuses…» is red after `cashflow.accounts` + `cashflow.budget`** (2026-09-30:
-  3/3 on a clean `develop` worktree, 2/3 on the branch of PR #418, green alone): after the refusal the dialog stays open
-  with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red; green in
-  the evening's full run of the same day (162/162). (moved from `CLAUDE.md` → Known Issues on 2026-10-07) Returned on
-  2026-11-03 (desktop project, once in 108): the BTP row detached from the picker as it was clicked; green ×3 alone.
-  Again on 2026-11-16, the same detach once in a full run of 403 on `next dev` (green ×4 alone).
+- **A refused submit focuses the picker back, and it stays open to typing** (2026-11-19): the click on «Registra
+  pagamento» blurs the field the dialog focused at open, and the refusal focuses it again inside the combobox's 200 ms
+  blur delay; `SearchableCombobox`'s `handleFocus` clears that pending blur (`__tests__/searchableComboboxRefocus.test.tsx`).
+  Before, «BTP» typed right after a refusal opened no list — the intermittent red of `e2e/cashflow.dividendi.spec.ts`
+  «the form refuses…» since 2026-09-30 (doc/guide/e2e-suite.md).
 
 - **A coupon recovered the day after a missed cron is NOT credited to its account** — by the owner's rule (only a
   payment dated today or later credits, so arrears never count twice). The income row is there, without an account:

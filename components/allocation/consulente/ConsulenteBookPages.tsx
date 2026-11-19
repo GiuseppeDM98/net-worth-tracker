@@ -271,7 +271,7 @@ export interface ApplyPiecesInput {
   handoff: ApplyHandoff;
 }
 
-/** «Applica»: one checkbox per thing it writes, the plans' warnings and the status line — only when ready with a proposal. */
+/** «Applica»: one checkbox per thing it writes, the plans' warnings and the status line when ready with a proposal; once applied, the active plan's note and the hand-off's reading or the draft's note. */
 export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
   const { document, proposal, rows, roles, goalPlan, goalsCount, applyState } = input;
   return {

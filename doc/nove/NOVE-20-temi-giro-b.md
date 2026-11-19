@@ -5,7 +5,7 @@
 > (`useCostumeScopeProps()`, NOVE-19 § 4.1, already spread on every dialog, drawer, sheet and alert content), the four
 > control properties and `COSTUME_FRAME_RADIUS_CLASS` / `COSTUME_PILL_RADIUS_CLASS` (§ 4.2), the emblems of Panoramica, Patrimonio and Cashflow (§ 4.5), the E2E files
 > `e2e/theme.costume{,.mobile,.tablet}.spec.ts` and `e2e/themeNeutral.ts`'s probes. It dresses NOVE-10's (retired on 2026-11-16, PR #540) Analisi,
-> NOVE-15's (retired on 2026-11-16, PR #544) Assistente, NOVE-16/17/18's Accumulo and NOVE-21's hand-off (`ConsulenteHandoff.tsx`, a
+> NOVE-15's (retired on 2026-11-16, PR #544) Assistente, NOVE-16/17/18's Accumulo and NOVE-21's (retired on 2026-11-19, PR #553) hand-off (`ConsulenteHandoff.tsx`, a
 > `ResponsiveModal`: frame and title by § 4.2; the applied book's link) as they leave them. Written on 2026-11-12; every `file:line` is
 > cited on `develop` @ b841cbd7, the Accumulo code as `pr488:file:line` (`refs/tmp/pr488`, holding #486 and #487).
 > Executes decisions 3, 4, 16, 17 and the adopted choice (a) (README.md § 3-4) on what NOVE-19 § 10 hands over;

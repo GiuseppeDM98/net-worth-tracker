@@ -290,7 +290,7 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
                   the rows, so «Il resto» and the rows are ONE index on a tablet in landscape: with a plan
                   Questo mese on row 1 at its natural height, the model under it on row 2; the `1fr` second
                   row takes the right box's extra height. The two columns end on one line (owner, 2026-11-18, as
-                  Bilanciamento's Piano — NOVE-02): the model stretches to the box's bottom edge when the box is
+                  Bilanciamento's Piano since 2026-11-13): the model stretches to the box's bottom edge when the box is
                   the taller, the box's last tile (Criteri, `desktop:flex-1`) when the model's column is. */}
               <div className={cn(composed ? COMPACT_GRID_CLASS : PLAIN_GRID_CLASS, plan && 'desktop:grid-rows-[auto_1fr]')}>
                 {!plan && (

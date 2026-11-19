@@ -54,16 +54,18 @@
     tests, Patrimonio's and Panoramica's, in one full run with the trace off (green 16/16 alone): closed in
     `patchOverview` itself, whose route callback lets a fetch the test's end cut short go (`Test ended` / `has been
     closed`) — every caller at once, no assertion touched.
-  - `cashflow.dividendi.spec.ts` «the form refuses…» — the BTP row detached from the picker as it was clicked (doc/guide/
-    cashflow-dividendi.md § Per-page blind spots): red again on 2026-11-16, once in the full run of the parallel seeds
-    (green ×4 alone right after) — the third time with this symptom, a pattern still open.
+  - `cashflow.dividendi.spec.ts` «the form refuses…» — red once in a full run on 2026-09-30, 2026-11-03, 2026-11-08,
+    2026-11-16 and 2026-11-19, never alone: **closed on 2026-11-19 in the page, not the spec**. The dialog focuses the
+    picker at open, the submit's click blurs it and the refusal focuses it back at once; `SearchableCombobox`'s pending
+    blur (200 ms) then closed it under the browser's focus, and «BTP» typed opened no list. `handleFocus` clears the
+    pending blur (`__tests__/searchableComboboxRefocus.test.tsx`, red without it); 8/8 alone after.
   - `assets.trade-fee.spec.ts` «a trade’s fee becomes a locked spending row…» [desktop] (2026-11-17): after the trade's
     removal its fee row was still in Firestore at the 30 s poll (1 where 0) — once in a full run on the production build
     (16,9 min, 421 green), green ×3 alone right after; the first time.
   - `bundle.lazy.mobile.spec.ts` «Allocazione › Accumulo at 390 lands where the page drew its placeholder…» [mobile]
     (2026-11-18, `next dev`): the first tile's box `null` at `e2e/lazyTabLanding.ts:72` — red 1 in 11 alone, then 1 in 7
     after the «Con vendite mirate» tour (PR #551); not the branch's (the same red with the Portafoglio modello tile's hunk reverted). A
-    pattern on the dev server; on the production build too (2026-11-18, NOVE-21's full run, 433 green): red once in
+    pattern on the dev server; on the production build too (2026-11-18, the full run of PR #553, 433 green): red once in
     the full run, 1 in 4 alone, and 1 in 9 on develop's code (the branch stashed) — the page's, not a branch's.
 - **A full run on the month's first three days reads a different Budget** (2026-11-03): `mobile-composition.cashflow.mobile.spec.ts` «the two cells open the right row» counted two lifted KPIs, one on those days (no pace, `liftedBlocks` skips «Fine mese»); it now reads the Italian day. Not a flake: a test written on a later day stays green until a run lands there. **A seed that ran before the Auth emulator was up** gave 12 red in one full run the same day (`seed exit=1`, the fixtures missing): wait on BOTH :8080 and :9099 before `emulators:seed`.
 - **`e2e/cashflow.transfer-fee.spec.ts` was red ONCE in a full run** (2026-10-07, Windows machine, the second full run
@@ -75,9 +77,9 @@
   the same way** (2026-10-08, the first full run on Next 16.4, PR #436): `apiResponse.text: Response has been disposed`
   inside `holdChunks`' route handler (`chunkProbe.ts:61`) — a chunk fetched by the handler was disposed before its body
   was read, i.e. the page had moved on; green ×2 alone right after (`--repeat-each=2`). If it returns, read the body
-  inside a `try` and `route.continue()` on the disposed one rather than widening a timeout. **`e2e/cashflow.dividendi.spec.ts` › «the form
-  refuses in the reading line…» was red ONCE the same way** (2026-11-08, a full run that did not touch the Dividendi): the
-  picker's BTP option was not clicked within 30 s; green alone right after (4/4). A second red there is a pattern, not noise.
+  inside a `try` and `route.continue()` on the disposed one rather than widening a timeout. `e2e/cashflow.dividendi.spec.ts` › «the form
+  refuses in the reading line…», red on 2026-11-08 with the same timeout, was not this race: the combobox's own, closed
+  on 2026-11-19 (above).
 
 ## The suite's speed
 
@@ -130,8 +132,8 @@ whole run, on the Windows machine (8 logical cores, 31,5 GB, Playwright 1.62.1, 
   between two projects of one account. **And the trace serialises the workers**: three accounts on three workers went
   49,3 → 40,2 s with it (the CPU at 1,7 cores of 8) and 42,1 → 21,9 s without; four workers on the base account with the
   trace made each test 3–7× slower. One port is enough on a production server.
-- **Not done, by the decision of 2026-11-13**: no sharding (above). Left for a later session, if ever: the Dividendi
-  picker flake (§ The full run and its known flakes; the `overview.mobile` six-figure one closed on 2026-11-18).
+- **Not done, by the decision of 2026-11-13**: no sharding (above). The Dividendi picker flake was
+  closed on 2026-11-19 and the `overview.mobile` six-figure one on 2026-11-18 (§ The full run and its known flakes).
 
 Time per area on 2026-11-13, `next dev` with the trace · production without it (the specs of an area: its guide's § *Files*):
 Consulente 207 · 73 s; Cashflow's Tracciamento, accounts, mortgage and fee 140 · 92; Patrimonio 82 · 51; Assistente 64 · 33;

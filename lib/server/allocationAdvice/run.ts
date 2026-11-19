@@ -395,7 +395,7 @@ async function runInstruments(document: AllocationAdviceDocument, onStage: (stag
 async function runReview(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, now: Date): Promise<void> {
   const { strategy, instruments } = document;
   if (!strategy?.proposal || !instruments) throw new AllocationAdviceStageError('review', 'Mancano strategia o strumenti da rivedere. Avvia di nuovo la ricerca.', false);
-  // The review reads no data block, but it judges whether the active plan goes toward the new targets.
+  // The review reads no portfolio data block — only PIANO DI ACCUMULO, to judge whether the active plan goes toward the new targets.
   const accumulationPlan = formatAccumulationPlanForPrompt(await readAccumulationPlanForAdvice(document.userId, now));
   await enterStage(document, 'review', onStage);
   const answer = await callModel('review', {

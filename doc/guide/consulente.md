@@ -39,7 +39,7 @@
 - **Server**: `lib/server/allocationAdvice/prompts.ts` (the builders of the strategy, the instruments, the revision and the review, the interview's and the IL COLLOQUIO
   block), `run.ts` (the orchestration: context → strategy → instruments → review, persisted at every stage;
   `runInterviewRound`, which persists nothing; the OBBLIGAZIONI block and the previous paths read beside the
-  context, 2026-11-08), `store.ts` (Admin, `allocationAdvice/{uid}` and the archive `allocationAdvice/{uid}/history`);
+  context, 2026-11-08, the PIANO DI ACCUMULO block too since 2026-11-12), `accumulationPlan.ts` (Admin, its read), `store.ts` (Admin, `allocationAdvice/{uid}` and the archive `allocationAdvice/{uid}/history`);
   `lib/utils/allocationAdviceBonds.ts` (pure: which holdings are the bond part, which cost a profile read, the block);
   `app/api/allocation-advice/run/route.ts` (SSE, `maxDuration = 300`, 12 model requests an hour per warm instance:
   interview rounds, strategy, revise), `applied/route.ts`.
@@ -116,7 +116,7 @@
 
 - **Three calls in series, persisted at every stage** (`runAllocationAdvice`; on the mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
   of the Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, portfolio block included) and the
-  CASHFLOW 12 MESI block, read beside it before the strategy stage (2026-11); the strategy
+  CASHFLOW 12 MESI block, read beside it before the strategy stage (2026-11), and the PIANO DI ACCUMULO block (below); the strategy
   on Opus 5.5 (effort `medium`, `max_tokens` 32 000, no tool); the instruments on Sonnet 5.5 (effort `high`) with
   `web_search_20260209` (`max_uses` 20, `ALLOCATION_ADVICE_WEB_SEARCH_MAX_USES`); the review on Opus 5.5. Each call is a stream read to the
   end by the SDK's accumulator (`beta.messages.stream(...).finalMessage()`): `stop_reason` and the model that
@@ -164,13 +164,13 @@
 - **The PIANO DI ACCUMULO block** (2026-11-12): `readAccumulationPlanForAdvice(userId, now)`
   (`lib/server/allocationAdvice/accumulationPlan.ts`, Admin SDK) + `formatAccumulationPlanForPrompt` (`prompts.ts`),
   printed after OBBLIGAZIONI in `userContent` of the interview and the strategy (through `buildConsulenteContext`), of
-  the review and of the revision (`opts.accumulationPlan`); never the instruments' stage. Three states: not read (a
+  the review and of the revision (`opts.accumulationPlan`); never the instruments' stage nor the Assistente (declared, 2026-11-12). Three states: not read (a
   failed read logs and never fails the run), no active plan (a draft or a completed one count as none), an active
   plan — month k of n («non ancora partito: parte a …» before its start), the instalment, the weights by name, the
   sales with their month and status. Sections 5 and 6 of the contracts carry the path in words: what to accumulate or
   sell, an indicative time, the monthly instalment as an order of magnitude, and with an active plan whether it goes
   toward the targets — never a table, never the plan's figures recomputed; the review names «Crea un piano di
-  accumulo verso questa allocazione» (decision 28).
+  accumulo verso questa allocazione» (owner, 2026-11-12).
 - **The CASHFLOW 12 MESI block** (2026-11): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
   `formatCashflowBlockForPrompt`) over `fetchCashflowBlockInputs(userId, now)` (lib/services/assistantMonthContextService.ts),
   ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
@@ -297,7 +297,7 @@
   report».
 - **The pager** is the card's footer on every width: «Indietro» (disabled on the first page) and, below `desktop:`,
   «Indice»; the page's own buttons — «Avanti» (absent on «Applica»), on «Chiedi una modifica» «Rivedi il report» and
-  «Salta le domande» with «Avanti» as an outline, on «Applica» «Applica alle impostazioni» and «Rifai il percorso».
+  «Salta le domande» with «Avanti» as an outline, on «Applica» «Applica alle impostazioni» and «Rifai il percorso» (once applied, also «Crea un piano di accumulo verso questa allocazione», below).
   With an active accumulation plan «Applica» says once that the new targets do not change it (`APPLY_ACTIVE_PLAN_NOTE`,
   read through `useAccumulationPlans`, 2026-11-12).
   Below `tablet:` a column, the page's buttons full width on top. From `desktop:` the rail's labels are buttons, ONE

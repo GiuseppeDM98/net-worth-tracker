@@ -116,7 +116,7 @@ test('E3 — «Crea» apre AssetDialog già compilato; salvato, la riga legge «
   await expect(handoffDialog(page).getByRole('listitem').filter({ hasText: 'ETF ornitorinco' })).toContainText('0 quote', { timeout: 30_000 });
 });
 
-// Owner, 2026-11-18 (the tour of NOVE-21): «Salva bozza» writes the model too when «Aggiorna anche il portafoglio
+// Owner, 2026-11-18 (the guided tour of the Consulente's hand-off): «Salva bozza» writes the model too when «Aggiorna anche il portafoglio
 // modello» is on, as «Attiva» does — for every plan. Seen red with `finishWithModel` dropped from `handleSaveDraft`.
 test('E4 — «Salva bozza» con la casella accesa scrive anche il portafoglio modello', async ({ page }) => {
   await removeModel();

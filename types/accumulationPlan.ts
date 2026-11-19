@@ -82,7 +82,7 @@ export interface PlanBaseline {
   measurement: ClassMeasurement;             // month 0 of the trajectory
 }
 
-/** What a caller hands the editor to start a NEW plan from: the model's dialog today, the Consulente tomorrow. */
+/** What a caller hands the editor to start a NEW plan from: the model's dialog, and the Consulente's hand-off since 2026-11-18. */
 export interface PlanSeedDraft {
   positions: PlanPosition[];
   disposals?: PlanDisposal[];

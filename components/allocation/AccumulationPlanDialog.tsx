@@ -199,7 +199,7 @@ interface AccumulationPlanDialogProps {
   /** A «+ Nuovo asset» create landed: the page must reload `allAssets`. */
   onAssetsChanged: () => void;
   onSaved: (planId: string) => void;
-  /** Seeds a BRAND-NEW draft (`plan === null`) — the model's dialog today — in place of
+  /** Seeds a BRAND-NEW draft (`plan === null`) — the model's dialog, or «Dal Consulente» since 2026-11-18 — in place of
    *  `seedPositionsFromAssets`. Ignored whenever `plan` is set (editing an existing draft or active plan
    *  never re-seeds it); without it the dialog behaves exactly as before. */
   seedDraft?: PlanSeedDraft;

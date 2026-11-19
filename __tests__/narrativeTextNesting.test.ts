@@ -1,7 +1,7 @@
 /**
  * `NarrativeText` renders its own `<p>` (components/ui/narrative-text.tsx): a `<p>` that wraps it is a
- * `<p>` inside a `<p>`, invalid HTML that React reports as a hydration error. Found in phase F of NOVE-21
- * (2026-11-18) on Accumulo's «Questo mese», under an active plan below its reserve. A scan of the
+ * `<p>` inside a `<p>`, invalid HTML that React reports as a hydration error. Found on the guided tour of the
+ * Consulente's hand-off (2026-11-18) on Accumulo's «Questo mese», under an active plan below its reserve. A scan of the
  * components' source, so every host is held, not only the one that broke.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';

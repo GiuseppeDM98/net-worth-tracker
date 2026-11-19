@@ -6,7 +6,7 @@
 > operativo», the absence row on «Applica»). Third of the five specs of «dal Consulente al piano di accumulo, in un
 > clic»: the click. It removes NOVE-21's window «Dal Consulente» and the optimizer from this path.
 > Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c. Executes decisions 67, 71, 72, 73, 74,
-> 76, 77, 79, 80, 81, 82, 94, 96, 97, 98 (README.md § 3); overturns decision 27, NOVE-21's choices C1 and C3 and
+> 76, 77, 79, 80, 81, 82, 94, 96, 97, 98 (README.md § 3); overturns decision 27, NOVE-21's (retired on 2026-11-19, PR #553) optimizer seed (`buildHandoffSeed`) and its rule of no seeded sale, and
 > the index's choice p (the one-line warning «a plan is active» on «Applica»: the click now revises that plan).
 
 ## 1. The problem today (evidence on the code)
@@ -18,8 +18,8 @@ Consulente» opens (`components/allocation/ConsulenteHandoff.tsx`), then `AssetD
 then the three-step editor, then «Attiva piano». The owner (2026-11-18): «solo il click per creare il pac e basta».
 
 **The plan that comes out is not the Consulente's.** `buildHandoffSeed`
-(`lib/utils/allocationAdviceHandoff.ts:130-209`) runs the optimizer in mode `'ideal'`; no sale is seeded (C3); a new
-instrument in a class without sub-targets starts at 0 % (decision 58).
+(`lib/utils/allocationAdviceHandoff.ts:130-211`) runs the optimizer in mode `'ideal'`; no sale is seeded; a new
+instrument in a class without sub-targets starts at 0 % (decision 58; doc/guide/accumulo.md § Dal Consulente).
 
 **No code can create a plan without the editor.** `createDraftPlan` then `activatePlan`
 (`lib/services/accumulationPlanService.ts:141`, `:210`) are called only from the dialog
@@ -101,10 +101,10 @@ first nor revise the second.
   correction before the click, which stays on the plan; the tick goes off only if the plan can buy nothing.
 - **Owner 79**: an open draft is REPLACED. **Owner 80**: an active plan is REVISED.
 - **Owner 81, 82**: read from NOVE-24 (taxes shown; a forgotten instrument at 0 %, a new one at its quota).
-- **Kept from NOVE-21 (owner)**: the model is written with the plan («Salva bozza writes the model too»); held rows
+- **Kept from NOVE-21 (retired on 2026-11-19, PR #553) (owner)**: the model is written with the plan («Salva bozza writes the model too»); held rows
   at 0 % enter the model; every held buyable instrument is a row.
 - **Overturned**: decision 27 (2026-11-12: «calcolato dal codice (ottimizzatore + `seedDraft`), il proprietario
-  conferma nell'editor») and NOVE-21's C1 (the optimizer's seed) and C3 (no sale seeded) — by decisions 67, 71, 72
+  conferma nell'editor») and NOVE-21's optimizer seed (`buildHandoffSeed`) and no seeded sale (doc/guide/accumulo.md § Dal Consulente) — by decisions 67, 71, 72
   (2026-11-19). Decision 58 no longer has a reader (decision 82). Choice p of the index (the one-line warning
   with an active plan, `APPLY_ACTIVE_PLAN_NOTE`) — by decision 80.
 - **Adopted, reversible (this spec)**:
@@ -580,7 +580,7 @@ sentence is not stored: on a reload Accumulo's own «superato» verdict tells it
   - from `lib/utils/allocationAdviceHandoff.ts`: `buildHandoffSeed`, `findKeptSales`, `handoffCriteria` (`:111`,
     read by the seed alone) and the optimizer imports; the module keeps `planConsulenteHandoff` and its matchers
     (NOVE-24's facts read them) and its header comment is rewritten to say so;
-  - from `lib/utils/accumulationNarrative.ts` every export of the «Dal Consulente» block (`:1403-1460`):
+  - from `lib/utils/accumulationNarrative.ts` every export of the «Dal Consulente» block (`:1403-1463`):
     `HANDOFF_EYEBROW`, `HANDOFF_TITLE`, `HANDOFF_NO_TICKER`, `HANDOFF_CREATED_PENDING`, `describeHandoffZero`,
     `describeHandoffExtra`, `describeHandoffUnnamed`, `describeHandoffNotBuyable`, `describeHandoffReading`,
     `describeKeptSales`, with the type import of `ConsulenteHandoffPlan` / `HandoffSeedOutcome` (`:26`);
@@ -594,7 +594,7 @@ sentence is not stored: on a reload Accumulo's own «superato» verdict tells it
   - tests: `e2e/accumulo.consulente.spec.ts`, `__tests__/consulenteHandoff.test.tsx`,
     `__tests__/keptSalesNote.test.tsx`; the hand-off cases of `__tests__/allocationAdviceHandoff.test.ts` and
     `__tests__/allocationAdviceDocument.test.ts`; the hand-off and active-plan-note cases of
-    `__tests__/consulenteBook.test.tsx` (`:22-23`, `:382-418`).
+    `__tests__/consulenteBook.test.tsx` (`:22-23`, `:369-420`).
 - `AssetDialog`'s `prefill` prop is deleted with its cases in `__tests__/assetDialogCreateEmpty.test.tsx:93`
   (its one caller was `ConsulenteHandoff.tsx:85`); the TYPE `AssetPrefill` stays — the operating plan's legend
   carries it.
