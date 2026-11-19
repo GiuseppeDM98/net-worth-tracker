@@ -206,3 +206,15 @@ describe('every euro field is written in cents', () => {
     expect((written?.installments as Array<{ lines: Array<{ executedAmountEur: number }> }>)[0].lines[0].executedAmountEur).toBe(10.01);
   });
 });
+
+// The review month the Consulente proposes travels with the draft (2026-11-19). Mutation that turns it red:
+// `reviewMonthIndex` omitted from `createDraftPlan`'s payload.
+describe('createDraftPlan and the review month', () => {
+  it('writes it when the draft has one, no key when it has none', async () => {
+    const withReview = await createDraftPlan(OWNER, { ...draft, reviewMonthIndex: 2 });
+    expect(store.get(`accumulationPlans/${withReview}`)?.reviewMonthIndex).toBe(2);
+    store.clear();
+    const without = await createDraftPlan(OWNER, draft);
+    expect(store.get(`accumulationPlans/${without}`)).not.toHaveProperty('reviewMonthIndex');
+  });
+});

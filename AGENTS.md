@@ -467,6 +467,7 @@ file used to carry.
 
 ### Allocazione › Accumulo → `doc/guide/accumulo.md`
 - A plan splits a monthly inflow over instruments by target weight and PROPOSES purchases, never writing a transaction on its own («Registra» prefills `TransactionDialog` and links it). ONE draft-or-active plan per account (the lock `accumulationPlanLocks/{ownerUid}`, written in the plan's transaction) in `accumulationPlans/{id}`; both Firestore rules are published by hand. The reserve is the allocation's cash quota kept on the real accounts (`isPlanSourceAccount`), refilled by the sales and the inflows before anything is bought (`computeUsableLiquidity.refillMonths`). The tab is a `lazyComponent`; the Piano's note reads the slim path (`useAccumulationPlans`, `usePacMonth`), both importing their modules on demand, never the editor.
+- A sale counts from its month (`PlanDisposal.monthIndex`, absent = 1): `computeUsableLiquidity` takes the first index and returns `dueProceedsEur` and `monthShares`, which `scheduleInstallments` spreads from the sale's month; a later sale refills the reserve first, so `L` does not depend on the months.
 - Sentences and figures live in `accumulationNarrative.ts` / `accumuloSummary.ts`; every write invalidates `queryKeys.accumulationPlans.all`, which the Piano's note reads too.
 - Il resto — the mobile composition (§ Composizione mobile), «Rivedi il piano», «Riattiva», the ledger matching — in `doc/guide/accumulo.md`.
 

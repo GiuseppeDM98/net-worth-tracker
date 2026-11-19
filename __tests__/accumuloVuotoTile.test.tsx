@@ -43,6 +43,7 @@ const props = {
   idealAllocation: null,
   model: null,
   modelBasis: { targets: null, criteria: DEFAULT_IDEAL_ALLOCATION, goals: null },
+  investmentAccountId: null,
 };
 
 const flat = (text: string | null) => (text ?? '').replace(/[  ]/g, ' ');

@@ -36,7 +36,7 @@ import type { RebalanceBand } from '@/lib/utils/allocationUtils';
 import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import { compareAllocations } from '@/lib/services/assetAllocationService';
 import { calculateAssetValue } from '@/lib/services/assetService';
-import { isPlanSourceAccount, onlyTargetedClasses, projectClassTrajectory, resolvePlanReserve } from '@/lib/utils/accumulationPlanUtils';
+import { isPlanSourceAccount, onlyTargetedClasses, projectClassTrajectory, resolveInvestmentAccountId, resolvePlanReserve } from '@/lib/utils/accumulationPlanUtils';
 import { matchPlanExecutions } from '@/lib/utils/accumulationPlanMatching';
 import {
   ACCUMULO_SECTION_IDS,
@@ -190,11 +190,14 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
   const draftSummary = useMemo(() => (plan?.status === 'draft' ? summarizeDraftTotal(plan, allAssets, DEPS) : null), [plan, allAssets]);
   const draftTotalEur = draftSummary?.totalEur ?? 0;
   const draftRefillMonths = draftSummary?.refillMonths ?? 0;
+  const draftFirstEur = draftSummary?.firstEur ?? null;
+  // Impostazioni › Spese «Conto per gli investimenti», while it still is an account (2026-11-19).
+  const investmentAccountId = resolveInvestmentAccountId(settings, allAssets);
 
   const verdictInput = useMemo(
     () =>
-      resolveAccumuloVerdictInput({ plan, currentIndex, sourceCashEur, reserveEur, otherCashEur, hasModel: !!model, lineStates: matchResult.lineStates, draftTotalEur, draftRefillMonths, reentry, today }),
-    [plan, currentIndex, sourceCashEur, reserveEur, otherCashEur, model, matchResult.lineStates, draftTotalEur, draftRefillMonths, reentry, today],
+      resolveAccumuloVerdictInput({ plan, currentIndex, sourceCashEur, reserveEur, otherCashEur, hasModel: !!model, lineStates: matchResult.lineStates, draftTotalEur, draftRefillMonths, draftFirstEur, reentry, today }),
+    [plan, currentIndex, sourceCashEur, reserveEur, otherCashEur, model, matchResult.lineStates, draftTotalEur, draftRefillMonths, draftFirstEur, reentry, today],
   );
   const verdict = useMemo(() => describeAccumuloVerdict(verdictInput), [verdictInput]);
 
@@ -307,6 +310,7 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
                       onAssetsChanged={onAssetsChanged}
                       reviewByIso={reviewByIso}
                       modelBasis={modelBasis}
+                      investmentAccountId={investmentAccountId}
                       onGoToComposition={sections.compact ? () => sections.reveal(ACCUMULO_SECTION_IDS.modello) : undefined}
                     />
                   </div>
@@ -332,6 +336,8 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
                       onAssetsChanged={onAssetsChanged}
                       reviewByIso={reviewByIso}
                       modelBasis={modelBasis}
+                      today={today}
+                      investmentAccountId={investmentAccountId}
                     />
                   </div>
                 )}
@@ -351,6 +357,7 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
                       plan={plan}
                       reviewByIso={reviewByIso}
                       modelBasis={modelBasis}
+                      investmentAccountId={investmentAccountId}
                       readFailed={modelQuery.isError}
                       onAssetsChanged={onAssetsChanged}
                       collapse={sections.collapse(ACCUMULO_SECTION_IDS.modello)}
@@ -447,6 +454,7 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
           targetLeverageRatio={targetLeverageRatio}
           idealAllocation={idealAllocation}
           model={model}
+          investmentAccountId={investmentAccountId}
           onAssetsChanged={onAssetsChanged}
           onClose={() => setHandoffOpen(false)}
         />

@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import type { Asset } from '@/types/assets';
 import type { AccumulationPlanDraft } from '@/types/accumulationPlan';
-import { isPlanBuyable, isPlanCashFund } from './accumulationPlanUtils';
+import { disposalMonthIndex, isPlanBuyable, isPlanCashFund } from './accumulationPlanUtils';
 import { unitPriceEur } from './costBasisEur';
 import { describeDraftIssue, type DraftIssueCode } from './accumulationNarrative';
 
@@ -47,7 +47,7 @@ const planPositionSchema = z.object({
 const planDisposalSchema = z.object({
   assetId: z.string().min(1),
   quantity: z.number().optional(),
-  monthIndex: z.number().int().optional(),
+  monthIndex: z.number().int().min(1).optional(),
   estimatedProceedsEur: z.number(),
   status: z.enum(['planned', 'executed', 'skipped']),
   transactionIds: z.array(z.string()).optional(),
@@ -67,6 +67,7 @@ export const accumulationPlanDraftSchema = z.object({
   liquidity: planLiquiditySchema,
   positions: z.array(planPositionSchema),
   disposals: z.array(planDisposalSchema),
+  reviewMonthIndex: z.number().int().min(1).optional(),
 });
 
 /** Every asset a draft names, whichever role it plays. */
@@ -79,11 +80,13 @@ function labelOf(assetId: string, assetsById: Map<string, Asset>): string {
  * negative_amount shape) are covered by `accumulationPlanDraftSchema` at the call site that owns
  * parsing; this function assumes the draft already parsed and re-checks the numeric ranges that
  * ALSO need to surface as a `DraftIssue` (so the editor's status line, not zod's own error shape,
- * is what the user reads).
+ * is what the user reads). `firstIndex` is the plan month of the draft's first month (1 for a new plan,
+ * `k` for a revision's draft): a sale's `monthIndex` is counted from the plan's first month.
  */
 export function validateDraftAgainstAssets(
   draft: AccumulationPlanDraft,
-  assetsById: Map<string, Asset>
+  assetsById: Map<string, Asset>,
+  firstIndex = 1
 ): DraftIssue[] {
   const issues: DraftIssue[] = [];
   // A loan's role is the role of what it finances: the predicate reads the whole list.
@@ -161,6 +164,13 @@ export function validateDraftAgainstAssets(
           assetId: disposal.assetId,
         });
       }
+    }
+    if (disposalMonthIndex(disposal) > firstIndex - 1 + draft.months) {
+      issues.push({
+        code: 'sale_month_out',
+        message: describeDraftIssue({ code: 'sale_month_out', label: labelOf(disposal.assetId, assetsById) }),
+        assetId: disposal.assetId,
+      });
     }
   }
 

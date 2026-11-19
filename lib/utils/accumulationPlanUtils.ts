@@ -6,7 +6,7 @@
  * injected (`PlanDeps`, `AllocationCompare`) rather than imported. No `Date.now()` inside any
  * function — "today" always arrives as a parameter.
  */
-import type { Asset, AssetAllocationTarget, AssetClass, AllocationResult } from '@/types/assets';
+import type { Asset, AssetAllocationSettings, AssetAllocationTarget, AssetClass, AllocationResult } from '@/types/assets';
 import type {
   AccumulationPlan,
   AccumulationPlanDraft,
@@ -132,14 +132,53 @@ export interface UsableLiquidity {
   shortfallEur: number;
   /** The months whose inflows refill the reserve, bought nothing (0..monthsRemaining). */
   refillMonths: number;
+  /** Σ proceeds of the open sales due by the first month scheduled: they arrive at once. */
+  dueProceedsEur: number;
+  /** Each month's share of L (Σ = 1) when a later sale leaves a tranche; null = the even spread. */
+  monthShares: number[] | null;
 }
 
+/** The plan month a sale falls in, counted from the plan's first month; absent = month 1. */
+export function disposalMonthIndex(disposal: Pick<PlanDisposal, 'monthIndex'>): number {
+  return disposal.monthIndex ?? 1;
+}
+
+/**
+ * Each tranche is spent evenly from the month it arrives to the last: the base from the first buying
+ * month, what the refill left of a later sale from its own. Null when no later sale leaves a tranche: the
+ * caller keeps the even spread it always had. `offset` is 0-based inside the months scheduled.
+ */
+function spreadMonthShares(
+  baseEur: number,
+  later: Array<{ offset: number; eur: number }>,
+  months: number,
+  refillMonths: number
+): number[] | null {
+  const totalEur = baseEur + later.reduce((sum, tranche) => sum + tranche.eur, 0);
+  if (later.length === 0 || months < 1 || totalEur <= 0) return null;
+  const euros = new Array<number>(months).fill(0);
+  const spread = (eur: number, from: number) => {
+    const start = Math.min(Math.max(0, from), months - 1);
+    for (let m = start; m < months; m++) euros[m] += eur / (months - start);
+  };
+  spread(baseEur, refillMonths);
+  for (const tranche of later) spread(tranche.eur, tranche.offset);
+  return euros.map((eur) => eur / totalEur);
+}
+
+/**
+ * The money a plan may spend over `monthsRemaining` months and WHEN it arrives. `firstIndex` is the plan
+ * month of the first month scheduled (1 at activation and in the preview, `k` in a revision, the open
+ * index in a recalibration): a sale's `monthIndex` is counted from the plan's first month, so a sale
+ * due by `firstIndex` arrives at once and a later one from its own month.
+ */
 export function computeUsableLiquidity(
   liquidity: PlanLiquidity,
   assetsById: Map<string, Asset>,
   disposals: PlanDisposal[],
   monthsRemaining: number,
-  deps: PlanDeps
+  deps: PlanDeps,
+  firstIndex = 1
 ): UsableLiquidity {
   let sourceCashEur = 0;
   for (const id of liquidity.sourceCashAssetIds) {
@@ -147,23 +186,38 @@ export function computeUsableLiquidity(
     if (asset) sourceCashEur += deps.valueOf(asset);
   }
   const availableNowEur = Math.max(0, sourceCashEur - liquidity.reserveEur);
-  const disposalProceedsEur = disposals
-    .filter((d) => d.status !== 'executed' && d.status !== 'skipped')
-    .reduce((sum, d) => sum + d.estimatedProceedsEur, 0);
+  const open = disposals.filter((d) => d.status !== 'executed' && d.status !== 'skipped');
+  // Every open sale, whatever its month: the draft box «Vendite fuori piano» reads this total.
+  const disposalProceedsEur = open.reduce((sum, d) => sum + d.estimatedProceedsEur, 0);
+  // 0 = due by the first month scheduled; a sale past the last month is the validator's issue, clamped here.
+  const offsetOf = (d: PlanDisposal) =>
+    Math.min(Math.max(0, disposalMonthIndex(d) - firstIndex), Math.max(0, monthsRemaining - 1));
+  const dueProceedsEur = open.filter((d) => offsetOf(d) === 0).reduce((sum, d) => sum + d.estimatedProceedsEur, 0);
   const inflowTotalEur = liquidity.monthlyInflowEur * monthsRemaining;
   const L0 = availableNowEur + disposalProceedsEur;
-  // The cash below the reserve is brought back first — by the sales, then month by month by the
-  // inflows — and only then invested (owner, 2026-11-17). Spreading the rest over the months after
-  // the refill keeps the cash at or above the reserve every month (the instalment ≥ the inflow).
+  // The cash below the reserve is brought back first and only then invested (owner, 2026-11-17), in the
+  // order the money arrives (owner, 2026-11-19): the sales due; then, month by month, a later sale BEFORE
+  // that month's inflow. What a later sale has left is its tranche; a month whose inflow refills buys nothing.
   const shortfallEur = Math.max(0, liquidity.reserveEur - sourceCashEur);
-  const gapAfterSalesEur = Math.max(0, shortfallEur - disposalProceedsEur);
-  const refillMonths =
-    gapAfterSalesEur <= 1e-9
-      ? 0
-      : liquidity.monthlyInflowEur > 0
-        ? Math.min(monthsRemaining, Math.ceil(gapAfterSalesEur / liquidity.monthlyInflowEur - 1e-9))
-        : monthsRemaining;
+  let gapEur = Math.max(0, shortfallEur - dueProceedsEur);
+  let refillMonths = 0;
+  const later: Array<{ offset: number; eur: number }> = [];
+  for (let m = 0; m < monthsRemaining; m++) {
+    for (const d of open) {
+      if (m === 0 || offsetOf(d) !== m) continue;
+      const refillEur = Math.min(gapEur, d.estimatedProceedsEur);
+      gapEur -= refillEur;
+      if (d.estimatedProceedsEur - refillEur > 1e-9) later.push({ offset: m, eur: d.estimatedProceedsEur - refillEur });
+    }
+    if (gapEur > 1e-9) {
+      gapEur -= Math.min(gapEur, liquidity.monthlyInflowEur);
+      refillMonths = m + 1;
+    }
+  }
+  // Every sale refills before it is invested, so L does not depend on the sales' months — only WHEN it is spent.
   const L = availableNowEur + Math.max(0, disposalProceedsEur + inflowTotalEur - shortfallEur);
+  const laterEur = later.reduce((sum, tranche) => sum + tranche.eur, 0);
+  const monthShares = spreadMonthShares(L - laterEur, later, monthsRemaining, refillMonths);
   return {
     sourceCashEur,
     availableNowEur,
@@ -174,6 +228,8 @@ export function computeUsableLiquidity(
     belowReserve: sourceCashEur < liquidity.reserveEur,
     shortfallEur,
     refillMonths,
+    dueProceedsEur,
+    monthShares,
   };
 }
 
@@ -231,7 +287,9 @@ export function scheduleInstallments(
   startMonth: MonthKey,
   firstIndex = 1,
   /** `UsableLiquidity.refillMonths`: the first months buy nothing, the totals spread over the rest. */
-  refillMonths = 0
+  refillMonths = 0,
+  /** `UsableLiquidity.monthShares`: each month's share of the totals; null = the even spread over the buying months. */
+  monthShares: number[] | null = null
 ): ScheduleResult {
   const refill = Math.min(Math.max(0, refillMonths), months);
   const buyingMonths = months - refill;
@@ -254,11 +312,12 @@ export function scheduleInstallments(
 
     const lines: InstallmentLine[] = [];
     const lineByPosition: Record<string, InstallmentLine> = {};
+    const share = monthShares ? (monthShares[m - 1] ?? 0) : null;
 
     for (const s of pricedStates) {
       if (m <= refill) break;
       const total = totals[s.positionId] ?? 0;
-      const budget = total / buyingMonths + carry[s.positionId];
+      const budget = (share === null ? total / buyingMonths : total * share) + carry[s.positionId];
       const q = Math.floor(budget / s.buyPriceEur + 1e-9);
       const spend = q * s.buyPriceEur;
       carry[s.positionId] = budget - spend;
@@ -277,7 +336,11 @@ export function scheduleInstallments(
       }
     }
 
-    if (m === months) {
+    if (m === months && buyingMonths === 0) {
+      // Every month refills the reserve: nothing is bought, and what the last refill left over stays the
+      // plan's residual, so Σ lines + residual = Σ totals holds here too (owner, 2026-11-19).
+      residualEur = roundToCents(Object.values(totals).reduce((sum, total) => sum + total, 0));
+    } else if (m === months) {
       let pool = Object.values(carry).reduce((sum, c) => sum + c, 0);
       const remainingDeficit: Record<string, number> = {};
       for (const s of pricedStates) {
@@ -359,18 +422,24 @@ export function recalibrateInstallment(
     assetsById,
     plan.disposals,
     monthsRemaining,
-    deps
+    deps,
+    index
   );
   const states = resolvePositionStates(plan.positions, assetsById, deps, plan.disposals);
   const totals = computeTotalPurchases(states, liquidity.L);
   const pricedStates = states.filter((s) => !s.unpriced);
-  // Never under the reserve: the sales refill it before they are spent (owner, 2026-11-17).
-  // ...and this month's inflow counts, as the calendar counts it (owner, 2026-11-17).
-  const cashCeiling = Math.max(0, liquidity.availableNowEur + liquidity.disposalProceedsEur + plan.liquidity.monthlyInflowEur - liquidity.shortfallEur);
+  // Never under the reserve: the sales due by this month refill it before they are spent (owner, 2026-11-17);
+  // a later sale is not in the account yet (owner, 2026-11-19). This month's inflow counts, as the calendar counts it.
+  // With the budgets from `monthShares[0]` this ceiling never binds: it stays as a guard.
+  const cashCeiling = Math.max(0, liquidity.availableNowEur + liquidity.dueProceedsEur + plan.liquidity.monthlyInflowEur - liquidity.shortfallEur);
 
   const budgets: Record<string, number> = {};
   const buyingMonths = monthsRemaining - liquidity.refillMonths;
-  for (const s of pricedStates) budgets[s.positionId] = buyingMonths > 0 && liquidity.refillMonths === 0 ? (totals[s.positionId] ?? 0) / buyingMonths : 0;
+  for (const s of pricedStates) {
+    budgets[s.positionId] = liquidity.monthShares
+      ? (totals[s.positionId] ?? 0) * liquidity.monthShares[0]
+      : buyingMonths > 0 && liquidity.refillMonths === 0 ? (totals[s.positionId] ?? 0) / buyingMonths : 0;
+  }
 
   const floorQuantities = (): Record<string, number> => {
     const quantities: Record<string, number> = {};
@@ -463,8 +532,10 @@ export interface PlanRevisionInput {
   reserveEur: number;
   remainingMonths: number;
   positions: PlanPosition[];
-  /** The NEW disposals only (they fall in the first revised month); the plan's existing ones stay. */
+  /** The NEW disposals, each in its month (never before the first revised one); the plan's existing ones stay. */
   disposals: PlanDisposal[];
+  /** The plan month to look at the plan again: absent = keep the plan's, null = clear it. */
+  reviewMonthIndex?: number | null;
   /** the source accounts, editable in a revision; absent = the plan's own. */
   sourceCashAssetIds?: string[];
   /** saved sales not yet executed that the revision takes off (by instrument). */
@@ -563,9 +634,10 @@ export function buildRevisedPlan(
   const repeated = revision.disposals.find((disposal) => alreadySelling.has(disposal.assetId));
   if (repeated) return { ok: false, issue: 'duplicate_asset', assetId: repeated.assetId };
 
+  if (revision.disposals.some((disposal) => (disposal.monthIndex ?? k) > months)) return { ok: false, issue: 'sale_month_range' };
   const newDisposals: PlanDisposal[] = revision.disposals.map((disposal) => ({
     ...disposal,
-    monthIndex: k,
+    monthIndex: Math.max(k, disposal.monthIndex ?? k),
     estimatedProceedsEur: proceedsOfDisposal(disposal, assetsById.get(disposal.assetId), deps),
   }));
   const disposals = [...keptDisposals, ...newDisposals];
@@ -575,10 +647,11 @@ export function buildRevisedPlan(
     monthlyInflowEur: revision.monthlyInflowEur,
     reserveEur: revision.reserveEur,
   };
-  const liquidity = computeUsableLiquidity(liquiditySettings, assetsById, disposals, revision.remainingMonths, deps);
+  const liquidity = computeUsableLiquidity(liquiditySettings, assetsById, disposals, revision.remainingMonths, deps, k);
   const states = resolvePositionStates(revision.positions, assetsById, deps, disposals);
   const totals = computeTotalPurchases(states, liquidity.L);
-  const schedule = scheduleInstallments(totals, states, revision.remainingMonths, first.month, k, liquidity.refillMonths);
+  const schedule = scheduleInstallments(totals, states, revision.remainingMonths, first.month, k, liquidity.refillMonths, liquidity.monthShares);
+  const reviewMonthIndex = revision.reviewMonthIndex === undefined ? plan.reviewMonthIndex : revision.reviewMonthIndex ?? undefined;
 
   return {
     ok: true,
@@ -587,6 +660,7 @@ export function buildRevisedPlan(
     plan: {
       ...plan,
       months,
+      reviewMonthIndex,
       liquidity: liquiditySettings,
       positions: revision.positions,
       disposals,
@@ -771,6 +845,16 @@ export function resolveAccountReserveEur(input: {
 /** A plan's source: a real account (type and class `cash`), never a money-market fund in the cash class (owner, 2026-11-17). */
 export function isPlanSourceAccount(asset: Pick<Asset, 'type' | 'assetClass'>): boolean {
   return asset.assetClass === 'cash' && asset.type === 'cash';
+}
+
+/** The settings' account for the investments, when it still is a source account; null otherwise. */
+export function resolveInvestmentAccountId(
+  settings: Pick<AssetAllocationSettings, 'investmentCashAssetId'> | null | undefined,
+  allAssets: readonly Asset[]
+): string | null {
+  const id = settings?.investmentCashAssetId;
+  const asset = id ? allAssets.find((candidate) => candidate.id === id) : undefined;
+  return asset && isPlanSourceAccount(asset) ? asset.id : null;
 }
 
 /** The reserve a new plan keeps on the cash accounts, from today's allocation: the quota, the cash outside the accounts. */
@@ -1052,6 +1136,8 @@ export function buildDraftPreview(input: {
   band: RebalanceBand;
   compare: AllocationCompare;
   deps: PlanDeps;
+  /** The plan month of the draft's first month: 1 for a new plan, `k` for a revision's draft (one frame, the plan's). */
+  firstIndex?: number;
 }): {
   liquidity: UsableLiquidity;
   totals: Record<string, number>;
@@ -1061,6 +1147,7 @@ export function buildDraftPreview(input: {
   unpricedPositionIds: string[];
 } {
   const { draft, allAssets, targets, band, compare, deps } = input;
+  const firstIndex = input.firstIndex ?? 1;
   const assetsById = new Map(allAssets.map((asset) => [asset.id, asset]));
 
   // Live, not the draft's own stored figure — a disposal's proceeds track the CURRENT market value.
@@ -1070,9 +1157,11 @@ export function buildDraftPreview(input: {
   });
 
   const states = resolvePositionStates(draft.positions, assetsById, deps, liveDisposals);
-  const liquidity = computeUsableLiquidity(draft.liquidity, assetsById, liveDisposals, draft.months, deps);
+  const liquidity = computeUsableLiquidity(draft.liquidity, assetsById, liveDisposals, draft.months, deps, firstIndex);
   const totals = computeTotalPurchases(states, liquidity.L);
-  const schedule = scheduleInstallments(totals, states, draft.months, draft.startMonth, 1, liquidity.refillMonths);
+  const schedule = scheduleInstallments(
+    totals, states, draft.months, draft.startMonth, firstIndex, liquidity.refillMonths, liquidity.monthShares
+  );
   const outcome = projectPlanOutcome(
     states,
     schedule.installments,

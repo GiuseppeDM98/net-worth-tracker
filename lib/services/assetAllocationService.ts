@@ -151,6 +151,7 @@ export async function getSettings(
       autoCalculateEquityBonds: data.autoCalculateEquityBonds,
       defaultDebitCashAssetId: data.defaultDebitCashAssetId,
       defaultCreditCashAssetId: data.defaultCreditCashAssetId,
+      investmentCashAssetId: data.investmentCashAssetId,
       stampDutyEnabled: data.stampDutyEnabled,
       stampDutyRate: data.stampDutyRate,
       checkingAccountSubCategory: data.checkingAccountSubCategory,
@@ -356,6 +357,13 @@ export async function setSettings(
           delete docData.defaultCreditCashAssetId;
         }
       }
+      if ('investmentCashAssetId' in settings) {
+        if (settings.investmentCashAssetId !== undefined) {
+          docData.investmentCashAssetId = settings.investmentCashAssetId;
+        } else {
+          delete docData.investmentCashAssetId;
+        }
+      }
       if (settings.stampDutyEnabled !== undefined) {
         docData.stampDutyEnabled = settings.stampDutyEnabled;
       }
@@ -551,6 +559,12 @@ export async function setSettings(
         docData.defaultCreditCashAssetId =
           settings.defaultCreditCashAssetId !== undefined
             ? settings.defaultCreditCashAssetId
+            : deleteField();
+      }
+      if ('investmentCashAssetId' in settings) {
+        docData.investmentCashAssetId =
+          settings.investmentCashAssetId !== undefined
+            ? settings.investmentCashAssetId
             : deleteField();
       }
       if (settings.stampDutyEnabled !== undefined) {

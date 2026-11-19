@@ -72,6 +72,7 @@ function renderTile(saved: ModelPortfolio) {
   return render(
     <PortafoglioModelloTile
       ownerId="owner-1"
+      investmentAccountId={null}
       allAssets={assets}
       targets={targets}
       targetLeverageRatio={1}

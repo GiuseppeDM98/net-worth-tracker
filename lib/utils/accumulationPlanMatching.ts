@@ -9,7 +9,7 @@
  */
 import type { AccumulationPlan } from '@/types/accumulationPlan';
 import type { AssetTransaction } from '@/types/assetTransactions';
-import { monthIndexOf, toMonthKey } from './accumulationPlanUtils';
+import { disposalMonthIndex, monthIndexOf, toMonthKey } from './accumulationPlanUtils';
 
 export type MatchConfidence = 'high' | 'medium';
 
@@ -24,7 +24,8 @@ export interface LineMatch {
   confidence: MatchConfidence;
 }
 
-export type LineUiState = 'todo' | 'toConfirm' | 'executed' | 'late' | 'skipped' | 'lostLink';
+/** `upcoming`: a sale whose month has not come yet (owner, 2026-11-19) — no action, the muted chip like `todo`. */
+export type LineUiState = 'todo' | 'toConfirm' | 'executed' | 'late' | 'skipped' | 'lostLink' | 'upcoming';
 
 /** `${index}:${positionId}` for an installment line, `disposal:${assetId}` for a disposal. */
 export function installmentLineKey(index: number, positionId: string): string {
@@ -131,11 +132,12 @@ export function matchPlanExecutions(
     }
   }
 
-  // a disposal is sold at month 1 of the plan — that is its own "current month" for lateness.
-  const DISPOSAL_MONTH_INDEX = 1;
-
+  // A disposal is sold in its own month (`monthIndex`, absent = 1): before it the sale is «In programma»,
+  // in it «Da fare» (a month-1 sale also before the plan starts), late from the next. A ledger sale made
+  // early still matches: the candidates below ignore the month.
   for (const disposal of plan.disposals) {
     const key = disposalLineKey(disposal.assetId);
+    const saleIndex = disposalMonthIndex(disposal);
 
     if (disposal.status === 'skipped') {
       lineStates[key] = 'skipped';
@@ -163,7 +165,7 @@ export function matchPlanExecutions(
       matches.push(sumMatch('disposal', disposal.assetId, candidates, 'high'));
       lineStates[key] = 'toConfirm';
     } else {
-      lineStates[key] = currentIndex > DISPOSAL_MONTH_INDEX ? 'late' : 'todo';
+      lineStates[key] = currentIndex > saleIndex ? 'late' : saleIndex > Math.max(currentIndex, 1) ? 'upcoming' : 'todo';
     }
   }
 

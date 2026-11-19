@@ -310,3 +310,28 @@ describe('matchPlanExecutions — disposals', () => {
     expect(lineStates['disposal:eimi']).toBe('executed');
   });
 });
+
+// A sale is sold in its month (owner, 2026-11-19): before it, «In programma» with no action; a month-1 sale may
+// be made as soon as the plan is active. Mutation that turns it red: `saleIndex > currentIndex` without `Math.max(…, 1)`.
+describe('matchPlanExecutions — a sale in its month', () => {
+  const inMonth3: PlanDisposal = { assetId: 'eimi', monthIndex: 3, estimatedProceedsEur: 1000, status: 'planned' };
+  // The plan starts 2026-10: September is index 0, October 1, November 2, December 3, January 4.
+  const dayOf = ['2026-09-15T12:00:00Z', '2026-10-15T12:00:00Z', '2026-11-15T12:00:00Z', '2026-12-15T12:00:00Z', '2027-01-15T12:00:00Z'];
+
+  it('upcoming before its month, todo in it, late after it', () => {
+    const plan = makePlan({ disposals: [inMonth3] });
+    const states = dayOf.map((day) => matchPlanExecutions(plan, [], new Date(day)).lineStates['disposal:eimi']);
+    expect(states).toEqual(['upcoming', 'upcoming', 'upcoming', 'todo', 'late']);
+  });
+
+  it('a month-1 sale is todo before the plan starts', () => {
+    const plan = makePlan({ disposals: [{ ...inMonth3, monthIndex: 1 }] });
+    expect(matchPlanExecutions(plan, [], new Date(dayOf[0])).lineStates['disposal:eimi']).toBe('todo');
+  });
+
+  it('a ledger sell before the sale month still asks to be confirmed', () => {
+    const plan = makePlan({ disposals: [inMonth3] });
+    const tx = makeTransaction({ assetId: 'eimi', type: 'sell', date: new Date('2026-10-20T12:00:00Z'), quantity: 10, priceEur: 100 });
+    expect(matchPlanExecutions(plan, [tx], new Date(dayOf[1])).lineStates['disposal:eimi']).toBe('toConfirm');
+  });
+});

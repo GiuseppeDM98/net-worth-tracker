@@ -6,7 +6,7 @@
  * the two tabs can never name different months or amounts. Words live in `accumulationNarrative.ts`.
  */
 import type { Asset, AssetAllocationTarget, AssetClass } from '@/types/assets';
-import type { AccumulationPlan } from '@/types/accumulationPlan';
+import type { AccumulationPlan, Installment, MonthKey, PlanDisposal } from '@/types/accumulationPlan';
 import type { PageVerdictModel } from './narrative';
 import type { LineUiState } from './accumulationPlanMatching';
 import { ACCUMULO_SECTION_IDS, describeAccumuloVerdict, monthLabelLong, type AccumuloVerdictInput, type ClosedPlanReadingInput } from './accumulationNarrative';
@@ -16,6 +16,7 @@ import {
   type ClassTrajectoryPoint,
   computeTotalPurchases,
   computeUsableLiquidity,
+  disposalMonthIndex,
   resolvePositionStates,
   isPlanBuyable,
   isPlanSourceAccount,
@@ -57,6 +58,8 @@ export interface AccumuloVerdictContext {
   draftTotalEur: number;
   /** Draft: the first months that refill the reserve and buy nothing (`UsableLiquidity.refillMonths`). */
   draftRefillMonths?: number;
+  /** Draft: the first instalment when a later sale makes the instalments differ (`summarizeDraftTotal`); null = even. */
+  draftFirstEur?: number | null;
   /** `describeBandReentry` for the open month, already worded. */
   reentry: string;
   /** The day the tab reads (its Italian year decides whether a start month names its year). */
@@ -78,6 +81,7 @@ export function resolveAccumuloVerdictInput(context: AccumuloVerdictContext): Ac
       months: plan.months - Math.min(context.draftRefillMonths ?? 0, plan.months),
       monthlyEur: plan.months - (context.draftRefillMonths ?? 0) > 0 ? context.draftTotalEur / (plan.months - (context.draftRefillMonths ?? 0)) : 0,
       startMonth: addMonths(plan.startMonth, Math.min(context.draftRefillMonths ?? 0, plan.months)),
+      firstEur: context.draftFirstEur ?? null,
     };
   }
 
@@ -368,13 +372,22 @@ export function buildAccumuloPreview(input: {
 
 /**
  * Σ of the purchases a draft would make over its whole length, and the first months that only refill
- * the reserve (the verdict's «10 rate da X € da marzo»).
+ * the reserve (the verdict's «10 rate da X € da marzo»), and the first instalment's euros when a later sale
+ * makes the instalments differ (`firstEur`, null when they are even).
  */
-export function summarizeDraftTotal(plan: AccumulationPlan, allAssets: Asset[], deps: PlanDeps): { totalEur: number; refillMonths: number } {
+export function summarizeDraftTotal(
+  plan: AccumulationPlan,
+  allAssets: Asset[],
+  deps: PlanDeps
+): { totalEur: number; refillMonths: number; firstEur: number | null } {
   const assetsById = new Map(allAssets.map((asset) => [asset.id, asset]));
   const liquidity = computeUsableLiquidity(plan.liquidity, assetsById, plan.disposals, plan.months, deps);
   const totals = computeTotalPurchases(resolvePositionStates(plan.positions, assetsById, deps, plan.disposals), liquidity.L);
-  return { totalEur: Object.values(totals).reduce((sum, value) => sum + value, 0), refillMonths: liquidity.refillMonths };
+  return {
+    totalEur: Object.values(totals).reduce((sum, value) => sum + value, 0),
+    refillMonths: liquidity.refillMonths,
+    firstEur: liquidity.monthShares ? liquidity.L * liquidity.monthShares[liquidity.refillMonths] : null,
+  };
 }
 
 /**
@@ -466,4 +479,73 @@ export function selectClosedPlans(plans: AccumulationPlan[] | undefined): Accumu
   return (plans ?? [])
     .filter((plan) => plan.status === 'completed' || plan.status === 'cancelled')
     .sort((a, b) => (b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0));
+}
+
+/**
+ * One entry per month, after the first scheduled, in which an open sale leaves the instalment larger than the
+ * month before (`describeSaleStep`'s sentences). `installments[0]` is plan month `firstIndex`; a sale the refill
+ * took whole changes no instalment, so it gives no entry.
+ */
+export function listSaleSteps(input: {
+  installments: Installment[];
+  disposals: PlanDisposal[];
+  firstIndex: number;
+  nameOf: (assetId: string) => string;
+}): Array<{ month: MonthKey; instalmentEur: number; names: string[] }> {
+  const { installments, firstIndex, nameOf } = input;
+  const open = input.disposals.filter((d) => d.status !== 'executed' && d.status !== 'skipped');
+  const months = [...new Set(open.map(disposalMonthIndex).filter((index) => index > firstIndex))].sort((a, b) => a - b);
+  const euros = (installment: Installment | undefined) =>
+    roundToCents((installment?.lines ?? []).reduce((sum, line) => sum + line.plannedAmountEur, 0));
+  const steps: Array<{ month: MonthKey; instalmentEur: number; names: string[] }> = [];
+  for (const index of months) {
+    const installment = installments[index - firstIndex];
+    if (!installment) continue;
+    const instalmentEur = euros(installment);
+    if (instalmentEur - euros(installments[index - firstIndex - 1]) <= 0.005) continue;
+    const names = open.filter((d) => disposalMonthIndex(d) === index).map((d) => nameOf(d.assetId));
+    steps.push({ month: installment.month, instalmentEur, names });
+  }
+  return steps;
+}
+
+
+/**
+ * The months that buy, after the ones that only refill the reserve (owner, 2026-11-19): how many, the first and the
+ * average — step 3's reading and the side panel say the same figures. `null` when no month buys.
+ */
+export function summarizeBuyingInstalments(
+  installments: Installment[],
+  refillMonths: number,
+): { count: number; firstEur: number; firstMonth: MonthKey; averageEur: number } | null {
+  const euros = (installment: Installment) => installment.lines.reduce((sum, line) => sum + line.plannedAmountEur, 0);
+  const buying = installments.slice(refillMonths);
+  const first = buying.find((installment) => installment.lines.length > 0);
+  if (!first) return null;
+  return {
+    count: buying.length,
+    firstEur: euros(first),
+    firstMonth: first.month,
+    averageEur: buying.reduce((sum, installment) => sum + euros(installment), 0) / buying.length,
+  };
+}
+
+/**
+ * The months of the open sales that refill the reserve with the inflows (owner, 2026-11-19): after the first scheduled
+ * month (`firstIndex`, whose sales count at once) and by the first month that buys (`firstIndex + refillMonths`).
+ */
+export function listRefillSaleMonths(input: {
+  disposals: PlanDisposal[];
+  startMonth: MonthKey;
+  firstIndex: number;
+  refillMonths: number;
+}): MonthKey[] {
+  if (input.refillMonths <= 0) return [];
+  const lastIndex = input.firstIndex + input.refillMonths;
+  return input.disposals
+    .filter((d) => d.status !== 'executed' && d.status !== 'skipped')
+    .map(disposalMonthIndex)
+    .filter((index) => index > input.firstIndex && index <= lastIndex)
+    .sort((a, b) => a - b)
+    .map((index) => addMonths(input.startMonth, index - 1));
 }

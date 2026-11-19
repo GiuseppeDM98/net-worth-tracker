@@ -153,11 +153,11 @@
         "screens": 1.01,
         "tilesAboveFold": 6,
         "tilesFullyAboveFold": 6,
-        "figuresAboveFold": 11,
-        "figuresOutsideVerdict": 8,
+        "figuresAboveFold": 12,
+        "figuresOutsideVerdict": 9,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-10-16: figuresAboveFold 7 → 11, figuresOutsideVerdict 4 → 8 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-16: a parità di codice, un giorno dopo, sulla macchina di riferimento (census in 2,0 min) tre corse identiche leggono un centesimo in più di schermate o una tessera intera in meno — il --tighten del 2026-10-15 aveva stretto Patrimonio 1024 1,58 → 1,57 e Budget 768 1,36 → 1,35 senza dichiararlo in doc/guide/prima-schermata-misure.md; nello stesso giro Budget 390, Storico 390 e Impostazioni leggono 0,02 SOTTO il budget: la differenza fra le due macchine del 2026-10-15 è una deriva di ±0,01–0,02 per cella, in entrambi i versi; 2026-10-14: LA tessera non sta più intera sopra la piega — il verdetto prende la striscia e «Il perché» (la composizione vale fino a 1439), e Patrimonio totale lordo scende sotto i 768 px; le colonne a 1024 le ha decise la composizione tablet del 2026-10-16"
+        "raisedBy": "2026-11-19: figuresAboveFold 11 → 12, figuresOutsideVerdict 8 → 9 — deriva, non codice: la build di develop (b57ada16) lo stesso giorno legge 11 in tre corse e poi 12 con le stesse dodici cifre del branch (proprietario: alzare); 2026-10-16: figuresAboveFold 7 → 11, figuresOutsideVerdict 4 → 8 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-16: a parità di codice, un giorno dopo, sulla macchina di riferimento (census in 2,0 min) tre corse identiche leggono un centesimo in più di schermate o una tessera intera in meno — il --tighten del 2026-10-15 aveva stretto Patrimonio 1024 1,58 → 1,57 e Budget 768 1,36 → 1,35 senza dichiararlo in doc/guide/prima-schermata-misure.md; nello stesso giro Budget 390, Storico 390 e Impostazioni leggono 0,02 SOTTO il budget: la differenza fra le due macchine del 2026-10-15 è una deriva di ±0,01–0,02 per cella, in entrambi i versi; 2026-10-14: LA tessera non sta più intera sopra la piega — il verdetto prende la striscia e «Il perché» (la composizione vale fino a 1439), e Patrimonio totale lordo scende sotto i 768 px; le colonne a 1024 le ha decise la composizione tablet del 2026-10-16"
       }
     },
     "cashflow-tracciamento": {

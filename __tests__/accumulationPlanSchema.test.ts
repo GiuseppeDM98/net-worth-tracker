@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Asset } from '@/types/assets';
 import type { AccumulationPlanDraft } from '@/types/accumulationPlan';
-import { validateDraftAgainstAssets } from '@/lib/utils/accumulationPlanSchema';
+import { accumulationPlanDraftSchema, validateDraftAgainstAssets } from '@/lib/utils/accumulationPlanSchema';
 import { seedPositionsFromAssets } from '@/lib/utils/accumulationPlanUtils';
 
 let seq = 0;
@@ -179,5 +179,30 @@ describe('only what a plan may buy is demanded (2026-11-12)', () => {
     const etf = makeAsset({ id: 'etf-a', name: 'ETF A' });
     const seeded = seedPositionsFromAssets([house, etf], (a) => a.quantity * a.currentPrice, () => 'id');
     expect(seeded.map((p) => p.buyAssetId)).toEqual(['etf-a']);
+  });
+});
+
+// A sale in its month (2026-11-19): never past the last instalment, in the frame of the months scheduled.
+// Mutations that turn it red: the check dropped; the check against `draft.months` alone.
+describe('a sale month inside the plan', () => {
+  const etfA = () => makeAsset({ id: 'etf-a', name: 'ETF-A', quantity: 10 });
+  const sellingAt = (monthIndex: number, months = 12) =>
+    baseDraft({ months, disposals: [{ assetId: 'etf-a', quantity: 1, monthIndex, estimatedProceedsEur: 100, status: 'planned' }] });
+
+  it('a sale past the last instalment is refused with its sentence', () => {
+    const issue = validateDraftAgainstAssets(sellingAt(13), byId(etfA())).find((i) => i.code === 'sale_month_out');
+    expect(issue?.message).toBe('La vendita di «ETF-A» è fissata oltre l’ultima rata: scegli un mese del piano.');
+    expect(validateDraftAgainstAssets(sellingAt(12), byId(etfA())).some((i) => i.code === 'sale_month_out')).toBe(false);
+  });
+
+  it('a month 0 fails the schema', () => {
+    expect(accumulationPlanDraftSchema.safeParse(sellingAt(0)).success).toBe(false);
+    expect(accumulationPlanDraftSchema.safeParse(sellingAt(1)).success).toBe(true);
+  });
+
+  it('a revision reads the month in the plan frame', () => {
+    // From the 4th instalment, 9 months left: plan months 4..12.
+    expect(validateDraftAgainstAssets(sellingAt(10, 9), byId(etfA()), 4).some((i) => i.code === 'sale_month_out')).toBe(false);
+    expect(validateDraftAgainstAssets(sellingAt(13, 9), byId(etfA()), 4).some((i) => i.code === 'sale_month_out')).toBe(true);
   });
 });

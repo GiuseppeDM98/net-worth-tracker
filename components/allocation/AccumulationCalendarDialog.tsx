@@ -33,6 +33,7 @@ import {
   ACCUMULO_ACTION_UNDO_EXECUTED,
   ACCUMULO_CALENDAR_TITLE,
   ACCUMULO_LINE_STATUS_LABEL,
+  describeInstallmentStatus,
   ACCUMULO_MANUAL_AMOUNT_LABEL,
   ACCUMULO_MANUAL_QUANTITY_LABEL,
   describeAccumuloModalEyebrow,
@@ -143,7 +144,6 @@ export function AccumulationCalendarDialog({ open, onClose, plan, ownerId, allAs
           {plan.installments.map((installment) => {
             const point = trajectory.find((p) => p.index === installment.index);
             const isOpen = expandedIndex === installment.index;
-            const allClosed = installment.lines.every((line) => line.status === 'executed' || line.status === 'skipped');
             return (
               <li key={installment.index} className="py-2.5">
                 <button
@@ -162,7 +162,7 @@ export function AccumulationCalendarDialog({ open, onClose, plan, ownerId, allAs
                     {cachedFormatCurrencyEUR(installmentTotalEur(installment))}
                   </span>
                   <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {allClosed ? ACCUMULO_LINE_STATUS_LABEL.executed : ACCUMULO_LINE_STATUS_LABEL.todo}
+                    {describeInstallmentStatus(installment.lines)}
                   </span>
                 </button>
 

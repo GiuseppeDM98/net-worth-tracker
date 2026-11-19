@@ -19,9 +19,10 @@ export const ROW_ACTION_CLASS = 'h-11 shrink-0 px-3 text-[12px] desktop:h-8 desk
 export const ROW_UNDO_CLASS = `${ROW_ACTION_CLASS} -mr-3 text-muted-foreground desktop:-mr-2`;
 
 /** A dismissed `toConfirm` match falls back to what its raw state would be without a match — the
- *  dismissal is never written, so it only affects THIS render. */
-export function effectiveLineState(rawState: LineUiState, key: string, ignored: Set<string>, isLate: boolean): LineUiState {
-  if (rawState === 'toConfirm' && ignored.has(key)) return isLate ? 'late' : 'todo';
+ *  dismissal is never written, so it only affects THIS render. A sale before its month falls back to
+ *  «In programma» (`isUpcoming`, 2026-11-19); the buy lines pass nothing. */
+export function effectiveLineState(rawState: LineUiState, key: string, ignored: Set<string>, isLate: boolean, isUpcoming = false): LineUiState {
+  if (rawState === 'toConfirm' && ignored.has(key)) return isUpcoming ? 'upcoming' : isLate ? 'late' : 'todo';
   return rawState;
 }
 

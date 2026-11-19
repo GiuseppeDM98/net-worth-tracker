@@ -31,6 +31,8 @@ import {
   planCashFundSaleEur,
   isPlanSourceAccount,
 } from '@/lib/utils/accumulationPlanUtils';
+import { createSeededRandom } from '@/lib/utils/seededRandom';
+import { resolveInvestmentAccountId } from '@/lib/utils/accumulationPlanUtils';
 import type { AccumulationPlan, PlanPosition, PlanLiquidity, PlanDisposal } from '@/types/accumulationPlan';
 
 let seq = 0;
@@ -741,5 +743,224 @@ describe("the recalibration counts the month's inflow", () => {
     const result = recalibrateInstallment(plan, 1, byId(cash, ETF_A), deps);
     expect(result.suggestedTotalEur).toBe(1000);
     expect(shouldProposeRecalibration(result)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A sale counts from its month (owner, 2026-11-19): its proceeds enter the instalments from the sale's month,
+// and a later sale refills what the reserve still misses before a euro of it is invested.
+// ---------------------------------------------------------------------------
+
+const ONE_EURO = makeAsset({ id: 'one-euro', name: 'ETF-UNO', quantity: 0, currentPrice: 1 });
+const ONE_EURO_POSITION: PlanPosition[] = [
+  { id: 'p1', label: 'ETF-UNO', targetPercentage: 100, memberAssetIds: ['one-euro'], buyAssetId: 'one-euro' },
+];
+
+function instalmentEuros(installments: { lines: { plannedAmountEur: number }[] }[]): number[] {
+  return installments.map((installment) => roundCents(installment.lines.reduce((sum, line) => sum + line.plannedAmountEur, 0)));
+}
+
+function roundCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function scheduleOn(cash: Asset, liquidity: PlanLiquidity, disposals: PlanDisposal[], months: number, firstIndex = 1) {
+  const assets = byId(cash, ONE_EURO);
+  const usable = computeUsableLiquidity(liquidity, assets, disposals, months, deps, firstIndex);
+  const states = resolvePositionStates(ONE_EURO_POSITION, assets, deps);
+  const totals = computeTotalPurchases(states, usable.L);
+  const schedule = scheduleInstallments(totals, states, months, '2027-01', firstIndex, usable.refillMonths, usable.monthShares);
+  return { usable, totals, schedule };
+}
+
+// § 1's invented figures: 12 months, 500 € a month, 1.200 € above the reserve, 2.400 € sold in month 1, 6.000 € in month 7.
+const CASH_ABOVE = makeAsset({ id: 'cash-above', name: 'Conto', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 11200 });
+const ABOVE_LIQUIDITY: PlanLiquidity = { sourceCashAssetIds: ['cash-above'], reserveEur: 10000, monthlyInflowEur: 500 };
+const TWO_SALES: PlanDisposal[] = [
+  { assetId: 'etf-x', estimatedProceedsEur: 2400, status: 'planned' },
+  { assetId: 'etf-y', monthIndex: 7, estimatedProceedsEur: 6000, status: 'planned' },
+];
+
+// U3. Mutation that turns it red: `spreadMonthShares` returning an even array instead of null.
+describe('a plan with no sale after its first month schedules as before', () => {
+  it('monthShares is null and L / refillMonths keep the figures of the existing fixtures', () => {
+    const liquidity: PlanLiquidity = { sourceCashAssetIds: ['cash1', 'cash2'], reserveEur: 10000, monthlyInflowEur: 500 };
+    const disposals: PlanDisposal[] = [{ assetId: 'etf-d', estimatedProceedsEur: 100, status: 'planned' }];
+    const plain = computeUsableLiquidity(liquidity, byId(CASH1, CASH2), disposals, 12, deps);
+    expect(plain.monthShares).toBeNull();
+    expect(plain.dueProceedsEur).toBe(100);
+    expect(plain.L).toBe(21100);
+    expect(plain.refillMonths).toBe(0);
+
+    const low = makeAsset({ id: 'cash-low', name: 'Conto', assetClass: 'cash', quantity: 1, currentPrice: 8000 });
+    const below: PlanLiquidity = { sourceCashAssetIds: ['cash-low'], reserveEur: 10000, monthlyInflowEur: 1000 };
+    const cases: Array<[PlanDisposal[], number, number]> = [
+      [[], 2, 10000],
+      [[{ assetId: 'etf-a', estimatedProceedsEur: 1500, status: 'planned' }], 1, 11500],
+      [[{ assetId: 'etf-a', monthIndex: 1, estimatedProceedsEur: 3000, status: 'planned' }], 0, 13000],
+    ];
+    for (const [sales, refillMonths, L] of cases) {
+      const result = computeUsableLiquidity(below, byId(low), sales, 12, deps);
+      expect(result.monthShares).toBeNull();
+      expect(result.refillMonths).toBe(refillMonths);
+      expect(result.L).toBe(L);
+    }
+    const noInflow = computeUsableLiquidity({ ...below, monthlyInflowEur: 0 }, byId(low), [], 12, deps);
+    expect(noInflow.monthShares).toBeNull();
+    expect(noInflow.refillMonths).toBe(12);
+  });
+
+  it('scheduleInstallments with null shares deep-equals the call without them', () => {
+    const states = resolvePositionStates(
+      [{ id: 'p1', label: 'ETF-A', targetPercentage: 100, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' }],
+      byId(ETF_A),
+      deps
+    );
+    expect(scheduleInstallments({ p1: 5000 }, states, 6, '2026-10', 1, 1, null)).toEqual(
+      scheduleInstallments({ p1: 5000 }, states, 6, '2026-10', 1, 1)
+    );
+  });
+});
+
+// U1. Mutation that turns it red: every later tranche pushed at offset 0.
+describe('computeUsableLiquidity counts a sale from its month', () => {
+  it('a month-7 sale is spent from month 7: six shares of 800 and six of 1.800 over 15.600', () => {
+    const result = computeUsableLiquidity(ABOVE_LIQUIDITY, byId(CASH_ABOVE), TWO_SALES, 12, deps);
+    expect(result.L).toBe(15600);
+    expect(result.disposalProceedsEur).toBe(8400);
+    expect(result.dueProceedsEur).toBe(2400);
+    expect(result.refillMonths).toBe(0);
+    expect(result.monthShares).toHaveLength(12);
+    result.monthShares!.forEach((share, m) => expect(share).toBeCloseTo((m < 6 ? 800 : 1800) / 15600, 12));
+  });
+
+  it('counted from month 7 (firstIndex 7) the month-7 sale is due and the spread is even', () => {
+    const result = computeUsableLiquidity(ABOVE_LIQUIDITY, byId(CASH_ABOVE), TWO_SALES, 6, deps, 7);
+    expect(result.dueProceedsEur).toBe(8400);
+    expect(result.monthShares).toBeNull();
+  });
+});
+
+// U2. Mutation that turns it red: `spread(tranche.eur, 0)` for a later sale.
+describe('scheduleInstallments spends a later sale from its month', () => {
+  it('§ 1: instalments 800 × 6 then 1.800 × 6', () => {
+    const { schedule } = scheduleOn(CASH_ABOVE, ABOVE_LIQUIDITY, TWO_SALES, 12);
+    expect(instalmentEuros(schedule.installments)).toEqual([800, 800, 800, 800, 800, 800, 1800, 1800, 1800, 1800, 1800, 1800]);
+    expect(schedule.residualEur).toBe(0);
+  });
+
+  it('property: the cumulative spend never passes the cash above the reserve plus the money arrived (200 seeded cases)', () => {
+    const random = createSeededRandom(20261119);
+    const pick = (lo: number, hi: number) => lo + Math.floor(random() * (hi - lo + 1));
+    for (let caseIndex = 0; caseIndex < 200; caseIndex++) {
+      const months = pick(1, 24);
+      const reserveEur = 10000;
+      const cashEur = reserveEur + pick(-50, 50) * 100;
+      const monthlyInflowEur = pick(0, 20) * 100;
+      const firstIndex = pick(1, 3);
+      const disposals: PlanDisposal[] = Array.from({ length: pick(0, 3) }, (_, i) => ({
+        assetId: `sale-${i}`,
+        monthIndex: pick(1, firstIndex - 1 + months),
+        estimatedProceedsEur: pick(1, 80) * 100,
+        status: 'planned' as const,
+      }));
+      const cash = makeAsset({ id: 'cash-prop', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: cashEur });
+      const liquidity: PlanLiquidity = { sourceCashAssetIds: ['cash-prop'], reserveEur, monthlyInflowEur };
+      const { totals, schedule } = scheduleOn(cash, liquidity, disposals, months, firstIndex);
+      const label = `case ${caseIndex}: ${JSON.stringify({ months, cashEur, monthlyInflowEur, firstIndex, disposals })}`;
+      let spentEur = 0;
+      schedule.installments.forEach((installment, i) => {
+        const m = i + 1;
+        spentEur += installment.lines.reduce((sum, line) => sum + line.plannedAmountEur, 0);
+        const arrivedEur = disposals
+          .filter((d) => d.monthIndex! <= firstIndex - 1 + m)
+          .reduce((sum, d) => sum + d.estimatedProceedsEur, 0);
+        const boundEur = Math.max(0, cashEur - reserveEur + arrivedEur + monthlyInflowEur * m);
+        expect(spentEur, `${label} month ${m}`).toBeLessThanOrEqual(boundEur + 1e-6);
+      });
+      const totalEur = Object.values(totals).reduce((sum, value) => sum + value, 0);
+      expect(spentEur + schedule.residualEur, label).toBeCloseTo(totalEur, 6);
+    }
+  });
+});
+
+// U14. A later sale refills the reserve first (owner, 2026-11-19). Mutation that turns it red: `refillEur = 0` for a later sale.
+describe('a later sale refills what the reserve still misses before it is invested', () => {
+  const sale = (eur: number): PlanDisposal[] => [{ assetId: 'etf-z', monthIndex: 7, estimatedProceedsEur: eur, status: 'planned' }];
+  const cashAt = (eur: number) => makeAsset({ id: 'cash-u', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: eur });
+
+  it('(a) 3.000 under, no inflow, a 6.000 € sale: L 3.000, six empty months then 500 × 6', () => {
+    const { usable, schedule } = scheduleOn(cashAt(7000), { sourceCashAssetIds: ['cash-u'], reserveEur: 10000, monthlyInflowEur: 0 }, sale(6000), 12);
+    expect(usable.L).toBe(3000);
+    expect(usable.refillMonths).toBe(6);
+    expect(instalmentEuros(schedule.installments)).toEqual([0, 0, 0, 0, 0, 0, 500, 500, 500, 500, 500, 500]);
+  });
+
+  it('(b) 5.000 under, 500 a month, an 8.000 € sale: the inflows refill 3.000, the sale 2.000, then 1.500 × 6', () => {
+    const { usable, schedule } = scheduleOn(cashAt(5000), { sourceCashAssetIds: ['cash-u'], reserveEur: 10000, monthlyInflowEur: 500 }, sale(8000), 12);
+    expect(usable.L).toBe(9000);
+    expect(usable.refillMonths).toBe(6);
+    expect(instalmentEuros(schedule.installments)).toEqual([0, 0, 0, 0, 0, 0, 1500, 1500, 1500, 1500, 1500, 1500]);
+  });
+
+  // Found by the property test above (owner, 2026-11-19): with every month refilling, the last refill's
+  // leftover was neither bought nor residual. Seen red with the residual left at 0.
+  it('every month refills: the leftover of the last refill is the residual, Σ lines + residual = L', () => {
+    const { usable, schedule } = scheduleOn(cashAt(6300), { sourceCashAssetIds: ['cash-u'], reserveEur: 10000, monthlyInflowEur: 1800 }, [], 3);
+    expect(usable.refillMonths).toBe(3);
+    expect(usable.L).toBe(1700);
+    expect(instalmentEuros(schedule.installments)).toEqual([0, 0, 0]);
+    expect(schedule.residualEur).toBe(1700);
+  });
+
+  it('(c) 3.000 under, no inflow, a 2.000 € sale: nothing to invest, every month refills', () => {
+    const { usable } = scheduleOn(cashAt(7000), { sourceCashAssetIds: ['cash-u'], reserveEur: 10000, monthlyInflowEur: 0 }, sale(2000), 12);
+    expect(usable.L).toBe(0);
+    expect(usable.refillMonths).toBe(12);
+    expect(usable.monthShares).toBeNull();
+  });
+});
+
+// U4. Mutation that turns it red: `recalibrateInstallment` calling `computeUsableLiquidity` without the index.
+describe('the recalibration counts only the sales due by the open month', () => {
+  function planWithLaterSale(): AccumulationPlan {
+    return {
+      id: 'plan-late', userId: 'u1', name: 'Piano', status: 'active', startMonth: '2027-01', months: 12,
+      liquidity: ABOVE_LIQUIDITY,
+      positions: ONE_EURO_POSITION,
+      disposals: [{ assetId: 'etf-y', monthIndex: 7, estimatedProceedsEur: 6000, status: 'planned' }],
+      installments: [], createdAt: new Date(0), updatedAt: new Date(0),
+    };
+  }
+
+  it('at month 3 the month-7 sale is not due and the budget is the month share, not the even one', () => {
+    const result = recalibrateInstallment(planWithLaterSale(), 3, byId(CASH_ABOVE, ONE_EURO), deps);
+    expect(result.liquidity.dueProceedsEur).toBe(0);
+    const shares = result.liquidity.monthShares!;
+    expect(shares).not.toBeNull();
+    const line = result.lines[0];
+    expect(line.suggestedQuantity).toBe(Math.floor(result.liquidity.L * shares[0] / 1 + 1e-9));
+    expect(line.suggestedQuantity).toBeLessThan(Math.floor(result.liquidity.L / 10));
+  });
+
+  it('at month 7 the sale is due', () => {
+    const result = recalibrateInstallment(planWithLaterSale(), 7, byId(CASH_ABOVE, ONE_EURO), deps);
+    expect(result.liquidity.dueProceedsEur).toBe(6000);
+    expect(result.liquidity.monthShares).toBeNull();
+  });
+});
+
+// The settings' «Conto per gli investimenti» (2026-11-19): a new plan starts on it while it still is an account.
+// Mutation that turns it red: `isPlanSourceAccount` dropped.
+describe('resolveInvestmentAccountId', () => {
+  const account = makeAsset({ id: 'cash-invest', name: 'Conto', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 5000 });
+  const moneyMarket = makeAsset({ id: 'fondo-mm', name: 'Monetario', type: 'etf', assetClass: 'cash', quantity: 10, currentPrice: 100 });
+
+  it('the id of an account; null when it is gone, is not an account or is not set', () => {
+    expect(resolveInvestmentAccountId({ investmentCashAssetId: 'cash-invest' }, [account, moneyMarket])).toBe('cash-invest');
+    expect(resolveInvestmentAccountId({ investmentCashAssetId: 'cash-invest' }, [moneyMarket])).toBeNull();
+    expect(resolveInvestmentAccountId({ investmentCashAssetId: 'fondo-mm' }, [account, moneyMarket])).toBeNull();
+    expect(resolveInvestmentAccountId({}, [account])).toBeNull();
+    expect(resolveInvestmentAccountId(null, [account])).toBeNull();
   });
 });

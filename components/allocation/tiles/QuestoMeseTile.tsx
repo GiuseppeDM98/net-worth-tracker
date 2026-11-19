@@ -16,16 +16,20 @@
  * `executed` (ledger-linked) → Scollega, `late` → the manual actions, `lostLink` → Rivedi (opens the
  * Calendario on that rata). `todo`/`skipped` carry no action, on purpose: the tile nudges towards
  * recording the trade in the Registro rather than pre-empting it by hand. The same vocabulary
- * covers the disposals («Vendite fuori piano»).
+ * covers the disposals («Vendite fuori piano»), each in its month: before it `upcoming` («In programma»,
+ * the month named, no action). In the month the Consulente asked to look at the plan again, a note
+ * and «Rivedi il piano» above the footer (`isPlanReviewDue`, 2026-11-19).
  */
 import type { ModelBasis } from '@/lib/utils/modelPortfolio';
 import { useMemo, useRef, useState } from 'react';
 import type { Asset, AssetAllocationTarget, IdealAllocationSettings } from '@/types/assets';
 import type { AccumulationPlan } from '@/types/accumulationPlan';
+import { addMonths, toMonthKey } from '@/lib/utils/planMonths';
 import type { ModelPortfolio } from '@/types/modelPortfolio';
 import type { RebalanceBand } from '@/lib/utils/allocationUtils';
 import {
   computeUsableLiquidity,
+  disposalMonthIndex,
   summarizeReserve,
   buildRegisteredLinePatch,
   findFirstIntactInstallment,
@@ -37,7 +41,7 @@ import {
 } from '@/lib/utils/accumulationPlanUtils';
 import type { LineMatch, LineUiState } from '@/lib/utils/accumulationPlanMatching';
 import { isPlanDone } from '@/lib/utils/accumuloSummary';
-import { countPlanInstalments, findFirstBuyingInstallment, planEndsAfterReview } from '@/lib/utils/accumuloMonth';
+import { countPlanInstalments, findFirstBuyingInstallment, isInstalmentClosed, isPlanReviewDue, locateOpenMonth, planEndsAfterReview } from '@/lib/utils/accumuloMonth';
 import { compareAllocations } from '@/lib/services/assetAllocationService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import {
@@ -96,6 +100,8 @@ import {
   ACCUMULO_DRAFT_BOX_LIQUIDITY,
   ACCUMULO_DRAFT_BOX_POSITIONS,
   ACCUMULO_LINE_STATUS_LABEL,
+  ACCUMULO_REVIEW_DUE_NOTE,
+  monthLabelShort,
   describeMatchNote,
   describeMonthTileAside,
   ACCUMULO_MANUAL_AMOUNT_LABEL,
@@ -138,6 +144,10 @@ interface QuestoMeseTileProps {
   reviewByIso: string | null;
   /** What the model rests on: the plan editor's «aggiorna anche il modello» stamps it. */
   modelBasis: ModelBasis;
+  /** The day `currentIndex` is read on (`useOpenAccumuloPlan`): the review month's check reads its month. */
+  today: Date;
+  /** Impostazioni › Spese «Conto per gli investimenti», handed to the editor (it reads it only for a new plan). */
+  investmentAccountId: string | null;
 }
 
 export function QuestoMeseTile({
@@ -154,6 +164,8 @@ export function QuestoMeseTile({
   onAssetsChanged,
   reviewByIso,
   modelBasis,
+  today,
+  investmentAccountId,
 }: QuestoMeseTileProps) {
   const isDemo = useDemoMode();
   const pastReviewNote = reviewByIso && planEndsAfterReview(plan, reviewByIso) ? (
@@ -357,6 +369,7 @@ export function QuestoMeseTile({
       onAssetsChanged={onAssetsChanged}
       reviewByIso={reviewByIso}
       basis={modelBasis}
+      investmentAccountId={investmentAccountId}
       onSaved={() => setPlanDialogOpen(false)}
     />
   );
@@ -378,6 +391,7 @@ export function QuestoMeseTile({
       onAssetsChanged={onAssetsChanged}
       reviewByIso={reviewByIso}
       basis={modelBasis}
+      investmentAccountId={investmentAccountId}
       onSaved={() => setReviseOpen(false)}
     />
   );
@@ -570,7 +584,7 @@ export function QuestoMeseTile({
       <Tile
         eyebrow={ACCUMULO_MONTH_TILE_EYEBROW}
         reading={monthReading}
-        aside={describeMonthTileAside(currentInstallment?.month ?? plan.startMonth, Math.min(Math.max(currentIndex, 1), plan.months), plan.months)}
+        aside={describeMonthTileAside(currentInstallment?.month ?? plan.startMonth, locateOpenMonth(plan, currentIndex))}
       >
         {pastReviewNote}
         {belowReserve && !refilling && (
@@ -732,15 +746,16 @@ export function QuestoMeseTile({
           )}
         </ul>
 
-        {/* Disposals — held instruments left out of the plan, sold at month 1 (the ledger matching of the disposals). */}
+        {/* Disposals — held instruments left out of the plan, sold in their month (the ledger matching of the disposals). */}
         {plan.disposals.length > 0 && (
           <div className="mt-3">
             <p className={TILE_SUB_EYEBROW_CLASS}>{ACCUMULO_DISPOSALS_SECTION_TITLE}</p>
             <ul className="mt-1.5 divide-y divide-border">
               {plan.disposals.map((disposal) => {
                 const key = `disposal:${disposal.assetId}`;
-                const isLateRow = currentIndex > 1;
-                const status = effectiveLineState(matchResult.lineStates[key] ?? 'todo', key, ignoredMatches, isLateRow);
+                const saleIndex = disposalMonthIndex(disposal);
+                const isLateRow = currentIndex > saleIndex;
+                const status = effectiveLineState(matchResult.lineStates[key] ?? 'todo', key, ignoredMatches, isLateRow, saleIndex > Math.max(currentIndex, 1));
                 const match = matchResult.matches.find((m) => m.kind === 'disposal' && m.assetId === disposal.assetId);
                 const isManual = manualDisposal?.assetId === disposal.assetId;
                 const asset = assetsById.get(disposal.assetId);
@@ -753,6 +768,7 @@ export function QuestoMeseTile({
                           {asset && `${getAssetDisplayTicker(asset)} · `}
                           {disposal.quantity !== undefined && `${formatNumberIt(disposal.quantity, 0)} quote · `}
                           {cachedFormatCurrencyEUR(disposal.executedAmountEur ?? disposal.estimatedProceedsEur)}
+                          {status === 'upcoming' && ` · ${monthLabelShort(addMonths(plan.startMonth, saleIndex - 1))}`}
                         </span>
                       </span>
                       <div className="flex shrink-0 flex-col items-end gap-1 desktop:flex-row desktop:items-center desktop:gap-3">
@@ -844,7 +860,8 @@ export function QuestoMeseTile({
         <div className="mt-3 flex gap-[3px]" role="img" aria-label={monthsCaption}>
           {plan.installments.map((installment) => {
             const hasLate = installment.index < currentIndex && installment.lines.some((line) => line.status === 'planned');
-            const closed = installment.lines.every((line) => line.status !== 'planned');
+            // A month with no line only refills the reserve: never filled as a closed instalment (owner, 2026-11-19).
+            const closed = isInstalmentClosed(installment);
             const isCurrent = installment.index === currentIndex;
             return (
               <div
@@ -856,6 +873,20 @@ export function QuestoMeseTile({
         </div>
         <p className="mt-1.5 font-mono text-[10px] tabular-nums text-muted-foreground">{monthsCaption}</p>
 
+
+        {isPlanReviewDue(plan, currentIndex, toMonthKey(today)) && (
+          <div className="mt-3">
+            <p className="text-[12px] text-muted-foreground">{ACCUMULO_REVIEW_DUE_NOTE}</p>
+            <Button
+              variant="link"
+              className="h-11 px-0 text-[12px] desktop:h-8"
+              disabled={isDemo || !findFirstIntactInstallment(plan)}
+              onClick={() => { setReviseFromModel(false); setReviseOpen(true); }}
+            >
+              {ACCUMULO_ACTION_REVISE}
+            </Button>
+          </div>
+        )}
 
         <div className="mt-auto border-t border-border pt-3.5">
           <NarrativeText segments={describeAccumulationOutcomeFooter({ maxDrift, residualEur: outcome.residualEur, reserve: { eur: plan.liquidity.reserveEur, intact: !belowReserve } })} className="text-[11px] leading-[1.5] text-muted-foreground" />

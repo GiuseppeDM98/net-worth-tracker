@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { narrativeToText } from '@/lib/utils/narrative';
 import { cachedFormatCurrencyEUR, formatPercentageIt } from '@/lib/utils/formatters';
+import { describeSaleStep } from '@/lib/utils/accumulationNarrative';
 import {
   describeAccumulationNone,
   describeBandReentry,
@@ -501,5 +502,14 @@ describe('the suggested instalment: the median of the monthly savings (owner, 20
   it('names how many months the median spans', () => {
     expect(flatSpaces(describeSuggestedInflow(1200, 12))).toBe('Il tuo risparmio mensile mediano degli ultimi 12 mesi è di 1200 €.');
     expect(flatSpaces(describeSuggestedInflow(1200, 5))).toBe('Il tuo risparmio mensile mediano degli ultimi 5 mesi è di 1200 €.');
+  });
+});
+
+// The month a later sale enters the instalments (2026-11-19). Mutation that turns it red: `compact` dropped.
+describe('describeSaleStep', () => {
+  it('names the month, the instalment without decimals and the sales joined', () => {
+    expect(describeSaleStep({ month: '2027-07', instalmentEur: 1800, names: ['Fondo X', 'Fondo Y'] }).replace(/[  ]/g, ' ')).toBe(
+      'Da luglio la rata sale a 1800 €: entra il ricavato di Fondo X, Fondo Y.'
+    );
   });
 });

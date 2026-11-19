@@ -103,6 +103,7 @@ export function docToAccumulationPlan(id: string, data: Record<string, unknown>)
     installments: ((data.installments ?? []) as Record<string, unknown>[]).map(toInstallment),
     residualEur: data.residualEur as number | undefined,
     optimizerSnapshot: toOptimizerSnapshot(data.optimizerSnapshot as Record<string, unknown> | undefined),
+    reviewMonthIndex: data.reviewMonthIndex as number | undefined,
     revisions: toRevisions(data.revisions),
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),
