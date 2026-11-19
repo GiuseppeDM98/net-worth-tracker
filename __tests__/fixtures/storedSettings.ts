@@ -38,6 +38,7 @@ export const STORED_SETTINGS = {
   spendingRolesEnabled: true,
   idealAllocation: STORED_IDEAL_ALLOCATION,
   dividendCashAssetId: 'cash-1',
+  investmentCashAssetId: 'cash-invest',
   transferFeeCategoryId: 'cat-fee',
   transferFeeSubCategoryId: 'sub-fee',
   realEstateCostCategories: [
@@ -100,6 +101,7 @@ export const FULL_PAGE_SETTINGS: AssetAllocationSettings = {
   dividendCashAssetId: 'cash-div',
   defaultDebitCashAssetId: 'cash-debit',
   defaultCreditCashAssetId: 'cash-credit',
+  investmentCashAssetId: 'cash-invest',
   transferFeeCategoryId: 'cat-fee',
   transferFeeSubCategoryId: 'sub-fee',
   // In `REAL_ESTATE_COST_KINDS` order, as the slice keeps it (orderRealEstateDefaults).

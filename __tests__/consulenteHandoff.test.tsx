@@ -67,6 +67,7 @@ function renderHandoff(assets: Asset[]) {
   return render(
     <ConsulenteHandoff
       ownerId="u1"
+      investmentAccountId={null}
       basis={{} as never}
       proposal={PROPOSAL}
       candidates={null}

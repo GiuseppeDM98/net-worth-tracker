@@ -10,14 +10,20 @@ import {
   resolveAccumuloSections,
   resolveAccumuloVerdictInput,
   selectAccumuloStrip,
+  listSaleSteps,
   stepTrajectoryCursor,
+  summarizeDraftTotal,
   summarizePacMonth,
+  summarizeBuyingInstalments,
+  listRefillSaleMonths,
 } from '@/lib/utils/accumuloSummary';
 import { ACCUMULO_CLOSED_ASIDES, describeAccumuloClosedAnswers } from '@/lib/utils/accumulationNarrative';
 import { formatStripFigure, validateStrip } from '@/lib/utils/verdictStrip';
 import { VERDICT_REST_SECTION } from '@/lib/utils/mobileSections';
-import type { ClassTrajectoryPoint } from '@/lib/utils/accumulationPlanUtils';
-import type { AccumulationPlan, InstallmentLine } from '@/types/accumulationPlan';
+import type { ClassTrajectoryPoint, PlanDeps } from '@/lib/utils/accumulationPlanUtils';
+import type { AccumulationPlan, InstallmentLine, PlanDisposal } from '@/types/accumulationPlan';
+import type { Asset } from '@/types/assets';
+import { unitPriceEur } from '@/lib/utils/costBasisEur';
 
 const flat = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
 
@@ -401,5 +407,102 @@ describe('no plan, cash held outside the accounts', () => {
     expect(flat(narrativeToText(verdict.sentence))).toBe(
       "Oltre la quota di liquidità dell'allocazione (50.000 €), nella liquidità hai 1000 €: un piano li spende in rate mensili verso i pesi che scegli.",
     );
+  });
+});
+
+﻿// A later sale makes the instalments differ (2026-11-19): the draft names its first one, and one sentence per
+// month a sale raises the instalment. Invented figures: 12 months from 2027-01, 500 € a month, 1.200 € above
+// the reserve, 2.400 € sold in month 1 and 6.000 € in month 7 → six instalments of 800 €, then six of 1.800 €.
+describe('a draft with a later sale', () => {
+  const deps: PlanDeps = { valueOf: (a) => a.quantity * unitPriceEur(a), priceOf: (a) => unitPriceEur(a) };
+  const asset = (id: string, extra: Partial<Asset>): Asset =>
+    ({ id, userId: 'u', ticker: id, name: id, type: 'etf', assetClass: 'equity', currency: 'EUR', quantity: 0, currentPrice: 1,
+      lastPriceUpdate: new Date(0), createdAt: new Date(0), updatedAt: new Date(0), ...extra }) as Asset;
+  const assets = [asset('conto', { type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 11200 }), asset('etf-uno', {})];
+  const sales: PlanDisposal[] = [
+    { assetId: 'fondo-x', estimatedProceedsEur: 2400, status: 'planned' },
+    { assetId: 'fondo-y', monthIndex: 7, estimatedProceedsEur: 6000, status: 'planned' },
+  ];
+  const draftPlan = (disposals: PlanDisposal[]) => plan({
+    status: 'draft', startMonth: '2027-01', months: 12, disposals,
+    liquidity: { sourceCashAssetIds: ['conto'], reserveEur: 10000, monthlyInflowEur: 500 },
+    positions: [{ id: 'p1', label: 'ETF-UNO', targetPercentage: 100, memberAssetIds: ['etf-uno'], buyAssetId: 'etf-uno' }],
+  });
+
+  // Mutation that turns it red: `firstEur` read from the even division.
+  it('names the first instalment; without a later sale the headline is the even one', () => {
+    const summary = summarizeDraftTotal(draftPlan(sales), assets, deps);
+    expect(summary.firstEur).toBeCloseTo(800, 6);
+    const verdict = buildAccumuloVerdict({ ...base, plan: draftPlan(sales), draftTotalEur: summary.totalEur, draftRefillMonths: summary.refillMonths, draftFirstEur: summary.firstEur });
+    expect(flat(verdict.headline)).toBe('Bozza pronta: 12 rate da gennaio, la prima di 800 €.');
+
+    const even = summarizeDraftTotal(draftPlan([sales[0]]), assets, deps);
+    expect(even.firstEur).toBeNull();
+    const evenVerdict = buildAccumuloVerdict({ ...base, plan: draftPlan([sales[0]]), draftTotalEur: even.totalEur, draftRefillMonths: even.refillMonths, draftFirstEur: even.firstEur });
+    expect(flat(evenVerdict.headline)).toBe('Bozza pronta: 12 rate da 800 € da gennaio.');
+  });
+
+  const instalments = (euros: number[], firstIndex = 1) =>
+    euros.map((eur, k) => ({
+      index: firstIndex + k,
+      month: `2027-${String(firstIndex + k).padStart(2, '0')}` as `${number}-${number}`,
+      lines: eur > 0 ? [line('p1', eur)] : [],
+      carryInEur: {},
+    }));
+  const nameOf = (id: string) => ({ 'fondo-x': 'Fondo X', 'fondo-y': 'Fondo Y', 'fondo-z': 'Fondo Z' } as Record<string, string>)[id] ?? id;
+  const STEPPED = [800, 800, 800, 800, 800, 800, 1800, 1800, 1800, 1800, 1800, 1800];
+
+  // Mutation that turns it red: every open sale's month listed.
+  it('listSaleSteps: one entry per month a later sale raises the instalment', () => {
+    const both: PlanDisposal[] = [...sales, { assetId: 'fondo-z', monthIndex: 7, estimatedProceedsEur: 100, status: 'planned' }];
+    expect(listSaleSteps({ installments: instalments(STEPPED), disposals: both, firstIndex: 1, nameOf })).toEqual([
+      { month: '2027-07', instalmentEur: 1800, names: ['Fondo Y', 'Fondo Z'] },
+    ]);
+    // A revision from the 4th instalment: installments[0] is plan month 4.
+    expect(listSaleSteps({ installments: instalments(STEPPED.slice(3), 4), disposals: sales, firstIndex: 4, nameOf })).toEqual([
+      { month: '2027-07', instalmentEur: 1800, names: ['Fondo Y'] },
+    ]);
+  });
+
+  it('listSaleSteps: no entry for a sale the refill took whole, a month-1 sale or a closed one', () => {
+    expect(listSaleSteps({ installments: instalments(new Array(12).fill(0)), disposals: sales, firstIndex: 1, nameOf })).toEqual([]);
+    expect(listSaleSteps({ installments: instalments(new Array(12).fill(800)), disposals: [sales[0]], firstIndex: 1, nameOf })).toEqual([]);
+    expect(listSaleSteps({ installments: instalments(STEPPED), disposals: [{ ...sales[1], status: 'skipped' }], firstIndex: 1, nameOf })).toEqual([]);
+  });
+});
+
+﻿
+// The step 3 reading and the side panel count the months that buy (owner, 2026-11-19), and the reserve note names
+// the sales that refill it with the inflows.
+describe('the months that buy, after a refill', () => {
+  const months = (euros: number[], firstIndex = 1) =>
+    euros.map((eur, k) => ({
+      index: firstIndex + k,
+      month: `2027-${String(firstIndex + k).padStart(2, '0')}` as `${number}-${number}`,
+      lines: eur > 0 ? [{ positionId: 'p1', assetId: 'p1', plannedQuantity: 1, priceEurAtPlan: eur, plannedAmountEur: eur, status: 'planned' as const }] : [],
+      carryInEur: {},
+    }));
+
+  // Mutation that turns it red: the average over every month, the zeros included.
+  it('summarizeBuyingInstalments: count, first and average over the months that buy', () => {
+    expect(summarizeBuyingInstalments(months([0, 0, 1500, 1000, 1000, 1500]), 2)).toEqual({
+      count: 4, firstEur: 1500, firstMonth: '2027-03', averageEur: 1250,
+    });
+    expect(summarizeBuyingInstalments(months([0, 0, 0]), 3)).toBeNull();
+  });
+
+  // Mutation that turns it red: a sale after the first buying month listed.
+  it('listRefillSaleMonths: the open sales that land by the first month that buys', () => {
+    const disposals: PlanDisposal[] = [
+      { assetId: 'a', monthIndex: 1, estimatedProceedsEur: 100, status: 'planned' },
+      { assetId: 'b', monthIndex: 3, estimatedProceedsEur: 9000, status: 'planned' },
+      { assetId: 'c', monthIndex: 3, estimatedProceedsEur: 500, status: 'planned' },
+      { assetId: 'd', monthIndex: 5, estimatedProceedsEur: 800, status: 'planned' },
+      { assetId: 'e', monthIndex: 2, estimatedProceedsEur: 800, status: 'skipped' },
+    ];
+    expect(listRefillSaleMonths({ disposals, startMonth: '2027-01', firstIndex: 1, refillMonths: 2 })).toEqual(['2027-03', '2027-03']);
+    expect(listRefillSaleMonths({ disposals, startMonth: '2027-01', firstIndex: 1, refillMonths: 0 })).toEqual([]);
+    // A revision from the 3rd instalment: plan month 5 is the first that buys after two refill months.
+    expect(listRefillSaleMonths({ disposals, startMonth: '2027-01', firstIndex: 3, refillMonths: 2 })).toEqual(['2027-05']);
   });
 });

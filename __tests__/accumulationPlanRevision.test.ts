@@ -343,3 +343,41 @@ describe('summarizeClosedPlan after a refill', () => {
     expect(row.plannedEur).toBe(2000);
   });
 });
+
+// A revision keeps a new sale's month, never before the first revised one (2026-11-19), and carries the review
+// month. Mutation that turns it red: `monthIndex: k` restored for every new sale.
+describe('a revision and the months of its sales', () => {
+  function afterThree() {
+    const { plan } = planOnF();
+    for (const installment of plan.installments.filter((i) => i.index <= 3)) {
+      installment.lines.forEach((l) => { l.status = 'executed'; l.transactionIds = ['t']; });
+    }
+    plan.disposals = [sale({ status: 'executed' })];
+    return { plan, assets: byId(etfA(155), etfB(143), conto(28320)) };
+  }
+  const input = (plan: AccumulationPlan, overrides = {}) => ({
+    monthlyInflowEur: 800, reserveEur: 10000, remainingMonths: 7, positions: plan.positions, disposals: [], ...overrides,
+  });
+  const newSale = (monthIndex: number): PlanDisposal => ({ assetId: 'etf-a', quantity: 10, monthIndex, estimatedProceedsEur: 0, status: 'planned' });
+  const monthOfNewSale = (result: ReturnType<typeof buildRevisedPlan>) =>
+    result.ok ? result.plan.disposals.find((d) => d.assetId === 'etf-a')?.monthIndex : undefined;
+
+  it('keeps a month after k, lifts one before it to k, refuses one past the plan', () => {
+    const { plan, assets } = afterThree();
+    expect(monthOfNewSale(buildRevisedPlan(plan, input(plan, { disposals: [newSale(6)] }), assets, deps, new Date()))).toBe(6);
+    expect(monthOfNewSale(buildRevisedPlan(plan, input(plan, { disposals: [newSale(2)] }), assets, deps, new Date()))).toBe(4);
+    expect(buildRevisedPlan(plan, input(plan, { disposals: [newSale(11)] }), assets, deps, new Date())).toEqual({ ok: false, issue: 'sale_month_range' });
+  });
+
+  it('the review month: absent keeps it, a number replaces it, null clears it', () => {
+    const { plan, assets } = afterThree();
+    plan.reviewMonthIndex = 8;
+    const review = (overrides: object) => {
+      const result = buildRevisedPlan(plan, input(plan, overrides), assets, deps, new Date());
+      return result.ok ? result.plan.reviewMonthIndex : 'refused';
+    };
+    expect(review({})).toBe(8);
+    expect(review({ reviewMonthIndex: 5 })).toBe(5);
+    expect(review({ reviewMonthIndex: null })).toBeUndefined();
+  });
+});

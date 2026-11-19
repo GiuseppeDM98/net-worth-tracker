@@ -18,12 +18,15 @@ export interface PlanPosition {
   buyAssetId: string;       // ∈ memberAssetIds; the ONLY member that receives buys
 }
 
-/** A held tradable instrument left out of the plan: sold in month 1, proceeds into L. */
+/** A held tradable instrument left out of the plan: sold in its month (`monthIndex`, absent = 1), proceeds into L. */
 export interface PlanDisposal {
   assetId: string;
   /** Shares to sell (integer > 0); absent = every share held at activation. */
   quantity?: number;
-  /** Installment index of the sale; absent = 1. A revision sets it to the first revised month. */
+  /**
+   * Installment index of the sale, counted from the plan's first month; absent = 1. A revision keeps a new
+   * sale's month, never before the first revised one.
+   */
   monthIndex?: number;
   estimatedProceedsEur: number; // quantity × price (or the whole position's value) when the plan is activated
   status: InstallmentLineStatus;
@@ -104,6 +107,8 @@ export interface AccumulationPlan {
   residualEur?: number;         // planned leftover after the last month (< one share)
   optimizerSnapshot?: OptimizerSnapshot;
   revisions?: PlanRevision[];
+  /** The plan month the Consulente asked to look at the plan again (1..months); absent = none. */
+  reviewMonthIndex?: number;
   createdAt: Date;
   updatedAt: Date;
   activatedAt?: Date;
@@ -125,5 +130,5 @@ export interface PacVerdictInput {
 /** Draft input edited by the dialog (no system fields). */
 export type AccumulationPlanDraft = Pick<
   AccumulationPlan,
-  'name' | 'startMonth' | 'months' | 'liquidity' | 'positions' | 'disposals' | 'optimizerSnapshot'
+  'name' | 'startMonth' | 'months' | 'liquidity' | 'positions' | 'disposals' | 'optimizerSnapshot' | 'reviewMonthIndex'
 >;

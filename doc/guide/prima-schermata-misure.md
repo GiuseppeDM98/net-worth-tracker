@@ -246,6 +246,11 @@ qui, la più recente in cima. Le eccezioni ammesse sono queste e nessun'altra: L
 prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la pill di `PageTabBar` portata a 44 px
 (2026-10-10), la deriva del giorno o della macchina provata sul codice di develop dello stesso giorno.
 
+- **`2026-11-19: …`** (le vendite nel calendario del piano di accumulo, branch `feat/accumulo-vendite-nel-calendario`; proprietario,
+  2026-11-19: alzare), `perf:build` su :3200, `census@example.com`, develop (b57ada16, worktree) e branch sulla stessa macchina lo stesso
+  giorno: 59 voci su 60 identiche. **Patrimonio 1024** `figuresAboveFold` 11 → 12, `figuresOutsideVerdict` 8 → 9 — il flip noto del
+  2026-11-17, ora provato sulla build di develop: tre corse a 11/8, poi 12/9 con le stesse dodici cifre del branch (il branch non tocca
+  Patrimonio). La voce si registra al valore alto, che entrambe le build leggono.
 - **`2026-11-17: …`** (il portafoglio modello, branch `feat/portafoglio-modello`; proprietario, 2026-11-17: Impostazioni registrata come misurata), Next 16.4.6, due corse (Patrimonio 1024 12/9 nella prima, 11/8 nella seconda: il flip noto), stessa
   macchina, `perf:build` su :3200, `census@example.com`. **Accumulo** (`allocazione-accumulo`, riregistrata come la spec chiede): le righe chiuse
   «Portafoglio modello» e «Criteri del modello» entrano in «Il resto della pagina» — 390 `screens` 1,56 → 1,72, 768 1,21 → 1,27 e tessere 2/1 → 3/1,

@@ -21,6 +21,7 @@ import {
   describeMonthReading,
   describeMonthTileAside,
   describePriceChangeNotice,
+  describeInstallmentStatus,
 } from '@/lib/utils/accumulationNarrative';
 import { narrativeToText } from '@/lib/utils/narrative';
 
@@ -88,7 +89,7 @@ describe('describeAccumuloPreview', () => {
 
 describe('Questo mese', () => {
   it('the header aside names the month and the installment', () => {
-    expect(describeMonthTileAside('2026-10', 3, 12)).toBe('ottobre 2026 · rata 3 di 12');
+    expect(describeMonthTileAside('2026-10', { kind: 'instalment', ordinal: 3, total: 12 })).toBe('ottobre 2026 · rata 3 di 12');
   });
   it('the match note says what the Registro holds', () => {
     expect(flat(describeMatchNote(24, 3134))).toMatch(/^Trovato nel Registro: 24 quote, 3\.?134,00 €$|^Trovato nel Registro: 24 quote, 3134 €$/);
@@ -259,5 +260,38 @@ describe('describeReserveOrigin', () => {
   });
   it('no quota, no line', () => {
     expect(describeReserveOrigin({ quotaEur: 0, otherCashEur: 5000 })).toBeNull();
+  });
+});
+
+
+// A sale that refills the reserve with the inflows is named (owner, 2026-11-19): two months of inflows alone do not.
+// Mutation that turns it red: the sale months ignored.
+describe('describeRefillNote — with a sale', () => {
+  it('names the inflows up to the month before and the sale', () => {
+    expect(flat(narrativeToText(describeRefillNote({ refillMonths: 2, months: 12, shortfallEur: 10000, firstMonth: '2027-03', saleMonths: ['2027-03'] })!))).toBe(
+      'Mancano 10.000 € alla riserva: la ricostituiscono le entrate fino a febbraio e la vendita di marzo, si compra da marzo 2027.',
+    );
+    expect(flat(narrativeToText(describeRefillNote({ refillMonths: 3, months: 12, shortfallEur: 10000, firstMonth: '2027-04', saleMonths: ['2027-02', '2027-04', '2027-04'] })!))).toBe(
+      'Mancano 10.000 € alla riserva: la ricostituiscono le entrate fino a marzo e le vendite di febbraio e aprile, si compra da aprile 2027.',
+    );
+  });
+});
+
+// A month with no line only refills the reserve: the calendar says so, never «Registrato» (owner, 2026-11-19).
+// Mutation that turns it red: an empty month read as all closed.
+describe('describeInstallmentStatus', () => {
+  it('a month with no line is «Solo riserva»', () => {
+    expect(describeInstallmentStatus([])).toBe('Solo riserva');
+    expect(describeInstallmentStatus([{ status: 'executed' }, { status: 'skipped' }])).toBe('Registrato');
+    expect(describeInstallmentStatus([{ status: 'executed' }, { status: 'planned' }])).toBe('Da fare');
+  });
+});
+
+// Questo mese's aside counts the months that buy (owner, 2026-11-19, the 2026-11-17 rule kept).
+// Mutation that turns it red: the refill month read as an instalment.
+describe('describeMonthTileAside — refill months', () => {
+  it('a refill month names the first instalment', () => {
+    expect(describeMonthTileAside('2026-12', { kind: 'refill', firstBuyingMonth: '2027-02' })).toBe('dicembre 2026 · solo riserva, prima rata a febbraio');
+    expect(describeMonthTileAside('2026-12', { kind: 'refill', firstBuyingMonth: undefined })).toBe('dicembre 2026 · solo riserva');
   });
 });

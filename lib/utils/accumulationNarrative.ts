@@ -9,8 +9,9 @@
  *
  * The ledger-matching states (`LineUiState`, from `accumulationPlanMatching.ts`): a still-`planned` line is `toConfirm` once a ledger trade matches it, `late` once its
  * installment is before the current month with no match, or plain `todo` otherwise; an `executed`
- * line whose linked trade was deleted from the ledger reads `lostLink`. `todo` and `skipped` carry
- * no action in the tile — only `toConfirm`/`executed`/`late`/`lostLink` do.
+ * line whose linked trade was deleted from the ledger reads `lostLink`; a sale before its month reads
+ * `upcoming` («In programma», 2026-11-19). `todo`, `upcoming` and `skipped` carry no action in the tile —
+ * only `toConfirm`/`executed`/`late`/`lostLink` do.
  */
 import type { MonthKey } from '@/types/accumulationPlan';
 import type { AssetClass } from '@/types/assets';
@@ -20,7 +21,7 @@ import type { RowAnswerMap } from '@/components/ui/row-answers';
 import type { ClassTrajectoryPoint } from './accumulationPlanUtils';
 import { ASSET_CLASS_LABELS, bandForTarget, type RebalanceBand } from './allocationUtils';
 import { cachedFormatCurrencyEUR, formatDate, formatNumberIt, formatPercentageIt } from './formatters';
-import { monthLabelLong, parseMonthKey } from './planMonths';
+import { addMonths, monthLabelLong, parseMonthKey } from './planMonths';
 import { monthWithPrepositionA } from './patrimonioNarrative';
 import { describeNegativeFixed } from './weightOptimizerNarrative';
 import type { ConsulenteHandoffPlan, HandoffSeedOutcome } from './allocationAdviceHandoff';
@@ -89,7 +90,8 @@ export type DraftIssueCode =
   | 'disposal_full_on_position'
   | 'disposal_quantity'
   | 'nothing_to_revise'
-  | 'sale_month_range';
+  | 'sale_month_range'
+  | 'sale_month_out';
 
 /** What `validateDraftAgainstAssets` knows about a finding — enough to phrase it, not the final `DraftIssue`. */
 export type DraftIssueContext =
@@ -106,7 +108,8 @@ export type DraftIssueContext =
   | { code: 'disposal_full_on_position'; label: string }
   | { code: 'disposal_quantity'; label: string }
   | { code: 'nothing_to_revise' }
-  | { code: 'sale_month_range' };
+  | { code: 'sale_month_range' }
+  | { code: 'sale_month_out'; label: string };
 
 /** One Italian sentence per `DraftIssue` code. */
 export function describeDraftIssue(context: DraftIssueContext): string {
@@ -139,6 +142,8 @@ export function describeDraftIssue(context: DraftIssueContext): string {
       return 'Non c\'è nessuna rata da rivedere: tutte hanno già righe eseguite o saltate.';
     case 'sale_month_range':
       return 'Una vendita può andare solo a una rata che la revisione riscrive: scegli un mese dalla prima rata rivista in poi.';
+    case 'sale_month_out':
+      return `La vendita di «${context.label}» è fissata oltre l’ultima rata: scegli un mese del piano.`;
     default:
       return 'Il piano non è valido.';
   }
@@ -196,11 +201,38 @@ export const ACCUMULO_LINE_STATUS_LABEL: Record<LineUiState, string> = {
   late: 'In ritardo',
   skipped: 'Saltata',
   lostLink: 'Collegamento perso',
+  upcoming: 'In programma',
 };
 
-/** Questo mese's header aside: «ottobre 2026 · rata 3 di 12» (render, view 1). */
-export function describeMonthTileAside(month: MonthKey, installmentIndex: number, totalMonths: number): string {
-  return `${monthLabelLong(month)} · rata ${installmentIndex} di ${totalMonths}`;
+/** «Questo mese» in the review month the Consulente indicated (`isPlanReviewDue`): a note, not a warning. */
+export const ACCUMULO_REVIEW_DUE_NOTE =
+  'Il Consulente ha indicato questo mese per rivedere il piano: guarda se quote e rata vanno ancora bene.';
+
+/** «Da luglio la rata sale a 1800 €: entra il ricavato di Fondo X.» — one sentence per month with a later sale (`listSaleSteps`). */
+export function describeSaleStep(input: { month: MonthKey; instalmentEur: number; names: string[] }): string {
+  return `Da ${monthLabelLong(input.month, false)} la rata sale a ${cachedFormatCurrencyEUR(input.instalmentEur, true)}: `
+    + `entra il ricavato di ${input.names.join(', ')}.`;
+}
+
+/**
+ * Questo mese's header aside: «ottobre 2026 · rata 3 di 12» over the months that buy, «dicembre 2026 · solo riserva,
+ * prima rata a febbraio» on a month that only refills the reserve (owner, 2026-11-19; `locateOpenMonth`).
+ */
+export function describeMonthTileAside(
+  month: MonthKey,
+  place: { kind: 'instalment'; ordinal: number; total: number } | { kind: 'refill'; firstBuyingMonth: MonthKey | undefined },
+): string {
+  if (place.kind === 'instalment') return `${monthLabelLong(month)} · rata ${place.ordinal} di ${place.total}`;
+  const first = place.firstBuyingMonth ? `, prima rata a ${monthLabelLong(place.firstBuyingMonth, false)}` : '';
+  return `${monthLabelLong(month)} · solo riserva${first}`;
+}
+
+/** The calendar's month: «Solo riserva» with no line to buy (owner, 2026-11-19), never «Registrato». */
+export const ACCUMULO_REFILL_MONTH_LABEL = 'Solo riserva';
+
+export function describeInstallmentStatus(lines: ReadonlyArray<{ status: string }>): string {
+  if (lines.length === 0) return ACCUMULO_REFILL_MONTH_LABEL;
+  return lines.every((line) => line.status !== 'planned') ? ACCUMULO_LINE_STATUS_LABEL.executed : ACCUMULO_LINE_STATUS_LABEL.todo;
 }
 /** «Trovato nel Registro: 24 quote, 3134 €» under a line waiting for the reader's confirmation. */
 export function describeMatchNote(quantity: number, amountEur: number): string {
@@ -649,7 +681,6 @@ export const ACCUMULO_STEP2_FROM_OPTIMIZER = 'Ricalcola';
 export const ACCUMULO_ACTION_GROUP_PROXY = 'Raggruppa due strumenti';
 export const ACCUMULO_ACTION_GROUP_CANCEL = 'Annulla raggruppamento';
 export const ACCUMULO_STEP2_GROUP_NO_BUY = 'non riceve acquisti';
-export const ACCUMULO_STEP2_SALE_PROCEEDS = 'ricavo al mese 1';
 export const ACCUMULO_STEP2_GROUP_HINT = 'Scegli gli strumenti da raggruppare: dividono un solo peso e si compra solo uno dei due.';
 export function describeStep2Shares(quantity: number): string {
   return `${formatNumberIt(quantity, 0)} quote`;
@@ -674,9 +705,8 @@ export function describeAddableAsset(input: { name: string; ticker: string; held
   return `${input.name}${input.ticker && input.ticker !== input.name ? ` (${input.ticker})` : ''}${tag}`;
 }
 
-/** a saved sale not yet executed can move to another month of the revised calendar. */
+/** a sale not yet executed picks its month of the plan (a new one, or a saved one in a revision). */
 export const ACCUMULO_STEP2_SALE_MONTH = 'Vendi a';
-export const ACCUMULO_STEP2_SALE_NOT_EXECUTED = 'salvata, non eseguita';
 export const ACCUMULO_STEP2_TOTAL_LABEL = 'Totale';
 export const ACCUMULO_STEP2_FOOTNOTE = 'Peso di mercato, non esposizione: la leva si vede al passo 3.';
 export const ACCUMULO_STEP2_NO_TRADABLE_ASSETS = 'Nessuno strumento negoziabile in portafoglio: aggiungine uno per iniziare.';
@@ -956,7 +986,8 @@ export function describeDriftReading(
 export type AccumuloVerdictInput =
   /** `reserveEur` is kept on the accounts; `otherCashEur` is the cash class outside them (a money-market fund). */
   | { state: 'none'; sourceCashEur: number; reserveEur: number; otherCashEur?: number; hasModel: boolean }
-  | { state: 'draft'; months: number; monthlyEur: number; startMonth: MonthKey }
+  /** `firstEur`: the first instalment when a later sale makes the instalments differ (2026-11-19); null = even. */
+  | { state: 'draft'; months: number; monthlyEur: number; startMonth: MonthKey; firstEur?: number | null }
   /** Active, before its first month (2026-11-12): nothing to buy yet. `todayYear` is the Italian year of today. */
   | { state: 'scheduled'; startMonth: MonthKey; firstMonth: MonthKey; firstInstalmentEur: number; lineCount: number; months: number; todayYear: number }
   /** Active, a month with no line (2026-11-17): the reserve refilling, or a share below one quota. */
@@ -1027,7 +1058,10 @@ export function describeAccumuloVerdict(input: AccumuloVerdictInput): PageVerdic
 
   if (input.state === 'draft') {
     return {
-      headline: `Bozza pronta: ${input.months} ${input.months === 1 ? 'rata' : 'rate'} da ${cachedFormatCurrencyEUR(input.monthlyEur, true)} da ${monthLabelLong(input.startMonth, false)}.`,
+      // With a later sale the instalments differ: «N rate da X €» would be false, the first one is named instead.
+      headline: input.firstEur !== undefined && input.firstEur !== null
+        ? `Bozza pronta: ${input.months} ${input.months === 1 ? 'rata' : 'rate'} da ${monthLabelLong(input.startMonth, false)}, la prima di ${cachedFormatCurrencyEUR(input.firstEur, true)}.`
+        : `Bozza pronta: ${input.months} ${input.months === 1 ? 'rata' : 'rate'} da ${cachedFormatCurrencyEUR(input.monthlyEur, true)} da ${monthLabelLong(input.startMonth, false)}.`,
       tone: 'neutral',
       sentence: [{ text: 'Attivala per fissare il calendario.' }],
     };
@@ -1220,11 +1254,25 @@ export function describeAccumuloIntro(
  * The months that only refill the reserve, for the step 1 box and the side panel (owner, 2026-11-17).
  * `null` when nothing is missing from the reserve.
  */
-export function describeRefillNote(input: { refillMonths: number; months: number; shortfallEur: number; firstMonth: MonthKey | undefined }): Narrative | null {
+export function describeRefillNote(input: {
+  refillMonths: number;
+  months: number;
+  shortfallEur: number;
+  firstMonth: MonthKey | undefined;
+  /** The sales that refill it with the inflows (`listRefillSaleMonths`): named, two months of inflows alone do not (owner, 2026-11-19). */
+  saleMonths?: MonthKey[];
+}): Narrative | null {
   if (input.shortfallEur <= 0.005 || input.refillMonths <= 0) return null;
   const head: Narrative = [{ text: 'Mancano ' }, { text: cachedFormatCurrencyEUR(input.shortfallEur, true), mono: true }, { text: ' alla riserva: ' }];
   if (input.refillMonths >= input.months || !input.firstMonth) {
     return [...head, { text: 'in ' + input.months + (input.months === 1 ? ' mese' : ' mesi') + ' le entrate non la ricostituiscono, non c’è nulla da comprare.' }];
+  }
+  const sales = [...new Set(input.saleMonths ?? [])].map((month) => monthLabelLong(month, false));
+  if (sales.length > 0) {
+    const list = sales.length === 1 ? sales[0] : sales.slice(0, -1).join(', ') + ' e ' + sales[sales.length - 1];
+    const what = (input.saleMonths?.length ?? 0) === 1 ? 'la vendita di ' : 'le vendite di ';
+    const until = monthLabelLong(addMonths(input.firstMonth, -1), false);
+    return [...head, { text: 'la ricostituiscono le entrate fino a ' + until + ' e ' + what + list + ', si compra da ' + monthLabelLong(input.firstMonth) + '.' }];
   }
   const which = input.refillMonths === 1 ? 'le entrate del primo mese' : 'le entrate dei primi ' + input.refillMonths + ' mesi';
   return [...head, { text: which + ' la ricostituiscono, si compra da ' + monthLabelLong(input.firstMonth) + '.' }];

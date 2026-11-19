@@ -40,7 +40,7 @@ const DEFAULT_TARGETS: AssetAllocationTarget = {
 /** Every key «Salva» hands to `setSettings` — the write surface of the page, as a checklist. */
 const WRITTEN_KEYS = [
   'autoCalculateEquityBonds', 'cashflowHistoryStartYear', 'checkingAccountSubCategory', 'costCentersEnabled',
-  'defaultCreditCashAssetId', 'defaultDebitCashAssetId', 'dividendCashAssetId', 'dividendIncomeCategoryId',
+  'defaultCreditCashAssetId', 'defaultDebitCashAssetId', 'dividendCashAssetId', 'dividendIncomeCategoryId', 'investmentCashAssetId',
   'dividendIncomeSubCategoryId', 'expenseSplitEnabled', 'familyMembers', 'goalBasedInvestingEnabled',
   'goalDrivenAllocationEnabled', 'includePrimaryResidenceInFIRE', 'laborIncomeCategoryIds', 'monthlyEmailEnabled',
   'monthlyEmailRecipients', 'pensionReturnStartMonth', 'performanceExcludesCash', 'performanceIncludesExcludedAssets',

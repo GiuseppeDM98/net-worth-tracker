@@ -48,6 +48,8 @@ interface ConsulenteHandoffProps {
   targetLeverageRatio: number;
   idealAllocation: IdealAllocationSettings | null;
   model: ModelPortfolio | null;
+  /** Impostazioni › Spese «Conto per gli investimenti»: the new plan starts on it; null = none. */
+  investmentAccountId: string | null;
   onAssetsChanged: () => void;
   onClose: () => void;
 }
@@ -107,6 +109,7 @@ export function ConsulenteHandoff(props: ConsulenteHandoffProps) {
         model={props.model}
         basis={props.basis}
         reviewByIso={proposal.reviewByIso}
+        investmentAccountId={props.investmentAccountId}
         onAssetsChanged={props.onAssetsChanged}
         onSaved={onClose}
         onClose={onClose}

@@ -804,6 +804,18 @@ describe('describeDefaultAccounts', () => {
       'Nessun conto predefinito: il modulo delle spese parte senza conto.'
     );
   });
+
+  // The account for the investments (owner, 2026-11-19): a second segment after every branch, absent = today's reading.
+  // Mutation that turns it red: the second segment dropped.
+  it('adds the account for the investments after every branch', () => {
+    expect(plain(describeDefaultAccounts({ debitName: 'Conto A', creditName: 'Conto B', investmentName: 'Conto C' }))).toBe(
+      'Le spese scalano da Conto A, le entrate arrivano su Conto B. Il piano di accumulo attinge da Conto C.'
+    );
+    expect(plain(describeDefaultAccounts({ investmentName: 'Conto C' }))).toBe(
+      'Nessun conto predefinito: il modulo delle spese parte senza conto. Il piano di accumulo attinge da Conto C.'
+    );
+    expect(describeDefaultAccounts({ debitName: 'Conto A', creditName: 'Conto A', investmentName: 'Conto C' })).toHaveLength(2);
+  });
 });
 
 describe('summarizeExpenseCategories + describeExpenseCategories', () => {

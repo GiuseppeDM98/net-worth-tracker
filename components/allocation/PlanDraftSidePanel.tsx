@@ -4,7 +4,8 @@
  * PlanDraftSidePanel — what the weights typed in the Target step do. Sits beside the table: the
  * monthly installment and what L is made of, whether the weights add up to 100%, the classes at the
  * end of the plan, the leverage and the month-by-month class chart, and — when the plan would end
- * after the Consulente's «rivedi entro» date — one note saying so (2026-11-12). The parent hands it a
+ * after the Consulente's «rivedi entro» date — one note saying so (2026-11-12). A sale after the first month
+ * reads as its own line and as the month it raises the instalment (2026-11-19). The parent hands it a
  * preview computed 300 ms after the last keystroke. Its sentences live in `accumulationNarrative.ts`.
  */
 import { useState } from 'react';
@@ -22,11 +23,13 @@ import {
   describeInstallmentAverage,
   describePlanPastReview,
   describeRefillNote,
+  describeSaleStep,
   describeWeightsSum,
   monthLabelLong,
 } from '@/lib/utils/accumulationNarrative';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { planEndsAfterReview } from '@/lib/utils/accumuloMonth';
+import { summarizeBuyingInstalments } from '@/lib/utils/accumuloSummary';
 import type { MonthKey } from '@/types/accumulationPlan';
 
 type DraftPreview = ReturnType<typeof buildDraftPreview>;
@@ -41,6 +44,10 @@ interface PlanDraftSidePanelProps {
   band: RebalanceBand;
   weightsSum: number;
   targetLeverageRatio: number;
+  /** `listSaleSteps` on the preview's schedule: one sentence per month a later sale raises the instalment. */
+  saleSteps?: Array<{ month: MonthKey; instalmentEur: number; names: string[] }>;
+  /** `listRefillSaleMonths`: the sales the reserve note names beside the inflows. */
+  refillSaleMonths?: MonthKey[];
 }
 
 function Line({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
@@ -52,7 +59,7 @@ function Line({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
-export function PlanDraftSidePanel({ preview, months, startMonth, reviewByIso, band, weightsSum, targetLeverageRatio }: PlanDraftSidePanelProps) {
+export function PlanDraftSidePanel({ preview, months, startMonth, reviewByIso, band, weightsSum, targetLeverageRatio, saleSteps = [], refillSaleMonths = [] }: PlanDraftSidePanelProps) {
   const [picked, setPicked] = useState<number | null>(null);
   const weightsOk = Math.abs(weightsSum - 100) <= 0.01;
   const pastReview = reviewByIso && planEndsAfterReview({ startMonth, months }, reviewByIso) ? (
@@ -71,17 +78,13 @@ export function PlanDraftSidePanel({ preview, months, startMonth, reviewByIso, b
   const trajectory = onlyTargetedClasses(preview.trajectory);
   const installments = preview.schedule.installments;
   // The first months may only refill the reserve (2026-11-17): the rate shown is the first that buys.
-  const buyingInstallments = installments.slice(liquidity.refillMonths);
-  const firstInstallment = buyingInstallments.find((installment) => installment.lines.length > 0);
-  const firstEur = (firstInstallment?.lines ?? []).reduce((sum, line) => sum + line.plannedAmountEur, 0);
-  const averageEur =
-    buyingInstallments.reduce((sum, installment) => sum + installment.lines.reduce((acc, line) => acc + line.plannedAmountEur, 0), 0) /
-    Math.max(buyingInstallments.length, 1);
+  const buying = summarizeBuyingInstalments(installments, liquidity.refillMonths);
   const refillNote = describeRefillNote({
     refillMonths: liquidity.refillMonths,
     months,
     shortfallEur: liquidity.shortfallEur,
-    firstMonth: buyingInstallments[0]?.month,
+    firstMonth: installments[liquidity.refillMonths]?.month,
+    saleMonths: refillSaleMonths,
   });
   const finalPoint = trajectory[trajectory.length - 1];
   const classRows = Object.entries(finalPoint?.byClass ?? {}).filter(
@@ -93,16 +96,22 @@ export function PlanDraftSidePanel({ preview, months, startMonth, reviewByIso, b
   return (
     <aside aria-label="Effetto dei pesi" className="flex flex-col gap-2 self-start rounded-xl bg-muted p-3.5">
       <p className={TILE_SUB_EYEBROW_CLASS}>
-        {firstInstallment ? `Rata di ${monthLabelLong(firstInstallment.month, false)}` : 'Rata mensile'}
+        {buying ? `Rata di ${monthLabelLong(buying.firstMonth, false)}` : 'Rata mensile'}
       </p>
-      <p className="font-mono text-[22px] font-semibold tabular-nums text-foreground">{cachedFormatCurrencyEUR(firstInstallment ? firstEur : liquidity.L / Math.max(months - liquidity.refillMonths, 1))}</p>
-      {firstInstallment && (
+      <p className="font-mono text-[22px] font-semibold tabular-nums text-foreground">{cachedFormatCurrencyEUR(buying ? buying.firstEur : liquidity.L / Math.max(months - liquidity.refillMonths, 1))}</p>
+      {buying && (
         <p className="text-[12px] text-muted-foreground">
-          {describeInstallmentAverage({ averageEur, firstEur, firstMonth: firstInstallment.month })}
+          {describeInstallmentAverage({ averageEur: buying.averageEur, firstEur: buying.firstEur, firstMonth: buying.firstMonth })}
         </p>
       )}
+      {saleSteps.map((saleStep) => (
+        <p key={saleStep.month} className="text-[12px] text-muted-foreground">{describeSaleStep(saleStep)}</p>
+      ))}
       <Line label="dai conti, tolta la riserva" value={cachedFormatCurrencyEUR(liquidity.availableNowEur)} />
-      {liquidity.disposalProceedsEur > 0 && <Line label="vendite al mese 1" value={cachedFormatCurrencyEUR(liquidity.disposalProceedsEur)} />}
+      {liquidity.dueProceedsEur > 0 && <Line label="vendite al mese 1" value={cachedFormatCurrencyEUR(liquidity.dueProceedsEur)} />}
+      {liquidity.disposalProceedsEur - liquidity.dueProceedsEur > 0.005 && (
+        <Line label="vendite nei mesi successivi" value={cachedFormatCurrencyEUR(liquidity.disposalProceedsEur - liquidity.dueProceedsEur)} />
+      )}
       {liquidity.inflowTotalEur > 0 && (
         <Line
           label={`${cachedFormatCurrencyEUR(liquidity.inflowTotalEur / Math.max(months, 1))} al mese per ${months} mesi`}

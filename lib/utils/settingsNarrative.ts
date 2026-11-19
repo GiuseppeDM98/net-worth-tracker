@@ -718,10 +718,18 @@ export function describeSpendingRolesSetting({ enabled, classification, categori
 export interface DefaultAccountsInput {
   debitName?: string;
   creditName?: string;
+  /** «Conto per gli investimenti»: the account a plan of accumulation draws from by default. */
+  investmentName?: string;
 }
 
 /** Conti di default — where expenses and income land without a choice. */
-export function describeDefaultAccounts({ debitName, creditName }: DefaultAccountsInput): Narrative {
+/** The two defaults of the expense form, then the plan of accumulation's account when one is set (2026-11-19). */
+export function describeDefaultAccounts({ debitName, creditName, investmentName }: DefaultAccountsInput): Narrative {
+  const reading = describeExpenseDefaults(debitName, creditName);
+  return investmentName ? [...reading, prose(` Il piano di accumulo attinge da ${investmentName}.`)] : reading;
+}
+
+function describeExpenseDefaults(debitName: string | undefined, creditName: string | undefined): Narrative {
   if (debitName && creditName) {
     if (debitName === creditName) {
       return [prose(`Spese ed entrate passano entrambe da ${debitName}.`)];

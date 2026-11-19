@@ -464,6 +464,7 @@ export interface AssetAllocationSettings {
   autoCalculateEquityBonds?: boolean; // When true, equity and bond targets are auto-computed via the "125 − age − (rate × 5)" formula; stored explicitly so disabling persists across reloads
   defaultDebitCashAssetId?: string; // Default cash asset pre-selected for expenses/debts in expense dialog
   defaultCreditCashAssetId?: string; // Default cash asset pre-selected for income entries in expense dialog
+  investmentCashAssetId?: string; // The account a plan of accumulation draws from by default
   stampDutyEnabled?: boolean; // Toggle to include stamp duty (imposta di bollo) in annual portfolio cost
   stampDutyRate?: number; // Annual stamp duty rate as a percentage (e.g. 0.2 for 0.20%)
   checkingAccountSubCategory?: string; // Cash subcategory name representing checking accounts (conti correnti); stamp duty applies only if value > 5000€

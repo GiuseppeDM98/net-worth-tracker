@@ -12,6 +12,10 @@
  * di 12». `startOffset: 1` makes a plan that starts next month (the `scheduled` verdict): no line executed.
  * `status: 'draft'` writes a draft instead (2026-11-12, the Consulente's hand-off): no installments, no
  * baseline, no `activatedAt`; the lock is written either way.
+ * `saleMonthOffset` (2026-11-19) plants a sale of one `seed-aapl` share `saleMonthOffset` months after the open one
+ * (with the default start, plan month 5 while month 3 is open: «In programma»); `reviewAtOpenMonth` writes the open
+ * month as the Consulente's review month. `removeOwnerPlans` deletes every plan of the account, then the lock: a plan
+ * created from the page has a generated id `removeAccumuloFixture` does not know.
  * Instruments are the base seed's (`seed-vwce`, `seed-aapl`, `seed-btp`, scripts/seedEmulator.ts), at
  * the prices the seed stamps; round invented figures (WORKFLOW.md § 1 rule 7). The spec asserts the
  * STRUCTURE, never a figure: the euro amounts follow the seed's prices.
@@ -65,7 +69,13 @@ const WEIGHTS = [
 ];
 
 /** Writes the active plan (by default installment 3 of 12 open) and its lock. */
-export async function seedAccumuloFixture({ startOffset = -2, status = 'active' }: { startOffset?: number; status?: 'active' | 'draft' } = {}): Promise<void> {
+export async function seedAccumuloFixture({
+  startOffset = -2,
+  status = 'active',
+  saleMonthOffset,
+  reviewAtOpenMonth = false,
+}: { startOffset?: number; status?: 'active' | 'draft'; saleMonthOffset?: number; reviewAtOpenMonth?: boolean } = {}): Promise<void> {
+  if (reviewAtOpenMonth && startOffset >= 1) throw new Error('reviewAtOpenMonth: no month is open before the plan starts');
   const now = new Date();
   const positionId = (assetId: string) => `e2e-pos-${assetId.replace('seed-', '')}`;
   const installments = Array.from({ length: 12 }, (_, k) => {
@@ -116,7 +126,11 @@ export async function seedAccumuloFixture({ startOffset = -2, status = 'active' 
       memberAssetIds: [weight.assetId],
       buyAssetId: weight.assetId,
     })),
-    disposals: [],
+    disposals:
+      saleMonthOffset === undefined
+        ? []
+        : [{ assetId: 'seed-aapl', quantity: 1, monthIndex: 1 - startOffset + saleMonthOffset, estimatedProceedsEur: 175, status: 'planned' }],
+    ...(reviewAtOpenMonth ? { reviewMonthIndex: 1 - startOffset } : {}),
     // A draft (the editor's draft shape since 2026-11-17) has no installments, no baseline and no activation.
     installments: status === 'active' ? installments : [],
     residualEur: 0,
@@ -125,6 +139,52 @@ export async function seedAccumuloFixture({ startOffset = -2, status = 'active' 
     ...activeOnly,
   });
   await write(`accumulationPlanLocks/${OWNER}`, { userId: OWNER, openPlanId: PLAN_ID, updatedAt: now });
+}
+
+/** Deletes every plan of the account (REST `runQuery`), then the lock; safe when there is none. */
+export async function removeOwnerPlans(): Promise<void> {
+  const res = await fetch(`${FIRESTORE}:runQuery`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'accumulationPlans' }],
+        where: { fieldFilter: { field: { fieldPath: 'userId' }, op: 'EQUAL', value: { stringValue: OWNER } } },
+      },
+    }),
+  });
+  expect(res.ok, `runQuery accumulationPlans: ${res.status}`).toBe(true);
+  const rows = (await res.json()) as Array<{ document?: { name: string } }>;
+  for (const row of rows) {
+    if (row.document) await remove(`accumulationPlans/${row.document.name.split('/').pop()}`);
+  }
+  await remove(`accumulationPlanLocks/${OWNER}`);
+}
+
+/** The account's active plan as written: its sales' months and each instalment's euros, by index; null without one. */
+export async function readActivePlan(): Promise<{ saleMonths: number[]; instalmentEur: number[] } | null> {
+  const res = await fetch(`${FIRESTORE}:runQuery`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'accumulationPlans' }],
+        where: { fieldFilter: { field: { fieldPath: 'userId' }, op: 'EQUAL', value: { stringValue: OWNER } } },
+      },
+    }),
+  });
+  expect(res.ok, `runQuery accumulationPlans: ${res.status}`).toBe(true);
+  type Value = { stringValue?: string; integerValue?: string; doubleValue?: number; mapValue?: { fields: Record<string, Value> }; arrayValue?: { values?: Value[] } };
+  const rows = (await res.json()) as Array<{ document?: { fields: Record<string, Value> } }>;
+  const fields = rows.map((row) => row.document?.fields).find((f) => f?.status?.stringValue === 'active');
+  if (!fields) return null;
+  const num = (v: Value | undefined) => Number(v?.integerValue ?? v?.doubleValue ?? 0);
+  const items = (v: Value | undefined) => (v?.arrayValue?.values ?? []).map((item) => item.mapValue!.fields);
+  const instalments = items(fields.installments).sort((a, b) => num(a.index) - num(b.index));
+  return {
+    saleMonths: items(fields.disposals).map((d) => num(d.monthIndex) || 1),
+    instalmentEur: instalments.map((i) => Math.round(items(i.lines).reduce((sum, line) => sum + num(line.plannedAmountEur), 0) * 100) / 100),
+  };
 }
 
 /** Removes the plan, then its lock; safe to call when they are not there. */

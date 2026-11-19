@@ -1,7 +1,7 @@
 /**
  * accumuloMonth — what a reader OUTSIDE the Accumulo tab may know of the open plan: the month it
  * buys in (the Piano's note on Bilanciamento), whether it ends after the Consulente's review date,
- * and the active plan as an advice reads it.
+ * whether this is the month the plan asked to be looked at again, and the active plan as an advice reads it.
  *
  * The Allocazione page's first load reads this module (2026-11-12), so it imports only
  * `planMonths.ts`, `accumulationPlanDoc.ts`, `cents.ts` and types — never `accumulationNarrative.ts`,
@@ -9,13 +9,13 @@
  */
 import type { AccumulationPlan, Installment, InstallmentLine, MonthKey, PlanDisposal } from '@/types/accumulationPlan';
 import type { PacVerdictInput } from '@/types/accumulationPlan';
-import { addMonths, monthIndexOf, monthLabelLong } from './planMonths';
+import { addMonths, monthIndexOf, monthLabelLong, toMonthKey } from './planMonths';
 import { roundToCents } from './cents';
 
 /** The instalments are the months that buy: a month with no line (the reserve refilling) is not one (2026-11-17). */
 export function countPlanInstalments(plan: Pick<AccumulationPlan, 'installments'>): { closed: number; total: number } {
   const buying = plan.installments.filter((installment) => installment.lines.length > 0);
-  return { closed: buying.filter((installment) => installment.lines.every((line) => line.status !== 'planned')).length, total: buying.length };
+  return { closed: buying.filter(isInstalmentClosed).length, total: buying.length };
 }
 
 /** The first installment from `fromIndex` with something to buy (the months before it refill the reserve). */
@@ -81,6 +81,17 @@ export function planEndsAfterReview(
   return addMonths(plan.startMonth, plan.months - 1) > reviewByIso.slice(0, 7);
 }
 
+/** The plan asks to be looked at again this month: its review month is the open one and no revision was saved in it. */
+export function isPlanReviewDue(
+  plan: Pick<AccumulationPlan, 'reviewMonthIndex' | 'months' | 'revisions' | 'status'>,
+  currentIndex: number,
+  currentMonth: MonthKey,
+): boolean {
+  const review = plan.reviewMonthIndex;
+  if (plan.status !== 'active' || !review || review > plan.months || review !== currentIndex) return false;
+  return !(plan.revisions ?? []).some((revision) => toMonthKey(revision.at) === currentMonth);
+}
+
 export interface OpenPlanForAdvice {
   monthIndex: number;      // k: 1..months; 0 before the first month
   months: number;          // N
@@ -112,4 +123,25 @@ export function describeOpenPlanForAdvice(
     sells: plan.disposals.map((d) => ({ assetId: d.assetId, name: nameOf(d.assetId), quantity: d.quantity ?? null,
       monthIndex: d.monthIndex ?? null, status: d.status })),
   };
+}
+
+
+/** A month that buys is closed when no line is left planned; a month with no line only refills the reserve and is never closed (owner, 2026-11-19). */
+export function isInstalmentClosed(installment: Pick<Installment, 'lines'>): boolean {
+  return installment.lines.length > 0 && installment.lines.every((line) => line.status !== 'planned');
+}
+
+/** Where the open month sits: its place among the months that buy, or a month that only refills the reserve. */
+export type OpenMonthPlace = { kind: 'instalment'; ordinal: number; total: number } | { kind: 'refill'; firstBuyingMonth: MonthKey | undefined };
+
+/**
+ * «rata k di n» counts the months that buy, like «n di m rate chiuse» (owner, 2026-11-19, the 2026-11-17 rule kept); a
+ * refill month points at the first instalment after it. `currentIndex` is clamped into the plan, as the tab reads it.
+ */
+export function locateOpenMonth(plan: Pick<AccumulationPlan, 'installments' | 'months'>, currentIndex: number): OpenMonthPlace {
+  const clamped = Math.min(Math.max(currentIndex, 1), plan.months);
+  const buying = plan.installments.filter((installment) => installment.lines.length > 0);
+  const ordinal = buying.findIndex((installment) => installment.index === clamped) + 1;
+  if (ordinal > 0) return { kind: 'instalment', ordinal, total: buying.length };
+  return { kind: 'refill', firstBuyingMonth: findFirstBuyingInstallment(plan, clamped)?.month };
 }

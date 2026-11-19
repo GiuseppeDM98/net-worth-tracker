@@ -70,6 +70,12 @@ describe('getSettings — lettura', () => {
     expect(settings?.pensionReturnStartMonth).toBe('2026-07');
   });
 
+  it('returns the account for the investments instead of dropping it', async () => {
+    const settings = await getSettings('user-1');
+
+    expect(settings?.investmentCashAssetId).toBe('cash-invest');
+  });
+
   it('returns idealAllocation instead of dropping it', async () => {
     const settings = await getSettings('user-1');
 
@@ -189,6 +195,7 @@ describe('setSettings — scrittura, ramo con targets (setDoc senza merge)', () 
     ['dividendCashAssetId', 'cash-1'],
     ['transferFeeCategoryId', 'cat-fee'],
     ['transferFeeSubCategoryId', 'sub-fee'],
+    ['investmentCashAssetId', 'cash-invest'],
   ])('drops %s from the payload when it is cleared', async (field, stored) => {
     vi.mocked(getDoc).mockResolvedValue({
       exists: () => true,
@@ -211,6 +218,7 @@ describe('setSettings — scrittura, ramo con targets (setDoc senza merge)', () 
     ['dividendCashAssetId', 'cash-1'],
     ['transferFeeCategoryId', 'cat-fee'],
     ['transferFeeSubCategoryId', 'sub-fee'],
+    ['investmentCashAssetId', 'cash-invest'],
   ])('leaves an untouched %s alone when the key is absent from the update', async (field, stored) => {
     vi.mocked(getDoc).mockResolvedValue({
       exists: () => true,
@@ -307,7 +315,7 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
 
   // Lo stesso per gli altri quattro campi svuotabili: qui si scrive con merge, quindi omettere
   // la chiave lascerebbe il valore vecchio — serve un deleteField() esplicito (2026-08-29).
-  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId', 'dividendCashAssetId', 'transferFeeCategoryId', 'transferFeeSubCategoryId'])(
+  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId', 'dividendCashAssetId', 'transferFeeCategoryId', 'transferFeeSubCategoryId', 'investmentCashAssetId'])(
     'uses deleteField to clear %s, since omitting the key would keep it',
     async (field) => {
       await setSettings('user-1', { [field]: undefined } as unknown as AssetAllocationSettings);
@@ -316,7 +324,7 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
     }
   );
 
-  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId', 'dividendCashAssetId', 'transferFeeCategoryId', 'transferFeeSubCategoryId'])(
+  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId', 'dividendCashAssetId', 'transferFeeCategoryId', 'transferFeeSubCategoryId', 'investmentCashAssetId'])(
     'does not touch %s when the key is absent from the update',
     async (field) => {
       await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);

@@ -55,6 +55,7 @@ import {
   unitPriceEur,
   type PlanDeps,
 } from '@/lib/utils/accumulationPlanUtils';
+import { listRefillSaleMonths, listSaleSteps, summarizeBuyingInstalments } from '@/lib/utils/accumuloSummary';
 import { validateDraftAgainstAssets, type DraftIssue } from '@/lib/utils/accumulationPlanSchema';
 import { compareAllocations } from '@/lib/services/assetAllocationService';
 import { calculateAssetValue } from '@/lib/services/assetService';
@@ -108,7 +109,6 @@ import {
   ACCUMULO_STEP2_FROM_TODAY,
   ACCUMULO_STEP2_GROUP_HINT,
   ACCUMULO_STEP2_GROUP_NO_BUY,
-  ACCUMULO_STEP2_SALE_PROCEEDS,
   ACCUMULO_STEP2_SELL_SHARES,
   ACCUMULO_STEP2_REDISTRIBUTE,
   ACCUMULO_USE_SUGGESTED_INFLOW,
@@ -126,7 +126,6 @@ import {
   ACCUMULO_STEP2_REPLACE_PLACEHOLDER,
   ACCUMULO_STEP2_REPLACE_PROMPT,
   ACCUMULO_STEP2_SALE_MONTH,
-  ACCUMULO_STEP2_SALE_NOT_EXECUTED,
   describeAddableAsset,
   ACCUMULO_ACTION_SAVE_DRAFT,
   ACCUMULO_ACTION_UNGROUP,
@@ -167,6 +166,7 @@ import {
   ACCUMULO_STEP3_SECTION_WEIGHTS,
   ACCUMULO_STEP_TITLES,
   describeStep3Summary,
+  describeSaleStep,
   ACCUMULO_STEP_READINGS,
   ACCUMULO_STEP3_WEIGHTS_COLUMNS,
   describeAccumuloDialogEyebrow,
@@ -215,24 +215,29 @@ interface AccumulationPlanDialogProps {
   basis: ModelBasis;
   /** The instruments the Consulente proposed to keep — only the hand-off passes them: a month-1 sale of one is named (2026-11-12). */
   advisorKeepAssetIds?: readonly string[];
+  /** Impostazioni › Spese «Conto per gli investimenti» (`resolveInvestmentAccountId`): a NEW plan starts on it; null = none. */
+  investmentAccountId: string | null;
 }
 
 const DEPS: PlanDeps = { valueOf: calculateAssetValue, priceOf: unitPriceEur };
 const MAX_CALENDAR_ROWS = 8;
 
-function emptyDraft(
+/** A brand-new draft. Exported for its test: no component test mounts the editor. */
+export function emptyDraft(
   startMonth: string,
   positions: PlanPosition[] = [],
   disposals: PlanDisposal[] = [],
   /** The allocation's cash quota (`resolvePlanReserveEur`), editable in step 1. */
   reserveEur = 0,
-  optimizerSnapshot?: OptimizerSnapshot
+  optimizerSnapshot?: OptimizerSnapshot,
+  /** The settings' account for the investments: the plan starts drawing from it (2026-11-19). */
+  investmentAccountId: string | null = null
 ): AccumulationPlanDraft {
   return {
     name: 'Piano di accumulo',
     startMonth,
     months: 12,
-    liquidity: { sourceCashAssetIds: [], reserveEur, monthlyInflowEur: 0 },
+    liquidity: { sourceCashAssetIds: investmentAccountId ? [investmentAccountId] : [], reserveEur, monthlyInflowEur: 0 },
     positions,
     disposals,
     optimizerSnapshot,
@@ -248,6 +253,7 @@ function draftFromPlan(plan: AccumulationPlan): AccumulationPlanDraft {
     positions: plan.positions,
     disposals: plan.disposals,
     optimizerSnapshot: plan.optimizerSnapshot,
+    reviewMonthIndex: plan.reviewMonthIndex,
   };
 }
 
@@ -288,6 +294,7 @@ export function AccumulationPlanDialog({
   basis,
   reviseFromModel = false,
   advisorKeepAssetIds,
+  investmentAccountId,
 }: AccumulationPlanDialogProps) {
   const isDemo = useDemoMode();
   const chartColors = useChartColors();
@@ -352,7 +359,8 @@ export function AccumulationPlanDialog({
                 DEPS,
                 planCashFundSaleEur(seedDraft?.disposals ?? [], new Map(allAssets.map((a) => [a.id, a])), allAssets)
               ).reserveEur,
-              seedDraft?.optimizerSnapshot ?? (fromModel ? model?.optimizerSnapshot : undefined)
+              seedDraft?.optimizerSnapshot ?? (fromModel ? model?.optimizerSnapshot : undefined),
+              investmentAccountId
             )
       );
       // «Rivedi dal modello» opens the revision with the model's weights (and groups) already applied.
@@ -417,14 +425,18 @@ export function AccumulationPlanDialog({
     return Array.from({ length: 12 }, (_, i) => addMonths(current, i));
   }, []);
 
+  // The installment index a revision starts from (k): the earliest month a moved sale can take, and the
+  // frame of every computation on the draft — a sale's month is a plan month (1 in a new plan).
+  const firstRevisedIndex = useMemo(() => (revise && plan ? findFirstIntactInstallment(plan)?.index ?? 1 : 1), [revise, plan]);
+
   const liquidity = useMemo(
-    () => (open ? computeUsableLiquidity(draft.liquidity, assetsById, draft.disposals, draft.months, DEPS) : null),
-    [open, draft, assetsById],
+    () => (open ? computeUsableLiquidity(draft.liquidity, assetsById, draft.disposals, draft.months, DEPS, firstRevisedIndex) : null),
+    [open, draft, assetsById, firstRevisedIndex],
   );
 
   const issues: DraftIssue[] = useMemo(
-    () => (open ? validateDraftAgainstAssets(draft, assetsById) : []),
-    [open, draft, assetsById],
+    () => (open ? validateDraftAgainstAssets(draft, assetsById, firstRevisedIndex) : []),
+    [open, draft, assetsById, firstRevisedIndex],
   );
   const weightsSum = draft.positions.reduce((sum, position) => sum + position.targetPercentage, 0);
   const weightsMessage = describeWeightsTotal(weightsSum);
@@ -464,13 +476,6 @@ export function AccumulationPlanDialog({
     () => new Set(revise && plan ? plan.disposals.filter((d) => !isOpenSavedDisposal(d)).map((d) => d.assetId) : []),
     [revise, plan],
   );
-  const savedOpenSaleIds = useMemo(
-    () => new Set(revise && plan ? plan.disposals.filter(isOpenSavedDisposal).map((d) => d.assetId) : []),
-    [revise, plan],
-  );
-  // The installment index a revision starts from (k): the earliest month a moved sale can take.
-  const firstRevisedIndex = useMemo(() => (revise && plan ? findFirstIntactInstallment(plan)?.index ?? 1 : 1), [revise, plan]);
-
   // the Registro tells a never-bought instrument from a sold-out one; read only while the Target step is up.
   const ledgerMetaQuery = useAssetLedgerMeta(open && step === 2 ? ownerId : undefined);
   const tradesQuery = useAssetTransactions(ownerId, undefined, { enabled: open && step === 2 && !!ledgerMetaQuery.data });
@@ -531,16 +536,36 @@ export function AccumulationPlanDialog({
       return;
     }
     const whole = Math.floor(quantity);
+    // A new quantity keeps the month already chosen for the sale (owner, 2026-11-19).
+    const monthIndex = draft.disposals.find((disposal) => disposal.assetId === asset.id)?.monthIndex;
     updateDisposals([
       ...rest,
-      { assetId: asset.id, quantity: whole, estimatedProceedsEur: Math.min(whole, asset.quantity) * DEPS.priceOf(asset), status: 'planned' },
+      {
+        assetId: asset.id,
+        quantity: whole,
+        estimatedProceedsEur: Math.min(whole, asset.quantity) * DEPS.priceOf(asset),
+        status: 'planned',
+        ...(monthIndex === undefined ? {} : { monthIndex }),
+      },
     ]);
   };
 
   // ── Step 2 helpers — one row per candidate asset ──────────────────────────
 
   const updatePositions = (positions: PlanPosition[]) => setDraft((prev) => ({ ...prev, positions }));
-  const updateDisposals = (disposals: PlanDisposal[]) => setDraft((prev) => ({ ...prev, disposals }));
+  // A sale added in a revision starts at the first revised month, never at a month already past.
+  const updateDisposals = (disposals: PlanDisposal[]) =>
+    setDraft((prev) => ({
+      ...prev,
+      disposals:
+        revise && plan
+          ? disposals.map((disposal) =>
+              disposal.monthIndex === undefined && !plan.disposals.some((saved) => saved.assetId === disposal.assetId)
+                ? { ...disposal, monthIndex: firstRevisedIndex }
+                : disposal
+            )
+          : disposals,
+    }));
 
   const moveAssetToDisposal = (asset: Asset) => {
     const leaving = draft.positions.find((position) => position.memberAssetIds.length === 1 && position.memberAssetIds[0] === asset.id);
@@ -590,7 +615,7 @@ export function AccumulationPlanDialog({
     setReplacingPositionId(null);
   };
 
-  /** a saved sale not yet executed moves to another installment of the revised calendar. */
+  /** a sale not yet executed moves to another month of the plan (a new one, or a saved one in a revision). */
   const setSaleMonth = (assetId: string, monthIndex: number) =>
     updateDisposals(draft.disposals.map((disposal) => (disposal.assetId === assetId ? { ...disposal, monthIndex } : disposal)));
 
@@ -722,9 +747,13 @@ export function AccumulationPlanDialog({
 
   const canProceedFromStep2 = Math.abs(weightsSum - 100) <= 0.01 && draft.positions.length > 0;
   const preview = useMemo(
-    () => (step === 3 ? buildDraftPreview({ draft, allAssets, targets, band, compare: compareAllocations, deps: DEPS }) : null),
-    [step, draft, allAssets, targets, band],
+    () => (step === 3 ? buildDraftPreview({ draft, allAssets, targets, band, compare: compareAllocations, deps: DEPS, firstIndex: firstRevisedIndex }) : null),
+    [step, draft, allAssets, targets, band, firstRevisedIndex],
   );
+  // One sentence per month a later sale raises the instalment (2026-11-19).
+  const step3SaleSteps = preview
+    ? listSaleSteps({ installments: preview.schedule.installments, disposals: draft.disposals, firstIndex: firstRevisedIndex, nameOf: labelOfAsset })
+    : [];
   // Coverage: `preview.totals` always SUMS to L (splitTowardTarget redistributes whatever
   // is available), so a shortfall shows only by comparing L against the IDEAL deficit —
   // Σ max(0, target%×B − currentValue) — computed the same way `computeTotalPurchases` does.
@@ -737,14 +766,14 @@ export function AccumulationPlanDialog({
     const pct = Math.min(100, (preview.liquidity.L / totalDeficit) * 100);
     return pct >= 99.5 ? null : pct;
   }, [preview, draft.positions, draft.disposals, assetsById]);
+  // The months that buy, as the side panel counts them (owner, 2026-11-19): a refill month is no instalment.
+  const step3Buying = preview ? summarizeBuyingInstalments(preview.schedule.installments, preview.liquidity.refillMonths) : null;
   const step3Summary = preview
     ? describeStep3Summary({
-        months: preview.schedule.installments.length,
-        firstEur: (preview.schedule.installments[0]?.lines ?? []).reduce((acc, line) => acc + line.plannedAmountEur, 0),
-        firstMonth: preview.schedule.installments[0]?.month ?? draft.startMonth,
-        averageEur:
-          preview.schedule.installments.reduce((sum, i) => sum + i.lines.reduce((acc, line) => acc + line.plannedAmountEur, 0), 0) /
-          Math.max(1, preview.schedule.installments.length),
+        months: step3Buying?.count ?? preview.schedule.installments.length,
+        firstEur: step3Buying?.firstEur ?? 0,
+        firstMonth: step3Buying?.firstMonth ?? preview.schedule.installments[0]?.month ?? draft.startMonth,
+        averageEur: step3Buying?.averageEur ?? 0,
         coveragePct,
         leverageRatio: preview.outcome.leverageRatio,
       })
@@ -788,10 +817,13 @@ export function AccumulationPlanDialog({
   const settledPreview = useMemo(
     () =>
       step === 2 && settledDraft.positions.length > 0
-        ? buildDraftPreview({ draft: settledDraft, allAssets, targets, band, compare: compareAllocations, deps: DEPS })
+        ? buildDraftPreview({ draft: settledDraft, allAssets, targets, band, compare: compareAllocations, deps: DEPS, firstIndex: firstRevisedIndex })
         : null,
-    [step, settledDraft, allAssets, targets, band],
+    [step, settledDraft, allAssets, targets, band, firstRevisedIndex],
   );
+  const step2SaleSteps = settledPreview
+    ? listSaleSteps({ installments: settledPreview.schedule.installments, disposals: settledDraft.disposals, firstIndex: firstRevisedIndex, nameOf: labelOfAsset })
+    : [];
   return (
     <>
       <ResponsiveModal
@@ -1001,7 +1033,14 @@ export function AccumulationPlanDialog({
                   <div className="flex justify-between border-t border-border pt-1.5">
                     <dt className="text-muted-foreground">{ACCUMULO_STEP1_L_MONTHLY}</dt>
                     <dd className="font-mono tabular-nums text-foreground">
-                      {cachedFormatCurrencyEUR(draft.months - liquidity.refillMonths > 0 ? liquidity.L / (draft.months - liquidity.refillMonths) : 0)}
+                      {/* With a later sale the months differ: the first buying month's euros. */}
+                      {cachedFormatCurrencyEUR(
+                        liquidity.monthShares
+                          ? liquidity.L * liquidity.monthShares[liquidity.refillMonths]
+                          : draft.months - liquidity.refillMonths > 0
+                            ? liquidity.L / (draft.months - liquidity.refillMonths)
+                            : 0
+                      )}
                     </dd>
                   </div>
                   {(() => {
@@ -1012,6 +1051,7 @@ export function AccumulationPlanDialog({
                       months: draft.months,
                       shortfallEur: liquidity.shortfallEur,
                       firstMonth: liquidity.refillMonths < draft.months ? addMonths(draft.startMonth, liquidity.refillMonths) : undefined,
+                      saleMonths: listRefillSaleMonths({ disposals: draft.disposals, startMonth: draft.startMonth, firstIndex: firstRevisedIndex, refillMonths: liquidity.refillMonths }),
                     });
                     return note ? <NarrativeText className="text-[11px] text-muted-foreground" segments={note} /> : null;
                   })()}
@@ -1217,6 +1257,16 @@ export function AccumulationPlanDialog({
                                       />
                                     </label>
                                   )}
+                                  {/* A partial sale picks its month too (owner, 2026-11-19). */}
+                                  {!locked && partial && (
+                                    <SaleMonthSelect
+                                      disposal={partial}
+                                      firstIndex={firstRevisedIndex}
+                                      months={draft.months}
+                                      firstMonth={draft.startMonth}
+                                      onChange={(monthIndex) => setSaleMonth(asset.id, monthIndex)}
+                                    />
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -1274,7 +1324,8 @@ export function AccumulationPlanDialog({
                           <td className="py-1.5 pr-2 text-right text-muted-foreground">—</td>
                           <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-foreground">
                             {cachedFormatCurrencyEUR(proceedsOfDisposal(disposal, asset, DEPS))}
-                            {savedOpenSaleIds.has(disposal.assetId) ? (
+                            {/* Every sale not yet closed picks its month, in a new plan and in a revision. */}
+                            {!lockedSaleIds.has(disposal.assetId) && (
                               <SaleMonthSelect
                                 disposal={disposal}
                                 firstIndex={firstRevisedIndex}
@@ -1282,8 +1333,6 @@ export function AccumulationPlanDialog({
                                 firstMonth={draft.startMonth}
                                 onChange={(monthIndex) => setSaleMonth(disposal.assetId, monthIndex)}
                               />
-                            ) : (
-                              <span className="block text-[11px] text-muted-foreground">{ACCUMULO_STEP2_SALE_PROCEEDS}</span>
                             )}
                           </td>
                           <td className="hidden py-1.5 text-right text-muted-foreground sm:table-cell">—</td>
@@ -1410,6 +1459,12 @@ export function AccumulationPlanDialog({
             band={band}
             weightsSum={weightsSum}
             targetLeverageRatio={targetLeverageRatio}
+            saleSteps={step2SaleSteps}
+            refillSaleMonths={
+              settledPreview
+                ? listRefillSaleMonths({ disposals: settledDraft.disposals, startMonth: settledDraft.startMonth, firstIndex: firstRevisedIndex, refillMonths: settledPreview.liquidity.refillMonths })
+                : []
+            }
           />
           <KeptSalesNote disposals={draft.disposals} keepAssetIds={advisorKeepAssetIds ?? []} nameOf={labelOfAsset} />
           </div>
@@ -1417,8 +1472,16 @@ export function AccumulationPlanDialog({
 
         {step === 3 && preview && (
           <div className="space-y-6">
-            {/* The plan in one line is the dialog's reading (describeStep3Summary); here the
-                warnings, then where it lands, the calendar and the classes month by month. */}
+            {/* The plan in one line is the dialog's reading (describeStep3Summary); here the months a
+                later sale raises the instalment, the warnings, then where it lands, the calendar and the
+                classes month by month. */}
+            {step3SaleSteps.length > 0 && (
+              <div className="space-y-1">
+                {step3SaleSteps.map((saleStep) => (
+                  <p key={saleStep.month} className="text-[12px] text-muted-foreground">{describeSaleStep(saleStep)}</p>
+                ))}
+              </div>
+            )}
             {coveragePct !== null && (
               <p className="rounded-lg border border-warning-border bg-warning p-3 text-[12px] text-warning-foreground">{describeInsufficientLiquidityWarning(coveragePct)}</p>
             )}
@@ -1644,8 +1707,8 @@ export function AccumulationPlanDialog({
   );
 }
 
-/** where a saved sale not yet executed happens — any installment of the revised calendar, from the first one on. */
-function SaleMonthSelect({
+/** «Vendi a»: the plan month a sale not yet closed is made in. Exported for its test. */
+export function SaleMonthSelect({
   disposal,
   firstIndex,
   months,
@@ -1658,14 +1721,13 @@ function SaleMonthSelect({
   firstMonth: string;
   onChange: (monthIndex: number) => void;
 }) {
-  const current = disposal.monthIndex ?? 1;
+  // A sale without a month is sold in the first month scheduled (1 in a new plan, k in a revision).
+  const current = disposal.monthIndex ?? firstIndex;
   const indexes = Array.from({ length: months }, (_, i) => firstIndex + i);
   if (!indexes.includes(current)) indexes.unshift(current);
   return (
     <label className="mt-1 flex flex-col items-end gap-0.5 text-[11px] text-muted-foreground">
-      <span>
-        {ACCUMULO_STEP2_SALE_MONTH} · {ACCUMULO_STEP2_SALE_NOT_EXECUTED}
-      </span>
+      <span>{ACCUMULO_STEP2_SALE_MONTH}</span>
       <Select value={String(current)} onValueChange={(value) => onChange(Number(value))}>
         <SelectTrigger className="h-11 w-36 text-[12px] desktop:h-7" aria-label={ACCUMULO_STEP2_SALE_MONTH}>
           <SelectValue />

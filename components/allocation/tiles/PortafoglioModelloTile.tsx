@@ -85,6 +85,8 @@ interface PortafoglioModelloTileProps {
   reviewByIso: string | null;
   /** What the model rests on: every save stamps it, and a model computed on another one is «superato». */
   modelBasis: ModelBasis;
+  /** Impostazioni › Spese «Conto per gli investimenti»: the plan «Crea il PAC» opens starts on it; null = none. */
+  investmentAccountId: string | null;
   /** The row of the phone composition (The Closed-Row Rule); absent at 1440. */
   collapse?: TileCollapse;
   asideWhenClosed?: string;
@@ -114,6 +116,7 @@ export function PortafoglioModelloTile({
   readFailed,
   reviewByIso,
   modelBasis,
+  investmentAccountId,
   collapse,
   asideWhenClosed,
   onAssetsChanged,
@@ -343,6 +346,7 @@ export function PortafoglioModelloTile({
           seedDraft={pacSeed}
           reviewByIso={reviewByIso}
           basis={modelBasis}
+          investmentAccountId={investmentAccountId}
           model={model}
           onAssetsChanged={onAssetsChanged}
           onSaved={() => setView('closed')}

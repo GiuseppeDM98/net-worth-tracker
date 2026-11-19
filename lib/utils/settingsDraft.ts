@@ -179,6 +179,8 @@ export interface GeneraleSlice {
 export interface SpeseSlice {
   defaultDebitCashAssetId: string;
   defaultCreditCashAssetId: string;
+  /** The account a plan of accumulation draws from by default; `NO_SELECTION` = none. */
+  investmentCashAssetId: string;
   /** '' = none: the expense form's «Commissione» stays off. */
   transferFeeCategoryId: string;
   transferFeeSubCategoryId: string;
@@ -417,6 +419,7 @@ export function sliceSettings(
   const spese: SpeseSlice = {
     defaultDebitCashAssetId: data.defaultDebitCashAssetId || NO_SELECTION,
     defaultCreditCashAssetId: data.defaultCreditCashAssetId || NO_SELECTION,
+    investmentCashAssetId: data.investmentCashAssetId || NO_SELECTION,
     transferFeeCategoryId: data.transferFeeCategoryId || '',
     transferFeeSubCategoryId: data.transferFeeSubCategoryId || '',
     spendingRolesEnabled: data.spendingRolesEnabled ?? false,
@@ -543,6 +546,7 @@ export function composeSettingsDocument(
     dividendCashAssetId: dividendi.dividendCashAssetId !== NO_SELECTION ? dividendi.dividendCashAssetId : undefined,
     defaultDebitCashAssetId: spese.defaultDebitCashAssetId !== NO_SELECTION ? spese.defaultDebitCashAssetId : undefined,
     defaultCreditCashAssetId: spese.defaultCreditCashAssetId !== NO_SELECTION ? spese.defaultCreditCashAssetId : undefined,
+    investmentCashAssetId: spese.investmentCashAssetId !== NO_SELECTION ? spese.investmentCashAssetId : undefined,
     transferFeeCategoryId: spese.transferFeeCategoryId || undefined,
     transferFeeSubCategoryId: spese.transferFeeSubCategoryId || undefined,
     realEstateCostCategories: spese.realEstateCostCategories.length > 0 ? spese.realEstateCostCategories : undefined,

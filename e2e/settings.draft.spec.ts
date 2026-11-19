@@ -175,3 +175,26 @@ test('a save from Preferenze keeps every other tab’s fields — read back afte
   await visibleTab(page, 'Spese').click();
   await expect(page.getByRole('switch', { name: 'Necessità, desideri, risparmi' })).toHaveAttribute('aria-checked', 'true');
 });
+
+// «Conto per gli investimenti» (2026-11-19), the third default of Spese: saved, read back after a hard refresh,
+// then cleared — the document holds no key, not an empty one (doc/guide/impostazioni.md § the FIVE places).
+test('«Conto per gli investimenti»: chosen, saved, cleared — each read back after a hard refresh', async ({ page }) => {
+  const picker = () => page.getByRole('combobox', { name: 'Conto per gli investimenti' });
+  const choose = async (option: string | RegExp) => {
+    await picker().click();
+    await page.getByRole('option', { name: option }).click();
+    await unsavedBar(page).getByRole('button', { name: 'Salva' }).click();
+    await expect(unsavedBar(page)).toHaveCount(0);
+  };
+
+  await openSettings(page, 'spese');
+  await choose(/^Conto Corrente/);
+  await expect.poll(async () => (await readFields()).investmentCashAssetId?.stringValue).toBe('seed-cash');
+  await page.reload({ waitUntil: 'load' });
+  await expect(picker()).toContainText('Conto Corrente', { timeout: 30_000 });
+
+  await choose('Nessun default');
+  await expect.poll(async () => 'investmentCashAssetId' in (await readFields())).toBe(false);
+  await page.reload({ waitUntil: 'load' });
+  await expect(picker()).toContainText('Nessun default', { timeout: 30_000 });
+});

@@ -7,6 +7,9 @@ import { describe, it, expect } from 'vitest';
 import {
   countPlanInstalments,
   describeOpenPlanForAdvice,
+  isInstalmentClosed,
+  locateOpenMonth,
+  isPlanReviewDue,
   planEndsAfterReview,
   summarizePacMonth,
   summarizePacMonthOn,
@@ -152,5 +155,56 @@ describe('countPlanInstalments', () => {
       ],
     });
     expect(countPlanInstalments(plan)).toEqual({ closed: 1, total: 2 });
+  });
+});
+
+// The month the Consulente asked to look at the plan again (2026-11-19). Mutation that turns it red: the revisions
+// clause dropped.
+describe('isPlanReviewDue', () => {
+  const withReview = (overrides: Partial<AccumulationPlan> = {}) => activePlan({ reviewMonthIndex: 3, ...overrides });
+
+  it('true only at the review month of an active plan', () => {
+    expect(isPlanReviewDue(withReview(), 3, '2027-03')).toBe(true);
+    expect(isPlanReviewDue(withReview(), 2, '2027-02')).toBe(false);
+    expect(isPlanReviewDue(withReview(), 4, '2027-04')).toBe(false);
+    expect(isPlanReviewDue(withReview({ status: 'draft' }), 3, '2027-03')).toBe(false);
+    expect(isPlanReviewDue(activePlan(), 3, '2027-03')).toBe(false);
+  });
+
+  it('false once a revision was saved in that month', () => {
+    const revised = withReview({ revisions: [{ at: new Date('2027-03-10T12:00:00'), fromIndex: 3 }] as never });
+    expect(isPlanReviewDue(revised, 3, '2027-03')).toBe(false);
+    const revisedBefore = withReview({ revisions: [{ at: new Date('2027-02-10T12:00:00'), fromIndex: 2 }] as never });
+    expect(isPlanReviewDue(revisedBefore, 3, '2027-03')).toBe(true);
+  });
+
+  it('false when the review month is past the plan', () => {
+    expect(isPlanReviewDue(withReview({ reviewMonthIndex: 5 }), 5, '2027-05')).toBe(false);
+  });
+});
+
+
+// The open month among the instalments (owner, 2026-11-19): «rata k di n» over the months that buy; a month with
+// no line only refills the reserve and is never closed. Mutation that turns it red: the ordinal read from the index.
+describe('locateOpenMonth and isInstalmentClosed', () => {
+  const plan = activePlan({
+    months: 4,
+    installments: [
+      { index: 1, month: '2027-01', lines: [], carryInEur: {} },
+      { index: 2, month: '2027-02', lines: [], carryInEur: {} },
+      { index: 3, month: '2027-03', lines: [line('a', 500, 'executed')], carryInEur: {} },
+      { index: 4, month: '2027-04', lines: [line('a', 500)], carryInEur: {} },
+    ],
+  });
+  it('a refill month points at the first instalment', () => {
+    expect(locateOpenMonth(plan, 0)).toEqual({ kind: 'refill', firstBuyingMonth: '2027-03' });
+    expect(locateOpenMonth(plan, 2)).toEqual({ kind: 'refill', firstBuyingMonth: '2027-03' });
+  });
+  it('a buying month is its place among the months that buy', () => {
+    expect(locateOpenMonth(plan, 4)).toEqual({ kind: 'instalment', ordinal: 2, total: 2 });
+    expect(locateOpenMonth(plan, 9)).toEqual({ kind: 'instalment', ordinal: 2, total: 2 });
+  });
+  it('an empty month is never closed', () => {
+    expect(plan.installments.map(isInstalmentClosed)).toEqual([false, false, true, false]);
   });
 });

@@ -189,6 +189,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   presses «Salva», reloads, and restores the WHOLE settings document in `afterAll`: «Salva» rewrites every field the page
   holds, and on the base seed it drops the allocation sub-targets (the seed's shape is not the page's), so restoring the
   two fee fields alone left `e2e/allocation.spec.ts` with no class row to open (seen red in the full run, 2026-09-25).
+- **«Conto per gli investimenti»** (Spese, 2026-11-19, the third row of the default accounts): `investmentCashAssetId`,
+  the account a plan of accumulation draws from by default. User-clearable (`'x' in settings`: `delete` on the no-merge
+  branch, `deleteField()` on the merge one), in `SpeseSlice` (`|| NO_SELECTION`), named in the tile's narrative
+  («Il piano di accumulo attinge da X.», `describeDefaultAccounts`). Its only reader is Accumulo's new plan
+  (`resolveInvestmentAccountId`, doc/guide/accumulo.md), which ticks it while it is still a plan source account; Registra,
+  the trade dialog and the server do not read it. Pinned by `settingsRoundTrip` (written, read back, cleared),
+  `settingsDraft` (both fixtures carry `'cash-invest'`) and `e2e/settings.draft.spec.ts`.
 
 ## Composizione mobile
 

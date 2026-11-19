@@ -3,7 +3,7 @@
  * holds open (one plan in draft or active per account, 2026-11-12).
  */
 import { describe, it, expect } from 'vitest';
-import { openPlanHeldBy, selectOpenPlan } from '@/lib/utils/accumulationPlanDoc';
+import { docToAccumulationPlan, openPlanHeldBy, selectOpenPlan } from '@/lib/utils/accumulationPlanDoc';
 import type { AccumulationPlan } from '@/types/accumulationPlan';
 
 describe('openPlanHeldBy', () => {
@@ -30,5 +30,15 @@ describe('selectOpenPlan', () => {
     const plans = [{ id: 'a', status: 'completed' }, { id: 'b', status: 'active' }] as AccumulationPlan[];
     expect(selectOpenPlan(plans)?.id).toBe('b');
     expect(selectOpenPlan(undefined)).toBeUndefined();
+  });
+});
+
+describe('docToAccumulationPlan', () => {
+  // Seen red without the mapping.
+  it('reads the review month', () => {
+    const at = new Date('2027-01-10T12:00:00');
+    const base = { userId: 'u1', name: 'Piano', status: 'active', startMonth: '2027-01', months: 12, liquidity: {}, createdAt: at, updatedAt: at };
+    expect(docToAccumulationPlan('p', { ...base, reviewMonthIndex: 6 }).reviewMonthIndex).toBe(6);
+    expect(docToAccumulationPlan('p', base).reviewMonthIndex).toBeUndefined();
   });
 });

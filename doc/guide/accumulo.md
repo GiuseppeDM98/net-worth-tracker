@@ -26,8 +26,8 @@ weight, month by month, proposes the purchases and never writes a transaction on
 - **A money-market fund may be SOLD, never bought** (`isPlanCashFund`, owner 2026-11-18): a disposal, never a
   position. Its sale only moves cash onto the accounts, so the reserve rises by it (`planCashFundSaleEur` →
   `resolvePlanReserve(…, cashFundSoldEur)` → `resolveAccountReserveEur`): only the euros above the quota become the
-  plan's. The editor's reserve is proposed with the seeded sales; a money-market sale added by hand at step 2 moves
-  the «Proposta:» line under the field, not the value already in it.
+  plan's. The editor's reserve is proposed with the seeded sales; a money-market sale comes from «Con vendite mirate»
+  only — no code path adds it by hand at step 2 (`listAddableAssets` reads `isPlanBuyable`; corrected 2026-11-19).
 - **The engine is pure** (`lib/utils/accumulationPlanUtils.ts`): `scheduleInstallments` lays the months, `matchPlanExecutions`
   (`accumulationPlanMatching.ts`) pairs the registry's BUY transactions with the planned lines, a late month carries
   its shortfall into the next. Sentences live in `accumulationNarrative.ts` and `accumuloSummary.ts`, never in a
@@ -47,7 +47,32 @@ weight, month by month, proposes the purchases and never writes a transaction on
   the refill (`describeRefillNote`); the recalibration's cash ceiling is the cash above the reserve + the sales + THIS
   month's inflow − the shortfall (the inflow counted as the calendar counts it, owner 2026-11-17: without it a plan
   just revised proposed «prezzi cambiati» with the prices still), and a refill month proposes no recalibration. A month with no line is not an instalment: «n di m rate chiuse» and a closed plan's row
-  count only the months that buy (`countPlanInstalments`), and a closed plan's planned euros subtract the gap.
+  count only the months that buy (`countPlanInstalments`), and a closed plan's planned euros subtract the gap. So does «Questo mese»'s
+  aside (owner, 2026-11-19, the rule kept): «rata k di n» over the months that buy, «dicembre 2026 · solo riserva, prima rata a
+  febbraio» on a refill month (`locateOpenMonth`); the calendar reads «Solo riserva» on it (`describeInstallmentStatus`, never
+  «Registrato»), and the months bar never fills it (`isInstalmentClosed`).
+- **A sale counts from its month** (owner, 2026-11-19). `PlanDisposal.monthIndex` is an absolute month of the plan
+  (absent = 1, `disposalMonthIndex`); `computeUsableLiquidity(…, firstIndex)` returns `dueProceedsEur` (the sales of
+  the first scheduled month, spent at once) and `monthShares` (`spreadMonthShares`), and `scheduleInstallments(…,
+  refillMonths, monthShares)` lets the proceeds enter the instalments from their month. A later sale first refills
+  what is still missing of the reserve, so `L` does not depend on the months. When no month buys, the residual is the
+  whole `L` (owner, 2026-11-19: it read 0 before). The editor puts «Vendi a» on every open sale, whole or partial
+  (the partial one since the tour, owner 2026-11-19: a new quantity keeps the month), a sale added in a revision
+  starts at the first revised month (a saved open sale with no month is not moved), and the schema refuses a month past the last instalment (`sale_month_out`). The
+  side panel splits «vendite al mese 1» from «vendite nei mesi successivi» and says each month a sale raises the
+  instalment («Da febbraio la rata sale a 1800 €: entra il ricavato di …», `listSaleSteps` → `describeSaleStep`,
+  repeated at the top of step 3); the reserve note names the sales that refill it with the inflows
+  (`listRefillSaleMonths`: «la ricostituiscono le entrate fino a gennaio e la vendita di febbraio»); step 3's reading
+  and the panel count only the months that buy (`summarizeBuyingInstalments`: «10 rate: in media … ; la prima,
+  febbraio, …»). Step 2's «Al mese» stays the even average (decision 95). The matcher's `upcoming` state: a sale
+  of a later month reads «In programma · feb 2027» with no «Registra»; a ledger sale made before it is «Da
+  confermare», and «Ignora» brings it back to `upcoming`.
+- **The default source account** (owner, 2026-11-19): Impostazioni › Spese › «Conto per gli investimenti»
+  (`AssetAllocationSettings.investmentCashAssetId`, doc/guide/impostazioni.md); `resolveInvestmentAccountId` ticks it
+  on a new plan while it is still a plan source account (`isPlanSourceAccount`), and nothing when it is gone.
+- **The review month** (owner, 2026-11-19): the Consulente's «rivedi entro» is stored as `reviewMonthIndex`;
+  in that month «Questo mese» shows `ACCUMULO_REVIEW_DUE_NOTE` with «Rivedi il piano» (`isPlanReviewDue`), and a
+  revision saved in the month clears it; editing a draft keeps it (`draftFromPlan` copies it).
 - **«Registra» opens `TransactionDialog` prefilled** from the planned line and links the transaction on save
   (`onCreated`); an instrument with no asset yet is created from «+ Nuovo asset» (`AssetDialog`, `createEmpty`).
 - **«Rivedi il piano»** rewrites the months from the first intact one; closed installments keep their lines
@@ -126,7 +151,7 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
 
 ## Files
 
-`types/accumulationPlan.ts` · `lib/utils/{accumulationPlanUtils,accumulationPlanMatching,accumulationPlanSchema,accumulationNarrative,accumuloSummary,zeroQuantityChip}.ts` · the slim read path `lib/utils/{openAccumulationPlan,planMonths,accumulationPlanDoc,accumuloMonth}.ts`, `lib/services/accumulationPlanRead.ts`, `lib/hooks/{useAccumulationPlans,usePacMonth}.ts` · `lib/services/accumulationPlanService.ts` (the transactions and the lock) · `lib/hooks/{useAccumulationPlan,useOpenAccumuloPlan,useMonthlySavingsMedian}.ts` · `components/allocation/{AccumuloTab,AccumuloTabSkeleton,AccumulationPlanDialog,AccumulationCalendarDialog,ClassDriftChart,PlanDraftSidePanel,ConsulenteHandoff,KeptSalesNote}.tsx` · the Consulente's hand-off `lib/utils/allocationAdviceHandoff.ts` (tests `allocationAdviceHandoff`, `consulenteHandoff`, `keptSalesNote`, `e2e/accumulo.consulente.spec.ts`) · `components/allocation/tiles/{QuestoMese,ClassiDelPiano,AccumuloVuoto,PianiConclusi}Tile.tsx` · tests `__tests__/accumul*.test.ts`, `e2e/accumulo.{mobile,tablet}.spec.ts` (fixture `e2e/accumuloFixture.ts`).
+`types/accumulationPlan.ts` · `lib/utils/{accumulationPlanUtils,accumulationPlanMatching,accumulationPlanSchema,accumulationNarrative,accumuloSummary,zeroQuantityChip}.ts` · the slim read path `lib/utils/{openAccumulationPlan,planMonths,accumulationPlanDoc,accumuloMonth}.ts`, `lib/services/accumulationPlanRead.ts`, `lib/hooks/{useAccumulationPlans,usePacMonth}.ts` · `lib/services/accumulationPlanService.ts` (the transactions and the lock) · `lib/hooks/{useAccumulationPlan,useOpenAccumuloPlan,useMonthlySavingsMedian}.ts` · `components/allocation/{AccumuloTab,AccumuloTabSkeleton,AccumulationPlanDialog,AccumulationCalendarDialog,ClassDriftChart,PlanDraftSidePanel,ConsulenteHandoff,KeptSalesNote}.tsx` · the Consulente's hand-off `lib/utils/allocationAdviceHandoff.ts` (tests `allocationAdviceHandoff`, `consulenteHandoff`, `keptSalesNote`, `e2e/accumulo.consulente.spec.ts`) · `components/allocation/tiles/{QuestoMese,ClassiDelPiano,AccumuloVuoto,PianiConclusi}Tile.tsx` · tests `__tests__/accumul*.test.ts`, `__tests__/{questoMeseTile,accumulationPlanDialogSaleMonth}.test.tsx`, `e2e/accumulo.{mobile,tablet}.spec.ts` (fixture `e2e/accumuloFixture.ts`).
 
 - **Suites to run after a change here — Accumulo** (2026-11-17; the Consulente's hand-off since 2026-11-18): `accumulationPlanUtils`, `accumulationPlanMatching`,
   `accumulationPlanSchema`, `accumulationPlanDoc`, `accumulationPlanService`, `accumulationPlanRevision`,
@@ -134,13 +159,18 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
   `accumuloMonth`, `accumuloSummary`, `accumuloTileSentences`, `zeroQuantityChip`, `allocazioneNarrative`,
   `allocazioneSummary`, `mirrorCollections`, `persistCache`, `allocationAdviceHandoff`, `allocationAdviceDocument`,
   `modelPortfolioGroups`, `narrativeTextNesting` · **dom** `accumuloVuotoTile`, `planDraftSidePanel`,
-  `assetDialogCreateEmpty`, `strumentiTile`, `consulenteBook`, `consulenteHandoff`, `keptSalesNote` · **AI context** `assistantPortfolioContext`,
+  `assetDialogCreateEmpty`, `strumentiTile`, `consulenteBook`, `consulenteHandoff`, `keptSalesNote`, `questoMeseTile`,
+  `accumulationPlanDialogSaleMonth` · **AI context** `assistantPortfolioContext`,
   `assistantPromptBundle`, `allocationAdviceApply`, `allocationAdvicePrompts`, `allocationAdvicePlanRead`, `allocationAdviceRun` · **Browser** `e2e/accumulo.spec.ts`,
   `e2e/accumulo.consulente.spec.ts`, `e2e/accumulo.{mobile,tablet}.spec.ts`,
   `e2e/allocation.spec.ts` (the tab, the Piano's note), `e2e/bundle.lazy.mobile.spec.ts` (the lazy landing).
 
 ## Per-page blind spots
 
+- **A sale in a later month makes the first instalments smaller** (2026-11-19): it is the plan not spending money it
+  does not have yet, not a bug; below the reserve the months before it may be 0 € («Solo riserva»).
+- **The recalibration's cash ceiling never binds once the budgets come from `monthShares`** (2026-11-19): a guard no
+  test turns red.
 - **Query key**: every write (create, revise, interrupt, reactivate, confirm) invalidates `queryKeys.accumulationPlans.all`,
   the one key the tab and the Piano's note both read.
 - **«Parti da»** seeds from today's tradable weights, typed targets or, when one is saved, the model portfolio (doc/guide/ottimizzatore.md); on a «superato» model the option stays and the tile's stale sentence shows under it.

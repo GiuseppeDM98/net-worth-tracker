@@ -61,11 +61,13 @@ interface AccumuloVuotoTileProps {
   reviewByIso: string | null;
   /** What the model rests on: the plan editor's «aggiorna anche il modello» stamps it. */
   modelBasis: ModelBasis;
+  /** Impostazioni › Spese «Conto per gli investimenti»: the new plan starts on it; null = none. */
+  investmentAccountId: string | null;
   /** Where «Apri il portafoglio modello» goes when the model is a closed row (below `desktop:`); absent = scroll to the anchor. */
   onGoToComposition?: () => void;
 }
 
-export function AccumuloVuotoTile({ ownerId, allAssets, targets, band, targetLeverageRatio, idealAllocation, model, today, onAssetsChanged, reviewByIso, onGoToComposition, modelBasis }: AccumuloVuotoTileProps) {
+export function AccumuloVuotoTile({ ownerId, allAssets, targets, band, targetLeverageRatio, idealAllocation, model, today, onAssetsChanged, reviewByIso, onGoToComposition, modelBasis, investmentAccountId }: AccumuloVuotoTileProps) {
   const isDemo = useDemoMode();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -172,6 +174,7 @@ export function AccumuloVuotoTile({ ownerId, allAssets, targets, band, targetLev
           onSaved={() => setDialogOpen(false)}
           reviewByIso={reviewByIso}
           basis={modelBasis}
+          investmentAccountId={investmentAccountId}
         />
       )}
     </>

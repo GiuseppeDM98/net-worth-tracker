@@ -157,6 +157,7 @@ export async function createDraftPlan(ownerId: string, draft: AccumulationPlanDr
       positions: draft.positions,
       disposals: draft.disposals,
       optimizerSnapshot: draft.optimizerSnapshot,
+      reviewMonthIndex: draft.reviewMonthIndex,
       installments: [] as Installment[],
       createdAt: now,
       updatedAt: now,
@@ -187,6 +188,7 @@ export async function updateDraftPlan(planId: string, draft: AccumulationPlanDra
         positions: draft.positions,
         disposals: draft.disposals,
         optimizerSnapshot: draft.optimizerSnapshot,
+        reviewMonthIndex: draft.reviewMonthIndex,
         updatedAt: new Date(),
       })
     );
@@ -232,7 +234,9 @@ export async function activatePlan(planId: string, input: ActivatePlanInput): Pr
     const states = resolvePositionStates(plan.positions, assetsById, deps, disposals);
     const liquidity = computeUsableLiquidity(plan.liquidity, assetsById, disposals, plan.months, deps);
     const totals = computeTotalPurchases(states, liquidity.L);
-    const { installments, residualEur } = scheduleInstallments(totals, states, plan.months, plan.startMonth, 1, liquidity.refillMonths);
+    const { installments, residualEur } = scheduleInstallments(
+      totals, states, plan.months, plan.startMonth, 1, liquidity.refillMonths, liquidity.monthShares
+    );
 
     const positionValuesEur: Record<string, number> = {};
     const pricesEur: Record<string, number> = {};
@@ -434,6 +438,10 @@ export async function revisePlan(planId: string, revision: PlanRevisionInput, in
         installments: result.plan.installments,
         residualEur: result.plan.residualEur,
         revisions: result.plan.revisions,
+        // Written only when the revision names it: absent keeps the stored month, null clears it.
+        ...(revision.reviewMonthIndex === undefined
+          ? {}
+          : { reviewMonthIndex: revision.reviewMonthIndex ?? deleteField() }),
         updatedAt: today,
       })
     );
