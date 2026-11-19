@@ -95,9 +95,9 @@
 25. PR #486: «+ Nuovo asset» creates a real asset at quantity 0, without an opening trade. → NOVE-16 (retired on 2026-11-17, PR #547)
 26. PR #488: «Con vendite mirate» stays a mode of the model's dialog, with the app's ONE tax rule. → NOVE-18 (retired on 2026-11-18, PR #551)
 27. Consulente ↔ PAC: a hand-off after «Applica» («Crea un piano di accumulo verso questa allocazione»), computed by
-    code, confirmed by the owner in the plan's editor. → NOVE-21
+    code, confirmed by the owner in the plan's editor. → NOVE-21; **overturned on 2026-11-19** by decisions 67, 71 and 72 (NOVE-24, NOVE-25)
 28. The Consulente REASONS about a PAC in words in «Cosa fare adesso» (accumulate or sell, an indicative horizon,
-    from the cashflow); the exact figures are the engine's. The prompt changes; the schema and the book do not. → NOVE-21
+    from the cashflow); the exact figures are the engine's. The prompt changes; the schema and the book do not. → NOVE-21; **overturned on 2026-11-19** by decisions 67 and 70 (NOVE-24)
 29. With an active PAC the Consulente reads one line (month k of N, instalment, end month) plus the instruments the
     plan buys and sells with their quotas; never the model nor its criteria. → NOVE-21
 30. The PAC editor's suggested instalment is the MEDIAN of the last twelve months' savings (the cashflow block's
@@ -150,7 +150,7 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 57. Spending the liquidity is not a sale: out of the sold total and of the taxes, its «Tasse» cell «—», the total
     line adds «, usi X € di liquidità». → NOVE-18 (retired on 2026-11-18, PR #551)
 58. The hand-off accepts that a new instrument at 0 quotes in a class without sub-targets starts near 0 % and says
-    so. → NOVE-21
+    so. → NOVE-21; without a reader after NOVE-25 (decision 82)
 59. The hand-off's seed holds EVERY tradable instrument held; the reading names the ones the Consulente did not
     name. → NOVE-21
 60. DESIGN.md: The Two-Font Rule's opening, «the one ornament» and The Unifying Law take the costume's clause;
@@ -168,6 +168,65 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
     allocation's cash quota (or today's level, when already below), so the PAC made from it refills no reserve the
     run spent. → NOVE-18 (retired on 2026-11-18, PR #551)
 
+The planning session of 2026-11-19 — «dal Consulente al piano di accumulo, in un clic» (the owner, 2026-11-18: «quando
+parlo con il consulente, questo mi guida sulle mie scelte, mi fa ragionare e poi mi propone un piano, che in questo
+caso si traduce nel pac: cosa e quanto vendere, quando riallocare, che acquisti fare e in che quantità»; «dopo aver
+parlato con il consulente, l'esperienza di creare il pac deve essere seamless, solo il click per creare il pac e
+basta») — decisions 67–92, each asked with its fact verified on the code:
+
+67. The purchase quotas of each instrument are written by the Consulente in its operating plan; the app checks them
+    with rules (sum 100, buyable, the limits of «Criteri del modello») and says every correction in one sentence; the
+    optimizer leaves this path. → NOVE-24, 25
+68. A sale's month counts in the calendar: its proceeds enter the instalments from that month. → NOVE-23
+69. «Quando riallocare» is a review month the Consulente indicates; in that month Accumulo shows a note with «Rivedi
+    il piano»; no phases with different quotas. → NOVE-23, 24
+70. A NEW stage «Piano» after the review (Opus 5.5): «Riprova» repeats it alone, «Chiedi una modifica» reruns review
+    and plan; every figure of the plan lives in ONE structured object that feeds the report's page and the PAC. →
+    NOVE-24
+71. ONE «Applica» does everything: a fourth tick «Il piano di accumulo» (on) with a one-line summary; it writes
+    targets, roles, goals AND creates the PAC; then «Piano creato» and «Apri in Accumulo»; the window «Dal Consulente»
+    disappears. → NOVE-25
+72. The click creates the plan ACTIVE (the first instalment the next month). → NOVE-25
+73. The click creates EVERY missing instrument at 0 quotes; one without a ticker is created all the same, without a
+    price, and the summary says so. → NOVE-25
+74. The right ticker: the instruments stage writes up to three Yahoo symbols per instrument (the user's exchange
+    first, then other euro listings); the app reads price and date of each in order and uses the first with a price of
+    the last 5 days; «Applica» shows «ticker · prezzo · data» before the click. → NOVE-24, 25
+75. A new setting «Conto per gli investimenti», ONE account, in Impostazioni › Spese. → NOVE-23
+76. Without it, the plan's tick asks «Da quale conto?» and SAVES the choice as the setting; without a choice the tick
+    stays off. → NOVE-25
+77. An app rule against the Consulente's plan: the app corrects and says it, one sentence per correction BEFORE the
+    click, kept on the plan; the tick goes off only when the plan can buy nothing. → NOVE-24, 25
+78. The interview's «da tenere» wins: the contract forbids selling such an instrument; if the plan does, the app
+    removes the sale and says so; «smetti di comprare» stays allowed. → NOVE-24
+79. An open DRAFT is replaced by the click (the tick says so) and the plan activated. → NOVE-25
+80. An ACTIVE plan is revised by the click («Rivede il piano di accumulo attivo»): from the first open month it takes
+    the Consulente's quotas, instalment, months and sales; the closed instalments stay. → NOVE-25
+81. The sales' taxes: estimated by the app (`saleTaxPerEuro`), given to the «Piano» stage, shown in the report and in
+    the «Applica» summary (per sale and in total); no cap; a sale that cannot be estimated stays, with «tasse non
+    stimabili». → NOVE-24, 25
+82. A held instrument the plan forgets is a row at 0 %, named; a new instrument takes the quota the Consulente writes,
+    also in a class without sub-targets (decision 58 has no reader on this path). → NOVE-24, 25
+83. The work is split: the engine and the setting (NOVE-23), the stage and the page (NOVE-24), the one «Applica»
+    (NOVE-25), then the path by hand. → § 5
+84. A NEW page of the report, «Il piano operativo», after «Cosa fare adesso» and before «Rischi e revisione», present
+    only with a valid plan. → NOVE-24
+85. A report without a plan (an older document, a failed stage): «Applica» works for targets, roles and goals; in
+    place of the tick a row «Il piano operativo non c'è ancora» with «Scrivi il piano operativo», which runs the plan
+    stage ALONE; a failed plan stage never blocks the report. → NOVE-24
+86. The plan by hand is a PAGE (a route), like Compravendita. → NOVE-22
+87. The path replaces EVERYTHING — create, «Modifica» of a draft, «Rivedi il piano» — and the editor is deleted
+    («decidiamo in ottica futura di UX utente, deve essere il più semplice possibile»). → NOVE-22, 26
+88. The path ends with ONE «Conferma» that activates; the unfinished path lives on the browser; the app no longer
+    creates drafts in Accumulo; an existing draft is continued in the path or deleted. → NOVE-22
+89. No advanced operation in the path: no «Raggruppa/Separa» by hand, no «Sostituisci», no «Ottimizzato»; groups come
+    only from the model portfolio. → NOVE-22, 26
+90. «Che cosa compra il piano?» is ONE screen with the list (a quota per row, today's weight, the sum, «Ridistribuisci
+    il resto», «Aggiungi uno strumento»). → NOVE-22
+91. The path by hand in two specs: NOVE-22 creates (and continues a draft), the editor staying for «Rivedi il piano»
+    alone; NOVE-26 revises in the path and deletes the editor. → NOVE-22, 26
+92. The five specs (23, 24, 25, 22, 26) are written in one session, on 2026-11-19. → § 6
+
 ## 4. The adopted choices (reversible before the implementation; each is repeated in the spec that uses it)
 
 - a. The themes' names are ours: «Egeo» (`egeo`), «Orbita» (`orbita`); no name or asset of a game in the app.
@@ -182,25 +241,49 @@ Decided at the adversarial reading of the whole series (2026-11-12, numbered on 
 - h. The saved model becomes «superato» after a change of the targets, by hand or by a Consulente's «Applica»; an
   «Applica» that writes the same targets changes nothing (decision 56). (NOVE-17, retired on 2026-11-18, PR #549)
 - i. The Consulente does not read the model nor its criteria (decision 29 adds the active plan only). (NOVE-21)
+  Amended on 2026-11-19 (NOVE-24, P9): the «Piano» stage reads the per-instrument LIMITS of the criteria — nothing
+  else of them, never the model.
 - j. The model's base is Bilanciamento's (net of debts, `resolveAllocationRoleWithin`; cash is a candidate). (NOVE-17, retired on 2026-11-18, PR #549)
 - k. The criteria are edited in Accumulo, read-only in Impostazioni. (NOVE-17, retired on 2026-11-18, PR #549)
 - l. Model and plans are read only on the Accumulo tab, except the Piano's note, the Consulente's «Applica» page
   (the active-plan note, choice p, and the hand-off's offer or draft, NOVE-21: the plans' state only, never their
   weights) and the Consulente's server read of the active plan (decision 29). (NOVE-16, retired on 2026-11-17, PR #547)
+  From NOVE-25 the «Applica» page also BUILDS the plan: it reads the plans' state, never the model, and writes the
+  model from the plan's weights, in a chunk loaded on demand.
 - m. Limits that force a tax above the cap: the forced tax becomes the cap, and the UI says so. (NOVE-18, retired on 2026-11-18, PR #551)
 - n. Losses are not counted in the tax estimate, declared in the text. (NOVE-18, retired on 2026-11-18, PR #551)
 - o. Loans and properties are never offered in «+ Aggiungi». (NOVE-16, retired on 2026-11-17, PR #547)
 - p. The Consulente's «Applica» page warns in one line when a plan is active. (NOVE-16, retired on 2026-11-17, PR #547)
 - q. «superato» fires on targets, roles AND criteria (decision 56): the fingerprint saved with the model covers the
   three. (NOVE-17, retired on 2026-11-18, PR #549)
-- r. In the hand-off, instruments not held are offered to be created at quantity 0, prefilled. (NOVE-21)
+- r. In the hand-off, instruments not held are offered to be created at quantity 0, prefilled. (NOVE-21) Replaced by NOVE-25: the click creates them (decision 73).
 - s. The `pacClause` PR #486 adds to the Bilanciamento verdict is removed (decision 24). (NOVE-16, retired on 2026-11-17, PR #547)
-- t. A warning when the PAC sells in month 1 an instrument the Consulente says to keep. (NOVE-21)
+- t. A warning when the PAC sells in month 1 an instrument the Consulente says to keep. (NOVE-21) Removed by NOVE-25: the plan never sells one (decision 78).
 - u. The AI's STRUMENTI block prints an asset created empty and never traded as «0 quote, mai comprato»; `findAssetByName` prefers
   quantity > 0. (NOVE-16, retired on 2026-11-17, PR #547)
 - v. A note when the plan ends after the «rivedi entro» date. (NOVE-16, retired on 2026-11-17, PR #547)
 - w. Compravendita: a mortgage above the PRICE is refused; property and account move in one transaction. (NOVE-04, retired on 2026-11-14, PR #528)
 - x. Panoramica: with a lived part that is not a rate, the headline follows the whole month. (NOVE-05, retired on 2026-11-14, PR #530)
+- y. The operating plan addresses instruments by keys the app prints (S held, N new, M money-market fund) and keeps
+  its OWN status on the advice document: a plan stage never changes the report's status. (NOVE-24)
+- z. `reconcileOperatingPlan` is ONE pure function run twice: on the server when the plan is written, at the click on
+  today's portfolio. (NOVE-24, NOVE-25)
+- aa. The click is not atomic: its steps run in order and each is idempotent on a second press (an instrument is
+  matched before it is created, an open plan is overwritten, never duplicated). (NOVE-25)
+- ab. An instrument created without a Yahoo symbol is stored with its ISIN (else a slug of its name) as ticker and
+  `autoUpdatePrice: false`; a government bond is created to be completed from its form. (NOVE-25)
+- ac. The plan made by the click draws from ONE account and its reserve is the new targets' cash quota left on that
+  account (`resolvePlanReserve` with the source ids). (NOVE-25)
+- ad. The app's corrections live on the plan (`advisorNotes`) and are shown in «Questo mese»; a revision by hand
+  clears them. (NOVE-25, NOVE-26)
+- ae. ONE URL, `/dashboard/allocation/piano`, creates, continues a draft and revises: the open plan decides. (NOVE-22,
+  NOVE-26)
+- af. The path's card is extracted at the third path (`PathCard`): Compravendita adopts it, the Consulente's wizard
+  only its class constants. (NOVE-22)
+- ag. The path has no screen for the plan's name, its start month or a review month; the sales come BEFORE the
+  instruments. (NOVE-22)
+- ah. The review month and «Conto per gli investimenti» are optional fields: absent, a plan and the settings behave as
+  before. (NOVE-23)
 
 These are the choices that cross specs or answer one of the owner's points. Each spec's § 3 lists, under «Adopted,
 reversible», the further choices that stay inside it (a wording, a file's home, a rounding): the owner overturns one
@@ -210,7 +293,7 @@ by saying so before that spec is implemented.
 
 The order of implementation (each followed by its retirement session, § 8):
 
-`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 (retired on 2026-11-16) → 16 (retired on 2026-11-17) → 17 (retired on 2026-11-18) → 18 (retired on 2026-11-18) → 21 → 22 → 11 → 12 → 13 → 19 → 20`
+`01 (retired on 2026-11-13) → 02 (retired on 2026-11-13) → 03 (retired on 2026-11-14) → 04 (retired on 2026-11-14) → 05 (retired on 2026-11-14) → 06 (retired on 2026-11-14) → 07 (retired on 2026-11-15) → 08 (retired on 2026-11-15) → 09 (retired on 2026-11-15) → 10 (retired on 2026-11-16) → 14 (retired on 2026-11-16) → 15 (retired on 2026-11-16) → 16 (retired on 2026-11-17) → 17 (retired on 2026-11-18) → 18 (retired on 2026-11-18) → 21 → 23 → 24 → 25 → 22 → 26 → 11 → 12 → 13 → 19 → 20`
 
 - **07** (retired on 2026-11-15, PR #534) after **03** (the fee row commits inside the ledger's transaction contract) and **06** (retired on 2026-11-14, PR #532) (`tradeMoneyIn` and
   `tradeAwarePriceEffect` change together).
@@ -219,9 +302,16 @@ The order of implementation (each followed by its retirement session, § 8):
 - **16** (retired on 2026-11-17, PR #547) after **02** (the same grid cell), reading **03**'s and **07**'s (retired on 2026-11-15, PR #534) dialogs (the fresh ledger meta, the fee
   field), already before it in the order; **17** (retired on 2026-11-18, PR #549) after **16** (retired); **18** (retired on 2026-11-18, PR #551) after **17** and **07** (both retired) (the fiscal cost basis).
 - **21** after **16** and **17** (both retired) (the editor's seed, the optimizer, the active-plan reader).
-- **23** after **21** (the hand-off it completes), before **22** (the manual path is written once the Consulente's one-click path has fixed what the editor receives).
-- **22** after **18** (retired), **21** and **23** (the editor it guides holds their disposals and hand-off), before **11** (the costume dresses its screens).
-- **11 → 12 → 13 → 19 → 20** come LAST (13 extends 12's contrast test): the page-by-page pass dresses pages that 08–10, 15, 16, 17, 18, 21, 22 and 23 change.
+- **23** after **21** (the plan the hand-off seeds): the engine counts a sale's month, the plan gains its review
+  month, the settings «Conto per gli investimenti».
+- **24** after **23** (the plan's object speaks the engine's months and the review month) and **21**
+  (`planConsulenteHandoff`, the PIANO DI ACCUMULO block).
+- **25** after **23** and **24** (the click turns 24's object into 23's plan); it removes 21's window.
+- **22** after **25** (`createAndActivatePlan`, `resolvePlanReserve`'s source ids, the editor freed of the hand-off)
+  and **23** (the sale's month).
+- **26** after **22** (the path it extends), **23** and **25** (what a revision carries), before **11** (the costume
+  dresses the path's card once for the three paths).
+- **11 → 12 → 13 → 19 → 20** come LAST (13 extends 12's contrast test): the page-by-page pass dresses pages that 08–10, 15, 16, 17, 18, 21, 22, 23, 24, 25 and 26 change.
 - 01, 02, 03, 04, 05, 06, 08, 14 and 11 depend on nothing.
 
 ## 6. Status
@@ -249,8 +339,11 @@ The order of implementation (each followed by its retirement session, § 8):
 | NOVE-19 | The costume, first pass: shell, portals, controls, Panoramica, Patrimonio, Cashflow | L | 11, 12, 13 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 18 findings, 1 owner decision |
 | NOVE-20 | The costume, round B: every dialog and the other nine pages | L | 19 | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 23 findings, 1 owner decision |
 | NOVE-21 | The Consulente and the plan of accumulation | L | 16, 17 (both retired; after 18, retired) | Opus 5.5 · medium | written on 2026-11-12; read adversarially on 2026-11-12: 26 findings, 2 owner decisions; implemented on 2026-11-18 (branch `feat/consulente-piano-accumulo`; every test of § 6 seen red with its mutation but M3, kept as a guard; `perf:budget` Allocazione 610,7 → 611,1 raised 611 → 612; collaudo A–E on the emulators, F on the mirror with the owner). Owner decisions of the session: decision 58 (a new instrument in a class without sub-targets starts at 0 %), «Salva bozza» writes the model too, and on the tour: a held instrument the Consulente does not name is a row at 0 % once the named one is among the assets (until then it holds the place), held rows at 0 % enter the model, the Accumulo columns end on one line |
-| NOVE-22 | Allocazione › Accumulo: a guided path to create a PAC by hand — one question per screen, a summary before «Conferma», as Compravendita and the Consulente | — | 18, 21, 23 | — | **to write** (owner, 2026-11-17, on the NOVE-17 tour: the PAC is complex to set up; the UX and UI of its creation optimised for whoever builds it by hand) |
-| NOVE-23 | The Consulente hands over an operating plan: the instalment and the months, the sales (instrument, amount, month), each held instrument kept, no longer bought or sold — validated by the app's rules (reserve, taxes, buyable quotas) and written into the PAC; after the Consulente, ONE click creates the PAC (a seamless, light path: no editor to fill, the editor only to change) | — | 21 | — | **to write** (owner, 2026-11-18, on NOVE-21's tour: «quando parlo con il consulente mi guida, mi fa ragionare e poi mi propone un piano: cosa e quanto vendere, quando riallocare, che acquisti fare e in che quantità»; the PAC by hand stays NOVE-22's) |
+| NOVE-22 | A plan of accumulation by hand: the guided path that creates it (a route, eight screens, ONE «Conferma»; «Crea piano», «Crea un PAC con questi pesi» and a draft's «Continua» lead to it; the editor stays for «Rivedi il piano» alone) | L | 23, 25 | Opus 5.5 · medium | written on 2026-11-19 (`develop` @ 7909fa4c); to be read adversarially (prompt 07) in the next session; decisions 86, 88, 89, 90, 91 (owner, 2026-11-17, on the NOVE-17 tour: the PAC is complex to set up) |
+| NOVE-23 | Accumulo: a sale's month in the calendar, the review month, «Conto per gli investimenti» | L | 21 | Opus 5.5 · medium | written on 2026-11-19 (`develop` @ 7909fa4c); to be read adversarially (prompt 07) in the next session; decisions 68, 69, 75 |
+| NOVE-24 | The Consulente's «Piano» stage: the operating plan as one structured object, its data block and the page «Il piano operativo» | L | 21, 23 | Opus 5.5 · medium | written on 2026-11-19 (`develop` @ 7909fa4c); to be read adversarially (prompt 07) in the next session; decisions 67, 69, 70, 74, 78, 81, 82, 84, 85; overturns decision 28 |
+| NOVE-25 | One «Applica»: the operating plan becomes the plan of accumulation (instruments created, the plan active; a draft replaced, an active plan revised; «Dal Consulente» removed) | L | 23, 24 | Opus 5.5 · medium | written on 2026-11-19 (`develop` @ 7909fa4c); to be read adversarially (prompt 07) in the next session; decisions 67, 71, 72, 73, 74, 76, 77, 79, 80, 81, 82; overturns decision 27 and NOVE-21's C1, C3 |
+| NOVE-26 | The guided path revises an active plan; the editor is deleted | M | 22, 23, 25 | Opus 5.5 · medium | written on 2026-11-19 (`develop` @ 7909fa4c); to be read adversarially (prompt 07) in the next session; decisions 87, 89, 91 |
 
 The transversal reading of the same day (the 21 specs against each other and against this index): 21 findings;
 decisions 33, 34, 35 and 62 hold for every spec.
@@ -372,7 +465,7 @@ A spec that needs one of these differently changes it HERE first, then in every 
   `candidateSaleTaxPerEuro`; a proposed sale deducts no sale fee. `OptimizerSaleReport.liquiditySpentEur`: the
   liquidity is spent, never sold — out of `soldEur` and `taxEur`.
 
-**The Consulente's hand-off** — defined by NOVE-21, on the two groups above
+**The Consulente's hand-off** — defined by NOVE-21, on the two groups above; **from NOVE-25 only the first bullet and `planConsulenteHandoff` remain** (NOVE-24 reads both), the rest is removed with its props
 - `lib/server/allocationAdvice/accumulationPlan.ts`: `readAccumulationPlanForAdvice(userId, now):
   Promise<AccumulationPlanRead>`, `AccumulationPlanRead = { read: true; plan: OpenPlanForAdvice | null } |
   { read: false }`; `formatAccumulationPlanForPrompt(state)` in `prompts.ts` (the «--- PIANO DI ACCUMULO ---» block,
@@ -386,6 +479,71 @@ A spec that needs one of these differently changes it HERE first, then in every 
 - Additive props: `AccumulationPlanDialog.advisorKeepAssetIds?`, `AssetDialog.prefill?: AssetPrefill`
   (`types/assets.ts`), `AccumuloTab.advice`, `ApplyPiecesInput.handoff`, `ConsulenteHandoff.basis` (`ModelBasis` of `lib/utils/modelPortfolio.ts`);
   `components/allocation/KeptSalesNote.tsx`.
+
+**The sale's month, the review month, the investment account** — defined by NOVE-23, read by NOVE-24, NOVE-25, NOVE-22, NOVE-26
+- `lib/utils/accumulationPlanUtils.ts`: `disposalMonthIndex(disposal: Pick<PlanDisposal, 'monthIndex'>): number`
+  (absent = 1); `plannedLiquidityEur(input)`; `UsableLiquidity.dueProceedsEur`, `.monthShares: number[] | null`;
+  `computeUsableLiquidity(liquidity, assetsById, disposals, months, deps, firstIndex = 1)`;
+  `scheduleInstallments(totals, states, months, startMonth, startIndex, refillMonths = 0, monthShares = null)`;
+  `buildRevisedPlan` keeps a new sale's `monthIndex` (≥ k); `PlanRevisionInput.reviewMonthIndex?: number | null`
+  (absent = keep, `null` = clear).
+- `types/accumulationPlan.ts`: `reviewMonthIndex?: number` on `AccumulationPlan` and `AccumulationPlanDraft`
+  (1…months, the plan's instalment index).
+- `lib/utils/accumulationPlanSchema.ts`: `planDisposalSchema.monthIndex` ≥ 1; the issue `sale_month_out` of
+  `validateDraftAgainstAssets`.
+- `lib/utils/accumulationPlanMatching.ts`: `LineUiState` + `'upcoming'`; `lib/utils/accumuloMonth.ts`:
+  `isPlanReviewDue(plan, currentIndex, currentMonth): boolean`.
+- `types/assets.ts`: `AssetAllocationSettings.investmentCashAssetId?: string` (the five places of impostazioni.md);
+  `resolveInvestmentAccountId(settings, allAssets): string | null` (null when unset or no longer a source account).
+
+**The operating plan** — defined by NOVE-24, read by NOVE-25
+- `types/allocationAdvice.ts`: the stage `'plan'` in `AllocationAdviceStage`, `ALLOCATION_ADVICE_STAGES`,
+  `AllocationAdviceRunStage`, `ALLOCATION_ADVICE_RUN_STAGES` (strategy → instruments → review → plan);
+  `AllocationAdviceOperatingPlan { status: 'running' | 'ready' | 'failed'; plan; error; model; startedAt; finishedAt;
+  reportFinishedAt }`; `AllocationAdviceDocument.operatingPlan?`.
+- `lib/utils/operatingPlan.ts` (zod-free): `OperatingPlan`, `OperatingPlanRow`, `OperatingPlanInstrument` (`ref`
+  S…/N…/M…, `kind`, `assetId?`, `prefill?: AssetPrefill`, `symbols?`), `OperatingPlanFacts`, `RawOperatingPlan`;
+  `operatingPlanOf(document): OperatingPlan | null` (ready, usable, written on this report);
+  `reconcileOperatingPlan(raw: RawOperatingPlan, facts: OperatingPlanFacts): OperatingPlan` (the fifteen rules,
+  idempotent).
+- `lib/utils/operatingPlanFacts.ts`: `buildOperatingPlanFacts(input): OperatingPlanFacts`; NOVE-25 adds
+  `refreshOperatingPlanFacts` beside it. `lib/utils/operatingPlanSchema.ts` (zod, server):
+  `operatingPlanAnswerSchema`, `parseOperatingPlanAnswer`.
+- `lib/utils/allocationAdviceProposal.ts`: `instrumentCandidateSchema.yahooSymbols?: string[]` (max 3).
+  `lib/utils/allocationAdviceBook.ts`: the page id `'piano'`, `BookPageInput.hasPlan`.
+- `components/allocation/consulente/useConsulentePlan.ts`: `useConsulentePlan(ownerId): { state; write }`; the
+  «Applica» page's `planRow` (replaced by NOVE-25's tick when the plan exists).
+
+**The one click** — defined by NOVE-25, read by NOVE-22 and NOVE-26
+- `types/accumulationPlan.ts`: `advisorNotes?: string[]` on the plan and the draft; `PlanRevisionInput.advisorNotes?:
+  string[]`.
+- `lib/utils/accumulationPlanUtils.ts`: `resolvePlanReserve(allAssets, targets, compare, deps, cashFundSoldEur = 0,
+  sourceIds?: readonly string[])`.
+- `lib/services/accumulationPlanService.ts`: `createAndActivatePlan(input: CreateAndActivateInput): Promise<string>`
+  with `CreateAndActivateInput { ownerId; draft; existingDraftId?; activate: ActivatePlanInput; model?: { input:
+  ModelPortfolioInput; basis: ModelBasis } }`, `PlanWriteStep = 'plan' | 'activate' | 'model'`, `PlanWriteError {
+  step; planId? }` — it runs `validateDraftAgainstAssets` before any write.
+- `lib/utils/advicePlan.ts`: `buildAdvicePlan(input: AdvicePlanInput): AdvicePlanBuild`, `pickFreshQuote`,
+  `FRESH_QUOTE_DAYS = 5`, `newInstrumentFormData`, `fallbackTicker`; `lib/services/advicePlanService.ts`:
+  `executeAdvicePlan(run): Promise<{ planId; action }>`.
+- `lib/services/yahooFinanceService.ts`: `QuoteResult.quotedAt?: string`; `/api/allocation-advice/applied`: `planId?`,
+  `planAction?: 'create' | 'replace' | 'revise'`.
+
+**The guided path** — defined by NOVE-22, extended by NOVE-26
+- `components/ui/path-card.tsx`: `PATH_HEADLINE_CLASS`, `PATH_HELP_CLASS`, `PATH_BUTTON_CLASS`, `PathCard(props:
+  PathCardProps)`, `PathDoneCard`; `components/ui/path-fields.tsx`: `numberOrNull`, `NumberField`, `AccountField`;
+  `lib/utils/pathDraftStorage.ts`: `readStoredJson`, `writeStoredJson`, `clearStored`.
+- `lib/utils/planPath.ts`: `PlanPathScreen`, `PLAN_PATH_SCREENS` (partenza · versamento · durata · conto · riserva ·
+  vendite · strumenti · riepilogo), `PlanPathStart`, `PlanPathSale { assetId; quantity: number | null; month }`,
+  `PlanPathAnswers`, `PlanPathDraft { version: 1; screen; answers }`, `PlanPathContext`, `planPathReducer`,
+  `initialPlanPathDraft`, `seedPlanPathPositions`, `resolvePathReserveEur`, `describePlanPathBlock`,
+  `firstPlanPathRefusal`, `planPathToDraft`, `reconcilePlanPathAnswers`, `planPathStorageKey(ownerId)`,
+  `parseStoredPlanPath`.
+- NOVE-26 adds: the start `'plan'`, `PlanPathRevision`, `PlanPathContext.revision` and `.fromModel`,
+  `PlanPathAnswers.revisesPlanId` and `.revisionCount`, `buildPlanPathRevision(plan)`, `planPathToRevision(answers,
+  context): PlanRevisionInput`, `previewPlanPathRevision(answers, context, today): RevisedPlanResult`.
+- The route `/dashboard/allocation/piano` (`?da=modello` from NOVE-26); `ACCUMULO_ACTION_CONTINUE`; the E2E helper
+  `walkPlanPath(page, answers)` in `e2e/accumuloFixture.ts`.
 
 **The costume** — defined by NOVE-11 § 4.3, filled by NOVE-12 and NOVE-13, read by NOVE-19 and NOVE-20
 - `lib/constants/colorTheme.ts`: `COSTUME_ATTRIBUTE = 'data-costume'`,
@@ -483,7 +641,10 @@ A spec that needs one of these differently changes it HERE first, then in every 
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 11 12 13 19 20 21`
+`SERIE: doc/nove/ · INDICE: doc/nove/README.md · SPEC VIVE: 11 12 13 19 20 21 22 23 24 25 26`
+
+The five specs written on 2026-11-19 are not yet read adversarially: prompt 07 runs on them in the next session, with
+`SERIE: doc/nove · INDICE: doc/nove/README.md · SPEC VIVE: NOVE-23, NOVE-24, NOVE-25, NOVE-22, NOVE-26`.
 
 Prompt 08 (`08_CREA_RITIRO_SPEC`) was run on 2026-11-12, after the adversarial reading, in a session of its own:
 `doc/nove/PROMPT-RITIRO.md` is the prompt the owner pastes to retire ONE spec. A retirement updates its precedents
@@ -496,10 +657,27 @@ folder.
 - No ring for a signed quantity, a time series or a comparison of two wholes; the savings ring removed on
   2026-08-31 does not come back.
 - No percentage of the income below −100% or without income, anywhere.
-- No section «Come arrivarci» written by the Consulente with its own figures: the path is the engine's (decision 28).
-- The Consulente never reads the model portfolio nor its criteria (choice i).
+- ~~No section «Come arrivarci» written by the Consulente with its own figures: the path is the engine's (decision
+  28).~~ Overturned on 2026-11-19 (decisions 67, 70, 84): the Consulente writes the operating plan as ONE structured
+  object in a stage of its own; the review still reasons in words, and the instalments stay the engine's.
+- The Consulente never reads the model portfolio nor its criteria (choice i), but the per-instrument limits the
+  «Piano» stage is given (NOVE-24, P9).
 - No backfill of past fee rows (decision 21); no change to the PMC shown to make a tax estimate right (decision 31).
 - No theme ornament outside the dashboard and its dialogs (decision 17); figures never leave Geist Mono.
 - No `npm audit fix`, no dependency upgrade inside a spec of this series, except the two theme fonts NOVE-12 and
   NOVE-13 load through `next/font`.
 - No merge of a contributor's branch as it is: each PR enters through its spec's list of changes.
+
+Decided on 2026-11-19:
+
+- No editor between the Consulente's report and the plan: the click creates it; it is changed afterwards, from
+  Accumulo (decisions 71, 72).
+- No sale of an instrument the user said to keep, no tax cap, no phases with different quotas in a plan (decisions 78,
+  81, 69).
+- No search of a Yahoo symbol by ISIN on the app's side (measured on 2026-11-19: one listing, a validation throw): the
+  symbols come from the instruments stage.
+- No asset stored with an empty ticker, and none without a symbol in the daily price update.
+- No «Salva bozza», no grouping by hand, no «Sostituisci», no «Ottimizzato» in a plan; no second form for a plan once
+  the path revises it (decisions 87, 88, 89).
+- No model call in a test or in a guided verification of these five specs: the document and the operating plan are
+  planted.
