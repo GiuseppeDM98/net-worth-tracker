@@ -773,7 +773,7 @@ function scheduleOn(cash: Asset, liquidity: PlanLiquidity, disposals: PlanDispos
   return { usable, totals, schedule };
 }
 
-// § 1's invented figures: 12 months, 500 € a month, 1.200 € above the reserve, 2.400 € sold in month 1, 6.000 € in month 7.
+// Invented figures (2026-11-19): 12 months, 500 € a month, 1.200 € above the reserve, 2.400 € sold in month 1, 6.000 € in month 7.
 const CASH_ABOVE = makeAsset({ id: 'cash-above', name: 'Conto', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 11200 });
 const ABOVE_LIQUIDITY: PlanLiquidity = { sourceCashAssetIds: ['cash-above'], reserveEur: 10000, monthlyInflowEur: 500 };
 const TWO_SALES: PlanDisposal[] = [
@@ -781,7 +781,7 @@ const TWO_SALES: PlanDisposal[] = [
   { assetId: 'etf-y', monthIndex: 7, estimatedProceedsEur: 6000, status: 'planned' },
 ];
 
-// U3. Mutation that turns it red: `spreadMonthShares` returning an even array instead of null.
+// Mutation that turns it red: `spreadMonthShares` returning an even array instead of null.
 describe('a plan with no sale after its first month schedules as before', () => {
   it('monthShares is null and L / refillMonths keep the figures of the existing fixtures', () => {
     const liquidity: PlanLiquidity = { sourceCashAssetIds: ['cash1', 'cash2'], reserveEur: 10000, monthlyInflowEur: 500 };
@@ -822,7 +822,7 @@ describe('a plan with no sale after its first month schedules as before', () => 
   });
 });
 
-// U1. Mutation that turns it red: every later tranche pushed at offset 0.
+// Mutation that turns it red: every later tranche pushed at offset 0.
 describe('computeUsableLiquidity counts a sale from its month', () => {
   it('a month-7 sale is spent from month 7: six shares of 800 and six of 1.800 over 15.600', () => {
     const result = computeUsableLiquidity(ABOVE_LIQUIDITY, byId(CASH_ABOVE), TWO_SALES, 12, deps);
@@ -841,9 +841,9 @@ describe('computeUsableLiquidity counts a sale from its month', () => {
   });
 });
 
-// U2. Mutation that turns it red: `spread(tranche.eur, 0)` for a later sale.
+// Mutation that turns it red: `spread(tranche.eur, 0)` for a later sale.
 describe('scheduleInstallments spends a later sale from its month', () => {
-  it('§ 1: instalments 800 × 6 then 1.800 × 6', () => {
+  it('the two-sale fixture: instalments 800 × 6 then 1.800 × 6', () => {
     const { schedule } = scheduleOn(CASH_ABOVE, ABOVE_LIQUIDITY, TWO_SALES, 12);
     expect(instalmentEuros(schedule.installments)).toEqual([800, 800, 800, 800, 800, 800, 1800, 1800, 1800, 1800, 1800, 1800]);
     expect(schedule.residualEur).toBe(0);
@@ -884,7 +884,7 @@ describe('scheduleInstallments spends a later sale from its month', () => {
   });
 });
 
-// U14. A later sale refills the reserve first (owner, 2026-11-19). Mutation that turns it red: `refillEur = 0` for a later sale.
+// A later sale refills the reserve first (owner, 2026-11-19). Mutation that turns it red: `refillEur = 0` for a later sale.
 describe('a later sale refills what the reserve still misses before it is invested', () => {
   const sale = (eur: number): PlanDisposal[] => [{ assetId: 'etf-z', monthIndex: 7, estimatedProceedsEur: eur, status: 'planned' }];
   const cashAt = (eur: number) => makeAsset({ id: 'cash-u', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: eur });
@@ -921,7 +921,7 @@ describe('a later sale refills what the reserve still misses before it is invest
   });
 });
 
-// U4. Mutation that turns it red: `recalibrateInstallment` calling `computeUsableLiquidity` without the index.
+// Mutation that turns it red: `recalibrateInstallment` calling `computeUsableLiquidity` without the index — the month-7 case (the month-3 one reads its own shares: the sale is not due either way).
 describe('the recalibration counts only the sales due by the open month', () => {
   function planWithLaterSale(): AccumulationPlan {
     return {

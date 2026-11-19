@@ -185,7 +185,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **«Commissioni bancarie»** (Spese, 2026-09-25 as «Commissioni sui trasferimenti»; the fee of ANY row since 2026-10-10, doc/guide/cashflow.md — the keys keep their name): `transferFeeCategoryId` / `transferFeeSubCategoryId`, both
   user-clearable (`'x' in settings` in both `setSettings` branches), in the `spese` snapshot, read by the expense
   form and, since 2026-11, mapped by the Assistente's `fetchSettings` (the eighth place above) for Registra. The Select lists the spending categories grouped by type — the fee row takes the category's
-  type. `e2e/cashflow.transfer-fee.spec.ts` is the one spec that WRITES this page's settings: it picks the category,
+  type. `e2e/cashflow.transfer-fee.spec.ts` WRITES the fee fields (the other writers: § Per-page blind spots): it picks the category,
   presses «Salva», reloads, and restores the WHOLE settings document in `afterAll`: «Salva» rewrites every field the page
   holds, and on the base seed it drops the allocation sub-targets (the seed's shape is not the page's), so restoring the
   two fee fields alone left `e2e/allocation.spec.ts` with no class row to open (seen red in the full run, 2026-09-25).

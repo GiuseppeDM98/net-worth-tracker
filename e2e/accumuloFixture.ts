@@ -17,7 +17,7 @@
  * month as the Consulente's review month. `removeOwnerPlans` deletes every plan of the account, then the lock: a plan
  * created from the page has a generated id `removeAccumuloFixture` does not know.
  * Instruments are the base seed's (`seed-vwce`, `seed-aapl`, `seed-btp`, scripts/seedEmulator.ts), at
- * the prices the seed stamps; round invented figures (WORKFLOW.md § 1 rule 7). The spec asserts the
+ * the prices the seed stamps; round invented figures (WORKFLOW.md § 1 rule 6). The spec asserts the
  * STRUCTURE, never a figure: the euro amounts follow the seed's prices.
  *
  * A helper, not a spec: no project collects it (`testMatch`), it only exports.

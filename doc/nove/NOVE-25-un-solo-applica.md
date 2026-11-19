@@ -1,11 +1,11 @@
 # NOVE-25 — One «Applica»: the Consulente's operating plan becomes the plan of accumulation
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (`disposalMonthIndex`, `reviewMonthIndex`,
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (retired on 2026-11-19, PR #557; `disposalMonthIndex`, `reviewMonthIndex`,
 > `resolveInvestmentAccountId`, `investmentCashAssetId`, a revision that keeps a new sale's month) **and NOVE-24**
 > (`OperatingPlan`, `operatingPlanOf`, `reconcileOperatingPlan`, `OperatingPlanFacts`, the page «Il piano
 > operativo», the absence row on «Applica»). Third of the five specs of «dal Consulente al piano di accumulo, in un
 > clic»: the click. It removes NOVE-21's window «Dal Consulente» and the optimizer from this path.
-> Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c. Executes decisions 67, 71, 72, 73, 74,
+> Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c (those into the files NOVE-23 changed re-pointed to `develop` @ 875f4882 at its retirement, 2026-11-19). Executes decisions 67, 71, 72, 73, 74,
 > 76, 77, 79, 80, 81, 82, 94, 96, 97, 98 (README.md § 3); overturns decision 27, NOVE-21's (retired on 2026-11-19, PR #553) optimizer seed (`buildHandoffSeed`) and its rule of no seeded sale, and
 > the index's choice p (the one-line warning «a plan is active» on «Applica»: the click now revises that plan).
 
@@ -22,10 +22,10 @@ then the three-step editor, then «Attiva piano». The owner (2026-11-18): «sol
 instrument in a class without sub-targets starts at 0 % (decision 58; doc/guide/accumulo.md § Dal Consulente).
 
 **No code can create a plan without the editor.** `createDraftPlan` then `activatePlan`
-(`lib/services/accumulationPlanService.ts:141`, `:210`) are called only from the dialog
-(`components/allocation/AccumulationPlanDialog.tsx:646-692`), which also owns the gate
-(`validateDraftAgainstAssets` is called by `revisePlan` alone, `:393-420`), the model's write (`finishWithModel`,
-`:634-645`) and the empty draft (`emptyDraft`, `:223-240`).
+(`lib/services/accumulationPlanService.ts:141`, `:212`) are called only from the dialog
+(`components/allocation/AccumulationPlanDialog.tsx:671-717`), which also owns the gate
+(`validateDraftAgainstAssets` is called by `revisePlan` alone, `:401-432`), the model's write (`finishWithModel`,
+`:659-670`) and the empty draft (`emptyDraft`, `:226-245`).
 
 **An instrument is created only by a form.** `createAsset` (`lib/services/assetService.ts:130-209`) accepts any
 `AssetFormData`, but the price is fetched by a private function of the dialog (`fetchMarketPrice`,
@@ -145,16 +145,16 @@ first nor revise the second.
 
 `AccumulationPlan` and `AccumulationPlanDraft` gain `advisorNotes?: string[]` (schema:
 `z.array(z.string().max(400)).max(40).optional()`); `docToAccumulationPlan` maps it; `createDraftPlan` writes it
-when defined; `PlanRevisionInput` (`lib/utils/accumulationPlanUtils.ts:461`) gains `advisorNotes?: string[]` and
+when defined; `PlanRevisionInput` (`lib/utils/accumulationPlanUtils.ts:530`) gains `advisorNotes?: string[]` and
 `revisePlan` writes it when the input names it (an input without the key leaves the stored notes: today's editor
 keeps them through a revision; NOVE-26 clears them, choice ad).
 
-**`updateDraftPlan` replaces the draft WHOLE** (`lib/services/accumulationPlanService.ts:163-192`): the three
+**`updateDraftPlan` replaces the draft WHOLE** (`lib/services/accumulationPlanService.ts:164-194`): the three
 optional fields of a draft — `reviewMonthIndex` (NOVE-23), `advisorNotes`, `optimizerSnapshot` — are written when
 the new draft defines them and CLEARED with `deleteField()` when it does not (today `removeUndefinedDeep` drops an
 absent `optimizerSnapshot` from the patch, so the old one survives). A replaced draft keeps nothing of the plan it
 replaces. So that the editor's «Salva bozza» on an existing draft loses nothing, `draftFromPlan`
-(`components/allocation/AccumulationPlanDialog.tsx:242-262`) carries the three fields from the plan into the draft
+(`components/allocation/AccumulationPlanDialog.tsx:247-268`) carries the three fields from the plan into the draft
 it edits.
 
 ### 4.2 The quote with its time (`lib/services/yahooFinanceService.ts`, `app/api/prices/quote/route.ts`)
@@ -450,7 +450,7 @@ export async function createAndActivatePlan(input: CreateAndActivateInput): Prom
 ```
 
 **The gate learns a missing account.** `validateDraftAgainstAssets` today skips a source account that is not
-among the assets (`lib/utils/accumulationPlanSchema.ts:193-201`: `source_not_cash` fires only on an asset that
+among the assets (`lib/utils/accumulationPlanSchema.ts:203-211`: `source_not_cash` fires only on an asset that
 EXISTS and is not cash), so a plan could be written on an account deleted a minute before. It gains the issue
 `source_missing` — a `liquidity.sourceCashAssetIds` id absent from `assetsById` — with `describeDraftIssue({ code:
 'source_missing' })` = «Un conto del piano non c'è più: scegli di nuovo da quale conto comprare.»
@@ -580,10 +580,10 @@ sentence is not stored: on a reload Accumulo's own «superato» verdict tells it
   - from `lib/utils/allocationAdviceHandoff.ts`: `buildHandoffSeed`, `findKeptSales`, `handoffCriteria` (`:111`,
     read by the seed alone) and the optimizer imports; the module keeps `planConsulenteHandoff` and its matchers
     (NOVE-24's facts read them) and its header comment is rewritten to say so;
-  - from `lib/utils/accumulationNarrative.ts` every export of the «Dal Consulente» block (`:1403-1463`):
+  - from `lib/utils/accumulationNarrative.ts` every export of the «Dal Consulente» block (`:1451-1511`):
     `HANDOFF_EYEBROW`, `HANDOFF_TITLE`, `HANDOFF_NO_TICKER`, `HANDOFF_CREATED_PENDING`, `describeHandoffZero`,
     `describeHandoffExtra`, `describeHandoffUnnamed`, `describeHandoffNotBuyable`, `describeHandoffReading`,
-    `describeKeptSales`, with the type import of `ConsulenteHandoffPlan` / `HandoffSeedOutcome` (`:26`);
+    `describeKeptSales`, with the type import of `ConsulenteHandoffPlan` / `HandoffSeedOutcome` (`:27`);
   - from `lib/utils/allocationAdviceDocument.ts`: `CONSULENTE_HANDOFF_HREF`, `applyHandoffOf`,
     `handoffProposalOf`, `ApplyHandoff`;
   - `ConsulenteBook.tsx`'s hand-off link (its two imports, `:36-37`, and the `handoff === 'offer'` button,
@@ -596,7 +596,7 @@ sentence is not stored: on a reload Accumulo's own «superato» verdict tells it
     `__tests__/allocationAdviceDocument.test.ts`; the hand-off and active-plan-note cases of
     `__tests__/consulenteBook.test.tsx` (`:22-23`, `:369-420`).
 - `AssetDialog`'s `prefill` prop is deleted with its cases in `__tests__/assetDialogCreateEmpty.test.tsx:93`
-  (its one caller was `ConsulenteHandoff.tsx:85`); the TYPE `AssetPrefill` stays — the operating plan's legend
+  (its one caller was `ConsulenteHandoff.tsx:87`); the TYPE `AssetPrefill` stays — the operating plan's legend
   carries it.
 - The editor (`AccumulationPlanDialog.tsx`), alive until NOVE-26: `draftFromPlan` carries `reviewMonthIndex`,
   `advisorNotes` and `optimizerSnapshot` (§ 4.1), so a draft the click made and the editor saves again keeps its
