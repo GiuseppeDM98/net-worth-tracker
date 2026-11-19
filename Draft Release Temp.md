@@ -72,6 +72,7 @@
 
 - **Allocazione › Accumulo — l'avviso della riserva** — Fixed an error the browser reported on «Questo mese» when an active plan starts with your cash below its reserve: the warning was a paragraph inside a paragraph.
 - **Cashflow › Dividendi — la cedola indicizzata del giorno** — Fixed the «Imposta il dato d'inflazione» banner disappearing on the very day an inflation-linked coupon is paid: a provisional coupon now stays in the banner through its payment day, by the Italian calendar.
+- **Cashflow › Dividendi — lo strumento dopo un rifiuto** — Fixed the instrument field ignoring what you type right after the form refused an incomplete submit: the field it brings back into focus now opens its list as you type «BTP».
 
 - **Tasso di risparmio — Panoramica · Assistente · Cashflow · Analisi · Hall of Fame · PDF · email** — Fixed a month with almost no income printing an absurd savings rate («Hai messo da parte il −16567% delle entrate finora»): below −100%, or with spending and no income, the app now speaks in euros, as in «Finora hai messo da parte −497 €: le spese superano le entrate», and the month's bar on «Risparmio nel tempo» no longer squashes the others. The twelve-month average now weighs each month by its income («In media il 33% su 10 mesi misurabili»), a negative rate keeps its minus everywhere, the Hall of Fame included, and the article follows the figure («l'81%», «Stipendio copre l'86,1%», where it read «il 81%»).
 

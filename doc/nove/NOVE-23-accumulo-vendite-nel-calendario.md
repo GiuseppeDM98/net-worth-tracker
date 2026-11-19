@@ -1,6 +1,6 @@
 # NOVE-23 — Accumulo: a sale's month in the calendar, the review month, the account for the investments
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-16, NOVE-17, NOVE-18 (retired) and on NOVE-21's retirement**
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-16, NOVE-17, NOVE-18 (retired) and on NOVE-21's retirement** (retired on 2026-11-19, PR #553)
 > (the plan document, `computeUsableLiquidity`, `scheduleInstallments`, `buildRevisedPlan`, the matcher, the
 > editor's sales). First of the five specs of «dal Consulente al piano di accumulo, in un clic» (owner, 2026-11-18):
 > **23 → 24 → 25 → 22 → 26**. It changes the ENGINE and one setting, nothing of the Consulente: NOVE-24 writes the

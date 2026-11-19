@@ -311,7 +311,7 @@ export interface PlanPositionLike {
 
 /**
  * The plan's weights as the model's rows: each position is one row (the buyer carries the weight,
- * a group keeps its members), rescaled to Σ = 100 with the model's own rule. A position at 0 is left out.
+ * a group keeps its members), rescaled to Σ = 100 with the model's own rule. A position at 0 is left out unless held (2026-11-18).
  */
 export function planPositionsToModelWeights(
   positions: PlanPositionLike[],

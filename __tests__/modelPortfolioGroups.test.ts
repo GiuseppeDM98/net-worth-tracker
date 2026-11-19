@@ -165,8 +165,8 @@ describe('the plan becomes the model', () => {
     ]);
   });
 
-  // Mutation: the `targetPercentage > 0` filter alone → the held row leaves the model → red (phase F of NOVE-21,
-  // owner 2026-11-18: a held instrument out of the model left the base, «Oggi» read a weight several times its share).
+  // Mutation: the `targetPercentage > 0` filter alone → the held row leaves the model → red (the guided tour of the
+  // Consulente's hand-off, owner 2026-11-18: a held instrument out of the model left the base, «Oggi» read a weight several times its share).
   it('a HELD position at 0 enters the model at 0, so it stays in the base; one never bought stays out', () => {
     const OLD = makeAsset('ETFVECCHIO', { quantity: 5 });
     const NEVER = makeAsset('ETFMAI', { quantity: 0 });

@@ -148,6 +148,9 @@ export function SearchableCombobox({
   };
 
   const handleFocus = () => {
+    // A blur followed by a focus inside the delay below (a dialog's refused submit focuses the
+    // field back at once) must not close it afterwards (2026-11-19, __tests__/searchableComboboxRefocus.test.tsx).
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     setIsFocused(true);
     setIsDropdownOpen(true);
   };

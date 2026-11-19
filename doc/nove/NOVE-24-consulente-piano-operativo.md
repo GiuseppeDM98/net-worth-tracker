@@ -1,7 +1,7 @@
 # NOVE-24 — The Consulente's «Piano» stage: the operating plan, its data and its page
 
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (a sale's month counts, `reviewMonthIndex`,
-> `investmentCashAssetId`, `disposalMonthIndex`) and on NOVE-21's retirement (`planConsulenteHandoff`, the PIANO DI
+> `investmentCashAssetId`, `disposalMonthIndex`) and on NOVE-21's retirement (retired on 2026-11-19, PR #553) (`planConsulenteHandoff`, the PIANO DI
 > ACCUMULO block). Second of the five specs of «dal Consulente al piano di accumulo, in un clic»: this one makes
 > the Consulente WRITE the plan — what to sell and how much, when, what to buy and in which quotas, when to look
 > again — as ONE structured object, and shows it in the report. It creates no plan of accumulation: NOVE-25's click
@@ -16,16 +16,16 @@
 esatto lo calcola l'app dopo «Applica» […]: niente tabelle di rate né quote mensili per strumento»
 (`lib/server/allocationAdvice/prompts.ts:460`, pinned by `__tests__/allocationAdvicePrompts.test.ts:500-510`); the
 strategy's section 5 gives «la rata mensile come ordine di grandezza» (`:159`). The plan the owner then gets is the
-optimizer's (`buildHandoffSeed`, `lib/utils/allocationAdviceHandoff.ts:130-209`): quotas no one explained, no sale,
+optimizer's (`buildHandoffSeed`, `lib/utils/allocationAdviceHandoff.ts:130-211`): quotas no one explained, no sale,
 no month.
 
 **No stage has what a plan needs.** The strategy reads every data block and writes before the instruments exist;
-the review knows the instruments and reads NO data block (`run.ts:398`, «The review reads no data block…»): it sees
+the review knows the instruments and reads no portfolio data block, only PIANO DI ACCUMULO (`run.ts:398`, «The review reads no portfolio data block…»): it sees
 no quantity, no price, no tax, no cash. Neither can write «vendi 20 quote del fondo X al terzo mese».
 
 **The model has no handle on an instrument.** A proposal names instruments by text (`subTargets[].instrument`,
 «nome e ISIN»); `planConsulenteHandoff` re-joins them by name, ticker, ISIN or sleeve
-(`allocationAdviceHandoff.ts:57-128`). A plan with a row per instrument needs a key that cannot be misspelt.
+(`allocationAdviceHandoff.ts:57-103`). A plan with a row per instrument needs a key that cannot be misspelt.
 
 **One ticker, on the exchange the user named, is not the ticker that updates.** The instruments contract asks for
 instruments «negoziabili sulla borsa indicata dall'utente» with one `ticker` (`prompts.ts:406-422`,
