@@ -226,9 +226,9 @@ Also: the twelve tooltips of § 1 row 10 — `GoalProjectionChart.tsx:75` `borde
 - **Storico**: `history/tiles/DriverTile.tsx:139`; `RaddoppiTile.tsx:100`, `:108`.
 - **Analisi**: `cashflow/ConfrontoAnnualeSection.tsx:123`, `:126`.
 - **Allocazione and Accumulo**: `ActionChip.tsx:37`; `pr488:` `TargetTick.tsx:70`, `:72` (`:50`, `:52` @ b841cbd7);
-  `tiles/EsposizioneTile.tsx:92`; `AccumulationPlanDialog.tsx:1455`; `OptimizerReport.tsx:108`, `:126`, `:128`;
-  `tiles/PortafoglioModelloTile.tsx:222`, `:229`, `:230`; `tiles/QuestoMeseTile.tsx:828`;
-  `tiles/accumuloShared.tsx:37` (`CHIP_BASE`).
+  `tiles/EsposizioneTile.tsx:92`; `AccumulationPlanDialog.tsx:1518`; `OptimizerReport.tsx:108`, `:126`, `:128`;
+  `tiles/PortafoglioModelloTile.tsx:225`, `:232`, `:233`; `tiles/QuestoMeseTile.tsx:844`;
+  `tiles/accumuloShared.tsx:38` (`CHIP_BASE`).
 - **Previdenza**: `pension/tiles/AnnoFiscaleTile.tsx:89`, `:96`.
 - **FIRE**: `fire-simulations/tiles/TraguardoTile.tsx:93`, `:102`; `coast/tiles/CoastTraguardoTile.tsx:73`, `:82`;
   `monte-carlo/tiles/ScenariConfrontoTile.tsx:60`, `:61`; `goals/tiles/ObiettiviTile.tsx:73`, `:80`.
@@ -252,7 +252,7 @@ They stay as they are (each read on the code): the dots (`goals/tiles/ObiettiviT
 `settings/page.tsx:458`, `EvoluzioneTile.tsx:215`, `AspettoTab.tsx:167`, `CompactExpenseRow.tsx:89`, `:100`,
 `TransactionFeed.tsx:74`, `GoalsDettaglio.tsx:80`, `AssegnazioniTile.tsx:63`, `:96`, `MilestoneTile.tsx:47`, `:52`,
 `CoastIpotesi.tsx:126`, `FireParametri.tsx:122`, `AfflussiTile.tsx:58`, `UnderwaterDrawdownChart.tsx:37`,
-`SpeseTab.tsx:133`, `:137`, the category dots of `CategoryDeleteConfirmDialog.tsx:421`, `CategoryMoveDialog.tsx:332`,
+`SpeseTab.tsx:134`, `:138`, the category dots of `CategoryDeleteConfirmDialog.tsx:421`, `CategoryMoveDialog.tsx:332`,
 `:355`), the knob `pr488:TargetTick.tsx:91`, the spinners (`GeneraleTab.tsx:711`, `RendimentoTile.tsx:148`), the count
 badge (`MobileFiltersDrawer.tsx:161`; the Assistente's `CountDot` is gone with NOVE-15), the numbered circles (`CoastDettaglio.tsx:91`,
 `CondivisioneTab.tsx:38`), the colour swatches (`CostCenterDialog.tsx:231`, `:245`, `:254`,
@@ -392,14 +392,14 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
   `DividendDialog`, `DividendRecordDetailsDialog`, `InflationRateDialog`, `CategoryMoveDialog`, `SeriesDeleteDialog`,
   `UnlinkSeriesDialog`, `BudgetItemDialog`, `AssetAssignmentDialog.tsx:193`, `:256`, `AssistantThreadList.tsx:96`,
   `:105`, `:201`, `EntityDossier.tsx:257`, `pensionStyles.ts`, and `pr488:` `AccumulationCalendarDialog.tsx:220`,
-  `AccumulationPlanDialog.tsx:954`, `:1323`, `:1380`, `:1384`, `:1653`, `IdealCompositionDialog.tsx:377`,
-  `OptimizerPanel.tsx:162`, `QuestoMeseTile.tsx:562`, `:578`, `:688`, `:791`.
+  `AccumulationPlanDialog.tsx:986`, `:1372`, `:1429`, `:1433`, `:1716`, `IdealCompositionDialog.tsx:377`,
+  `OptimizerPanel.tsx:162`, `QuestoMeseTile.tsx:576`, `:592`, `:702`, `:807`.
 - `CategoryManagementDialog.tsx:205` `rounded-2xl`; `CategoryDeleteConfirmDialog.tsx:391`, `CategoryMoveDialog.tsx:304`
   in-content lists `rounded-md`; `AnalisiPeriodControls.tsx:82` `max-sm:rounded-2xl`; the disclosures on the ground
   (`DettaglioDisclosure.tsx:67-73`, `ConfrontoDisclosure.tsx:91`, `PerformanceDettaglio.tsx:294`, NOVE-12 K1).
 - `AssistantMemoryPanel.tsx:48` sub-tiles are `Tile`s (cap, shadow by NOVE-11). Accumulo: the tiles are `Tile`s;
-  the five dialogs (`pr488:` `AccumulationCalendarDialog.tsx:127`,
-  `AccumulationPlanDialog.tsx:781`, `IdealCompositionDialog.tsx:375`, `ModelEditDialog.tsx:107`,
+  the five dialogs (`pr488:` `AccumulationCalendarDialog.tsx:128`,
+  `AccumulationPlanDialog.tsx:810`, `IdealCompositionDialog.tsx:375`, `ModelEditDialog.tsx:107`,
   `ObiettiviDialog.tsx:141`) and NOVE-15's two Assistente modals are `ResponsiveModal`s: § 4.2.
 - `ConsulenteReport.tsx:133` a generated `Tile`; `ConsulenteBookPages.tsx:150` chip `rounded-md`; `ChoiceList`'s frame
   (NOVE-19) on Compravendita and the Consulente.

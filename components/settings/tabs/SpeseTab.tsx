@@ -434,7 +434,7 @@ export function SpeseTab({
           desktop the wrapper dissolves (`contents`) and each tile is a grid cell; from desktop
           they stack at their natural height beside the taller import tile. */}
       <div className="contents desktop:col-span-5 desktop:flex desktop:flex-col desktop:gap-3">
-      {/* Conti di default (moved here from Preferenze: they act in the expense dialog) */}
+      {/* Conti di default (moved here from Preferenze): debit and credit act in the expense dialog, the investment account (2026-11-19) in a new plan of accumulation */}
       <div className={TILE_CELL_CLASS}>
         {accountsState === 'failed' ? (
           <ErrorNotice

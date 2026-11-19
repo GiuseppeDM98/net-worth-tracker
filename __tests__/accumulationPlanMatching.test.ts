@@ -286,7 +286,7 @@ describe('matchPlanExecutions — disposals', () => {
     expect(lineStates['disposal:eimi']).toBe('todo');
   });
 
-  it('is late once past month 1 with no match (a disposal belongs to month 1)', () => {
+  it('is late once past month 1 with no match (a disposal with no month belongs to month 1)', () => {
     const plan = makePlan({ disposals: [disposal] });
     const laterToday = new Date('2026-12-01T10:00:00Z'); // installment 1 → past, currentIndex > 1
     const { lineStates } = matchPlanExecutions(plan, [], laterToday);

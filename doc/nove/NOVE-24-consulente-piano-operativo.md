@@ -1,12 +1,12 @@
 # NOVE-24 — The Consulente's «Piano» stage: the operating plan, its data and its page
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (a sale's month counts, `reviewMonthIndex`,
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (retired on 2026-11-19, PR #557; a sale's month counts, `reviewMonthIndex`,
 > `investmentCashAssetId`, `disposalMonthIndex`) and on NOVE-21's retirement (retired on 2026-11-19, PR #553) (`planConsulenteHandoff`, the PIANO DI
 > ACCUMULO block). Second of the five specs of «dal Consulente al piano di accumulo, in un clic»: this one makes
 > the Consulente WRITE the plan — what to sell and how much, when, what to buy and in which quotas, when to look
 > again — as ONE structured object, and shows it in the report. It creates no plan of accumulation: NOVE-25's click
 > does, from this object. Between the two, NOVE-21's hand-off («Dal Consulente») stays as it is.
-> Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c. Executes decisions 67, 69, 70, 74, 78,
+> Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c (those into the files NOVE-23 changed re-pointed to `develop` @ 875f4882 at its retirement, 2026-11-19). Executes decisions 67, 69, 70, 74, 78,
 > 81, 82, 84, 85 (README.md § 3) and tells the model decision 93; overturns decision 28 and README § 10's «no
 > section with the Consulente's own figures».
 
@@ -415,7 +415,7 @@ async function runPlan(document: AllocationAdviceDocument, onStage: (stage: Allo
    - `reserveEur = resolvePlanReserve(assets, buildTargetsFromProposal(report.proposal), compareAllocations, {
      valueOf: calculateAssetValue, priceOf: unitPriceEur }, 0, accountId ? [accountId] : undefined).reserveEur` —
      the reserve the click will use (NOVE-25's K7). **`resolvePlanReserve` gains here its optional last parameter
-     `sourceIds?: readonly string[]`** (`lib/utils/accumulationPlanUtils.ts:777`): when given, `accountsEur` inside
+     `sourceIds?: readonly string[]`** (`lib/utils/accumulationPlanUtils.ts:861`): when given, `accountsEur` inside
      it sums those accounts only, so the cash on the other accounts counts as cash outside the plan (`otherCashEur`);
      absent, the function is today's (U16). `compareAllocations` is imported from
      `lib/services/assetAllocationService.ts`, as `app/api/portfolio/snapshot/route.ts:12` already imports that

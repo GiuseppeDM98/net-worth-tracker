@@ -1,32 +1,32 @@
 # NOVE-22 — A plan of accumulation by hand: the guided path that creates it
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (`disposalMonthIndex`, `sale_month_out`,
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (retired on 2026-11-19, PR #557; `disposalMonthIndex`, `sale_month_out`,
 > `resolveInvestmentAccountId`, `listSaleSteps`, `removeOwnerPlans`), **NOVE-24** (`resolvePlanReserve`'s
 > `sourceIds`) **and NOVE-25** (`createAndActivatePlan`, `resolveEffectiveTargets`, `lib/utils/accumuloCopy.ts`,
 > `updateDraftPlan` replacing a draft whole, the gate's `source_missing`, the editor freed of the hand-off). Fourth
 > of the five specs of «dal Consulente al piano di accumulo, in un clic»: who builds a plan WITHOUT the Consulente
 > gets a path of one question per screen with ONE «Conferma», as Compravendita. The editor
 > (`AccumulationPlanDialog`) stays for «Rivedi il piano» only; NOVE-26 moves that too and deletes it.
-> Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c. Executes decisions 86, 88, 89, 90, 91,
+> Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c (those into the files NOVE-23 changed re-pointed to `develop` @ 875f4882 at its retirement, 2026-11-19). Executes decisions 86, 88, 89, 90, 91,
 > the half of 87 that is «create» and «Modifica», and 94 and 98 on its screens (README.md § 3).
 
 ## 1. The problem today (evidence on the code)
 
-**A plan is created in a three-step modal of 1.747 lines.** `components/allocation/AccumulationPlanDialog.tsx`:
-step 1 (`:834`) asks name, source accounts, reserve, monthly inflow, duration and start month in one grid; step 2
-(`:1025`) is «Parti da» with four sources (`startFrom`, `:488-524`), the weights' table, «Nel piano / Da vendere»,
-grouping, «Sostituisci», «+ Nuovo asset», the optimizer's panel; step 3 (`:1418`) the preview. The owner
+**A plan is created in a three-step modal of 1.809 lines (2026-11-19, after NOVE-23).** `components/allocation/AccumulationPlanDialog.tsx`:
+step 1 (`:866`) asks name, source accounts, reserve, monthly inflow, duration and start month in one grid; step 2
+(`:1065`) is «Parti da» with four sources (`startFrom`, `:493-529`), the weights' table, «Nel piano / Da vendere»,
+grouping, «Sostituisci», «+ Nuovo asset», the optimizer's panel; step 3 (`:1473`) the preview. The owner
 (2026-11-17, on the model's tour): the PAC is complex to set up. (2026-11-19): «deve essere il più semplice
 possibile».
 
 **Three buttons end the same form.** «Salva bozza», «Attiva piano» (`handleSaveDraft`, `handleActivate`,
-`:666-692`) and, on a draft, «Modifica» again (`components/allocation/tiles/QuestoMeseTile.tsx:435-440`): a draft is
+`:666-692`) and, on a draft, «Modifica» again (`components/allocation/tiles/QuestoMeseTile.tsx:449-454`): a draft is
 a state the user must understand and come back to.
 
 **The editor is opened from four places with different props**: «Crea piano»
-(`components/allocation/tiles/AccumuloVuotoTile.tsx:150-176`), «Crea un PAC con questi pesi»
-(`components/allocation/tiles/PortafoglioModelloTile.tsx:325-349`, `seedDraft`), «Modifica» of a draft
-(`QuestoMeseTile.tsx:346-362`) and «Rivedi il piano» (`:365-383`).
+(`components/allocation/tiles/AccumuloVuotoTile.tsx:152-179`), «Crea un PAC con questi pesi»
+(`components/allocation/tiles/PortafoglioModelloTile.tsx:328-353`, `seedDraft`), «Modifica» of a draft
+(`QuestoMeseTile.tsx:358-375`) and «Rivedi il piano» (`:378-397`).
 
 **The app already has the shape that fits**: Compravendita and the Consulente are routes with one 720px card, one
 question per screen, «Indietro», the draft on the browser, a summary and one «Conferma»
@@ -270,7 +270,7 @@ sale.quantity ?? undefined, monthIndex: sale.month, status: 'planned', estimated
 - **`seedPlanPathPositions`** (the editor's own helpers, unchanged): `sold` = the assets of `answers.sales` with
   `quantity: null`; `base = seedPositionsFromAssets(assets, deps.valueOf)` WITHOUT every position whose only
   member is in `sold` (`applyWeightsToPositions` and `applyModelToPositions` use `sold` only to not ADD a
-  position, `lib/utils/accumulationPlanUtils.ts:1229-1282`: a row already in the base would stay); `model` →
+  position, `lib/utils/accumulationPlanUtils.ts:1318-1371`: a row already in the base would stay); `model` →
   `applyModelToPositions(base, model, sold, labelOf)`; `today` → `applyWeightsToPositions(base,
   marketWeights(<the assets that are members of base's positions>, deps), sold, labelOf)` — the weights among
   the instruments that stay; `zero` → `base` with every quota 0; `seed` → `answers.seed.positions`; `draft` → the
@@ -293,13 +293,13 @@ sale.quantity ?? undefined, monthIndex: sale.month, status: 'planned', estimated
   when the asset is in `listAddableAssets(assets, { positions, disposals }, tradedAssetIds)`, `label` its name;
   with `created: true` (the `onCreated` of `AssetDialog`, whose asset is not in `context.assets` until the query
   is read again) the row is added at once with `ACCUMULO_STEP2_PENDING_ASSET_LABEL`, as the editor does
-  (`AccumulationPlanDialog.tsx:1626-1640`), the host invalidates `assets`, and `reconcilePlanPathAnswers` (run by
+  (`AccumulationPlanDialog.tsx:1689-1703`), the host invalidates `assets`, and `reconcilePlanPathAnswers` (run by
   the host when the assets change) replaces a pending label with the asset's name.
 - **`adopt`**: sets `answers.serverDraftId`, nothing else.
 - **`resolvePathReserveEur`**: `answers.reserveEur ?? resolvePlanReserve(assets, targets, compare, deps,
   planCashFundSaleEur(<the sales as disposals>, assetsById, assets), answers.sourceIds).reserveEur` (the
   `sourceIds` parameter of NOVE-24).
-- **`planPathTodayWeights`**: the editor's «oggi» (`AccumulationPlanDialog.tsx:443-453`), by `deps.valueOf`.
+- **`planPathTodayWeights`**: the editor's «oggi» (`AccumulationPlanDialog.tsx:455-465`), by `deps.valueOf`.
 - **`describePlanPathBlock`** (the sentence that disables «Avanti»; null = free to go):
 
 | Screen | Block | Sentence |
@@ -375,8 +375,8 @@ screen, `PianoScreens.tsx` the bodies. «Ricomincia» dispatches `reset` with `i
 
 | Screen | Theme · question | Body |
 | --- | --- | --- |
-| partenza | «Partenza» · «Da dove partono le quote?» | `ChoiceList` single: «Dal portafoglio modello» (only with a model that has weights — `Object.keys(modelWeightMap(model)).length > 0`, the editor's rule, `AccumulationPlanDialog.tsx:321`; under it the tile's «superato» sentence when `isModelStale`), «Dai pesi di oggi», «Da zero: le scrivo io»; with a seed, first and chosen, «Dai pesi che hai appena calcolato»; with a continued draft, first and chosen, «Dalla bozza che avevi». Help: «Puoi cambiare ogni quota più avanti.» Changing a start after quotas were typed shows «Le quote che avevi scritto vengono sostituite.» |
-| versamento | «Versamento» · «Quanto versi ogni mese?» | `NumberField` (€); under it, when `suggestMonthlyInflow(median?.medianEur)` is not null (`lib/utils/accumulationNarrative.ts:1309-1317`: the editor's rule — a median above 0, rounded down to 10), the editor's sentence `describeSuggestedInflow(suggestion, median.months)` and the button «Usa {suggestion €}» (`variant="outline"`). Help: «Anche 0: il piano investe allora solo la liquidità che hai già.» |
+| partenza | «Partenza» · «Da dove partono le quote?» | `ChoiceList` single: «Dal portafoglio modello» (only with a model that has weights — `Object.keys(modelWeightMap(model)).length > 0`, the editor's rule, `AccumulationPlanDialog.tsx:328`; under it the tile's «superato» sentence when `isModelStale`), «Dai pesi di oggi», «Da zero: le scrivo io»; with a seed, first and chosen, «Dai pesi che hai appena calcolato»; with a continued draft, first and chosen, «Dalla bozza che avevi». Help: «Puoi cambiare ogni quota più avanti.» Changing a start after quotas were typed shows «Le quote che avevi scritto vengono sostituite.» |
+| versamento | «Versamento» · «Quanto versi ogni mese?» | `NumberField` (€); under it, when `suggestMonthlyInflow(median?.medianEur)` is not null (`lib/utils/accumulationNarrative.ts:1357-1365`: the editor's rule — a median above 0, rounded down to 10), the editor's sentence `describeSuggestedInflow(suggestion, median.months)` and the button «Usa {suggestion €}» (`variant="outline"`). Help: «Anche 0: il piano investe allora solo la liquidità che hai già.» |
 | durata | «Durata» · «Per quanti mesi?» | `NumberField` (integer) and the chips 6 · 12 · 24 · 36 (`SegmentedPill`). Help: «La prima rata è a {mese prossimo}.» |
 | conto | «Conto» · «Da quale conto escono i soldi?» | one `Checkbox` row per `isPlanSourceAccount` asset: name and balance (mono). Help: «Il piano compra con la liquidità di questi conti e con quello che versi.» |
 | riserva | «Riserva» · «Quanto deve restare sul conto?» | `NumberField` (€) holding `resolvePathReserveEur`; under it «La tua allocazione chiede {€} di liquidità; {€} sono già altrove.» (the `quotaEur` and `otherCashEur` of `resolvePlanReserve`) and, when typed, the link-button «Torna a {€}» (clears the override). Help: «Il piano non scende mai sotto questa cifra: se oggi sei sotto, prima la ricostituisce.» |
@@ -422,23 +422,23 @@ A failure (`status`, tone `failure`):
 
 ### 4.5 The entry points
 
-- `AccumuloVuotoTile.tsx:150-176`: «Crea piano» is a `Button asChild` → `Link` to `/dashboard/allocation/piano`
+- `AccumuloVuotoTile.tsx:152-179`: «Crea piano» is a `Button asChild` → `Link` to `/dashboard/allocation/piano`
   when it is allowed; in demo, or without targets (the condition of § 4.3, which replaces today's `!targets`:
   `AccumuloTab` passes `hasTargets`), it stays a disabled `Button` with the same label — a link ignores
   `disabled`, so none is rendered. The `AccumulationPlanDialog`, its state and the props only it read
   (`targetLeverageRatio`, `idealAllocation`, `onAssetsChanged`, `reviewByIso`, `modelBasis`) leave the file and
   `AccumuloTab`'s call.
-- `PortafoglioModelloTile.tsx:325-349` (`onCreatePac(seed)`): writes `writeStoredJson(localStorage,
+- `PortafoglioModelloTile.tsx:328-353` (`onCreatePac(seed)`): writes `writeStoredJson(localStorage,
   planPathStorageKey(ownerId), seededPlanPathDraft(seed, investmentAccountId))` and
   `router.push('/dashboard/allocation/piano')` — `investmentAccountId` is a new prop, the value `AccumuloTab`
-  computes once (NOVE-23). The `View` `'pac'`, its dialog, `pacSeed` (`:124`) and the props only they read (`band`
+  computes once (NOVE-23). The `View` `'pac'`, its dialog, `pacSeed` (`:127`) and the props only they read (`band`
   `:78`, `reviewByIso` `:85`) leave the file and `AccumuloTab`'s call. When the browser already holds a draft the
   seed replaces it (the user just asked for these weights). With a draft open in Accumulo the path discards the
   seed for that draft (`restorePlanPathDraft`): the tile's button is offered, as today, only without an open plan.
-- `QuestoMeseTile.tsx` draft view (`:425-442`): «Modifica» becomes the link «Continua» to the path —
+- `QuestoMeseTile.tsx` draft view (`:439-456`): «Modifica» becomes the link «Continua» to the path —
   `ACCUMULO_ACTION_CONTINUE = 'Continua'` in `lib/utils/accumulationNarrative.ts`, in place of
-  `ACCUMULO_ACTION_EDIT` (`:159`, its one use, deleted); `planDialog` (`:346-362`) is deleted; «Attiva piano» and
-  «Elimina bozza» stay. `reviseDialog` (`:365-383`) stays.
+  `ACCUMULO_ACTION_EDIT` (`:164`, its one use, deleted); `planDialog` (`:358-375`) is deleted; «Attiva piano» and
+  «Elimina bozza» stay. `reviseDialog` (`:378-397`) stays.
 - `AccumulationPlanDialog.tsx`: untouched but for what NOVE-25 removed; from now on every caller passes `revise`.
   Its create-only branches are dead until NOVE-26 deletes the file — declared (§ 10).
 - `/dashboard/allocation?tab=accumulo`'s `PageTabBar` and the sidebar gain nothing: the path is reached from its
@@ -474,9 +474,10 @@ measured `initialJsGzKB` rounded up and `raisedBy: "new route (the plan's guided
 - **Tests that move** (edited on purpose): `__tests__/accumuloVuotoTile.test.tsx` (the button is a link),
   `__tests__/portafoglioModelloTile.test.tsx` (the seed goes to the storage); `e2e/accumulo.tablet.spec.ts:90`,
   `e2e/allocation.mobile.spec.ts:278` and `e2e/allocation.spec.ts:320` find «Crea piano» as `getByRole('link',
-  …)` (the 44px guard of `allocation.mobile` unchanged); in `e2e/accumulo.spec.ts` the ONE test that creates a
-  plan in the editor — NOVE-23's E2 (a sale in the 3rd month) — is deleted: this spec's E2 asserts the same on
-  the path, the calendar included; `e2e/accumulo.mobile.spec.ts` does not change. The helper `walkPlanPath(page,
+  …)` (the 44px guard of `allocation.mobile` unchanged); in `e2e/accumulo.spec.ts` the TWO tests that create a
+  plan in the editor — «Vendi a» il 3° mese and «Vendi quote» poi «Vendi a» il 4° mese (a partial sale keeps its month
+  when its quantity changes, owner 2026-11-19) — are deleted: this spec's E2 asserts both on the path, the calendar
+  included; `e2e/accumulo.mobile.spec.ts` does not change. The helper `walkPlanPath(page,
   answers)` in `e2e/accumuloFixture.ts` serves `e2e/accumulo.piano{,.mobile}.spec.ts`.
   `__tests__/accumulationPlanDialogSaleMonth.test.tsx` (NOVE-23) stays: the editor still revises, until NOVE-26.
 
@@ -558,7 +559,7 @@ step on the owner's production account beyond a look after the deploy: «Crea pi
 
 ## 9. Documentation
 
-- `doc/guide/accumulo.md` (157 lines): a new section «## Creare un piano: il percorso» after § Rules — the eight
+- `doc/guide/accumulo.md` (211 lines on 2026-11-19, after NOVE-23's retirement): a new section «## Creare un piano: il percorso» after § Rules — the eight
   screens, the blocks, the browser draft and its restore, «Conferma» (the month check, the failures), the entry
   points; what the path does NOT offer: groups by hand, «Sostituisci», «Ottimizzato». The bullets of § Rules that
   describe CREATING in the editor (the seed `:20`, the reserve `:29`, step 1 `:46` and `:67`, the model box

@@ -928,7 +928,7 @@ function classPointFromEntries(
  * executed buys/disposals move quantities as before, and the
  * plan's own cash moves too, instead of sitting untouched while the buy side grows the market base
  * out of nowhere. `cassa(m) = cassa₀ − Σ acquisti pianificati fino a m + E × m + Σ ricavi delle
- * vendite non eseguite (dal mese 1)`, split pro-rata over the LIVE balances of
+ * vendite non eseguite, ciascuna dal suo mese (absent = 1)`, split pro-rata over the LIVE balances of
  * `liquidity.sourceCashAssetIds` — never over the user's `allocationRole`: an `excluded` source
  * account is dropped by `compare()`'s market base regardless of its projected balance, so moving it
  * here changes nothing about the trajectory (verified). An `executed` line/disposal is skipped on

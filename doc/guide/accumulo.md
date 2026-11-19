@@ -64,15 +64,18 @@ weight, month by month, proposes the purchases and never writes a transaction on
   repeated at the top of step 3); the reserve note names the sales that refill it with the inflows
   (`listRefillSaleMonths`: «la ricostituiscono le entrate fino a gennaio e la vendita di febbraio»); step 3's reading
   and the panel count only the months that buy (`summarizeBuyingInstalments`: «10 rate: in media … ; la prima,
-  febbraio, …»). Step 2's «Al mese» stays the even average (decision 95). The matcher's `upcoming` state: a sale
+  febbraio, …»). Step 2's «Al mese» stays the even average, «Da comprare» ÷ the months (owner, 2026-11-19: the true
+  figures are the side panel's, the first instalment and the sale-step sentences). The matcher's `upcoming` state: a sale
   of a later month reads «In programma · feb 2027» with no «Registra»; a ledger sale made before it is «Da
   confermare», and «Ignora» brings it back to `upcoming`.
 - **The default source account** (owner, 2026-11-19): Impostazioni › Spese › «Conto per gli investimenti»
   (`AssetAllocationSettings.investmentCashAssetId`, doc/guide/impostazioni.md); `resolveInvestmentAccountId` ticks it
   on a new plan while it is still a plan source account (`isPlanSourceAccount`), and nothing when it is gone.
-- **The review month** (owner, 2026-11-19): the Consulente's «rivedi entro» is stored as `reviewMonthIndex`;
-  in that month «Questo mese» shows `ACCUMULO_REVIEW_DUE_NOTE` with «Rivedi il piano» (`isPlanReviewDue`), and a
-  revision saved in the month clears it; editing a draft keeps it (`draftFromPlan` copies it).
+- **The review month** (owner, 2026-11-19): a plan may carry `reviewMonthIndex`, the plan month the Consulente asks
+  to look at it again — no app path writes it yet on 2026-11-19 (the Consulente's operating plan is to); in that month
+  «Questo mese» shows `ACCUMULO_REVIEW_DUE_NOTE` with «Rivedi il piano» (`isPlanReviewDue`), and a revision saved in
+  the month hides the note (the field stays); editing a draft keeps it (`draftFromPlan` copies it), a revision keeps,
+  replaces or clears it (`PlanRevisionInput.reviewMonthIndex`: absent, a number, `null`).
 - **«Registra» opens `TransactionDialog` prefilled** from the planned line and links the transaction on save
   (`onCreated`); an instrument with no asset yet is created from «+ Nuovo asset» (`AssetDialog`, `createEmpty`).
 - **«Rivedi il piano»** rewrites the months from the first intact one; closed installments keep their lines
@@ -171,6 +174,15 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
   does not have yet, not a bug; below the reserve the months before it may be 0 € («Solo riserva»).
 - **The recalibration's cash ceiling never binds once the budgets come from `monthShares`** (2026-11-19): a guard no
   test turns red.
+- **A partial sale leaves the position's value from month 0, whatever its month** (2026-11-19, declared):
+  `resolvePositionStates` computes the totals once, on the portfolio as the plan will leave it; only the money's month
+  moves.
+- **A plan saved before 2026-11-19 keeps its stored instalments**: no migration (an absent `monthIndex` is month 1, an
+  absent `reviewMonthIndex` none); only a recalibration or a revision recomputes on the sale's month, and a plan whose
+  sales are all in month 1 recomputes to the same figures.
+- **What the sale's month does not do** (declared on 2026-11-19): the Calendario dialog has no row for the sales (a
+  lost link is recovered only by unlinking, in «Questo mese»); `reviewMonthIndex` has no control in the editor, and a hand
+  revision keeps it.
 - **Query key**: every write (create, revise, interrupt, reactivate, confirm) invalidates `queryKeys.accumulationPlans.all`,
   the one key the tab and the Piano's note both read.
 - **«Parti da»** seeds from today's tradable weights, typed targets or, when one is saved, the model portfolio (doc/guide/ottimizzatore.md); on a «superato» model the option stays and the tile's stale sentence shows under it.
