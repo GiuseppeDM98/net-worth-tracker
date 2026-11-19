@@ -857,19 +857,24 @@ export function resolveInvestmentAccountId(
   return asset && isPlanSourceAccount(asset) ? asset.id : null;
 }
 
-/** The reserve a new plan keeps on the cash accounts, from today's allocation: the quota, the cash outside the accounts. */
+/**
+ * The reserve a new plan keeps on the cash accounts, from today's allocation: the quota, the cash outside the accounts.
+ * `sourceIds` (2026-11-19) names the plan's accounts — the investment account alone, when set: the cash on the
+ * other accounts then counts as cash outside the plan (`otherCashEur`); absent, every source account is the plan's.
+ */
 export function resolvePlanReserve(
   allAssets: Asset[],
   targets: AssetAllocationTarget | null,
   compare: AllocationCompare,
   deps: PlanDeps,
-  cashFundSoldEur = 0
+  cashFundSoldEur = 0,
+  sourceIds?: readonly string[]
 ): { reserveEur: number; otherCashEur: number; quotaEur: number } {
   if (!targets) return { reserveEur: 0, otherCashEur: 0, quotaEur: 0 };
   const result = compare(allAssets, targets);
   const quotaEur = resolvePlanReserveEur(targets, result.marketValue);
   const accountsEur = allAssets
-    .filter(isPlanSourceAccount)
+    .filter((asset) => isPlanSourceAccount(asset) && (sourceIds === undefined || sourceIds.includes(asset.id)))
     .reduce((sum, asset) => sum + deps.valueOf(asset), 0);
   const { reserveEur, otherCashEur } = resolveAccountReserveEur({
     quotaEur,

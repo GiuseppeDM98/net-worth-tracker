@@ -154,7 +154,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   default (it used to carry only the email fields). `familyMembers` was missing from BOTH server mappers until
   2026-08-31 and there is no type error for it — an absent field is simply `undefined` server-side. **And an EIGHTH
   for the Assistente**: `fetchSettings` in `lib/services/assistantMonthContextService.ts`, narrow too (each new reader
-  adds its fields; Registra added its own in 2026-11).
+  adds its fields; Registra added its own in 2026-11), read since 2026-11-19 by the Consulente's plan stage too, which
+  added `investmentCashAssetId` and `idealAllocation` (doc/guide/consulente-piano.md).
   `pensionReturnStartMonth` joined it on 2026-10-14 (the email names the month's pension contributions only from
   there, doc/guide/email-pdf.md).
 - **Store a boolean explicitly, never derive it** from other fields. All feature toggles live in

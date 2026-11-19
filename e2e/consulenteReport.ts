@@ -11,10 +11,16 @@
  * status is `ready` after «Applica» with the targets written (2026-11-12: the hand-off's link).
  * `rememberHeld` / `restoreHeld` put back what the account held, or delete the document.
  *
+ * The operating plan (2026-11-19): `plant`'s `operatingPlan` option stores one on the report
+ * (`ready` with `fakeOperatingPlan`, built by `reconcileOperatingPlan` so the stored object is what
+ * the code would store, or `failed` with `FAKE_PLAN_ERROR`); `writeOperatingPlan` and
+ * `writeRevisedReport` are what the faked run route writes before it answers.
+ *
  * No run is started: every spec that reads a report fakes the run route (`installFakeRun`).
  */
 
 import { expect, type Page } from '@playwright/test';
+import { reconcileOperatingPlan, type OperatingPlan } from '../lib/utils/operatingPlan';
 
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 process.env.GCLOUD_PROJECT = 'demo-net-worth';
@@ -53,7 +59,69 @@ export const SEVEN_SECTIONS = [
 export const PRINTABLE_TITLES = ['In una frase', "L'allocazione proposta", 'Gli strumenti', 'Gli obiettivi', 'Casa, fondi pensione e illiquidi', 'Cosa fare adesso', 'Rischi e revisione', 'Il colloquio'];
 
 /** A literal document, every date a Timestamp; the answers and the proposal shaped by the schemas of lib/utils/allocationAdviceProposal.ts. */
-export async function plant(status: ReportStatus, variant: ReportVariant = 'headings') {
+export const FAKE_PLAN_ERROR = 'Piano finto non leggibile: ornitorinco.';
+
+/** An invented plan on the fixture's instruments, reconciled: 70 on «ETF ornitorinco» held, 30 on «ETF fenicottero breve» new. `marker` is its summary. */
+export function fakeOperatingPlan(marker: string): OperatingPlan {
+  const plan = reconcileOperatingPlan(
+    {
+      summary: marker,
+      monthlyInflowEur: 2000,
+      months: 12,
+      rows: [
+        { ref: 'S1', action: 'buy', targetPercentage: 70, reason: 'Il nucleo azionario.' },
+        { ref: 'N1', action: 'buy', targetPercentage: 30, reason: 'La parte che frena.' },
+      ],
+      reviewMonth: 6,
+      reviewReason: 'A metà strada.',
+      departures: [],
+    },
+    {
+      instruments: [
+        { ref: 'S1', kind: 'held', name: 'ETF ornitorinco', assetClass: 'equity', assetId: 'finto-ornitorinco' },
+        { ref: 'N1', kind: 'new', name: 'ETF fenicottero breve', assetClass: 'bonds' },
+      ],
+      held: { S1: { quantity: 100, priceEur: 100, valueEur: 10000, keep: false, tax: { kind: 'exempt' } } },
+    },
+  );
+  // Firestore takes no `undefined`: the plan as JSON.
+  return JSON.parse(JSON.stringify(plan)) as OperatingPlan;
+}
+
+/** The stored plan field, every date a Timestamp; `reportFinishedAt` the report's own. */
+function operatingPlanField(Timestamp: typeof import('firebase-admin/firestore').Timestamp, outcome: 'ready' | 'failed', reportFinishedAt: FirebaseFirestore.Timestamp, marker: string) {
+  const now = Timestamp.fromDate(new Date());
+  return outcome === 'ready'
+    ? { status: 'ready', plan: fakeOperatingPlan(marker), error: null, model: 'opus-finto', startedAt: now, finishedAt: now, reportFinishedAt }
+    : { status: 'failed', plan: null, error: FAKE_PLAN_ERROR, model: null, startedAt: now, finishedAt: now, reportFinishedAt };
+}
+
+/** What the faked plan stage writes: the plan on the report the document holds (the run's instant when it holds none). */
+export async function writeOperatingPlan(outcome: 'ready' | 'failed', marker: string) {
+  const { db, Timestamp } = await admin();
+  const ref = db.collection('allocationAdvice').doc(UID);
+  const snap = await ref.get();
+  const reportFinishedAt = (snap.get('report.finishedAt') as FirebaseFirestore.Timestamp | undefined) ?? Timestamp.fromDate(new Date());
+  await ref.set({ operatingPlan: operatingPlanField(Timestamp, outcome, reportFinishedAt, marker) }, { merge: true });
+}
+
+/** What the faked revise writes on a document that exists: a new report instant, the old plan dropped. */
+export async function writeRevisedReport() {
+  const { db, Timestamp } = await admin();
+  const ref = db.collection('allocationAdvice').doc(UID);
+  const snap = await ref.get();
+  if (!snap.exists || !snap.get('report')) return;
+  await ref.update({ 'report.finishedAt': Timestamp.fromDate(new Date()), operatingPlan: null });
+}
+
+/** The stored document's plan status, or null. */
+export async function storedOperatingPlanStatus(): Promise<string | null> {
+  const { db } = await admin();
+  const snap = await db.collection('allocationAdvice').doc(UID).get();
+  return (snap.get('operatingPlan.status') as string | undefined) ?? null;
+}
+
+export async function plant(status: ReportStatus, variant: ReportVariant = 'headings', options: { operatingPlan?: 'ready' | 'failed' } = {}) {
   const { db, Timestamp } = await admin();
   const now = Timestamp.fromDate(new Date());
   const answers = {
@@ -124,7 +192,8 @@ export async function plant(status: ReportStatus, variant: ReportVariant = 'head
       : status === 'failed'
         ? { ...base, status, stage: 'instruments', strategy, instruments: null, report: null, error: 'Ricerca finta interrotta: ornitorinco.' }
         : { ...base, status, stage: 'instruments', strategy, instruments: null, report: null, error: null };
-  await db.collection('allocationAdvice').doc(UID).set(document);
+  const operatingPlan = options.operatingPlan && document.report ? operatingPlanField(Timestamp, options.operatingPlan, now, 'Il piano piantato.') : null;
+  await db.collection('allocationAdvice').doc(UID).set({ ...document, operatingPlan });
 }
 
 let held: FirebaseFirestore.DocumentData | null = null;

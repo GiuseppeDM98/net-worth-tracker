@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The RUN's screen: the four stages as rows that light up in turn, the page's one live region
+ * The RUN's screen: the five stages (the operating plan's since 2026-11-19) as rows that light up in turn, the page's one live region
  * saying which is on, the rail's fills beside the card (2026-11-07). Presentational —
  * the stream and its state are `useConsulenteRun`, started by the gesture that asked for the
  * run; a drop of the connection leaves the document where the run was, and the query that

@@ -27,6 +27,7 @@ import {
   buildRegisteredLinePatch,
   proceedsOfDisposal,
   resolvePlanReserveEur,
+  resolvePlanReserve,
   resolveAccountReserveEur,
   planCashFundSaleEur,
   isPlanSourceAccount,
@@ -581,6 +582,23 @@ describe('the engine writes euros in cents', () => {
 
 // The reserve a new plan starts from is the allocation's cash quota (owner, 2026-11-17): the fixed
 // amount when the cash target is one, else its percentage of today's allocated base, up to the euro.
+// The plan's reserve on the investment account alone (2026-11-19): the cash on the other accounts is cash outside
+// the plan, so it lowers the reserve the plan's account keeps. Seen red with `sourceIds` ignored.
+describe('resolvePlanReserve — the source accounts', () => {
+  const A = makeAsset({ id: 'conto-a', name: 'Conto ornitorinco', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 10000 });
+  const B = makeAsset({ id: 'conto-b', name: 'Conto fenicottero', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 5000 });
+  const targets = { cash: { targetPercentage: 0, useFixedAmount: true, fixedAmount: 12000 } } as never;
+  const compare = (() => ({ marketValue: 100000, byAssetClass: { cash: { currentValue: 15000 } } })) as never;
+
+  it("without sourceIds every account is the plan's: the reserve is the whole quota", () => {
+    expect(resolvePlanReserve([A, B], targets, compare, deps)).toEqual({ reserveEur: 12000, otherCashEur: 0, quotaEur: 12000 });
+  });
+
+  it("with one account of two, the other account's cash lowers the reserve the plan's account keeps", () => {
+    expect(resolvePlanReserve([A, B], targets, compare, deps, 0, ['conto-a'])).toEqual({ reserveEur: 7000, otherCashEur: 5000, quotaEur: 12000 });
+  });
+});
+
 describe('resolvePlanReserveEur', () => {
   const targets = (cash: Record<string, unknown>) => ({ cash: { targetPercentage: 10, ...cash } }) as never;
   // Seen red with the percentage read even under a fixed amount.

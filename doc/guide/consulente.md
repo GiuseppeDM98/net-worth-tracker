@@ -114,6 +114,8 @@
 
 ## The run
 
+- **A fifth stage writes the operating plan** (2026-11-19, NOVE-24): after the review, on its own status in
+  `document.operatingPlan`, never failing the run — doc/guide/consulente-piano.md.
 - **Three calls in series, persisted at every stage** (`runAllocationAdvice`; on the mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
   of the Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, portfolio block included) and the
   CASHFLOW 12 MESI block, read beside it before the strategy stage (2026-11), and the PIANO DI ACCUMULO block (below); the strategy
@@ -276,8 +278,9 @@
   rail beside it (DESIGN.md → The Path-Scene Rule). The pages, in order, are `buildBookPages`
   (lib/utils/allocationAdviceBook.ts): «In una frase» (the cover: the verdict, then the text's first section;
   «La situazione» when the text is the strategy alone) · «L'allocazione proposta» · «Gli strumenti» · «Gli obiettivi» ·
-  «Casa, fondi pensione e illiquidi» · «Cosa fare adesso» · «Rischi e revisione» · «Il colloquio» · «Chiedi una
-  modifica» · «Applica». A page exists when it has text or figures: the proposal's two with a proposal (the review
+  «Casa, fondi pensione e illiquidi» · «Cosa fare adesso» · «Il piano operativo» (2026-11-19, only with a usable plan
+  of this report: doc/guide/consulente-piano.md) · «Rischi e revisione» · «Il colloquio» · «Chiedi una modifica» ·
+  «Applica». A page exists when it has text or figures: the proposal's two with a proposal (the review
   date is required, so «Rischi e revisione» always follows a proposal), «Gli strumenti» with the instruments,
   «Gli obiettivi» with the proposal's goals, the roles' page with a change or a name not found, «Il colloquio» with a
   round, «Chiedi una modifica» with a report, «Cosa fare adesso» only with its section; the cover and «Applica» always.
@@ -365,22 +368,8 @@
   revisione» (the aside «rivedi entro il …», the reason, `proposal.risks` as rows), «Chiedi una modifica», «Applica».
   The generated card — the 1px `--ai-accent` border, the accented eyebrow — follows § The report as a book above;
   «Le fasi» of the running view wears it.
-- **«Applica» shows the plans BEFORE writing, one tick per item** (owner, 2026-10-20): the targets
-  (`buildTargetsFromProposal` → `setSettings({ targets })`, which REPLACES the targets document as Impostazioni does;
-  a class absent from the proposal disappears from the targets), the roles (`updateAssetAllocationRole`, an `updateDoc`
-  on the field alone: `updateAsset` and `updateAssetMetadata` delete `taxRate`/`displayTicker` absent from the
-  partial), the goals (`planGoalDocument` → `saveGoalData`, the whole document as FIRE › Obiettivi does: existing ones
-  updated by id, new ones with a colour, those marked «da eliminare» in the answers deleted, the quotas of the touched
-  goals only rewritten in percent; an instrument's quotas beyond 100% are REDUCED within the margin the untouched
-  goals leave, and the plan says so, never silently). Then `POST /api/allocation-advice/applied` records what was
-  written and the document moves to `applied`; every key of the readers is invalidated (settings, assets, overview,
-  goals, allocationAdvice).
-- **After «Applica», a plan of accumulation** (owner, 2026-11-12): with the targets written and no open plan the page
-  offers «Crea un piano di accumulo verso questa allocazione», a link to Accumulo `?da=consulente` (`applyHandoffOf`,
-  `CONSULENTE_HANDOFF_HREF`; nothing while the plans load, the link on a failed read); a draft gets a note
-  (`HANDOFF_DRAFT_NOTE`), an active plan the line of before (`APPLY_ACTIVE_PLAN_NOTE`). A link, not an AI control (The
-  AI-Accent Rule lists it). The Consulente's components import neither the hand-off nor the optimizer (a test reads
-  their sources): the hand-off is Accumulo's, doc/guide/accumulo.md § Dal Consulente.
+- **«Applica», its plans, its hand-off and the operating plan's row** moved to doc/guide/consulente-piano.md
+  (2026-11-19, NOVE-24), with the page «Il piano operativo».
 - **The review date** (`reviewByIso`) lives in the document, not in the settings: the Allocazione page prints it in
   its header (`describeReviewBy` → `describeAllocazioneHeader.reviewBy`) only when the plan has been applied — no
   sixth place in the FIVE places.
@@ -486,7 +475,7 @@ on a phone, and from the row under the Assistente's conversation).
 - **A new report opens on its cover** whatever `?pagina=` says.
 - **The count-up plays on the proposal page's first mount in the session**, not on the cover.
 - **Copy and the browser's find see the open page only**; the print sheet holds every page.
-- **Twelve requests an hour**: a run with three rounds is four, a revision with its round two.
+- **Twelve requests an hour**: a run with three rounds is five, a revision with its round three (the plan stage counts one, 2026-11-19).
 - **«Rifai il percorso» drops an interview the document on screen already used** (`reopenStoredDraft`): only rounds
   asked after that document's `updatedAt` survive.
 - **The arrows and a swipe never turn the card** (2026-11-11): a textarea and radios live on the pages; the arrows move

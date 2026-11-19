@@ -7,8 +7,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   INTERVIEW_CONTRACT,
+  PLAN_CONTRACT,
   buildInstrumentsPrompt,
   buildInterviewPrompt,
+  buildPlanPrompt,
+  formatOperatingPlanFacts,
   buildReviewPrompt,
   buildRevisionPrompt,
   buildStrategyPrompt,
@@ -21,6 +24,7 @@ import {
 import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { AllocationAdviceAnswers, AllocationAdviceInterview, AllocationAdviceInterviewRound, AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import { QUESTION_DECLINE_VALUE } from '@/lib/utils/questionSet';
+import type { OperatingPlanFacts } from '@/lib/utils/operatingPlan';
 
 const ANSWERS: AllocationAdviceAnswers = {
   age: 35,
@@ -184,6 +188,13 @@ describe('the three prompts', () => {
     expect(prompt.userContent).toContain('Borsa di riferimento: Borsa Italiana (Milano, XMIL) (broker Broker X). Politica dei proventi: ad accumulazione (reinveste i proventi). ESG: preferiti.');
     expect(prompt.userContent).toContain('Da evitare: niente leva');
     expect(prompt.system).toContain('```instrument-candidates');
+  });
+
+  // The Yahoo symbols (2026-11-19): in the block's shape, after the ticker, and asked in the contract.
+  it('asks the instrument search for up to three Yahoo symbols, the user\'s exchange first', () => {
+    const { system } = buildInstrumentsPrompt(ANSWERS, PROPOSAL, 'STRUMENTI');
+    expect(system).toContain('"ticker"?: string, "yahooSymbols"?: [ string ] (da 1 a 3 simboli con cui Yahoo Finance quota lo strumento: il primo sulla borsa indicata dall\'utente, poi altri listini in euro, es. "SWDA.MI", "EUNL.DE", "IWDA.AS"), "exchange": string');
+    expect(system).toContain('Non inventare ISIN o ticker: un dato che non riesci a verificare lo ometti e lo dici in "caveat". Per ogni strumento che l\'utente non possiede scrivi in "yahooSymbols" i simboli di Yahoo Finance che hai verificato con la ricerca: il primo sulla borsa indicata, poi fino a due altri listini in euro dello stesso strumento (stesso ISIN) — l\'app userà il primo che ha un prezzo recente. Per un titolo di Stato basta l\'ISIN.');
   });
 
   it('tells the review when the candidates block is missing, and not otherwise', () => {
@@ -499,13 +510,13 @@ describe('the PIANO DI ACCUMULO block', () => {
 
   it('the strategy\'s section 5 and the review\'s section 6 carry the path in words, from the cashflow, with no table', () => {
     const strategy = buildStrategyPrompt(ANSWERS, 'DATI').system;
-    expect(strategy).toContain("5. **Cosa cambia rispetto a oggi** — le differenze principali con i target attuali e con le classi attuali, in punti percentuali; poi come arrivarci: accumulando con il risparmio mensile (un piano di accumulo che compra le classi sotto target) o vendendo, e in quanto tempo all'incirca, con la rata mensile come ordine di grandezza (una cifra tonda), dalla mediana del risparmio mensile del blocco CASHFLOW 12 MESI (senza quel blocco non stimare né il tempo né la rata); se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va già in quella direzione o va rivisto. Nessuna tabella di rate o di quote per strumento: le cifre esatte le calcola l'app dopo «Applica».");
+    expect(strategy).toContain("5. **Cosa cambia rispetto a oggi** — le differenze principali con i target attuali e con le classi attuali, in punti percentuali; poi come arrivarci: accumulando con il risparmio mensile (un piano di accumulo che compra le classi sotto target) o vendendo, e in quanto tempo all'incirca, con la rata mensile come ordine di grandezza (una cifra tonda), dalla mediana del risparmio mensile del blocco CASHFLOW 12 MESI (senza quel blocco non stimare né il tempo né la rata); se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va già in quella direzione o va rivisto. Nessuna tabella di rate o di quote per strumento: le cifre esatte le scrive il piano operativo, dopo il report.");
     expect(strategy).toContain('poi come arrivarci');
     expect(strategy).toContain('con la rata mensile come ordine di grandezza');
     const review = buildReviewPrompt(ANSWERS, 'S', 'I', null).system;
-    expect(review).toContain("6. **Cosa fare adesso** — i passi concreti, in ordine, con i costi fiscali di un eventuale cambio di strumento; poi la strada che la strategia indica per arrivare ai target — accumulare con il risparmio mensile o vendere, il tempo indicativo e la rata come la strategia li stima, senza ricalcolarli — e, se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va verso i nuovi target o va rivisto. Il piano esatto lo calcola l'app dopo «Applica» («Crea un piano di accumulo verso questa allocazione»): niente tabelle di rate né quote mensili per strumento.");
+    expect(review).toContain("6. **Cosa fare adesso** — i passi concreti, in ordine, con i costi fiscali di un eventuale cambio di strumento; poi la strada che la strategia indica per arrivare ai target — accumulare con il risparmio mensile o vendere, il tempo indicativo e la rata come la strategia li stima, senza ricalcolarli — e, se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va verso i nuovi target o va rivisto. Le cifre del piano — versamento, mesi, quote, vendite — le scrive il passo successivo, nella pagina «Il piano operativo»: qui ragiona a parole, niente tabelle di rate né quote per strumento.");
     expect(review).toContain('senza ricalcolarli');
-    expect(review).toContain('Crea un piano di accumulo verso questa allocazione');
+    expect(review).not.toContain("Il piano esatto lo calcola l'app");
   });
 
   // Mutation: an eighth section added.
@@ -513,5 +524,137 @@ describe('the PIANO DI ACCUMULO block', () => {
     const review = buildReviewPrompt(ANSWERS, 'S', 'I', null).system;
     expect(review).toContain('7. **Rischi e revisione**');
     expect(review).not.toContain('8. **');
+  });
+});
+
+// ── The «Piano» stage (2026-11-19): the facts block, the contract, the user turn ─────────────
+describe('formatOperatingPlanFacts and buildPlanPrompt', () => {
+  const facts = (): OperatingPlanFacts => ({
+    instruments: [
+      { ref: 'S1', kind: 'held', name: 'ETF Mondo', assetClass: 'equity', subCategory: 'Mondo', assetId: 'asset-mondo-1' },
+      { ref: 'S2', kind: 'held', name: 'ETF Emergenti', assetClass: 'equity', subCategory: 'Emergenti', assetId: 'asset-emergenti-2' },
+      { ref: 'S3', kind: 'held', name: 'ETF Oro', assetClass: 'commodity', assetId: 'asset-oro-3' },
+      {
+        ref: 'N1', kind: 'new', name: 'ETF Obbligazioni Euro 1-3', assetClass: 'bonds', subCategory: 'Euro 1-3 anni',
+        prefill: { name: 'ETF Obbligazioni Euro 1-3', ticker: '', isin: 'IE00AAAAAAA1', type: 'etf', assetClass: 'bonds', subCategory: 'Euro 1-3 anni' },
+        symbols: [],
+      },
+      { ref: 'M1', kind: 'cashFund', name: 'Fondo Monetario Euro', assetClass: 'cash', assetId: 'asset-fondo-4' },
+    ],
+    held: {
+      S1: { quantity: 120, priceEur: 100, valueEur: 12000, keep: true, tax: { kind: 'taxed', perEuro: 520 / 12000 } },
+      S2: { quantity: 40, priceEur: 50, valueEur: 2000, keep: false, tax: { kind: 'unknown', reason: 'rate' }, maxPct: 15 },
+      S3: { quantity: 0, priceEur: 60, valueEur: 0, keep: false, tax: { kind: 'exempt' } },
+      M1: { quantity: 300, priceEur: 10, valueEur: 3000, keep: false, tax: { kind: 'exempt' } },
+    },
+  });
+  const block = (overrides: Partial<Parameters<typeof formatOperatingPlanFacts>[0]> = {}) =>
+    formatOperatingPlanFacts({
+      facts: facts(),
+      firstMonthLabel: 'dicembre 2026',
+      investmentAccount: { name: 'Conto ornitorinco', balanceEur: 12000 },
+      accountsEur: 18000,
+      reserveEur: 10000,
+      ...overrides,
+    });
+
+  // Mutation: `asset.isin` printed, or the rate.
+  it('prints one fact per line, every key with its legend, never an id, a rate or a held ISIN', () => {
+    const text = block();
+    expect(text.split('\n')).toEqual([
+      '--- DATI PER IL PIANO OPERATIVO ---',
+      'Mese 1 del piano: dicembre 2026.',
+      'Conto per gli investimenti: Conto ornitorinco, saldo €12.000.',
+      "Riserva di liquidità dell'allocazione proposta: €10.000. Sopra la riserva ci sono €2.000.",
+      'Strumenti posseduti che un piano può comprare (chiave · nome · classe › sotto-categoria · quote · prezzo · valore · tasse stimate se venduto tutto):',
+      'S1 · ETF Mondo · Azioni › Mondo · 120 quote · €100,00 · €12.000 · tasse stimate €520 · DA TENERE',
+      "S2 · ETF Emergenti · Azioni › Emergenti · 40 quote · €50,00 · €2.000 · tasse non stimabili (manca l'aliquota) · limite: massimo 15%",
+      'S3 · ETF Oro · Materie Prime · 0 quote, non posseduto · €60,00',
+      'Fondi monetari (si possono vendere, mai comprare):',
+      'M1 · Fondo Monetario Euro · 300 quote · €10,00 · €3.000 · esente',
+      'Strumenti nuovi indicati dal report (0 quote, da creare):',
+      'N1 · ETF Obbligazioni Euro 1-3 (IE00AAAAAAA1) · Obbligazioni › Euro 1-3 anni',
+    ]);
+    expect(text).not.toMatch(/asset-/);
+    // No rate: the only «%» is a limit's, and no «26» outside the month's year.
+    expect(text.replace('dicembre 2026', '')).not.toContain('26');
+    expect(text.match(/%/g)).toHaveLength(1);
+  });
+
+  it('says the account is not set, a reserve short of money, both limits, the cost basis missing and an empty section', () => {
+    const own = facts();
+    own.held.S2 = { ...own.held.S2, tax: { kind: 'unknown', reason: 'cost-basis' }, minPct: 5 };
+    own.instruments = own.instruments.filter((instrument) => instrument.kind !== 'cashFund');
+    delete own.held.M1;
+    const text = block({ facts: own, investmentAccount: null, accountsEur: 7000 });
+    expect(text).toContain('Conto per gli investimenti: non impostato: i conti liquidi sommano €7.000.');
+    expect(text).toContain('Mancano €3.000 alla riserva.');
+    expect(text).toContain('tasse non stimabili (manca il costo fiscale) · limite: minimo 5% · massimo 15%');
+    expect(text).toContain('Fondi monetari (si possono vendere, mai comprare):\nnessuno');
+  });
+
+  // Found on the guided verification (2026-11-19): a proposal without a cash class gave a reserve of
+  // a float's negative zero, printed «€-0». Mutation: the euro figure printed without the zero's sign cleared.
+  // Found on the guided verification (2026-11-19): a held asset's name stored with a leading space
+  // printed «S1 ·  …». Mutation: the names printed as stored.
+  it('trims the names it prints: a key, an account, a new instrument', () => {
+    const own = facts();
+    own.instruments = own.instruments.map((instrument) => ({ ...instrument, name: `  ${instrument.name} ` }));
+    const text = block({ facts: own, investmentAccount: { name: ' Conto ornitorinco ', balanceEur: 12000 } });
+    expect(text).toContain('S1 · ETF Mondo · Azioni');
+    expect(text).toContain('M1 · Fondo Monetario Euro · 300 quote');
+    expect(text).toContain('N1 · ETF Obbligazioni Euro 1-3 (IE00AAAAAAA1)');
+    expect(text).toContain('Conto per gli investimenti: Conto ornitorinco, saldo');
+    expect(text).not.toMatch(/ {2}/);
+  });
+
+  it('never prints a negative zero: a reserve of −0,0001 reads «€0»', () => {
+    const text = block({ reserveEur: -0.0001, investmentAccount: null, accountsEur: 8000 });
+    expect(text).toContain("Riserva di liquidità dell'allocazione proposta: €0. Sopra la riserva ci sono €8.000.");
+    expect(text).not.toContain('€-0');
+  });
+
+  const prompt = (overrides: { factsBlock?: string; cashflowBlock?: string } = {}) =>
+    buildPlanPrompt(ANSWERS, '# In una frase\nIl report.\n\n```allocation-proposal\n{}\n```', '- Mondo: trovato.', null, {
+      factsBlock: overrides.factsBlock ?? block(),
+      cashflowBlock: overrides.cashflowBlock ?? '--- CASHFLOW 12 MESI ---\nmediana del risparmio €1.000',
+      accumulationPlan: '--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.',
+    });
+
+  // Mutation: the cashflow block dropped.
+  it('carries the answers, the report with its block, the instruments, the facts, the cashflow and the plan, in this order', () => {
+    const { userContent } = prompt();
+    const at = (needle: string) => {
+      const index = userContent.indexOf(needle);
+      expect(index, needle).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    const order = [
+      at('--- RISPOSTE DEL PERCORSO ---'),
+      at('--- IL REPORT (la revisione) ---'),
+      at('```allocation-proposal'),
+      at('--- STRUMENTI TROVATI ---'),
+      at('--- DATI PER IL PIANO OPERATIVO ---'),
+      at('--- CASHFLOW 12 MESI ---'),
+      at('--- PIANO DI ACCUMULO ---'),
+      at('Scrivi il piano operativo come descritto.'),
+    ];
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(userContent).toContain('NOTA: il secondo agente non ha prodotto un blocco strutturato valido');
+  });
+
+  // Mutation: the month interpolated in the contract.
+  it('keeps system byte-identical for two portfolios, ending with the contract', () => {
+    const other = buildPlanPrompt({ ...ANSWERS, age: 60 }, 'Altro report.', 'Altri strumenti.', null, {
+      factsBlock: block({ firstMonthLabel: 'marzo 2027', investmentAccount: null, accountsEur: 500, reserveEur: 0 }),
+      cashflowBlock: '--- CASHFLOW 12 MESI ---\naltro',
+      accumulationPlan: '--- PIANO DI ACCUMULO ---\naltro',
+    });
+    const { system } = prompt();
+    expect(system).toBe(other.system);
+    expect(system.endsWith(PLAN_CONTRACT)).toBe(true);
+    expect(system).not.toContain('dicembre 2026');
+    expect(PLAN_CONTRACT).toContain('Non vendere MAI uno strumento segnato DA TENERE');
+    expect(PLAN_CONTRACT).toContain('le vendite e i primi versamenti la ricostituiscono prima che il piano compri');
   });
 });

@@ -155,6 +155,19 @@ describe('POST /api/allocation-advice/run', () => {
     expect(rateLimitMock).toHaveBeenCalledTimes(1);
   });
 
+  // The operating plan (2026-11-19): a model call of its own, so it counts. Mutation: `plan` left out of the limit.
+  it('plan reaches the stage runner without answers, counts against the limit, and is refused at 429 once the hour is spent', async () => {
+    runMock.mockResolvedValue({ userId: 'user-1', status: 'ready' });
+    const response = await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'plan' }));
+    expect(response.status).toBe(200);
+    await readSse(response);
+    expect(runMock.mock.calls[0][0]).toMatchObject({ userId: 'user-1', stage: 'plan', answers: undefined });
+    expect(rateLimitMock).toHaveBeenCalledWith('user-1:allocation-advice', 12, 3_600_000);
+    rateLimitMock.mockReturnValueOnce({ allowed: false, retryAfterSeconds: 60 } as never);
+    expect((await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'plan' }))).status).toBe(429);
+    expect(runMock).toHaveBeenCalledTimes(1);
+  });
+
   it('streams a stage failure as an error event in the product\'s words', async () => {
     runMock.mockRejectedValue(new AllocationAdviceStageError('instruments', 'Il servizio AI non ha risposto.', true));
     const events = await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', answers: ANSWERS })));

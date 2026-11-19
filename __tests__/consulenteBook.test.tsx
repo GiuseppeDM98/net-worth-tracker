@@ -120,7 +120,7 @@ function Host({ document, initialPage = null, onPage, handoff = 'none', activePl
       roles={ROLES}
       goalPlan={null}
       revision={revision}
-      apply={{ document, proposal, rows, roles: ROLES, goalPlan: null, goalsCount: 0, applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {}, applyGoals: true, setApplyGoals: () => {}, applyState, activePlanNote, handoff }}
+      apply={{ document, proposal, rows, roles: ROLES, goalPlan: null, goalsCount: 0, applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {}, applyGoals: true, setApplyGoals: () => {}, applyState, activePlanNote, handoff, planRow: null }}
       canApply
       onApply={() => {}}
       pageId={pageId}
@@ -373,7 +373,7 @@ describe('«Applica» with an active accumulation plan (2026-11-12)', () => {
     return applyPieces({
       document, proposal, rows: proposal ? buildProposalRows(proposal, { equity: 60, bonds: 40 }) : [], roles: ROLES, goalPlan: null, goalsCount: 0,
       applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {},
-      applyGoals: true, setApplyGoals: () => {}, applyState: { phase: 'idle' }, activePlanNote, handoff: 'none',
+      applyGoals: true, setApplyGoals: () => {}, applyState: { phase: 'idle' }, activePlanNote, handoff: 'none', planRow: null,
     });
   };
 

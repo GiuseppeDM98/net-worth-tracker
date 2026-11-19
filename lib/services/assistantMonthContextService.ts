@@ -177,7 +177,8 @@ async function fetchExpenses(
   });
 }
 
-async function fetchSettings(userId: string): Promise<AssetAllocationSettings | null> {
+/** The settings the server reads, a field at a time: the SIXTH place a new settings field is added to (doc/guide/impostazioni.md). */
+export async function fetchSettings(userId: string): Promise<AssetAllocationSettings | null> {
   const doc = await adminDb.collection('assetAllocationTargets').doc(userId).get();
   if (!doc.exists) {
     return null;
@@ -208,6 +209,9 @@ async function fetchSettings(userId: string): Promise<AssetAllocationSettings | 
     transferFeeCategoryId: data.transferFeeCategoryId,
     transferFeeSubCategoryId: data.transferFeeSubCategoryId,
     assistantMemoryEnabled: data.assistantMemoryEnabled,
+    // The Consulente's operating plan (2026-11-19): the plan's account and the limits of «Criteri del modello».
+    investmentCashAssetId: data.investmentCashAssetId,
+    idealAllocation: data.idealAllocation,
   } as AssetAllocationSettings;
 }
 

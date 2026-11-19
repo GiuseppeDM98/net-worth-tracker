@@ -99,11 +99,13 @@ describe('the run’s stage rows (2026-11-07)', () => {
       { stage: 'strategy', state: 'pending' },
       { stage: 'instruments', state: 'pending' },
       { stage: 'review', state: 'pending' },
+      { stage: 'plan', state: 'pending' },
     ]);
-    expect(states(runStageStates({ status: 'running', stage: 'instruments' }))).toEqual(['done', 'done', 'active', 'pending']);
-    expect(states(runStageStates({ status: 'failed', stage: 'strategy' }))).toEqual(['done', 'failed', 'pending', 'pending']);
-    expect(states(runStageStates({ status: 'failed', stage: 'review' }))).toEqual(['done', 'done', 'done', 'failed']);
-    expect(states(runStageStates({ status: 'done', stage: null }))).toEqual(['done', 'done', 'done', 'done']);
+    expect(states(runStageStates({ status: 'running', stage: 'instruments' }))).toEqual(['done', 'done', 'active', 'pending', 'pending']);
+    expect(states(runStageStates({ status: 'failed', stage: 'strategy' }))).toEqual(['done', 'failed', 'pending', 'pending', 'pending']);
+    expect(states(runStageStates({ status: 'failed', stage: 'review' }))).toEqual(['done', 'done', 'done', 'failed', 'pending']);
+    expect(states(runStageStates({ status: 'running', stage: 'plan' }))).toEqual(['done', 'done', 'done', 'done', 'active']);
+    expect(states(runStageStates({ status: 'done', stage: null }))).toEqual(['done', 'done', 'done', 'done', 'done']);
   });
 });
 
@@ -171,7 +173,21 @@ describe('applyHandoffOf: what «Applica» offers after the write', () => {
     expect(sources.length).toBeGreaterThan(0);
     for (const name of sources) {
       const text = readFileSync(join(dir, name), 'utf8');
-      expect(text, name).not.toMatch(/allocationAdviceHandoff|weightOptimizer/);
+      // The operating plan's facts and schema (2026-11-19) pull the hand-off and zod: server only.
+      expect(text, name).not.toMatch(/allocationAdviceHandoff|weightOptimizer|operatingPlanFacts|operatingPlanSchema/);
     }
+  });
+});
+
+describe('the operating plan on the document (2026-11-19: null when absent)', () => {
+  const AT2 = new Date('2026-11-19T10:00:00.000Z');
+  // Mutation: a date left as the stored Timestamp.
+  it('maps operatingPlan with its three dates through toDate, and null when the field is absent', () => {
+    const stored = { status: 'ready', plan: null, error: null, model: 'opus', startedAt: { toDate: () => AT2 }, finishedAt: { toDate: () => AT2 }, reportFinishedAt: { toDate: () => AT } };
+    const document = mapAllocationAdviceData('u1', { status: 'ready', answers: {}, stage: 'review', createdAt: AT, updatedAt: AT, operatingPlan: stored });
+    expect(document.operatingPlan).toEqual({ status: 'ready', plan: null, error: null, model: 'opus', startedAt: AT2, finishedAt: AT2, reportFinishedAt: AT });
+    const running = mapAllocationAdviceData('u1', { status: 'ready', answers: {}, createdAt: AT, updatedAt: AT, operatingPlan: { ...stored, status: 'running', finishedAt: null } });
+    expect(running.operatingPlan?.finishedAt).toBeNull();
+    expect(mapAllocationAdviceData('u1', { status: 'ready', answers: {}, createdAt: AT, updatedAt: AT }).operatingPlan).toBeNull();
   });
 });

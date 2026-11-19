@@ -294,6 +294,11 @@ export const instrumentCandidateSchema = z.object({
   name: z.string().trim().min(1).max(160),
   isin: z.string().trim().max(20).optional(),
   ticker: z.string().trim().max(30).optional(),
+  /**
+   * Up to three Yahoo Finance symbols of the same instrument, the user's exchange first (owner, 2026-11-19): a
+   * share bought on one exchange may be tracked on another whose quote moves. Absent in older blocks.
+   */
+  yahooSymbols: z.array(z.string().trim().min(1).max(20)).max(3).optional(),
   exchange: z.string().trim().max(120),
   policy: z.enum(['accumulazione', 'distribuzione']).optional(),
   /** Percent per year, e.g. 0.2. */

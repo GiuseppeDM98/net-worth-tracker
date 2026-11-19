@@ -1,6 +1,6 @@
 # Velocità e dimensione (budget, benchmark, census)
 
-> **When to open this guide** — anyone touching `perf/budget.json`, `perf/routes.json`, the four scripts `scripts/perf{Budget.mts,Benchmark.mjs,Serve.mjs,RenderCensus.mjs}` or `lib/utils/perfBudget.ts`, a PR that makes a route grow past its ceiling, or anyone who has to say whether a change made the app faster or heavier. The tooling is in repo since 2026-09-28 (PR #409); this manual lived in `perf/README.md` until 2026-10-08, when the last of the fourteen PERF specs of 2026-09-26 was retired and their dossier (`doc/perf/`) with it — the measure they all started from is § Baseline storica below. `AGENTS.md` keeps the stub (`AGENTS.md § Performance tooling`, `AGENTS.md § Commands`); here is the full rule: how each tool is run, what every column means, the baseline in force, the before/after of every speed session and the register of raised ceilings (the body is in Italian, as the manual was written). The environment — the production build on :3200, the emulators, the mirror — is SETUP.md → Step 6-7 and WORKFLOW.md § 3. The first-screen census, which runs on the same build and port but measures composition rather than time, has its own guide since 2026-10-10: `doc/guide/prima-schermata.md`.
+> **When to open this guide** — anyone touching `perf/budget.json`, `perf/routes.json`, the four scripts `scripts/perf{Budget.mts,Benchmark.mjs,Serve.mjs,RenderCensus.mjs}` or `lib/utils/perfBudget.ts`, a PR that makes a route grow past its ceiling, or anyone who has to say whether a change made the app faster or heavier. The tooling is in repo since 2026-09-28 (PR #409); this manual lived in `perf/README.md` until 2026-10-08, when the last of the fourteen PERF specs of 2026-09-26 was retired and their dossier (`doc/perf/`) with it — the measure they all started from is in `doc/guide/velocita-storico.md` (moved 2026-11-19). `AGENTS.md` keeps the stub (`AGENTS.md § Performance tooling`, `AGENTS.md § Commands`); here is the full rule: how each tool is run, what every column means, the baseline in force, the before/after of every speed session and the register of raised ceilings (the body is in Italian, as the manual was written). The environment — the production build on :3200, the emulators, the mirror — is SETUP.md → Step 6-7 and WORKFLOW.md § 3. The first-screen census, which runs on the same build and port but measures composition rather than time, has its own guide since 2026-10-10: `doc/guide/prima-schermata.md`.
 
 ## Files
 
@@ -51,6 +51,10 @@ shell è già andata (`contexts/AuthContext.tsx`, 2026-09-28), il modulo no, e t
 `radix-ui` (il pacchetto ombrello), `date-fns/locale` e papaparse (solo Impostazioni › spese, in una tab) non sono
 stati verificati nell'analizzatore: il dubbio sul tree-shaking di `radix-ui` resta aperto.
 
+- **Una route dinamica (ƒ) non ha HTML prerenderizzato e `perf:budget` non la elenca** (2026-11-19, il Consulente):
+  si misura servendo la build (`perf:serve`, :3200 su `localhost`, non 127.0.0.1) e passando l'HTML della route a
+  `extractInitialChunks` + gzip dei chunk, prima e dopo sulla stessa macchina; il numero va nel Registro.
+
 ### Il ratchet e il tetto alzato
 
 - Un tetto nasce dalla misura +2%, arrotondato per eccesso (535 → 546), e **si abbassa solo con una misura**
@@ -80,6 +84,7 @@ stati verificati nell'analizzatore: il dubbio sul tree-shaking di `radix-ui` res
 
 | Data | Route | Da → a (KB gz) | PR | Perché |
 |---|---|---|---|---|
+| 2026-11-19 | Consulente (senza tetto) · Allocazione | Consulente 693,9 → 696,1 (raw 2237,7 → 2244,5) · Allocazione 611,3 → 611,8, tetto 612 invariato | NOVE-24 | **Il piano operativo del Consulente** (doc/guide/consulente-piano.md): la pagina «Il piano operativo» (`planPieces`), la riga su «Applica» e `useConsulentePlan`, `operatingPlanOf` e le frasi in `operatingPlan.ts` (zod-free: lo schema e i fatti restano sul server). `/dashboard/allocation/consulente` è dinamica (ƒ), quindi `perf:budget` non la elenca: misurata sull'HTML servito da `perf:serve` con `extractInitialChunks` e gzip dei 31 chunk iniziali, prima develop @55b210f9 (il branch in uno stash) e dopo il branch, stessa macchina (Windows, Node 24, `perf:build`), stesso giorno. Nessun tetto alzato. |
 | 2026-11-19 | Impostazioni, Cashflow | Impostazioni 724 → 725 (724,0 → 724,3), Cashflow 796 → 797 (796,0 → 796,1) | #557 | **Le vendite nel calendario e «Conto per gli investimenti»** (doc/guide/accumulo.md, impostazioni.md): la terza riga di «Conti di default» in Impostazioni › Spese e il campo `investmentCashAssetId` nelle cinque sedi, la lettura delle impostazioni importata anche da Cashflow. L'implementazione aveva misurato sulla build `.next-perf` (+0,0…+0,2, sotto ogni tetto); la sessione di ritiro (2026-11-19) con `npm run build` sulla stessa macchina (Windows, Node 24) e lo stesso giorno legge develop @b57ada16 contro @875f4882, e il ritiro stesso non cambia codice eseguibile (gli stessi valori con le sue modifiche in uno stash). Entro 1 KB: alzati senza chiedere (regola della serie). |
 | 2026-11-18 | Allocazione | 611 → 612 (610,7 → 611,1) | #553 | **Il Consulente e il piano di accumulo** (doc/guide/accumulo.md § Dal Consulente): la finestra «Dal Consulente», l'ottimizzatore e il suo seme restano nella tab pigra (Accumulo li portava già con `ObiettiviTile`); sul primo chunk arrivano la prop `advice` della tab, `handoffProposalOf` / `applyHandoffOf` in `allocationAdviceDocument.ts` e le tre frasi di «Applica» in `allocationAdviceNarrative.ts`, moduli che la pagina importa già. Prima: develop @0099f9e0 (lo stash del branch); dopo: il branch, stessa macchina (Windows, Node 24, `perf:build`), stesso giorno. Entro 1 KB. |
 | 2026-11-18 | Analisi | Analisi 658 → 659 (658,0 → 658,1) | #551 | **«Con vendite mirate»** (doc/guide/ottimizzatore.md): nessun codice nuovo sulla route — l'ottimizzatore e il dialogo restano nella tab Accumulo, caricata su richiesta. Stessa macchina (Windows, Node 24), stesso giorno, `perf:build` + `perf:budget`: develop @301ecffd in un worktree con `npm ci` dentro (la junction di `node_modules` non passa a Turbopack) contro il branch. Ogni route si muove di ±0,1–0,2 KB gz (condivisi −0,1, landing +0,2, Allocazione 610,7 → 610,7): i chunk si ridividono; Analisi, che era AL tetto, lo passa di 0,1. Tetto alzato entro 1 KB. |
@@ -292,68 +297,9 @@ payload arrivano i chunk client di quella route — a freddo, la finestra di una
 `import()` (il PDF, il Sankey sul telefono, le icone, le tab di FIRE) non viene prefetchato; uno nel grafo iniziale di
 un'altra route sì. La colonna JS del benchmark lo include: è una traccia, non il budget.
 
-## Baseline storica (2026-09-26, macchina Windows, mirror, nessun throttling CPU)
+## Baseline storica → `doc/guide/velocita-storico.md`
 
-La misura usa-e-getta da cui sono partite le quattordici spec PERF (dossier `doc/perf/`, 2026-09-26 → 2026-10-08), presa su
-`develop` PRIMA dei contributi del 2026-09-27 (#400, #401, #403) e della nuova Esposizione (PERF-00, #407), con uno script
-Playwright usa-e-getta poi diventato `scripts/perfBenchmark.mjs`: 3 run cold, 2 warm, mediane; i grezzi restano in git
-(`git show d8d3d98:doc/perf/reference/baseline-2026-09-26-cold.log`, e `…-warm.json`). Superata il 2026-09-28 dalla
-baseline in vigore sopra; resta come «prima» di tutto il lavoro. I «46 caratteri di testo» dell'HTML erano il `<title>`:
-il `body` ne aveva 0.
-
-**Le tre domande di partenza, con le risposte.** Firebase non è il limite: con Firestore emulato (round trip ~1 ms)
-Cashflow impiegava 2,1 s a mostrare un numero, Storico 2,3 s, Analisi 1,7 s — CPU del browser (deserializzare 1533
-documenti, ridurli, montare la pagina) e catena d'avvio (HTML vuoto → JS → Firebase Auth → query); in produzione ogni
-round trip vale 50–150 ms, quindi contano i round trip IN SERIE (Rendimenti ne faceva 4–5 con 17 chiamate API; la
-Panoramica ricalcolava il riepilogo in sei stadi sequenziali con le funzioni Vercel a Washington). Non serviva migrare
-(AGENTS.md § React Query and Derived State): le due leve lato Firebase erano la regione delle funzioni e i riassunti
-materializzati per pagina. Lato codice stava quasi tutto: la shell che non esisteva finché Auth non risolveva, la cache
-che moriva al reload, 460 KB gz di JS su ogni pagina con recharts quattro volte e il PDF nel grafo di Storico, le stesse
-collezioni lette con meccanismi diversi, le spese intere per mostrare un mese, N grafici montati al buio su Patrimonio,
-il React Compiler mai acceso e 70 stati in un componente, il lavoro di layout e colori a ogni mount.
-
-**Cold** — reload della route dopo il login (ms; mediane di 3):
-
-| Pagina | primo numero | LCP | long task | Firestore | API | note |
-|---|---|---|---|---|---|---|
-| Panoramica | 150 | 680 | 93 | 3 | 1 | un payload materializzato |
-| Patrimonio | 790 | 1230 | 270 | 8 | 1 | N sparkline montate; waterfall mutuo e ledger |
-| Cashflow › Tracciamento | 2110 | 2200 | 400 | 3 | 0 | tutta E (1533 doc) |
-| Analisi | 1690 | 1710 | 565 | 3 | 0 | tutta E |
-| Rendimenti | 1110 (1000–2070) | 1140 | 144–377 | 10–14 | 17 | 5 collezioni lette due volte + 10 route yield |
-| Storico | 2285 | 2300 | 670 | 3 | 0 | tutta E; PDF nel bundle |
-| Allocazione | 590 | 610 | 165 | 4 | 1 | Esposizione → Yahoo ogni volta |
-| Previdenza | 584 | 600 | 96 | 4 | 0 | il modello: tutto su React Query |
-| FIRE | 2040 | 2050 | 300 | 7–8 | 0–1 | catena a 3 |
-| Hall of Fame | 510 | 530 | 88 | 3 | 0 | un documento |
-| Impostazioni | 527 | 548 | 93 | 5 | 0 | 71 `useState` |
-
-Lo spinner di `ProtectedRoute` (Firebase Auth) se ne andava fra 86 e 228 ms dal `navigationStart`.
-
-**Warm** — navigazione client dalla sidebar, stessa sessione (ms dal click; mediane di 2):
-
-| Pagina | skeleton mostrato | primo numero | long task | Firestore | API |
-|---|---|---|---|---|---|
-| Panoramica | no | 141 | 0 | 5 | 0 |
-| Patrimonio | sì | 314 | 83 | 11 | 0 |
-| Cashflow | sì | 1226 | 124 | 4 | 0 |
-| Analisi (spese già in cache) | **no** | **242** | 153 | 2 | 0 |
-| Rendimenti | sì | 574 | 0 | 13 | 17 |
-| Storico | sì | 1250 | 255 | 8 | 0 |
-| Allocazione | sì | 606 | 55 | 4 | 1 |
-| Previdenza | sì | 131 | 0 | 2 | 0 |
-| FIRE | sì | 1757 | 75 | 6 | 0 |
-| Hall of Fame | sì | 127 | 0 | 2 | 0 |
-
-Analisi con le spese già in cache (242 ms, nessuno skeleton) contro Analisi a freddo (1690 ms): la stessa pagina, con lo
-stesso dato già in memoria, sette volte più veloce — la misura che ha giustificato la cache persistita e un solo binario
-per i dati (doc/guide/cache-persistita.md, AGENTS.md § React Query and Derived State).
-
-**Bundle** (gzip, chunk iniziali per route): condivisi da ogni pagina 460 KB (21 chunk; 136 KB firebase, 69 react-dom, 43
-framer-motion) · login 415 · Panoramica 535 · Patrimonio 717 · Cashflow 726 · Analisi 734 · Rendimenti 681 · **Storico
-1192** · Allocazione 510 · Previdenza 589 · FIRE 743 · Hall of Fame 534 · Impostazioni 610 · Assistente 657; recharts in
-QUATTRO chunk da 350 KB raw (uno per pagina); lucide-react intero (575 KB raw / 143 KB gz) alla prima icona di
-categoria; 93 chunk su disco, 9,0 MB raw.
+La misura del 2026-09-26 da cui partirono le quattordici spec PERF (macchina Windows, mirror, nessun throttling CPU) vive in `doc/guide/velocita-storico.md` dal 2026-11-19.
 
 ## Il census — «quanta pagina ri-renderizza UN tasto?» (2026-10-05)
 

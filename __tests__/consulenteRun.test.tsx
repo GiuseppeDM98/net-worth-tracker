@@ -29,7 +29,7 @@ describe('ConsulenteRun', () => {
   it('shows the active stage with what it usually takes and a clock the reader does not hear', () => {
     const { container } = render(<ConsulenteRun state={{ kind: 'running', answers, interview: null, stage: 'strategy', stageStartedAt: Date.now() - 61_000 }} onRetry={noop} onBack={noop} />);
     expect(container.querySelectorAll('[aria-live]')).toHaveLength(1);
-    expect(statesOf(container)).toEqual(['done', 'active', 'pending', 'pending']);
+    expect(statesOf(container)).toEqual(['done', 'active', 'pending', 'pending', 'pending']);
     const active = container.querySelector(`${ROWS}[data-state="active"]`) as HTMLElement;
     expect(active.textContent).toContain('Propongo la strategia');
     expect(active.textContent).toContain('di solito ~2 min');
@@ -49,7 +49,7 @@ describe('ConsulenteRun', () => {
     const { container } = render(
       <ConsulenteRun state={{ kind: 'failed', answers, interview: null, error: 'Ricerca interrotta: ornitorinco.', retryable: true, resumeFrom: 'instruments' }} onRetry={noop} onBack={noop} />
     );
-    expect(statesOf(container)).toEqual(['done', 'done', 'failed', 'pending']);
+    expect(statesOf(container)).toEqual(['done', 'done', 'failed', 'pending', 'pending']);
     expect(screen.getByRole('status').textContent).toBe('Il percorso non si è concluso.');
     expect(screen.getByText('Ricerca interrotta: ornitorinco.')).not.toBeNull();
     expect(container.querySelector('ol[aria-label="Le fasi"]:not([aria-hidden])')?.textContent).not.toMatch(/\d+:\d\d/);
@@ -58,7 +58,7 @@ describe('ConsulenteRun', () => {
 
   it('shows every stage done when the run has finished', () => {
     const { container } = render(<ConsulenteRun state={{ kind: 'done', answers, interview: null }} onRetry={noop} onBack={noop} />);
-    expect(statesOf(container)).toEqual(['done', 'done', 'done', 'done']);
+    expect(statesOf(container)).toEqual(['done', 'done', 'done', 'done', 'done']);
     expect(screen.getByRole('status').textContent).toBe('La proposta è pronta.');
   });
 });
