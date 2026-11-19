@@ -13,7 +13,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import type { AllocationAdviceInterview } from '@/types/allocationAdvice';
-import { requestStage } from './useConsulenteRun';
+import { requestPlanQuietly, requestStage } from './useConsulenteRun';
 
 export type ConsulenteRevisionState = { kind: 'idle' } | { kind: 'running' } | { kind: 'failed'; error: string };
 
@@ -32,6 +32,10 @@ export function useConsulenteRevision(ownerId: string) {
         const result = await requestStage(ownerId, { stage: 'revise', request, interview }, () => {});
         await queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
         if (result.ok) {
+          // A new report drops the old plan (2026-11-19): the plan is asked again, and its outcome
+          // never fails the revision — the row on «Applica» tells a plan that did not land.
+          await requestPlanQuietly(ownerId, () => {});
+          await queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
           setState({ kind: 'idle' });
           onDone();
           return;

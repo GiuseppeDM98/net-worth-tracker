@@ -28,6 +28,9 @@ weight, month by month, proposes the purchases and never writes a transaction on
   `resolvePlanReserve(…, cashFundSoldEur)` → `resolveAccountReserveEur`): only the euros above the quota become the
   plan's. The editor's reserve is proposed with the seeded sales; a money-market sale comes from «Con vendite mirate»
   only — no code path adds it by hand at step 2 (`listAddableAssets` reads `isPlanBuyable`; corrected 2026-11-19).
+  `resolvePlanReserve` takes an optional last `sourceIds` (2026-11-19, NOVE-24): given, its accounts' sum reads those
+  accounts only and the cash on the others counts as outside the plan — the Consulente's plan stage passes the
+  investment account; absent, the function is unchanged.
 - **The engine is pure** (`lib/utils/accumulationPlanUtils.ts`): `scheduleInstallments` lays the months, `matchPlanExecutions`
   (`accumulationPlanMatching.ts`) pairs the registry's BUY transactions with the planned lines, a late month carries
   its shortfall into the next. Sentences live in `accumulationNarrative.ts` and `accumuloSummary.ts`, never in a
@@ -119,7 +122,8 @@ whatever it finds (a failed read of the advice is «no advice»). No model is ca
   property, a loan, a non-tradable role) is «Fuori dal piano»; a name with no asset is a row to create, its
   `AssetPrefill` carrying name, ticker (often `''`), ISIN, type (`bond` for an IT/XS ISIN without ticker, `crypto` in
   crypto, else `etf`) and the sub-target as sub-category. The interview's «da tenere» join the kept ids.
-- **The seed** (`buildHandoffSeed`): `runOptimizer` in mode `'ideal'` on the proposal's targets and the owner's
+- **The seed** (`buildHandoffSeed`; until NOVE-25 the hand-off still seeds from the optimizer, not from the
+  Consulente's operating plan, doc/guide/consulente-piano.md): `runOptimizer` in mode `'ideal'` on the proposal's targets and the owner's
   criteria (`DEFAULT_IDEAL_ALLOCATION` without them), with a factor objective at `'high'` added per class with
   sub-targets the owner did not list (`handoffCriteria`) — not for a class whose instruments carry a sub-category the
   targets do not name (`unmappedClasses`: the objective would push them toward 0). **The seed holds every tradable

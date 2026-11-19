@@ -167,6 +167,7 @@ export const STAGE_COPY: Record<AllocationAdviceStage, { label: string; detail: 
   strategy: { label: 'Propongo la strategia', detail: 'Opus 5.5 ragiona su orizzonte, tolleranza, obiettivi e vincoli.' },
   instruments: { label: 'Cerco gli strumenti', detail: 'Sonnet 5.5 verifica sul web quotazione, ISIN e costi sulla tua borsa.' },
   review: { label: 'Rivedo il tutto', detail: 'Opus 5.5 unisce strategia e strumenti nel report finale.' },
+  plan: { label: 'Scrivo il piano operativo', detail: 'Opus 5.5 traduce il report in versamento, mesi, quote e vendite.' },
 };
 
 export function describeRunHeadline(stage: AllocationAdviceStage | null): string {
@@ -174,8 +175,8 @@ export function describeRunHeadline(stage: AllocationAdviceStage | null): string
   return `${STAGE_COPY[stage].label}.`;
 }
 
-/** What a stage usually takes, in minutes (about five in all at effort `medium`, 2026-10-23; the owner's figures of 2026-11-01). */
-export const STAGE_TYPICAL_MINUTES: Record<AllocationAdviceStage, number> = { context: 0, strategy: 2, instruments: 2, review: 1 };
+/** What a stage usually takes, in minutes (about five in all at effort `medium`, 2026-10-23; the owner's figures of 2026-11-01; the plan's minute, 2026-11-19). */
+export const STAGE_TYPICAL_MINUTES: Record<AllocationAdviceStage, number> = { context: 0, strategy: 2, instruments: 2, review: 1, plan: 1 };
 
 /** «di solito ~N min»; null when N is 0 (the context: the row prints no duration). */
 export function describeStageTypical(stage: AllocationAdviceStage): string | null {
@@ -329,4 +330,35 @@ export function describeReviewBy(document: AllocationAdviceDocument | null | und
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
   if (!proposal) return `Piano del Consulente applicato il ${formatDate(document.applied.at)}`;
   return `Piano del Consulente applicato il ${formatDate(document.applied.at)} · rivedi entro il ${formatDate(new Date(proposal.reviewByIso))}`;
+}
+
+// ─── The operating plan (2026-11-19, doc/guide/consulente-piano.md) ───────────
+
+export const OPERATING_PLAN_PAGE_COPY = {
+  buy: 'Compra',
+  hold: 'Smetti di comprare',
+  sell: 'Vendi',
+  departures: 'Dove si discosta dal report',
+  corrections: "Corretto dall'app",
+  footnote: "Le rate esatte le calcola l'app quando crei il piano: dipendono dai prezzi di quel giorno.",
+  allShares: 'tutte le quote',
+  taxUnknown: { rate: "tasse non stimabili: manca l'aliquota", 'cost-basis': 'tasse non stimabili: manca il costo fiscale' },
+  rowAbsent: "Il piano operativo non c'è ancora.",
+  rowRunning: 'Scrivo il piano operativo…',
+  action: 'Scrivi il piano operativo',
+} as const;
+
+/** «12 mesi · 500,00 € al mese»: the aside of the page «Il piano operativo». */
+export function describePlanAside(plan: { months: number; monthlyInflowEur: number }): string {
+  return `${plan.months} ${plan.months === 1 ? 'mese' : 'mesi'} · ${formatCurrency(plan.monthlyInflowEur)} al mese`;
+}
+
+/** «Tasse stimate delle vendite: €X», plus «, senza N vendite non stimabili»; null when no sale is estimable. */
+export function describePlanTaxTotal(sales: ReadonlyArray<{ estimatedTaxEur?: number | null }>): string | null {
+  const estimable = sales.filter((sale) => typeof sale.estimatedTaxEur === 'number');
+  if (estimable.length === 0) return null;
+  const total = estimable.reduce((sum, sale) => sum + (sale.estimatedTaxEur as number), 0);
+  const unknown = sales.length - estimable.length;
+  const without = unknown === 0 ? '' : unknown === 1 ? ', senza 1 vendita non stimabile' : `, senza ${unknown} vendite non stimabili`;
+  return `Tasse stimate delle vendite: ${formatCurrency(Math.round(total * 100) / 100)}${without}`;
 }

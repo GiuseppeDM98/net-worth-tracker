@@ -11,7 +11,7 @@ import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, ALLOCATION_ADVICE_RUN_STAGES, t
  * POST /api/allocation-advice/run — the Consulente's run (2026-10-20).
  *
  * Body: { userId, stage, answers?, request?, interview?, revision? }. ONE stage per request (`strategy` · `instruments` ·
- * `review`, plus `revise` — «Chiedi una modifica» on a finished report, with `request`): the strategy takes the answers, validated against the ONE schema the screens typed
+ * `review` · `plan`, the operating plan on the finished report (2026-11-19), plus `revise` — «Chiedi una modifica» on a finished report, with `request`): the strategy takes the answers, validated against the ONE schema the screens typed
  * them with, and creates the document; the other two continue the persisted document. Each
  * request streams SSE (`stage` events, then `done` with the document, or `error`), and the
  * client chains the three (`useConsulenteRun`), retrying a failed stage from itself.
@@ -33,7 +33,7 @@ export const maxDuration = 300;
 /** What «Chiedi una modifica» may say: one request, a paragraph at most. */
 const revisionRequestSchema = z.string().trim().min(1).max(1000);
 
-/** 12 model requests an hour per warm instance (interview rounds, strategy, revise; instruments and review do not count). */
+/** 12 model requests an hour per warm instance (interview rounds, strategy, revise, plan; instruments and review do not count). */
 const RUN_RATE_LIMIT_MAX = 12;
 const RUN_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -106,9 +106,9 @@ export async function POST(request: NextRequest) {
     }
 
     // The limit counts MODEL REQUESTS, after the body is known good (a 400 costs no slot): an
-    // interview round, the strategy and a revision are one call each; instruments and review continue a run.
+    // interview round, the strategy, a revision and the operating plan are one call each; instruments and review continue a run.
     const rateLimit =
-      stage === 'strategy' || stage === 'revise' || stage === 'interview'
+      stage === 'strategy' || stage === 'revise' || stage === 'interview' || stage === 'plan'
         ? checkRateLimit(`${ownerId}:allocation-advice`, RUN_RATE_LIMIT_MAX, RUN_RATE_LIMIT_WINDOW_MS)
         : { allowed: true as const, retryAfterSeconds: 0 };
     if (!rateLimit.allowed) {

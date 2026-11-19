@@ -2,6 +2,7 @@
  * `useConsulenteRun` (components/allocation/consulente/useConsulenteRun.ts, 2026-11-07): the stage's
  * clock — `stageStartedAt` stamped when the run opens, at every `stage` event and at a retry. The
  * route is a mocked `authenticatedFetch` answering SSE streams the test feeds; only `Date` is faked.
+ * The operating plan (2026-11-19) is the chain's fourth request and never fails the run.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -131,9 +132,9 @@ describe('useConsulenteRun', () => {
 
 describe('the interview rides with the run (2026-11-08)', () => {
   it('sends the interview with the strategy, keeps it in every state, and «Riprova» on a failed strategy resends it', async () => {
-    const streams = [sseResponse(), sseResponse(), sseResponse(), sseResponse()];
+    const streams = [sseResponse(), sseResponse(), sseResponse(), sseResponse(), sseResponse()];
     authenticatedFetch.mockImplementation(() => Promise.resolve(streams.shift()!.response));
-    const [first, retried, instruments, review] = [...streams];
+    const [first, retried, instruments, review, plan] = [...streams];
     const client = new QueryClient();
     const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
     const { result } = renderHook(() => useConsulenteRun('u1', vi.fn()), { wrapper });
@@ -183,6 +184,13 @@ describe('the interview rides with the run (2026-11-08)', () => {
       review.close();
       await flush();
     });
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(5));
+    expect(JSON.parse(authenticatedFetch.mock.calls[4][1].body)).toEqual({ userId: 'u1', stage: 'plan' });
+    await act(async () => {
+      plan.send({ type: 'done' });
+      plan.close();
+      await flush();
+    });
     await waitFor(() => expect(result.current.state).toMatchObject({ kind: 'done', interview }));
   });
 
@@ -203,5 +211,61 @@ describe('the interview rides with the run (2026-11-08)', () => {
       strategy.close();
       await flush();
     });
+  });
+});
+
+// U17 (2026-11-19). Mutation: the plan's throw let through to `run()`'s catch.
+describe('the operating plan never fails the run', () => {
+  const finishThree = async (streams: ReturnType<typeof sseResponse>[]) => {
+    for (const stream of streams) {
+      await act(async () => {
+        stream.send({ type: 'done' });
+        stream.close();
+        await flush();
+      });
+    }
+  };
+
+  it('a plan request answered 429 ends the run done, and onFinished runs', async () => {
+    const streams = [sseResponse(), sseResponse(), sseResponse()];
+    authenticatedFetch
+      .mockImplementationOnce(() => Promise.resolve(streams[0].response))
+      .mockImplementationOnce(() => Promise.resolve(streams[1].response))
+      .mockImplementationOnce(() => Promise.resolve(streams[2].response))
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify({ error: "Hai fatto troppe richieste al Consulente in un'ora." }), { status: 429 })));
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const onFinished = vi.fn();
+    const { result } = renderHook(() => useConsulenteRun('u1', onFinished), { wrapper });
+    act(() => {
+      result.current.start(answers);
+    });
+    await finishThree(streams);
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(result.current.state).toMatchObject({ kind: 'done' }));
+    expect(onFinished).toHaveBeenCalledTimes(1);
+  });
+
+  it('a plan stage that answers an error event ends the run done too', async () => {
+    const streams = [sseResponse(), sseResponse(), sseResponse(), sseResponse()];
+    authenticatedFetch.mockImplementation(() => Promise.resolve(streams.shift()!.response));
+    const [strategy, instruments, review, plan] = [...streams];
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const onFinished = vi.fn();
+    const { result } = renderHook(() => useConsulenteRun('u1', onFinished), { wrapper });
+    act(() => {
+      result.current.start(answers);
+    });
+    await finishThree([strategy, instruments, review]);
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(4));
+    await act(async () => {
+      plan.send({ type: 'stage', stage: 'plan' });
+      plan.send({ type: 'error', error: 'Il Consulente non ha scritto un piano leggibile.', retryable: true });
+      plan.close();
+      await flush();
+    });
+    await waitFor(() => expect(result.current.state).toMatchObject({ kind: 'done' }));
+    expect(onFinished).toHaveBeenCalledTimes(1);
   });
 });

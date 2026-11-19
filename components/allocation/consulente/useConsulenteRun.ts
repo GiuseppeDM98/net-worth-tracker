@@ -2,7 +2,7 @@
 
 /**
  * The RUN as state started from a gesture (2026-10-20): «Avvia la ricerca» calls `start`, which
- * sends the route ONE request per stage (strategy · instruments · review — Vercel's Hobby plan
+ * sends the route ONE request per stage (strategy · instruments · review · plan — Vercel's Hobby plan
  * stops a function at 300 s, a whole run is about five minutes at effort `medium` (2026-10-23)), reading each SSE stream to
  * its `done` before the next, and moves `state` stage by stage. A stage that fails or is cut is
  * remembered as `resumeFrom`: «Riprova» (`retry`) restarts there, on the persisted document,
@@ -67,6 +67,19 @@ export async function requestStage(
   return outcome.value;
 }
 
+/**
+ * The operating plan's request (2026-11-19), which never fails the run: an error event, a 429 or a
+ * dropped stream all end in nothing — the report is the run's result, and the absence row on
+ * «Applica» tells a missing plan. A module function, so the hook holds no try/catch of its own.
+ */
+export async function requestPlanQuietly(ownerId: string, onStage: (stage: AllocationAdviceStage) => void): Promise<StageOutcome> {
+  try {
+    return await requestStage(ownerId, { stage: 'plan' }, onStage);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Il piano operativo non è partito.', retryable: true };
+  }
+}
+
 export function useConsulenteRun(ownerId: string, onFinished: () => void) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<ConsulenteRunState>({ kind: 'idle' });
@@ -89,7 +102,14 @@ export function useConsulenteRun(ownerId: string, onFinished: () => void) {
         let outcome: ConsulenteRunState = { kind: 'done', answers, interview };
         for (const stage of stages) {
           reached = stage;
-          const result = await requestStage(ownerId, stage === 'strategy' ? { stage, answers, interview } : { stage }, (reached) => setState({ kind: 'running', answers, interview, stage: reached, stageStartedAt: Date.now() }));
+          const onStage = (reachedStage: AllocationAdviceStage) => setState({ kind: 'running', answers, interview, stage: reachedStage, stageStartedAt: Date.now() });
+          if (stage === 'plan') {
+            // The fifth stage never fails the run: whatever its outcome, the run is done.
+            await requestPlanQuietly(ownerId, onStage);
+            await queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
+            break;
+          }
+          const result = await requestStage(ownerId, stage === 'strategy' ? { stage, answers, interview } : { stage }, onStage);
           // The report's query rereads after every stage: a reload mid-run shows what landed.
           await queryClient.invalidateQueries({ queryKey: queryKeys.allocationAdvice.all(ownerId) });
           if (!result.ok) {

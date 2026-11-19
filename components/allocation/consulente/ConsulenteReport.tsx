@@ -8,7 +8,8 @@
  * the cover and the way back on the last page.
  *
  * This file owns the data and the writes: the plans (`buildProposalRows`, `planRoleChanges`,
- * `planGoalDocument`), `useConsulenteRevision`, the apply state. The writes go through the app's own
+ * `planGoalDocument`), `useConsulenteRevision`, the apply state, and the operating plan's row on
+ * «Applica» (`useConsulentePlan`, 2026-11-19). The writes go through the app's own
  * services (`setSettings`, `updateAssetAllocationRole`, `saveGoalData`) and then the «applied» route
  * records them; every reader's key is invalidated.
  */
@@ -25,12 +26,15 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { useAllocationAdvice } from '@/lib/hooks/useAllocationAdvice';
 import { useConsulenteRevision } from './useConsulenteRevision';
+import { useConsulentePlan } from './useConsulentePlan';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { operatingPlanOf } from '@/lib/utils/operatingPlan';
 import { StageRows } from './ConsulenteRun';
 import { ConsulenteBook } from './ConsulenteBook';
-import type { ApplyState } from './ConsulenteBookPages';
+import type { ApplyState, PlanRow } from './ConsulenteBookPages';
 import type { BookPageId } from '@/lib/utils/allocationAdviceBook';
 import { buildTargetsFromProposal, currentAllocationOnBase, planGoalDocument, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
-import { applyHandoffOf, runStageStates } from '@/lib/utils/allocationAdviceDocument';
+import { applyHandoffOf, RUN_STALE_AFTER_MS, runStageStates } from '@/lib/utils/allocationAdviceDocument';
 import { removedGoalIds } from '@/lib/utils/allocationAdviceDraft';
 import { APPLY_ACTIVE_PLAN_NOTE, buildConsulenteVerdict, buildProposalRows, describeApplySummary, describeRunHeadline } from '@/lib/utils/allocationAdviceNarrative';
 import { selectOpenPlan, useAccumulationPlans } from '@/lib/hooks/useAccumulationPlans';
@@ -76,9 +80,13 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, pageId, 
   // After the write, a plan toward the new targets: the plans' STATE only, never their weights nor the model.
   const handoff = applyHandoffOf(document, plansQuery.isPending ? 'loading' : plansQuery.isError ? 'failed' : { open: selectOpenPlan(plansQuery.data) });
   const revising = revision.state.kind === 'running';
+  const planWriter = useConsulentePlan(ownerId);
+  const isDemo = useDemoMode();
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
   // Today's Italian day once per mount: the applied verdict says when the review is near or due.
   const [todayIso] = useState(() => getItalyDateIso());
+  // The page's opening instant: a stored plan still `running` after the run's staleness window was cut — the row offers the button again.
+  const [openedAt] = useState(() => Date.now());
   const verdict = useMemo(() => buildConsulenteVerdict(document, todayIso), [document, todayIso]);
   const base = useMemo(() => currentAllocationOnBase(assets, calculateAssetValue), [assets]);
   const rows = useMemo(() => (proposal ? buildProposalRows(proposal, base.pctByClass) : []), [proposal, base.pctByClass]);
@@ -97,6 +105,35 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, pageId, 
   const rolesCount = applyRoles ? roles.changes.length : 0;
   const applySummary = describeApplySummary({ targets: applyTargets, roles: rolesCount, goals: applyGoals ? goalsCount : 0 });
   const canApply = document.status === 'ready' && !revising && proposal !== null && (applyTargets || rolesCount > 0 || (applyGoals && goalsCount > 0));
+
+  // The operating plan's row (2026-11-19): null with a usable plan of this report. A plan started in
+  // another tab reads «running» until the document is read again — no polling.
+  const stored = document.operatingPlan ?? null;
+  const ofThisReport = stored !== null && document.report !== null && stored.reportFinishedAt.getTime() === document.report.finishedAt.getTime();
+  const storedRunning = ofThisReport && stored.status === 'running' && openedAt - stored.startedAt.getTime() <= RUN_STALE_AFTER_MS;
+  const planRow: PlanRow | null =
+    operatingPlanOf(document) !== null || document.report === null
+      ? null
+      : {
+          state:
+            planWriter.state === 'running' || storedRunning
+              ? 'running'
+              : planWriter.state === 'failed' || (ofThisReport && stored.status === 'failed')
+                ? 'failed'
+                : ofThisReport && stored.status === 'ready' && stored.plan?.usable === false
+                  ? 'unusable'
+                  : 'absent',
+          message:
+            planWriter.state === 'failed'
+              ? planWriter.error
+              : ofThisReport && stored.status === 'failed'
+                ? stored.error
+                : ofThisReport && stored.status === 'ready' && stored.plan?.usable === false
+                  ? stored.plan.corrections.at(-1) ?? null
+                  : null,
+          onWrite: planWriter.write,
+          disabled: isDemo || revising,
+        };
 
   const apply = async () => {
     if (!proposal) return;
@@ -175,6 +212,7 @@ export function ConsulenteReport({ ownerId, document, assets, goalData, pageId, 
         applyState,
         activePlanNote,
         handoff,
+        planRow,
       }}
       canApply={canApply}
       onApply={() => void apply()}

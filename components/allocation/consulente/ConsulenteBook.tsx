@@ -35,6 +35,7 @@ import type { GoalPlan, planRoleChanges } from '@/lib/utils/allocationAdviceAppl
 import { bookIndexOf, bookPageUrl, buildBookPages, turnDirection, type BookPage, type BookPageId } from '@/lib/utils/allocationAdviceBook';
 import { BOOK_COPY, describeInterviewAside, HANDOFF_ACTION_LABEL, REVISION_COPY, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
 import { CONSULENTE_HANDOFF_HREF } from '@/lib/utils/allocationAdviceDocument';
+import { operatingPlanOf } from '@/lib/utils/operatingPlan';
 import { cardItem, sceneVariants, sceneVariantsReduced, staggerContainer } from '@/lib/utils/motionVariants';
 import type { PageVerdictModel } from '@/lib/utils/narrative';
 import { useCompactLayout } from '@/lib/hooks/useCompactLayout';
@@ -52,11 +53,13 @@ import { InterviewBody } from './ConsulenteInterviewTile';
 import { describeRevisionAside, RevisionBody, useRevisionDraft, type RevisionDraft } from './ConsulenteRevisionTile';
 import {
   applyPieces,
+  BUTTON_CLASS,
   consulenteReportEntrance,
   goalsPieces,
   instrumentsPieces,
   MARKDOWN_COMPONENTS,
   modelAside,
+  planPieces,
   proposalPieces,
   risksPieces,
   rolesPieces,
@@ -66,7 +69,6 @@ import {
 import { useSceneTurn } from './useSceneTurn';
 import type { useConsulenteRevision } from './useConsulenteRevision';
 
-const BUTTON_CLASS = 'h-11 desktop:h-9';
 const REMARK_PLUGINS = [remarkGfm];
 const VERDICT_LABEL = 'Verdetto del Consulente';
 
@@ -108,6 +110,10 @@ function piecesOf(page: BookPage, pages: readonly BookPage[], props: ConsulenteB
       return proposal && proposal.goals.length > 0 ? goalsPieces(proposal) : NO_PIECES;
     case 'ruoli':
       return proposal ? rolesPieces(props.roles) : NO_PIECES;
+    case 'piano': {
+      const plan = operatingPlanOf(document);
+      return plan ? planPieces(plan) : NO_PIECES;
+    }
     case 'rischi':
       return proposal ? risksPieces(proposal) : NO_PIECES;
     case 'colloquio':
@@ -185,6 +191,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
     hasRoles: proposal !== null && roles.changes.length + roles.unmatched.length > 0,
     hasInterview: (document.interview?.rounds.length ?? 0) > 0,
     hasReport: document.report !== null,
+    hasPlan: operatingPlanOf(document) !== null,
   });
   const index = bookIndexOf(pages, pageId);
   const page = pages[index];

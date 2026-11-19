@@ -20,6 +20,7 @@ export type BookPageId =
   | 'obiettivi'
   | 'ruoli'
   | 'passi'
+  | 'piano'
   | 'rischi'
   | 'report'
   | 'colloquio'
@@ -37,7 +38,7 @@ export interface BookPageSpec {
   generated: boolean;
 }
 
-/** The ten pages in reading order; `report` is not here — `buildBookPages` inserts it after `copertina` in the degenerate book. */
+/** The eleven pages in reading order; `report` is not here — `buildBookPages` inserts it after `copertina` in the degenerate book. */
 export const BOOK_PAGE_TABLE: readonly BookPageSpec[] = [
   { id: 'copertina', title: 'In una frase', aliases: ['in una frase', 'la situazione', 'la tua richiesta'], generated: false },
   {
@@ -50,6 +51,8 @@ export const BOOK_PAGE_TABLE: readonly BookPageSpec[] = [
   { id: 'obiettivi', title: 'Gli obiettivi', aliases: ['gli obiettivi', 'obiettivi'], generated: true },
   { id: 'ruoli', title: 'Casa, fondi pensione e illiquidi', aliases: ['casa, fondi pensione e illiquidi'], generated: true },
   { id: 'passi', title: 'Cosa fare adesso', aliases: ['cosa fare adesso'], generated: true },
+  // The operating plan (2026-11-19): the stage's structured object, never a section of the text.
+  { id: 'piano', title: 'Il piano operativo', aliases: [], generated: true },
   { id: 'rischi', title: 'Rischi e revisione', aliases: ['rischi e revisione', 'i rischi', 'la revisione'], generated: true },
   { id: 'colloquio', title: 'Il colloquio', aliases: [], generated: false },
   { id: 'modifica', title: 'Chiedi una modifica', aliases: [], generated: false },
@@ -236,6 +239,8 @@ export interface BookPageInput {
   hasRoles: boolean;
   hasInterview: boolean;
   hasReport: boolean;
+  /** A usable operating plan written on this report (`operatingPlanOf(document) !== null`, 2026-11-19). */
+  hasPlan: boolean;
 }
 
 export interface BookPage {
@@ -248,8 +253,8 @@ export interface BookPage {
 /**
  * The pages of the book, in order. A page exists when it has text or figures: the proposal's two
  * (`allocazione`, `rischi` — the review date is required, so a proposal always has its risks page),
- * the instruments, the goals, the roles, the interview, the revision with a report; `passi` only
- * with its section; the cover and «Applica» always.
+ * the instruments, the goals, the roles, the interview, the revision with a report, the operating
+ * plan with a plan; `passi` only with its section; the cover and «Applica» always.
  */
 export function buildBookPages(input: BookPageInput): BookPage[] {
   const source = input.source ?? 'report';
@@ -266,6 +271,7 @@ export function buildBookPages(input: BookPageInput): BookPage[] {
     obiettivi: input.hasGoals,
     ruoli: input.hasRoles,
     passi: false,
+    piano: input.hasPlan,
     rischi: input.hasProposal,
     report: false,
     colloquio: input.hasInterview,

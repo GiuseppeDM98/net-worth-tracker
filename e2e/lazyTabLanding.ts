@@ -66,8 +66,12 @@ export async function expectAccumuloTabLandsInPlace(page: Page): Promise<void> {
   expect(tabChunk.held(), 'the Accumulo tab\'s chunk is held while the placeholder is measured').toBeGreaterThan(0);
 
   tabChunk.release();
-  // A tile is a `section` (components/ui/tile.tsx); the verdict is one too, so it is left out.
-  const firstTile = panel.locator('section:not([aria-label^="Verdetto"])').first();
+  // A tile is a `section` with its `aria-label` (components/ui/tile.tsx); the verdict is one too, so it is
+  // left out. The placeholder holds an UNLABELLED `section` (the verdict's skeleton) for a frame or two after
+  // the chunk lands: matched by an unlabelled selector, it was measured while React removed it — a `null`
+  // box, the flake of 2026-11-18/19 (doc/guide/e2e-suite.md) — so the check waits for the placeholder to go.
+  await expect(panel.getByRole('status', { name: 'Caricamento' })).toHaveCount(0, { timeout: 30_000 });
+  const firstTile = panel.locator('section[aria-label]:not([aria-label^="Verdetto"])').first();
   await expect(firstTile).toBeVisible({ timeout: 30_000 });
   expect(Math.abs((await settledTopOf(firstTile)) - placeholderTop)).toBeLessThan(1);
 }

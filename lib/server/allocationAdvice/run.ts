@@ -8,10 +8,20 @@ import {
   ALLOCATION_ADVICE_STRATEGY_MODEL,
   SERVER_SIDE_FALLBACK_BETA,
 } from '@/lib/constants/aiModels';
-import { buildAssistantYtdContext } from '@/lib/services/assistantMonthContextService';
+import { buildAssistantYtdContext, fetchSettings } from '@/lib/services/assistantMonthContextService';
+import { getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
+import { calculateAssetValue } from '@/lib/services/assetService';
+import { compareAllocations } from '@/lib/services/assetAllocationService';
+import { unitPriceEur } from '@/lib/utils/costBasisEur';
+import { isPlanSourceAccount, resolveInvestmentAccountId, resolvePlanReserve } from '@/lib/utils/accumulationPlanUtils';
+import { addMonths, monthLabelLong, toMonthKey } from '@/lib/utils/planMonths';
+import { buildTargetsFromProposal } from '@/lib/utils/allocationAdviceApply';
+import { buildOperatingPlanFacts } from '@/lib/utils/operatingPlanFacts';
+import { reconcileOperatingPlan } from '@/lib/utils/operatingPlan';
+import { operatingPlanAnswerSchema, parseOperatingPlanAnswer } from '@/lib/utils/operatingPlanSchema';
 import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import { formatBundleForPrompt, formatPortfolioForPrompt } from '@/lib/server/assistant/prompts';
-import { buildInstrumentsPrompt, buildInterviewPrompt, buildReviewPrompt, buildRevisionPrompt, buildStrategyPrompt, formatAccumulationPlanForPrompt } from './prompts';
+import { buildInstrumentsPrompt, buildInterviewPrompt, buildPlanPrompt, buildReviewPrompt, buildRevisionPrompt, buildStrategyPrompt, formatAccumulationPlanForPrompt, formatOperatingPlanFacts } from './prompts';
 import { readAccumulationPlanForAdvice } from './accumulationPlan';
 import { archiveAllocationAdviceAdmin, getAllocationAdviceAdmin, listAllocationAdviceHistoryAdmin, patchAllocationAdviceAdmin, setAllocationAdviceAdmin } from './store';
 import {
@@ -30,6 +40,7 @@ import {
   type AllocationAdviceDocument,
   type AllocationAdviceInterview,
   type AllocationAdviceInterviewRound,
+  type AllocationAdviceOperatingPlan,
   type AllocationAdvicePreviousPaths,
   type AllocationAdvicePriorPlan,
   type AllocationAdviceRunStage,
@@ -67,6 +78,8 @@ import type { InstrumentProfile } from '@/types/exposure';
 export const ALLOCATION_ADVICE_MAX_TOKENS = 32000;
 /** An interview round is a note and at most four questions: half the strategy's budget, most of it reasoning. */
 export const ALLOCATION_ADVICE_INTERVIEW_MAX_TOKENS = 16000;
+/** The operating plan (2026-11-19) is one object of a few dozen rows: the interview's budget. */
+export const ALLOCATION_ADVICE_PLAN_MAX_TOKENS = 16000;
 /**
  * How many searches the instrument agent may run. Twelve ran out on a lived portfolio
  * (2026-10-20: two left unverified «perché il limite di ricerche è finito prima»); the prompt now
@@ -122,6 +135,8 @@ export const ALLOCATION_ADVICE_MAX_CONTINUATIONS = 3;
 const ALLOCATION_ANSWER_FORMAT = { type: 'json_schema' as const, schema: betaZodOutputFormat(allocationAdviceAnswerSchema).schema };
 /** The interview round's wire form (`interviewRoundSchema`): `note` first, so the model reads before it asks. */
 const INTERVIEW_FORMAT = { type: 'json_schema' as const, schema: betaZodOutputFormat(interviewRoundSchema).schema };
+/** The operating plan's wire form (`operatingPlanAnswerSchema`, 2026-11-19): optional keys only, no record. */
+const OPERATING_PLAN_FORMAT = { type: 'json_schema' as const, schema: betaZodOutputFormat(operatingPlanAnswerSchema).schema };
 
 /** A stage's answer is usable only when the model finished on its own. */
 function assertFinished(stage: CallStage, answer: CollectedAnswer): void {
@@ -141,7 +156,7 @@ interface ModelCall {
   effort: 'low' | 'medium' | 'high';
   /** Web search: the instrument stage only — its citations rule out a structured answer. */
   webSearch?: boolean;
-  /** The structured answer's wire schema: the strategy, the review and the revision (`ALLOCATION_ANSWER_FORMAT`), the interview (`INTERVIEW_FORMAT`). */
+  /** The structured answer's wire schema: the strategy, the review and the revision (`ALLOCATION_ANSWER_FORMAT`), the interview (`INTERVIEW_FORMAT`), the plan (`OPERATING_PLAN_FORMAT`). */
   format?: { type: 'json_schema'; schema: Record<string, unknown> };
   /** The output budget; `ALLOCATION_ADVICE_MAX_TOKENS` when absent. */
   maxTokens?: number;
@@ -214,7 +229,7 @@ async function callModel(stage: CallStage, call: ModelCall): Promise<CollectedAn
 // three requests, one per model call, each its own function invocation under the ceiling:
 // `runAllocationAdviceStage` runs ONE stage on the persisted document and the client chains
 // them (`useConsulenteRun`); a failed stage is retried from that stage, never from scratch.
-// `runAllocationAdvice` is the three in sequence for a caller with no ceiling (and the tests).
+// `runAllocationAdvice` is the four in sequence for a caller with no ceiling (and the tests).
 
 export interface RunAllocationAdviceStageArgs {
   userId: string;
@@ -231,7 +246,7 @@ export interface RunAllocationAdviceStageArgs {
   now?: Date;
 }
 
-/** The document's stage a request belongs to: a revision is the review again. */
+/** The document's stage a request belongs to: a revision is the review again; the plan is its own. */
 function documentStageOf(stage: AllocationAdviceRunStage): AllocationAdviceStage {
   return stage === 'revise' ? 'review' : stage;
 }
@@ -450,7 +465,88 @@ async function runRevise(document: AllocationAdviceDocument, request: string, in
   document.revisions = [...(document.revisions ?? []), { request, at: new Date() }];
   document.revisionInterview = interview ?? null;
   document.status = 'ready';
-  await patchAllocationAdviceAdmin(document.userId, { report: document.report, revisions: document.revisions, revisionInterview: document.revisionInterview, status: 'ready' });
+  // A new report: the plan written on the old one goes with it (2026-11-19); the client asks a new one.
+  document.operatingPlan = null;
+  await patchAllocationAdviceAdmin(document.userId, { report: document.report, revisions: document.revisions, revisionInterview: document.revisionInterview, status: 'ready', operatingPlan: null });
+}
+
+// ─── The operating plan, a request of its own (2026-11-19) ─────────────────────
+//
+// The fifth stage writes `document.operatingPlan` and NOTHING else: never `enterStage`, never
+// `status`, `stage`, `error` (the document's status is the report's, P1), never `updatedAt` (its
+// patches keep it, P10). A failure lands on `operatingPlan` and is rethrown; the report stays readable.
+
+const PLAN_NO_REPORT = "Non c'è un report finito su cui scrivere il piano. Avvia la ricerca.";
+const PLAN_UNREADABLE = 'Il Consulente non ha scritto un piano leggibile. Premi «Scrivi il piano operativo»: di norma la seconda volta rientra.';
+const PLAN_UNEXPECTED = 'Il piano operativo si è interrotto per un errore imprevisto. Premi «Scrivi il piano operativo».';
+
+async function patchOperatingPlan(userId: string, document: AllocationAdviceDocument, operatingPlan: AllocationAdviceOperatingPlan): Promise<void> {
+  document.operatingPlan = operatingPlan;
+  await patchAllocationAdviceAdmin(userId, { operatingPlan }, { keepUpdatedAt: true });
+}
+
+async function runPlan(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, now: Date): Promise<void> {
+  const { report, instruments, userId } = document;
+  // P11: only on a finished report; a revision left `failed`, or a run still `running`, is refused.
+  if ((document.status !== 'ready' && document.status !== 'applied') || !report?.proposal || !instruments) {
+    throw new AllocationAdviceStageError('plan', PLAN_NO_REPORT, false);
+  }
+  const [assets, settings, cashflowBlock, planRead] = await Promise.all([
+    getUserAssetsAdmin(userId),
+    fetchSettings(userId),
+    readCashflowBlockForPrompt(userId, now),
+    readAccumulationPlanForAdvice(userId, now),
+  ]);
+  const startedAt = now;
+  const reportFinishedAt = report.finishedAt;
+  const base = { model: null, startedAt, finishedAt: null, reportFinishedAt };
+  await patchOperatingPlan(userId, document, { status: 'running', plan: null, error: null, ...base });
+  onStage('plan');
+  try {
+    const deps = { valueOf: calculateAssetValue, priceOf: unitPriceEur };
+    const facts = buildOperatingPlanFacts({
+      assets,
+      proposal: report.proposal,
+      candidates: instruments.candidates,
+      keepNames: document.answers.keepAssets,
+      limits: settings?.idealAllocation?.instrumentLimits ?? [],
+      ...deps,
+    });
+    const accountId = resolveInvestmentAccountId(settings, assets);
+    const account = accountId ? assets.find((asset) => asset.id === accountId) : undefined;
+    const accountsEur = assets.filter(isPlanSourceAccount).reduce((sum, asset) => sum + calculateAssetValue(asset), 0);
+    // The reserve the click will use; indicative under goal-driven targets (the click recomputes it).
+    const { reserveEur } = resolvePlanReserve(assets, buildTargetsFromProposal(report.proposal), compareAllocations, deps, 0, accountId ? [accountId] : undefined);
+    const factsBlock = formatOperatingPlanFacts({
+      facts,
+      firstMonthLabel: monthLabelLong(addMonths(toMonthKey(now), 1)),
+      investmentAccount: account ? { name: account.name, balanceEur: calculateAssetValue(account) } : null,
+      accountsEur,
+      reserveEur,
+    });
+    const answer = await callModel('plan', {
+      model: ALLOCATION_ADVICE_STRATEGY_MODEL,
+      effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
+      format: OPERATING_PLAN_FORMAT,
+      maxTokens: ALLOCATION_ADVICE_PLAN_MAX_TOKENS,
+      prompt: buildPlanPrompt(
+        document.answers,
+        withBlock(report.markdown, ALLOCATION_PROPOSAL_BLOCK, report.proposal),
+        withBlock(instruments.markdown, INSTRUMENT_CANDIDATES_BLOCK, instruments.candidates),
+        instruments.candidates,
+        { factsBlock, cashflowBlock, accumulationPlan: formatAccumulationPlanForPrompt(planRead) }
+      ),
+    });
+    const raw = parseOperatingPlanAnswer(answer.text);
+    if (!raw) throw new AllocationAdviceStageError('plan', PLAN_UNREADABLE, true);
+    const plan = reconcileOperatingPlan(raw, facts);
+    await patchOperatingPlan(userId, document, { status: 'ready', plan, error: null, ...base, model: answer.model, finishedAt: new Date() });
+  } catch (error) {
+    if (!(error instanceof AllocationAdviceStageError)) console.error('[consulente] plan failed', error);
+    const message = error instanceof AllocationAdviceStageError ? error.message : PLAN_UNEXPECTED;
+    await patchOperatingPlan(userId, document, { status: 'failed', plan: null, error: message, ...base, finishedAt: new Date() });
+    throw new AllocationAdviceStageError('plan', message, true);
+  }
 }
 
 // ─── The interview, a request of its own (2026-11-08) ─────────────────────────
@@ -542,12 +638,15 @@ export async function runAllocationAdviceStage({ userId, stage, answers, documen
     if (stage === 'strategy') await runStrategy(document, onStage, priorPlan, now, previousPaths);
     else if (stage === 'instruments') await runInstruments(document, onStage, now);
     else if (stage === 'review') await runReview(document, onStage, now);
+    else if (stage === 'plan') await runPlan(document, onStage, now);
     else {
       if (!request) throw new AllocationAdviceStageError('review', 'Scrivi cosa vuoi cambiare nel report.');
       await runRevise(document, request, interview, onStage, now);
     }
     return document;
   } catch (error) {
+    // The plan's failure is already on `operatingPlan`: the document's status, error and stage stay the report's (P1).
+    if (stage === 'plan') throw error;
     const failure =
       error instanceof AllocationAdviceStageError
         ? error
@@ -561,9 +660,15 @@ export async function runAllocationAdviceStage({ userId, stage, answers, documen
   }
 }
 
-/** The three stages in sequence, for a caller with no ceiling on its time. */
+/** The four stages in sequence, for a caller with no ceiling on its time; the plan's failure never fails the run. */
 export async function runAllocationAdvice({ userId, answers, onStage, now = new Date() }: RunAllocationAdviceArgs): Promise<AllocationAdviceDocument> {
   let document = await runAllocationAdviceStage({ userId, stage: 'strategy', answers, onStage, now });
   document = await runAllocationAdviceStage({ userId, stage: 'instruments', document, onStage, now });
-  return runAllocationAdviceStage({ userId, stage: 'review', document, onStage, now });
+  document = await runAllocationAdviceStage({ userId, stage: 'review', document, onStage, now });
+  try {
+    document = await runAllocationAdviceStage({ userId, stage: 'plan', document, onStage, now });
+  } catch {
+    // The failure is on `document.operatingPlan`; the report is the run's result.
+  }
+  return document;
 }

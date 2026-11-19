@@ -16,9 +16,10 @@ import { useEffect, useState } from 'react';
 import type ReactMarkdown from 'react-markdown';
 import { Globe } from 'lucide-react';
 import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
+import type { OperatingPlan, OperatingPlanRow } from '@/lib/utils/operatingPlan';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import type { GoalPlan, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
-import { BOOK_COPY, describeProposalReading, HANDOFF_DRAFT_NOTE, HANDOFF_READING, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
+import { BOOK_COPY, describePlanAside, describePlanTaxTotal, describeProposalReading, HANDOFF_DRAFT_NOTE, HANDOFF_READING, OPERATING_PLAN_PAGE_COPY, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
 import type { ApplyHandoff } from '@/lib/utils/allocationAdviceDocument';
 import { formatCurrency, formatDate, formatNumberIt, formatPercentageIt, formatSignedPoints } from '@/lib/utils/formatters';
 import type { Narrative } from '@/lib/utils/narrative';
@@ -26,7 +27,12 @@ import { useCountUp } from '@/lib/utils/useCountUp';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS } from '@/lib/constants/aiAccent';
 import { cn } from '@/lib/utils';
+
+/** The footer's buttons: 44 px to touch below `desktop:`, 36 px from it (shared by the book and «Applica»'s plan row). */
+export const BUTTON_CLASS = 'h-11 desktop:h-9';
 
 /**
  * Once per JS session (a reload plays them again, a client navigation back does not): the first
@@ -247,6 +253,116 @@ export function risksPieces(proposal: AllocationAdviceProposal): BookPagePieces 
   };
 }
 
+/**
+ * «Il piano operativo» (2026-11-19): the stored plan as three groups — what it buys at which
+ * weight, what it stops buying, what it sells and when, with the app's figures in mono — then the
+ * taxes' total, the review month, where it departs from the report and the app's corrections. The
+ * names come from `plan.instruments` by key: no asset is read.
+ */
+export function planPieces(plan: OperatingPlan): BookPagePieces {
+  const nameOf = (ref: string) => plan.instruments.find((instrument) => instrument.ref === ref)?.name ?? ref;
+  const of = (action: OperatingPlanRow['action']) => plan.rows.filter((row) => row.action === action);
+  const buys = of('buy');
+  const holds = of('hold');
+  const sells = of('sell');
+  const taxTotal = describePlanTaxTotal(sells);
+  const group = (label: string, rows: OperatingPlanRow[], line: (row: OperatingPlanRow) => React.ReactNode) =>
+    rows.length === 0 ? null : (
+      <div className="mt-3">
+        <p className={TILE_SUB_EYEBROW_CLASS}>{label}</p>
+        <ul className="mt-1 divide-y divide-border" aria-label={label}>
+          {rows.map((row) => (
+            <li key={row.ref} className="py-2.5">
+              {line(row)}
+              {row.reason && <p className="mt-0.5 text-[12px] leading-[1.45] text-muted-foreground">{row.reason}</p>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  const sentences = (label: string, items: readonly string[]) =>
+    items.length === 0 ? null : (
+      <div className="mt-3">
+        <p className={TILE_SUB_EYEBROW_CLASS}>{label}</p>
+        <ul className="mt-1 flex flex-col gap-1" aria-label={label}>
+          {items.map((item, index) => (
+            <li key={index} className="text-[12px] leading-[1.45] text-foreground">
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  return {
+    aside: describePlanAside(plan),
+    reading: [{ text: plan.summary }],
+    body: (
+      <>
+        {group(OPERATING_PLAN_PAGE_COPY.buy, buys, (row) => (
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 text-[13px] text-foreground">{nameOf(row.ref)}</span>
+            <span className="shrink-0 font-mono text-[13px] tabular-nums text-foreground">{formatPercentageIt(row.targetPercentage, 2)}</span>
+          </div>
+        ))}
+        {group(OPERATING_PLAN_PAGE_COPY.hold, holds, (row) => (
+          <span className="text-[13px] text-foreground">{nameOf(row.ref)}</span>
+        ))}
+        {group(OPERATING_PLAN_PAGE_COPY.sell, sells, (row) => (
+          // The figures wrap under the name at 390: each part is a chunk of its own.
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <span className="min-w-0 text-[13px] text-foreground">{nameOf(row.ref)}</span>
+            <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
+              {[
+                row.sellQuantity !== undefined ? `${formatNumberIt(row.sellQuantity, 0)} quote` : OPERATING_PLAN_PAGE_COPY.allShares,
+                `${row.sellMonth ?? 1}º mese`,
+                `circa ${formatCurrency(row.estimatedProceedsEur ?? 0)}`,
+                typeof row.estimatedTaxEur === 'number' ? `tasse stimate ${formatCurrency(row.estimatedTaxEur)}` : OPERATING_PLAN_PAGE_COPY.taxUnknown[row.taxUnknownReason ?? 'rate'],
+              ].join(' · ')}
+            </span>
+          </div>
+        ))}
+        {taxTotal && <p className="mt-3 text-[12px] text-foreground">{taxTotal}</p>}
+        {plan.reviewMonth !== undefined && (
+          <p className="mt-2 text-[12px] leading-[1.45] text-foreground">
+            Da riguardare al {plan.reviewMonth}º mese{plan.reviewReason ? `: ${plan.reviewReason}` : '.'}
+          </p>
+        )}
+        {sentences(OPERATING_PLAN_PAGE_COPY.departures, plan.departures)}
+        {sentences(OPERATING_PLAN_PAGE_COPY.corrections, plan.corrections)}
+      </>
+    ),
+    footnote: <p className={FOOTNOTE_CLASS}>{OPERATING_PLAN_PAGE_COPY.footnote}</p>,
+  };
+}
+
+/**
+ * The row on «Applica» while the report has no usable plan (2026-11-19): absent, running, failed
+ * with its sentence, unusable with the last correction; the button asks the model (The AI-Accent
+ * Rule) and hides while the plan is being written.
+ */
+export interface PlanRow {
+  state: 'absent' | 'running' | 'failed' | 'unusable';
+  message: string | null;
+  onWrite: () => void;
+  disabled: boolean;
+}
+
+function PlanRowBlock({ row }: { row: PlanRow }) {
+  const sentence = row.state === 'absent' ? OPERATING_PLAN_PAGE_COPY.rowAbsent : row.state === 'running' ? OPERATING_PLAN_PAGE_COPY.rowRunning : row.message ?? OPERATING_PLAN_PAGE_COPY.rowAbsent;
+  return (
+    <div data-plan-row={row.state} className="flex flex-col gap-2 border-t border-border pt-3 tablet:flex-row tablet:items-center tablet:justify-between">
+      <p role="status" className={cn('text-[12px] leading-[1.45]', row.state === 'failed' || row.state === 'unusable' ? 'text-warning-foreground' : 'text-muted-foreground')}>
+        {sentence}
+      </p>
+      {row.state !== 'running' && (
+        <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'shrink-0', AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS)} onClick={row.onWrite} disabled={row.disabled}>
+          {OPERATING_PLAN_PAGE_COPY.action}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export type ApplyState = { phase: 'idle' } | { phase: 'writing' } | { phase: 'error'; message: string } | { phase: 'done' };
 
 /** «Applica»'s inputs: the document, the plans, the three choices and the write's state — all owned by the report. */
@@ -269,9 +385,11 @@ export interface ApplyPiecesInput {
   activePlanNote: string | null;
   /** After the write: the link to a plan toward the new targets, a draft's note, or nothing (`applyHandoffOf`). */
   handoff: ApplyHandoff;
+  /** The operating plan's row (2026-11-19); null when the report has a usable plan (`operatingPlanOf`). */
+  planRow: PlanRow | null;
 }
 
-/** «Applica»: one checkbox per thing it writes, the plans' warnings and the status line when ready with a proposal; once applied, the active plan's note and the hand-off's reading or the draft's note. */
+/** «Applica»: one checkbox per thing it writes, the plans' warnings and the status line when ready with a proposal; once applied, the active plan's note and the hand-off's reading or the draft's note; in both, the operating plan's row while there is no plan. */
 export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
   const { document, proposal, rows, roles, goalPlan, goalsCount, applyState } = input;
   return {
@@ -308,8 +426,9 @@ export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
           <p role="status" className={cn('min-h-[1.25rem] text-[12px]', applyState.phase === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
             {applyState.phase === 'error' ? applyState.message : applyState.phase === 'writing' ? 'Scrivo…' : applyState.phase === 'done' ? 'Applicato.' : ''}
           </p>
+          {input.planRow && <PlanRowBlock row={input.planRow} />}
         </div>
-      ) : document.status === 'applied' && (input.activePlanNote || input.handoff !== 'none') ? (
+      ) : document.status === 'applied' && (input.activePlanNote || input.handoff !== 'none' || input.planRow !== null) ? (
         // After the write the page keeps one line on the plan: an active plan's note, the offer's reading, a draft's note.
         <div className="mt-3 flex flex-col gap-3">
           {input.activePlanNote && <p className="text-[12px] text-warning-foreground">{input.activePlanNote}</p>}
@@ -317,6 +436,7 @@ export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
             <p className="text-[13px] leading-[1.45] text-muted-foreground">{HANDOFF_READING}</p>
           )}
           {input.handoff === 'draft' && <p className="text-[12px] text-warning-foreground">{HANDOFF_DRAFT_NOTE}</p>}
+          {input.planRow && <PlanRowBlock row={input.planRow} />}
         </div>
       ) : null,
     footnote: null,

@@ -44,6 +44,7 @@ const FULL: BookPageInput = {
   hasRoles: true,
   hasInterview: true,
   hasReport: true,
+  hasPlan: false,
 };
 
 describe('normalizeHeading', () => {
@@ -199,7 +200,7 @@ describe('buildBookPages', () => {
   });
 
   it('no text and no proposal (failed at the strategy): the cover «In una frase» and «Applica»', () => {
-    const pages = buildBookPages({ markdown: null, source: null, hasProposal: false, hasInstruments: false, hasGoals: false, hasRoles: false, hasInterview: false, hasReport: false });
+    const pages = buildBookPages({ markdown: null, source: null, hasProposal: false, hasInstruments: false, hasGoals: false, hasRoles: false, hasInterview: false, hasReport: false, hasPlan: false });
     expect(pages.map((page) => page.id)).toEqual(['copertina', 'applica']);
     expect(pages[0]).toMatchObject({ title: 'In una frase', text: null, generated: false });
   });
@@ -214,6 +215,14 @@ describe('buildBookPages', () => {
     const oneHeading = buildBookPages({ ...FULL, markdown: '## In una frase\nSolo questo.', source: 'strategy', hasReport: false });
     expect(oneHeading[0]).toMatchObject({ title: 'La situazione', text: null });
     expect(oneHeading[1]).toMatchObject({ id: 'report', title: 'La strategia', text: '## In una frase\nSolo questo.' });
+  });
+
+  // U11 (2026-11-19). Mutation: `figures.piano` true always.
+  it('the operating plan is the page between passi and rischi, only with a plan', () => {
+    expect(ids({ ...FULL, hasPlan: true })).toEqual(['copertina', 'allocazione', 'strumenti', 'obiettivi', 'ruoli', 'passi', 'piano', 'rischi', 'colloquio', 'modifica', 'applica']);
+    const plan = buildBookPages({ ...FULL, hasPlan: true }).find((page) => page.id === 'piano');
+    expect(plan).toMatchObject({ title: 'Il piano operativo', text: null, generated: true });
+    expect(ids(FULL)).not.toContain('piano');
   });
 
   it('the accent: never on colloquio, modifica, applica', () => {
