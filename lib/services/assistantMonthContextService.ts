@@ -177,7 +177,7 @@ async function fetchExpenses(
   });
 }
 
-/** The settings the server reads, a field at a time: the SIXTH place a new settings field is added to (doc/guide/impostazioni.md). */
+/** The settings the server reads, a field at a time: the EIGHTH place a new settings field is added to (doc/guide/impostazioni.md § Settings). */
 export async function fetchSettings(userId: string): Promise<AssetAllocationSettings | null> {
   const doc = await adminDb.collection('assetAllocationTargets').doc(userId).get();
   if (!doc.exists) {

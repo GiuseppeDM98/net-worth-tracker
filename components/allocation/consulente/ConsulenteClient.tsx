@@ -5,8 +5,8 @@
  *
  * Three views on one page, by what the account holds: the PATH (one question per screen,
  * «Indietro» always available, the draft kept on this browser, then the interview's rounds in the
- * same card, 2026-11-08), the RUN (the three stages of
- * the two agents, persisted after each so a reload shows where it is), the REPORT read as a book
+ * same card, 2026-11-08), the RUN (the stages of
+ * the two agents and, since 2026-11-19, the operating plan, persisted after each so a reload shows where it is), the REPORT read as a book
  * (the verdict on the cover, one page per section of the text and tile of figures, «Applica» last
  * with one checkbox per thing it writes; a page is an address, `?pagina=`, 2026-11-08). Not a tile grid: like the Assistente, the content is
  * a conversation — here a form — so the page is one column at 720px (900px at 1440, the path's rail beside the card) and nothing is composed,

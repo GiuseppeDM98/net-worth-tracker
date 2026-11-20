@@ -299,8 +299,8 @@
   it. The spec installs `page.route('**/api/allocation-advice/run', …)` BEFORE the click and answers each request by
   its `stage` with an SSE body (`data: {json}\n\n`: the `stage` events, then `done` or `error`; an interview round is ONE `interview` event, `e2e/consulenteInterview.ts`); a request it must
   hold to read a state is answered after the assertion. No dummy key in `package.json`, no real request from a spec.
-  Worked example: `e2e/allocation.consulente.spec.ts` › «runs the three stages on a faked route, a failed stage
-  retried from itself». **A fake that stands for a route which WRITES does the write itself** (2026-11-10,
+  Worked example: `e2e/allocation.consulente.spec.ts` › «runs the stages on a faked route, a failed stage
+  retried from itself, then the operating plan». **A fake that stands for a route which WRITES does the write itself** (2026-11-10,
   `e2e/assistantRegister.ts`): the Assistente's stream route stores the thread and the two messages before it answers,
   and the card's PATCH and the reload read them — so the fake writes them with the Admin SDK and answers `done` with
   the id it wrote; the real PATCH and thread routes then run against real documents. Since 2026-11-12 the

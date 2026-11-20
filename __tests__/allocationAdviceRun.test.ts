@@ -1,5 +1,6 @@
 /**
- * The Consulente's run (lib/server/allocationAdvice/run.ts): the three model calls in order
+ * The Consulente's run (lib/server/allocationAdvice/run.ts): the model calls in order (the
+ * operating plan the fourth since 2026-11-19)
  * with their models, efforts, tools and answer formats, the document persisted after every
  * stage, a proposal the schema refuses that fails the strategy, a `max_tokens` cut said in the
  * product's words, the review's proposal falling back to the strategy's, a paused turn resumed;
@@ -172,7 +173,7 @@ describe('runAllocationAdvice', () => {
     planMock.mockResolvedValue({ read: true, plan: null });
   });
 
-  it('runs the three stages in order, on their models, efforts and formats, with web search only for the instruments, and persists each', async () => {
+  it('runs the stages in order (the operating plan the last), on their models, efforts and formats, with web search only for the instruments, and persists each', async () => {
     const reviewed = { ...PROPOSAL, summary: 'Rivista.' };
     const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(reviewed), 'end_turn', 'opus'), message(planText, 'end_turn', 'opus'));
     assetsMock.mockResolvedValueOnce([ORNITORINCO]);
@@ -217,7 +218,7 @@ describe('runAllocationAdvice', () => {
     expect(setMock).toHaveBeenCalledTimes(1);
     expect(firstWrite).toMatchObject({ userId: 'u1', status: 'running', stage: 'context' });
     const patches = patchMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
-    // The plan's two patches are `operatingPlan` alone, sent without moving `updatedAt` (P1, P10).
+    // The plan's two patches are `operatingPlan` alone, sent without moving `updatedAt` (2026-11-19).
     expect(patches.map((patch) => Object.keys(patch).join('+'))).toEqual(['stage+status+error', 'strategy', 'stage+status+error', 'instruments', 'stage+status+error', 'report+status', 'operatingPlan', 'operatingPlan']);
     expect(patches[5]).toMatchObject({ status: 'ready' });
     expect(patches[6].operatingPlan).toMatchObject({ status: 'running', plan: null, error: null, reportFinishedAt: document.report?.finishedAt });
@@ -896,7 +897,7 @@ describe('the operating plan stage', () => {
     expect(document.operatingPlan?.finishedAt).toBeInstanceOf(Date);
   });
 
-  // U10. Mutation: the generic catch lets the plan's failure patch the document's status.
+  // 2026-11-19. Mutation that turned it red: the generic catch lets the plan's failure patch the document's status.
   it('an unreadable answer fails the plan alone: operatingPlan failed, the status untouched, the error retryable', async () => {
     answerWith(message('Non è un piano.'));
     const document = finishedReport();
@@ -913,12 +914,28 @@ describe('the operating plan stage', () => {
     for (const call of patchMock.mock.calls) expect(call[2]).toEqual({ keepUpdatedAt: true });
   });
 
-  it("an unexpected error is said in the plan's words, and never touches the document", async () => {
+  it("an unexpected error after the running patch is said in the plan's words, and never touches the document", async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     answerWith(message(planText));
-    assetsMock.mockResolvedValueOnce(null as never);
-    await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'plan', document: finishedReport(), onStage: vi.fn(), now: NOW })).rejects.toMatchObject({ stage: 'plan', retryable: true });
+    patchMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('the ready patch failed'));
+    await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'plan', document: finishedReport(), onStage: vi.fn(), now: NOW })).rejects.toMatchObject({
+      stage: 'plan',
+      retryable: true,
+      message: 'Il piano operativo si è interrotto per un errore imprevisto. Premi «Scrivi il piano operativo».',
+    });
     for (const call of patchMock.mock.calls) expect(Object.keys(call[1] as object)).toEqual(['operatingPlan']);
+    expect((patchMock.mock.calls.at(-1)?.[1] as { operatingPlan: { status: string } }).operatingPlan.status).toBe('failed');
+  });
+
+  // The facts, the account and the reserve are computed BEFORE the `running` patch, like the reads
+  // (2026-11-19, found at the retirement: they ran after it, so a failure there wrote a failed plan).
+  // Mutation that turned it red: the running patch moved back above `buildOperatingPlanFacts`.
+  it('a failure computing the facts patches nothing and calls no model', async () => {
+    const calls = answerWith(message(planText));
+    assetsMock.mockResolvedValueOnce(null as never);
+    await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'plan', document: finishedReport(), onStage: vi.fn(), now: NOW })).rejects.toBeDefined();
+    expect(patchMock).not.toHaveBeenCalled();
+    expect(calls).not.toHaveBeenCalled();
   });
 
   it('refuses a document running, failed or without a report, with nothing patched and no model called', async () => {

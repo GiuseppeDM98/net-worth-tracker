@@ -47,7 +47,7 @@ const PLAN: OperatingPlan = {
 };
 
 describe('planPieces', () => {
-  // R1. Mutation: the sell group rendered without the month.
+  // 2026-11-19. Mutation that turned it red: the sell group rendered without the month.
   it('draws the three groups, the sales with quantity, month, proceeds and tax, the total, the review, the departures and the corrections', () => {
     const pieces = planPieces(PLAN);
     expect(pieces.aside).toBe(`12 mesi · ${formatCurrency(500)} al mese`);
@@ -129,7 +129,7 @@ describe('«Applica» and the operating plan row', () => {
     }).body;
   const row = (state: PlanRow['state'], message: string | null = null, onWrite = vi.fn(), disabled = false): PlanRow => ({ state, message, onWrite, disabled });
 
-  // R2. Mutation: the row hidden on `applied`.
+  // 2026-11-19. Mutation that turned it red: the row hidden on `applied`.
   it('says each of the four states, on a ready and on an applied document with no note and no hand-off', async () => {
     for (const status of ['ready', 'applied'] as const) {
       const onWrite = vi.fn();

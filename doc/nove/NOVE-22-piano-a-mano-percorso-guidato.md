@@ -1,7 +1,7 @@
 # NOVE-22 — A plan of accumulation by hand: the guided path that creates it
 
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (retired on 2026-11-19, PR #557; `disposalMonthIndex`, `sale_month_out`,
-> `resolveInvestmentAccountId`, `listSaleSteps`, `removeOwnerPlans`), **NOVE-24** (`resolvePlanReserve`'s
+> `resolveInvestmentAccountId`, `listSaleSteps`, `removeOwnerPlans`), **NOVE-24** (retired on 2026-11-19, PR #559; `resolvePlanReserve`'s
 > `sourceIds`) **and NOVE-25** (`createAndActivatePlan`, `resolveEffectiveTargets`, `lib/utils/accumuloCopy.ts`,
 > `updateDraftPlan` replacing a draft whole, the gate's `source_missing`, the editor freed of the hand-off). Fourth
 > of the five specs of «dal Consulente al piano di accumulo, in un clic»: who builds a plan WITHOUT the Consulente
@@ -157,7 +157,7 @@ export function PathDoneCard(props: { ariaLabel: string; headline: string; help:
   of its copy.
 - The Consulente: `ConsulenteWizard.tsx`, `ConsulenteBook.tsx` and `ConsulenteInterviewScene.tsx` import
   `PATH_HEADLINE_CLASS` / `PATH_HELP_CLASS` / `PATH_BUTTON_CLASS` from `components/ui/path-card.tsx` and delete
-  their own copies — `ConsulenteWizard.tsx:91-93` (its exported `HEADLINE_CLASS` goes, and `ConsulenteBook.tsx:50`'s
+  their own copies — `ConsulenteWizard.tsx:91-93` (its exported `HEADLINE_CLASS` goes, and `ConsulenteBook.tsx:51`'s
   import of it with it), `ConsulenteInterviewScene.tsx:35-36`, and the `BUTTON_CLASS` NOVE-24 moved to
   `ConsulenteBookPages.tsx` (every copy is the same string, measured on 2026-11-19: `'h-11 desktop:h-9'` and the
   24/30px headline); `ConsulenteWizard.tsx` also imports `numberOrNull` from `components/ui/path-fields.tsx` and
@@ -270,7 +270,7 @@ sale.quantity ?? undefined, monthIndex: sale.month, status: 'planned', estimated
 - **`seedPlanPathPositions`** (the editor's own helpers, unchanged): `sold` = the assets of `answers.sales` with
   `quantity: null`; `base = seedPositionsFromAssets(assets, deps.valueOf)` WITHOUT every position whose only
   member is in `sold` (`applyWeightsToPositions` and `applyModelToPositions` use `sold` only to not ADD a
-  position, `lib/utils/accumulationPlanUtils.ts:1318-1371`: a row already in the base would stay); `model` →
+  position, `lib/utils/accumulationPlanUtils.ts:1323-1376`: a row already in the base would stay); `model` →
   `applyModelToPositions(base, model, sold, labelOf)`; `today` → `applyWeightsToPositions(base,
   marketWeights(<the assets that are members of base's positions>, deps), sold, labelOf)` — the weights among
   the instruments that stay; `zero` → `base` with every quota 0; `seed` → `answers.seed.positions`; `draft` → the

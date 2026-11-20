@@ -12,9 +12,10 @@ import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, ALLOCATION_ADVICE_RUN_STAGES, t
  *
  * Body: { userId, stage, answers?, request?, interview?, revision? }. ONE stage per request (`strategy` · `instruments` ·
  * `review` · `plan`, the operating plan on the finished report (2026-11-19), plus `revise` — «Chiedi una modifica» on a finished report, with `request`): the strategy takes the answers, validated against the ONE schema the screens typed
- * them with, and creates the document; the other two continue the persisted document. Each
+ * them with, and creates the document; the stages after it continue the persisted document. Each
  * request streams SSE (`stage` events, then `done` with the document, or `error`), and the
- * client chains the three (`useConsulenteRun`), retrying a failed stage from itself.
+ * client chains them (`useConsulenteRun`), retrying a failed stage from itself (the plan never
+ * fails the run: its failure lives on `operatingPlan`).
  *
  * `stage: 'interview'` (2026-11-08; doc/guide/consulente.md § The run) is a branch of its own: with
  * `answers` and `interview` (the rounds so far; `revision: { requests }` for the ONE round before
@@ -22,8 +23,8 @@ import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, ALLOCATION_ADVICE_RUN_STAGES, t
  * write to `allocationAdvice/{uid}` — and streams one terminal event, `interview` or `error`.
  * The strategy and the revise carry `interview` into the document (`interview`, `revisionInterview`).
  *
- * Why three requests: a model call with reasoning (two on Opus 5.5, one on Sonnet 5.5 with web
- * search) is minutes — the owner's run of 2026-10-20 took 396 s, the strategy alone 210 s — and
+ * Why one request per stage: a model call with reasoning (on Opus 5.5, the instruments on Sonnet 5.5
+ * with web search) is minutes — the owner's run of 2026-10-20 took 396 s, the strategy alone 210 s — and
  * Vercel's Hobby plan stops a function at 300 s (60 s without Fluid compute: it must be on).
  * `maxDuration` is that ceiling; a stage that outlives it is cut with a 504 and the document
  * stays on that stage, which «Riprova» resumes.
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     const ownerId = typeof body.userId === 'string' ? body.userId : null;
     await assertCanAccessAccount(decodedToken, ownerId);
 
-    // No stage is the first one (an older client); a stage outside the three, the revise and the interview is a bad request.
+    // No stage is the first one (an older client); a stage outside the run's stages, the revise and the interview is a bad request.
     const stage: AllocationAdviceRunStage | 'interview' | null =
       body.stage === undefined
         ? 'strategy'
