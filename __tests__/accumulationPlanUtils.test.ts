@@ -983,7 +983,7 @@ describe('resolveInvestmentAccountId', () => {
   });
 });
 
-// ── The swap (owner, 2026-11-20, NOVE-25's phase F on the mirror): a sale whose proceeds buy ONE named
+// ── The swap (owner, 2026-11-20, on the mirror tour of the one-click «Applica»): a sale whose proceeds buy ONE named
 // instrument in the sale's month, never the reserve. Invented figures: 3.000 € under the reserve, 500 € a month,
 // 12 months, an old ETF sold in month 1 for 4.000 € that buys a bond at 100 €.
 describe('the swap: a sale that buys one instrument in its month', () => {

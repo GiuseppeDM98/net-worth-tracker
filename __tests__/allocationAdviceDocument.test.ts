@@ -136,7 +136,7 @@ describe('the interview on the document (2026-11-08: null when absent)', () => {
 
 // ── «Applica» creates the plan of accumulation (2026-11-20) ─────────────────────────────────
 describe('the hand-off is gone, and the Consulente route stays light', () => {
-  // U11: the exports of the editor's hand-off are removed.
+  // The exports of the editor's hand-off are removed (2026-11-20).
   it('allocationAdviceDocument no longer exports the hand-off', async () => {
     const exported: Record<string, unknown> = await import('@/lib/utils/allocationAdviceDocument');
     for (const name of ['applyHandoffOf', 'handoffProposalOf', 'CONSULENTE_HANDOFF_HREF']) expect(exported[name], name).toBeUndefined();
@@ -145,12 +145,13 @@ describe('the hand-off is gone, and the Consulente route stays light', () => {
     expect(true as unknown as Gone).toBe(true);
   });
 
-  // U12. Mutation that turns it red: a static import of '@/lib/utils/advicePlan' in ConsulenteReport.tsx.
+  // Mutation that turns it red: a static import of '@/lib/utils/advicePlan' — or of the tick's sentences,
+  // '@/lib/utils/advicePlanNarrative' (2026-11-20) — in ConsulenteReport.tsx.
   it('only ConsulentePlanTick imports the plan\'s builder and utils; the executor only through import(); the tick only through lazyComponent()', () => {
     const dir = join(process.cwd(), 'components/allocation/consulente');
     const sources = readdirSync(dir).filter((name) => name.endsWith('.tsx'));
     expect(sources).toContain('ConsulentePlanTick.tsx');
-    const heavy = /@\/lib\/utils\/(advicePlan|accumulationPlanUtils|accumulationNarrative|operatingPlanFacts|operatingPlanSchema|allocationAdviceHandoff|weightOptimizer)['"]/;
+    const heavy = /@\/lib\/utils\/(advicePlan|advicePlanNarrative|accumulationPlanUtils|accumulationNarrative|operatingPlanFacts|operatingPlanSchema|allocationAdviceHandoff|weightOptimizer)['"]/;
     const staticExecutor = /from\s+['"]@\/lib\/services\/advicePlanService['"]/;
     const tickImport = /(?:import|from)\s*\(?\s*['"]\.\/ConsulentePlanTick['"]/g;
     for (const name of sources) {

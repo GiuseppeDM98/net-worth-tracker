@@ -127,7 +127,7 @@ describe('planConsulenteHandoff', () => {
   });
 });
 
-// ── Two instruments in one sub-target (owner, 2026-11-20, NOVE-25's phase F: «BTP A (IT…) + BTP€i B
+// ── Two instruments in one sub-target (owner, 2026-11-20, on the mirror tour of the one-click «Applica»: «BTP A (IT…) + BTP€i B
 // (IT…, da comprare sul MOT)» became ONE new ETF with the whole text as its name, no ISIN, no price).
 describe('planConsulenteHandoff — a sub-target naming two instruments', () => {
   const btpValore = makeAsset('btpv', { name: 'BTP Valore airone 2031', type: 'bond', assetClass: 'bonds', isin: 'IT0000000VA1', quantity: 10 });

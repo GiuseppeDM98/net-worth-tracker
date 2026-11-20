@@ -142,8 +142,10 @@ describe('buildAdvicePlan — the quotas are shares of the money', () => {
   });
 });
 
-// Mutation that turns U1 red: build the positions from the stored rows, skipping today's reconcile (U2 too).
-describe('buildAdvicePlan — a new plan from the operating plan (U1)', () => {
+// Mutation that turns it red: ignore a row's `sellMonth` (ETF C's sale lands in month 1). Building from the
+// stored rows without today's reconcile stays green HERE — today's portfolio is the stored one — and turns the
+// next block red, on a portfolio that moved (2026-11-20).
+describe('buildAdvicePlan — a new plan from the operating plan', () => {
   it('positions, sales in their months, months, inflow and review month, on today\'s portfolio', () => {
     const build = buildAdvicePlan(input());
     expect(build.action).toBe('create');
@@ -167,7 +169,7 @@ describe('buildAdvicePlan — a new plan from the operating plan (U1)', () => {
   });
 });
 
-describe('buildAdvicePlan — today\'s facts (U2)', () => {
+describe('buildAdvicePlan — today\'s facts', () => {
   // Mutation that turns it red: keep the stored facts (reconcile against the plan's own instruments).
   it('an instrument sold since is dropped with its sentence, one bought since is a row at 0 named in the notes', () => {
     const plan = { ...storedPlan(), corrections: ['Nota memorizzata.', 'Il piano citava uno strumento che non è fra i tuoi né fra quelli del report: la riga non entra.'] };
@@ -204,7 +206,7 @@ describe('buildAdvicePlan — today\'s facts (U2)', () => {
 });
 
 // Mutation that turns it red: return `blocked: null` whatever the build finds.
-describe('buildAdvicePlan — what blocks the tick (U3)', () => {
+describe('buildAdvicePlan — what blocks the tick', () => {
   it('a draft with an issue never reaches the tick: blocked is its message', () => {
     const reconcile: AdvicePlanInput['reconcile'] = (raw, facts) => {
       const plan = reconcileOperatingPlan(raw, facts);
@@ -223,6 +225,19 @@ describe('buildAdvicePlan — what blocks the tick (U3)', () => {
     expect(build.blocked).toBe(ADVICE_PLAN_COPY.nothingToInvest);
   });
 
+  // The inflows exist but only refill the reserve (2026-11-20, found at the retirement of the one click: the
+  // sentence said «non ci sono versamenti» beside 1000 € a month). Mutation that turns it red: one sentence for
+  // every `L <= 0`.
+  it('inflows that only refill the reserve → «ricostituiscono solo la riserva», never «non ci sono versamenti»', () => {
+    const raw: RawOperatingPlan = { ...RAW, monthlyInflowEur: 100, rows: [{ ref: 'S1', action: 'buy', targetPercentage: 100, reason: '' }] };
+    const assets = [asset('conto', 'Conto', { type: 'cash', assetClass: 'cash', quantity: 100, currentPrice: 1 }), etfA()];
+    const plan = reconcileOperatingPlan(raw, factsOf(assets, INSTRUMENTS.slice(0, 1)));
+    const build = buildAdvicePlan(input({ plan, assets, targets: { equity: { targetPercentage: 50 }, cash: { targetPercentage: 50 } } }));
+    expect(build.preview.liquidity.L).toBe(0);
+    expect(build.preview.liquidity.inflowTotalEur).toBeGreaterThan(0);
+    expect(build.blocked).toBe(ADVICE_PLAN_COPY.onlyReserve);
+  });
+
   it('every buy on an unpriced new instrument → «nessuno … ha un prezzo»', () => {
     const raw: RawOperatingPlan = { ...RAW, rows: [{ ref: 'S1', action: 'hold', targetPercentage: 0, reason: '' }, { ref: 'N1', action: 'buy', targetPercentage: 100, reason: '' }] };
     const assets = [conto(), etfA()];
@@ -233,7 +248,7 @@ describe('buildAdvicePlan — what blocks the tick (U3)', () => {
 });
 
 // Mutation that turns it red: `>=` on the age (a quote of exactly five days refused) — and the order.
-describe('pickFreshQuote (U4)', () => {
+describe('pickFreshQuote', () => {
   const now = new Date('2026-11-20T12:00:00Z').getTime();
   const at = (days: number) => new Date(now - days * DAY).toISOString();
 
@@ -257,7 +272,7 @@ describe('pickFreshQuote (U4)', () => {
 });
 
 // Mutation that turns it red: `autoUpdatePrice: true` always.
-describe('newInstrumentFormData and resolveNewInstrumentPricing (U5)', () => {
+describe('newInstrumentFormData and resolveNewInstrumentPricing', () => {
   const instrument = INSTRUMENTS[3];
   const now = TODAY.getTime();
 
@@ -307,7 +322,7 @@ function activePlan(overrides: Partial<AccumulationPlan> = {}, closed = 3, month
 }
 
 // Mutation that turns it red: leave the months unshifted in a revision (the sale at 3, the review at 6).
-describe('buildAdvicePlan — an open plan (U7)', () => {
+describe('buildAdvicePlan — an open plan', () => {
   it('a draft → replace, on the same numbering as a new plan', () => {
     const draft = { ...activePlan(), status: 'draft' as const, installments: [] };
     const build = buildAdvicePlan(input({ openPlan: draft }));
@@ -350,14 +365,14 @@ describe('buildAdvicePlan — an open plan (U7)', () => {
     expect(build.issues).toEqual([]);
   });
 
-  it('an active plan with every instalment closed → decision 98\'s sentence', () => {
+  it('an active plan with every instalment closed → ACCUMULO_PLAN_NOTHING_TO_REVISE', () => {
     const build = buildAdvicePlan(input({ openPlan: activePlan({}, 12) }));
     expect(build.blocked).toBe(ACCUMULO_PLAN_NOTHING_TO_REVISE);
     expect(build.toCreate).toEqual([]);
   });
 });
 
-// ── The swap (owner, 2026-11-20, NOVE-25's phase F): «vendi ETF C e con quei soldi compra ETF Nuovo».
+// ── The swap (owner, 2026-11-20, on the mirror tour): «vendi ETF C e con quei soldi compra ETF Nuovo».
 describe('buildAdvicePlan — the swap', () => {
   const RAW_SWAP: RawOperatingPlan = {
     ...RAW,

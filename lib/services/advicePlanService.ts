@@ -1,6 +1,6 @@
 /**
  * The click of the Consulente's «Applica» that creates the plan of accumulation (2026-11-20,
- * doc/guide/consulente-piano.md § After «Applica»): client SDK, through the app's own services.
+ * doc/guide/consulente-piano.md § The book and «Applica»): client SDK, through the app's own services.
  *
  * Not atomic, idempotent on a second press: the steps run in order and each is awaited — the
  * investment account saved as a setting, the missing instruments (each matched by ISIN or name on

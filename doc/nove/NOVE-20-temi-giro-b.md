@@ -7,7 +7,7 @@
 > `e2e/theme.costume{,.mobile,.tablet}.spec.ts` and `e2e/themeNeutral.ts`'s probes. It dresses NOVE-10's (retired on 2026-11-16, PR #540) Analisi,
 > NOVE-15's (retired on 2026-11-16, PR #544) Assistente and NOVE-16/17/18's Accumulo as they leave them.
 > Written on 2026-11-12; every `file:line` is
-> cited on `develop` @ b841cbd7, the Accumulo code as `pr488:file:line` (`refs/tmp/pr488`, holding #486 and #487). The cites of `ConsulenteBook{,Pages}.tsx`, `ConsulenteReport.tsx`, `AccumulationPlanDialog.tsx`, `QuestoMeseTile.tsx` and `PianoTile.tsx` re-read on the working tree of 2026-11-20 (the one-click «Applica»).
+> cited on `develop` @ b841cbd7, the Accumulo code as `pr488:file:line` (`refs/tmp/pr488`, holding #486 and #487). The cites of `ConsulenteBook{,Pages}.tsx`, `ConsulenteReport.tsx`, `AccumulationPlanDialog.tsx`, `QuestoMeseTile.tsx` and `PianoTile.tsx` re-read on `develop` @ 0a2e2851 (PR #561, the one-click «Applica») at its retirement, 2026-11-20.
 > Executes decisions 3, 4, 16, 17 and the adopted choice (a) (README.md § 3-4) on what NOVE-19 § 10 hands over;
 > respects 14 (no resource bar on these pages).
 
@@ -226,8 +226,8 @@ Also: the twelve tooltips of § 1 row 10 — `GoalProjectionChart.tsx:75` `borde
 - **Storico**: `history/tiles/DriverTile.tsx:139`; `RaddoppiTile.tsx:100`, `:108`.
 - **Analisi**: `cashflow/ConfrontoAnnualeSection.tsx:123`, `:126`.
 - **Allocazione and Accumulo**: `ActionChip.tsx:37`; `pr488:` `TargetTick.tsx:70`, `:72` (`:50`, `:52` @ b841cbd7);
-  `tiles/EsposizioneTile.tsx:92`; `AccumulationPlanDialog.tsx:1558`; `OptimizerReport.tsx:108`, `:126`, `:128`;
-  `tiles/PortafoglioModelloTile.tsx:225`, `:232`, `:233`; `tiles/QuestoMeseTile.tsx:874`;
+  `tiles/EsposizioneTile.tsx:92`; `AccumulationPlanDialog.tsx:1560`; `OptimizerReport.tsx:108`, `:126`, `:128`;
+  `tiles/PortafoglioModelloTile.tsx:225`, `:232`, `:233`; `tiles/QuestoMeseTile.tsx:892`;
   `tiles/accumuloShared.tsx:38` (`CHIP_BASE`).
 - **Previdenza**: `pension/tiles/AnnoFiscaleTile.tsx:89`, `:96`.
 - **FIRE**: `fire-simulations/tiles/TraguardoTile.tsx:93`, `:102`; `coast/tiles/CoastTraguardoTile.tsx:73`, `:82`;
@@ -392,16 +392,16 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
   `DividendDialog`, `DividendRecordDetailsDialog`, `InflationRateDialog`, `CategoryMoveDialog`, `SeriesDeleteDialog`,
   `UnlinkSeriesDialog`, `BudgetItemDialog`, `AssetAssignmentDialog.tsx:193`, `:256`, `AssistantThreadList.tsx:96`,
   `:105`, `:201`, `EntityDossier.tsx:257`, `pensionStyles.ts`, and `pr488:` `AccumulationCalendarDialog.tsx:220`,
-  `AccumulationPlanDialog.tsx:1001`, `:1410`, `:1483`, `:1487`, `:1755`, `IdealCompositionDialog.tsx:377`,
-  `OptimizerPanel.tsx:162`, `QuestoMeseTile.tsx:605`, `:621`, `:731`, `:836`.
+  `AccumulationPlanDialog.tsx:1003`, `:1412`, `:1485`, `:1489`, `:1757`, `IdealCompositionDialog.tsx:377`,
+  `OptimizerPanel.tsx:162`, `QuestoMeseTile.tsx:611`, `:729`, `:745`, `:853`.
 - `CategoryManagementDialog.tsx:205` `rounded-2xl`; `CategoryDeleteConfirmDialog.tsx:391`, `CategoryMoveDialog.tsx:304`
   in-content lists `rounded-md`; `AnalisiPeriodControls.tsx:82` `max-sm:rounded-2xl`; the disclosures on the ground
   (`DettaglioDisclosure.tsx:67-73`, `ConfrontoDisclosure.tsx:91`, `PerformanceDettaglio.tsx:294`, NOVE-12 K1).
 - `AssistantMemoryPanel.tsx:48` sub-tiles are `Tile`s (cap, shadow by NOVE-11). Accumulo: the tiles are `Tile`s;
   the five dialogs (`pr488:` `AccumulationCalendarDialog.tsx:128`,
-  `AccumulationPlanDialog.tsx:827`, `IdealCompositionDialog.tsx:375`, `ModelEditDialog.tsx:107`,
+  `AccumulationPlanDialog.tsx:829`, `IdealCompositionDialog.tsx:375`, `ModelEditDialog.tsx:107`,
   `ObiettiviDialog.tsx:141`) and NOVE-15's two Assistente modals are `ResponsiveModal`s: § 4.2.
-- `ConsulenteReport.tsx:302` a generated `Tile`; `ConsulenteBookPages.tsx:158` chip `rounded-md`; `ChoiceList`'s frame
+- `ConsulenteReport.tsx:303` a generated `Tile`; `ConsulenteBookPages.tsx:158` chip `rounded-md`; `ChoiceList`'s frame
   (NOVE-19) on Compravendita and the Consulente.
 
 **Strings**: none. No UI string is added or changed.

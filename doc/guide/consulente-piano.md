@@ -49,16 +49,21 @@
   `allocationAdviceRun.test.ts` (§ the operating plan stage), `useConsulentePlan.test.tsx`,
   `consulenteBookPlan.test.tsx`; the click: `advicePlan.test.ts`, `advicePlanService.test.ts`,
   `accumulationPlanService.test.ts` (§ createAndActivatePlan), `effectiveTargets.test.ts`,
-  `consulentePlanTick.test.tsx`, `allocationAdviceDocument.test.ts` (the route's import guard); E2E in `e2e/allocation.consulente{,.report}.spec.ts`, the fake stage in
+  `consulentePlanTick.test.tsx`, `useAdviceQuotes.test.tsx`, `advicePlanNarrative.test.ts`, `priceUpdater.test.ts` (no
+  empty ticker to Yahoo), `yahooFinanceService.test.ts` (`quotedAt`), `allocationAdviceDocument.test.ts` (the route's
+  import guard); E2E in `e2e/allocation.consulente{,.report,.plan}.spec.ts`, the fake stage in
   `e2e/consulenteInterview.ts` writing through `e2e/consulenteReport.ts`.
 - **Suites to run after a change here**: `operatingPlan`, `operatingPlanFacts`, `operatingPlanSchema`,
   `allocationAdviceRun`, `allocationAdvicePrompts`, `allocationAdviceProposal`, `allocationAdviceDocument`,
   `allocationAdviceBook`, `allocationAdviceNarrative`, `advicePlanNarrative`, `allocationAdviceRoutes`, `accumulationPlanUtils`
   (`resolvePlanReserve`), `advicePlan`, `advicePlanService`, `accumulationPlanService`, `accumulationPlanSchema`,
-  `effectiveTargets` and the Testing Library suites `useConsulentePlan`, `useConsulenteRun`, `consulenteBookPlan`,
-  `consulenteBook`, `consulenteRun`, `consulenteRevisionTile`, `consulentePlanTick` · **Browser** `e2e/allocation.consulente.spec.ts`
+  `effectiveTargets`, `priceUpdater`, `yahooFinanceService` and the Testing Library suites `useConsulentePlan`,
+  `useConsulenteRun`, `consulenteBookPlan`, `consulenteBook`, `consulenteRun`, `consulenteRevisionTile`,
+  `consulentePlanTick`, `useAdviceQuotes` · **Browser** `e2e/allocation.consulente.spec.ts`
   (the run's five rows, the plan the fake wrote) and `e2e/allocation.consulente.report.spec.ts` (the row, the
-  failed plan, the page, «Chiedi una modifica» rewriting the plan); the route always faked.
+  failed plan, the page, «Chiedi una modifica» rewriting the plan), `e2e/allocation.consulente.plan.spec.ts` (the
+  click: the tick, the instrument at 0 quotes, ONE plan active, the model, a draft replaced, an active plan revised,
+  «Crea il piano di accumulo», the swap; the quote route faked); the run route always faked.
 
 ## The stage
 
@@ -125,7 +130,7 @@
   hold nor removed). The page draws «con il ricavato compra X» on the sale and «con lo scambio» for a quota of 0.
 - **Yahoo symbols** (owner, 2026-11-19): the instruments stage writes up to three per candidate (`yahooSymbols`, the user's
   exchange first); an older block without them still parses. The tick of «Applica» prices a new instrument with them
-  (2026-11-20, § After «Applica»).
+  (2026-11-20, § The book and «Applica»).
 
 ## The book and «Applica»
 
@@ -204,7 +209,7 @@
 - **The click's order** (`executeAdvicePlan`, not atomic, each step awaited): targets, roles, goals as before; then
   the assets RE-READ (the account gone → nothing of the plan written, `ADVICE_SOURCE_GONE`); the account as a
   setting; the instruments (each matched on the re-read first, so a second press creates none, at 0 quotes,
-  `createdEmpty`, priced or `autoUpdatePrice: false`); `createAndActivatePlan` (validated again on the re-read
+  `createdEmpty`, priced; a government bond with its ISIN `autoUpdatePrice: true`; else `autoUpdatePrice: false`); `createAndActivatePlan` (validated again on the re-read
   assets, the draft written or the open draft replaced whole — `updateDraftPlan` — then activated, then the model
   from the plan's weights, always: a plan from the Consulente is the new intent) or, on an active plan,
   `revisePlan` then the model; last the «applied» record with `planId` and `planAction` (the route keeps the
@@ -231,7 +236,10 @@
 - **A stored plan of another report is no plan**: after a revision the old `reportFinishedAt` no longer matches and
   the row comes back, even before `runRevise`'s `operatingPlan: null` is read.
 - **A plan at 0 € a month is still `usable`**: whether there is money to invest is for the click that creates the
-  plan of accumulation to check (`blocked`: «niente da investire»), not the reconcile.
+  plan of accumulation to check (`blocked`: «niente da investire»), not the reconcile. Two sentences (owner,
+  2026-11-20, found at the click's retirement): no money above the reserve and no inflow nor sale → «…non ci sono
+  versamenti né vendite»; inflows or sales that only refill the reserve → «…versamenti e vendite ricostituiscono solo
+  la riserva» (`ADVICE_PLAN_COPY.onlyReserve`, `advicePlan.test.ts`).
 - **A plan failure after the three writes leaves the document applied** (2026-11-20, by design): targets, roles and
   goals are written and recorded; the applied page's «Crea il piano di accumulo» creates the plan later.
 - **A model not written is said once, on the press that left it** (2026-11-20): the sentence is not stored; after a

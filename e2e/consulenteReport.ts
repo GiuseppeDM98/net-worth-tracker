@@ -8,7 +8,8 @@
  * interview of two rounds with one decline, the request «meno cripto» with the round asked before
  * it. The `headings` variant writes the review's seven sections, so the book has its ten pages; the
  * `plain` variant a text without headings, so the book has one text page «Il report». The `applied`
- * status is `ready` after «Applica» with the targets written (2026-11-12: the hand-off's link).
+ * status is `ready` after «Applica» with the targets written (2026-11-12; since 2026-11-20 the page offers
+ * «Crea il piano di accumulo» there).
  * `rememberHeld` / `restoreHeld` put back what the account held, or delete the document.
  *
  * The operating plan (2026-11-19): `plant`'s `operatingPlan` option stores one on the report

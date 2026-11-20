@@ -442,7 +442,7 @@ describe('formatPreviousPathsForPrompt', () => {
     expect(text).not.toContain('Modifiche chieste allora sul report: 1. meno cripto\n\n## Percorso del 2024');
   });
 
-  // The goals a path proposed are part of what it did: «Applica» created them (owner, 2026-11-20, NOVE-25's phase F:
+  // The goals a path proposed are part of what it did: «Applica» created them (owner, 2026-11-20, on the mirror tour of the one-click «Applica»:
   // the Consulente read its own new goal as the user's novelty). Mutation that turns it red: the line left out.
   it('names the new goals the path proposed, created by «Applica» when it was applied', () => {
     const goals = [

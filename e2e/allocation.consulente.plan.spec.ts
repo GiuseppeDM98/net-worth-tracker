@@ -150,7 +150,7 @@ test.afterEach(async () => {
   await restoreHeld();
 });
 
-test('E1: the tick shows the plan with the new instrument priced; one click creates it, activates the plan and writes the model', async ({ page }) => {
+test('the tick shows the plan with the new instrument priced; one click creates it, activates the plan and writes the model', async ({ page }) => {
   await plantWithPlan('ready');
   await fakeQuotes(page, 0);
   const card = await openApply(page);
@@ -180,7 +180,7 @@ test('E1: the tick shows the plan with the new instrument priced; one click crea
   expect(advice.get('applied.planAction')).toBe('create');
 });
 
-test('E2: a stale quote on every symbol → «senza prezzo»; the plan is still created, the instrument not auto-priced', async ({ page }) => {
+test('a stale quote on every symbol → «senza prezzo»; the plan is still created, the instrument not auto-priced', async ({ page }) => {
   await plantWithPlan('ready');
   await fakeQuotes(page, 9);
   const card = await openApply(page);
@@ -195,7 +195,7 @@ test('E2: a stale quote on every symbol → «senza prezzo»; the plan is still 
   expect((plans[0].positions as Array<{ buyAssetId: string }>).some((p) => p.buyAssetId === created[0].id)).toBe(true);
 });
 
-test('E3: no investment account → the select; the click saves the chosen one and keeps the targets written', async ({ page }) => {
+test('no investment account → the select; the click saves the chosen one and keeps the targets written', async ({ page }) => {
   await setInvestmentAccount(null);
   await plantWithPlan('ready');
   await fakeQuotes(page, 0);
@@ -215,7 +215,7 @@ test('E3: no investment account → the select; the click saves the chosen one a
   expect(settings.get('targets.bonds.targetPercentage')).toBe(30);
 });
 
-test('E4: a draft open → «al posto della bozza»; after the click ONE plan, active', async ({ page }) => {
+test('a draft open → «al posto della bozza»; after the click ONE plan, active', async ({ page }) => {
   await seedAccumuloFixture({ status: 'draft' });
   await plantWithPlan('ready');
   await fakeQuotes(page, 0);
@@ -228,7 +228,7 @@ test('E4: a draft open → «al posto della bozza»; after the click ONE plan, a
   expect(plans[0].status).toBe('active');
 });
 
-test('E5: an active plan → «Rivede il piano…»; the click adds a revision with the Consulente\'s positions', async ({ page }) => {
+test('an active plan → «Rivede il piano…»; the click adds a revision with the Consulente\'s positions', async ({ page }) => {
   await seedAccumuloFixture();
   await plantWithPlan('ready');
   await fakeQuotes(page, 0);
@@ -248,7 +248,7 @@ test('E5: an active plan → «Rivede il piano…»; the click adds a revision w
   expect([...new Set(openLines.map((line) => line.assetId))].sort()).toEqual([created[0].id, 'seed-vwce'].sort());
 });
 
-test('E6: an applied report with a plan and none recorded → «Crea il piano di accumulo» → «Piano creato»', async ({ page }) => {
+test('an applied report with a plan and none recorded → «Crea il piano di accumulo» → «Piano creato»', async ({ page }) => {
   await plantWithPlan('applied');
   await fakeQuotes(page, 0);
   const card = await openApply(page, 'applied');
@@ -262,7 +262,26 @@ test('E6: an applied report with a plan and none recorded → «Crea il piano di
   expect((await db.collection('allocationAdvice').doc(UID).get()).get('applied.planId')).toBe(plans[0].id);
 });
 
-test('E7: the instrument already among the assets under another name (a first press that failed) → not created again', async ({ page }) => {
+// On an applied report the plan goes toward the targets SAVED today, not the report's (2026-11-20): the owner
+// may have changed them since. The report proposes no cash; the saved targets keep 1% of it, so the plan's
+// reserve is above 0 only when it reads them. Mutation that turns it red: build on the proposal's targets
+// whatever the document's status (ConsulenteReport's `planTargets`).
+test('an applied report: the plan goes toward the targets saved today, not the report\'s', async ({ page }) => {
+  await plantWithPlan('applied');
+  const { db } = await admin();
+  await db.collection('assetAllocationTargets').doc(UID).update({ targets: { ...SEED_TARGETS, equity: { ...SEED_TARGETS.equity, targetPercentage: 59 }, cash: { targetPercentage: 1 } } });
+  await fakeQuotes(page, 0);
+  const card = await openApply(page, 'applied');
+  const create = card.getByRole('button', { name: 'Crea il piano di accumulo' });
+  await expect(create).toBeEnabled({ timeout: 30_000 });
+  await create.click();
+  await expect(card.getByText('Piano creato.')).toBeVisible({ timeout: 30_000 });
+  const plans = await ownerPlans();
+  expect(plans).toHaveLength(1);
+  expect((plans[0].liquidity as { reserveEur: number }).reserveEur).toBeGreaterThan(0);
+});
+
+test('the instrument already among the assets under another name (a first press that failed) → not created again', async ({ page }) => {
   const { db, Timestamp } = await admin();
   const now = Timestamp.fromDate(new Date());
   await db.collection('assets').doc('e2e-airone-before').set({
@@ -285,7 +304,7 @@ test('E7: the instrument already among the assets under another name (a first pr
 
 // The swap (owner, 2026-11-20). Mutation that turns it red: the swap not carried onto the plan's sale.
 // Month 1 here also buys with the rata, so it reads «Da fare»: «Scambio da fare» is a month of swaps alone (unit tests).
-test('E8: a swap → the summary names it; the plan sells and buys the new ETF in month 1, and the Calendario shows it there', async ({ page }) => {
+test('a swap → the summary names it; the plan sells and buys the new ETF in month 1, and the Calendario shows it there', async ({ page }) => {
   await plantWithPlan('ready', SWAP_ROWS);
   await fakeQuotes(page, 0);
   const card = await openApply(page);

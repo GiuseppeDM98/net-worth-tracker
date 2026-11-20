@@ -103,12 +103,11 @@ function makeDocument(overrides: Partial<AllocationAdviceDocument> = {}): Alloca
 
 const ROLES = { changes: [{ assetId: 'a1', assetName: 'Fondo fenicottero', from: 'tradable' as const, to: 'excluded' as const, reason: 'Un fondo pensione.' }], unmatched: [] };
 
-function Host({ document, initialPage = null, onPage }: { document: AllocationAdviceDocument; initialPage?: string | null; onPage?: (id: BookPageId) => void }) {
+function Host({ document, initialPage = null, onPage, applyState = { phase: 'idle' } }: { document: AllocationAdviceDocument; initialPage?: string | null; onPage?: (id: BookPageId) => void; applyState?: ApplyState }) {
   const [pageId, setPageId] = useState<string | null>(initialPage);
   const revision = useConsulenteRevision('u1');
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
   const rows = proposal ? buildProposalRows(proposal, { equity: 60, bonds: 40 }) : [];
-  const applyState: ApplyState = { phase: 'idle' };
   return (
     <ConsulenteBook
       ownerId="u1"
@@ -271,6 +270,18 @@ describe('the pager and «Indice»', () => {
     renderBook(makeDocument(), 'modifica');
     expect(button('Avanti').className).toContain('bg-background');
     expect(button('Rivedi il report').className).toContain('var(--ai-glow)');
+  });
+
+  // A double click sends one run (2026-11-20): the button that started a write stays disabled while it runs.
+  // Mutation that turns it red: drop `writing` from the button's `disabled` in ConsulenteBook.tsx.
+  it('«Applica alle impostazioni» is disabled while the write runs', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <Host document={makeDocument()} initialPage="applica" applyState={{ phase: 'writing' }} />
+      </QueryClientProvider>
+    );
+    expect((button('Applica alle impostazioni') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('a failed document: no «Applica alle impostazioni» on the last page, only «Rifai il percorso»', () => {
