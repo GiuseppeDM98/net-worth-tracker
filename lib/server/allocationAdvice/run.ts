@@ -54,9 +54,9 @@ import { resolveInstrumentProfiles } from '@/lib/server/exposure/instrumentProfi
 import type { InstrumentProfile } from '@/types/exposure';
 
 /**
- * The Consulente's run (2026-10-20): the context, then three model calls in series — the
+ * The Consulente's run (2026-10-20): the context, then the model calls in series — the
  * strategy on Opus 5.5, the instruments on Sonnet 5.5 with web search, the review on Opus 5.5
- * — each persisted as soon as it lands, so a reload mid-run shows where the run is and a run
+ * and, since 2026-11-19, the operating plan on Opus 5.5 — each persisted as soon as it lands, so a reload mid-run shows where the run is and a run
  * the platform cut leaves what it had reached. Each call is its OWN request from the client
  * (`runAllocationAdviceStage`): see the note above it.
  *
@@ -226,7 +226,7 @@ async function callModel(stage: CallStage, call: ModelCall): Promise<CollectedAn
 //
 // Vercel's Hobby plan stops a function at 300 s (60 s without Fluid compute), and the owner's
 // third run took 396 s in ONE request — the strategy alone 210 s (2026-10-20). So a run is
-// three requests, one per model call, each its own function invocation under the ceiling:
+// one request per model call (four since 2026-11-19, the operating plan the last), each its own function invocation under the ceiling:
 // `runAllocationAdviceStage` runs ONE stage on the persisted document and the client chains
 // them (`useConsulenteRun`); a failed stage is retried from that stage, never from scratch.
 // `runAllocationAdvice` is the four in sequence for a caller with no ceiling (and the tests).
@@ -473,8 +473,8 @@ async function runRevise(document: AllocationAdviceDocument, request: string, in
 // ─── The operating plan, a request of its own (2026-11-19) ─────────────────────
 //
 // The fifth stage writes `document.operatingPlan` and NOTHING else: never `enterStage`, never
-// `status`, `stage`, `error` (the document's status is the report's, P1), never `updatedAt` (its
-// patches keep it, P10). A failure lands on `operatingPlan` and is rethrown; the report stays readable.
+// `status`, `stage`, `error` (the document's status is the report's), never `updatedAt` (its
+// patches keep it: `pageShowsReport` and `reopenStoredDraft` compare it). A failure lands on `operatingPlan` and is rethrown; the report stays readable.
 
 const PLAN_NO_REPORT = "Non c'è un report finito su cui scrivere il piano. Avvia la ricerca.";
 const PLAN_UNREADABLE = 'Il Consulente non ha scritto un piano leggibile. Premi «Scrivi il piano operativo»: di norma la seconda volta rientra.';
@@ -487,7 +487,7 @@ async function patchOperatingPlan(userId: string, document: AllocationAdviceDocu
 
 async function runPlan(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, now: Date): Promise<void> {
   const { report, instruments, userId } = document;
-  // P11: only on a finished report; a revision left `failed`, or a run still `running`, is refused.
+  // Only on a finished report (`ready` or `applied`); a revision left `failed`, or a run still `running`, is refused.
   if ((document.status !== 'ready' && document.status !== 'applied') || !report?.proposal || !instruments) {
     throw new AllocationAdviceStageError('plan', PLAN_NO_REPORT, false);
   }
@@ -497,33 +497,35 @@ async function runPlan(document: AllocationAdviceDocument, onStage: (stage: Allo
     readCashflowBlockForPrompt(userId, now),
     readAccumulationPlanForAdvice(userId, now),
   ]);
+  // The facts, the account and the reserve are computed with the reads, BEFORE the `running` patch:
+  // a failure in any of them patches nothing (2026-11-19).
+  const deps = { valueOf: calculateAssetValue, priceOf: unitPriceEur };
+  const facts = buildOperatingPlanFacts({
+    assets,
+    proposal: report.proposal,
+    candidates: instruments.candidates,
+    keepNames: document.answers.keepAssets,
+    limits: settings?.idealAllocation?.instrumentLimits ?? [],
+    ...deps,
+  });
+  const accountId = resolveInvestmentAccountId(settings, assets);
+  const account = accountId ? assets.find((asset) => asset.id === accountId) : undefined;
+  const accountsEur = assets.filter(isPlanSourceAccount).reduce((sum, asset) => sum + calculateAssetValue(asset), 0);
+  // The reserve the click will use; indicative under goal-driven targets (the click recomputes it).
+  const { reserveEur } = resolvePlanReserve(assets, buildTargetsFromProposal(report.proposal), compareAllocations, deps, 0, accountId ? [accountId] : undefined);
+  const factsBlock = formatOperatingPlanFacts({
+    facts,
+    firstMonthLabel: monthLabelLong(addMonths(toMonthKey(now), 1)),
+    investmentAccount: account ? { name: account.name, balanceEur: calculateAssetValue(account) } : null,
+    accountsEur,
+    reserveEur,
+  });
   const startedAt = now;
   const reportFinishedAt = report.finishedAt;
   const base = { model: null, startedAt, finishedAt: null, reportFinishedAt };
   await patchOperatingPlan(userId, document, { status: 'running', plan: null, error: null, ...base });
   onStage('plan');
   try {
-    const deps = { valueOf: calculateAssetValue, priceOf: unitPriceEur };
-    const facts = buildOperatingPlanFacts({
-      assets,
-      proposal: report.proposal,
-      candidates: instruments.candidates,
-      keepNames: document.answers.keepAssets,
-      limits: settings?.idealAllocation?.instrumentLimits ?? [],
-      ...deps,
-    });
-    const accountId = resolveInvestmentAccountId(settings, assets);
-    const account = accountId ? assets.find((asset) => asset.id === accountId) : undefined;
-    const accountsEur = assets.filter(isPlanSourceAccount).reduce((sum, asset) => sum + calculateAssetValue(asset), 0);
-    // The reserve the click will use; indicative under goal-driven targets (the click recomputes it).
-    const { reserveEur } = resolvePlanReserve(assets, buildTargetsFromProposal(report.proposal), compareAllocations, deps, 0, accountId ? [accountId] : undefined);
-    const factsBlock = formatOperatingPlanFacts({
-      facts,
-      firstMonthLabel: monthLabelLong(addMonths(toMonthKey(now), 1)),
-      investmentAccount: account ? { name: account.name, balanceEur: calculateAssetValue(account) } : null,
-      accountsEur,
-      reserveEur,
-    });
     const answer = await callModel('plan', {
       model: ALLOCATION_ADVICE_STRATEGY_MODEL,
       effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
@@ -645,7 +647,7 @@ export async function runAllocationAdviceStage({ userId, stage, answers, documen
     }
     return document;
   } catch (error) {
-    // The plan's failure is already on `operatingPlan`: the document's status, error and stage stay the report's (P1).
+    // The plan's failure is already on `operatingPlan`: the document's status, error and stage stay the report's (2026-11-19).
     if (stage === 'plan') throw error;
     const failure =
       error instanceof AllocationAdviceStageError
@@ -660,7 +662,7 @@ export async function runAllocationAdviceStage({ userId, stage, answers, documen
   }
 }
 
-/** The four stages in sequence, for a caller with no ceiling on its time; the plan's failure never fails the run. */
+/** The four model stages in sequence (strategy, instruments, review, plan), for a caller with no ceiling on its time; the plan's failure never fails the run. */
 export async function runAllocationAdvice({ userId, answers, onStage, now = new Date() }: RunAllocationAdviceArgs): Promise<AllocationAdviceDocument> {
   let document = await runAllocationAdviceStage({ userId, stage: 'strategy', answers, onStage, now });
   document = await runAllocationAdviceStage({ userId, stage: 'instruments', document, onStage, now });

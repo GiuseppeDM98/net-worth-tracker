@@ -214,7 +214,7 @@ describe('the interview rides with the run (2026-11-08)', () => {
   });
 });
 
-// U17 (2026-11-19). Mutation: the plan's throw let through to `run()`'s catch.
+// 2026-11-19. Mutation that turned it red: the plan's throw let through to `run()`'s catch.
 describe('the operating plan never fails the run', () => {
   const finishThree = async (streams: ReturnType<typeof sseResponse>[]) => {
     for (const stream of streams) {

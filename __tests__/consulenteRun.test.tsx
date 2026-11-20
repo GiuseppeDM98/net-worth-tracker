@@ -21,7 +21,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** The card's rows — the rail above the card lists the same four stages, hidden from the reader. */
+/** The card's rows — the rail above the card lists the same stages (five since 2026-11-19), hidden from the reader. */
 const ROWS = 'ol[aria-label="Le fasi"]:not([aria-hidden]) li';
 const statesOf = (container: HTMLElement) => Array.from(container.querySelectorAll(ROWS)).map((li) => li.getAttribute('data-state'));
 

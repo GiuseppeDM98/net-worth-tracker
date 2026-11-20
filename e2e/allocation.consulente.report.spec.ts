@@ -148,7 +148,7 @@ test('the rail is the index: its label turns the page, one Tab stop between the 
 // (pinned 2026-11-12). «Cosa fare adesso» is the fixture's shortest page at 1440 (223px against the
 // 338px rail); «Gli obiettivi» is as tall as the rail and proves nothing. The fixture holds no
 // operating plan, so the book keeps its ten pages and «Cosa fare adesso» stays the shortest
-// (2026-11-19, NOVE-24).
+// (2026-11-19: the page «Il piano operativo» exists only with a plan).
 test('a short page hugs its text: the card ends at its footer, shorter than the rail', async ({ page }) => {
   await plant('ready');
   await openReport(page, '?pagina=passi');

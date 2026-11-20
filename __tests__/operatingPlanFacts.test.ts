@@ -140,4 +140,15 @@ describe('buildOperatingPlanFacts', () => {
     const older = { sleeves: [{ ...CANDIDATES.sleeves[0], candidates: [{ ...CANDIDATES.sleeves[0].candidates[0], yahooSymbols: undefined }] }] };
     expect(build({ candidates: older, valueOf }).instruments.find((instrument) => instrument.ref === 'N1')?.symbols).toEqual(['AAA']);
   });
+
+  // A held instrument's ISIN never reaches the facts, so the block the plan stage reads cannot print
+  // it (2026-11-19, the proof fixed at the retirement: the prompt test builds its facts by hand).
+  // Mutation that turned it red: `isin: asset.isin` added to the held instruments' legend.
+  it("carries no held instrument's ISIN, nor its asset's tax rate", () => {
+    const withIsin: Asset[] = ASSETS.map((asset): Asset => (asset.id === 'a-ornitorinco' ? { ...asset, isin: 'IE00HELD0001' } : asset));
+    const facts = build({ assets: withIsin, valueOf });
+    expect(facts.instruments.some((instrument) => instrument.kind === 'held' && instrument.assetId === 'a-ornitorinco')).toBe(true);
+    expect(JSON.stringify(facts)).not.toContain('IE00HELD0001');
+    expect(JSON.stringify(facts)).not.toMatch(/"taxRate"/);
+  });
 });

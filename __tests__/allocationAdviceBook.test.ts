@@ -217,7 +217,8 @@ describe('buildBookPages', () => {
     expect(oneHeading[1]).toMatchObject({ id: 'report', title: 'La strategia', text: '## In una frase\nSolo questo.' });
   });
 
-  // U11 (2026-11-19). Mutation: `figures.piano` true always.
+  // 2026-11-19. Mutation that turned it red: `figures.piano` true always. That a plan of another
+  // report is no plan is `operatingPlanOf`'s, in operatingPlan.test.ts.
   it('the operating plan is the page between passi and rischi, only with a plan', () => {
     expect(ids({ ...FULL, hasPlan: true })).toEqual(['copertina', 'allocazione', 'strumenti', 'obiettivi', 'ruoli', 'passi', 'piano', 'rischi', 'colloquio', 'modifica', 'applica']);
     const plan = buildBookPages({ ...FULL, hasPlan: true }).find((page) => page.id === 'piano');

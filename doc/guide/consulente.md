@@ -22,7 +22,7 @@
 - **Primitives**: `components/ui/choice-list.tsx` (`ChoiceList`, every choice of the path and of the Compravendita),
   `components/ui/question-card.tsx` (`QuestionCard`: ONE question a model asks, shared with the Assistente's in-chat
   questions), `components/ui/path-rail.tsx` (`PathRail`: the path's eight ticks, the interview's three, the run's
-  four segments, the book's pages (buttons from `desktop:`)), `Tile`'s `generated`
+  stages (five since 2026-11-19), the book's pages (buttons from `desktop:`)), `Tile`'s `generated`
   and the classes of `lib/constants/aiAccent.ts`, `sceneVariants` in `lib/utils/motionVariants.ts`.
 - **Pure**: `lib/utils/questionSet.ts` (the one question schema — kinds, options, the reserved rows «Altro…» and
   «Preferisco non dire», the lenient parser, the describer of an answer, the prompt lines — shared with the
@@ -37,17 +37,17 @@
   for both SDKs), `lib/utils/sseReader.ts`, `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, shared with
   every mode of the Assistente and the emails' AI comments since 2026-11-07).
 - **Server**: `lib/server/allocationAdvice/prompts.ts` (the builders of the strategy, the instruments, the revision and the review, the interview's and the IL COLLOQUIO
-  block), `run.ts` (the orchestration: context → strategy → instruments → review, persisted at every stage;
+  block), `run.ts` (the orchestration: context → strategy → instruments → review → plan, persisted at every stage;
   `runInterviewRound`, which persists nothing; the OBBLIGAZIONI block and the previous paths read beside the
   context, 2026-11-08, the PIANO DI ACCUMULO block too since 2026-11-12), `accumulationPlan.ts` (Admin, its read), `store.ts` (Admin, `allocationAdvice/{uid}` and the archive `allocationAdvice/{uid}/history`);
   `lib/utils/allocationAdviceBonds.ts` (pure: which holdings are the bond part, which cost a profile read, the block);
   `app/api/allocation-advice/run/route.ts` (SSE, `maxDuration = 300`, 12 model requests an hour per warm instance:
-  interview rounds, strategy, revise), `applied/route.ts`.
+  interview rounds, strategy, revise, plan), `applied/route.ts`.
 - **Client**: `lib/services/allocationAdviceService.ts` (the read under the rules), `lib/hooks/useAllocationAdvice.ts`
   (`queryKeys.allocationAdvice.all`), `lib/services/assetService.ts → updateAssetAllocationRole` (the ONLY field
   «Applica» touches on an asset), `firestore.rules` (`read: canAccess`, `write: false`).
 - **Models**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5: the interview, the
-  strategy, the review) and `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
+  strategy, the review, the operating plan) and `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
 - **Suites to run after a change here**: `questionSet`, `allocationAdviceInterview`, `allocationAdviceProposal`, `allocationAdviceBook`,
   `allocationAdviceDraft`, `allocationAdviceDocument`, `allocationAdviceBonds`, `allocationAdviceApply`, `allocationAdviceNarrative`,
   `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes`, `cashflowBlock`,
@@ -114,9 +114,10 @@
 
 ## The run
 
-- **A fifth stage writes the operating plan** (2026-11-19, NOVE-24): after the review, on its own status in
+- **A fifth stage writes the operating plan** (2026-11-19): after the review, on its own status in
   `document.operatingPlan`, never failing the run — doc/guide/consulente-piano.md.
-- **Three calls in series, persisted at every stage** (`runAllocationAdvice`; on the mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
+- **The model calls in series, persisted at every stage** (`runAllocationAdvice`; the plan the fourth since
+  2026-11-19, above; on the mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
   of the Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, portfolio block included) and the
   CASHFLOW 12 MESI block, read beside it before the strategy stage (2026-11), and the PIANO DI ACCUMULO block (below); the strategy
   on Opus 5.5 (effort `medium`, `max_tokens` 32 000, no tool); the instruments on Sonnet 5.5 (effort `high`) with
@@ -245,11 +246,11 @@
   devono stare sotto il minuto, vero?»). Vercel Hobby stops a function at 300 s with Fluid compute (60 s without: it
   must be turned on in Vercel → Settings → Functions), and the third run on the mirror lasted 396 s in one request,
   with the strategy alone at 210 s. So `runAllocationAdviceStage` runs ONE stage (`AllocationAdviceRunStage`: `strategy`,
-  which creates the document from the answers and includes the context · `instruments` · `review`, which read the
-  persisted document — `document` passed in memory by the whole run, read from the store by the route) and the route
+  which creates the document from the answers and includes the context · `instruments` · `review` · `plan` (2026-11-19),
+  which read the persisted document — `document` passed in memory by the whole run, read from the store by the route) and the route
   (`maxDuration = 300`, body `{ userId, stage, answers?, request?, interview?, revision? }`, the rate limit counts
-  the interview rounds, the `strategy` and `revise`: 12 an hour per warm instance) streams
-  `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from, interview)`) chains the three, reads
+  the interview rounds, the `strategy`, `revise` and `plan`: 12 an hour per warm instance) streams
+  `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from, interview)`) chains the stages, reads
   each stream to its `done`, rereads the document after every stage; a failed or cut stage stays
   `resumeFrom` and «Riprova» (`retry`) restarts from there on the persisted document, never from scratch — a request
   that throws (a non-ok status, a stream the network drops) is remembered by the stage in flight too, never by the
@@ -369,7 +370,7 @@
   The generated card — the 1px `--ai-accent` border, the accented eyebrow — follows § The report as a book above;
   «Le fasi» of the running view wears it.
 - **«Applica», its plans, its hand-off and the operating plan's row** moved to doc/guide/consulente-piano.md
-  (2026-11-19, NOVE-24), with the page «Il piano operativo».
+  (2026-11-19), with the page «Il piano operativo».
 - **The review date** (`reviewByIso`) lives in the document, not in the settings: the Allocazione page prints it in
   its header (`describeReviewBy` → `describeAllocazioneHeader.reviewBy`) only when the plan has been applied — no
   sixth place in the FIVE places.
@@ -449,7 +450,7 @@ on a phone, and from the row under the Assistente's conversation).
   (`answers.exchange` is '' until typed, and step 3 does not pass), and a draft that comes back with an unlisted
   exchange reopens it (`isListedExchange`). The free text goes to the instrument agent as written.
 
-- **The run costs money and takes minutes** (three calls, two on Opus 5.5, one with web search): «Puoi lasciare la
+- **The run costs money and takes minutes** (four calls, three on Opus 5.5, one with web search): «Puoi lasciare la
   pagina» is true — every stage is saved — but the closed SSE connection does not stop the server; whoever reopens
   sees the saved stage and the page rereads the document while it is `running`. A run cut by the platform stays
   `running` until the 20-minute stale mark.
@@ -461,7 +462,7 @@ on a phone, and from the row under the Assistente's conversation).
 - **The rules are inert until they are deployed** (`npx firebase deploy --only firestore:rules`; done by the owner on 2026-10-20, the Consulente tried in production; the `history` rule of 2026-11-08 deployed by the retirement session on the owner's call — a merge deploys nothing): before the deploy
   the page does not read the document (permission-denied → the read fails and the page says so).
 - **The run's E2E specs fake the route**: one `page.route` handler per spec — `e2e/consulenteInterview.ts` scripts the
-  interview's rounds and records the strategy and revise bodies (a strategy answers with an error so the chain stops, a revise completes), `allocation.consulente.spec.ts` scripts its three stages and the retry
+  interview's rounds and records the strategy and revise bodies (a strategy answers with an error so the chain stops, a revise completes), `allocation.consulente.spec.ts` scripts its four stages, the retry and the plan the fake writes
   (`doc/guide/e2e-playwright.md` § Browser-Driven E2E); no test spends, and the real run is made once per change on
   the mirror (2026-10-20 with the owner's key; the outcomes in that session's SESSION_NOTES and in the commit).
 - **The interview writes nothing**: its rounds live in the draft until the strategy, and a cleared storage loses them.

@@ -155,7 +155,7 @@ read).
   pass through `reconcilePlanPathAnswers` (NOVE-22): a position member whose asset is gone is dropped, and every
   held buyable instrument without a row — one bought after the activation — gets its row at 0 %.
 - **`seedPlanPathPositions`** in a revision: `'plan'` → `plan.positions`; `'model'` →
-  `applyModelToPositions(plan.positions, model, sold, labelOf)` (`lib/utils/accumulationPlanUtils.ts:1348`, the
+  `applyModelToPositions(plan.positions, model, sold, labelOf)` (`lib/utils/accumulationPlanUtils.ts:1353`, the
   editor's «Rivedi dal modello», `AccumulationPlanDialog.tsx:366-373`; `sold` = the assets of the answers' whole
   sales); `'today'` → `plan.positions` with every quota replaced by `planPathTodayWeights` — in both, a row the
   plan holds stays a row.

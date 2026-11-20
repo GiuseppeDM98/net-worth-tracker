@@ -208,7 +208,7 @@ test('runs the stages on a faked route, a failed stage retried from itself, then
   await expect(rows.nth(4)).toContainText('Scrivo il piano operativo');
   expect(order).toEqual(['strategy', 'instruments', 'instruments', 'review', 'plan']);
   expect(carriesAnswers).toEqual({ 'strategy#1': true, 'instruments#2': false, 'instruments#3': false, 'review#4': false, 'plan#5': false });
-  // E1: the document read after the run carries the plan the fake wrote.
+  // The document read after the run carries the plan the fake wrote.
   expect(await storedOperatingPlanStatus()).toBe('ready');
 });
 

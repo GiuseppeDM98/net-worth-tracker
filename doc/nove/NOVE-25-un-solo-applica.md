@@ -2,7 +2,7 @@
 
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-23** (retired on 2026-11-19, PR #557; `disposalMonthIndex`, `reviewMonthIndex`,
 > `resolveInvestmentAccountId`, `investmentCashAssetId`, a revision that keeps a new sale's month) **and NOVE-24**
-> (`OperatingPlan`, `operatingPlanOf`, `reconcileOperatingPlan`, `OperatingPlanFacts`, the page «Il piano
+> (retired on 2026-11-19, PR #559; `OperatingPlan`, `operatingPlanOf`, `reconcileOperatingPlan`, `OperatingPlanFacts`, the page «Il piano
 > operativo», the absence row on «Applica»). Third of the five specs of «dal Consulente al piano di accumulo, in un
 > clic»: the click. It removes NOVE-21's window «Dal Consulente» and the optimizer from this path.
 > Written on 2026-11-19; every `file:line` is cited on `develop` @ 7909fa4c (those into the files NOVE-23 changed re-pointed to `develop` @ 875f4882 at its retirement, 2026-11-19). Executes decisions 67, 71, 72, 73, 74,
@@ -12,8 +12,8 @@
 ## 1. The problem today (evidence on the code)
 
 **From «Applica» to a running plan there are at least six clicks and three windows.** `apply()`
-(`components/allocation/consulente/ConsulenteReport.tsx:101-131`) writes targets, roles and goals; then the page
-offers a LINK (`CONSULENTE_HANDOFF_HREF`, `lib/utils/allocationAdviceDocument.ts:78`) to Accumulo, where «Dal
+(`components/allocation/consulente/ConsulenteReport.tsx:138-168`) writes targets, roles and goals; then the page
+offers a LINK (`CONSULENTE_HANDOFF_HREF`, `lib/utils/allocationAdviceDocument.ts:91`) to Accumulo, where «Dal
 Consulente» opens (`components/allocation/ConsulenteHandoff.tsx`), then `AssetDialog` once per missing instrument,
 then the three-step editor, then «Attiva piano». The owner (2026-11-18): «solo il click per creare il pac e basta».
 
@@ -299,13 +299,13 @@ export function buildAdvicePlan(input: AdvicePlanInput): AdvicePlanBuild
    `lib/utils/operatingPlanFacts.ts`:
    - a stored `held` / `cashFund` instrument keeps its `ref` when its `assetId` is still among the assets and
      still buyable (`isPlanBuyable`) or a money-market fund (`isPlanCashFund`); else it is absent from the facts
-     (rule 3 of the reconcile drops its row with its sentence — the instrument was sold or deleted since);
+     (the reconcile's rule on an unknown key drops its row with its sentence — the instrument was sold or deleted since);
    - a stored `new` instrument that now exists — `findAdviceInstrument(assets, prefill)` — KEEPS its `ref` (`N1`)
      and becomes `kind: 'held'` with that `assetId`: the stored rows cite the ref, and every rule reads `kind`
-     (NOVE-24 § 4.2);
+     (`lib/utils/operatingPlan.ts`, doc/guide/consulente-piano.md § The stage);
    - a held buyable asset with value that no instrument names gets a new `held` instrument, its `ref` the next
-     free `S` number (rule 9 gives it a row at 0 %);
-   - quantities, prices, taxes, limits and `keep` (by `keepNames`, as NOVE-24 § 4.2) are today's.
+     free `S` number (the reconcile's rule on a held instrument without a row gives it a row at 0 %);
+   - quantities, prices, taxes, limits and `keep` (by `keepNames`, as `buildOperatingPlanFacts` does in `lib/utils/operatingPlanFacts.ts`) are today's.
 
    `findAdviceInstrument(assets: readonly Asset[], prefill: Pick<AssetPrefill, 'name' | 'isin'>): Asset | null`
    (exported from `lib/utils/operatingPlanFacts.ts`) matches by `prefill.isin` against `asset.isin`, case- and
@@ -540,7 +540,7 @@ sentence is not stored: on a reload Accumulo's own «superato» verdict tells it
   `markApplied` that fails after the plan was created is today's failure of `apply()` («Applica» stays, the status
   line says it): pressing again rewrites the settings as today and REVISES the plan just created — one more
   `revisions` row with the same figures; left as it is, declared (§ 10).
-- `ApplyPiecesInput` (`ConsulenteBookPages.tsx:253-272`) loses `handoff` and `activePlanNote` and gains `planTick:
+- `ApplyPiecesInput` (`ConsulenteBookPages.tsx:369-390`) loses `handoff` and `activePlanNote` and gains `planTick:
   ReactNode | null` (the lazy component in its mode, rendered after the three ticks in the `ready` body and in
   the applied body's last branch below), `planDone: { sentence: string; modelNote: string | null } | null`,
   `planFailure: string | null`, `onCreatePlan: (() => void) | null` and `creatingPlan: boolean`. `ApplyState`
@@ -626,7 +626,7 @@ piano di accumulo», «Apri Accumulo», «Salta il colloquio», …».
   not call it): `buildAdvicePlan` calls it; `executeAdvicePlan` refuses a `build` whose `issues` are not empty,
   and `createAndActivatePlan` runs it again on the re-read assets before its first write.
 - **The roles the click changes are in the build**: «Applica» writes `updateAssetAllocationRole` BEFORE the plan
-  (`ConsulenteReport.tsx:110-114`); a build made on the roles of before would be refused at the click (an
+  (`ConsulenteReport.tsx:147-151`); a build made on the roles of before would be refused at the click (an
   instrument turned `frozen` is a `position_not_tradable`, one turned `tradable` an `unassigned_tradable`).
   `ConsulenteReport` passes the tick the assets with the ticked changes applied (§ 4.3); R1 asserts a role turned
   `frozen` leaves no position.
@@ -645,7 +645,7 @@ piano di accumulo», «Apri Accumulo», «Salta il colloquio», …».
   «on when it differs» becomes «always»: a plan made from the Consulente is the new intent).
 - **The Consulente route's weight**: `ConsulentePlanTick.tsx` is the only file under
   `components/allocation/consulente/` that may import `advicePlan`, `accumulationPlanUtils`, `operatingPlanFacts`
-  or `accumulationNarrative`. The guard test (`__tests__/allocationAdviceDocument.test.ts:167-176`, the pattern at
+  or `accumulationNarrative`. The guard test (`__tests__/allocationAdviceDocument.test.ts:169-179`, the pattern at
   `:174`) matches MODULE PATHS, not bare names («advicePlan» is inside «advicePlanService»):
   `/@\/lib\/utils\/(advicePlan|accumulationPlanUtils|accumulationNarrative|operatingPlanFacts|allocationAdviceHandoff|weightOptimizer)['"]/`
   on every `.tsx` there but `ConsulentePlanTick.tsx`; a second pattern refuses a static `from
@@ -679,7 +679,7 @@ piano di accumulo», «Apri Accumulo», «Salta il colloquio», …».
 | U9 | same: `replace` → `createAndActivatePlan` with `existingDraftId`; `revise` → `revisePlan` with `remainingMonths: draft.months`, `diffRevisionDisposals`' three fields, `reviewMonthIndex`, `advisorNotes`, then `saveModelPortfolio`, never `createAndActivatePlan` | pass `reconciled.months` |
 | U10 | same: `createAndActivatePlan` rejects with a `PlanWriteError` at `activate` → `AdvicePlanError` with `step: 'activate'`, `done: ['instruments', 'plan']`; a second run with the instrument already among the assets creates none; `createAndActivatePlan` resolves with a `modelError` → the result carries it, no throw; `revise` with `saveModelPortfolio` rejecting → the same; a source account missing from the re-read → `step: 'plan'`, `done: []`, no service called | create without the re-read |
 | U11 | `__tests__/allocationAdviceDocument.test.ts`: the exports removed are gone (a `// @ts-expect-error` import list); `__tests__/accumulationPlanSchema.test.ts`: `advisorNotes` accepted, 41 refused; a source account id absent from the assets → `source_missing` with its sentence, a present cash account → no issue | skip an absent account |
-| U12 | the guard of § 5 (`allocationAdviceDocument.test.ts:167-176`) | a static import of `@/lib/utils/advicePlan` in `ConsulenteReport.tsx` |
+| U12 | the guard of § 5 (`allocationAdviceDocument.test.ts:169-179`) | a static import of `@/lib/utils/advicePlan` in `ConsulenteReport.tsx` |
 | U13 | `__tests__/allocationUtils.test.ts` › `resolveEffectiveTargets`: goal-driven on with goals → the derived targets, `fromGoals: true`; off, or no goal → `settings.targets`; no settings → the defaults | return `settings.targets` always |
 | U14 | `__tests__/allocationAdviceNarrative.test.ts`: `describeAdvicePlanSummary` (the four sales' clauses), `describeApplySummary` with the plan, `describeAdvicePlanFailure` (with and without the settings' clause), `describeNewInstrument`'s four lines | — |
 | U15 | `__tests__/accumulationPlanService.test.ts` (Firestore mocked as the file does today) › `createAndActivatePlan`: a draft with an issue → `PlanWriteError` `step: 'plan'` and no write; `existingDraftId` → the draft is updated, not created; an activation that rejects → `step: 'activate'` with the `planId`; a model that rejects → resolves with `modelError`, the plan active. › `updateDraftPlan`: a draft without `advisorNotes`, `reviewMonthIndex`, `optimizerSnapshot` clears the three with `deleteField()` | validate after `createDraftPlan` |
@@ -738,7 +738,7 @@ it; with a planted active plan it revises it; no model is called and no window o
   government bond with an ISIN among the new instruments → created with the ISIN, `autoUpdatePrice: true`, its
   line on the tick.
 - **F (owner, at «pronto»)**: the mirror (`npm run mirror:seed -- <email>`); a plan built by hand in the script
-  (as NOVE-24's F) is planted on his mirrored report; he reads the tick's summary, the instruments' lines and the
+  (as on the operating plan's tour of 2026-11-19) is planted on his mirrored report; he reads the tick's summary, the instruments' lines and the
   corrections, presses «Applica» on the MIRROR and opens Accumulo. Nothing touches production; no model runs.
   `npm run mirror:remove`.
 - **G**: `npm run perf:budget`, every route green (`/dashboard/allocation` must not grow: the hand-off leaves it —

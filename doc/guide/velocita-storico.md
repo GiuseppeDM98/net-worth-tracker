@@ -1,7 +1,7 @@
 # Velocità — la baseline storica
 
 > **When to open this guide** — whoever needs the measure the fourteen PERF specs of 2026-09-26 all started from.
-> Moved here from `doc/guide/velocita.md` on 2026-11-19 (NOVE-24: that guide was 518 lines, past what a guide
+> Moved here from `doc/guide/velocita.md` on 2026-11-19 (#559: that guide was 518 lines, past what a guide
 > holds); the tools, the baseline in force and the register of raised ceilings stay there. The body is in Italian,
 > as the manual was written.
 
