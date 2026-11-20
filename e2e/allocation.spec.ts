@@ -317,7 +317,7 @@ test('a 1440 Accumulo senza piano: nessuna riga chiusa, nessuna striscia, il ver
   await expect(page.getByRole('list', { name: 'Le cifre del verdetto' })).toBeHidden();
   await expect(page.getByRole('heading', { level: 2, name: 'Il resto della pagina' })).toBeHidden();
   await expect(page.getByRole('button', { name: /^Il perché/ })).toHaveCount(0);
-  await expect(page.locator('section[aria-label="Accumulo"]').getByRole('button', { name: 'Crea piano' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('section[aria-label="Accumulo"]').getByRole('link', { name: 'Crea piano' })).toBeVisible({ timeout: 30_000 });
 });
 
 test('la scheda Bilanciamento resta quella di prima: il tab è nell\'URL e Accumulo non la sostituisce', async ({ page }) => {

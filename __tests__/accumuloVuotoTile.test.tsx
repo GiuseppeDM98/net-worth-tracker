@@ -9,7 +9,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-const { expensesState, blockState } = vi.hoisted(() => ({
+const { expensesState, blockState, demoState } = vi.hoisted(() => ({
+  demoState: { value: false },
   expensesState: { value: { data: [] as unknown[] | undefined, isError: false } },
   blockState: { value: null as null | { median: number; months: number } },
 }));
@@ -17,10 +18,12 @@ const { expensesState, blockState } = vi.hoisted(() => ({
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
 vi.mock('@/lib/hooks/useExpenses', () => ({ useExpensesInRange: () => expensesState.value }));
 vi.mock('@/lib/hooks/useSettings', () => ({ useSettings: () => ({ data: null, isError: false }) }));
-vi.mock('@/lib/hooks/useDemoMode', () => ({ useDemoMode: () => false }));
+vi.mock('@/lib/hooks/useDemoMode', () => ({ useDemoMode: () => demoState.value }));
 vi.mock('@/lib/services/assetService', () => ({ calculateAssetValue: (a: { quantity: number; currentPrice: number }) => a.quantity * a.currentPrice }));
-vi.mock('@/lib/services/assetAllocationService', () => ({ compareAllocations: vi.fn() }));
-vi.mock('@/components/allocation/AccumulationPlanDialog', () => ({ AccumulationPlanDialog: () => null }));
+vi.mock('@/lib/services/assetAllocationService', () => ({
+  compareAllocations: () => ({ byAssetClass: {}, bySubCategory: {}, bySpecificAsset: {}, totalValue: 0, marketValue: 0 }),
+}));
+vi.mock('@/lib/utils/accumuloSummary', () => ({ buildAccumuloPreview: () => null }));
 vi.mock('@/lib/utils/cashflowBlock', () => ({
   buildCashflowBlock: () => ({
     volatility: blockState.value ? { savings: { median: blockState.value.median } } : null,
@@ -28,7 +31,6 @@ vi.mock('@/lib/utils/cashflowBlock', () => ({
   }),
 }));
 
-import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import { AccumuloVuotoTile } from '@/components/allocation/tiles/AccumuloVuotoTile';
 
 const props = {
@@ -36,21 +38,37 @@ const props = {
   allAssets: [],
   targets: null,
   band: { mode: 'relative', value: 20 } as never,
-  targetLeverageRatio: 1,
+  hasTargets: false,
   today: new Date('2026-11-12T12:00:00'),
-  onAssetsChanged: () => {},
-  reviewByIso: null,
-  idealAllocation: null,
   model: null,
-  modelBasis: { targets: null, criteria: DEFAULT_IDEAL_ALLOCATION, goals: null },
-  investmentAccountId: null,
 };
+const TARGETS = { equity: { targetPercentage: 100 } };
 
 const flat = (text: string | null) => (text ?? '').replace(/[  ]/g, ' ');
 
 beforeEach(() => {
   expensesState.value = { data: [], isError: false };
   blockState.value = null;
+  demoState.value = false;
+});
+
+describe('AccumuloVuotoTile — «Crea piano» (2026-11-20)', () => {
+  it('with targets: a link to the guided path', () => {
+    render(<AccumuloVuotoTile {...props} targets={TARGETS} hasTargets />);
+    expect(screen.getByRole('link', { name: 'Crea piano' }).getAttribute('href')).toBe('/dashboard/allocation/piano');
+  });
+
+  it('in demo, or without targets: a disabled button, no link', () => {
+    demoState.value = true;
+    const { unmount } = render(<AccumuloVuotoTile {...props} targets={TARGETS} hasTargets />);
+    expect(screen.queryByRole('link', { name: 'Crea piano' })).toBeNull();
+    expect((screen.getByRole('button', { name: 'Crea piano' }) as HTMLButtonElement).disabled).toBe(true);
+    unmount();
+    demoState.value = false;
+    render(<AccumuloVuotoTile {...props} targets={TARGETS} hasTargets={false} />);
+    expect(screen.queryByRole('link', { name: 'Crea piano' })).toBeNull();
+    expect((screen.getByRole('button', { name: 'Crea piano' }) as HTMLButtonElement).disabled).toBe(true);
+  });
 });
 
 describe('AccumuloVuotoTile — the suggested instalment', () => {

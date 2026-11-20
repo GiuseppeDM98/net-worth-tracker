@@ -15,11 +15,15 @@ export { selectOpenPlan } from '@/lib/utils/openAccumulationPlan';
 // At module scope: the React Compiler does not lower an `import()` inside a hook.
 const loadPlanRead = () => import('@/lib/services/accumulationPlanRead');
 
-/** All of the owner's accumulation plans. */
-export function useAccumulationPlans(ownerId: string | undefined) {
+/**
+ * All of the owner's accumulation plans. `refetchOnMount: 'always'` (the guided path, 2026-11-20): read again
+ * on mount even when the cached list is fresh — the path decides its mode on the list fetched after mount.
+ */
+export function useAccumulationPlans(ownerId: string | undefined, options: { refetchOnMount?: 'always' } = {}) {
   return useQuery({
     queryKey: queryKeys.accumulationPlans.all(ownerId || ''),
     queryFn: async () => (await loadPlanRead()).getAccumulationPlans(ownerId!),
     enabled: !!ownerId,
+    ...(options.refetchOnMount ? { refetchOnMount: options.refetchOnMount } : {}),
   });
 }

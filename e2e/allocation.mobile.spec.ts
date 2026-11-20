@@ -275,7 +275,7 @@ test('«Crea piano» dell’Accumulo è un bersaglio di almeno 44px sul telefono
   await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toBeVisible({ timeout: 60_000 });
 
   const accumulo = page.locator('section[aria-label="Accumulo"]');
-  const create = accumulo.getByRole('button', { name: 'Crea piano' });
+  const create = accumulo.getByRole('link', { name: 'Crea piano' });
   await expect(create).toBeVisible({ timeout: 30_000 });
 
   const box = await create.boundingBox();

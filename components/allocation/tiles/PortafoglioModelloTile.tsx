@@ -9,19 +9,19 @@
  * The tile shows «oggi · modello · differenza» (`describeModelVsToday`) and owns the ways to change
  * it — among them «Ricalcola» (`IdealCompositionDialog`, which saves its result), «Modifica a mano»
  * (`ModelEditDialog`), «Usa i pesi del piano» and «Aggiungi strumento da valutare» (`AssetDialog` in
- * the empty mode) — and, from the calculation, «Crea un PAC con questi pesi»: it chooses between that dialog and
- * `AccumulationPlanDialog` so two modals are never stacked. No calculation and no network call before
- * the reader asks.
+ * the empty mode) — and, from the calculation, «Crea un PAC con questi pesi»: the seed is written as the guided
+ * path's browser draft and the page goes to `/dashboard/allocation/piano` (2026-11-20; no weight in the URL). No
+ * calculation and no network call before the reader asks.
  */
 import type { ModelBasis } from '@/lib/utils/modelPortfolio';
 import { runGuarded } from '@/lib/utils/runGuarded';
 import { Fragment, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import type { Asset, AssetAllocationTarget, IdealAllocationSettings } from '@/types/assets';
-import type { AccumulationPlan, PlanSeedDraft } from '@/types/accumulationPlan';
+import type { AccumulationPlan } from '@/types/accumulationPlan';
 import type { ModelPortfolio } from '@/types/modelPortfolio';
-import type { RebalanceBand } from '@/lib/utils/allocationUtils';
 import { calculateAssetValue, getAssetById } from '@/lib/services/assetService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import {
@@ -65,9 +65,11 @@ import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui
 import { Button } from '@/components/ui/button';
 import { AssetDialog } from '@/components/assets/AssetDialog';
 import { IdealCompositionDialog } from '@/components/allocation/IdealCompositionDialog';
-import { AccumulationPlanDialog } from '@/components/allocation/AccumulationPlanDialog';
 import { ModelEditDialog } from '@/components/allocation/ModelEditDialog';
 import { TILE_ACTION_CLASS } from '@/components/allocation/tiles/accumuloShared';
+import { planPathStorageKey, seededPlanPathDraft } from '@/lib/utils/planPath';
+import { writeStoredJson } from '@/lib/utils/pathDraftStorage';
+import { PLAN_PATH_HREF } from '@/lib/utils/accumuloCopy';
 
 interface PortafoglioModelloTileProps {
   ownerId: string;
@@ -75,17 +77,14 @@ interface PortafoglioModelloTileProps {
   targets: AssetAllocationTarget | null;
   targetLeverageRatio: number;
   idealAllocation: IdealAllocationSettings | null;
-  band: RebalanceBand;
   /** The saved model, `null` when none; `readFailed` when the read itself failed (rule not deployed). */
   model: ModelPortfolio | null;
   /** The open plan: an active one with no model saved offers «Usa i pesi del piano». */
   plan?: AccumulationPlan | null;
   readFailed: boolean;
-  /** The Consulente's «rivedi entro», carried to the plan editor the tile opens. */
-  reviewByIso: string | null;
   /** What the model rests on: every save stamps it, and a model computed on another one is «superato». */
   modelBasis: ModelBasis;
-  /** Impostazioni › Spese «Conto per gli investimenti»: the plan «Crea il PAC» opens starts on it; null = none. */
+  /** Impostazioni › Spese «Conto per gli investimenti»: the path «Crea il PAC» opens ticks it; null = none. */
   investmentAccountId: string | null;
   /** The row of the phone composition (The Closed-Row Rule); absent at 1440. */
   collapse?: TileCollapse;
@@ -93,7 +92,7 @@ interface PortafoglioModelloTileProps {
   onAssetsChanged: () => void;
 }
 
-type View = 'closed' | 'composition' | 'pac' | 'edit' | 'candidate';
+type View = 'closed' | 'composition' | 'edit' | 'candidate';
 
 const HEAD_CLASS = 'py-1.5 pr-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground';
 const NUM_CELL_CLASS = 'py-1.5 pr-2 text-right font-mono tabular-nums';
@@ -110,11 +109,9 @@ export function PortafoglioModelloTile({
   targets,
   targetLeverageRatio,
   idealAllocation,
-  band,
   model,
   plan = null,
   readFailed,
-  reviewByIso,
   modelBasis,
   investmentAccountId,
   collapse,
@@ -124,7 +121,7 @@ export function PortafoglioModelloTile({
   const isDemo = useDemoMode();
   const saveModel = useSaveModelPortfolio(ownerId);
   const [view, setView] = useState<View>('closed');
-  const [pacSeed, setPacSeed] = useState<PlanSeedDraft | undefined>(undefined);
+  const router = useRouter();
 
   const assetsById = useMemo(() => new Map(allAssets.map((asset) => [asset.id, asset])), [allAssets]);
   const nameOf = (assetId: string): string => assetsById.get(assetId)?.name ?? assetId;
@@ -326,30 +323,10 @@ export function PortafoglioModelloTile({
           model={model}
           basis={modelBasis}
           onCreatePac={(seed) => {
-            setPacSeed(seed);
-            setView('pac');
+            // The browser draft is the transport: a draft already there is replaced (the reader just asked for these weights).
+            writeStoredJson(typeof window !== 'undefined' ? window.localStorage : null, planPathStorageKey(ownerId), seededPlanPathDraft(seed, investmentAccountId));
+            router.push(PLAN_PATH_HREF);
           }}
-        />
-      )}
-
-      {view === 'pac' && targets && (
-        <AccumulationPlanDialog
-          open
-          onClose={() => setView('closed')}
-          ownerId={ownerId}
-          plan={null}
-          allAssets={allAssets}
-          targets={targets}
-          band={band}
-          targetLeverageRatio={targetLeverageRatio}
-          idealAllocation={idealAllocation}
-          seedDraft={pacSeed}
-          reviewByIso={reviewByIso}
-          basis={modelBasis}
-          investmentAccountId={investmentAccountId}
-          model={model}
-          onAssetsChanged={onAssetsChanged}
-          onSaved={() => setView('closed')}
         />
       )}
 

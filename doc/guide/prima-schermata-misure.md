@@ -266,6 +266,9 @@ prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la 
   sopra la pill solo a 1024, come nella prima misura). Patrimonio 1024 legge 12/9 o 11/8 secondo la corsa (tre corse: 12, 11, 12; la dissolvenza
   della riga «Strumenti»), non una voce mossa. Le altre voci identiche alla corsa di develop; restano rosse come su develop Centri 1024, Analisi
   768 e 1024, Bilanciamento 1024.
+  **2026-11-20, il percorso guidato del piano** (branch `feat/piano-percorso-guidato`): «Crea piano» della tessera vuota diventa un link della
+  stessa misura; `allocazione-accumulo` legge come develop @a3d7a0ef dello stesso giorno (stessa macchina, `census@example.com`), e così le
+  60 voci, una per una; rosse come su develop Centri 1024, Analisi 768 e 1024, Bilanciamento 1024.
 - **`2026-11-12: Analisi «Classifica» …`** (#540; proprietario, 2026-11-15: registrate come misurate), le tre voci di Analisi contro la build di develop dello stesso giorno, stessa macchina,
   `census@example.com`: a 390 `screens` 1,86 → 2,11 e `figuresOutsideVerdict` 5 → 4 (LA tessera «Dove vanno i soldi», alta 654 px con l'anello e la
   classifica intera, contro i 392 del Periodo; una cifra in meno fuori dal verdetto perché il centro dell'anello non è una cifra sollevata), la prima riga

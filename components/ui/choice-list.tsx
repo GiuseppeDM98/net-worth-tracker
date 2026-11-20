@@ -17,6 +17,7 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PATH_FIELD_HEIGHT_CLASS } from '@/components/ui/path-fields';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRovingFocus } from '@/lib/hooks/useRovingFocus';
 
@@ -35,8 +36,8 @@ const GROUP_CLASS = 'divide-y divide-border rounded-xl border border-border';
 const LABEL_CLASS = 'flex min-h-11 flex-1 cursor-pointer flex-col items-start justify-center gap-0.5 text-left desktop:min-h-0';
 const TITLE_CLASS = 'text-[14px] font-medium text-foreground';
 const HINT_CLASS = 'text-[13px] font-normal leading-[1.45] text-muted-foreground';
-/** The «Altro…» field's height: the value of the Compravendita's FIELD_HEIGHT_CLASS, written here (a primitive imports nothing from components/assets/). */
-const OTHER_FIELD_CLASS = 'mt-2 h-11 desktop:h-9';
+/** The «Altro…» field: the guided paths' field height. */
+const OTHER_FIELD_CLASS = `mt-2 ${PATH_FIELD_HEIGHT_CLASS}`;
 
 export type ChoiceListProps<T extends string> = {
   name: string;

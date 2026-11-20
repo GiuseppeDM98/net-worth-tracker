@@ -31,9 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS } from '@/lib/constants/aiAccent';
 import { cn } from '@/lib/utils';
-
-/** The footer's buttons: 44 px to touch below `desktop:`, 36 px from it (shared by the book and «Applica»'s plan row). */
-export const BUTTON_CLASS = 'h-11 desktop:h-9';
+import { PATH_BUTTON_CLASS } from '@/components/ui/path-card';
 
 /**
  * Once per JS session (a reload plays them again, a client navigation back does not): the first
@@ -359,7 +357,7 @@ function PlanRowBlock({ row }: { row: PlanRow }) {
         {sentence}
       </p>
       {row.state !== 'running' && (
-        <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'shrink-0', AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS)} onClick={row.onWrite} disabled={row.disabled}>
+        <Button type="button" variant="outline" className={cn(PATH_BUTTON_CLASS, 'shrink-0', AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS)} onClick={row.onWrite} disabled={row.disabled}>
           {OPERATING_PLAN_PAGE_COPY.action}
         </Button>
       )}
@@ -409,7 +407,7 @@ function AppliedPlanBlock({ input }: { input: ApplyPiecesInput }) {
       <div data-plan-done="" className="flex flex-col gap-2">
         <p role="status" className="text-[13px] leading-[1.45] text-foreground">{input.planDone.sentence}</p>
         {input.planDone.modelNote && <p className="text-[12px] text-warning-foreground">{input.planDone.modelNote}</p>}
-        <Button asChild variant="outline" className={cn(BUTTON_CLASS, 'w-fit')}>
+        <Button asChild variant="outline" className={cn(PATH_BUTTON_CLASS, 'w-fit')}>
           <Link href={ACCUMULO_HREF}>{ACCUMULO_OPEN_LINK}</Link>
         </Button>
       </div>
@@ -420,7 +418,7 @@ function AppliedPlanBlock({ input }: { input: ApplyPiecesInput }) {
       {input.planFailure && <p role="alert" className="text-[12px] leading-[1.45] text-destructive">{input.planFailure}</p>}
       {input.planTick}
       {/* No model is asked: never accented (The AI-Accent Rule). */}
-      <Button type="button" className={cn(BUTTON_CLASS, 'w-fit')} disabled={!input.onCreatePlan || input.creatingPlan} onClick={() => input.onCreatePlan?.()}>
+      <Button type="button" className={cn(PATH_BUTTON_CLASS, 'w-fit')} disabled={!input.onCreatePlan || input.creatingPlan} onClick={() => input.onCreatePlan?.()}>
         {input.creatingPlan ? ADVICE_PLAN_TICK_COPY.creating : ADVICE_PLAN_TICK_COPY.createAction}
       </Button>
     </div>

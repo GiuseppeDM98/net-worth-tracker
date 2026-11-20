@@ -34,7 +34,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { ChoiceList } from '@/components/ui/choice-list';
-import { AccountField, CategoryField, DateField, FIELD_HEIGHT_CLASS, NumberField } from './fields';
+import { AccountField, NumberField, PATH_FIELD_HEIGHT_CLASS } from '@/components/ui/path-fields';
+import { CategoryField, DateField } from './fields';
 
 export interface ScreenProps {
   screen: RealEstateOperationScreen;
@@ -116,7 +117,7 @@ function ImmobileScreen({ answers, dispatch, context, familyMembers }: ScreenPro
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="re-property">{isPurchase ? 'La casa' : 'La casa che vendi'}</Label>
           <Select value={answers.propertyId ?? (isPurchase ? NEW_PROPERTY : undefined)} onValueChange={(value) => dispatch({ type: 'patch', patch: { propertyId: value === NEW_PROPERTY ? null : value } })}>
-            <SelectTrigger id="re-property" className={FIELD_HEIGHT_CLASS}>
+            <SelectTrigger id="re-property" className={PATH_FIELD_HEIGHT_CLASS}>
               <SelectValue placeholder="Scegli la casa" />
             </SelectTrigger>
             <SelectContent>
@@ -135,7 +136,7 @@ function ImmobileScreen({ answers, dispatch, context, familyMembers }: ScreenPro
         <>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="re-name">Nome della casa</Label>
-            <Input id="re-name" className={FIELD_HEIGHT_CLASS} value={answers.propertyName} placeholder="es. Casa in via Roma" onChange={(event) => dispatch({ type: 'patch', patch: { propertyName: event.target.value } })} />
+            <Input id="re-name" className={PATH_FIELD_HEIGHT_CLASS} value={answers.propertyName} placeholder="es. Casa in via Roma" onChange={(event) => dispatch({ type: 'patch', patch: { propertyName: event.target.value } })} />
           </div>
           <div className="flex items-start gap-3">
             <Checkbox id="re-home" checked={answers.isPrimaryResidence} onCheckedChange={(checked) => dispatch({ type: 'patch', patch: { isPrimaryResidence: checked === true } })} className="mt-0.5" />
@@ -176,7 +177,7 @@ function OwnershipField({ answers, dispatch, familyMembers }: Pick<ScreenProps, 
       <ChoiceList mode="single" name="re-owner" label="Intestatari" value={ownership.mode} options={options} onChange={setMode} />
       {ownership.mode === 'member' && (
         <Select value={ownership.memberId} onValueChange={(memberId) => dispatch({ type: 'patch', patch: { ownership: { mode: 'member', memberId } } })}>
-          <SelectTrigger aria-label="Intestatario" className={FIELD_HEIGHT_CLASS}>
+          <SelectTrigger aria-label="Intestatario" className={PATH_FIELD_HEIGHT_CLASS}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -314,7 +315,7 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
           <div key={index} className="flex flex-col gap-3 rounded-xl border border-border bg-muted px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[13px] font-medium text-foreground">Polizza vita {index + 1}</p>
-              <Button type="button" variant="ghost" className={cn(FIELD_HEIGHT_CLASS, 'gap-1.5 text-destructive')} onClick={() => dispatch({ type: 'removeLifePolicy', index })}>
+              <Button type="button" variant="ghost" className={cn(PATH_FIELD_HEIGHT_CLASS, 'gap-1.5 text-destructive')} onClick={() => dispatch({ type: 'removeLifePolicy', index })}>
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
                 Rimuovi
               </Button>
@@ -323,7 +324,7 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor={`re-life-${index}-insured`}>Assicurato</Label>
                 <Select value={policy.insuredMemberId || undefined} onValueChange={(insuredMemberId) => dispatch({ type: 'updateLifePolicy', index, patch: { insuredMemberId } })}>
-                  <SelectTrigger id={`re-life-${index}-insured`} className={FIELD_HEIGHT_CLASS}>
+                  <SelectTrigger id={`re-life-${index}-insured`} className={PATH_FIELD_HEIGHT_CLASS}>
                     <SelectValue placeholder="Scegli chi assicura" />
                   </SelectTrigger>
                   <SelectContent>
@@ -370,7 +371,7 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
             </div>
           </div>
         ))}
-        <Button type="button" variant="outline" className={cn(FIELD_HEIGHT_CLASS, 'w-fit gap-1.5')} onClick={() => dispatch({ type: 'addLifePolicy' })}>
+        <Button type="button" variant="outline" className={cn(PATH_FIELD_HEIGHT_CLASS, 'w-fit gap-1.5')} onClick={() => dispatch({ type: 'addLifePolicy' })}>
           <Plus className="h-4 w-4" aria-hidden="true" />
           Aggiungi una polizza vita
         </Button>
@@ -466,12 +467,12 @@ function CentroScreen({ answers, dispatch, context }: ScreenProps) {
       {center.mode === 'new' && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="re-center-name">Nome del centro</Label>
-          <Input id="re-center-name" className={FIELD_HEIGHT_CLASS} value={center.name} onChange={(event) => dispatch({ type: 'patch', patch: { costCenter: { ...center, name: event.target.value } } })} />
+          <Input id="re-center-name" className={PATH_FIELD_HEIGHT_CLASS} value={center.name} onChange={(event) => dispatch({ type: 'patch', patch: { costCenter: { ...center, name: event.target.value } } })} />
         </div>
       )}
       {center.mode === 'existing' && (
         <Select value={center.existingId || undefined} onValueChange={(existingId) => dispatch({ type: 'patch', patch: { costCenter: { ...center, existingId } } })}>
-          <SelectTrigger aria-label="Centro" className={FIELD_HEIGHT_CLASS}>
+          <SelectTrigger aria-label="Centro" className={PATH_FIELD_HEIGHT_CLASS}>
             <SelectValue placeholder="Scegli il centro" />
           </SelectTrigger>
           <SelectContent>
