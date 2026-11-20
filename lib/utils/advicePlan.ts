@@ -1,6 +1,6 @@
 /**
  * The plan of accumulation the Consulente's «Applica» creates from the operating plan (2026-11-20,
- * doc/guide/consulente-piano.md § After «Applica»): ONE pure builder, run in render on the «Applica»
+ * doc/guide/consulente-piano.md § The book and «Applica»): ONE pure builder, run in render on the «Applica»
  * page and again on the re-read data by the click.
  *
  * The stored operating plan was checked on the portfolio of the day it was written; the builder
@@ -56,6 +56,8 @@ export const ADVICE_PLAN_COPY = {
   monthsCapped: (closed: number, months: number) =>
     `Il piano attivo ha già ${closed} ${closed === 1 ? 'rata chiusa' : 'rate chiuse'}: la durata scende a ${months} ${months === 1 ? 'mese' : 'mesi'}.`,
   nothingToInvest: 'Oggi il piano non ha niente da investire: sopra la riserva non c\'è liquidità, e non ci sono versamenti né vendite.',
+  // Inflows or sales that exist but only refill the reserve (2026-11-20): never «non ci sono versamenti» beside them.
+  onlyReserve: 'Oggi il piano non ha niente da investire: versamenti e vendite ricostituiscono solo la riserva.',
   nothingPriced: 'Nessuno degli strumenti da comprare ha un prezzo: dai loro un ticker in Patrimonio, poi crea il piano da qui.',
   sourceGone: ADVICE_SOURCE_GONE,
   swapUnpriced: (sold: string, bought: string) =>
@@ -122,7 +124,8 @@ export function newInstrumentFormData(instrument: OperatingPlanInstrument, prici
     createdEmpty: true,
     currentPrice: priced ? priced.price : (bondPrice ?? 0),
     currentPriceEur: priced && priced.currency !== 'EUR' ? priced.priceEur : undefined,
-    // A symbol with a fresh price, or a government bond with its ISIN (owner, 2026-11-19): Borsa Italiana prices it.
+    // A symbol with a fresh price, or a government bond with its ISIN (owner, 2026-11-19): Borsa Italiana prices it
+    // every day — and at the click too when it has a quote (owner, 2026-11-20).
     autoUpdatePrice: priced !== null || pricing.kind === 'bond',
     // The asset form's create defaults.
     isLiquid: true,
@@ -465,7 +468,9 @@ export function buildAdvicePlan(input: AdvicePlanInput): AdvicePlanBuild {
     : issues.length > 0
       ? issues[0].message
       : preview.liquidity.L <= 0
-        ? ADVICE_PLAN_COPY.nothingToInvest
+        ? preview.liquidity.inflowTotalEur + preview.liquidity.disposalProceedsEur > 0
+          ? ADVICE_PLAN_COPY.onlyReserve
+          : ADVICE_PLAN_COPY.nothingToInvest
         : buying.every((position) => unpriced.has(position.id))
           ? ADVICE_PLAN_COPY.nothingPriced
           : null;

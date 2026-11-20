@@ -79,7 +79,7 @@ stati verificati nell'analizzatore: il dubbio sul tree-shaking di `radix-ui` res
   `patrimonioNarrative` e `savingsRate` (/ 522,4 invece di 521,1); vive in `lib/utils/compositionRing.ts`, e per lo
   stesso motivo `incomeRingSegments` in `lib/utils/categoryRing.ts`, non in `tracciamentoSummary.ts`. Prima di alzare un
   tetto si guarda che cosa importa il modulo nuovo.
-- **Un servizio che ogni pagina carica non importa un modulo di una sola route** (2026-11-20, NOVE-25 phase F): la
+- **Un servizio che ogni pagina carica non importa un modulo di una sola route** (2026-11-20, the one-click «Applica», #561): la
   regola sui target da obiettivi (`resolveEffectiveTargets`, con `goalMath`) in `assetAllocationService.ts` portava
   i condivisi da 535,2 a 536,1 KB gz e la landing da 521,7 a 523,8; le frasi della spunta del piano dentro
   `allocationAdviceNarrative.ts`, che Allocazione carica intero, la pagina a 613,2. Vivono in

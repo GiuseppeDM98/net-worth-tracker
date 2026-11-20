@@ -125,7 +125,7 @@ beforeEach(() => {
 });
 
 // Mutation that turns it red: call `createAndActivatePlan` before creating the instruments.
-describe('a new plan (U8)', () => {
+describe('a new plan', () => {
   it('creates each missing instrument, THEN the plan on the real ids with the model of its weights', async () => {
     const result = await executeAdvicePlan(run({ saveSourceAsSetting: true }));
     expect(result).toEqual({ planId: 'plan-new', action: 'create', modelError: null });
@@ -162,7 +162,7 @@ describe('a new plan (U8)', () => {
 });
 
 // Mutation that turns it red: pass `reconciled.months` as the revision's months.
-describe('an open plan (U9)', () => {
+describe('an open plan', () => {
   const draftPlan = { id: 'draft-1', status: 'draft', disposals: [] } as unknown as AccumulationPlan;
   const activePlan = {
     id: 'active-1', status: 'active',
@@ -201,7 +201,7 @@ describe('an open plan (U9)', () => {
 });
 
 // Mutation that turns it red: create the instruments from the page's assets, without the re-read.
-describe('failures and a second press (U10)', () => {
+describe('failures and a second press', () => {
   it('an activation that fails → the step activate, after the instruments and the plan', async () => {
     createAndActivatePlan.mockImplementationOnce(async () => { throw new PlanWriteError('activate', 'Rete assente.', { planId: 'plan-new' }); });
     const error = await executeAdvicePlan(run()).catch((e: unknown) => e);

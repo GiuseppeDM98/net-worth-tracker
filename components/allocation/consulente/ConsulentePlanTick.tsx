@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * The plan of accumulation on «Applica» (2026-11-20, doc/guide/consulente-piano.md § After
- * «Applica»): the report's operating plan turned into a plan the click creates, shown BEFORE the
+ * The plan of accumulation on «Applica» (2026-11-20, doc/guide/consulente-piano.md § The
+ * book and «Applica»): the report's operating plan turned into a plan the click creates, shown BEFORE the
  * click with everything the report did not say — the summary, the account, the instruments to
  * create with their listing, price and date, the app's corrections, what happens to an open plan.
  *
@@ -69,13 +69,13 @@ export interface ConsulentePlanTickProps {
 
 const deps = { valueOf: calculateAssetValue, priceOf: unitPriceEur };
 
-/** Deterministic position ids: the build runs in render, so a random id would change on every one. */
 /** A coefficient as typed, «1,2345» or «1.2345»; null when it is no positive number (a BTP€i's sits near 1). */
 function parseCoefficient(text: string | undefined): number | null {
   const value = Number((text ?? '').trim().replace(',', '.'));
   return (text ?? '').trim() !== '' && Number.isFinite(value) && value > 0 && value < 10 ? value : null;
 }
 
+/** Deterministic position ids: the build runs in render, so a random id would change on every one. */
 function sequentialIds(): () => string {
   let next = 0;
   return () => `pos-${++next}`;

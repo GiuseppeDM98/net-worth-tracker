@@ -3,7 +3,7 @@
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-22** (the path: `planPath.ts` with `restorePlanPathDraft`
 > and `planPathTodayWeights`, `PathCard`, the route `/dashboard/allocation/piano`), on **NOVE-23** (retired on 2026-11-19, PR #557; a sale's month
 > is the plan's absolute instalment index, the validator's and the preview's `firstIndex`, `listSaleSteps`,
-> `reviewMonthIndex`, the note «Rivedi il piano» of the review month) and **NOVE-25** (`advisorNotes`,
+> `reviewMonthIndex`, the note «Rivedi il piano» of the review month) and **NOVE-25** (retired on 2026-11-20, PR #561; `advisorNotes`,
 > `PlanRevisionInput.advisorNotes`, `lib/utils/accumuloCopy.ts`, the gate's `source_missing`). Last of the five
 > specs of «dal Consulente al piano di accumulo, in un clic»: «Rivedi il piano» and «Rivedi dal modello» open the
 > same eight screens, prefilled with the plan, and `AccumulationPlanDialog` leaves the repo.
@@ -18,18 +18,18 @@ copies of every sentence (the exports of `lib/utils/accumulationNarrative.ts` th
 `components/allocation/AccumulationPlanDialog.tsx` and `PlanDraftSidePanel.tsx` read: § 4.5).
 
 **The modal's revision is the create form with exceptions.** `draftForRevision`
-(`AccumulationPlanDialog.tsx:264-276`) rebuilds a draft from the first intact instalment; step 1 swaps «Durata» for
-«Mesi restanti» and adds a note (`:999`); the saved sales are locked by a set (`lockedSaleIds`, `:475`) and the
-changes diffed at save (`revisionChanges`, `:487`; `handleRevise`, `:720-746`); its preview is `buildDraftPreview`
+(`AccumulationPlanDialog.tsx:263-275`) rebuilds a draft from the first intact instalment; step 1 swaps «Durata» for
+«Mesi restanti» and adds a note (`:999`); the saved sales are locked by a set (`lockedSaleIds`, `:473`) and the
+changes diffed at save (`revisionChanges`, `:485`; `handleRevise`, `:720-746`); its preview is `buildDraftPreview`
 on that draft (`:750`), not the calendar `revisePlan` will write.
 
 **Three engine functions and two entry points exist only for the modal's advanced operations**, which decision 89
 removed from the product: `groupPositions`, `separatePosition`, `replaceBuyAsset`
 (`lib/utils/accumulationPlanUtils.ts`), and the optimizer's panel inside step 2.
 
-**«Rivedi il piano» has three doors**: the footer button (`components/allocation/tiles/QuestoMeseTile.tsx:897-899`),
-«Rivedi dal modello» (`:617-629`) and, since NOVE-23, the review month's note — each sets two pieces of state and
-opens the modal (`reviseDialog`, `:378-397`).
+**«Rivedi il piano» has three doors**: the footer button (`components/allocation/tiles/QuestoMeseTile.tsx:920-922`),
+«Rivedi dal modello» (`:746-758`) and, since NOVE-23, the review month's note — each sets two pieces of state and
+opens the modal (`reviseDialog`, `:383-402`).
 
 ## 2. Goal and acceptance criteria
 
@@ -133,12 +133,12 @@ expectedFirstIndex?: number;
 export function revisedPlanGateDraft(plan: AccumulationPlan): AccumulationPlanDraft
 ```
 
-`revisedPlanGateDraft` is the object `revisePlan` builds today at `lib/services/accumulationPlanService.ts:417-426`;
+`revisedPlanGateDraft` is the object `revisePlan` builds today at `lib/services/accumulationPlanService.ts:482-491`;
 `revisePlan` calls it, and so does the summary: one gate, two readers. `DraftIssueCode` and `DraftIssueContext`
-(`lib/utils/accumulationNarrative.ts:87-112`) gain `plan_moved`, and `describeDraftIssue({ code: 'plan_moved' })`
+(`lib/utils/accumulationNarrative.ts:85-112`) gain `plan_moved`, and `describeDraftIssue({ code: 'plan_moved' })`
 = «Il piano è cambiato mentre lo rivedevi: ricarica la pagina.» — `revisePlan` already turns a failed result into
-`describeDraftIssue({ code: result.issue })` (`accumulationPlanService.ts:409-414`), so the sentence reaches the path with no other change.
-NOVE-25's executor does not pass `expectedFirstIndex` (it builds and writes inside one press, on plans it just
+`describeDraftIssue({ code: result.issue })` (`accumulationPlanService.ts:474-479`), so the sentence reaches the path with no other change.
+The Consulente's executor (`executeAdvicePlan`, `lib/services/advicePlanService.ts`) does not pass `expectedFirstIndex` (it builds and writes inside one press, on plans it just
 read).
 
 - **`fromModel`** = `searchParams.da === 'modello'`, read by `app/dashboard/allocation/piano/page.tsx` from its
@@ -155,8 +155,8 @@ read).
   pass through `reconcilePlanPathAnswers` (NOVE-22): a position member whose asset is gone is dropped, and every
   held buyable instrument without a row — one bought after the activation — gets its row at 0 %.
 - **`seedPlanPathPositions`** in a revision: `'plan'` → `plan.positions`; `'model'` →
-  `applyModelToPositions(plan.positions, model, sold, labelOf)` (`lib/utils/accumulationPlanUtils.ts:1353`, the
-  editor's «Rivedi dal modello», `AccumulationPlanDialog.tsx:366-373`; `sold` = the assets of the answers' whole
+  `applyModelToPositions(plan.positions, model, sold, labelOf)` (`lib/utils/accumulationPlanUtils.ts:1436`, the
+  editor's «Rivedi dal modello», `AccumulationPlanDialog.tsx:364-371`; `sold` = the assets of the answers' whole
   sales); `'today'` → `plan.positions` with every quota replaced by `planPathTodayWeights` — in both, a row the
   plan holds stays a row.
 - **`describePlanPathBlock`** in a revision: `durata` — «Scrivi quanti mesi restano, da 1 a {60 − closedCount}.»;
@@ -234,7 +234,7 @@ if (updateModel) {
 
 `weights` and `basis` as NOVE-22 (`planPositionsToModelWeights(answers.positions, …)`); `optimizerSnapshot` =
 `answers.start === 'model' ? context.model?.optimizerSnapshot : plan.optimizerSnapshot` — the editor's rule
-(`AccumulationPlanDialog.tsx:272`, `:369-373`). NOVE-22's month check (G16) does not run in a revision: the
+(`AccumulationPlanDialog.tsx:271`, `:367-371`). NOVE-22's month check (G16) does not run in a revision: the
 revision starts from the plan's first intact instalment, whatever the month.
 
 Invalidations as NOVE-22; the stored draft cleared; `PathDoneCard` (`ariaLabel="Piano rivisto"`, V8) with the
@@ -260,7 +260,7 @@ plan interrupted meanwhile — and nothing was written; the answers stay.
 - `components/allocation/AccumulationPlanDialog.tsx` (1.809 lines on 2026-11-19, after NOVE-23, with the `SaleMonthSelect` and
   `emptyDraft` NOVE-23 exported from it), `components/allocation/PlanDraftSidePanel.tsx` (170 lines) and
   `components/allocation/OptimizerPanel.tsx` — its only importer is the editor
-  (`AccumulationPlanDialog.tsx:82`); the model's dialog and «Obiettivi» import `OptimizerObjectivesReport` and
+  (`AccumulationPlanDialog.tsx:81`); the model's dialog and «Obiettivi» import `OptimizerObjectivesReport` and
   `ObjectiveBars`, which stay — and with it the export `OptimizerReport` of
   `components/allocation/OptimizerReport.tsx`, read by `OptimizerPanel.tsx:40` alone.
 - `lib/utils/accumulationPlanUtils.ts`: `groupPositions`, `separatePosition`, `replaceBuyAsset`. Their cases live
@@ -271,7 +271,7 @@ plan interrupted meanwhile — and nothing was written; the answers stay.
   `vi.mock('@/components/allocation/AccumulationPlanDialog', …)` lines of `__tests__/accumuloVuotoTile.test.tsx`
   (`:23`), `__tests__/portafoglioModelloTile.test.tsx` (`:32`) and `__tests__/questoMeseTile.test.tsx` are
   removed. `__tests__/accumulationPlanRevision.test.ts` tests the pure engine and stays.
-- `lib/utils/accumulationNarrative.ts`, with their test cases: `describeModelWriteAfterPlan` (`:733`; the path
+- `lib/utils/accumulationNarrative.ts`, with their test cases: `describeModelWriteAfterPlan` (`:745`; the path
   reads `describeModelNotUpdated`), `describeAccumuloDialogEyebrow`,
   `ACCUMULO_STEP_READINGS`, `ACCUMULO_STEP_TITLES`, every `ACCUMULO_STEP1_*`, `ACCUMULO_STEP2_*` and
   `ACCUMULO_STEP3_*` constant, `ACCUMULO_ACTION_SAVE_DRAFT`, `ACCUMULO_ACTION_SAVE_REVISION`,
@@ -308,14 +308,14 @@ message, not in `perf/budget.json`.
 
 - **A revision never rewrites the past** (doc/guide/accumulo.md): instalments `1 … k−1`, their measurements and
   the baseline are untouched — `buildRevisedPlan` guarantees it; the path never builds a calendar of its own.
-- **`revisePlan` is the only writer and runs the gate** (`accumulationPlanService.ts:397-424`): the path calls it
+- **`revisePlan` is the only writer and runs the gate** (`accumulationPlanService.ts:462-489`): the path calls it
   with the SAME `PlanRevisionInput` the summary previewed — one object, built once per render by
   `planPathToRevision`.
 - **A saved sale whose shares change is «removed + new»** (`diffRevisionDisposals`,
-  `accumulationPlanUtils.ts:558-583`): the summary says «{nome}: da {a} a {b} quote, a {mese}», not two lines.
+  `accumulationPlanUtils.ts:641-666`): the summary says «{nome}: da {a} a {b} quote, a {mese}», not two lines.
 - **Executed, skipped or linked sales never move** (`isOpenSavedDisposal`): they are lines, not controls, and
-  `diffRevisionDisposals` drops in silence a new sale on their asset (`:568`) — hence V12: the row is not offered.
-- **The first intact instalment looks at the instalments' lines only** (`findFirstIntactInstallment`, `:591-598`):
+  `diffRevisionDisposals` drops in silence a new sale on their asset (`:651`) — hence V12: the row is not offered.
+- **The first intact instalment looks at the instalments' lines only** (`findFirstIntactInstallment`, `:674-681`):
   an open sale can sit in a month before it (V4).
 - **The plans are in the persisted cache** (doc/guide/cache-persistita.md): the wizard waits for the fetch after
   mount (NOVE-22), and the write carries `expectedFirstIndex` (V9) for what changes after it.

@@ -130,7 +130,7 @@ describe('describeOpenPlanForAdvice', () => {
   });
 
   // The plan «Applica» creates refills the reserve first and keeps the held positions at their weight (owner,
-  // 2026-11-20, NOVE-25's phase F: the Consulente read «prima rata di 0 €» and the holds as buys). Mutations that
+  // 2026-11-20, on the mirror tour of the one-click «Applica»: the Consulente read «prima rata di 0 €» and the holds as buys). Mutations that
   // turn it red: the first buy read from the open month; a hold among the buys; the shares read from the weights.
   it('a plan that refills first: the first month that buys, the shares of the money, the holds apart', () => {
     const plan = activePlan({

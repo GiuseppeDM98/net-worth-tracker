@@ -5,7 +5,7 @@
  * years to it, every bond ETF with its value and role — so the strategy can tie each bond
  * sub-target to a goal's horizon and name the maturity nobody covers.
  *
- * No duration (owner, 2026-11-20, after NOVE-25's phase F on the mirror): Yahoo's
+ * No duration (owner, 2026-11-20, on the mirror tour of the one-click «Applica»): Yahoo's
  * `topHoldings.bondHoldings` proved wrong on real ETFs — an inflation-linked fund at 1,08 years of
  * duration against about 7, a 1-3 year fund at 9,8 years of average maturity — and the strategy
  * built its reasoning on the wrong figure. Only the second agent writes a duration, verified with

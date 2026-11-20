@@ -154,9 +154,6 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The picker exists because the type is not one field among many** — it decides which categories/classes exist, which
   accounts are asked for, and how many balances move. Step 1 turns *one form with N conditional shapes* into *N plain
   forms*; a discriminant that only re-labels things does NOT earn a step.
-- **`AssetDialog`'s `prefill`** (`AssetPrefill`: name, ticker, ISIN, type, class, sub-category; the Consulente's hand-off,
-  2026-11-12) opens the create on step 2, like `initialType`; the reset effect reads it and lists it in its deps — the
-  one host keeps the object in state, so it is stable across renders.
 - **Create opens on step 1 — on step 2 when `initialValues.categoryId` names a category (`ExpenseDialog`, the Assistente's «Modifica», 2026-11) — edit skips to step 2** — changing a saved record's type is a different act, with
   reconciliation consequences the in-form notice must explain, so the `Select` stays there and only there.
 - **`setStep(record ? 2 : 1)` is settled during render on the `(open, record, initialValues)` subject**, never in `useState`'s
@@ -181,7 +178,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   focus stays on the opener behind the sheet, and after a hand-over between two drawers (a detail → its edit form)
   it lands on `body` because the opener has unmounted. A dialog above 768 focuses itself as Radix does. Not
   changed: `autoFocus` on a phone opens the keyboard on every form's first field, which is why vaul ships it off —
-  it is a decision for all 42 mounts at once, not a polish.
+  it is a decision for every mount at once, not a polish.
   NO two-click confirm auto-disarms on a timer any more — that was not true until 2026-09-22, when Impostazioni's two
   (the category delete and the dividend sync, 3 s each) went to `useArmedDelete` with its revoke of an access. Before
   them the last one (`AssistantThreadList`, kept BY DESIGN while
@@ -203,7 +200,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   replaces it. **Since 2026-10-08 `ResponsiveModal` keeps its own fallback**: a layout effect on `open` records
   `document.activeElement` (before Radix's FocusScope moves it into the content from a passive effect) and
   `onCloseAutoFocus` restores it — skipped when it is `body` or has since unmounted — so every keyboard opener and
-  every Chrome click gets its focus back on all 42 modals without a prop (pinned by `e2e/pension.spec.ts`, seen red with
+  every Chrome click gets its focus back on every modal without a prop (pinned by `e2e/pension.spec.ts`, seen red with
   the fallback removed). `returnFocusTo` still wins and is still needed where the opener NEVER held the focus: Safari
   does not focus a clicked button, and a row opened from a window event or a non-focusable cell leaves `body` focused at
   open. Fed from `event.currentTarget` at the click (a `PageHeader` action is mounted twice; only `currentTarget` is the
@@ -221,4 +218,4 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   on macOS with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. An
   origin off the button's centre is NOT this flake: the spec reads the box after the entrance (doc/guide/e2e-playwright.md).
   (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
-- **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per 42 mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per tutti i mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

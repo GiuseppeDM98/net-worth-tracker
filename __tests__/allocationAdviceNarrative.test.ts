@@ -159,7 +159,7 @@ describe('the stages’ typical durations (2026-11-07)', () => {
   });
 });
 
-// The sentences of the plan the click creates (2026-11-20, doc/guide/consulente-piano.md § After «Applica»).
+// The sentences of the plan the click creates (2026-11-20, doc/guide/consulente-piano.md § The book and «Applica»).
 describe('the plan of accumulation on «Applica»', () => {
   it('describeApplySummary names what the click does to the plan', () => {
     expect(describeApplySummary({ targets: true, roles: 0, goals: 0, plan: 'create' })).toBe('Scrive i target in Impostazioni → Allocazione e crea il piano di accumulo.');

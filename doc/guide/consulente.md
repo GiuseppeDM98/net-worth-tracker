@@ -142,8 +142,8 @@
   `bondDetails.maturityDate` and the coupon the DIVIDENDI facts know), the funds by CLASS (`bonds`, never an account or
   a loan) by value and role, «--- OBBLIGAZIONI: SCADENZE ---». The block closes the data of the interview and
   the strategy (`buildConsulenteContext`) and the holdings of the instrument search; a single without a date reads
-  «scadenza non registrata». **No duration in the block, and no Yahoo read** (owner, 2026-11-20, after NOVE-25's
-  phase F on the mirror): Yahoo's `topHoldings.bondHoldings` proved wrong on real ETFs — an inflation-linked fund at
+  «scadenza non registrata». **No duration in the block, and no Yahoo read** (owner, 2026-11-20, on the mirror
+  tour of the one-click «Applica»): Yahoo's `topHoldings.bondHoldings` proved wrong on real ETFs — an inflation-linked fund at
   1,08 years of duration against about 7 verified by the search, a 1-3 year fund at 9,8 years of average maturity —
   and the strategy had written its reasoning on the wrong figure. The funds' line says the second agent verifies it
   (`BOND_FUNDS_LINE`); the strategy and the interview contracts forbid a duration in figures; the instruments
@@ -181,7 +181,7 @@
   MONEY (Σ of the lines not skipped by position, «Compra, in parti dei soldi del piano: X 60% (… €)»), the positions
   kept at their weight apart («Tiene al loro peso, senza comprarli»), the sales with their month and status (a swap adds «, e con il ricavato compra X nello stesso mese», 2026-11-20; a swap line is never counted among the buys). A plan
   that refills the reserve first names it: «fino a 2027-10 ricostituiscono solo la riserva (11 mesi senza acquisti),
-  prima rata 800 € a 2027-11» (`OpenPlanForAdvice.firstBuy`; owner, 2026-11-20, after NOVE-25's phase F: the
+  prima rata 800 € a 2027-11» (`OpenPlanForAdvice.firstBuy`; owner, 2026-11-20, on the mirror tour of the click: the
   Consulente had read «prima rata di 0 €» and the held positions' end weights as buys). Sections 5 and 6 of the contracts carry the path in words: what to accumulate or
   sell, an indicative time, the monthly instalment as an order of magnitude, and with an active plan whether it goes
   toward the targets — never a table, never the plan's figures recomputed; the review names «Crea un piano di
@@ -379,7 +379,7 @@
   revisione» (the aside «rivedi entro il …», the reason, `proposal.risks` as rows), «Chiedi una modifica», «Applica».
   The generated card — the 1px `--ai-accent` border, the accented eyebrow — follows § The report as a book above;
   «Le fasi» of the running view wears it.
-- **«Applica», its plans, its hand-off and the operating plan's row** moved to doc/guide/consulente-piano.md
+- **«Applica», its plans, the plan of accumulation it creates and the operating plan's row** moved to doc/guide/consulente-piano.md
   (2026-11-19), with the page «Il piano operativo».
 - **The review date** (`reviewByIso`) lives in the document, not in the settings: the Allocazione page prints it in
   its header (`describeReviewBy` → `describeAllocazioneHeader.reviewBy`) only when the plan has been applied — no

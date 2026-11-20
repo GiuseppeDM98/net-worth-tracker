@@ -2,7 +2,7 @@
 
 /**
  * The quotes of the instruments the Consulente's «Applica» would create (2026-11-20,
- * doc/guide/consulente-piano.md § After «Applica»): one `GET /api/prices/quote?ticker=` per symbol,
+ * doc/guide/consulente-piano.md § The book and «Applica»): one `GET /api/prices/quote?ticker=` per symbol,
  * under ONE key (the sorted symbols), five minutes fresh, never persisted. A symbol whose request
  * fails is a quote without a price — `pickFreshQuote` skips it. A government bond is quoted by its ISIN
  * (`GET /api/prices/bond-quote?isin=`, owner 2026-11-20), under the ISIN, its price the % of par.

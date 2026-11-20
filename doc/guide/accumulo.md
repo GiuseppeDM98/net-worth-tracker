@@ -83,7 +83,8 @@ weight, month by month, proposes the purchases and never writes a transaction on
   of swap lines alone is no instalment (`isRegularLine`, `locateOpenMonth` → `swap`): the aside reads «dicembre 2026 ·
   scambio, prima rata a febbraio 2028», the calendar «Scambio da fare»; sales that buy one instrument in one month are ONE purchase on their summed proceeds (`computeUsableLiquidity` merges them: the mirror had two lines and two orders); the verdict counts the rate as the months that buy (`countPlanInstalments`): before the start «N rate; a dicembre lo scambio: il ricavato delle vendite compra X», in the swap month «Scambio di dicembre: …» with «Prima rata a febbraio 2028, …», a month with nothing to buy beside late lines «Niente da comprare a gennaio, 1 in ritardo», a refill month «Rata k di n» on the NEXT rata (it read the month index over all the months before); the recalibration adds the swap's units to the
   suggested ones; `diffRevisionDisposals` reads a changed swap as a changed sale (removed + new). «Questo mese» draws a swap's purchase under the sales that pay it, «Con il ricavato: X» with its own Registra, from the moment the sales are registrable (before the plan starts too; owner, 2026-11-20: the sales read «Da fare» in November and the purchase appeared only in December, as a line of the rata); it is never among the rata's lines (`renderLine`, `swapRows`). The editor keeps
-  the swap on a new quantity and sets none (NOVE-22 redoes it).
+  the swap on a new quantity (untested, declared 2026-11-20: the editor goes when the guided path revises) and sets
+  none.
 - **The default source account** (owner, 2026-11-19): Impostazioni › Spese › «Conto per gli investimenti»
   (`AssetAllocationSettings.investmentCashAssetId`, doc/guide/impostazioni.md); `resolveInvestmentAccountId` ticks it
   on a new plan while it is still a plan source account (`isPlanSourceAccount`), and nothing when it is gone.
@@ -123,7 +124,7 @@ weight, month by month, proposes the purchases and never writes a transaction on
 
 ## Il piano del Consulente
 
-The plan the Consulente's «Applica» creates (2026-11-20; doc/guide/consulente-piano.md § After «Applica»): it
+The plan the Consulente's «Applica» creates (2026-11-20; doc/guide/consulente-piano.md § The book and «Applica»): it
 arrives ACTIVE from one click, built from the report's operating plan on today's portfolio — no editor on this path,
 no model called by the click. Until 2026-11-20 the «Applica» page linked here (`?da=consulente`) to a window that
 seeded the editor from the optimizer; the window, its seed and the editor's kept-sale note are gone. An old bookmark
@@ -166,12 +167,13 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
   `accumulationPlanReviewFlow`, `accumulationClassTrajectory`, `accumulationNarrative`, `accumulationReactivate`,
   `accumuloMonth`, `accumuloSummary`, `accumuloTileSentences`, `zeroQuantityChip`, `allocazioneNarrative`,
   `allocazioneSummary`, `mirrorCollections`, `persistCache`, `allocationAdviceHandoff`, `allocationAdviceDocument`, `advicePlan`, `advicePlanService`,
-  `modelPortfolioGroups`, `narrativeTextNesting` · **dom** `accumuloVuotoTile`, `planDraftSidePanel`,
-  `assetDialogCreateEmpty`, `strumentiTile`, `consulenteBook`, `consulentePlanTick`, `questoMeseTile`,
-  `accumulationPlanDialogSaleMonth` · **AI context** `assistantPortfolioContext`,
+  `advicePlanNarrative`, `effectiveTargets`, `priceUpdater`, `yahooFinanceService`, `modelPortfolioGroups`, `narrativeTextNesting` · **dom** `accumuloVuotoTile`, `planDraftSidePanel`,
+  `assetDialogCreateEmpty`, `strumentiTile`, `consulenteBook`, `consulentePlanTick`, `useAdviceQuotes`,
+  `questoMeseTile`, `accumulationPlanDialogSaleMonth` · **AI context** `assistantPortfolioContext`,
   `assistantPromptBundle`, `allocationAdviceApply`, `allocationAdvicePrompts`, `allocationAdvicePlanRead`, `allocationAdviceRun` · **Browser** `e2e/accumulo.spec.ts`,
   `e2e/accumulo.{mobile,tablet}.spec.ts`,
-  `e2e/allocation.spec.ts` (the tab, the Piano's note), `e2e/bundle.lazy.mobile.spec.ts` (the lazy landing).
+  `e2e/allocation.spec.ts` (the tab, the Piano's note), `e2e/bundle.lazy.mobile.spec.ts` (the lazy landing),
+  `e2e/allocation.consulente.plan.spec.ts` (the plan the Consulente's click creates).
 
 ## Per-page blind spots
 
@@ -198,5 +200,8 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
 - **«Mai comprato»** (`describeZeroQuantityChip`) needs `Asset.createdEmpty`, written only by «+ Nuovo asset»: an asset created at 0 before 2026-11-12, or a position sold before the ledger migration, reads «Azzerato».
 - **The census fixture plants a plan and its lock** (`scripts/seedCensusE2E.mts`); the `allocazione-accumulo` entry of `perf/mobile-budget.json` is measured on this machine (doc/guide/prima-schermata-misure.md).
 - **The Consulente's plan: what the click does not do** (declared on 2026-11-20): no editor between the report and the
-  plan (it is revised from «Rivedi il piano»); no government bond's terms (the asset form owns them, the price arrives
-  by itself); no group of equivalent instruments (one instrument per row); the Assistente creates no plan.
+  plan (it is revised from «Rivedi il piano»); no government bond's terms (the asset form owns them; the price is
+  Borsa Italiana's at the click, else it arrives at the first daily update); no group of equivalent instruments (one
+  instrument per row); the Assistente creates no plan; no Yahoo symbol searched by ISIN (measured on 2026-11-19:
+  one listing, then a validation throw — the symbols come from the instruments stage); no undo as one action
+  («Interrompi piano», then the instruments at 0 quotes deleted from Patrimonio).

@@ -102,7 +102,7 @@ beforeEach(() => {
 });
 
 // Mutation that turns it red: hide the notes.
-describe('the tick with a plan to create (R1)', () => {
+describe('the tick with a plan to create', () => {
   it('the label by action, the summary, the instrument with ticker · price · date, «Corretto dall\'app»', async () => {
     const { lastBuild, onBuild } = renderTick();
     await waitFor(() => expect(onBuild).toHaveBeenCalled());
@@ -140,7 +140,7 @@ describe('the tick with a plan to create (R1)', () => {
 });
 
 // Mutation that turns it red: enable the checkbox without a chosen account.
-describe('the account (R2)', () => {
+describe('the account', () => {
   it('no investment account → the select; disabled until a choice, then the build carries it and saves it', async () => {
     settingsState = ok({ targets: TARGETS });
     const { lastBuild, onBuild } = renderTick();
@@ -157,7 +157,7 @@ describe('the account (R2)', () => {
 });
 
 // Mutation that turns it red: enable on a failed read.
-describe('the states (R3)', () => {
+describe('the states', () => {
   const expectState = async (sentence: string | RegExp, overrides: Partial<React.ComponentProps<typeof ConsulentePlanTick>> = {}) => {
     const { onBuild, unmount } = renderTick(overrides);
     expect(screen.getByText(typeof sentence === 'string' ? new RegExp(`: ${sentence.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) : sentence)).not.toBeNull();
@@ -180,7 +180,7 @@ describe('the states (R3)', () => {
     await expectState('Il piano va verso i nuovi target: applicali insieme.', { targetsTicked: false });
   });
 
-  it('blocked: the reconcile\'s sentence; nothing left to revise → its sentence and «Apri Accumulo»', async () => {
+  it('blocked: the build\'s sentence (nothing to invest); nothing left to revise → its sentence and «Apri Accumulo»', async () => {
     quotesState = ok({ 'NEW1.MI': { symbol: 'NEW1.MI', price: null } });
     const noInflow = { ...makeDocument() };
     noInflow.operatingPlan = { ...noInflow.operatingPlan!, plan: { ...noInflow.operatingPlan!.plan!, monthlyInflowEur: 0 } };

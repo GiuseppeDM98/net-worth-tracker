@@ -1,8 +1,8 @@
 /**
- * Tests for `resolveEffectiveTargets` (lib/services/assetAllocationService.ts) — the targets Allocazione
+ * Tests for `resolveEffectiveTargets` (lib/services/effectiveTargets.ts) — the targets Allocazione
  * measures, goal-driven ones included, moved out of the page (2026-11-20) so the Consulente's plan
- * measures the same. It lives beside `buildTargetsFromGoalAllocation` and `getDefaultTargets` (owner,
- * 2026-11-20): `allocationUtils` stays Firebase-free. Mutation that turns it red: return
+ * measures the same. A module of its own (2026-11-20): `allocationUtils` stays Firebase-free, and in
+ * `assetAllocationService` the goal math cost every page's shared code 0,9 KB gz. Mutation that turns it red: return
  * `settings.targets` always.
  */
 import { describe, it, expect, vi } from 'vitest';
