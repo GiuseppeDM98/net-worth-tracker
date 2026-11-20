@@ -15,6 +15,8 @@ const writes: Array<{ kind: 'set' | 'update' | 'delete'; path: string; data?: Re
 let autoId = 0;
 
 vi.mock('@/lib/firebase/config', () => ({ db: {} }));
+const saveModelPortfolio = vi.fn(async () => undefined);
+vi.mock('@/lib/services/modelPortfolioService', () => ({ saveModelPortfolio: (...args: unknown[]) => saveModelPortfolio(...(args as [])) }));
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db: unknown, col: string) => ({ col })),
   doc: vi.fn((first: unknown, col?: string, id?: string) => {
@@ -53,10 +55,13 @@ vi.mock('firebase/firestore', () => ({
 import {
   activatePlan,
   closePlan,
+  createAndActivatePlan,
   createDraftPlan,
+  PlanWriteError,
   deleteDraftPlan,
   reactivatePlan,
   setInstallmentLine,
+  updateDraftPlan,
 } from '@/lib/services/accumulationPlanService';
 import { ACCUMULO_ONE_OPEN_PLAN, ACCUMULO_REACTIVATE_REFUSED } from '@/lib/utils/accumulationNarrative';
 import type { AccumulationPlanDraft } from '@/types/accumulationPlan';
@@ -216,5 +221,92 @@ describe('createDraftPlan and the review month', () => {
     store.clear();
     const without = await createDraftPlan(OWNER, draft);
     expect(store.get(`accumulationPlans/${without}`)).not.toHaveProperty('reviewMonthIndex');
+  });
+});
+
+// A replaced draft keeps nothing of the plan it replaces (2026-11-20): `updateDraftPlan` writes the three optional
+// fields when the new draft defines them and clears them with `deleteField()` when it does not. Mutation that turns
+// it red: `removeUndefinedDeep` dropping the absent fields from the patch, as before (the old ones survived).
+describe('updateDraftPlan replaces the draft whole', () => {
+  const snapshot = { computedAt: NOW, mode: 'ideal', settingsUsed: {}, weights: [], objectives: [] };
+
+  it('clears reviewMonthIndex, advisorNotes and optimizerSnapshot the new draft does not carry', async () => {
+    store.set('accumulationPlans/d1', planDoc('draft', { reviewMonthIndex: 2, advisorNotes: ['Vecchia nota.'], optimizerSnapshot: snapshot }));
+    await updateDraftPlan('d1', draft);
+    const written = writes.find((w) => w.path === 'accumulationPlans/d1')?.data;
+    expect(written?.reviewMonthIndex).toEqual(DELETE);
+    expect(written?.advisorNotes).toEqual(DELETE);
+    expect(written?.optimizerSnapshot).toEqual(DELETE);
+  });
+
+  it('writes the three when the new draft defines them', async () => {
+    store.set('accumulationPlans/d1', planDoc('draft'));
+    await updateDraftPlan('d1', { ...draft, reviewMonthIndex: 3, advisorNotes: ['Nota nuova.'], optimizerSnapshot: snapshot as never });
+    const written = writes.find((w) => w.path === 'accumulationPlans/d1')?.data;
+    expect(written?.reviewMonthIndex).toBe(3);
+    expect(written?.advisorNotes).toEqual(['Nota nuova.']);
+    expect(written?.optimizerSnapshot).toMatchObject({ mode: 'ideal' });
+  });
+});
+
+describe('createDraftPlan and the advisor notes', () => {
+  it('writes them when the draft has them, no key when it has none', async () => {
+    const withNotes = await createDraftPlan(OWNER, { ...draft, advisorNotes: ['ETF A: limite applicato.'] });
+    expect(store.get(`accumulationPlans/${withNotes}`)?.advisorNotes).toEqual(['ETF A: limite applicato.']);
+    store.clear();
+    const without = await createDraftPlan(OWNER, draft);
+    expect(store.get(`accumulationPlans/${without}`)).not.toHaveProperty('advisorNotes');
+  });
+});
+
+// ONE write path for a plan made outside the editor (2026-11-20): the gate before any write, the draft (new or an
+// open one overwritten), the activation, then the model — whose failure never undoes the plan. Mutation that turns
+// it red: validate after `createDraftPlan` (a draft with an issue is written).
+describe('createAndActivatePlan', () => {
+  const etf = { id: 'etf-a', type: 'etf', assetClass: 'equity', quantity: 3, currentPrice: 100, currency: 'EUR' } as Asset;
+  const cash = { id: 'cash', type: 'cash', assetClass: 'cash', quantity: 1000, currentPrice: 1, currency: 'EUR' } as Asset;
+  const deps = { valueOf: (a: Asset) => a.quantity * a.currentPrice, priceOf: (a: Asset) => a.currentPrice };
+  const compare = () => ({ byAssetClass: { equity: { currentValue: 300 }, cash: { currentValue: 1000 } }, marketValue: 1300 }) as never;
+  const activate = { allAssets: [etf, cash], targets: {} as never, compare, deps, today: NOW };
+  const model = { input: { weights: [{ assetId: 'etf-a', targetPercentage: 100 }], origin: 'manual' as const }, basis: { targets: null, criteria: {} as never, goals: null } };
+
+  beforeEach(() => saveModelPortfolio.mockReset().mockResolvedValue(undefined));
+
+  it('refuses a draft the gate has an issue with, before any write', async () => {
+    const error = await createAndActivatePlan({ ownerId: OWNER, draft, activate: { ...activate, allAssets: [etf] } }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PlanWriteError);
+    expect((error as PlanWriteError).step).toBe('plan');
+    expect(writes).toHaveLength(0);
+  });
+
+  it('creates the draft, activates it and writes the model', async () => {
+    const { planId, modelError } = await createAndActivatePlan({ ownerId: OWNER, draft, activate, model });
+    expect(store.get(`accumulationPlans/${planId}`)?.status).toBe('active');
+    expect(modelError).toBeNull();
+    expect(saveModelPortfolio).toHaveBeenCalledWith(OWNER, model.input, activate.allAssets, model.basis);
+  });
+
+  it('overwrites the open draft it is given, never a second plan', async () => {
+    store.set('accumulationPlans/d1', planDoc('draft'));
+    store.set(LOCK, { userId: OWNER, openPlanId: 'd1' });
+    const { planId } = await createAndActivatePlan({ ownerId: OWNER, draft: { ...draft, name: 'Nuovo' }, existingDraftId: 'd1', activate });
+    expect(planId).toBe('d1');
+    expect(store.get('accumulationPlans/d1')).toMatchObject({ status: 'active', name: 'Nuovo' });
+    expect([...store.keys()].filter((key) => key.startsWith('accumulationPlans/'))).toEqual(['accumulationPlans/d1']);
+  });
+
+  it('an activation that fails is the step activate, with the draft it left', async () => {
+    const failing = () => { throw new Error('boom'); };
+    const error = await createAndActivatePlan({ ownerId: OWNER, draft, activate: { ...activate, compare: failing as never } }).catch((e: unknown) => e);
+    expect((error as PlanWriteError).step).toBe('activate');
+    const planId = (error as PlanWriteError).planId!;
+    expect(store.get(`accumulationPlans/${planId}`)?.status).toBe('draft');
+  });
+
+  it('a model that cannot be written leaves the plan active and comes back as a sentence', async () => {
+    saveModelPortfolio.mockRejectedValueOnce(new Error('rete'));
+    const { planId, modelError } = await createAndActivatePlan({ ownerId: OWNER, draft, activate, model });
+    expect(store.get(`accumulationPlans/${planId}`)?.status).toBe('active');
+    expect(typeof modelError).toBe('string');
   });
 });

@@ -23,7 +23,7 @@
 import type { ModelBasis } from '@/lib/utils/modelPortfolio';
 import { useMemo, useRef, useState } from 'react';
 import type { Asset, AssetAllocationTarget, IdealAllocationSettings } from '@/types/assets';
-import type { AccumulationPlan } from '@/types/accumulationPlan';
+import type { AccumulationPlan, InstallmentLine } from '@/types/accumulationPlan';
 import { addMonths, toMonthKey } from '@/lib/utils/planMonths';
 import type { ModelPortfolio } from '@/types/modelPortfolio';
 import type { RebalanceBand } from '@/lib/utils/allocationUtils';
@@ -41,7 +41,7 @@ import {
 } from '@/lib/utils/accumulationPlanUtils';
 import type { LineMatch, LineUiState } from '@/lib/utils/accumulationPlanMatching';
 import { isPlanDone } from '@/lib/utils/accumuloSummary';
-import { countPlanInstalments, findFirstBuyingInstallment, isInstalmentClosed, isPlanReviewDue, locateOpenMonth, planEndsAfterReview } from '@/lib/utils/accumuloMonth';
+import { countPlanInstalments, findFirstBuyingInstallment, isInstalmentClosed, isRegularLine, isPlanReviewDue, locateOpenMonth, planEndsAfterReview } from '@/lib/utils/accumuloMonth';
 import { compareAllocations } from '@/lib/services/assetAllocationService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import {
@@ -92,6 +92,7 @@ import {
   ACCUMULO_ACTION_UNDO_EXECUTED,
   ACCUMULO_ACTION_UNLINK,
   ACCUMULO_DISPOSALS_SECTION_TITLE,
+  ACCUMULO_SWAP_ROW_PREFIX,
   ACCUMULO_DONE_BOX_DRIFT,
   ACCUMULO_DONE_BOX_EXECUTED,
   ACCUMULO_DONE_BOX_RESIDUAL,
@@ -104,6 +105,7 @@ import {
   monthLabelShort,
   describeMatchNote,
   describeMonthTileAside,
+  describeUnpricedWarning,
   ACCUMULO_MANUAL_AMOUNT_LABEL,
   ACCUMULO_MANUAL_QUANTITY_LABEL,
   ACCUMULO_MONTH_TILE_DONE_EYEBROW,
@@ -119,6 +121,9 @@ import {
   describeReserveWarning,
   describePlanModelDivergence,
   ACCUMULO_ACTION_REVIEW_FROM_MODEL,
+  ACCUMULO_ADVISOR_NOTES_EYEBROW,
+  ACCUMULO_ADVISOR_NOTES_VISIBLE,
+  describeMoreAdvisorNotes,
 } from '@/lib/utils/accumulationNarrative';
 import { comparePlanToModel } from '@/lib/utils/modelPortfolio';
 
@@ -463,6 +468,9 @@ export function QuestoMeseTile({
   const done = isPlanDone(plan, currentIndex);
   const states = resolvePositionStates(plan.positions, assetsById, DEPS, plan.disposals);
   const outcome = projectPlanOutcome(states, plan.installments, plan.residualEur ?? 0, assetsById, plan.positions, DEPS);
+  // A position to buy whose instrument has no price receives nothing until it has one (an instrument the
+  // Consulente's «Applica» created when no listing quoted it, or one a plan by hand left unpriced).
+  const unpricedLabels = states.filter((state) => state.unpriced && state.targetPercentage > 0).map((state) => state.label);
 
   if (done) {
     const { closed: closedCount, total: instalmentCount } = countPlanInstalments(plan);
@@ -500,10 +508,127 @@ export function QuestoMeseTile({
   const currentInstallment = plan.installments.find((installment) => installment.index === currentIndex);
   const lateLines = plan.installments
     .filter((installment) => installment.index < currentIndex)
-    .flatMap((installment) => installment.lines.filter((line) => line.status === 'planned').map((line) => ({ installment, line })));
-  const currentLines = currentInstallment ? currentInstallment.lines.filter((line) => line.plannedQuantity > 0 || line.status !== 'planned') : [];
+    .flatMap((installment) => installment.lines.filter((line) => line.status === 'planned' && isRegularLine(line)).map((line) => ({ installment, line })));
+  const currentLines = currentInstallment ? currentInstallment.lines.filter((line) => isRegularLine(line) && (line.plannedQuantity > 0 || line.status !== 'planned')) : [];
+  // A swap's purchase is read with the sales that pay it, registrable as soon as they are (owner, 2026-11-20).
+  const swapRows = plan.installments.flatMap((installment) =>
+    installment.lines.filter((line) => line.swap && (line.plannedQuantity > 0 || line.status !== 'planned')).map((line) => ({ installment, line })));
 
   const { sourceCashEur: planSourceCashEur, belowReserve } = summarizeReserve(plan.liquidity, assetsById, DEPS);
+
+  /**
+   * One planned line with its state and actions: a rata's line, or a swap's purchase under the sales that pay it
+   * (`prefix` «Con il ricavato: », `upcoming` before its month; owner, 2026-11-20).
+   */
+  const renderLine = (installmentIndex: number, line: InstallmentLine, upcoming = false, prefix = '') => {
+              const key = `${installmentIndex}:${line.positionId}`;
+              const isLateRow = installmentIndex < currentIndex;
+              const status = effectiveLineState(matchResult.lineStates[key] ?? 'todo', key, ignoredMatches, isLateRow, upcoming);
+              const match = matchResult.matches.find((m) => m.kind === 'installment' && m.index === installmentIndex && m.positionId === line.positionId);
+              const isManual = manualLine?.installmentIndex === installmentIndex && manualLine.positionId === line.positionId;
+              const asset = assetsById.get(line.assetId);
+              return (
+                <li key={key} className="py-2">
+                  {/* The name takes the room and wraps (never cut —); the state
+                      and its actions stack at the right on a phone and sit in one line from
+                      `desktop:`. A wrapping row put «Scollega» on a line of its own at 390. */}
+                  <div className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-2 break-words text-[13px] text-foreground">
+                        {prefix}{plan.positions.find((p) => p.id === line.positionId)?.label ?? asset?.name ?? line.positionId}
+                      </span>
+                      <span className="mt-0.5 block font-mono text-[11px] tabular-nums text-muted-foreground">
+                        {asset && `${getAssetDisplayTicker(asset)} · `}
+                        {formatNumberIt(line.plannedQuantity, 0)} · {cachedFormatCurrencyEUR(line.plannedAmountEur)}
+                      </span>
+                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1 desktop:flex-row desktop:items-center desktop:gap-3">
+                    <LineStateChip state={status} label={ACCUMULO_LINE_STATUS_LABEL[status]} />
+                    {!isDemo && status === 'toConfirm' && match && (
+                      <span className="flex shrink-0 gap-1.5">
+                        <Button
+                          variant="outline"
+                          className={ROW_ACTION_CLASS}
+                          onClick={() => setIgnoredMatches((prev) => new Set(prev).add(key))}
+                        >
+                          {ACCUMULO_ACTION_IGNORE_MATCH}
+                        </Button>
+                        <Button className={ROW_ACTION_CLASS} onClick={() => void confirmMatch(installmentIndex, line.positionId, match)}>
+                          {ACCUMULO_ACTION_CONFIRM}
+                        </Button>
+                      </span>
+                    )}
+                    {!isDemo && (status === 'todo' || status === 'late') && (
+                      <Button
+                        className={ROW_ACTION_CLASS}
+                        onClick={() => setRegisterTarget({ kind: 'line', installmentIndex, positionId: line.positionId })}
+                      >
+                        {ACCUMULO_ACTION_REGISTER}
+                      </Button>
+                    )}
+                    {!isDemo && status === 'late' && (
+                      <span className="flex shrink-0 gap-1.5">
+                        <Button
+                          variant="outline"
+                          className={ROW_ACTION_CLASS}
+                          onClick={() =>
+                            setManualLine({
+                              installmentIndex,
+                              positionId: line.positionId,
+                              qty: String(line.plannedQuantity),
+                              amount: line.plannedAmountEur.toFixed(2),
+                            })
+                          }
+                        >
+                          {ACCUMULO_ACTION_MARK_EXECUTED}
+                        </Button>
+                        <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => void setStatus(installmentIndex, line.positionId, 'skipped')}>
+                          {ACCUMULO_ACTION_SKIP}
+                        </Button>
+                      </span>
+                    )}
+                    {!isDemo && status === 'executed' && !!line.transactionIds?.length && (
+                      <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void unlinkLine(installmentIndex, line.positionId)}>
+                        {ACCUMULO_ACTION_UNLINK}
+                      </Button>
+                    )}
+                    {!isDemo && status === 'executed' && !line.transactionIds?.length && (
+                      <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void setStatus(installmentIndex, line.positionId, 'planned')}>
+                        {ACCUMULO_ACTION_UNDO_EXECUTED}
+                      </Button>
+                    )}
+                    {!isDemo && status === 'lostLink' && (
+                      <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => openCalendarOn(installmentIndex)}>
+                        {ACCUMULO_ACTION_REVIEW}
+                      </Button>
+                    )}
+                  </div>
+                  </div>
+                  {status === 'toConfirm' && match && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">{describeMatchNote(match.quantity, match.amountEur)}</p>
+                  )}
+                  {isManual && (
+                    <div className="mt-1.5 flex items-end gap-2 rounded-lg bg-muted p-2.5">
+                      <label className="flex-1 text-[11px] text-muted-foreground">
+                        {ACCUMULO_MANUAL_QUANTITY_LABEL}
+                        <Input type="number" value={manualLine.qty} onChange={(event) => setManualLine({ ...manualLine, qty: event.target.value })} className="mt-1 h-11 font-mono desktop:h-8" />
+                      </label>
+                      <label className="flex-1 text-[11px] text-muted-foreground">
+                        {ACCUMULO_MANUAL_AMOUNT_LABEL}
+                        <Input type="number" value={manualLine.amount} onChange={(event) => setManualLine({ ...manualLine, amount: event.target.value })} className="mt-1 h-11 font-mono desktop:h-8" />
+                      </label>
+                      <Button variant="ghost" className={ROW_ACTION_CLASS} onClick={() => setManualLine(null)}>
+                        {ACCUMULO_ACTION_CANCEL}
+                      </Button>
+                      <Button className={ROW_ACTION_CLASS} onClick={() => void saveManual()}>
+                        {ACCUMULO_ACTION_SAVE}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              );
+  };
+
 
   const maxDrift = outcome.maxDriftPositionId
     ? { label: outcome.positions.find((p) => p.positionId === outcome.maxDriftPositionId)?.label ?? '', deltaPp: outcome.maxAbsDriftPp }
@@ -596,6 +721,10 @@ export function QuestoMeseTile({
           </div>
         )}
 
+        {unpricedLabels.length > 0 && <p className="mt-2 text-[12px] text-warning-foreground">{describeUnpricedWarning(unpricedLabels)}</p>}
+
+        <AdvisorNotes notes={plan.advisorNotes ?? []} />
+
         {proposal && (
           <div className="mt-3 rounded-lg border border-warning-border bg-warning p-3">
             <NarrativeText segments={proposal.reading} className="text-[12px] leading-[1.5] text-warning-foreground" />
@@ -635,114 +764,7 @@ export function QuestoMeseTile({
         {/* Lines of the current installment, late lines first. */}
         <ul className="divide-y divide-border">
           {[...lateLines.map(({ installment, line }) => ({ installmentIndex: installment.index, line })), ...currentLines.map((line) => ({ installmentIndex: currentIndex, line }))].map(
-            ({ installmentIndex, line }) => {
-              const key = `${installmentIndex}:${line.positionId}`;
-              const isLateRow = installmentIndex < currentIndex;
-              const status = effectiveLineState(matchResult.lineStates[key] ?? 'todo', key, ignoredMatches, isLateRow);
-              const match = matchResult.matches.find((m) => m.kind === 'installment' && m.index === installmentIndex && m.positionId === line.positionId);
-              const isManual = manualLine?.installmentIndex === installmentIndex && manualLine.positionId === line.positionId;
-              const asset = assetsById.get(line.assetId);
-              return (
-                <li key={key} className="py-2">
-                  {/* The name takes the room and wraps (never cut —); the state
-                      and its actions stack at the right on a phone and sit in one line from
-                      `desktop:`. A wrapping row put «Scollega» on a line of its own at 390. */}
-                  <div className="flex items-center gap-3">
-                    <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 break-words text-[13px] text-foreground">
-                        {plan.positions.find((p) => p.id === line.positionId)?.label ?? asset?.name ?? line.positionId}
-                      </span>
-                      <span className="mt-0.5 block font-mono text-[11px] tabular-nums text-muted-foreground">
-                        {asset && `${getAssetDisplayTicker(asset)} · `}
-                        {formatNumberIt(line.plannedQuantity, 0)} · {cachedFormatCurrencyEUR(line.plannedAmountEur)}
-                      </span>
-                    </span>
-                    <div className="flex shrink-0 flex-col items-end gap-1 desktop:flex-row desktop:items-center desktop:gap-3">
-                    <LineStateChip state={status} label={ACCUMULO_LINE_STATUS_LABEL[status]} />
-                    {!isDemo && status === 'toConfirm' && match && (
-                      <span className="flex shrink-0 gap-1.5">
-                        <Button
-                          variant="outline"
-                          className={ROW_ACTION_CLASS}
-                          onClick={() => setIgnoredMatches((prev) => new Set(prev).add(key))}
-                        >
-                          {ACCUMULO_ACTION_IGNORE_MATCH}
-                        </Button>
-                        <Button className={ROW_ACTION_CLASS} onClick={() => void confirmMatch(installmentIndex, line.positionId, match)}>
-                          {ACCUMULO_ACTION_CONFIRM}
-                        </Button>
-                      </span>
-                    )}
-                    {!isDemo && (status === 'todo' || status === 'late') && (
-                      <Button
-                        className={ROW_ACTION_CLASS}
-                        onClick={() => setRegisterTarget({ kind: 'line', installmentIndex, positionId: line.positionId })}
-                      >
-                        {ACCUMULO_ACTION_REGISTER}
-                      </Button>
-                    )}
-                    {!isDemo && status === 'late' && (
-                      <span className="flex shrink-0 gap-1.5">
-                        <Button
-                          variant="outline"
-                          className={ROW_ACTION_CLASS}
-                          onClick={() =>
-                            setManualLine({
-                              installmentIndex,
-                              positionId: line.positionId,
-                              qty: String(line.plannedQuantity),
-                              amount: line.plannedAmountEur.toFixed(2),
-                            })
-                          }
-                        >
-                          {ACCUMULO_ACTION_MARK_EXECUTED}
-                        </Button>
-                        <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => void setStatus(installmentIndex, line.positionId, 'skipped')}>
-                          {ACCUMULO_ACTION_SKIP}
-                        </Button>
-                      </span>
-                    )}
-                    {!isDemo && status === 'executed' && !!line.transactionIds?.length && (
-                      <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void unlinkLine(installmentIndex, line.positionId)}>
-                        {ACCUMULO_ACTION_UNLINK}
-                      </Button>
-                    )}
-                    {!isDemo && status === 'executed' && !line.transactionIds?.length && (
-                      <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void setStatus(installmentIndex, line.positionId, 'planned')}>
-                        {ACCUMULO_ACTION_UNDO_EXECUTED}
-                      </Button>
-                    )}
-                    {!isDemo && status === 'lostLink' && (
-                      <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => openCalendarOn(installmentIndex)}>
-                        {ACCUMULO_ACTION_REVIEW}
-                      </Button>
-                    )}
-                  </div>
-                  </div>
-                  {status === 'toConfirm' && match && (
-                    <p className="mt-1 text-[11px] text-muted-foreground">{describeMatchNote(match.quantity, match.amountEur)}</p>
-                  )}
-                  {isManual && (
-                    <div className="mt-1.5 flex items-end gap-2 rounded-lg bg-muted p-2.5">
-                      <label className="flex-1 text-[11px] text-muted-foreground">
-                        {ACCUMULO_MANUAL_QUANTITY_LABEL}
-                        <Input type="number" value={manualLine.qty} onChange={(event) => setManualLine({ ...manualLine, qty: event.target.value })} className="mt-1 h-11 font-mono desktop:h-8" />
-                      </label>
-                      <label className="flex-1 text-[11px] text-muted-foreground">
-                        {ACCUMULO_MANUAL_AMOUNT_LABEL}
-                        <Input type="number" value={manualLine.amount} onChange={(event) => setManualLine({ ...manualLine, amount: event.target.value })} className="mt-1 h-11 font-mono desktop:h-8" />
-                      </label>
-                      <Button variant="ghost" className={ROW_ACTION_CLASS} onClick={() => setManualLine(null)}>
-                        {ACCUMULO_ACTION_CANCEL}
-                      </Button>
-                      <Button className={ROW_ACTION_CLASS} onClick={() => void saveManual()}>
-                        {ACCUMULO_ACTION_SAVE}
-                      </Button>
-                    </div>
-                  )}
-                </li>
-              );
-            },
+            ({ installmentIndex, line }) => renderLine(installmentIndex, line),
           )}
         </ul>
 
@@ -849,6 +871,7 @@ export function QuestoMeseTile({
                   </li>
                 );
               })}
+              {swapRows.map(({ installment, line }) => renderLine(installment.index, line, installment.index > Math.max(currentIndex, 1), ACCUMULO_SWAP_ROW_PREFIX))}
             </ul>
           </div>
         )}
@@ -915,5 +938,36 @@ export function QuestoMeseTile({
       {registerDialog}
       {reviseDialog}
     </>
+  );
+}
+
+/**
+ * The corrections the Consulente's «Applica» made to its operating plan when it created this plan
+ * (2026-11-20): three in sight, the rest behind «Altre n». Nothing without notes.
+ */
+export function AdvisorNotes({ notes }: { notes: readonly string[] }) {
+  if (notes.length === 0) return null;
+  const shown = notes.slice(0, ACCUMULO_ADVISOR_NOTES_VISIBLE);
+  const rest = notes.slice(ACCUMULO_ADVISOR_NOTES_VISIBLE);
+  const list = (items: readonly string[]) => (
+    <ul className="divide-y divide-border">
+      {items.map((note) => (
+        <li key={note} className="py-1.5 text-[12px] leading-[1.45] text-muted-foreground">
+          {note}
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <div className="mt-3">
+      <p className={TILE_SUB_EYEBROW_CLASS}>{ACCUMULO_ADVISOR_NOTES_EYEBROW}</p>
+      {list(shown)}
+      {rest.length > 0 && (
+        <details>
+          <summary className="min-h-11 cursor-pointer py-2 text-[12px] text-muted-foreground desktop:min-h-0">{describeMoreAdvisorNotes(rest.length)}</summary>
+          {list(rest)}
+        </details>
+      )}
+    </div>
   );
 }

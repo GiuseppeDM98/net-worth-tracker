@@ -26,15 +26,13 @@
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-motion';
-import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import type { GoalPlan, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
 import { bookIndexOf, bookPageUrl, buildBookPages, turnDirection, type BookPage, type BookPageId } from '@/lib/utils/allocationAdviceBook';
-import { BOOK_COPY, describeInterviewAside, HANDOFF_ACTION_LABEL, REVISION_COPY, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
-import { CONSULENTE_HANDOFF_HREF } from '@/lib/utils/allocationAdviceDocument';
+import { BOOK_COPY, describeInterviewAside, REVISION_COPY, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
 import { operatingPlanOf } from '@/lib/utils/operatingPlan';
 import { cardItem, sceneVariants, sceneVariantsReduced, staggerContainer } from '@/lib/utils/motionVariants';
 import type { PageVerdictModel } from '@/lib/utils/narrative';
@@ -281,13 +279,6 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
                       {document.status === 'ready' && (
                         <Button type="button" className={cn(BUTTON_CLASS, 'tablet:order-2')} disabled={!props.canApply || writing || done} onClick={props.onApply}>
                           Applica alle impostazioni
-                        </Button>
-                      )}
-                      {/* A link, not an AI control: it asks no model (The AI-Accent Rule). The editor opens on the Accumulo tab, where the model is read. */}
-                      {document.status === 'applied' && props.apply.handoff === 'offer' && (
-                        // The longest label of the footer: it wraps below `desktop:` (a phone's column clipped it, 2026-11-18).
-                        <Button asChild className={cn(BUTTON_CLASS, 'h-auto min-h-11 whitespace-normal py-2 text-center tablet:order-2 desktop:h-9 desktop:min-h-0 desktop:py-0')}>
-                          <Link href={CONSULENTE_HANDOFF_HREF}>{HANDOFF_ACTION_LABEL}</Link>
                         </Button>
                       )}
                       <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'tablet:order-1')} onClick={onRedo}>

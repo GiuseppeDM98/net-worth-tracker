@@ -104,6 +104,7 @@ export function docToAccumulationPlan(id: string, data: Record<string, unknown>)
     residualEur: data.residualEur as number | undefined,
     optimizerSnapshot: toOptimizerSnapshot(data.optimizerSnapshot as Record<string, unknown> | undefined),
     reviewMonthIndex: data.reviewMonthIndex as number | undefined,
+    advisorNotes: Array.isArray(data.advisorNotes) ? (data.advisorNotes as string[]) : undefined,
     revisions: toRevisions(data.revisions),
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),

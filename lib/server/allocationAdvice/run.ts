@@ -47,11 +47,9 @@ import {
   type AllocationAdviceStage,
 } from '@/types/allocationAdvice';
 import { priorPlanOf } from '@/lib/utils/allocationAdviceDocument';
-import { bondProfileRequests, formatBondTermsBlock, selectBondHoldings } from '@/lib/utils/allocationAdviceBonds';
+import { formatBondTermsBlock } from '@/lib/utils/allocationAdviceBonds';
 import type { AssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
-import { resolveInstrumentProfiles } from '@/lib/server/exposure/instrumentProfileService';
-import type { InstrumentProfile } from '@/types/exposure';
 
 /**
  * The Consulente's run (2026-10-20): the context, then the model calls in series — the
@@ -279,23 +277,11 @@ function newDocument(userId: string, answers: AllocationAdviceAnswers, now: Date
 
 /**
  * The OBBLIGAZIONI block (2026-11-08, the owner's addition after the interview's phase F on the mirror): the single
- * bonds' maturities from the portfolio context, the bond ETFs' duration and average maturity from
- * the Esposizione's shared profile cache (Yahoo once per ticker, then 30 days) — a read that may
- * fail without failing the run: the block then says the profiles were not read.
+ * bonds' maturities from the portfolio context and the bond ETFs by value and role. No duration and no
+ * Yahoo read since 2026-11-20: Yahoo's proved wrong on real ETFs, the second agent verifies it (allocationAdviceBonds.ts).
  */
-async function readBondTermsBlock(portfolio: AssistantPortfolioContext, now: Date): Promise<string> {
-  const requests = bondProfileRequests(selectBondHoldings(portfolio.holdings).funds);
-  let profiles: Record<string, InstrumentProfile> = {};
-  let profilesRead = true;
-  if (requests.length > 0) {
-    try {
-      profiles = (await resolveInstrumentProfiles(requests, { now })).response.profiles;
-    } catch (error) {
-      profilesRead = false;
-      console.error('[consulente] bond profiles not read', error);
-    }
-  }
-  return formatBondTermsBlock({ holdings: portfolio.holdings, coupons: portfolio.dividends.coupons, profiles, profilesRead, todayIso: getItalyDateIso(now) }).join('\n');
+function readBondTermsBlock(portfolio: AssistantPortfolioContext, now: Date): string {
+  return formatBondTermsBlock({ holdings: portfolio.holdings, coupons: portfolio.dividends.coupons, todayIso: getItalyDateIso(now) }).join('\n');
 }
 
 /**
@@ -341,7 +327,7 @@ async function buildConsulenteContext(userId: string, now: Date): Promise<{ data
     readCashflowBlockForPrompt(userId, now),
     readAccumulationPlanForAdvice(userId, now),
   ]);
-  const bondBlock = await readBondTermsBlock(bundle.portfolio, now);
+  const bondBlock = readBondTermsBlock(bundle.portfolio, now);
   return { dataBlock: `${formatBundleForPrompt(bundle)}\n\n${bondBlock}\n\n${formatAccumulationPlanForPrompt(planRead)}`, cashflowBlock };
 }
 
@@ -384,7 +370,7 @@ async function runInstruments(document: AllocationAdviceDocument, onStage: (stag
   if (!proposal) throw new AllocationAdviceStageError('instruments', 'Manca la strategia da cui partire. Avvia di nuovo la ricerca.', false);
   const bundle = await buildAssistantYtdContext(document.userId);
   // The holdings and, under them, the OBBLIGAZIONI block: the agent reads the durations it must confirm.
-  const holdingsBlock = [...formatPortfolioForPrompt(bundle.portfolio), '', await readBondTermsBlock(bundle.portfolio, now)].join('\n');
+  const holdingsBlock = [...formatPortfolioForPrompt(bundle.portfolio), '', readBondTermsBlock(bundle.portfolio, now)].join('\n');
   await enterStage(document, 'instruments', onStage);
   const answer = await callModel('instruments', {
     model: ALLOCATION_ADVICE_INSTRUMENTS_MODEL,

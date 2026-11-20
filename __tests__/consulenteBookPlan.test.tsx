@@ -17,7 +17,7 @@ import { formatCurrency } from '@/lib/utils/formatters';
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
 vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch: vi.fn() }));
 
-import { applyPieces, planPieces, type PlanRow } from '@/components/allocation/consulente/ConsulenteBookPages';
+import { applyPieces, planPieces, type ApplyPiecesInput, type PlanRow } from '@/components/allocation/consulente/ConsulenteBookPages';
 
 const NOW = new Date('2026-11-19T12:00:00');
 
@@ -73,6 +73,20 @@ describe('planPieces', () => {
     expect(text).toContain("Le rate esatte le calcola l'app quando crei il piano: dipendono dai prezzi di quel giorno.");
   });
 
+  // The swap (owner, 2026-11-20). Mutation that turns it red: the sale drawn without what it buys.
+  it('a swap: the sale names what its proceeds buy, the row bought only by it reads «con lo scambio»', () => {
+    const plan: OperatingPlan = {
+      ...PLAN,
+      rows: [PLAN.rows[0], { ...PLAN.rows[2], reinvestInto: 'N1' }, { ...PLAN.rows[3], targetPercentage: 0 }],
+    };
+    render(<>{planPieces(plan).body}</>);
+    const sell = within(screen.getByRole('list', { name: 'Vendi' })).getAllByRole('listitem');
+    expect(sell[0].textContent).toContain('ETF pellicano10 quote · 3º mese · circa');
+    expect(sell[0].textContent).toContain(' · con il ricavato compra ETF airone');
+    const buy = within(screen.getByRole('list', { name: 'Compra' })).getAllByRole('listitem');
+    expect(buy[1].textContent).toBe('ETF aironecon lo scambioI bond che mancano.');
+  });
+
   it('leaves out an empty group, the total without an estimable sale, the review without a month', () => {
     const plan: OperatingPlan = {
       ...PLAN,
@@ -107,7 +121,7 @@ describe('«Applica» and the operating plan row', () => {
     applied: status === 'applied' ? { at: NOW, targetsWritten: true, rolesChanged: 0, goalsWritten: 0 } : null,
     interview: null,
   });
-  const body = (status: 'ready' | 'applied', planRow: PlanRow | null) =>
+  const body = (status: 'ready' | 'applied', planRow: PlanRow | null, plan: Partial<Pick<ApplyPiecesInput, 'planTick' | 'planDone' | 'planFailure' | 'onCreatePlan' | 'creatingPlan'>> = {}) =>
     applyPieces({
       document: makeDocument(status),
       proposal: status === 'ready' ? ({ classes: [], goals: [], assetRoles: [], risks: [], summary: '', reviewByIso: '2027-11-19', reviewReason: '' } as never) : null,
@@ -123,9 +137,13 @@ describe('«Applica» and the operating plan row', () => {
       applyGoals: true,
       setApplyGoals: () => {},
       applyState: { phase: 'idle' },
-      activePlanNote: null,
-      handoff: 'none',
       planRow,
+      planTick: null,
+      planDone: null,
+      planFailure: null,
+      onCreatePlan: null,
+      creatingPlan: false,
+      ...plan,
     }).body;
   const row = (state: PlanRow['state'], message: string | null = null, onWrite = vi.fn(), disabled = false): PlanRow => ({ state, message, onWrite, disabled });
 
@@ -161,5 +179,42 @@ describe('«Applica» and the operating plan row', () => {
     applied.unmount();
     const demo = render(<>{body('ready', row('absent', null, vi.fn(), true))}</>);
     expect((within(demo.container).getByRole('button', { name: 'Scrivi il piano operativo' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  // The plan of accumulation on an applied report (2026-11-20). Mutation that turns it red: the button shown with a planId.
+  it('with the plan recorded: its sentence, the model line when given, «Apri Accumulo»; no button', () => {
+    const done = render(<>{body('applied', null, { planDone: { sentence: 'Bozza sostituita e piano attivato.', modelNote: 'Il portafoglio modello non è stato aggiornato: rete assente. Aggiornalo da Accumulo.' }, planTick: <p>tick</p>, onCreatePlan: vi.fn() })}</>);
+    expect(done.container.textContent).toContain('Bozza sostituita e piano attivato.');
+    expect(done.container.textContent).toContain('Il portafoglio modello non è stato aggiornato: rete assente.');
+    expect(within(done.container).getByRole('link', { name: 'Apri Accumulo' }).getAttribute('href')).toBe('/dashboard/allocation?tab=accumulo');
+    expect(within(done.container).queryByRole('button', { name: 'Crea il piano di accumulo' })).toBeNull();
+    expect(done.container.textContent).not.toContain('tick');
+    done.unmount();
+    const plain = render(<>{body('applied', null, { planDone: { sentence: 'Piano creato.', modelNote: null } })}</>);
+    expect(plain.container.textContent).toContain('Piano creato.');
+    expect(plain.container.textContent).not.toContain('portafoglio modello');
+  });
+
+  it('without it: the failure, the tick, «Crea il piano di accumulo» — disabled without a build and while creating', async () => {
+    const onCreatePlan = vi.fn();
+    const open = render(<>{body('applied', row('absent'), { planTick: <p>la spunta</p>, planFailure: 'Non sono riuscito ad attivare il piano: rete assente.', onCreatePlan })}</>);
+    expect(open.container.textContent).toContain('Non sono riuscito ad attivare il piano: rete assente.');
+    expect(open.container.textContent).toContain('la spunta');
+    // The tick replaces the operating plan's row: never both.
+    expect(open.container.textContent).not.toContain("Il piano operativo non c'è ancora.");
+    await userEvent.click(within(open.container).getByRole('button', { name: 'Crea il piano di accumulo' }));
+    expect(onCreatePlan).toHaveBeenCalledTimes(1);
+    open.unmount();
+    const creating = render(<>{body('applied', null, { planTick: <p>la spunta</p>, onCreatePlan, creatingPlan: true })}</>);
+    expect((within(creating.container).getByRole('button', { name: 'Creo il piano…' }) as HTMLButtonElement).disabled).toBe(true);
+    creating.unmount();
+    const unbuilt = render(<>{body('applied', null, { planTick: <p>la spunta</p> })}</>);
+    expect((within(unbuilt.container).getByRole('button', { name: 'Crea il piano di accumulo' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('on a ready report the tick sits among the checkboxes, before the status line', () => {
+    const ready = render(<>{body('ready', null, { planTick: <p data-testid="tick">la spunta</p> })}</>);
+    expect(ready.getByTestId('tick')).not.toBeNull();
+    expect(within(ready.container).queryByRole('button', { name: 'Crea il piano di accumulo' })).toBeNull();
   });
 });

@@ -24,6 +24,7 @@ import type { ClassTrajectoryPoint, PlanDeps } from '@/lib/utils/accumulationPla
 import type { AccumulationPlan, InstallmentLine, PlanDisposal } from '@/types/accumulationPlan';
 import type { Asset } from '@/types/assets';
 import { unitPriceEur } from '@/lib/utils/costBasisEur';
+import { addMonths as addMonthKey } from '@/lib/utils/planMonths';
 
 const flat = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
 
@@ -350,6 +351,42 @@ describe('a plan whose first month is in the future (2026-11-12)', () => {
     expect(flat(soon.headline)).toBe('Il piano parte a dicembre: prima rata di 750 € in 2 acquisti.');
   });
 
+  // The swap before the first rata (owner's mirror, 2026-11-20: «N rate; fino ad allora non c'è nulla da comprare»
+  // with N the months, under a month that swaps and months that refill). Mutations that turn it red: the months counted whole; the
+  // swap's line counted in the first rata; the swap unsaid.
+  it('a swap month and refill months before the first rata: the rate counted from it, the swap named', () => {
+    const swapLine: InstallmentLine = { positionId: 'p-btp', assetId: 'btp', plannedQuantity: 4000, priceEurAtPlan: 1.1, plannedAmountEur: 4400, status: 'planned', swap: true };
+    const installments = [
+      { index: 1, month: '2026-12' as const, lines: [swapLine], carryInEur: {} },
+      ...Array.from({ length: 10 }, (_, k) => ({ index: k + 2, month: addMonthKey('2027-01', k), lines: [], carryInEur: {} })),
+      ...Array.from({ length: 35 }, (_, k) => ({ index: k + 12, month: addMonthKey('2027-11', k), lines: [line('a', 500), line('b', 300)], carryInEur: {} })),
+    ];
+    const swapping = plan({
+      startMonth: '2026-12', months: 46, installments,
+      positions: [{ id: 'p-btp', label: 'BTP€i fenicottero', targetPercentage: 3, memberAssetIds: ['btp'], buyAssetId: 'btp' }],
+    });
+    const verdict = buildAccumuloVerdict({ ...base, plan: swapping, currentIndex: 0 });
+    expect(flat(verdict.headline)).toBe('Il piano parte a dicembre: prima rata di 800 € in 2 acquisti, a novembre 2027.');
+    expect(narrativeToText(verdict.sentence)).toBe('35 rate; a dicembre lo scambio: il ricavato delle vendite compra BTP€i fenicottero.');
+    // In the plan (owner's mirror, 2026-11-20: «Rata di dicembre: … in 2 acquisti», «Rata 1 di N» over the months, «0 € in 0
+    // acquisti, 2 in ritardo»). Mutations that turn it red: the swap month read as a rata; the rate counted on months.
+    const at = (currentIndex: number, p = swapping) => {
+      const v = buildAccumuloVerdict({ ...base, plan: p, currentIndex });
+      return [flat(v.headline), narrativeToText(v.sentence)];
+    };
+    expect(at(1)[0]).toBe('Scambio di dicembre: 4400 € in 1 acquisto.');
+    expect(at(1)[1]).toMatch(/^Prima rata a novembre 2027, investiti finora 0\s€ su /);
+    expect(at(2)[0]).toBe('Niente da comprare a gennaio, 1 in ritardo.');
+    expect(at(2)[1]).toMatch(/^Prima rata a novembre 2027, investiti finora /);
+    expect(at(12)[0]).toBe('Rata di novembre: 800 € in 2 acquisti, 1 in ritardo.');
+    expect(at(12)[1]).toMatch(/^Rata 1 di 35, investiti finora /);
+    const swapped = plan({ ...swapping, installments: swapping.installments.map((i) => (i.index === 1 ? { ...i, lines: [{ ...swapLine, status: 'executed' as const }] } : i)) });
+    expect(at(2, swapped)[1]).toBe('Rata 1 di 35: fino ad allora non c’è nulla da comprare.');
+    // A swap in the first rata's own month is no part of the rata.
+    const together = plan({ ...swapping, installments: [{ index: 1, month: '2026-12', lines: [line('a', 500), swapLine], carryInEur: {} }] });
+    expect(flat(buildAccumuloVerdict({ ...base, plan: together, currentIndex: 0 }).headline)).toBe('Il piano parte a dicembre: prima rata di 500 € in 1 acquisto.');
+  });
+
   it('draws no strip', () => {
     const verdictInput = resolveAccumuloVerdictInput({ ...base, plan: scheduled('2027-04'), currentIndex: 0 });
     expect(selectAccumuloStrip({ verdictInput, trajectory: [], currentIndex: 0 })).toEqual([]);
@@ -372,7 +409,8 @@ describe('the refill months', () => {
   it('an empty month while the reserve refills', () => {
     const verdict = buildAccumuloVerdict({ ...base, plan: refilling, currentIndex: 1, today: january });
     expect(flat(verdict.headline)).toBe('A gennaio le entrate riportano la liquidità alla riserva: la prima rata è a marzo.');
-    expect(flat(narrativeToText(verdict.sentence))).toBe('Rata 1 di 4: fino ad allora non c’è nulla da comprare.');
+    // The rate are the months that buy: 2 here, the next is the first (2026-11-20; it read «Rata 1 di 4» before).
+    expect(flat(narrativeToText(verdict.sentence))).toBe('Rata 1 di 2: fino ad allora non c’è nulla da comprare.');
     expect(verdict.tone).toBe('neutral');
   });
 

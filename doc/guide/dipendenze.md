@@ -10,8 +10,8 @@
 
 | | |
 | --- | --- |
-| **Last audit** | 2026-11-18 (`npm audit --json` after `npm ci`, on the lock of 2026-11-16 — `next` moved that day, § Registro › Moves) |
-| **Result** | **30 advisories** in the evening of 2026-11-18 (9 high · 21 moderate, no critical, no low, no new package; the same lock): the `picomatch` advisory is no longer reported by the registry, its 18 rows gone; 48 in the morning of 2026-11-18 (29 high · 19 moderate, the 18 more ONE new advisory, `picomatch`, § Registro's last row, accepted); 30 on 2026-11-16 (31 in the evening of 2026-11-16 with a new moderate on `next`, cured the same day; 31 on the morning of 2026-11-13 with a new moderate on `hono`, cured the same day; 30 on 2026-11-11, 32 on 2026-11-07, 41 on 2026-11-03; 54 before the upgrade of that day) |
+| **Last audit** | 2026-11-20 (`npm audit --json` after `npm ci`, on the lock of 2026-11-16 — `next` moved that day, § Registro › Moves) |
+| **Result** | **30 advisories** on 2026-11-20, unchanged (9 high · 21 moderate, the same packages and lock as the evening of 2026-11-18); in the evening of 2026-11-18 (9 high · 21 moderate, no critical, no low, no new package; the same lock): the `picomatch` advisory is no longer reported by the registry, its 18 rows gone; 48 in the morning of 2026-11-18 (29 high · 19 moderate, the 18 more ONE new advisory, `picomatch`, § Registro's last row, accepted); 30 on 2026-11-16 (31 in the evening of 2026-11-16 with a new moderate on `next`, cured the same day; 31 on the morning of 2026-11-13 with a new moderate on `hono`, cured the same day; 30 on 2026-11-11, 32 on 2026-11-07, 41 on 2026-11-03; 54 before the upgrade of that day) |
 | **Frameworks** | Next.js `^16.4.6` · React 19 (compiler on) · firebase `^12.5.0` (12.19.0) · firebase-admin `^14.5.0` · zod `^4.6.7` · `@anthropic-ai/sdk` `^0.115.0` · storybook `^10.6.5` · firebase-tools `^15.24.0` (15.33.0) · vitest `^4.1.12` |
 | **Node** | 24.x (`engines.node`, held by `__tests__/vercelConfig.test.ts`) |
 | **Next step** | none open: the next audit opens the next session (WORKFLOW.md rule 8) |

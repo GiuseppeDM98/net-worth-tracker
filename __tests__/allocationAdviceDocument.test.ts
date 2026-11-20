@@ -7,9 +7,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { AccumulationPlan } from '@/types/accumulationPlan';
-import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
-import { applyHandoffOf, CONSULENTE_HANDOFF_HREF, handoffProposalOf, isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS, runStageStates, stageOfRunStage } from '@/lib/utils/allocationAdviceDocument';
+import { isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS, runStageStates, stageOfRunStage } from '@/lib/utils/allocationAdviceDocument';
 
 const AT = new Date('2026-10-20T10:00:00.000Z');
 
@@ -136,45 +134,35 @@ describe('the interview on the document (2026-11-08: null when absent)', () => {
   });
 });
 
-// ── The hand-off after «Applica» (owner, 2026-11-12) ──────────────────────────────────────────
-describe('applyHandoffOf: what «Applica» offers after the write', () => {
-  const proposal = { summary: 'S.', classes: [], assetRoles: [], goals: [], reviewByIso: '2027-11-18', reviewReason: '', risks: [] };
-  const applied = (targetsWritten: boolean) => ({
-    ...mapAllocationAdviceData('u1', { status: 'applied', answers: {}, createdAt: AT, updatedAt: AT }),
-    report: { markdown: 'r', proposal, model: 'o', finishedAt: AT },
-    applied: { at: AT, targetsWritten, rolesChanged: 0, goalsWritten: 0 },
-  }) as AllocationAdviceDocument;
-  const plan = (status: AccumulationPlan['status']) => ({ status }) as AccumulationPlan;
-
-  // Mutation: 'offer' while the plans load → red.
-  it('offers the link only on an applied document that wrote the targets, with no open plan or a failed read', () => {
-    const ready = { ...applied(true), status: 'ready' } as AllocationAdviceDocument;
-    expect(applyHandoffOf(ready, { open: undefined })).toBe('none');
-    expect(applyHandoffOf(applied(false), { open: undefined })).toBe('none');
-    expect(applyHandoffOf(applied(true), 'loading')).toBe('none');
-    expect(applyHandoffOf(applied(true), 'failed')).toBe('offer');
-    expect(applyHandoffOf(applied(true), { open: plan('draft') })).toBe('draft');
-    expect(applyHandoffOf(applied(true), { open: plan('active') })).toBe('none');
-    expect(applyHandoffOf(applied(true), { open: undefined })).toBe('offer');
+// ── «Applica» creates the plan of accumulation (2026-11-20) ─────────────────────────────────
+describe('the hand-off is gone, and the Consulente route stays light', () => {
+  // U11: the exports of the editor's hand-off are removed.
+  it('allocationAdviceDocument no longer exports the hand-off', async () => {
+    const exported: Record<string, unknown> = await import('@/lib/utils/allocationAdviceDocument');
+    for (const name of ['applyHandoffOf', 'handoffProposalOf', 'CONSULENTE_HANDOFF_HREF']) expect(exported[name], name).toBeUndefined();
+    // @ts-expect-error — the type went with the link.
+    type Gone = import('@/lib/utils/allocationAdviceDocument').ApplyHandoff;
+    expect(true as unknown as Gone).toBe(true);
   });
 
-  it('the proposal is the report\'s, then the strategy\'s; none unless applied with the targets written', () => {
-    expect(handoffProposalOf(applied(true))).toBe(proposal);
-    expect(handoffProposalOf({ ...applied(true), report: null, strategy: { markdown: 's', proposal, model: 'o', finishedAt: AT } })).toBe(proposal);
-    expect(handoffProposalOf(applied(false))).toBeNull();
-    expect(handoffProposalOf(null)).toBeNull();
-    expect(CONSULENTE_HANDOFF_HREF).toBe('/dashboard/allocation?tab=accumulo&da=consulente');
-  });
-
-  // Mutation: the hand-off imported into `ConsulenteReport` → red. The Consulente's route never loads the optimizer.
-  it('the Consulente\'s components import neither the hand-off module nor the optimizer', () => {
+  // U12. Mutation that turns it red: a static import of '@/lib/utils/advicePlan' in ConsulenteReport.tsx.
+  it('only ConsulentePlanTick imports the plan\'s builder and utils; the executor only through import(); the tick only through lazyComponent()', () => {
     const dir = join(process.cwd(), 'components/allocation/consulente');
     const sources = readdirSync(dir).filter((name) => name.endsWith('.tsx'));
-    expect(sources.length).toBeGreaterThan(0);
+    expect(sources).toContain('ConsulentePlanTick.tsx');
+    const heavy = /@\/lib\/utils\/(advicePlan|accumulationPlanUtils|accumulationNarrative|operatingPlanFacts|operatingPlanSchema|allocationAdviceHandoff|weightOptimizer)['"]/;
+    const staticExecutor = /from\s+['"]@\/lib\/services\/advicePlanService['"]/;
+    const tickImport = /(?:import|from)\s*\(?\s*['"]\.\/ConsulentePlanTick['"]/g;
     for (const name of sources) {
       const text = readFileSync(join(dir, name), 'utf8');
-      // The operating plan's facts and schema (2026-11-19) pull the hand-off and zod: server only.
-      expect(text, name).not.toMatch(/allocationAdviceHandoff|weightOptimizer|operatingPlanFacts|operatingPlanSchema/);
+      expect(text, name).not.toMatch(staticExecutor);
+      if (name === 'ConsulentePlanTick.tsx') continue;
+      expect(text, name).not.toMatch(heavy);
+      // A type import is erased; any other import of the tick is the lazy one.
+      for (const match of text.matchAll(tickImport)) {
+        const line = text.slice(text.lastIndexOf('\n', match.index) + 1, text.indexOf('\n', match.index));
+        expect(/^import type /.test(line) || /lazyComponent\(\(\) => import\('\.\/ConsulentePlanTick'\)/.test(line), `${name}: ${line}`).toBe(true);
+      }
     }
   });
 });

@@ -8,23 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import { narrativeToText } from '@/lib/utils/narrative';
-import {
-  BOOK_COPY,
-  buildConsulenteVerdict,
-  buildProposalRows,
-  describeApplySummary,
-  describeLossScenario,
-  describeProposalReading,
-  describeReviewBy,
-  describeReviewInvite,
-  reviewDueState,
-  describeRunHeadline,
-  describeStageTypical,
-  EXCHANGE_OPTIONS,
-  EXCHANGE_OTHER,
-  isListedExchange,
-  STAGE_TYPICAL_MINUTES,
-} from '@/lib/utils/allocationAdviceNarrative';
+import { BOOK_COPY, buildConsulenteVerdict, buildProposalRows, ADVICE_SOURCE_GONE, describeAdvicePlanFailure, describeApplySummary, describeLossScenario, describeProposalReading, describeReviewBy, describeReviewInvite, reviewDueState, describeRunHeadline, describeStageTypical, EXCHANGE_OPTIONS, EXCHANGE_OTHER, isListedExchange, STAGE_TYPICAL_MINUTES } from '@/lib/utils/allocationAdviceNarrative';
 
 const NOW = new Date('2026-10-20T12:00:00.000Z');
 
@@ -172,5 +156,24 @@ describe('the stages’ typical durations (2026-11-07)', () => {
     expect(describeStageTypical('strategy')).toBe('di solito ~2 min');
     expect(describeStageTypical('review')).toBe('di solito ~1 min');
     expect(describeStageTypical('context')).toBeNull();
+  });
+});
+
+// The sentences of the plan the click creates (2026-11-20, doc/guide/consulente-piano.md § After «Applica»).
+describe('the plan of accumulation on «Applica»', () => {
+  it('describeApplySummary names what the click does to the plan', () => {
+    expect(describeApplySummary({ targets: true, roles: 0, goals: 0, plan: 'create' })).toBe('Scrive i target in Impostazioni → Allocazione e crea il piano di accumulo.');
+    expect(describeApplySummary({ targets: true, roles: 0, goals: 0, plan: 'replace' })).toMatch(/e sostituisce la bozza del piano\.$/);
+    expect(describeApplySummary({ targets: true, roles: 0, goals: 0, plan: 'revise' })).toMatch(/e rivede il piano di accumulo\.$/);
+  });
+
+  it('describeAdvicePlanFailure: what was written, the step, the reason, where to start again', () => {
+    expect(describeAdvicePlanFailure({ step: 'activate', done: ['instruments', 'plan'], message: 'Connessione assente.' }, true)).toBe(
+      'Ho scritto target, ruoli e obiettivi. Ho creato gli strumenti. Non sono riuscito ad attivare il piano: connessione assente. Premi «Crea il piano di accumulo»: riparte da lì.'
+    );
+    expect(describeAdvicePlanFailure({ step: 'setting', done: [], message: 'Permesso negato.' }, false)).toBe(
+      'Non sono riuscito a salvare il conto per gli investimenti: permesso negato. Premi «Crea il piano di accumulo»: riparte da lì.'
+    );
+    expect(describeAdvicePlanFailure({ step: 'plan', done: [], message: ADVICE_SOURCE_GONE }, true)).toBe(`Ho scritto target, ruoli e obiettivi. ${ADVICE_SOURCE_GONE}`);
   });
 });

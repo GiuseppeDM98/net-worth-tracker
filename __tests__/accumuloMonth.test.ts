@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   countPlanInstalments,
   describeOpenPlanForAdvice,
+  findFirstBuyingInstallment,
   isInstalmentClosed,
   locateOpenMonth,
   isPlanReviewDue,
@@ -118,12 +119,42 @@ describe('describeOpenPlanForAdvice', () => {
       instalmentEur: 490,
       startMonth: '2027-01',
       endMonth: '2027-04',
+      firstBuy: { month: '2027-02', index: 2, amountEur: 490 },
       buys: [
-        { assetId: 'etf-a', name: 'ETF-A', targetPercentage: 60 },
-        { assetId: 'etf-b', name: 'ETF-B', targetPercentage: 40 },
+        { assetId: 'etf-a', name: 'ETF-A', sharePct: 72.6, amountEur: 1990 },
+        { assetId: 'etf-b', name: 'ETF-B', sharePct: 27.4, amountEur: 750 },
       ],
+      holds: [],
       sells: [],
     });
+  });
+
+  // The plan «Applica» creates refills the reserve first and keeps the held positions at their weight (owner,
+  // 2026-11-20, NOVE-25's phase F: the Consulente read «prima rata di 0 €» and the holds as buys). Mutations that
+  // turn it red: the first buy read from the open month; a hold among the buys; the shares read from the weights.
+  it('a plan that refills first: the first month that buys, the shares of the money, the holds apart', () => {
+    const plan = activePlan({
+      positions: [
+        { id: 'a', label: 'ETF A', targetPercentage: 50, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' },
+        { id: 'b', label: 'ETF B', targetPercentage: 30, memberAssetIds: ['etf-b'], buyAssetId: 'etf-b' },
+        { id: 'c', label: 'ETF C', targetPercentage: 20, memberAssetIds: ['etf-c'], buyAssetId: 'etf-c' },
+      ],
+    });
+    plan.installments[0].lines = [];
+    plan.installments[1].lines = [];
+    const advice = describeOpenPlanForAdvice(plan, '2027-01', nameOf);
+    expect(advice?.monthIndex).toBe(1);
+    expect(advice?.instalmentEur).toBe(0);
+    expect(advice?.firstBuy).toEqual({ month: '2027-03', index: 3, amountEur: 750 });
+    expect(advice?.buys).toEqual([
+      { assetId: 'etf-a', name: 'ETF-A', sharePct: 66.7, amountEur: 1000 },
+      { assetId: 'etf-b', name: 'ETF-B', sharePct: 33.3, amountEur: 500 },
+    ]);
+    expect(advice?.holds).toEqual([{ assetId: 'etf-c', name: 'ETF-C' }]);
+    // Past the last month that buys: nothing left to buy.
+    plan.installments[2].lines = [];
+    plan.installments[3].lines = [];
+    expect(describeOpenPlanForAdvice(plan, '2027-01', nameOf)?.firstBuy).toBeNull();
   });
 
   it('before the start reads the first instalment at month 0', () => {
@@ -206,5 +237,39 @@ describe('locateOpenMonth and isInstalmentClosed', () => {
   });
   it('an empty month is never closed', () => {
     expect(plan.installments.map(isInstalmentClosed)).toEqual([false, false, true, false]);
+  });
+});
+
+// ── The swap (owner, 2026-11-20): a month with only a swap's purchase is no instalment, and no refill either.
+// Mutations that turn it red: a swap line counted as an instalment; the swap month read as a refill.
+describe('a month with only a swap', () => {
+  const swapLine = { ...line('a', 4200), swap: true as const };
+  const withSwap = () => {
+    const plan = activePlan();
+    plan.installments[0].lines = [swapLine];
+    plan.installments[1].lines = [];
+    return plan;
+  };
+
+  it('is no instalment: the count, the first buying month and the open place skip it', () => {
+    const plan = withSwap();
+    expect(countPlanInstalments(plan)).toEqual({ closed: 0, total: 2 });
+    expect(findFirstBuyingInstallment(plan)?.month).toBe('2027-03');
+    expect(locateOpenMonth(plan, 1)).toEqual({ kind: 'swap', firstBuyingMonth: '2027-03' });
+    expect(locateOpenMonth(plan, 2)).toEqual({ kind: 'refill', firstBuyingMonth: '2027-03' });
+    expect(locateOpenMonth(plan, 3)).toEqual({ kind: 'instalment', ordinal: 1, total: 2 });
+  });
+
+  it('gives the Piano no note, as a refill month', () => {
+    expect(summarizePacMonth(withSwap(), 1)).toBeNull();
+  });
+
+  it('the advice reading: the first buy after it, the swap out of the shares of the money', () => {
+    const advice = describeOpenPlanForAdvice(withSwap(), '2027-01', (id) => id.toUpperCase());
+    expect(advice?.firstBuy).toEqual({ month: '2027-03', index: 3, amountEur: 750 });
+    expect(advice?.buys).toEqual([
+      { assetId: 'etf-a', name: 'ETF-A', sharePct: 66.7, amountEur: 1000 },
+      { assetId: 'etf-b', name: 'ETF-B', sharePct: 33.3, amountEur: 500 },
+    ]);
   });
 });

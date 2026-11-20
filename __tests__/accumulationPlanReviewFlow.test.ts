@@ -276,4 +276,14 @@ describe('source accounts and saved sales in a revision', () => {
     expect(diff.newDisposals.map((d) => d.assetId).sort()).toEqual(['fresh', 'new']);
     expect(diff.movedDisposalMonthIndexes).toEqual({ old: 6 });
   });
+
+  // The swap (owner, 2026-11-20): a swap added, removed or redirected on an open sale is a changed sale, like
+  // its shares. Mutation that turns it red: the swap left out of the comparison.
+  it('diffRevisionDisposals: a changed swap is removed + new', () => {
+    const saved = [sale({ assetId: 'x', reinvestAssetId: 'btp' }), sale({ assetId: 'y' }), sale({ assetId: 'z', reinvestAssetId: 'btp' })];
+    const draft = [sale({ assetId: 'x', reinvestAssetId: 'btp' }), sale({ assetId: 'y', reinvestAssetId: 'btp' }), sale({ assetId: 'z' })];
+    const diff = diffRevisionDisposals({ disposals: saved }, draft);
+    expect(diff.removedDisposalAssetIds.sort()).toEqual(['y', 'z']);
+    expect(diff.newDisposals.map((d) => [d.assetId, d.reinvestAssetId])).toEqual([['y', 'btp'], ['z', undefined]]);
+  });
 });

@@ -14,7 +14,6 @@
  * only `toConfirm`/`executed`/`late`/`lostLink` do.
  */
 import type { MonthKey } from '@/types/accumulationPlan';
-import type { AssetClass } from '@/types/assets';
 import type { LineUiState } from './accumulationPlanMatching';
 import type { Narrative, PageVerdictModel } from './narrative';
 import type { RowAnswerMap } from '@/components/ui/row-answers';
@@ -23,8 +22,6 @@ import { ASSET_CLASS_LABELS, bandForTarget, type RebalanceBand } from './allocat
 import { cachedFormatCurrencyEUR, formatDate, formatNumberIt, formatPercentageIt } from './formatters';
 import { addMonths, monthLabelLong, parseMonthKey } from './planMonths';
 import { monthWithPrepositionA } from './patrimonioNarrative';
-import { describeNegativeFixed } from './weightOptimizerNarrative';
-import type { ConsulenteHandoffPlan, HandoffSeedOutcome } from './allocationAdviceHandoff';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Month labels — DESIGN.md: abbreviated lowercase on a label, full name in a reading.
@@ -83,6 +80,7 @@ export type DraftIssueCode =
   | 'buy_not_member'
   | 'position_not_tradable'
   | 'source_not_cash'
+  | 'source_missing'
   | 'unassigned_tradable'
   | 'months_range'
   | 'negative_amount'
@@ -91,7 +89,8 @@ export type DraftIssueCode =
   | 'disposal_quantity'
   | 'nothing_to_revise'
   | 'sale_month_range'
-  | 'sale_month_out';
+  | 'sale_month_out'
+  | 'swap_target';
 
 /** What `validateDraftAgainstAssets` knows about a finding — enough to phrase it, not the final `DraftIssue`. */
 export type DraftIssueContext =
@@ -101,6 +100,7 @@ export type DraftIssueContext =
   | { code: 'buy_not_member'; label: string }
   | { code: 'position_not_tradable'; label: string }
   | { code: 'source_not_cash'; label: string }
+  | { code: 'source_missing' }
   | { code: 'unassigned_tradable'; label: string }
   | { code: 'months_range' }
   | { code: 'negative_amount' }
@@ -109,7 +109,8 @@ export type DraftIssueContext =
   | { code: 'disposal_quantity'; label: string }
   | { code: 'nothing_to_revise' }
   | { code: 'sale_month_range' }
-  | { code: 'sale_month_out'; label: string };
+  | { code: 'sale_month_out'; label: string }
+  | { code: 'swap_target'; label: string };
 
 /** One Italian sentence per `DraftIssue` code. */
 export function describeDraftIssue(context: DraftIssueContext): string {
@@ -126,6 +127,8 @@ export function describeDraftIssue(context: DraftIssueContext): string {
       return `«${context.label}» non è negoziabile: solo gli asset tradable possono entrare nel piano.`;
     case 'source_not_cash':
       return `«${context.label}» non è un conto di liquidità: scegli un conto sorgente di classe Liquidità.`;
+    case 'source_missing':
+      return 'Un conto del piano non c\'è più: scegli di nuovo da quale conto comprare.';
     case 'unassigned_tradable':
       return `«${context.label}» ha un valore ma non è né in una posizione né in una vendita: assegnalo o escludilo.`;
     case 'months_range':
@@ -144,6 +147,8 @@ export function describeDraftIssue(context: DraftIssueContext): string {
       return 'Una vendita può andare solo a una rata che la revisione riscrive: scegli un mese dalla prima rata rivista in poi.';
     case 'sale_month_out':
       return `La vendita di «${context.label}» è fissata oltre l’ultima rata: scegli un mese del piano.`;
+    case 'swap_target':
+      return `La vendita di «${context.label}» reinveste in uno strumento che il piano non compra: scegline uno del piano.`;
     default:
       return 'Il piano non è valido.';
   }
@@ -220,19 +225,24 @@ export function describeSaleStep(input: { month: MonthKey; instalmentEur: number
  */
 export function describeMonthTileAside(
   month: MonthKey,
-  place: { kind: 'instalment'; ordinal: number; total: number } | { kind: 'refill'; firstBuyingMonth: MonthKey | undefined },
+  place: { kind: 'instalment'; ordinal: number; total: number } | { kind: 'refill' | 'swap'; firstBuyingMonth: MonthKey | undefined },
 ): string {
   if (place.kind === 'instalment') return `${monthLabelLong(month)} · rata ${place.ordinal} di ${place.total}`;
-  const first = place.firstBuyingMonth ? `, prima rata a ${monthLabelLong(place.firstBuyingMonth, false)}` : '';
-  return `${monthLabelLong(month)} · solo riserva${first}`;
+  // The year once the first instalment is 12 months away or more: the month alone names the next one (owner, 2026-11-20).
+  const yearNeeded = place.firstBuyingMonth !== undefined && place.firstBuyingMonth >= addMonths(month, 12);
+  const first = place.firstBuyingMonth ? `, prima rata a ${monthLabelLong(place.firstBuyingMonth, yearNeeded)}` : '';
+  return `${monthLabelLong(month)} · ${place.kind === 'swap' ? 'scambio' : 'solo riserva'}${first}`;
 }
 
 /** The calendar's month: «Solo riserva» with no line to buy (owner, 2026-11-19), never «Registrato». */
 export const ACCUMULO_REFILL_MONTH_LABEL = 'Solo riserva';
+export const ACCUMULO_SWAP_TODO_LABEL = 'Scambio da fare';
 
-export function describeInstallmentStatus(lines: ReadonlyArray<{ status: string }>): string {
+export function describeInstallmentStatus(lines: ReadonlyArray<{ status: string; swap?: boolean }>): string {
   if (lines.length === 0) return ACCUMULO_REFILL_MONTH_LABEL;
-  return lines.every((line) => line.status !== 'planned') ? ACCUMULO_LINE_STATUS_LABEL.executed : ACCUMULO_LINE_STATUS_LABEL.todo;
+  if (lines.every((line) => line.status !== 'planned')) return ACCUMULO_LINE_STATUS_LABEL.executed;
+  // A month with only a swap's purchase is no instalment: «Scambio da fare» (owner, 2026-11-20).
+  return lines.every((line) => line.swap) ? ACCUMULO_SWAP_TODO_LABEL : ACCUMULO_LINE_STATUS_LABEL.todo;
 }
 /** «Trovato nel Registro: 24 quote, 3134 €» under a line waiting for the reader's confirmation. */
 export function describeMatchNote(quantity: number, amountEur: number): string {
@@ -248,6 +258,8 @@ export const ACCUMULO_ACTION_REVIEW = 'Rivedi';
 export const ACCUMULO_MANUAL_QUANTITY_LABEL = 'Quantità';
 export const ACCUMULO_MANUAL_AMOUNT_LABEL = 'Importo (€)';
 export const ACCUMULO_DISPOSALS_SECTION_TITLE = 'Vendite fuori piano';
+/** A swap's purchase, under the sales that pay it (owner, 2026-11-20). */
+export const ACCUMULO_SWAP_ROW_PREFIX = 'Con il ricavato: ';
 export const ACCUMULO_CLASS_STRIP_TITLE = 'Classi del piano';
 /** The key under the strip's title: what the fill, the hairline and the ring on each track are. */
 export const ACCUMULO_CLASS_STRIP_LEGEND = 'barra oggi · tacca target · anello a fine piano';
@@ -989,7 +1001,7 @@ export type AccumuloVerdictInput =
   /** `firstEur`: the first instalment when a later sale makes the instalments differ (2026-11-19); null = even. */
   | { state: 'draft'; months: number; monthlyEur: number; startMonth: MonthKey; firstEur?: number | null }
   /** Active, before its first month (2026-11-12): nothing to buy yet. `todayYear` is the Italian year of today. */
-  | { state: 'scheduled'; startMonth: MonthKey; firstMonth: MonthKey; firstInstalmentEur: number; lineCount: number; months: number; todayYear: number }
+  | { state: 'scheduled'; startMonth: MonthKey; firstMonth: MonthKey; firstInstalmentEur: number; lineCount: number; months: number; todayYear: number; swapMonth?: MonthKey; swapNames?: string[] }
   /** Active, a month with no line (2026-11-17): the reserve refilling, or a share below one quota. */
   | { state: 'quiet'; monthKey: MonthKey; nextMonth?: MonthKey; installmentIndex: number; months: number; refilling: boolean }
   | {
@@ -1008,6 +1020,10 @@ export type AccumuloVerdictInput =
       planTotalEur: number;
       /** `describeBandReentry`, or empty when there is no trajectory. */
       reentry: string;
+      /** A month that is no rata (2026-11-20): only a swap, or nothing to buy beside late lines; absent = a rata. */
+      kind?: 'swap' | 'none';
+      /** With `kind`: the month of the next rata. */
+      nextMonth?: MonthKey;
     }
   | { state: 'done'; investedEur: number; totalEur: number };
 
@@ -1075,7 +1091,11 @@ export function describeAccumuloVerdict(input: AccumuloVerdictInput): PageVerdic
     return {
       headline: `Il piano parte ${when}: prima rata di ${cachedFormatCurrencyEUR(input.firstInstalmentEur, true)} in ${input.lineCount} ${input.lineCount === 1 ? 'acquisto' : 'acquisti'}${firstWhen}.`,
       tone: 'neutral',
-      sentence: [{ text: `${input.months} ${input.months === 1 ? 'rata' : 'rate'}; fino ad allora non c’è nulla da comprare.` }],
+      sentence: [{
+        text: input.swapMonth && input.swapNames?.length
+          ? `${input.months} ${input.months === 1 ? 'rata' : 'rate'}; ${monthWithPrepositionA(parseMonthKey(input.swapMonth).monthIndex + 1)} lo scambio: il ricavato delle vendite compra ${input.swapNames.join(' e ')}.`
+          : `${input.months} ${input.months === 1 ? 'rata' : 'rate'}; fino ad allora non c’è nulla da comprare.`,
+      }],
     };
   }
 
@@ -1107,13 +1127,22 @@ export function describeAccumuloVerdict(input: AccumuloVerdictInput): PageVerdic
     if (input.executedCount > 0) parts.push(`${input.executedCount} ${input.executedCount === 1 ? 'registrato' : 'registrati'}`);
     if (input.toConfirmCount > 0) parts.push(`${input.toConfirmCount} da confermare`);
   }
-  let headline = `Rata di ${monthLabelLong(input.monthKey, false)}: ${cachedFormatCurrencyEUR(input.installmentTotalEur, true)} in ${input.lineCount} ${input.lineCount === 1 ? 'acquisto' : 'acquisti'}`;
+  let headline = input.kind === 'none'
+    ? `Niente da comprare ${monthWithPrepositionA(parseMonthKey(input.monthKey).monthIndex + 1)}`
+    : `${input.kind === 'swap' ? 'Scambio' : 'Rata'} di ${monthLabelLong(input.monthKey, false)}: ${cachedFormatCurrencyEUR(input.installmentTotalEur, true)} in ${input.lineCount} ${input.lineCount === 1 ? 'acquisto' : 'acquisti'}`;
   if (parts.length > 0) headline += `, ${parts.length === 2 ? `${parts[0]} e ${parts[1]}` : parts[0]}`;
   if (input.lateCount > 0) headline += `, ${input.lateCount} in ritardo`;
   headline += '.';
 
+  const next = input.nextMonth ? parseMonthKey(input.nextMonth) : null;
   const sentence: Narrative = [
-    { text: `Rata ${input.installmentIndex} di ${input.months}, investiti finora ` },
+    {
+      text: input.kind
+        ? next
+          ? `Prima rata ${monthWithPrepositionA(next.monthIndex + 1)} ${next.year}, investiti finora `
+          : 'Investiti finora '
+        : `Rata ${input.installmentIndex} di ${input.months}, investiti finora `,
+    },
     mono(cachedFormatCurrencyEUR(input.investedEur, true)),
     { text: ' su ' },
     mono(cachedFormatCurrencyEUR(input.planTotalEur, true)),
@@ -1445,67 +1474,12 @@ export function describeAccumuloClosedAnswers(input: AccumuloClosedAnswersInput)
 }
 
 // ---------------------------------------------------------------------------
-// «Dal Consulente» — the hand-off after «Applica» (owner, 2026-11-12)
+// «Dal Consulente» — the corrections on a plan the Consulente's «Applica» created (2026-11-20)
 // ---------------------------------------------------------------------------
 
-export const HANDOFF_EYEBROW = 'Dal Consulente';
-export const HANDOFF_TITLE = 'Un piano verso la nuova allocazione';
-/** Under a row to create with no ticker (and not a bond): `AssetDialog` quotes by ticker, without one the price is 0. */
-export const HANDOFF_NO_TICKER = 'senza ticker: inseriscilo per il prezzo';
-/** A row just created, until the assets' re-read moves it among the matched ones. */
-export const HANDOFF_CREATED_PENDING = 'creato, in aggiornamento';
-
-/** Inside a class without sub-targets a new instrument starts at 0 %: no rule invents a share the targets do not state. */
-export function describeHandoffZero(classLabels: string[]): string {
-  return `Dentro ${listInItalian(classLabels)} lo strumento nuovo parte da 0%: dagli tu una quota nell'editor.`;
-}
-
-/** The seed holds every tradable instrument held; these are the ones the Consulente did not name. */
-export function describeHandoffExtra(names: string[]): string {
-  const [verb, pronoun, suffix] = names.length > 1 ? ['restano', 'li', 'li'] : ['resta', 'lo', 'lo'];
-  return `Il Consulente non cita ${listInItalian(names)}, che tieni oggi: ${verb} nel piano a 0%, il piano non ${pronoun} compra più. Se vuoi continuare a comprar${suffix}, dagli una quota nell'editor.`;
-}
-
-export function describeHandoffUnnamed(subTargets: string[]): string {
-  return `Senza uno strumento indicato: ${listInItalian(subTargets)}.`;
-}
-
-export function describeHandoffNotBuyable(names: string[]): string {
-  return `Fuori dal piano (un conto, un immobile, un prestito o un ruolo non negoziabile): ${listInItalian(names)}.`;
-}
-
-/**
- * The hand-off dialog's reading, which IS its status (The Modal-Is-A-Tile Rule): how the quotas
- * were made — or why they start at 0 % — then what to create, the classes whose split follows the
- * whole class, the classes where a new instrument starts at 0 %, the held instruments it also buys.
- */
-export function describeHandoffReading(handoff: ConsulenteHandoffPlan, outcome: HandoffSeedOutcome): string {
-  const n = outcome.seed.positions.length;
-  const lead = n === 0
-    ? "Nessuno strumento del piano è ancora fra i tuoi asset: crea almeno uno di quelli proposti per aprire l'editor."
-    : outcome.kind === 'computed'
-      ? `Quote calcolate dall'app sui nuovi target e sul patrimonio di oggi, per ${n} ${n === 1 ? 'strumento' : 'strumenti'}: le confermi o le cambi nell'editor.`
-      : outcome.reason === 'negative_fixed'
-        ? `${describeNegativeFixed(outcome.negativeFixedLabels)} Nell'editor gli strumenti partono da 0%: le quote le scegli tu.`
-        : "L'app non riesce a calcolare le quote su questi target: nell'editor gli strumenti partono da 0%, le quote le scegli tu.";
-  const parts = [lead];
-  const toCreate = handoff.toCreate.length;
-  if (toCreate === 1) parts.push('Uno strumento proposto non è ancora fra i tuoi asset: «Crea» lo aggiunge a 0 quote e le quote si ricalcolano.');
-  if (toCreate > 1) parts.push(`${toCreate} strumenti proposti non sono ancora fra i tuoi asset: «Crea» li aggiunge a 0 quote e le quote si ricalcolano.`);
-  if (outcome.kind === 'computed') {
-    const label = (c: AssetClass) => ASSET_CLASS_LABELS[c] ?? c;
-    if (outcome.unmappedClasses.length > 0) {
-      parts.push(`Dentro ${listInItalian(outcome.unmappedClasses.map(label))} le quote seguono la classe intera: qualche strumento ha una sottocategoria che i nuovi target non elencano.`);
-    }
-    if (outcome.zeroClasses.length > 0) parts.push(describeHandoffZero(outcome.zeroClasses.map(label)));
-    if (outcome.extraNames.length > 0) parts.push(describeHandoffExtra(outcome.extraNames));
-  }
-  return parts.join(' ');
-}
-
-/** The editor's warning: the plan sells in month 1 an instrument the Consulente proposes to keep. */
-export function describeKeptSales(names: string[]): string {
-  return names.length === 1
-    ? `${names[0]} è fra gli strumenti che il Consulente propone di tenere: il piano lo vende al primo mese.`
-    : `${listInItalian(names)} sono fra gli strumenti che il Consulente propone di tenere: il piano li vende al primo mese.`;
+export const ACCUMULO_ADVISOR_NOTES_EYEBROW = 'Dal Consulente';
+/** The notes shown before the rest folds. */
+export const ACCUMULO_ADVISOR_NOTES_VISIBLE = 3;
+export function describeMoreAdvisorNotes(count: number): string {
+  return `Altre ${count}`;
 }

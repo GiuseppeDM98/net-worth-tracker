@@ -259,3 +259,12 @@ test.describe('una vendita parziale nel suo mese', () => {
     await expect.poll(async () => (await readActivePlan())?.saleMonths, { timeout: 15_000 }).toEqual([4]);
   });
 });
+
+// The Consulente's old link to its hand-off (2026-11-20: «Applica» creates the plan itself): an old bookmark
+// lands on the tab with the URL cleaned and nothing opened.
+test('?da=consulente: the URL is cleaned to ?tab=accumulo, no dialog opens', async ({ page }) => {
+  await page.goto('/dashboard/allocation?tab=accumulo&da=consulente', { waitUntil: 'load' });
+  await expect(tileOf(page)).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => new URL(page.url()).search, { timeout: 15_000 }).toBe('?tab=accumulo');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});

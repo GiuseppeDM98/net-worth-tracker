@@ -19,8 +19,9 @@ import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
 import type { OperatingPlan, OperatingPlanRow } from '@/lib/utils/operatingPlan';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 import type { GoalPlan, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
-import { BOOK_COPY, describePlanAside, describePlanTaxTotal, describeProposalReading, HANDOFF_DRAFT_NOTE, HANDOFF_READING, OPERATING_PLAN_PAGE_COPY, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
-import type { ApplyHandoff } from '@/lib/utils/allocationAdviceDocument';
+import { ADVICE_PLAN_TICK_COPY, BOOK_COPY, describePlanAside, describePlanTaxTotal, describeProposalReading, OPERATING_PLAN_PAGE_COPY, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
+import { ACCUMULO_HREF, ACCUMULO_OPEN_LINK } from '@/lib/utils/accumuloCopy';
+import Link from 'next/link';
 import { formatCurrency, formatDate, formatNumberIt, formatPercentageIt, formatSignedPoints } from '@/lib/utils/formatters';
 import type { Narrative } from '@/lib/utils/narrative';
 import { useCountUp } from '@/lib/utils/useCountUp';
@@ -301,7 +302,9 @@ export function planPieces(plan: OperatingPlan): BookPagePieces {
         {group(OPERATING_PLAN_PAGE_COPY.buy, buys, (row) => (
           <div className="flex items-baseline justify-between gap-3">
             <span className="min-w-0 text-[13px] text-foreground">{nameOf(row.ref)}</span>
-            <span className="shrink-0 font-mono text-[13px] tabular-nums text-foreground">{formatPercentageIt(row.targetPercentage, 2)}</span>
+            <span className="shrink-0 font-mono text-[13px] tabular-nums text-foreground">
+              {row.targetPercentage === 0 && sells.some((sale) => sale.reinvestInto === row.ref) ? OPERATING_PLAN_PAGE_COPY.bySwap : formatPercentageIt(row.targetPercentage, 2)}
+            </span>
           </div>
         ))}
         {group(OPERATING_PLAN_PAGE_COPY.hold, holds, (row) => (
@@ -317,6 +320,7 @@ export function planPieces(plan: OperatingPlan): BookPagePieces {
                 `${row.sellMonth ?? 1}º mese`,
                 `circa ${formatCurrency(row.estimatedProceedsEur ?? 0)}`,
                 typeof row.estimatedTaxEur === 'number' ? `tasse stimate ${formatCurrency(row.estimatedTaxEur)}` : OPERATING_PLAN_PAGE_COPY.taxUnknown[row.taxUnknownReason ?? 'rate'],
+                ...(row.reinvestInto ? [OPERATING_PLAN_PAGE_COPY.swapBuys(nameOf(row.reinvestInto))] : []),
               ].join(' · ')}
             </span>
           </div>
@@ -381,15 +385,53 @@ export interface ApplyPiecesInput {
   applyGoals: boolean;
   setApplyGoals: (value: boolean) => void;
   applyState: ApplyState;
-  /** `APPLY_ACTIVE_PLAN_NOTE` when an accumulation plan is active, null otherwise. */
-  activePlanNote: string | null;
-  /** After the write: the link to a plan toward the new targets, a draft's note, or nothing (`applyHandoffOf`). */
-  handoff: ApplyHandoff;
   /** The operating plan's row (2026-11-19); null when the report has a usable plan (`operatingPlanOf`). */
   planRow: PlanRow | null;
+  /**
+   * The plan of accumulation's tick (2026-11-20, `ConsulentePlanTick` loaded on demand): in its 'tick'
+   * mode after the three checkboxes on a ready report, in its 'button' mode on an applied one; null
+   * without a usable operating plan.
+   */
+  planTick: React.ReactNode | null;
+  /** The plan the document records: its sentence, and why the model was not written by THIS press. */
+  planDone: { sentence: string; modelNote: string | null } | null;
+  /** Why THIS press did not create the plan (`describeAdvicePlanFailure`). */
+  planFailure: string | null;
+  /** «Crea il piano di accumulo» on an applied report; null while the plan cannot be created now. */
+  onCreatePlan: (() => void) | null;
+  creatingPlan: boolean;
 }
 
-/** «Applica»: one checkbox per thing it writes, the plans' warnings and the status line when ready with a proposal; once applied, the active plan's note and the hand-off's reading or the draft's note; in both, the operating plan's row while there is no plan. */
+/** The applied body's plan branch: created → its sentence and the link; else the failure, the tick and the button. */
+function AppliedPlanBlock({ input }: { input: ApplyPiecesInput }) {
+  if (input.planDone) {
+    return (
+      <div data-plan-done="" className="flex flex-col gap-2">
+        <p role="status" className="text-[13px] leading-[1.45] text-foreground">{input.planDone.sentence}</p>
+        {input.planDone.modelNote && <p className="text-[12px] text-warning-foreground">{input.planDone.modelNote}</p>}
+        <Button asChild variant="outline" className={cn(BUTTON_CLASS, 'w-fit')}>
+          <Link href={ACCUMULO_HREF}>{ACCUMULO_OPEN_LINK}</Link>
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div data-plan-create="" className="flex flex-col gap-3">
+      {input.planFailure && <p role="alert" className="text-[12px] leading-[1.45] text-destructive">{input.planFailure}</p>}
+      {input.planTick}
+      {/* No model is asked: never accented (The AI-Accent Rule). */}
+      <Button type="button" className={cn(BUTTON_CLASS, 'w-fit')} disabled={!input.onCreatePlan || input.creatingPlan} onClick={() => input.onCreatePlan?.()}>
+        {input.creatingPlan ? ADVICE_PLAN_TICK_COPY.creating : ADVICE_PLAN_TICK_COPY.createAction}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * «Applica»: on a ready report one checkbox per thing it writes — the plan of accumulation's among
+ * them —, the plans' warnings and the status line; once applied, the plan the document records, else
+ * the way to create it; in both, the operating plan's row while there is no plan.
+ */
 export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
   const { document, proposal, rows, roles, goalPlan, goalsCount, applyState } = input;
   return {
@@ -422,21 +464,16 @@ export function applyPieces(input: ApplyPiecesInput): BookPagePieces {
           </div>
           {goalPlan && goalPlan.unmatched.length > 0 && <p className="text-[12px] text-warning-foreground">Quote su strumenti non trovati, ignorate: {goalPlan.unmatched.join(', ')}.</p>}
           {goalPlan && goalPlan.rescaled.length > 0 && <p className="text-[12px] text-warning-foreground">Quote ridotte perché superavano il 100% dello strumento: {goalPlan.rescaled.join(', ')}.</p>}
-          {input.activePlanNote && <p className="text-[12px] text-warning-foreground">{input.activePlanNote}</p>}
+          {input.planTick}
           <p role="status" className={cn('min-h-[1.25rem] text-[12px]', applyState.phase === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
             {applyState.phase === 'error' ? applyState.message : applyState.phase === 'writing' ? 'Scrivo…' : applyState.phase === 'done' ? 'Applicato.' : ''}
           </p>
           {input.planRow && <PlanRowBlock row={input.planRow} />}
         </div>
-      ) : document.status === 'applied' && (input.activePlanNote || input.handoff !== 'none' || input.planRow !== null) ? (
-        // After the write the page keeps one line on the plan: an active plan's note, the offer's reading, a draft's note.
+      ) : document.status === 'applied' && (input.planDone || input.planTick || input.planRow) ? (
+        // After the write: the plan the document records, else the way to create it, else the operating plan's row.
         <div className="mt-3 flex flex-col gap-3">
-          {input.activePlanNote && <p className="text-[12px] text-warning-foreground">{input.activePlanNote}</p>}
-          {input.handoff === 'offer' && (
-            <p className="text-[13px] leading-[1.45] text-muted-foreground">{HANDOFF_READING}</p>
-          )}
-          {input.handoff === 'draft' && <p className="text-[12px] text-warning-foreground">{HANDOFF_DRAFT_NOTE}</p>}
-          {input.planRow && <PlanRowBlock row={input.planRow} />}
+          {input.planDone || input.planTick ? <AppliedPlanBlock input={input} /> : input.planRow && <PlanRowBlock row={input.planRow} />}
         </div>
       ) : null,
     footnote: null,

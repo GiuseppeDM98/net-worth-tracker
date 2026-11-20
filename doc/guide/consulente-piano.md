@@ -4,7 +4,8 @@
 > `lib/utils/operatingPlan{,Facts,Schema}.ts`, `runPlan` in `lib/server/allocationAdvice/run.ts`,
 > `formatOperatingPlanFacts` / `PLAN_CONTRACT` / `buildPlanPrompt` in `lib/server/allocationAdvice/prompts.ts`,
 > `components/allocation/consulente/useConsulentePlan.ts`, the page `piano` and «Applica»'s plan row in
-> `ConsulenteBookPages.tsx`. Born on 2026-11-19 beside `doc/guide/consulente.md` (504 lines that day, past
+> `ConsulenteBookPages.tsx`, the plan of accumulation the click creates (`lib/utils/advicePlan.ts`,
+> `lib/services/advicePlanService.ts`, `ConsulentePlanTick.tsx`, 2026-11-20). Born on 2026-11-19 beside `doc/guide/consulente.md` (504 lines that day, past
 > what a guide holds): the run, the book and the path stay there; the operating plan and «Applica» are here. In
 > `AGENTS.md` the stub with the essentials stays.
 
@@ -15,8 +16,26 @@
   (`OPERATING_PLAN_COPY`) and `reconcileOperatingPlan`. Zod-free and free of the hand-off and the optimizer: the
   Consulente's route imports it.
 - `lib/utils/operatingPlanFacts.ts` — `buildOperatingPlanFacts`: the keys and what the app knows of each instrument
-  (quantity, unit price, value, «da tenere», the tax per euro, the limits of «Criteri del modello»). Server only in
-  practice: no component of the route imports it.
+  (quantity, unit price, value, «da tenere», the tax per euro, the limits of «Criteri del modello»);
+  `refreshOperatingPlanFacts` (the stored plan's facts on TODAY's portfolio, the click's) and `findAdviceInstrument`
+  (a `new` instrument among the assets, by ISIN then name). On the route only `ConsulentePlanTick` imports it.
+- `lib/utils/advicePlan.ts` (2026-11-20) — `buildAdvicePlan` (pure: the draft, the instruments to create, the
+  notes, the issues, `blocked`), `pickFreshQuote`, `resolveNewInstrumentPricing`, `newInstrumentFormData`,
+  `fallbackTicker`, `ADVICE_PLAN_COPY`.
+- `lib/utils/advicePlanNarrative.ts` (2026-11-20) — `describeAdvicePlanSummary` and `describeNewInstrument`, the tick's
+  sentences: apart from `allocationAdviceNarrative.ts`, which Allocazione's page loads whole on its first screen, so
+  that the swap's and the bond's sentences ride the lazy tick only (perf:budget, 2026-11-20).
+- `lib/services/advicePlanService.ts` — `executeAdvicePlan` and `AdvicePlanError { step, done }`, imported by the
+  click with `await import()`; `createAndActivatePlan` and `PlanWriteError` live in
+  `lib/services/accumulationPlanService.ts`.
+- `components/allocation/consulente/ConsulentePlanTick.tsx` — the fourth tick (and the applied page's line), loaded
+  through `lazyComponent()`; `lib/hooks/useAdviceQuotes.ts` (`queryKeys.adviceQuotes`, not persisted);
+  `lib/utils/accumuloCopy.ts` (import-free: «Apri Accumulo», `ACCUMULO_HREF`, `ACCUMULO_PLAN_NOTHING_TO_REVISE`,
+  `describeModelNotUpdated`, `ADVICE_SOURCE_GONE`).
+- `resolveEffectiveTargets` in `lib/services/effectiveTargets.ts` (owner, 2026-11-20: not in the Firebase-free
+  `allocationUtils.ts`, since the goal math pulls the client SDK; nor in `assetAllocationService.ts`, which every page
+  loads: `goalMath` there cost the shared code 0,9 KB gz, perf:budget 2026-11-20) — the targets
+  Allocazione measures, goal-driven ones included; the page and the click call it.
 - `lib/utils/operatingPlanSchema.ts` — `operatingPlanAnswerSchema` (zod, loose bounds) and
   `parseOperatingPlanAnswer`.
 - `lib/server/allocationAdvice/run.ts` — `runPlan`, the dispatch of `stage === 'plan'`, the rethrow in the catch.
@@ -28,13 +47,16 @@
   «Applica»; `ConsulenteReport.tsx` builds the row.
 - Tests: `__tests__/operatingPlan.test.ts`, `operatingPlanFacts.test.ts`, `operatingPlanSchema.test.ts`,
   `allocationAdviceRun.test.ts` (§ the operating plan stage), `useConsulentePlan.test.tsx`,
-  `consulenteBookPlan.test.tsx`; E2E in `e2e/allocation.consulente{,.report}.spec.ts`, the fake stage in
+  `consulenteBookPlan.test.tsx`; the click: `advicePlan.test.ts`, `advicePlanService.test.ts`,
+  `accumulationPlanService.test.ts` (§ createAndActivatePlan), `effectiveTargets.test.ts`,
+  `consulentePlanTick.test.tsx`, `allocationAdviceDocument.test.ts` (the route's import guard); E2E in `e2e/allocation.consulente{,.report}.spec.ts`, the fake stage in
   `e2e/consulenteInterview.ts` writing through `e2e/consulenteReport.ts`.
 - **Suites to run after a change here**: `operatingPlan`, `operatingPlanFacts`, `operatingPlanSchema`,
   `allocationAdviceRun`, `allocationAdvicePrompts`, `allocationAdviceProposal`, `allocationAdviceDocument`,
-  `allocationAdviceBook`, `allocationAdviceNarrative`, `allocationAdviceRoutes`, `accumulationPlanUtils`
-  (`resolvePlanReserve`) and the Testing Library suites `useConsulentePlan`, `useConsulenteRun`, `consulenteBookPlan`,
-  `consulenteBook`, `consulenteRun`, `consulenteRevisionTile` · **Browser** `e2e/allocation.consulente.spec.ts`
+  `allocationAdviceBook`, `allocationAdviceNarrative`, `advicePlanNarrative`, `allocationAdviceRoutes`, `accumulationPlanUtils`
+  (`resolvePlanReserve`), `advicePlan`, `advicePlanService`, `accumulationPlanService`, `accumulationPlanSchema`,
+  `effectiveTargets` and the Testing Library suites `useConsulentePlan`, `useConsulenteRun`, `consulenteBookPlan`,
+  `consulenteBook`, `consulenteRun`, `consulenteRevisionTile`, `consulentePlanTick` · **Browser** `e2e/allocation.consulente.spec.ts`
   (the run's five rows, the plan the fake wrote) and `e2e/allocation.consulente.report.spec.ts` (the row, the
   failed plan, the page, «Chiedi una modifica» rewriting the plan); the route always faked.
 
@@ -82,8 +104,8 @@
   savings median (or said in `departures`); the months those needed to cover the gap with that inflow (owner, 2026-11-19:
   never asked to the user, said in `summary`); never sell a «DA TENERE»; a later sale refills the reserve first
   (owner, 2026-11-19); only the blocks' numbers.
-- **The reconcile** (`reconcileOperatingPlan`, ONE pure function, written to run here and again at the click of
-  «Applica» on the live portfolio, which is not in the code yet), fifteen rules in order, each correction ONE sentence in `corrections`: months clamped to 1..60;
+- **The reconcile** (`reconcileOperatingPlan`, ONE pure function, run here and again at the click of «Applica» on
+  the live portfolio, 2026-11-20), fifteen rules in order, each correction ONE sentence in `corrections`: months clamped to 1..60;
   a negative inflow to 0 (silent); an unknown or repeated key dropped (one sentence); a new instrument held or sold
   dropped, a money-market fund bought turned into a hold; a sale of a «da tenere» removed (owner, 2026-11-19: the interview's «da tenere» wins, «smetti di comprare»
   stays allowed); the quantity
@@ -94,9 +116,16 @@
   to 100,00; a review month outside the plan dropped; no buy above 0 → `usable: false`. Then each sale's proceeds and
   tax at today's price. Idempotent. The sentences agree in number (2026-11-19: «il piano dura 1 mese», «{nome}: il
   piano non lo cita. Resta dov'è…» for one name).
+- **The swap** (owner, 2026-11-20): a sell row may carry `reinvestInto` (the ref of a buy row): its whole proceeds
+  buy that instrument in the sale's month, never through the reserve nor the rates (doc/guide/accumulo.md § The
+  swap). The contract writes it only when the report says to sell one instrument to buy another with that money, the
+  bought row's quota counting only the rates' money (0 when the swap alone buys it). The reconcile keeps it only
+  toward a buy row other than the sold one (else dropped, said: «…il ricavato entra nel piano come le altre
+  vendite.»), drops it from any row that is no sale, and keeps a buy row at 0 that a swap funds (never turned into a
+  hold nor removed). The page draws «con il ricavato compra X» on the sale and «con lo scambio» for a quota of 0.
 - **Yahoo symbols** (owner, 2026-11-19): the instruments stage writes up to three per candidate (`yahooSymbols`, the user's
-  exchange first); an older block without them still parses. Nothing prices with them yet: the click of «Applica» will (not in the
-  code yet).
+  exchange first); an older block without them still parses. The tick of «Applica» prices a new instrument with them
+  (2026-11-20, § After «Applica»).
 
 ## The book and «Applica»
 
@@ -123,14 +152,72 @@
   goals only rewritten in percent; an instrument's quotas beyond 100% are REDUCED within the margin the untouched
   goals leave, and the plan says so, never silently). Then `POST /api/allocation-advice/applied` records what was
   written and the document moves to `applied`; every key of the readers is invalidated (settings, assets, overview,
-  goals, allocationAdvice).
-- **After «Applica», a plan of accumulation** (owner, 2026-11-12): with the targets written and no open plan the page
-  offers «Crea un piano di accumulo verso questa allocazione», a link to Accumulo `?da=consulente` (`applyHandoffOf`,
-  `CONSULENTE_HANDOFF_HREF`; nothing while the plans load, the link on a failed read); a draft gets a note
-  (`HANDOFF_DRAFT_NOTE`), an active plan the line of before (`APPLY_ACTIVE_PLAN_NOTE`). A link, not an AI control (The
-  AI-Accent Rule lists it). The Consulente's components import neither the hand-off nor the optimizer (a test reads
-  their sources): the hand-off is Accumulo's, doc/guide/accumulo.md § Dal Consulente — it still seeds from the optimizer,
-  not from the operating plan (2026-11-19).
+  goals, allocationAdvice, and since 2026-11-20 the plans and the model).
+- **After «Applica», a plan of accumulation: ONE click** (2026-11-20; it replaced the link to an editor of
+  2026-11-12). With a usable operating plan of this report, «Applica» has a FOURTH tick, on by default
+  (`ConsulentePlanTick`, loaded on demand only on that page): «Il piano di accumulo: {summary}» — «, al posto
+  della bozza che hai in Accumulo» on an open draft, «Rivede il piano di accumulo attivo» on an active plan. The
+  summary (`describeAdvicePlanSummary`): months, first month, the inflow, the first instalment that buys (with its
+  month when it is not the first, and «dopo N mesi che ricostituiscono la riserva» when the refill is why, 2026-11-20), the
+  instruments to create, the sales with the TOTAL of their estimated taxes. Under it: «Da quale conto?» (a select
+  of the accounts, only without «Conto per gli investimenti»; the same click saves the choice, with a SECOND
+  `setSettings` without targets — the merge branch), one line per instrument to create (`describeNewInstrument`:
+  «nome · simbolo · prezzo · data», «senza prezzo…», «senza ticker né prezzo…», a government bond's), «Corretto
+  dall'app» with the notes. **Its states** — the tick off and disabled, the sentence in the summary's place:
+  «Preparo il piano…» (settings, plans or quotes loading, or plans only from the restored cache —
+  `isFetchedAfterMount`), the plans not read, no account among the assets, «I target» unticked («Il piano va
+  verso i nuovi target: applicali insieme.»), `blocked` (the build's sentence; an active plan with no intact
+  instalment adds «Apri Accumulo»); no account chosen yet: disabled, no sentence.
+- **What it is built on** (`buildAdvicePlan`, pure, in render): the stored plan refreshed on TODAY's portfolio
+  (`refreshOperatingPlanFacts`: a `new` instrument found by ISIN or name is held; an instrument bought since gets
+  a row), a sale already executed by the active plan kept as a position at 0, then the reconcile again; the
+  portfolio AS THE CLICK LEAVES IT — the ticked role changes applied — and the targets it goes toward
+  (`resolveEffectiveTargets` on the proposal's targets and the goals the click writes; on an applied document the
+  live ones). A revision keeps the active plan's numbering: the months from its first intact instalment, at most
+  60 in all (said), each sale's month shifted. `validateDraftAgainstAssets` runs here (`issues` → `blocked`); the
+  quotes come from `useAdviceQuotes` (one `/api/prices/quote` per symbol, the first with a last trade ≤ 5 days).
+- **The quotas are shares of the plan's money** (owner, 2026-11-20, found on the mirror tour: a 60/40 between a small
+  and a large holding went almost whole to the small one). The engine reads a position's weight as its share of the
+  plan's portfolio at the end and splits the money `L` by what each lacks (`computeTotalPurchases`), so the build
+  turns the quotas into weights (`weightsFromQuotas`, `lib/utils/advicePlan.ts`): a priced instrument to buy weighs
+  (today's value + its quota of `L`) ÷ (today's value of the plan + `L`), one to hold or partly sold weighs what it
+  holds (rounded down: it lacks nothing and receives nothing). One to buy with no price keeps the weight it would
+  reach, taken from the ones to hold first, then from the priced ones, so the plan buys it once it has a price; the
+  priced quotas are taken over their own sum. `L` comes from the liquidity alone (a first preview), the weights then
+  feed the final preview. The model written from the plan is therefore the portfolio at the end of the plan. The
+  monthly recalibration and «Rivedi il piano» aim at these weights; prices that move a lot shift the split a little.
+- **The swap at the click**: `buildAdvicePlan` carries `reinvestInto` onto `PlanDisposal.reinvestAssetId`
+  (`new:<ref>` for a new instrument, mapped to the created id by `withRealIds`); a target with no price adds the note
+  «X non ha ancora un prezzo: il ricavato di Y entra nel piano come le altre vendite…». The summary never counts the
+  swap as the first rata and names it: «, scambio a dicembre 2026: vendi X e Y e compri Z».
+- **A new government bond is priced at the click** (owner, 2026-11-20, so the swap can buy it): `useAdviceQuotes` asks
+  Borsa Italiana by ISIN (`/api/prices/bond-quote`) beside the symbols; `resolveNewInstrumentPricing(…, { pricePct,
+  coefficient })` → `{ kind: 'bond', pricePct, indexed }`, and `bondUnitPriceEur` (`lib/utils/bondPricing.ts`) makes it
+  euro per 1 € of nominal: the quote ÷ 100, × the indexation coefficient for a BTP€i (`isEuroIndexedBondName`, never a
+  BTP Italia). A BTP€i without the coefficient has no price: the page asks it in a field under the instrument («Il
+  coefficiente di oggi, dal sito del MEF o dal tuo broker.»). The coefficient is NOT saved on the asset (its
+  `bondDetails` need coupon, issue and maturity, which the click does not know): the daily update prices it without
+  it until the bond is completed in Patrimonio, as the line says.
+- **A sub-target naming two instruments** (owner, 2026-11-20, the mirror's «BTP A (IT…) + BTP€i B (IT…, da
+  comprare sul MOT)» became ONE new ETF named after the whole text): `planConsulenteHandoff`
+  splits it on « + » and «;», each part its own instrument, and reads an ISIN followed by a note in the parentheses.
+- **The click's order** (`executeAdvicePlan`, not atomic, each step awaited): targets, roles, goals as before; then
+  the assets RE-READ (the account gone → nothing of the plan written, `ADVICE_SOURCE_GONE`); the account as a
+  setting; the instruments (each matched on the re-read first, so a second press creates none, at 0 quotes,
+  `createdEmpty`, priced or `autoUpdatePrice: false`); `createAndActivatePlan` (validated again on the re-read
+  assets, the draft written or the open draft replaced whole — `updateDraftPlan` — then activated, then the model
+  from the plan's weights, always: a plan from the Consulente is the new intent) or, on an active plan,
+  `revisePlan` then the model; last the «applied» record with `planId` and `planAction` (the route keeps the
+  first `applied.at`). A step that fails names itself and what it wrote (`describeAdvicePlanFailure`); the
+  settings stay applied.
+- **The applied page**: with `applied.planId` → «Piano creato.» / «Bozza sostituita e piano attivato.» / «Piano
+  rivisto.», `describeModelNotUpdated` when this press could not write the model, and «Apri Accumulo» (outline);
+  with the targets written and no `planId` → the failure of this press, the tick as a line and «Crea il piano di
+  accumulo» (primary, disabled without a build and while it runs), which runs the plan alone and records it with
+  the counts already stored; else the operating plan's row. «Crea il piano di accumulo» and «Apri Accumulo» ask no
+  model: never accented (The AI-Accent Rule). **The route stays light**: only `ConsulentePlanTick.tsx` may import
+  `advicePlan`, `accumulationPlanUtils`, `operatingPlanFacts` or `accumulationNarrative`; the executor only through
+  `import()`; the tick only through `lazyComponent()` (a test reads the sources).
 - **«Chiedi una modifica» = review + plan**: `runRevise` drops the old plan with the old report (`operatingPlan:
   null`), then `useConsulenteRevision` asks the plan; whatever the plan's outcome the revision ends and the page
   shows the new report (the row tells a failed plan).
@@ -144,7 +231,16 @@
 - **A stored plan of another report is no plan**: after a revision the old `reportFinishedAt` no longer matches and
   the row comes back, even before `runRevise`'s `operatingPlan: null` is read.
 - **A plan at 0 € a month is still `usable`**: whether there is money to invest is for the click that creates the
-  plan of accumulation to check, not the reconcile.
+  plan of accumulation to check (`blocked`: «niente da investire»), not the reconcile.
+- **A plan failure after the three writes leaves the document applied** (2026-11-20, by design): targets, roles and
+  goals are written and recorded; the applied page's «Crea il piano di accumulo» creates the plan later.
+- **A model not written is said once, on the press that left it** (2026-11-20): the sentence is not stored; after a
+  reload Accumulo's «superato» verdict tells it.
+- **A `markApplied` that fails after the plan was created** (declared): «Applica» stays, and pressing again revises the
+  plan just created with the same figures — one more `revisions` row.
+- **Two tabs pressing at the same instant** (declared): the same instrument can be created twice; the plans' lock
+  keeps the plan single, the duplicate is deleted from Patrimonio.
+- **The failure's sentence reads «ad attivare»** (2026-11-20): the euphonic d before a vowel; the other steps «a».
 - **What the plan stage does not do** (declared 2026-11-19): it prices no new instrument (the quotas need no price),
   caps no tax, writes no phases with different quotas; the strategy and the review never read its facts block (one
   stage owns the figures); the Assistente does not read the operating plan; a document a revision left `failed` is

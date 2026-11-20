@@ -982,3 +982,107 @@ describe('resolveInvestmentAccountId', () => {
     expect(resolveInvestmentAccountId(null, [account])).toBeNull();
   });
 });
+
+// ── The swap (owner, 2026-11-20, NOVE-25's phase F on the mirror): a sale whose proceeds buy ONE named
+// instrument in the sale's month, never the reserve. Invented figures: 3.000 € under the reserve, 500 € a month,
+// 12 months, an old ETF sold in month 1 for 4.000 € that buys a bond at 100 €.
+describe('the swap: a sale that buys one instrument in its month', () => {
+  const cash = makeAsset({ id: 'cash-swap', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 7000 });
+  const world = makeAsset({ id: 'world', name: 'ETF ornitorinco', quantity: 100, currentPrice: 50 });
+  const bond = makeAsset({ id: 'bond', name: 'BTP fenicottero', type: 'bond', assetClass: 'bonds', quantity: 0, currentPrice: 100 });
+  const liquidity: PlanLiquidity = { sourceCashAssetIds: ['cash-swap'], reserveEur: 10000, monthlyInflowEur: 500 };
+  const positions: PlanPosition[] = [
+    { id: 'p-world', label: 'ETF ornitorinco', targetPercentage: 60, memberAssetIds: ['world'], buyAssetId: 'world' },
+    { id: 'p-bond', label: 'BTP fenicottero', targetPercentage: 40, memberAssetIds: ['bond'], buyAssetId: 'bond' },
+  ];
+  const swap: PlanDisposal = { assetId: 'old-etf', estimatedProceedsEur: 4000, status: 'planned', reinvestAssetId: 'bond' };
+  const plain: PlanDisposal = { assetId: 'old-etf', estimatedProceedsEur: 4000, status: 'planned' };
+  const run = (assets: Map<string, Asset>, disposals: PlanDisposal[], months = 12) => {
+    const usable = computeUsableLiquidity(liquidity, assets, disposals, months, deps);
+    const states = resolvePositionStates(positions, assets, deps, disposals);
+    const totals = computeTotalPurchases(states, usable.L);
+    const schedule = scheduleInstallments(totals, states, months, '2027-01', 1, usable.refillMonths, usable.monthShares, usable.swaps);
+    return { usable, states, totals, schedule };
+  };
+
+  // Mutation that turns it red: the swap left in the pool (the reserve takes its proceeds).
+  it('the proceeds skip the reserve and the pool: the inflows alone refill, L counts no sale', () => {
+    const swapped = computeUsableLiquidity(liquidity, byId(cash, world, bond), [swap], 12, deps);
+    expect(swapped.disposalProceedsEur).toBe(0);
+    expect(swapped.swapProceedsEur).toBe(4000);
+    expect(swapped.refillMonths).toBe(6);
+    expect(swapped.L).toBe(3000);
+    expect(swapped.swaps).toEqual([{ assetId: 'bond', offset: 0, eur: 4000 }]);
+    // The same sale without the swap refills the reserve at once.
+    const pooled = computeUsableLiquidity(liquidity, byId(cash, world, bond), [plain], 12, deps);
+    expect(pooled.refillMonths).toBe(0);
+    expect(pooled.L).toBe(7000);
+    expect(pooled.swaps).toEqual([]);
+  });
+
+  // Mutation that turns it red: the swap line skipped in a refill month.
+  it('month 1 buys the bond with the whole proceeds in whole units, even while the inflows refill; the cents are residual', () => {
+    const { schedule } = run(byId(cash, world, bond), [swap]);
+    const first = schedule.installments[0];
+    expect(first.lines).toEqual([
+      { positionId: 'p-bond', assetId: 'bond', plannedQuantity: 40, priceEurAtPlan: 100, plannedAmountEur: 4000, status: 'planned', swap: true },
+    ]);
+    for (const installment of schedule.installments.slice(1, 6)) expect(installment.lines).toEqual([]);
+    expect(schedule.installments[6].lines.length).toBeGreaterThan(0);
+    expect(schedule.installments[6].lines.some((line) => line.swap)).toBe(false);
+    const spent = schedule.installments.reduce((sum, i) => sum + i.lines.reduce((s, l) => s + l.plannedAmountEur, 0), 0);
+    expect(roundCents(spent + schedule.residualEur)).toBe(3000 + 4000);
+  });
+
+  // Two sales that buy the same instrument in the same month are ONE purchase (owner's mirror, 2026-11-20: two lines
+  // of the BTP€i, two orders, a unit lost to the rounding). Mutation that turns it red: one swap per sale.
+  it('two swaps toward one instrument in one month: one line on their summed proceeds', () => {
+    const second: PlanDisposal = { assetId: 'other-etf', estimatedProceedsEur: 150, status: 'planned', reinvestAssetId: 'bond' };
+    const { usable, schedule } = run(byId(cash, world, bond), [{ ...swap, estimatedProceedsEur: 4250 }, second]);
+    expect(usable.swaps).toEqual([{ assetId: 'bond', offset: 0, eur: 4400 }]);
+    expect(schedule.installments[0].lines).toEqual([
+      { positionId: 'p-bond', assetId: 'bond', plannedQuantity: 44, priceEurAtPlan: 100, plannedAmountEur: 4400, status: 'planned', swap: true },
+    ]);
+  });
+
+  // Mutation that turns it red: the swap not added to the bought position's value (the rates would buy it again).
+  it('the bought position counts the swap as held: the rates split toward the targets on top of it', () => {
+    const { states } = run(byId(cash, world, bond), [swap]);
+    expect(states.find((s) => s.positionId === 'p-bond')?.currentValueEur).toBe(4000);
+    expect(run(byId(cash, world, bond), [plain]).states.find((s) => s.positionId === 'p-bond')?.currentValueEur).toBe(0);
+  });
+
+  // Mutation that turns it red: an unpriced swap target kept as a swap (its money would vanish).
+  it('a bought instrument with no price: the sale goes back to the pool, as without the swap', () => {
+    const unpriced = makeAsset({ id: 'bond', name: 'BTP fenicottero', type: 'bond', assetClass: 'bonds', quantity: 0, currentPrice: 0 });
+    const result = run(byId(cash, world, unpriced), [swap]);
+    expect(result.usable.swaps).toEqual([]);
+    expect(result.usable.L).toBe(7000);
+    expect(result.states.find((s) => s.positionId === 'p-bond')?.currentValueEur).toBe(0);
+  });
+
+  // Mutation that turns it red: the recalibration blind to the month's swap (it would propose to drop it).
+  it('the recalibration of the swap month suggests what the calendar planned: nothing to propose', () => {
+    const assets = byId(cash, world, bond);
+    const { schedule } = run(assets, [swap]);
+    const plan = {
+      months: 12, startMonth: '2027-01', liquidity, positions, disposals: [swap], installments: schedule.installments,
+    } as unknown as AccumulationPlan;
+    const result = recalibrateInstallment(plan, 1, assets, deps);
+    const bondLine = result.lines.find((line) => line.positionId === 'p-bond');
+    expect(bondLine?.plannedQuantity).toBe(40);
+    expect(bondLine?.suggestedQuantity).toBe(40);
+    expect(shouldProposeRecalibration(result)).toBe(false);
+  });
+
+  it('a later swap buys in its own month; a swap in a month that also buys merges into the one line', () => {
+    const later = run(byId(cash, world, bond), [{ ...swap, monthIndex: 3 }]);
+    expect(later.usable.swaps).toEqual([{ assetId: 'bond', offset: 2, eur: 4000 }]);
+    expect(later.schedule.installments[2].lines.filter((line) => line.swap)).toHaveLength(1);
+    const rich = makeAsset({ id: 'cash-swap', type: 'cash', assetClass: 'cash', quantity: 1, currentPrice: 20000 });
+    const merged = run(byId(rich, world, bond), [swap]);
+    const bondLines = merged.schedule.installments[0].lines.filter((line) => line.positionId === 'p-bond');
+    expect(bondLines).toHaveLength(1);
+    expect(bondLines[0].plannedQuantity).toBeGreaterThan(42);
+  });
+});

@@ -12,15 +12,25 @@ import type { PacVerdictInput } from '@/types/accumulationPlan';
 import { addMonths, monthIndexOf, monthLabelLong, toMonthKey } from './planMonths';
 import { roundToCents } from './cents';
 
-/** The instalments are the months that buy: a month with no line (the reserve refilling) is not one (2026-11-17). */
+/** A line of the plan's own buying: never a swap's purchase (owner, 2026-11-20). */
+export function isRegularLine(line: Pick<InstallmentLine, 'swap'>): boolean {
+  return !line.swap;
+}
+
+/** A month that buys with the plan's money: a refill month and a month with only a swap are not (2026-11-17, 2026-11-20). */
+export function buysRegularly(installment: Pick<Installment, 'lines'>): boolean {
+  return installment.lines.some(isRegularLine);
+}
+
+/** The instalments are the months that buy: a month with no line (the reserve refilling) is not one (2026-11-17), nor a swap's (2026-11-20). */
 export function countPlanInstalments(plan: Pick<AccumulationPlan, 'installments'>): { closed: number; total: number } {
-  const buying = plan.installments.filter((installment) => installment.lines.length > 0);
+  const buying = plan.installments.filter(buysRegularly);
   return { closed: buying.filter(isInstalmentClosed).length, total: buying.length };
 }
 
 /** The first installment from `fromIndex` with something to buy (the months before it refill the reserve). */
 export function findFirstBuyingInstallment(plan: Pick<AccumulationPlan, 'installments'>, fromIndex = 1): Installment | undefined {
-  return plan.installments.find((installment) => installment.index >= fromIndex && installment.lines.some((line) => line.plannedQuantity > 0));
+  return plan.installments.find((installment) => installment.index >= fromIndex && installment.lines.some((line) => isRegularLine(line) && line.plannedQuantity > 0));
 }
 
 /** Every installment fully closed, `late` lines included — the plan has nothing left to do. */
@@ -50,8 +60,8 @@ export function summarizePacMonth(plan: AccumulationPlan | undefined, currentInd
   if (!plan || plan.status !== 'active') return null;
   if (currentIndex < 1 || currentIndex > plan.months) return null;
   const installment = findOpenInstallment(plan, currentIndex);
-  // A month that buys nothing (the reserve refilling, 2026-11-17) gives the Piano no note.
-  if (!installment || installment.lines.length === 0) return null;
+  // A month that buys nothing (the reserve refilling, 2026-11-17) or only a swap (2026-11-20) gives the Piano no note.
+  if (!installment || !buysRegularly(installment)) return null;
   const lines = installment.lines.filter((line) => line.status !== 'skipped' && (line.plannedQuantity > 0 || line.status !== 'planned'));
   return {
     monthTotalEur: roundToCents(lines.reduce((sum, line) => sum + amountOf(line), 0)),
@@ -98,9 +108,14 @@ export interface OpenPlanForAdvice {
   instalmentEur: number;   // the month's lines not skipped (the first instalment before the start), in cents
   startMonth: MonthKey;
   endMonth: MonthKey;
-  buys: Array<{ assetId: string; name: string; targetPercentage: number }>;
+  /** The first month from the open one that buys; null when none is left (2026-11-20). */
+  firstBuy: { month: MonthKey; index: number; amountEur: number } | null;
+  /** What the plan buys, as shares of its money (the lines not skipped, one decimal), never the end weights (2026-11-20). */
+  buys: Array<{ assetId: string; name: string; sharePct: number; amountEur: number }>;
+  /** The positions kept at their weight: a weight in the plan, no line that buys them. */
+  holds: Array<{ assetId: string; name: string }>;
   sells: Array<{ assetId: string; name: string; quantity: number | null; monthIndex: number | null;
-    status: PlanDisposal['status'] }>;
+    status: PlanDisposal['status']; reinvestName?: string }>;
 }
 
 /** What a reader outside the tab may know of the active plan; null unless one is active. */
@@ -111,17 +126,33 @@ export function describeOpenPlanForAdvice(
 ): OpenPlanForAdvice | null {
   if (!plan || plan.status !== 'active') return null;
   const k = Math.min(monthIndexOf(plan, monthKey), plan.months);
-  const lines = (findOpenInstallment(plan, Math.max(k, 1))?.lines ?? []).filter((l) => l.status !== 'skipped');
+  const monthTotal = (installment: Installment | undefined) =>
+    roundToCents((installment?.lines ?? []).filter((l) => l.status !== 'skipped').reduce((sum, l) => sum + amountOf(l), 0));
+  const first = findFirstBuyingInstallment(plan, Math.max(k, 1));
+  // The plan's money by position: every line not skipped, executed at what it cost, never a swap's (owner, 2026-11-20).
+  const byPosition = new Map<string, number>();
+  for (const installment of plan.installments) {
+    for (const l of installment.lines) {
+      if (l.status !== 'skipped' && isRegularLine(l)) byPosition.set(l.positionId, (byPosition.get(l.positionId) ?? 0) + amountOf(l));
+    }
+  }
+  const total = [...byPosition.values()].reduce((sum, value) => sum + value, 0);
+  const bought = plan.positions.filter((p) => (byPosition.get(p.id) ?? 0) > 0);
   return {
     monthIndex: k,
     months: plan.months,
-    instalmentEur: roundToCents(lines.reduce((sum, l) => sum + amountOf(l), 0)),
+    instalmentEur: monthTotal(findOpenInstallment(plan, Math.max(k, 1))),
     startMonth: plan.startMonth,
     endMonth: addMonths(plan.startMonth, plan.months - 1),
-    buys: plan.positions.map((p) => ({ assetId: p.buyAssetId, name: nameOf(p.buyAssetId),
-      targetPercentage: p.targetPercentage })),
+    firstBuy: first ? { month: first.month, index: first.index, amountEur: monthTotal(first) } : null,
+    buys: bought.map((p) => {
+      const amountEur = roundToCents(byPosition.get(p.id) ?? 0);
+      return { assetId: p.buyAssetId, name: nameOf(p.buyAssetId), sharePct: Math.round((amountEur / total) * 1000) / 10, amountEur };
+    }),
+    holds: plan.positions.filter((p) => !bought.includes(p)).map((p) => ({ assetId: p.buyAssetId, name: nameOf(p.buyAssetId) })),
     sells: plan.disposals.map((d) => ({ assetId: d.assetId, name: nameOf(d.assetId), quantity: d.quantity ?? null,
-      monthIndex: d.monthIndex ?? null, status: d.status })),
+      monthIndex: d.monthIndex ?? null, status: d.status,
+      ...(d.reinvestAssetId ? { reinvestName: nameOf(d.reinvestAssetId) } : {}) })),
   };
 }
 
@@ -131,8 +162,10 @@ export function isInstalmentClosed(installment: Pick<Installment, 'lines'>): boo
   return installment.lines.length > 0 && installment.lines.every((line) => line.status !== 'planned');
 }
 
-/** Where the open month sits: its place among the months that buy, or a month that only refills the reserve. */
-export type OpenMonthPlace = { kind: 'instalment'; ordinal: number; total: number } | { kind: 'refill'; firstBuyingMonth: MonthKey | undefined };
+/** Where the open month sits: its place among the months that buy, a month that only refills the reserve, or a swap's (2026-11-20). */
+export type OpenMonthPlace =
+  | { kind: 'instalment'; ordinal: number; total: number }
+  | { kind: 'refill' | 'swap'; firstBuyingMonth: MonthKey | undefined };
 
 /**
  * «rata k di n» counts the months that buy, like «n di m rate chiuse» (owner, 2026-11-19, the 2026-11-17 rule kept); a
@@ -140,8 +173,10 @@ export type OpenMonthPlace = { kind: 'instalment'; ordinal: number; total: numbe
  */
 export function locateOpenMonth(plan: Pick<AccumulationPlan, 'installments' | 'months'>, currentIndex: number): OpenMonthPlace {
   const clamped = Math.min(Math.max(currentIndex, 1), plan.months);
-  const buying = plan.installments.filter((installment) => installment.lines.length > 0);
+  const buying = plan.installments.filter(buysRegularly);
   const ordinal = buying.findIndex((installment) => installment.index === clamped) + 1;
   if (ordinal > 0) return { kind: 'instalment', ordinal, total: buying.length };
-  return { kind: 'refill', firstBuyingMonth: findFirstBuyingInstallment(plan, clamped)?.month };
+  const open = plan.installments.find((installment) => installment.index === clamped);
+  const kind = open && open.lines.length > 0 ? 'swap' : 'refill';
+  return { kind, firstBuyingMonth: findFirstBuyingInstallment(plan, clamped)?.month };
 }

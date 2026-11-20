@@ -156,10 +156,11 @@ export async function updateUserAssetPrices(
       }
     }
 
-    // Extract unique tickers for other assets
+    // Extract unique tickers for other assets. An empty ticker never reaches Yahoo, whatever its
+    // source (2026-11-20: an instrument created without a symbol).
     const tickers = [
       ...new Set(otherAssets.map((asset) => asset.ticker)),
-    ];
+    ].filter((ticker) => typeof ticker === 'string' && ticker.trim() !== '');
 
     // Fetch quotes from Yahoo Finance
     const quotes = await getMultipleQuotes(tickers);

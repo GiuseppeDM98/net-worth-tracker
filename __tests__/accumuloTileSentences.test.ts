@@ -294,4 +294,24 @@ describe('describeMonthTileAside — refill months', () => {
     expect(describeMonthTileAside('2026-12', { kind: 'refill', firstBuyingMonth: '2027-02' })).toBe('dicembre 2026 · solo riserva, prima rata a febbraio');
     expect(describeMonthTileAside('2026-12', { kind: 'refill', firstBuyingMonth: undefined })).toBe('dicembre 2026 · solo riserva');
   });
+
+  // A first instalment 12 months away or more reads with its year: «a gennaio» alone is the next January
+  // (owner, 2026-11-20). Mutation that turns it red: the year never printed.
+  it('the year when the month alone would name an earlier one', () => {
+    expect(describeMonthTileAside('2026-12', { kind: 'refill', firstBuyingMonth: '2027-11' })).toBe('dicembre 2026 · solo riserva, prima rata a novembre');
+    expect(describeMonthTileAside('2026-12', { kind: 'refill', firstBuyingMonth: '2027-12' })).toBe('dicembre 2026 · solo riserva, prima rata a dicembre 2027');
+    expect(describeMonthTileAside('2026-12', { kind: 'refill', firstBuyingMonth: '2028-02' })).toBe('dicembre 2026 · solo riserva, prima rata a febbraio 2028');
+  });
+});
+
+// ── The swap month (owner, 2026-11-20): «scambio», never «rata» nor «solo riserva».
+// Mutations that turn it red: the swap place read as a refill; the status of a swap month read «Da fare».
+describe('the swap month reads «scambio»', () => {
+  it('the aside and the status', () => {
+    expect(describeMonthTileAside('2026-12', { kind: 'swap', firstBuyingMonth: '2028-02' })).toBe('dicembre 2026 · scambio, prima rata a febbraio 2028');
+    expect(describeMonthTileAside('2026-12', { kind: 'swap', firstBuyingMonth: '2027-02' })).toBe('dicembre 2026 · scambio, prima rata a febbraio');
+    expect(describeInstallmentStatus([{ status: 'planned', swap: true }])).toBe('Scambio da fare');
+    expect(describeInstallmentStatus([{ status: 'executed', swap: true }])).toBe('Registrato');
+    expect(describeInstallmentStatus([{ status: 'planned', swap: true }, { status: 'planned' }])).toBe('Da fare');
+  });
 });

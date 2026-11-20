@@ -19,6 +19,7 @@ export const operatingPlanAnswerSchema = z.object({
     targetPercentage: z.number().finite(),
     sellQuantity: z.number().finite().optional(),
     sellMonth: z.number().finite().optional(),
+    reinvestInto: z.string().trim().min(1).max(8).optional(),
     reason: z.string().max(400),
   })).max(80),
   reviewMonth: z.number().finite().optional(),

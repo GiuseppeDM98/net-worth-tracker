@@ -52,6 +52,7 @@ const planDisposalSchema = z.object({
   status: z.enum(['planned', 'executed', 'skipped']),
   transactionIds: z.array(z.string()).optional(),
   executedAmountEur: z.number().optional(),
+  reinvestAssetId: z.string().min(1).optional(),
 });
 
 const planLiquiditySchema = z.object({
@@ -68,6 +69,7 @@ export const accumulationPlanDraftSchema = z.object({
   positions: z.array(planPositionSchema),
   disposals: z.array(planDisposalSchema),
   reviewMonthIndex: z.number().int().min(1).optional(),
+  advisorNotes: z.array(z.string().max(400)).max(40).optional(),
 });
 
 /** Every asset a draft names, whichever role it plays. */
@@ -165,6 +167,15 @@ export function validateDraftAgainstAssets(
         });
       }
     }
+    // The swap (owner, 2026-11-20): its proceeds buy an instrument the plan buys, never the one sold.
+    if (disposal.reinvestAssetId !== undefined
+      && (disposal.reinvestAssetId === disposal.assetId || !draft.positions.some((p) => p.buyAssetId === disposal.reinvestAssetId))) {
+      issues.push({
+        code: 'swap_target',
+        message: describeDraftIssue({ code: 'swap_target', label: labelOf(disposal.assetId, assetsById) }),
+        assetId: disposal.assetId,
+      });
+    }
     if (disposalMonthIndex(disposal) > firstIndex - 1 + draft.months) {
       issues.push({
         code: 'sale_month_out',
@@ -202,7 +213,10 @@ export function validateDraftAgainstAssets(
 
   for (const sourceId of draft.liquidity.sourceCashAssetIds) {
     const asset = assetsById.get(sourceId);
-    if (asset && asset.assetClass !== 'cash') {
+    // An account deleted after the draft was built (2026-11-20): a plan must never be written on it.
+    if (!asset) {
+      issues.push({ code: 'source_missing', message: describeDraftIssue({ code: 'source_missing' }), assetId: sourceId });
+    } else if (asset.assetClass !== 'cash') {
       issues.push({
         code: 'source_not_cash',
         message: describeDraftIssue({ code: 'source_not_cash', label: labelOf(sourceId, assetsById) }),

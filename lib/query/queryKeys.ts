@@ -132,6 +132,10 @@ export const queryKeys = {
     all: (userId: string) => ['accumulation-plans', userId] as const,
   },
 
+  // The quotes of the instruments the Consulente's «Applica» would create (2026-11-20): by the sorted
+  // symbols joined by `,`; never persisted (a price read from a restored cache is not today's).
+  adviceQuotes: (symbolsKey: string) => ['advice-quotes', symbolsKey] as const,
+
   // Model portfolio (PAC / Accumulo) — one document per account, `modelPortfolios/{ownerId}`.
   modelPortfolio: {
     byOwner: (userId: string) => ['model-portfolio', userId] as const,

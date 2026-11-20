@@ -22,6 +22,8 @@ export interface QuoteResult {
   ticker: string;
   price: number | null;
   currency: string;
+  /** The last trade's time (ISO), when Yahoo gives one: a symbol that stopped updating is told from a live one. */
+  quotedAt?: string;
   error?: string;
 }
 
@@ -48,6 +50,7 @@ export async function getQuote(ticker: string): Promise<QuoteResult> {
       ticker,
       price: quote.regularMarketPrice,
       currency: quote.currency || 'EUR',
+      ...(quote.regularMarketTime instanceof Date ? { quotedAt: quote.regularMarketTime.toISOString() } : {}),
     };
   } catch (error) {
     console.error(`Error fetching quote for ${ticker}:`, error);

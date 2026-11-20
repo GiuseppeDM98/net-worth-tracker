@@ -30,8 +30,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { Asset, AssetAllocationSettings, AssetAllocationTarget, IdealAllocationSettings } from '@/types/assets';
 import type { InvestmentGoal } from '@/types/goals';
-import type { AllocationAdviceDocument } from '@/types/allocationAdvice';
-import { handoffProposalOf } from '@/lib/utils/allocationAdviceDocument';
 import type { RebalanceBand } from '@/lib/utils/allocationUtils';
 import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import { compareAllocations } from '@/lib/services/assetAllocationService';
@@ -87,7 +85,6 @@ import { PortafoglioModelloTile } from '@/components/allocation/tiles/Portafogli
 import { PianiConclusiTile } from '@/components/allocation/tiles/PianiConclusiTile';
 import { ObiettiviTile } from '@/components/allocation/tiles/ObiettiviTile';
 import { ObiettiviDialog } from '@/components/allocation/ObiettiviDialog';
-import { ConsulenteHandoff } from '@/components/allocation/ConsulenteHandoff';
 import { DEPS } from '@/components/allocation/tiles/accumuloShared';
 
 interface AccumuloTabProps {
@@ -107,15 +104,9 @@ interface AccumuloTabProps {
    */
   settings: AssetAllocationSettings | null | undefined;
   goals: readonly InvestmentGoal[] | undefined;
-  /**
-   * The Consulente's document — `?da=consulente` (the «Applica» page's link, 2026-11-12) opens «Dal Consulente»
-   * when it is applied with the targets written and no plan is open. `undefined` while it loads; a failed read
-   * is `null`, so the landing only cleans the URL.
-   */
-  advice: AllocationAdviceDocument | null | undefined;
 }
 
-export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageRatio, idealAllocation, onAssetsChanged, reviewByIso, settings, goals, advice }: AccumuloTabProps) {
+export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageRatio, idealAllocation, onAssetsChanged, reviewByIso, settings, goals }: AccumuloTabProps) {
   // What the model portfolio rests on, without a price in it (2026-11-12).
   const modelBasis = useMemo(() => buildModelBasis(settings, goals), [settings, goals]);
   const { plansQuery, plan, today, currentIndex } = useOpenAccumuloPlan(ownerId);
@@ -141,20 +132,12 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
     return () => clearTimeout(timer);
   }, [wantsObjectives, pathname, router]);
 
-  // The Consulente's hand-off: opened once by `?da=consulente`, only with no open plan and an applied proposal.
-  const [handoffOpen, setHandoffOpen] = useState(false);
-  const handoffProposal = handoffProposalOf(advice);
-  const wantsHandoff = searchParams.get('da') === 'consulente';
-  const plansSettled = !plansQuery.isPending;
+  // `?da=consulente` was the Consulente's old link to its hand-off (2026-11-12 → 2026-11-20): an old bookmark
+  // lands on the tab with the URL cleaned, nothing opened.
+  const fromOldLink = searchParams.get('da') === 'consulente';
   useEffect(() => {
-    if (!wantsHandoff || !plansSettled || advice === undefined) return;
-    // Deferred like `?obiettivi=1`: the effect body itself sets no state (react-hooks/set-state-in-effect).
-    const timer = setTimeout(() => {
-      if (!plan && handoffProposal) setHandoffOpen(true);
-      router.replace(`${pathname}?tab=accumulo`, { scroll: false });
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [wantsHandoff, plansSettled, advice, plan, handoffProposal, pathname, router]);
+    if (fromOldLink) router.replace(`${pathname}?tab=accumulo`, { scroll: false });
+  }, [fromOldLink, pathname, router]);
 
   const matchResult = useMemo(
     () =>
@@ -441,24 +424,6 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
         />
       )}
 
-      {handoffOpen && handoffProposal && advice && (
-        <ConsulenteHandoff
-          ownerId={ownerId}
-          basis={modelBasis}
-          proposal={handoffProposal}
-          candidates={advice.instruments?.candidates ?? null}
-          keepAssets={advice.answers.keepAssets}
-          allAssets={allAssets}
-          targets={targets}
-          band={band}
-          targetLeverageRatio={targetLeverageRatio}
-          idealAllocation={idealAllocation}
-          model={model}
-          investmentAccountId={investmentAccountId}
-          onAssetsChanged={onAssetsChanged}
-          onClose={() => setHandoffOpen(false)}
-        />
-      )}
     </div>
   );
 }
