@@ -366,6 +366,27 @@ describe('the OBBLIGAZIONI block in the four contracts', () => {
     expect(buildReviewPrompt(ANSWERS, 'STRATEGIA', 'STRUMENTI', null).system).toContain("per gli obbligazionari la duration e l'orizzonte (l'obiettivo) che coprono");
   });
 
+  // Yahoo's duration proved wrong on real ETFs (owner, 2026-11-20): only the search writes a duration in figures.
+  // Mutation that turns it red: the strategy's rule put back to «le duration degli ETF».
+  it('only the instrument search writes a duration in figures: the interview and the strategy never do', () => {
+    const strategy = buildStrategyPrompt(ANSWERS, 'DATI').system;
+    expect(strategy).toContain("non scrivere la duration di un ETF in numeri: la verifica il secondo agente con la ricerca web");
+    expect(strategy).not.toContain('le duration degli ETF');
+    expect(INTERVIEW_CONTRACT).toContain("mai una duration in numeri: il blocco non ne riporta");
+    expect(INTERVIEW_CONTRACT).not.toContain('le duration che il blocco riporta');
+    expect(buildInstrumentsPrompt(ANSWERS, PROPOSAL, 'STRUMENTI').system).not.toContain('duration di Yahoo');
+  });
+
+  // A goal with a date and an amount wants a known sum on that date (owner, 2026-11-20): a government bond held to
+  // maturity, an ETF only when the user chose it. Mutation that turns it red: any of the three rules left out.
+  it('a goal with a date and an amount: the interview offers a bond to maturity, the strategy proposes it, the search finds one by that year', () => {
+    expect(INTERVIEW_CONTRACT).toContain("fra le opzioni c'è un titolo singolo che scade vicino a quella data, tenuto a scadenza");
+    const strategy = buildStrategyPrompt(ANSWERS, 'DATI').system;
+    expect(strategy).toContain("proponi per lui un titolo di Stato tenuto a scadenza (un BTP, o un BTP€i se la cifra va protetta dall'inflazione) che scade entro l'anno dell'obiettivo");
+    expect(strategy).toContain("lo proponi solo se l'utente nel colloquio ha scelto gli ETF per quell'obiettivo, e allora dici in una riga cosa perde");
+    expect(buildInstrumentsPrompt(ANSWERS, PROPOSAL, 'STRUMENTI').system).toContain("che scadono entro l'anno nominato dal testo della strategia, mai dopo, il più vicino a quell'anno per primo");
+  });
+
   it('the data intro names OBBLIGAZIONI among the exhaustive blocks, with and without the cashflow block', () => {
     expect(buildStrategyPrompt(ANSWERS, 'DATI', { cashflowBlock: '--- CASHFLOW 12 MESI (x) ---\nX' }).userContent).toContain('MUTUI, FAMIGLIA, OBBLIGAZIONI, PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi');
     expect(buildStrategyPrompt(ANSWERS, 'DATI').userContent).toContain('FAMIGLIA, OBBLIGAZIONI e PIANO DI ACCUMULO sono esaustivi.');
@@ -421,6 +442,21 @@ describe('formatPreviousPathsForPrompt', () => {
     expect(text).not.toContain('Modifiche chieste allora sul report: 1. meno cripto\n\n## Percorso del 2024');
   });
 
+  // The goals a path proposed are part of what it did: «Applica» created them (owner, 2026-11-20, NOVE-25's phase F:
+  // the Consulente read its own new goal as the user's novelty). Mutation that turns it red: the line left out.
+  it('names the new goals the path proposed, created by «Applica» when it was applied', () => {
+    const goals = [
+      { goalId: 'g1', name: 'Casa', priority: 'alta' as const, assignments: [], rationale: '' },
+      { name: 'Lavori', targetAmount: 10000, targetDateIso: '2027-06-01', priority: 'media' as const, assignments: [], rationale: '' },
+    ];
+    const applied = collapse(formatPreviousPathsForPrompt({ paths: [pathDoc({ report: { markdown: '# R', proposal: { ...PROPOSAL, goals }, model: 'o', finishedAt: at('2025-10-20') } })], archiveRead: true }));
+    expect(applied).toContain('Obiettivi nuovi proposti allora, creati da «Applica»: Lavori (target 10.000 €, scadenza 2027-06-01, priorità media)');
+    expect(applied).not.toContain('proposti allora, creati da «Applica»: Casa');
+    const never = collapse(formatPreviousPathsForPrompt({ paths: [pathDoc({ applied: null, report: { markdown: '# R', proposal: { ...PROPOSAL, goals }, model: 'o', finishedAt: at('2025-10-20') } })], archiveRead: true }));
+    expect(never).toContain('Obiettivi nuovi proposti allora, mai creati: Lavori (');
+    expect(collapse(formatPreviousPathsForPrompt({ paths: [pathDoc()], archiveRead: true }))).not.toContain('Obiettivi nuovi proposti allora');
+  });
+
   it('a path without a report says which stage it stopped at; an unread archive leaves the live one alone', () => {
     const text = formatPreviousPathsForPrompt({ paths: [pathDoc({ status: 'failed', stage: 'strategy', report: null, applied: null, revisions: [] })], archiveRead: false });
     expect(text).toContain('(1 percorso, dal più recente; il report del primo è il piano in vigore) ---\nL\'archivio dei percorsi non è stato letto in questa corsa: qui c\'è solo l\'ultimo.');
@@ -458,7 +494,9 @@ describe('the PIANO DI ACCUMULO block', () => {
   const nbsp = (text: string) => text.replace(/ /g, ' ');
   const RUNNING = {
     monthIndex: 3, months: 12, instalmentEur: 500, startMonth: '2026-09', endMonth: '2027-08',
-    buys: [{ assetId: 'a', name: 'ETF ornitorinco', targetPercentage: 70 }, { assetId: 'b', name: 'ETF fenicottero', targetPercentage: 30 }],
+    firstBuy: { month: '2026-11' as const, index: 3, amountEur: 500 },
+    buys: [{ assetId: 'a', name: 'ETF ornitorinco', sharePct: 70, amountEur: 3500 }, { assetId: 'b', name: 'ETF fenicottero', sharePct: 30, amountEur: 1500 }],
+    holds: [] as Array<{ assetId: string; name: string }>,
     sells: [{ assetId: 'c', name: 'Fondo vecchio', quantity: null, monthIndex: null, status: 'planned' as const }],
   };
 
@@ -466,7 +504,7 @@ describe('the PIANO DI ACCUMULO block', () => {
   it('tells the three states apart: not read, no active plan, an active plan before its start and while it runs', () => {
     expect(formatAccumulationPlanForPrompt({ read: false })).toBe("--- PIANO DI ACCUMULO ---\nIl piano di accumulo non è stato letto in questa corsa: non so se ce n'è uno.");
     expect(formatAccumulationPlanForPrompt({ read: true, plan: null })).toBe('--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.');
-    const notStarted = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: { ...RUNNING, monthIndex: 0, startMonth: '2027-01', endMonth: '2027-12', sells: [] } }));
+    const notStarted = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: { ...RUNNING, monthIndex: 0, startMonth: '2027-01', endMonth: '2027-12', firstBuy: { month: '2027-01', index: 1, amountEur: 500 }, sells: [] } }));
     expect(notStarted).toContain('Piano attivo, non ancora partito: parte a 2027-01, 12 mesi fino a 2027-12, prima rata 500 €.');
     expect(notStarted).not.toContain('mese 0 di');
     expect(notStarted).toContain('Vende: niente.');
@@ -474,11 +512,36 @@ describe('the PIANO DI ACCUMULO block', () => {
     expect(running).toBe([
       '--- PIANO DI ACCUMULO ---',
       'Piano attivo: mese 3 di 12, rata del mese 500 €, ultimo mese 2027-08.',
-      'Compra, con le quote del piano: ETF ornitorinco 70% · ETF fenicottero 30%.',
+      'Compra, in parti dei soldi del piano: ETF ornitorinco 70% (3500 €) · ETF fenicottero 30% (1500 €).',
       'Vende: Fondo vecchio, tutte le quote, al mese 1 (da fare).',
     ].join('\n'));
     const sale = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: { ...RUNNING, sells: [{ ...RUNNING.sells[0], quantity: 10, monthIndex: 2, status: 'executed' as const }] } }));
     expect(sale).toContain('Vende: Fondo vecchio, 10 quote, al mese 2 (fatta).');
+    // The swap (owner, 2026-11-20): the sale names what its proceeds buy. Mutation that turns it red: the clause dropped.
+    const swap = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: { ...RUNNING, sells: [{ ...RUNNING.sells[0], reinvestName: 'BTP civetta' }] } }));
+    expect(swap).toContain('Vende: Fondo vecchio, tutte le quote, al mese 1 (da fare), e con il ricavato compra BTP civetta nello stesso mese.');
+  });
+
+  // The plan «Applica» creates refills the reserve first and keeps the held positions at their weight (owner,
+  // 2026-11-20): the Consulente read «prima rata di 0 €» and the holds as buys. Mutations that turn it red: the
+  // refill clause dropped; the holds printed among the buys.
+  it('a plan that refills first names the months of reserve and the first instalment; the holds are not buys', () => {
+    const refill = {
+      ...RUNNING, monthIndex: 1, months: 36, instalmentEur: 0, startMonth: '2026-12', endMonth: '2029-11',
+      firstBuy: { month: '2027-11' as const, index: 12, amountEur: 800 },
+      holds: [{ assetId: 'c', name: 'ETC civetta' }, { assetId: 'd', name: 'ETF tasso' }], sells: [],
+    };
+    expect(nbsp(formatAccumulationPlanForPrompt({ read: true, plan: refill }))).toBe([
+      '--- PIANO DI ACCUMULO ---',
+      'Piano attivo: mese 1 di 36, ultimo mese 2029-11; questo mese e i successivi fino a 2027-10 ricostituiscono solo la riserva (11 mesi senza acquisti), prima rata 800 € a 2027-11.',
+      'Compra, in parti dei soldi del piano: ETF ornitorinco 70% (3500 €) · ETF fenicottero 30% (1500 €).',
+      'Tiene al loro peso, senza comprarli: ETC civetta · ETF tasso.',
+      'Vende: niente.',
+    ].join('\n'));
+    const before = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: { ...refill, monthIndex: 0 } }));
+    expect(before).toContain('Piano attivo, non ancora partito: parte a 2026-12, 36 mesi fino a 2029-11; i mesi fino a 2027-10 ricostituiscono solo la riserva (11 mesi senza acquisti), prima rata 800 € a 2027-11.');
+    const none = nbsp(formatAccumulationPlanForPrompt({ read: true, plan: { ...refill, firstBuy: null } }));
+    expect(none).toContain('Piano attivo: mese 1 di 36, ultimo mese 2029-11; non resta nessuna rata da comprare.');
   });
 
   it('names the block among the exhaustive ones in both data intros', () => {
@@ -656,5 +719,13 @@ describe('formatOperatingPlanFacts and buildPlanPrompt', () => {
     expect(system).not.toContain('dicembre 2026');
     expect(PLAN_CONTRACT).toContain('Non vendere MAI uno strumento segnato DA TENERE');
     expect(PLAN_CONTRACT).toContain('le vendite e i primi versamenti la ricostituiscono prima che il piano compri');
+  });
+
+  // The swap (owner, 2026-11-20): written only when the report says to sell one instrument to buy another with the
+  // money. Mutation that turns it red: the field or its rule left out of the contract.
+  it('the contract names the swap: the field, when to write it, and the quota it leaves', () => {
+    expect(PLAN_CONTRACT).toContain('"reinvestInto"?: string (solo su una riga "sell": la chiave della riga "buy" che il ricavato compra tutto nel mese della vendita, lo scambio)');
+    expect(PLAN_CONTRACT).toContain('- Scrivi "reinvestInto" solo quando il report dice di vendere uno strumento per comprarne un altro con quei soldi');
+    expect(PLAN_CONTRACT).toContain('una riga comprata solo con lo scambio ha "targetPercentage" 0');
   });
 });

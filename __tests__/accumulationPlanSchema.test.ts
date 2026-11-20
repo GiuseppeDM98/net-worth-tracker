@@ -106,6 +106,17 @@ describe('validateDraftAgainstAssets — one case per code', () => {
     expect(issues.some((i) => i.code === 'source_not_cash')).toBe(true);
   });
 
+  // A plan must not be written on an account deleted a minute before (2026-11-20). Mutation that turns it red:
+  // skip a source id absent from the assets, as before.
+  it('source_missing: an account no longer among the assets, never a present cash account', () => {
+    const conto = makeAsset({ id: 'conto', name: 'Conto', type: 'cash', assetClass: 'cash' });
+    const missing = baseDraft({ liquidity: { sourceCashAssetIds: ['gone'], reserveEur: 0, monthlyInflowEur: 0 } });
+    const issue = validateDraftAgainstAssets(missing, byId(conto)).find((i) => i.code === 'source_missing');
+    expect(issue?.message).toBe('Un conto del piano non c\'è più: scegli di nuovo da quale conto comprare.');
+    const present = baseDraft({ liquidity: { sourceCashAssetIds: ['conto'], reserveEur: 0, monthlyInflowEur: 0 } });
+    expect(validateDraftAgainstAssets(present, byId(conto)).filter((i) => i.code.startsWith('source_'))).toEqual([]);
+  });
+
   it('unassigned_tradable', () => {
     const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A', quantity: 5 });
     const draft = baseDraft();
@@ -142,6 +153,23 @@ describe('validateDraftAgainstAssets — one case per code', () => {
     });
     const issues = validateDraftAgainstAssets(draft, byId(etfA));
     expect(issues.some((i) => i.code === 'duplicate_asset')).toBe(true);
+  });
+
+  // The swap (owner, 2026-11-20): the bought instrument is one the plan buys, never the sold one.
+  // Mutation that turns it red: the check left out.
+  it('swap_target', () => {
+    const etfA = makeAsset({ id: 'etf-a', name: 'ETF-A', quantity: 10, currentPrice: 10 });
+    const old = makeAsset({ id: 'old', name: 'ETF vecchio', quantity: 5, currentPrice: 10 });
+    const draft = (reinvestAssetId: string) => baseDraft({
+      positions: [{ id: 'p1', label: 'ETF-A', targetPercentage: 100, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' }],
+      disposals: [{ assetId: 'old', estimatedProceedsEur: 50, status: 'planned', reinvestAssetId }],
+    });
+    expect(validateDraftAgainstAssets(draft('etf-a'), byId(etfA, old)).filter((i) => i.code === 'swap_target')).toEqual([]);
+    const outside = validateDraftAgainstAssets(draft('altro'), byId(etfA, old)).find((i) => i.code === 'swap_target');
+    expect(outside?.message).toBe('La vendita di «ETF vecchio» reinveste in uno strumento che il piano non compra: scegline uno del piano.');
+    expect(validateDraftAgainstAssets(draft('old'), byId(etfA, old)).some((i) => i.code === 'swap_target')).toBe(true);
+    // The zod shape keeps the field.
+    expect(accumulationPlanDraftSchema.parse(draft('etf-a')).disposals[0].reinvestAssetId).toBe('etf-a');
   });
 
   it('months_range', () => {
@@ -204,5 +232,16 @@ describe('a sale month inside the plan', () => {
     // From the 4th instalment, 9 months left: plan months 4..12.
     expect(validateDraftAgainstAssets(sellingAt(10, 9), byId(etfA()), 4).some((i) => i.code === 'sale_month_out')).toBe(false);
     expect(validateDraftAgainstAssets(sellingAt(13, 9), byId(etfA()), 4).some((i) => i.code === 'sale_month_out')).toBe(true);
+  });
+});
+
+// The app's corrections travel on the draft (2026-11-20): at most 40 sentences of 400 characters, so a capped list always parses.
+// Mutation that turns it red: drop the max(40) bound.
+describe('the advisor notes', () => {
+  it('accepts forty, refuses forty-one and a sentence past 400 characters', () => {
+    const notes = (n: number) => Array.from({ length: n }, (_, i) => 'Nota ' + i + '.');
+    expect(accumulationPlanDraftSchema.safeParse(baseDraft({ advisorNotes: notes(40) })).success).toBe(true);
+    expect(accumulationPlanDraftSchema.safeParse(baseDraft({ advisorNotes: notes(41) })).success).toBe(false);
+    expect(accumulationPlanDraftSchema.safeParse(baseDraft({ advisorNotes: ['x'.repeat(401)] })).success).toBe(false);
   });
 });

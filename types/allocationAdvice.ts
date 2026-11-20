@@ -121,6 +121,9 @@ export interface AllocationAdviceApplied {
   targetsWritten: boolean;
   rolesChanged: number;
   goalsWritten: number;
+  /** The plan of accumulation the same document created (2026-11-20), and what the click did to the open one. */
+  planId?: string;
+  planAction?: 'create' | 'replace' | 'revise';
 }
 
 /**

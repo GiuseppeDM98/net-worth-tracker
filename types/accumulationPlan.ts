@@ -29,6 +29,11 @@ export interface PlanDisposal {
    */
   monthIndex?: number;
   estimatedProceedsEur: number; // quantity × price (or the whole position's value) when the plan is activated
+  /**
+   * The swap (owner, 2026-11-20): the instrument the proceeds buy in the sale's month, whole, never the reserve
+   * nor the pool. Ignored when that instrument has no price: the sale goes back to the pool.
+   */
+  reinvestAssetId?: string;
   status: InstallmentLineStatus;
   transactionIds?: string[];    // ledger `sell` ids linked on confirmation
   executedAmountEur?: number;
@@ -50,6 +55,8 @@ export interface InstallmentLine {
   transactionIds?: string[];
   executedQuantity?: number;
   executedAmountEur?: number;   // Σ quantity × priceEur of linked buys, fees excluded
+  /** The purchase of a swap (`PlanDisposal.reinvestAssetId`): a month with only these lines is no instalment. */
+  swap?: true;
 }
 
 /** What Allocazione measured when an installment was closed. */
@@ -85,7 +92,7 @@ export interface PlanBaseline {
   measurement: ClassMeasurement;             // month 0 of the trajectory
 }
 
-/** What a caller hands the editor to start a NEW plan from: the model's dialog, and the Consulente's hand-off since 2026-11-18. */
+/** What a caller hands the editor to start a NEW plan from: the model's dialog (the Consulente's hand-off, 2026-11-18, was the second until 2026-11-20). */
 export interface PlanSeedDraft {
   positions: PlanPosition[];
   disposals?: PlanDisposal[];
@@ -109,6 +116,8 @@ export interface AccumulationPlan {
   revisions?: PlanRevision[];
   /** The plan month the Consulente asked to look at the plan again (1..months); absent = none. */
   reviewMonthIndex?: number;
+  /** The corrections the app made to the Consulente's operating plan when it created this plan, one sentence each. */
+  advisorNotes?: string[];
   createdAt: Date;
   updatedAt: Date;
   activatedAt?: Date;
@@ -130,5 +139,5 @@ export interface PacVerdictInput {
 /** Draft input edited by the dialog (no system fields). */
 export type AccumulationPlanDraft = Pick<
   AccumulationPlan,
-  'name' | 'startMonth' | 'months' | 'liquidity' | 'positions' | 'disposals' | 'optimizerSnapshot' | 'reviewMonthIndex'
+  'name' | 'startMonth' | 'months' | 'liquidity' | 'positions' | 'disposals' | 'optimizerSnapshot' | 'reviewMonthIndex' | 'advisorNotes'
 >;

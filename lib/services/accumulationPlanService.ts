@@ -30,7 +30,10 @@ import {
 import { db } from '@/lib/firebase/config';
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { roundToCents } from '@/lib/utils/cents';
-import { userFacingError } from '@/lib/utils/dialogNarrative';
+import { describeWriteError, userFacingError } from '@/lib/utils/dialogNarrative';
+import { saveModelPortfolio } from '@/lib/services/modelPortfolioService';
+import type { ModelBasis } from '@/lib/utils/modelPortfolio';
+import type { ModelPortfolioInput } from '@/types/modelPortfolio';
 import { accumulationPlanDraftSchema, validateDraftAgainstAssets } from '@/lib/utils/accumulationPlanSchema';
 import { describeDraftIssue, ACCUMULO_ONE_OPEN_PLAN, ACCUMULO_REACTIVATE_REFUSED } from '@/lib/utils/accumulationNarrative';
 import { canReactivatePlan } from '@/lib/utils/accumuloSummary';
@@ -158,6 +161,7 @@ export async function createDraftPlan(ownerId: string, draft: AccumulationPlanDr
       disposals: draft.disposals,
       optimizerSnapshot: draft.optimizerSnapshot,
       reviewMonthIndex: draft.reviewMonthIndex,
+      advisorNotes: draft.advisorNotes,
       installments: [] as Installment[],
       createdAt: now,
       updatedAt: now,
@@ -167,7 +171,11 @@ export async function createDraftPlan(ownerId: string, draft: AccumulationPlanDr
   return planRef.id;
 }
 
-/** Replace a draft's editable fields — refused once the plan has left `draft`. */
+/**
+ * Replace a draft WHOLE — refused once the plan has left `draft`. The three optional fields are
+ * written when the new draft defines them and cleared when it does not (2026-11-20): a replaced draft
+ * keeps nothing of the plan it replaces, where `removeUndefinedDeep` alone would let the old ones survive.
+ */
 export async function updateDraftPlan(planId: string, draft: AccumulationPlanDraft): Promise<void> {
   accumulationPlanDraftSchema.parse(draft);
   const ref = doc(db, ACCUMULATION_PLANS_COLLECTION, planId);
@@ -187,8 +195,9 @@ export async function updateDraftPlan(planId: string, draft: AccumulationPlanDra
         liquidity: draft.liquidity,
         positions: draft.positions,
         disposals: draft.disposals,
-        optimizerSnapshot: draft.optimizerSnapshot,
-        reviewMonthIndex: draft.reviewMonthIndex,
+        optimizerSnapshot: draft.optimizerSnapshot ?? deleteField(),
+        reviewMonthIndex: draft.reviewMonthIndex ?? deleteField(),
+        advisorNotes: draft.advisorNotes ?? deleteField(),
         updatedAt: new Date(),
       })
     );
@@ -235,7 +244,7 @@ export async function activatePlan(planId: string, input: ActivatePlanInput): Pr
     const liquidity = computeUsableLiquidity(plan.liquidity, assetsById, disposals, plan.months, deps);
     const totals = computeTotalPurchases(states, liquidity.L);
     const { installments, residualEur } = scheduleInstallments(
-      totals, states, plan.months, plan.startMonth, 1, liquidity.refillMonths, liquidity.monthShares
+      totals, states, plan.months, plan.startMonth, 1, liquidity.refillMonths, liquidity.monthShares, liquidity.swaps
     );
 
     const positionValuesEur: Record<string, number> = {};
@@ -266,6 +275,60 @@ export async function activatePlan(planId: string, input: ActivatePlanInput): Pr
       })
     );
   });
+}
+
+export interface CreateAndActivateInput {
+  ownerId: string;
+  draft: AccumulationPlanDraft;
+  /** An open draft to overwrite, in place of a new one. */
+  existingDraftId?: string;
+  activate: ActivatePlanInput;
+  /** The model to write after the activation; absent = the model is not written. */
+  model?: { input: ModelPortfolioInput; basis: ModelBasis };
+}
+
+export type PlanWriteStep = 'plan' | 'activate';
+
+/** A plan write that failed at `step`; `planId` names the draft an activation left behind. */
+export class PlanWriteError extends Error {
+  readonly step: PlanWriteStep;
+  readonly planId?: string;
+  constructor(step: PlanWriteStep, message: string, options: { planId?: string; cause?: unknown } = {}) {
+    super(message, { cause: options.cause });
+    this.name = 'PlanWriteError';
+    this.step = step;
+    this.planId = options.planId;
+  }
+}
+
+/**
+ * A plan made outside the editor, in ONE call (2026-11-20; the Consulente's «Applica», and the path by
+ * hand after it): refuses a draft `validateDraftAgainstAssets` has an issue with on the assets the
+ * caller re-read, before any write (`step: 'plan'` — the editor owns that gate, the services do not);
+ * writes the draft (`createDraftPlan`, or `updateDraftPlan` on `existingDraftId`), activates it
+ * (`step: 'activate'`, with the draft's `planId`: the next attempt replaces it), then writes the
+ * model. Once the plan is active it NEVER throws: a model that cannot be written comes back as
+ * `modelError`, the plan stands. Two transactions, not one: a failure between them leaves a draft.
+ */
+export async function createAndActivatePlan(input: CreateAndActivateInput): Promise<{ planId: string; modelError: string | null }> {
+  const { ownerId, draft, existingDraftId, activate, model } = input;
+  const issues = validateDraftAgainstAssets(draft, new Map(activate.allAssets.map((asset) => [asset.id, asset])));
+  if (issues.length > 0) throw new PlanWriteError('plan', issues[0].message);
+
+  const planId = await (existingDraftId
+    ? updateDraftPlan(existingDraftId, draft).then(() => existingDraftId)
+    : createDraftPlan(ownerId, draft)
+  ).catch((error: unknown) => {
+    throw new PlanWriteError('plan', describeWriteError(error), { cause: error });
+  });
+  await activatePlan(planId, activate).catch((error: unknown) => {
+    throw new PlanWriteError('activate', describeWriteError(error), { planId, cause: error });
+  });
+  if (!model) return { planId, modelError: null };
+  const modelError = await saveModelPortfolio(ownerId, model.input, activate.allAssets, model.basis)
+    .then(() => null)
+    .catch((error: unknown) => describeWriteError(error));
+  return { planId, modelError };
 }
 
 export interface SetInstallmentLinePatch {
@@ -370,7 +433,9 @@ export async function applyRecalibration(
         plannedQuantity: line.suggestedQuantity,
         priceEurAtPlan: line.priceEur,
         plannedAmountEur: line.suggestedAmountEur,
-        status: 'planned',
+        status: 'planned' as const,
+        // A swap's own line stays one: the month keeps reading «scambio» (2026-11-20).
+        ...(installment.lines.some((saved) => saved.positionId === line.positionId && saved.swap) ? { swap: true as const } : {}),
       }));
 
     const updatedInstallment: Installment = {
@@ -442,6 +507,7 @@ export async function revisePlan(planId: string, revision: PlanRevisionInput, in
         ...(revision.reviewMonthIndex === undefined
           ? {}
           : { reviewMonthIndex: revision.reviewMonthIndex ?? deleteField() }),
+        ...(revision.advisorNotes === undefined ? {} : { advisorNotes: revision.advisorNotes }),
         updatedAt: today,
       })
     );

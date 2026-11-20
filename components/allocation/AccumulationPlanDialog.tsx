@@ -76,7 +76,6 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AssetDialog } from '@/components/assets/AssetDialog';
-import { KeptSalesNote } from '@/components/allocation/KeptSalesNote';
 import { PlanDraftSidePanel } from '@/components/allocation/PlanDraftSidePanel';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { OptimizerPanel } from '@/components/allocation/OptimizerPanel';
@@ -199,7 +198,7 @@ interface AccumulationPlanDialogProps {
   /** A «+ Nuovo asset» create landed: the page must reload `allAssets`. */
   onAssetsChanged: () => void;
   onSaved: (planId: string) => void;
-  /** Seeds a BRAND-NEW draft (`plan === null`) — the model's dialog, or «Dal Consulente» since 2026-11-18 — in place of
+  /** Seeds a BRAND-NEW draft (`plan === null`) — the model's dialog — in place of
    *  `seedPositionsFromAssets`. Ignored whenever `plan` is set (editing an existing draft or active plan
    *  never re-seeds it); without it the dialog behaves exactly as before. */
   seedDraft?: PlanSeedDraft;
@@ -213,8 +212,6 @@ interface AccumulationPlanDialogProps {
   reviewByIso: string | null;
   /** What the model rests on: «aggiorna anche il portafoglio modello» stamps it. */
   basis: ModelBasis;
-  /** The instruments the Consulente proposed to keep — only the hand-off passes them: a month-1 sale of one is named (2026-11-12). */
-  advisorKeepAssetIds?: readonly string[];
   /** Impostazioni › Spese «Conto per gli investimenti» (`resolveInvestmentAccountId`): a NEW plan starts on it; null = none. */
   investmentAccountId: string | null;
 }
@@ -254,6 +251,8 @@ function draftFromPlan(plan: AccumulationPlan): AccumulationPlanDraft {
     disposals: plan.disposals,
     optimizerSnapshot: plan.optimizerSnapshot,
     reviewMonthIndex: plan.reviewMonthIndex,
+    // «Salva bozza» replaces the draft whole: a draft the Consulente's click made keeps its notes.
+    advisorNotes: plan.advisorNotes,
   };
 }
 
@@ -293,7 +292,6 @@ export function AccumulationPlanDialog({
   reviewByIso,
   basis,
   reviseFromModel = false,
-  advisorKeepAssetIds,
   investmentAccountId,
 }: AccumulationPlanDialogProps) {
   const isDemo = useDemoMode();
@@ -536,8 +534,9 @@ export function AccumulationPlanDialog({
       return;
     }
     const whole = Math.floor(quantity);
-    // A new quantity keeps the month already chosen for the sale (owner, 2026-11-19).
-    const monthIndex = draft.disposals.find((disposal) => disposal.assetId === asset.id)?.monthIndex;
+    // A new quantity keeps the month already chosen for the sale (owner, 2026-11-19), and its swap (2026-11-20).
+    const existing = draft.disposals.find((disposal) => disposal.assetId === asset.id);
+    const monthIndex = existing?.monthIndex;
     updateDisposals([
       ...rest,
       {
@@ -546,6 +545,7 @@ export function AccumulationPlanDialog({
         estimatedProceedsEur: Math.min(whole, asset.quantity) * DEPS.priceOf(asset),
         status: 'planned',
         ...(monthIndex === undefined ? {} : { monthIndex }),
+        ...(existing?.reinvestAssetId ? { reinvestAssetId: existing.reinvestAssetId } : {}),
       },
     ]);
   };
@@ -1466,7 +1466,6 @@ export function AccumulationPlanDialog({
                 : []
             }
           />
-          <KeptSalesNote disposals={draft.disposals} keepAssetIds={advisorKeepAssetIds ?? []} nameOf={labelOfAsset} />
           </div>
         )}
 
@@ -1676,7 +1675,6 @@ export function AccumulationPlanDialog({
                 </table>
               </div>
             </div>
-            <KeptSalesNote disposals={draft.disposals} keepAssetIds={advisorKeepAssetIds ?? []} nameOf={labelOfAsset} />
           </div>
         )}
       </ResponsiveModal>

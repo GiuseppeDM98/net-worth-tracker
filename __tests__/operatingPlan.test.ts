@@ -229,3 +229,34 @@ describe('operatingPlanOf', () => {
     expect(operatingPlanOf(null)).toBeNull();
   });
 });
+
+// ── The swap (owner, 2026-11-20): a sale whose proceeds buy one instrument of the plan in the sale's month.
+describe('reconcileOperatingPlan — the swap', () => {
+  // Mutation that turns it red: a buy at 0 funded by a swap dropped (a new instrument) or turned to hold.
+  it('keeps the swap on the sale and the bought row as a buy, even at quota 0', () => {
+    const plan = reconcileOperatingPlan(raw([buy('S1', 100), sell('S2', { reinvestInto: 'N1' }), sell('S3', { reinvestInto: 'N1' }), buy('N1', 0)]), facts());
+    expect(rowOf(plan, 'S2')).toMatchObject({ action: 'sell', reinvestInto: 'N1' });
+    expect(rowOf(plan, 'S3')).toMatchObject({ action: 'sell', reinvestInto: 'N1' });
+    expect(rowOf(plan, 'N1')).toMatchObject({ action: 'buy', targetPercentage: 0 });
+    expect(rowOf(plan, 'S1')).toMatchObject({ action: 'buy', targetPercentage: 100 });
+    expect(plan.corrections).toEqual([]);
+    expect(plan.usable).toBe(true);
+  });
+
+  // Mutation that turns it red: the check on the bought row left out.
+  it('drops a swap toward a row the plan does not buy, or toward itself, and says so', () => {
+    const plan = reconcileOperatingPlan(raw([buy('S1', 100), sell('S2', { reinvestInto: 'S3' }), hold('S3')]), facts());
+    expect(rowOf(plan, 'S2')).not.toHaveProperty('reinvestInto');
+    expect(plan.corrections).toEqual(['La vendita di ETF fenicottero reinvestiva in uno strumento che il piano non compra: il ricavato entra nel piano come le altre vendite.']);
+    const self = reconcileOperatingPlan(raw([buy('S1', 100), sell('S2', { reinvestInto: 'S2' })]), facts());
+    expect(rowOf(self, 'S2')).not.toHaveProperty('reinvestInto');
+  });
+
+  it('a row that is no sale carries no swap', () => {
+    const plan = reconcileOperatingPlan(raw([buy('S1', 100), { ...hold('S2'), reinvestInto: 'S1' }]), facts());
+    expect(rowOf(plan, 'S2')).not.toHaveProperty('reinvestInto');
+    // Nor does it keep a new instrument at quota 0 alive: only a sale's swap funds one.
+    const stale = reconcileOperatingPlan(raw([buy('S1', 100), { ...hold('S2'), reinvestInto: 'N1' }, buy('N1', 0)]), facts());
+    expect(rowOf(stale, 'N1')).toBeUndefined();
+  });
+});

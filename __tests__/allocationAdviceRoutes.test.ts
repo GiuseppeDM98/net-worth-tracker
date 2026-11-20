@@ -288,4 +288,15 @@ describe('POST /api/allocation-advice/applied', () => {
     expect(response.status).toBe(200);
     expect(patchAdviceMock).toHaveBeenCalledWith('user-1', { status: 'applied', applied: expect.objectContaining({ ...applied, at: expect.any(Date) }) });
   });
+
+  // «applicato il …» stays the day the settings were applied (2026-11-20): a second POST records the plan the click
+  // created and keeps the first `at`. Mutation that turns it red: stamp `new Date()` on every POST.
+  it('a second POST with the plan keeps the first applied.at', async () => {
+    const first = new Date('2026-11-10T09:00:00.000Z');
+    getAdviceMock.mockResolvedValue({ userId: 'user-1', status: 'applied', report: { markdown: 'x', proposal: null }, applied: { at: first, ...applied } });
+    const response = await appliedRoute(post('http://localhost/api/allocation-advice/applied', { userId: 'user-1', applied: { ...applied, planId: 'plan-1', planAction: 'create' } }));
+    expect(response.status).toBe(200);
+    expect(patchAdviceMock).toHaveBeenCalledWith('user-1', { status: 'applied', applied: { at: first, ...applied, planId: 'plan-1', planAction: 'create' } });
+    expect((await appliedRoute(post('http://localhost/api/allocation-advice/applied', { userId: 'user-1', applied: { ...applied, planAction: 'other' } }))).status).toBe(400);
+  });
 });

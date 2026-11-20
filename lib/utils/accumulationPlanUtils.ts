@@ -81,6 +81,16 @@ export function proceedsOfDisposal(disposal: PlanDisposal, asset: Asset | undefi
   return roundToCents(Math.min(disposal.quantity, asset.quantity) * deps.priceOf(asset));
 }
 
+/**
+ * The instrument an OPEN sale's proceeds buy, when it is a swap that can be planned (owner, 2026-11-20): the
+ * instrument exists and has a price. Otherwise undefined, and the sale is an ordinary one: its money joins the pool.
+ */
+export function swapTargetOf(disposal: PlanDisposal, assetsById: Map<string, Asset>, deps: PlanDeps): string | undefined {
+  if (!disposal.reinvestAssetId || disposal.status === 'executed' || disposal.status === 'skipped') return undefined;
+  const target = assetsById.get(disposal.reinvestAssetId);
+  return target && deps.priceOf(target) > 0 ? target.id : undefined;
+}
+
 export function resolvePositionStates(
   positions: PlanPosition[],
   assetsById: Map<string, Asset>,
@@ -89,13 +99,17 @@ export function resolvePositionStates(
 ): PositionState[] {
   // the shares still to be sold leave the position's value (an executed/skipped sale already left the ledger or never will).
   const pendingSale = new Map<string, number>();
+  // A swap's proceeds are the bought instrument's from its month: the rates split on top of them (2026-11-20).
+  const swapIn = new Map<string, number>();
   for (const disposal of disposals) {
+    const target = swapTargetOf(disposal, assetsById, deps);
+    if (target) swapIn.set(target, (swapIn.get(target) ?? 0) + disposal.estimatedProceedsEur);
     if (disposal.quantity === undefined) continue;
     if (disposal.status === 'executed' || disposal.status === 'skipped') continue;
     pendingSale.set(disposal.assetId, (pendingSale.get(disposal.assetId) ?? 0) + disposal.quantity);
   }
   return positions.map((position) => {
-    let currentValueEur = 0;
+    let currentValueEur = swapIn.get(position.buyAssetId) ?? 0;
     for (const memberId of position.memberAssetIds) {
       const member = assetsById.get(memberId);
       if (!member) continue;
@@ -136,6 +150,17 @@ export interface UsableLiquidity {
   dueProceedsEur: number;
   /** Each month's share of L (Σ = 1) when a later sale leaves a tranche; null = the even spread. */
   monthShares: number[] | null;
+  /** Σ proceeds of the open swaps: outside L, the pool and the reserve (2026-11-20). */
+  swapProceedsEur: number;
+  /** What each open swap buys and when (`offset` 0-based inside the months scheduled). */
+  swaps: SwapPurchase[];
+}
+
+/** A swap's purchase: the whole proceeds of a sale buy `assetId` in the month at `offset` (owner, 2026-11-20). */
+export interface SwapPurchase {
+  assetId: string;
+  offset: number;
+  eur: number;
 }
 
 /** The plan month a sale falls in, counted from the plan's first month; absent = month 1. */
@@ -186,12 +211,27 @@ export function computeUsableLiquidity(
     if (asset) sourceCashEur += deps.valueOf(asset);
   }
   const availableNowEur = Math.max(0, sourceCashEur - liquidity.reserveEur);
-  const open = disposals.filter((d) => d.status !== 'executed' && d.status !== 'skipped');
-  // Every open sale, whatever its month: the draft box «Vendite fuori piano» reads this total.
-  const disposalProceedsEur = open.reduce((sum, d) => sum + d.estimatedProceedsEur, 0);
   // 0 = due by the first month scheduled; a sale past the last month is the validator's issue, clamped here.
   const offsetOf = (d: PlanDisposal) =>
     Math.min(Math.max(0, disposalMonthIndex(d) - firstIndex), Math.max(0, monthsRemaining - 1));
+  const openAll = disposals.filter((d) => d.status !== 'executed' && d.status !== 'skipped');
+  // A swap never enters the pool nor refills the reserve: its proceeds buy their instrument (owner, 2026-11-20).
+  const swaps: SwapPurchase[] = [];
+  const open: PlanDisposal[] = [];
+  for (const d of openAll) {
+    const target = swapTargetOf(d, assetsById, deps);
+    if (!target || monthsRemaining <= 0) {
+      open.push(d);
+      continue;
+    }
+    // Sales that buy one instrument in one month are ONE purchase, on their summed proceeds (2026-11-20).
+    const same = swaps.find((s) => s.assetId === target && s.offset === offsetOf(d));
+    if (same) same.eur = roundToCents(same.eur + d.estimatedProceedsEur);
+    else swaps.push({ assetId: target, offset: offsetOf(d), eur: d.estimatedProceedsEur });
+  }
+  const swapProceedsEur = swaps.reduce((sum, s) => sum + s.eur, 0);
+  // Every open sale but the swaps, whatever its month: the draft box «Vendite fuori piano» reads this total.
+  const disposalProceedsEur = open.reduce((sum, d) => sum + d.estimatedProceedsEur, 0);
   const dueProceedsEur = open.filter((d) => offsetOf(d) === 0).reduce((sum, d) => sum + d.estimatedProceedsEur, 0);
   const inflowTotalEur = liquidity.monthlyInflowEur * monthsRemaining;
   const L0 = availableNowEur + disposalProceedsEur;
@@ -230,6 +270,8 @@ export function computeUsableLiquidity(
     refillMonths,
     dueProceedsEur,
     monthShares,
+    swapProceedsEur,
+    swaps,
   };
 }
 
@@ -289,9 +331,12 @@ export function scheduleInstallments(
   /** `UsableLiquidity.refillMonths`: the first months buy nothing, the totals spread over the rest. */
   refillMonths = 0,
   /** `UsableLiquidity.monthShares`: each month's share of the totals; null = the even spread over the buying months. */
-  monthShares: number[] | null = null
+  monthShares: number[] | null = null,
+  /** `UsableLiquidity.swaps`: bought whole in their month, even a refill month (owner, 2026-11-20). */
+  swaps: SwapPurchase[] = []
 ): ScheduleResult {
   const refill = Math.min(Math.max(0, refillMonths), months);
+  let swapResidualEur = 0;
   const buyingMonths = months - refill;
   const pricedStates = states.filter((s) => !s.unpriced);
   const carry: Record<string, number> = {};
@@ -333,6 +378,35 @@ export function scheduleInstallments(
         lines.push(line);
         lineByPosition[s.positionId] = line;
         spentByPosition[s.positionId] += spend;
+      }
+    }
+
+    // The swaps of this month: the whole proceeds, in whole units, on the month's line of that instrument when
+    // it already buys (one line per position), else on a line of their own; the cents left are residual.
+    for (const swap of swaps) {
+      if (swap.offset !== m - 1) continue;
+      const s = pricedStates.find((state) => state.buyAssetId === swap.assetId);
+      if (!s) {
+        swapResidualEur += swap.eur;
+        continue;
+      }
+      const q = Math.floor(swap.eur / s.buyPriceEur + 1e-9);
+      swapResidualEur += swap.eur - q * s.buyPriceEur;
+      if (q === 0) continue;
+      const existing = lineByPosition[s.positionId];
+      if (existing) {
+        existing.plannedQuantity += q;
+        existing.plannedAmountEur = roundToCents(existing.plannedAmountEur + q * s.buyPriceEur);
+      } else {
+        lines.push({
+          positionId: s.positionId,
+          assetId: s.buyAssetId,
+          plannedQuantity: q,
+          priceEurAtPlan: s.buyPriceEur,
+          plannedAmountEur: roundToCents(q * s.buyPriceEur),
+          status: 'planned',
+          swap: true,
+        });
       }
     }
 
@@ -386,7 +460,7 @@ export function scheduleInstallments(
     installments.push({ index: firstIndex + m - 1, month: addMonths(startMonth, m - 1), lines, carryInEur });
   }
 
-  return { installments, residualEur };
+  return { installments, residualEur: roundToCents(residualEur + swapResidualEur) };
 }
 
 // ---------------------------------------------------------------------------
@@ -457,6 +531,13 @@ export function recalibrateInstallment(
     const ratio = sumBudgets > 0 ? cashCeiling / sumBudgets : 0;
     for (const key of Object.keys(budgets)) budgets[key] *= ratio;
     quantities = floorQuantities();
+  }
+
+  // This month's swaps buy what the calendar planned for them, on top of the month's budget (2026-11-20).
+  for (const swap of liquidity.swaps) {
+    if (swap.offset !== 0) continue;
+    const s = pricedStates.find((state) => state.buyAssetId === swap.assetId);
+    if (s) quantities[s.positionId] += Math.floor(swap.eur / s.buyPriceEur + 1e-9);
   }
 
   const plannedByPosition: Record<string, number> = {};
@@ -536,6 +617,8 @@ export interface PlanRevisionInput {
   disposals: PlanDisposal[];
   /** The plan month to look at the plan again: absent = keep the plan's, null = clear it. */
   reviewMonthIndex?: number | null;
+  /** The app's corrections to the Consulente's plan: absent = keep the plan's (the editor's revision keeps them). */
+  advisorNotes?: string[];
   /** the source accounts, editable in a revision; absent = the plan's own. */
   sourceCashAssetIds?: string[];
   /** saved sales not yet executed that the revision takes off (by instrument). */
@@ -569,7 +652,7 @@ export function diffRevisionDisposals(
     const saved = open.get(disposal.assetId);
     if (!saved) {
       newDisposals.push(disposal);
-    } else if (saved.quantity !== disposal.quantity) {
+    } else if (saved.quantity !== disposal.quantity || saved.reinvestAssetId !== disposal.reinvestAssetId) {
       removed.push(saved.assetId);
       newDisposals.push(disposal);
     } else if ((disposal.monthIndex ?? 1) !== (saved.monthIndex ?? 1)) {
@@ -650,7 +733,7 @@ export function buildRevisedPlan(
   const liquidity = computeUsableLiquidity(liquiditySettings, assetsById, disposals, revision.remainingMonths, deps, k);
   const states = resolvePositionStates(revision.positions, assetsById, deps, disposals);
   const totals = computeTotalPurchases(states, liquidity.L);
-  const schedule = scheduleInstallments(totals, states, revision.remainingMonths, first.month, k, liquidity.refillMonths, liquidity.monthShares);
+  const schedule = scheduleInstallments(totals, states, revision.remainingMonths, first.month, k, liquidity.refillMonths, liquidity.monthShares, liquidity.swaps);
   const reviewMonthIndex = revision.reviewMonthIndex === undefined ? plan.reviewMonthIndex : revision.reviewMonthIndex ?? undefined;
 
   return {
@@ -1165,7 +1248,7 @@ export function buildDraftPreview(input: {
   const liquidity = computeUsableLiquidity(draft.liquidity, assetsById, liveDisposals, draft.months, deps, firstIndex);
   const totals = computeTotalPurchases(states, liquidity.L);
   const schedule = scheduleInstallments(
-    totals, states, draft.months, draft.startMonth, firstIndex, liquidity.refillMonths, liquidity.monthShares
+    totals, states, draft.months, draft.startMonth, firstIndex, liquidity.refillMonths, liquidity.monthShares, liquidity.swaps
   );
   const outcome = projectPlanOutcome(
     states,

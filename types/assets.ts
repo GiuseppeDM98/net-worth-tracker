@@ -179,8 +179,8 @@ export type AssetOwnerShare =
   | { memberId: string; units: number } // > 0
   | { memberId: string; percent: number }; // 0-100
 
-// What a create of `AssetDialog` may start from (2026-11-12): the Consulente's hand-off prefills an
-// instrument it proposes and the owner does not hold yet (`planConsulenteHandoff`), created at 0 quotes.
+// An instrument the Consulente proposes and the owner does not hold yet (`planConsulenteHandoff`, 2026-11-12):
+// the operating plan's legend carries it, and «Applica» creates the asset from it (`newInstrumentFormData`, 2026-11-20).
 export interface AssetPrefill {
   name: string;
   ticker: string;

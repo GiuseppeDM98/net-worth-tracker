@@ -704,7 +704,6 @@ describe('the bond block in the Consulente context', () => {
     ],
     dividends: { coupons: [] },
   };
-  const YAHOO = { response: { profiles: { 'BEUR.MI': { ticker: 'BEUR.MI', fund: { fetchedAt: '2026-11-01T10:00:00.000Z', schema: 2, holdingsBasis: 'fund', family: null, bond: { durationYears: 2.42, maturityYears: 9.807 } } } }, oldestFetchedAt: null } };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -723,39 +722,28 @@ describe('the bond block in the Consulente context', () => {
     const calls = answerWith(message(roundText([], 'Nota.', true)));
     await runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn(), now: NOW });
     expect(profilesMock).not.toHaveBeenCalled();
-    expect(userTurn(calls.mock.calls[0])).toContain('DATI\n\n--- OBBLIGAZIONI: SCADENZE E DURATION ---\nNessun titolo né ETF obbligazionario in portafoglio.');
+    expect(userTurn(calls.mock.calls[0])).toContain('DATI\n\n--- OBBLIGAZIONI: SCADENZE ---\nNessun titolo né ETF obbligazionario in portafoglio.');
   });
 
-  it("asks the profile cache for the bond ETFs only (module fund, raw ticker, the run clock) and prints Yahoo's duration to the strategy and the instruments alike", async () => {
+  // Yahoo's duration proved wrong on real ETFs (owner, 2026-11-20): no profile is read, no duration is printed, the
+  // search verifies it. Mutation that turns it red: the profile read put back.
+  it('prints the bond ETFs with no duration to the strategy and the instruments alike, and asks Yahoo nothing', async () => {
     ytdMock.mockResolvedValue({ portfolio: BOND_PORTFOLIO });
-    profilesMock.mockResolvedValue(YAHOO);
     const calls = answerWith(message(strategyText(PROPOSAL)), message(instrumentsText, 'end_turn', 'sonnet', true));
     const first = await runAllocationAdviceStage({ userId: 'u1', stage: 'strategy', answers: ANSWERS, onStage: vi.fn(), now: NOW });
     await runAllocationAdviceStage({ userId: 'u1', stage: 'instruments', document: first, onStage: vi.fn(), now: NOW });
 
-    expect(profilesMock).toHaveBeenCalledTimes(2);
-    expect(profilesMock.mock.calls[0][0]).toEqual([{ ticker: 'BEUR.MI', module: 'fund' }]);
-    expect(profilesMock.mock.calls[0][1]).toEqual({ now: NOW });
+    expect(profilesMock).not.toHaveBeenCalled();
     expect(calls).toHaveBeenCalledTimes(2);
     for (const call of calls.mock.calls) {
       const turn = userTurn(call);
-      expect(turn).toContain('--- OBBLIGAZIONI: SCADENZE E DURATION (1 titolo, 1 ETF o fondo; le scadenze degli obiettivi sono nelle risposte del percorso) ---');
+      expect(turn).toContain('--- OBBLIGAZIONI: SCADENZE (1 titolo, 1 ETF o fondo; le scadenze degli obiettivi sono nelle risposte del percorso) ---');
       expect(turn).toContain(`- BTP Esempio 2030: scade il 2030-03-01 (3,4 anni), valore ${eur(5000)}, negoziabile`);
-      expect(turn).toContain(`- ETF Bond Euro (BEUR): duration 2,4 anni, scadenza media 9,8 anni, letto il 2026-11-01, valore ${eur(10000)}, negoziabile`);
-      expect(turn).not.toContain('ETF Mondo (MONDO.MI): duration');
+      expect(turn).toContain(`- ETF Bond Euro (BEUR): valore ${eur(10000)}, negoziabile`);
+      expect(turn).not.toContain('ETF Mondo');
     }
     // The instruments read the holdings and, under them, the block.
     expect(userTurn(calls.mock.calls[1])).toContain('STRUMENTI\n\n--- OBBLIGAZIONI');
-  });
-
-  it('a failed profile read never fails the round: the block says the durations were not read', async () => {
-    ytdMock.mockResolvedValue({ portfolio: BOND_PORTFOLIO });
-    profilesMock.mockRejectedValue(new Error('yahoo down'));
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const calls = answerWith(message(roundText([], 'Nota.', true)));
-    await runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn(), now: NOW });
-    expect(userTurn(calls.mock.calls[0])).toContain(`- ETF Bond Euro (BEUR): duration non letta (profili non disponibili in questa corsa), valore ${eur(10000)}, negoziabile`);
-    expect(errorSpy).toHaveBeenCalledWith('[consulente] bond profiles not read', expect.any(Error));
   });
 });
 

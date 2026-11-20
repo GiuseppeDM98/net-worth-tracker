@@ -37,7 +37,7 @@ import type { SectionSpec } from '@/lib/hooks/useMobileSections';
 
 // The month helpers the page's first load reads live in accumuloMonth.ts, without this module's imports.
 export { findOpenInstallment, isPlanDone, summarizePacMonth } from './accumuloMonth';
-import { countPlanInstalments, findFirstBuyingInstallment, findOpenInstallment, isPlanDone } from './accumuloMonth';
+import { buysRegularly, countPlanInstalments, findFirstBuyingInstallment, findOpenInstallment, isPlanDone, isRegularLine } from './accumuloMonth';
 import { addMonths } from './planMonths';
 
 export interface AccumuloVerdictContext {
@@ -95,11 +95,20 @@ export function resolveAccumuloVerdictInput(context: AccumuloVerdictContext): Ac
   // Active before its first month: the first instalment, nothing «questo mese» (2026-11-12).
   if (currentIndex < 1) {
     const first = findFirstBuyingInstallment(plan) ?? plan.installments.find((i) => i.index === 1);
-    const lines = (first?.lines ?? []).filter((l) => l.plannedQuantity > 0);
-    return { state: 'scheduled', startMonth: plan.startMonth, firstMonth: first?.month ?? plan.startMonth, months: plan.months, lineCount: lines.length,
+    const lines = (first?.lines ?? []).filter((l) => l.plannedQuantity > 0 && isRegularLine(l));
+    // The months before the first rata are no rate (the reserve, a swap); a swap there is named (owner, 2026-11-20).
+    const before = plan.installments.filter((i) => i.index < (first?.index ?? 1));
+    const swapMonth = before.find((i) => i.lines.some((l) => l.swap));
+    const swapNames = [...new Set((swapMonth?.lines ?? []).filter((l) => l.swap).map((l) => plan.positions.find((p) => p.id === l.positionId)?.label ?? ''))].filter((n) => n !== '');
+    return { state: 'scheduled', startMonth: plan.startMonth, firstMonth: first?.month ?? plan.startMonth, months: plan.months - ((first?.index ?? 1) - 1), lineCount: lines.length,
       firstInstalmentEur: roundToCents(lines.reduce((sum, l) => sum + l.plannedAmountEur, 0)),
-      todayYear: getItalyMonthYear(context.today).year };
+      todayYear: getItalyMonthYear(context.today).year,
+      ...(swapMonth && swapNames.length > 0 ? { swapMonth: swapMonth.month, swapNames } : {}) };
   }
+
+  // The rate are the months that buy (2026-11-20): a month that refills the reserve, or only swaps, is none.
+  const rateTotal = countPlanInstalments(plan).total;
+  const rataNumber = (index: number) => plan.installments.filter((i) => i.index <= index && buysRegularly(i)).length;
 
   const installment = findOpenInstallment(plan, currentIndex);
   if (!installment) return { state: 'none', sourceCashEur: context.sourceCashEur, reserveEur: context.reserveEur, otherCashEur: context.otherCashEur ?? 0, hasModel: context.hasModel };
@@ -113,8 +122,9 @@ export function resolveAccumuloVerdictInput(context: AccumuloVerdictContext): Ac
       state: 'quiet',
       monthKey: installment.month,
       nextMonth: next?.month,
-      installmentIndex: installment.index,
-      months: plan.months,
+      // «Rata k di n»: the next rata's number among the months that buy.
+      installmentIndex: next ? rataNumber(next.index) : rateTotal,
+      months: rateTotal,
       refilling: (plan.baseline?.sourceCashEur ?? Infinity) < plan.liquidity.reserveEur - 0.005,
     };
   }
@@ -133,8 +143,13 @@ export function resolveAccumuloVerdictInput(context: AccumuloVerdictContext): Ac
     toConfirmCount,
     lateCount,
     installmentClosed: installment.lines.every((line) => line.status !== 'planned'),
-    installmentIndex: installment.index,
-    months: plan.months,
+    installmentIndex: buysRegularly(installment) ? rataNumber(installment.index) : 0,
+    months: rateTotal,
+    // A month that is no rata: only a swap, or nothing to buy with late lines (2026-11-20).
+    ...(buysRegularly(installment) ? {} : {
+      kind: lines.some((line) => line.swap) ? ('swap' as const) : ('none' as const),
+      ...(findFirstBuyingInstallment(plan, installment.index + 1) ? { nextMonth: findFirstBuyingInstallment(plan, installment.index + 1)!.month } : {}),
+    }),
     investedEur,
     planTotalEur,
     reentry: context.reentry,

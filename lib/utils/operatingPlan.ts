@@ -45,6 +45,8 @@ export interface OperatingPlanRow {
   sellQuantity?: number;
   /** 'sell' only, 1..months; absent = 1. */
   sellMonth?: number;
+  /** 'sell' only: the ref of the 'buy' row its proceeds buy in the sale's month, the swap (owner, 2026-11-20). */
+  reinvestInto?: string;
   reason: string;
   /** Sales only, the app's figures at writing time. */
   estimatedProceedsEur?: number;
@@ -81,7 +83,7 @@ export interface OperatingPlanFacts {
 /** What the stage answered, after the schema: the numbers are the reconcile's to check. */
 export interface RawOperatingPlan {
   summary: string; monthlyInflowEur: number; months: number;
-  rows: Array<{ ref: string; action: OperatingPlanAction; targetPercentage: number; sellQuantity?: number; sellMonth?: number; reason: string }>;
+  rows: Array<{ ref: string; action: OperatingPlanAction; targetPercentage: number; sellQuantity?: number; sellMonth?: number; reinvestInto?: string; reason: string }>;
   reviewMonth?: number; reviewReason: string; departures: string[];
 }
 
@@ -123,6 +125,7 @@ export const OPERATING_PLAN_COPY = {
   kept: (name: string) => `Hai indicato di tenere ${name}: la vendita non entra nel piano.`,
   tooMany: (asked: number, name: string, held: number) => `Il Consulente indicava ${formatQuantity(asked)} quote di ${name}: il piano ne vende ${formatQuantity(held)}, quelle che possiedi.`,
   saleMonth: (name: string, month: number) => `La vendita di ${name} era fissata fuori dal piano: va al mese ${month}.`,
+  swapDropped: (name: string) => `La vendita di ${name} reinvestiva in uno strumento che il piano non compra: il ricavato entra nel piano come le altre vendite.`,
   forgotten: (names: readonly string[]) =>
     names.length === 1
       ? `${names[0]}: il piano non lo cita. Resta dov'è e il piano non lo compra.`
@@ -133,7 +136,7 @@ export const OPERATING_PLAN_COPY = {
   nothingBought: 'Il piano non compra niente: non può diventare un piano di accumulo.',
 } as const;
 
-type WorkRow = { ref: string; action: OperatingPlanAction; targetPercentage: number; sellQuantity?: number; sellMonth?: number; reason: string };
+type WorkRow = { ref: string; action: OperatingPlanAction; targetPercentage: number; sellQuantity?: number; sellMonth?: number; reinvestInto?: string; reason: string };
 
 const finiteOr = (value: number | undefined, fallback: number) => (value !== undefined && Number.isFinite(value) ? value : fallback);
 const clampInt = (value: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(value)));
@@ -203,6 +206,7 @@ export function reconcileOperatingPlan(raw: RawOperatingPlan, facts: OperatingPl
       targetPercentage: finiteOr(row.targetPercentage, 0),
       ...(row.sellQuantity !== undefined ? { sellQuantity: row.sellQuantity } : {}),
       ...(row.sellMonth !== undefined ? { sellMonth: row.sellMonth } : {}),
+      ...(row.reinvestInto !== undefined ? { reinvestInto: row.reinvestInto } : {}),
       reason: row.reason,
     });
   }
@@ -211,6 +215,7 @@ export function reconcileOperatingPlan(raw: RawOperatingPlan, facts: OperatingPl
   const removeSale = (row: WorkRow) => {
     delete row.sellQuantity;
     delete row.sellMonth;
+    delete row.reinvestInto;
     row.action = kindOf(row.ref) === 'held' && row.targetPercentage > 0 ? 'buy' : 'hold';
   };
 
@@ -263,6 +268,7 @@ export function reconcileOperatingPlan(raw: RawOperatingPlan, facts: OperatingPl
     if (row.action !== 'sell') {
       delete row.sellQuantity;
       delete row.sellMonth;
+      delete row.reinvestInto;
       continue;
     }
     row.targetPercentage = 0;
@@ -271,6 +277,20 @@ export function reconcileOperatingPlan(raw: RawOperatingPlan, facts: OperatingPl
     const month = clampInt(asked, 1, months);
     if (month !== Math.round(asked) || !Number.isFinite(row.sellMonth)) corrections.push(OPERATING_PLAN_COPY.saleMonth(nameOf(row.ref), month));
     row.sellMonth = month;
+  }
+
+  // 8b. The swap (owner, 2026-11-20): it buys a row the plan buys, never the sold one; otherwise the sale is an
+  // ordinary one. A row a swap buys stays a buy at quota 0: the swap alone funds it.
+  const swapTargets = new Set<string>();
+  for (const row of rows) {
+    if (row.reinvestInto === undefined) continue;
+    const target = rows.find((other) => other.ref === row.reinvestInto);
+    if (!target || target.ref === row.ref || target.action !== 'buy') {
+      delete row.reinvestInto;
+      corrections.push(OPERATING_PLAN_COPY.swapDropped(nameOf(row.ref)));
+      continue;
+    }
+    swapTargets.add(target.ref);
   }
 
   // 9. Every held instrument has a row.
@@ -285,6 +305,7 @@ export function reconcileOperatingPlan(raw: RawOperatingPlan, facts: OperatingPl
     if (row.targetPercentage < 0) row.targetPercentage = 0;
     if (kind === 'cashFund') row.targetPercentage = 0;
     if (row.action === 'buy' && row.targetPercentage <= 0) {
+      if (swapTargets.has(row.ref)) continue;
       if (kind === 'new') rows.splice(index, 1);
       else row.action = 'hold';
     } else if (row.action === 'hold' && row.targetPercentage > 0) {
@@ -366,6 +387,7 @@ export function reconcileOperatingPlan(raw: RawOperatingPlan, facts: OperatingPl
       targetPercentage: 0,
       ...(row.sellQuantity !== undefined ? { sellQuantity: row.sellQuantity } : {}),
       ...(row.sellMonth !== undefined ? { sellMonth: row.sellMonth } : {}),
+      ...(row.reinvestInto !== undefined ? { reinvestInto: row.reinvestInto } : {}),
       reason: row.reason,
       estimatedProceedsEur: proceeds,
       ...(tax.kind === 'taxed'

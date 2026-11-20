@@ -35,6 +35,8 @@ import type { AccumulationPlanRead } from './accumulationPlan';
 import type { InstallmentLineStatus } from '@/types/accumulationPlan';
 import type { OperatingPlanFacts, OperatingPlanInstrument } from '@/lib/utils/operatingPlan';
 import { roundToCents } from '@/lib/utils/cents';
+import { formatNumberIt } from '@/lib/utils/formatters';
+import { addMonths } from '@/lib/utils/planMonths';
 
 function eur(value: number): string {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
@@ -169,7 +171,9 @@ const STRATEGY_CONTRACT = [
   // The goals' contributions and the cash reserve rest on the cashflow block (owner, 2026-11-01).
   'I "monthlyContribution" degli obiettivi stanno dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI (se la superano, dillo e perché); la riserva di liquidità si misura sulla spesa mensile mediana e sui conti liquidi del blocco.',
   // The bonds by horizon (owner, 2026-11-08, after the interview's phase F on the mirror): the block OBBLIGAZIONI is the data, the goals' dates the horizons.
-  "Nella classe Obbligazioni ogni sotto-target dice nel testo quale orizzonte copre (es. 1-3 anni, 3-7 anni) e quale obiettivo serve, a partire dalle scadenze degli obiettivi e dal blocco OBBLIGAZIONI (le scadenze dei titoli, le duration degli ETF): se l'orizzonte di un obiettivo resta scoperto, proponi il sotto-target che lo copre e di' che resta vuoto finché l'utente non ci mette uno strumento; se le scadenze possedute sono già allineate, dillo in una riga.",
+  "Nella classe Obbligazioni ogni sotto-target dice nel testo quale orizzonte copre (es. 1-3 anni, 3-7 anni) e quale obiettivo serve, a partire dalle scadenze degli obiettivi e dal blocco OBBLIGAZIONI (le scadenze dei titoli); non scrivere la duration di un ETF in numeri: la verifica il secondo agente con la ricerca web, tu descrivi l'orizzonte che il sotto-target deve coprire. Se l'orizzonte di un obiettivo resta scoperto, proponi il sotto-target che lo copre e di' che resta vuoto finché l'utente non ci mette uno strumento; se le scadenze possedute sono già allineate, dillo in una riga.",
+  // A goal with a date and an amount wants a known sum on that date (owner, 2026-11-20, after NOVE-25's phase F).
+  "Un obiettivo con una scadenza e un importo, servito dalle obbligazioni, chiede una cifra certa a quella data: proponi per lui un titolo di Stato tenuto a scadenza (un BTP, o un BTP€i se la cifra va protetta dall'inflazione) che scade entro l'anno dell'obiettivo, in un sotto-target che nel testo nomina l'obiettivo e l'anno di scadenza cercato. Un ETF obbligazionario non ha una scadenza: al posto del titolo lo proponi solo se l'utente nel colloquio ha scelto gli ETF per quell'obiettivo, e allora dici in una riga cosa perde (il suo prezzo a quella data non è garantito).",
   // The previous paths (owner, 2026-11-08): what changed since then, and whether the facts or the words moved it.
   "Se ci sono PERCORSI PRECEDENTI, «La situazione» dice cosa è cambiato rispetto ad allora — tolleranza, orizzonte, obiettivi, strumenti da tenere — e se il cambiamento nasce dai fatti (reddito, patrimonio, famiglia, obiettivi) o dalle parole dell'utente: se nelle sue parole, di allora o di oggi, leggi paura, fretta o euforia, nominale citando la frase che te lo fa pensare, senza giudicare; un piano che cambia direzione per emozione lo dice e propone il passo più piccolo che la rispetta.",
 ].join('\n');
@@ -265,6 +269,16 @@ export function formatPreviousPathsForPrompt(previous: AllocationAdvicePreviousP
     if (revisionRounds.length > 0) lines.push(formatQuestionAnswersForPrompt(revisionRounds, 'Tornata della revisione'));
     if (proposal) {
       lines.push(`Proposta di allora: ${proposal.summary} — ${proposal.classes.map((cls) => `${ASSET_CLASS_LABELS[cls.assetClass] ?? cls.assetClass} ${cls.targetPercentage}%`).join(' · ')}`);
+      // Its new goals are its own doing: «Applica» created them (owner, 2026-11-20).
+      const proposedGoals = (proposal.goals ?? []).filter((goal) => !goal.goalId);
+      if (proposedGoals.length > 0) {
+        const described = proposedGoals.map((goal) => `${goal.name} (${[
+          goal.targetAmount !== undefined ? `target ${eur(goal.targetAmount)}` : 'senza importo',
+          goal.targetDateIso ? `scadenza ${goal.targetDateIso}` : 'senza scadenza',
+          `priorità ${goal.priority}`,
+        ].join(', ')})`).join(' · ');
+        lines.push(`Obiettivi nuovi proposti allora, ${path.applied ? 'creati da «Applica»' : 'mai creati'}: ${described}`);
+      }
     } else {
       lines.push(`Proposta di allora: nessuna (percorso ${path.status === 'failed' ? 'fallito' : 'interrotto'} alla fase ${path.stage ?? 'iniziale'})`);
     }
@@ -288,17 +302,32 @@ export function formatAccumulationPlanForPrompt(state: AccumulationPlanRead): st
   if (!state.read) return `${header}\nIl piano di accumulo non è stato letto in questa corsa: non so se ce n'è uno.`;
   const plan = state.plan;
   if (!plan) return `${header}\nNessun piano di accumulo attivo.`;
+  // A plan that refills the reserve first says so, and names its first instalment (owner, 2026-11-20).
+  const from = Math.max(plan.monthIndex, 1);
+  const first = plan.firstBuy;
+  const waitsFirst = first === null || first.index > from;
+  const waiting = first === null ? 0 : first.index - from;
+  const firstClause = first === null
+    ? 'non resta nessuna rata da comprare.'
+    : `${plan.monthIndex === 0 ? 'i mesi' : 'questo mese e i successivi'} fino a ${addMonths(first.month, -1)} ricostituiscono solo la riserva `
+      + `(${waiting} ${waiting === 1 ? 'mese' : 'mesi'} senza acquisti), prima rata ${eur(first.amountEur)} a ${first.month}.`;
   const head = plan.monthIndex === 0
-    ? `Piano attivo, non ancora partito: parte a ${plan.startMonth}, ${plan.months} mesi fino a ${plan.endMonth}, `
-      + `prima rata ${eur(plan.instalmentEur)}.`
-    : `Piano attivo: mese ${plan.monthIndex} di ${plan.months}, rata del mese ${eur(plan.instalmentEur)}, `
-      + `ultimo mese ${plan.endMonth}.`;
-  const buys = plan.buys.map((buy) => `${buy.name} ${buy.targetPercentage}%`).join(' · ');
+    ? `Piano attivo, non ancora partito: parte a ${plan.startMonth}, ${plan.months} mesi fino a ${plan.endMonth}`
+      + (waitsFirst ? `; ${firstClause}` : `, prima rata ${eur(first.amountEur)}.`)
+    : waitsFirst
+      ? `Piano attivo: mese ${plan.monthIndex} di ${plan.months}, ultimo mese ${plan.endMonth}; ${firstClause}`
+      : `Piano attivo: mese ${plan.monthIndex} di ${plan.months}, rata del mese ${eur(plan.instalmentEur)}, ultimo mese ${plan.endMonth}.`;
+  // The shares of the plan's money, never the end weights: a held position has a weight and buys nothing (2026-11-20).
+  const buys = plan.buys.length === 0
+    ? 'niente'
+    : plan.buys.map((buy) => `${buy.name} ${formatNumberIt(buy.sharePct, Number.isInteger(buy.sharePct) ? 0 : 1)}% (${eur(buy.amountEur)})`).join(' · ');
+  const holds = plan.holds.length === 0 ? [] : [`Tiene al loro peso, senza comprarli: ${plan.holds.map((hold) => hold.name).join(' · ')}.`];
   // An absent month is month 1, as the plan's own sales read it.
   const sells = plan.sells.length === 0 ? 'niente' : plan.sells.map((sell) =>
     `${sell.name}, ${sell.quantity === null ? 'tutte le quote' : `${sell.quantity} quote`}, al mese `
-    + `${sell.monthIndex ?? 1} (${PLAN_SALE_STATUS[sell.status]})`).join(' · ');
-  return [header, head, `Compra, con le quote del piano: ${buys}.`, `Vende: ${sells}.`].join('\n');
+    + `${sell.monthIndex ?? 1} (${PLAN_SALE_STATUS[sell.status]})`
+    + (sell.reinvestName ? `, e con il ricavato compra ${sell.reinvestName} nello stesso mese` : '')).join(' · ');
+  return [header, head, `Compra, in parti dei soldi del piano: ${buys}.`, ...holds, `Vende: ${sells}.`].join('\n');
 }
 
 /**
@@ -340,7 +369,7 @@ export const INTERVIEW_CONTRACT = [
   'In questa fase non proponi né consigli: chiedi.',
   "Hai davanti le risposte del percorso e i dati dell'intero portafoglio e del cashflow. Fai da amico critico: chiedi SOLO ciò che i dati o le risposte rendono dubbio e che cambierebbe la strategia. Esempi del genere di dubbio: un reddito concentrato su una sola fonte con un orizzonte lungo e una tolleranza alle perdite alta; un obiettivo entro pochi anni con molte azioni; una riserva di emergenza che i conti liquidi non coprono; una rata di prestito accanto a «niente da evitare».",
   'Non chiedere ciò che le risposte dicono già. Non dare consigli, non proporre allocazioni, non giudicare il mercato.',
-  "Le obbligazioni: se il blocco OBBLIGAZIONI elenca titoli o ETF, o la classe dovrà avere peso nel piano, chiedi a cosa servono (quale obiettivo, quale orizzonte), se l'utente preferisce titoli singoli, ETF o entrambi, e quali scadenze vuole coprire — nel `why` le scadenze e le duration che il blocco riporta.",
+  "Le obbligazioni: se il blocco OBBLIGAZIONI elenca titoli o ETF, o la classe dovrà avere peso nel piano, chiedi a cosa servono (quale obiettivo, quale orizzonte), se l'utente preferisce titoli singoli, ETF o entrambi, e quali scadenze vuole coprire — nel `why` le scadenze che il blocco riporta, mai una duration in numeri: il blocco non ne riporta. Se un obiettivo ha una scadenza e un importo e le obbligazioni lo servono, fra le opzioni c'è un titolo singolo che scade vicino a quella data, tenuto a scadenza, e nel `why` dici perché: la cifra a scadenza è nota, un ETF obbligazionario a quella data non la garantisce.",
   '',
   '# Cosa devi produrre',
   "La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfied`, `questions`.",
@@ -417,7 +446,8 @@ const INSTRUMENTS_CONTRACT = [
   "Se l'utente possiede già uno strumento adatto a un sotto-target, è il primo candidato e lo segni «alreadyHeld»: cambiare strumento ha un costo fiscale.",
   'Non inventare ISIN o ticker: un dato che non riesci a verificare lo ometti e lo dici in "caveat". Per ogni strumento che l\'utente non possiede scrivi in "yahooSymbols" i simboli di Yahoo Finance che hai verificato con la ricerca: il primo sulla borsa indicata, poi fino a due altri listini in euro dello stesso strumento (stesso ISIN) — l\'app userà il primo che ha un prezzo recente. Per un titolo di Stato basta l\'ISIN. Non dare giudizi di mercato né previsioni.',
   "Una ricerca per strumento, non per sotto-target: le ricerche sono limitate, quindi verifica prima gli strumenti che l'utente NON possiede ancora e per quelli già posseduti conferma solo quotazione e ISIN. Parla all'utente in seconda persona («lo possiedi già»), mai in prima.",
-  "Per un sotto-target obbligazionario verifica anche la duration effettiva (o la scadenza media) di ogni ETF e scrivila in \"duration\" (anni): il blocco OBBLIGAZIONI dei dati riporta le duration di Yahoo per gli strumenti posseduti, da confermare, e il testo della strategia dice quale orizzonte il sotto-target deve coprire — un candidato la cui duration non lo copre non è un candidato.",
+  "Per un sotto-target obbligazionario verifica anche la duration effettiva (o la scadenza media) di ogni ETF e scrivila in \"duration\" (anni): vale anche per gli ETF già posseduti, che il blocco OBBLIGAZIONI elenca senza duration; il testo della strategia dice quale orizzonte il sotto-target deve coprire — un candidato la cui duration non lo copre non è un candidato.",
+  "Per un sotto-target che chiede un titolo tenuto a scadenza, i candidati sono titoli di Stato (BTP, o BTP€i quando il testo chiede la protezione dall'inflazione) quotati sulla borsa indicata o sul MOT che scadono entro l'anno nominato dal testo della strategia, mai dopo, il più vicino a quell'anno per primo: verifica con la ricerca ISIN e data di scadenza e scrivi la data nella \"note\"; un titolo non ha \"duration\".",
   '',
   'Scrivi prima una breve nota in markdown (una riga per sotto-target: cosa hai trovato e cosa non hai potuto verificare), poi UN solo blocco di codice con linguaggio `instrument-candidates` con SOLO JSON valido, con questo schema:',
   CANDIDATES_SCHEMA_TEXT,
@@ -637,7 +667,7 @@ export const PLAN_CONTRACT = [
   '  "summary": string (2-3 frasi: il piano in breve, a parole),',
   '  "monthlyInflowEur": number (quanto l\'utente versa nel piano ogni mese, in euro: dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI; se la superi, dillo in "departures" con il perché; se il blocco non dà una mediana, usa la rata che il report indica come ordine di grandezza e dillo in "departures"),',
   '  "months": number (la durata in mesi, da 1 a 60: quella che serve a coprire lo scarto dai target del report con il versamento che l\'utente può sostenere — non più lunga del necessario, non così corta da chiedere un versamento sopra la mediana; in "summary" scrivi perché dura così),',
-  '  "rows": [ { "ref": chiave copiata ESATTAMENTE dal blocco DATI PER IL PIANO OPERATIVO (S…, N…, M…), "action": "buy" | "hold" | "sell", "targetPercentage": number, "sellQuantity"?: number (quote intere da vendere; assente = tutte), "sellMonth"?: number (il mese del piano in cui vendere, da 1 a "months"; assente = 1), "reason": string (una frase: perché) } ],',
+  '  "rows": [ { "ref": chiave copiata ESATTAMENTE dal blocco DATI PER IL PIANO OPERATIVO (S…, N…, M…), "action": "buy" | "hold" | "sell", "targetPercentage": number, "sellQuantity"?: number (quote intere da vendere; assente = tutte), "sellMonth"?: number (il mese del piano in cui vendere, da 1 a "months"; assente = 1), "reinvestInto"?: string (solo su una riga "sell": la chiave della riga "buy" che il ricavato compra tutto nel mese della vendita, lo scambio), "reason": string (una frase: perché) } ],',
   '  "reviewMonth"?: number (il mese del piano in cui riguardare quote e rata, se ha senso riguardarle prima della fine),',
   '  "reviewReason": string,',
   '  "departures": [ string ] (dove il piano si discosta dal report o dalla strategia, una frase ciascuna; vuoto se non si discosta)',
@@ -647,6 +677,8 @@ export const PLAN_CONTRACT = [
   '- "targetPercentage" è il peso a cui il piano porta lo strumento fra gli strumenti che compra: le righe "buy" sommano esattamente a 100; "hold" e "sell" hanno 0. I pesi seguono l\'allocazione e i sotto-target del report; rispetta i limiti scritti accanto a uno strumento.',
   '- Vendi solo quando serve ad arrivare ai target in un tempo ragionevole o a uscire da uno strumento che il report sostituisce: ogni vendita ha un costo fiscale, scritto nel blocco («tasse stimate»), e la sua ragione lo pesa. Non vendere MAI uno strumento segnato DA TENERE: puoi solo smettere di comprarlo.',
   '- Una vendita in un mese successivo al primo fa entrare il suo ricavato nelle rate da quel mese: usala per diluire le tasse o per non restare fuori dal mercato.',
+  // The swap (owner, 2026-11-20): the proceeds buy one instrument at once, never the reserve.
+  '- Scrivi "reinvestInto" solo quando il report dice di vendere uno strumento per comprarne un altro con quei soldi (uno scambio): il ricavato compra tutto lo strumento indicato nel mese della vendita, senza passare dalla riserva né dalle rate. "targetPercentage" della riga comprata conta solo i soldi delle rate: una riga comprata solo con lo scambio ha "targetPercentage" 0. Senza "reinvestInto" il ricavato entra nel piano come ogni vendita.',
   "- Il piano compra dal conto per gli investimenti e non scende mai sotto la riserva scritta nel blocco: se alla riserva manca qualcosa, le vendite e i primi versamenti la ricostituiscono prima che il piano compri (lo fa l'app, anche con una vendita in un mese successivo). Tienine conto nella durata e nel versamento, e non proporre di spendere la riserva.",
   "- Le quote da vendere non superano quelle possedute. Non scrivere prezzi né importi che non siano nei campi: gli importi delle rate li calcola l'app dai tuoi campi.",
   '- Usa esclusivamente i numeri dei blocchi: non ricalcolarli e non inventarne.',

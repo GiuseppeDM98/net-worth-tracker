@@ -140,25 +140,33 @@
   anche le loro duration … per proporre un altro ETF che copra una duration diversa»): `lib/utils/allocationAdviceBonds.ts`
   (pure) over the holdings of the YTD bundle — the single bonds by TYPE (`bond`, with `maturityIso` from
   `bondDetails.maturityDate` and the coupon the DIVIDENDI facts know), the funds by CLASS (`bonds`, never an account or
-  a loan) with the effective duration and the average maturity Yahoo publishes (`topHoldings.bondHoldings`, read as
-  `InstrumentFundProfile.bond` through the Esposizione's shared profile cache, `resolveInstrumentProfiles` with the
-  `fund` module, one request per bond ETF with a raw ticker: a cached document written before the field existed is
-  asked once more whatever its age, `schema` in `yahooSource.ts`). The block closes the data of the interview and
-  the strategy (`buildConsulenteContext`) and the holdings of the instrument search; three absences are named apart
-  («scadenza non registrata», «duration non pubblicata da Yahoo», «duration non letta» when the profile read threw —
-  a failed read never fails the run). Yahoo's figures are «secondo Yahoo, non verificate»: the instruments contract
-  makes the second agent confirm a bond ETF's duration with the web search and write it in the candidate's
-  `duration` (years, 0–40, `instrumentCandidateSchema`; the report prints « · duration 2,4 anni»), the strategy
-  contract makes every bond sub-target say which horizon and which goal it covers (and which horizon stays
-  uncovered), the interview contract asks what the bond part is for and whether singles or ETFs when the block has
-  rows or the class will weigh. Not a fixed screen of the path (the eight screens stay as drawn on 2026-11-06): a reading rule.
+  a loan) by value and role, «--- OBBLIGAZIONI: SCADENZE ---». The block closes the data of the interview and
+  the strategy (`buildConsulenteContext`) and the holdings of the instrument search; a single without a date reads
+  «scadenza non registrata». **No duration in the block, and no Yahoo read** (owner, 2026-11-20, after NOVE-25's
+  phase F on the mirror): Yahoo's `topHoldings.bondHoldings` proved wrong on real ETFs — an inflation-linked fund at
+  1,08 years of duration against about 7 verified by the search, a 1-3 year fund at 9,8 years of average maturity —
+  and the strategy had written its reasoning on the wrong figure. The funds' line says the second agent verifies it
+  (`BOND_FUNDS_LINE`); the strategy and the interview contracts forbid a duration in figures; the instruments
+  contract makes the second agent verify a bond ETF's duration with the web search, the held ones too, and write it
+  in the candidate's `duration` (years, 0–40, `instrumentCandidateSchema`; the report prints « · duration 2,4
+  anni»). `InstrumentFundProfile.bond` is still written by `yahooSource.ts` into the Esposizione's cache, read by
+  nobody. The strategy contract makes every bond sub-target say which horizon and which goal it covers (and which
+  horizon stays uncovered), the interview contract asks what the bond part is for and whether singles or ETFs when
+  the block has rows or the class will weigh. **A goal with a date and an amount wants a government bond held to
+  maturity** (owner, 2026-11-20): the interview offers a single bond expiring near that date among the options, with
+  why (the sum at maturity is known, an ETF's price on that date is not); the strategy proposes a BTP — a BTP€i when
+  the sum must keep up with inflation — expiring by the goal's year, in a sub-target that names the goal and the year,
+  an ETF in its place only when the user chose ETFs for that goal, saying what it loses; the instrument search lists
+  government bonds expiring by that year, never after, the nearest first, the date in the candidate's `note`. A
+  revision («Chiedi una modifica») reruns only the review on the same candidates, with no search: a new bond needs a
+  new path. Not a fixed screen of the path (the eight screens stay as drawn on 2026-11-06): a reading rule.
 - **The previous paths** (owner, 2026-11-08: «tra un anno ha paura e lo rifa … il consulente nota nelle sue parole
   della paura o della fomo»): a new path's interview rounds and strategy read «--- I PERCORSI PRECEDENTI ---»
   (`formatPreviousPathsForPrompt`): the live document when it has a report — nothing has replaced it during the
   interview; at the strategy it is read before the new one — then the archive, the most recent first, at most
   `ALLOCATION_ADVICE_HISTORY_LIMIT` (6). Per path: its dates, the answers of then in two lines, the user's own
   words (what was missing, the notes, the goals' notes), the interview of then with its answers
-  (`formatQuestionAnswersForPrompt`), the requests for changes, the proposal in one line. The plan in force stays
+  (`formatQuestionAnswersForPrompt`), the requests for changes, the proposal in one line and its NEW goals («Obiettivi nuovi proposti allora, creati da «Applica»» or «mai creati», 2026-11-20: the Consulente had read its own new goal as the user's novelty). The plan in force stays
   printed whole before it (IL PIANO IN VIGORE); the revision's round reads neither (its report is the context). The
   reading rule in both contracts: a change in tolerance, horizon, goals or constraints the data do not explain is a
   question (interview) or a sentence of «La situazione» (strategy); fear, haste or euphoria read in the words — of
@@ -169,8 +177,12 @@
   printed after OBBLIGAZIONI in `userContent` of the interview and the strategy (through `buildConsulenteContext`), of
   the review and of the revision (`opts.accumulationPlan`); never the instruments' stage nor the Assistente (declared, 2026-11-12). Three states: not read (a
   failed read logs and never fails the run), no active plan (a draft or a completed one count as none), an active
-  plan — month k of n («non ancora partito: parte a …» before its start), the instalment, the weights by name, the
-  sales with their month and status. Sections 5 and 6 of the contracts carry the path in words: what to accumulate or
+  plan — month k of n («non ancora partito: parte a …» before its start), the instalment, what it buys as SHARES OF ITS
+  MONEY (Σ of the lines not skipped by position, «Compra, in parti dei soldi del piano: X 60% (… €)»), the positions
+  kept at their weight apart («Tiene al loro peso, senza comprarli»), the sales with their month and status (a swap adds «, e con il ricavato compra X nello stesso mese», 2026-11-20; a swap line is never counted among the buys). A plan
+  that refills the reserve first names it: «fino a 2027-10 ricostituiscono solo la riserva (11 mesi senza acquisti),
+  prima rata 800 € a 2027-11» (`OpenPlanForAdvice.firstBuy`; owner, 2026-11-20, after NOVE-25's phase F: the
+  Consulente had read «prima rata di 0 €» and the held positions' end weights as buys). Sections 5 and 6 of the contracts carry the path in words: what to accumulate or
   sell, an indicative time, the monthly instalment as an order of magnitude, and with an active plan whether it goes
   toward the targets — never a table, never the plan's figures recomputed; the review names «Crea un piano di
   accumulo verso questa allocazione» (owner, 2026-11-12).
@@ -301,9 +313,7 @@
   report».
 - **The pager** is the card's footer on every width: «Indietro» (disabled on the first page) and, below `desktop:`,
   «Indice»; the page's own buttons — «Avanti» (absent on «Applica»), on «Chiedi una modifica» «Rivedi il report» and
-  «Salta le domande» with «Avanti» as an outline, on «Applica» «Applica alle impostazioni» and «Rifai il percorso» (once applied, also «Crea un piano di accumulo verso questa allocazione», below).
-  With an active accumulation plan «Applica» says once that the new targets do not change it (`APPLY_ACTIVE_PLAN_NOTE`,
-  read through `useAccumulationPlans`, 2026-11-12).
+  «Salta le domande» with «Avanti» as an outline, on «Applica» «Applica alle impostazioni» and «Rifai il percorso»; the plan of accumulation's tick and, once applied, «Crea il piano di accumulo» live in the page's body (2026-11-20, doc/guide/consulente-piano.md § The book and «Applica»).
   Below `tablet:` a column, the page's buttons full width on top. From `desktop:` the rail's labels are buttons, ONE
   Tab stop (the arrows move along the rail); below it «Indice» opens «Vai a una pagina», a `ResponsiveModal` of 44px
   rows — the route's one modal. The WHOLE page slides along the turn, the leaving page `inert`; after a turn the
@@ -408,11 +418,9 @@ on a phone, and from the row under the Assistente's conversation).
 - **The strategy reads this year's rows twice** (2026-11): the YTD bundle and the cashflow block query them apart —
   accepted, the bundle stays the Assistente's, and the block is read once per strategy and once per interview round (`buildConsulenteContext`), never by the instruments or
   the review.
-- **A bond ETF's duration in the context is Yahoo's, up to 30 days old, and may differ from the factsheet**
-  (2026-11-08): the block says «secondo Yahoo, non verificate» and the instruments contract has the second agent
-  confirm it before a candidate carries `duration`; a fund Yahoo does not describe («non pubblicata») is still in the
-  block with its value, so the strategy can ask the search for it. The context never rereads Yahoo: the Esposizione's
-  TTL rules it.
+- **The strategy names no duration in figures, only a horizon** (2026-11-20): the OBBLIGAZIONI block carries none
+  (Yahoo's proved wrong), so a bond sub-target's text says «orizzonte 1-3 anni» and the figure appears only on the
+  candidates of «Gli strumenti», verified by the search. A strategy written before 2026-11-20 may still carry Yahoo's.
 - **A path abandoned before its report is not in the archive** (2026-11-08): the previous paths are those with a
   report; «Riprova» after a failed strategy creates a new document with the same answers, and archiving the failed
   one would have listed the same words twice. The one exception the model sees: the live document without a report

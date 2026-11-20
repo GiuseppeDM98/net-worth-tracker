@@ -27,6 +27,7 @@ import type { Narrative } from '@/lib/utils/narrative';
 import type { AllocationAction, RebalanceMove } from '@/lib/utils/allocationUtils';
 import { MIN_VISIBLE_AMOUNT, type PlanMode, type PlanView } from '@/lib/utils/allocazioneSummary';
 import { formatLeverage } from '@/lib/utils/allocazioneNarrative';
+import { ACCUMULO_OPEN_LINK } from '@/lib/utils/accumuloCopy';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { useActionColors } from '@/lib/hooks/useActionColors';
@@ -223,7 +224,7 @@ export function PianoTile({ mode, onModeChange, amountInput, onAmountInputChange
         <div className="mt-3 rounded-[10px] bg-muted px-3 py-2.5 text-[12px] leading-[1.5] text-foreground">
           <NarrativeText segments={pacNote.reading} className="inline" />{' '}
           <button type="button" onClick={pacNote.onOpenAccumulo} className={TILE_FOOTER_ACTION_CLASS}>
-            Apri Accumulo
+            {ACCUMULO_OPEN_LINK}
           </button>
         </div>
       )}

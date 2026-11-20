@@ -28,7 +28,7 @@ vi.mock('@/components/allocation/AccumulationPlanDialog', () => ({ AccumulationP
 vi.mock('@/components/allocation/AccumulationCalendarDialog', () => ({ AccumulationCalendarDialog: () => null }));
 vi.mock('@/components/assets/TransactionDialog', () => ({ TransactionDialog: () => null }));
 
-import { QuestoMeseTile } from '@/components/allocation/tiles/QuestoMeseTile';
+import { AdvisorNotes, QuestoMeseTile } from '@/components/allocation/tiles/QuestoMeseTile';
 import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import {
   ACCUMULO_ACTION_IGNORE_MATCH,
@@ -71,7 +71,7 @@ function activePlan(overrides: Partial<AccumulationPlan> = {}): AccumulationPlan
   } as AccumulationPlan;
 }
 
-function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcoming' as LineUiState, today = new Date('2027-02-12T12:00:00') } = {}) {
+function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcoming' as LineUiState, today = new Date('2027-02-12T12:00:00'), assets = ASSETS } = {}) {
   const matches = saleState === 'toConfirm'
     ? [{ kind: 'disposal' as const, assetId: 'fondo-y', transactionIds: ['tx-1'], quantity: 10, amountEur: 6000 }]
     : [];
@@ -79,7 +79,7 @@ function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcomi
     <QuestoMeseTile
       ownerId="owner-1"
       plan={plan}
-      allAssets={ASSETS}
+      allAssets={assets}
       targets={{} as never}
       band={{ mode: 'relative', value: 20 } as never}
       targetLeverageRatio={1}
@@ -131,4 +131,66 @@ describe('QuestoMeseTile — the review month', () => {
     expect(screen.queryByText(ACCUMULO_REVIEW_DUE_NOTE)).toBeNull();
     expect(screen.getAllByRole('button', { name: ACCUMULO_ACTION_REVISE })).toHaveLength(1);
   });
+});
+
+// A position whose instrument has no price (the Consulente's «Applica» creates one when no listing quotes it, 2026-11-20).
+// Mutation that turns it red: the sentence dropped from the active view.
+describe('QuestoMeseTile — a position with no price', () => {
+  it('names it once, and says nothing while every position has a price', () => {
+    const { unmount } = renderTile();
+    expect(screen.queryByText(/non ha un prezzo disponibile/)).toBeNull();
+    unmount();
+    const plan = activePlan({
+      positions: [
+        { id: 'p1', label: 'ETF Uno', targetPercentage: 60, memberAssetIds: ['etf-uno'], buyAssetId: 'etf-uno' },
+        { id: 'p2', label: 'ETF Nuovo', targetPercentage: 40, memberAssetIds: ['etf-nuovo'], buyAssetId: 'etf-nuovo' },
+      ],
+    });
+    renderTile({ plan, assets: [...ASSETS, asset('etf-nuovo', 'ETF Nuovo', { currentPrice: 0 })] });
+    expect(screen.getByText('ETF Nuovo non ha un prezzo disponibile: non riceve acquisti finché non lo aggiorni.')).not.toBeNull();
+  });
+});
+
+// The Consulente's corrections on a plan its «Applica» created (2026-11-20). Mutation that turns it red: every note shown.
+describe('AdvisorNotes', () => {
+  it('nothing without notes; up to three in sight, the rest behind «Altre n»', () => {
+    const { container, unmount } = render(<AdvisorNotes notes={[]} />);
+    expect(container.textContent).toBe('');
+    unmount();
+    const notes = ['Nota uno.', 'Nota due.', 'Nota tre.', 'Nota quattro.', 'Nota cinque.'];
+    const view = render(<AdvisorNotes notes={notes} />);
+    expect(screen.getByText('Dal Consulente')).not.toBeNull();
+    const list = screen.getAllByRole('list')[0];
+    expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Nota uno.', 'Nota due.', 'Nota tre.']);
+    const more = view.container.querySelector('details') as HTMLDetailsElement;
+    expect(more.querySelector('summary')?.textContent).toBe('Altre 2');
+    expect(more.textContent).toContain('Nota cinque.');
+  });
+});
+
+// The swap (owner, 2026-11-20, on the mirror: the two sales registrable in November, the BTP€i only from December, as a
+// line of the rata). Its purchase sits under the sales that pay it, with its own Registra, never among the rata's lines.
+// Mutations that turn it red: the swap line kept among the rata's lines; the swap row not drawn under the sales.
+describe('QuestoMeseTile — the swap', () => {
+  const swapPlan = () => {
+    const base = activePlan({ disposals: [{ assetId: 'fondo-y', quantity: 10, monthIndex: 1, estimatedProceedsEur: 6000, status: 'planned', reinvestAssetId: 'btp' }] });
+    return {
+      ...base,
+      positions: [...base.positions, { id: 'p-btp', label: 'BTP€i fenicottero', targetPercentage: 0, memberAssetIds: ['btp'], buyAssetId: 'btp' }],
+      installments: base.installments.map((installment) => installment.index === 1
+        ? { ...installment, lines: [...installment.lines, { positionId: 'p-btp', assetId: 'btp', plannedQuantity: 5000, priceEurAtPlan: 1.2, plannedAmountEur: 6000, status: 'planned' as const, swap: true as const }] }
+        : installment),
+    } as AccumulationPlan;
+  };
+  const assets = [...ASSETS, asset('btp', 'BTP€i fenicottero', { type: 'bond', assetClass: 'bonds', currentPrice: 1.2 })];
+
+  for (const [when, currentIndex, today] of [['before the start', 0, '2026-12-12'], ['in its month', 1, '2027-01-12']] as const) {
+    it(`${when}: under the sale, «Con il ricavato», with Registra; not among the rata's lines`, () => {
+      renderTile({ plan: swapPlan(), currentIndex, saleState: 'todo', today: new Date(`${today}T12:00:00`), assets });
+      const row = screen.getByText((text) => text.startsWith('Con il ricavato: BTP€i fenicottero')).closest('li') as HTMLElement;
+      expect(row.previousElementSibling).toBe(saleRow());
+      expect(within(row).getByRole('button', { name: ACCUMULO_ACTION_REGISTER })).toBeTruthy();
+      expect(screen.queryAllByText((text) => text.includes('BTP€i fenicottero') && !text.startsWith('Con il ricavato')).filter((el) => el.tagName === 'SPAN' && el.closest('li'))).toHaveLength(0);
+    });
+  }
 });

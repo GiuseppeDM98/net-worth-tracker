@@ -85,12 +85,10 @@ import { calculateAssetValue } from '@/lib/services/assetService';
 import {
   compareAllocations,
   deriveTargetLeverageRatio,
-  getDefaultTargets,
-  buildTargetsFromGoalAllocation,
 } from '@/lib/services/assetAllocationService';
-import { deriveTargetAllocationFromGoals } from '@/lib/services/goalService';
+import { resolveEffectiveTargets } from '@/lib/services/effectiveTargets';
 import type { LeveragePlanInputs } from '@/lib/utils/leverageAwareAllocationUtils';
-import type { Asset, AssetAllocationTarget } from '@/types/assets';
+import type { Asset } from '@/types/assets';
 import {
   applyRebalanceBand,
   summarizeBalance,
@@ -259,24 +257,7 @@ export default function AllocationPage() {
     const { tradable, frozen, excluded } = partitionByAllocationRole(assetsData);
     const inAllocation = [...tradable, ...frozen];
 
-    let effectiveTargets: AssetAllocationTarget;
-    let fromGoals = false;
-    if (
-      settings?.goalBasedInvestingEnabled &&
-      settings?.goalDrivenAllocationEnabled &&
-      goalData &&
-      goalData.goals.length > 0
-    ) {
-      const derived = deriveTargetAllocationFromGoals(goalData.goals, goalData.assignments, assetsData);
-      if (derived) {
-        effectiveTargets = buildTargetsFromGoalAllocation(derived, settings?.targets);
-        fromGoals = true;
-      } else {
-        effectiveTargets = settings?.targets || getDefaultTargets();
-      }
-    } else {
-      effectiveTargets = settings?.targets || getDefaultTargets();
-    }
+    const { targets: effectiveTargets, fromGoals } = resolveEffectiveTargets(settings, goalData, assetsData);
 
     return {
       targets: effectiveTargets,
@@ -811,7 +792,6 @@ export default function AllocationPage() {
                 reviewByIso={reviewDue.state === 'none' ? null : reviewDue.reviewByIso}
                 settings={settings}
                 goals={goalData?.goals}
-                advice={adviceQuery.isError ? null : adviceQuery.data}
               />
             )}
           </TabsContent>
