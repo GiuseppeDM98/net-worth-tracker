@@ -127,6 +127,10 @@ holds it): how it was learned is `git log`'s.
   `DialogDescription` hands `text-sm text-muted-foreground` down, a child running `cn(own…, className)` lets
   `tailwind-merge` keep the wrapper's, and a font-size utility also drops a `leading-*` — put the incoming `className`
   BEFORE the classes that must win, and read the result with `getComputedStyle`.
+- **A guided path renders `PathCard`** (`components/ui/path-card.tsx`, 2026-11-20: Compravendita and the plan of
+  accumulation): the 720px card, «Passo n di N · tema», one primary button, «Ricomincia» armed; its fields are
+  `components/ui/path-fields.tsx`, its browser draft `lib/utils/pathDraftStorage.ts`. The Consulente keeps its own card
+  (the rail, the slide) and imports only the class constants.
 
 ### Layout and Color Tokens
 - Never hardcode structural colors in shell components — `bg-background`, `text-foreground`, `border-border`.
@@ -471,6 +475,7 @@ file used to carry.
 - Sentences and figures live in `accumulationNarrative.ts` / `accumuloSummary.ts`; every write invalidates `queryKeys.accumulationPlans.all`, which the Piano's note reads too.
 - The Consulente's plan (2026-11-20) arrives ACTIVE from «Applica»: `createAndActivatePlan` validates on the given assets, writes (or replaces the open draft whole — `updateDraftPlan` clears what the draft lacks), activates, then writes the model; no editor on this path, its corrections in `advisorNotes` («Questo mese» › «Dal Consulente»).
 - A swap (2026-11-20): a sale with `reinvestAssetId` buys that instrument with its WHOLE proceeds in its own month, outside the reserve, `L` and the rates (`computeUsableLiquidity.swaps`, lines `swap: true`); every reading of «a month that buys» goes through `isRegularLine` (`accumuloMonth.ts`), never `lines.length`.
+- A plan is created by the guided path at `/dashboard/allocation/piano` (2026-11-20: eight screens, ONE «Conferma» that activates, the answers on the browser; a draft in Accumulo is continued there); the editor only revises.
 - Il resto — the mobile composition (§ Composizione mobile), «Rivedi il piano», «Riattiva», the ledger matching — in `doc/guide/accumulo.md`.
 
 ### Allocazione › Portafoglio modello e ottimizzatore → `doc/guide/ottimizzatore.md`

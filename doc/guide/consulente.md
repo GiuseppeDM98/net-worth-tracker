@@ -12,7 +12,7 @@
 
 - **Page**: `app/dashboard/allocation/consulente/page.tsx` (the gate on the `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` flag, as
   for the Assistente, and `configured` = the key read on the server), `components/allocation/consulente/ConsulenteClient.tsx`
-  (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens and the interview's scene),
+  (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens and the interview's scene; its card classes and `numberOrNull` from `components/ui/path-{card,fields}.tsx`),
   `ConsulenteInterviewScene.tsx` (the rounds' cards, the skeleton, the scene's footer; 2026-11-08),
   `useConsulenteInterview.ts` (one round per gesture, aborted by «Salta il colloquio»), `ConsulenteRun.tsx` (the
   run's screen and `StageRows`, which the report's running view shares), `ConsulenteReport.tsx` (the running view,

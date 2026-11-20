@@ -21,9 +21,9 @@ After NOVE-19 every portalled content carries `data-costume-scope`. What still m
 | 2 | `components/ui/dialog.tsx:69`; NOVE-11 § 4.3 `[data-tile]:not([data-generated])` | the modal's `rounded-2xl` follows `--radius-2xl` but has no cap or marks; `data-tile` would replace the Float shadow with `--costume-tile-shadow: none` |
 | 3 | `components/ui/drawer.tsx:74` | `rounded-t-[10px]`: a 10px sheet under 4px / 0px tiles (NOVE-19 § 10) |
 | 4 | `components/ui/alert-dialog.tsx:64`, `:110-114`; `components/layout/LogoutDialog.tsx:30-31` | the logout confirm (from `Sidebar.tsx:297`, `SecondaryMenuDrawer.tsx:345`) is in scope after NOVE-19 but has no frame and a title without hook |
-| 5 | `ConsulenteWizard.tsx:236`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:226`, `CompravenditaWizard.tsx:111`, `:133` | five scene cards on `TILE_SURFACE_CLASS` without `data-tile`: no cap, no marks |
-| 6 | `ConsulenteWizard.tsx:91` (`HEADLINE_CLASS`, reused at `ConsulenteBook.tsx:245`), `ConsulenteInterviewScene.tsx:35`, `ConsulenteRun.tsx:121`, `CompravenditaWizard.tsx:40` | four headlines at the verdict's 24/30px in Geist beside a costumed verdict |
-| 7 | `ConsulenteWizard.tsx:266-268`, `ConsulenteInterviewScene.tsx:94`, `CompravenditaWizard.tsx:134-136`, `ConsulenteBook.tsx:236` | eyebrows with digits printed as JSX, not through `HeadingText` |
+| 5 | `ConsulenteWizard.tsx:236`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:226`, `components/ui/path-card.tsx:48` (`PathCard`), `:97` (`PathDoneCard`) — Compravendita and the plan of accumulation since 2026-11-20 | five scene cards on `TILE_SURFACE_CLASS` without `data-tile`: no cap, no marks |
+| 6 | `components/ui/path-card.tsx:20` (`PATH_HEADLINE_CLASS`, since 2026-11-20 the one headline class of `ConsulenteWizard.tsx`, `ConsulenteBook.tsx`, `ConsulenteInterviewScene.tsx`, Compravendita and the plan of accumulation), `ConsulenteRun.tsx:121` | four headlines at the verdict's 24/30px in Geist beside a costumed verdict |
+| 7 | `ConsulenteWizard.tsx:266-268`, `ConsulenteInterviewScene.tsx:94`, `components/ui/path-card.tsx:49-51`, `ConsulenteBook.tsx:236` | eyebrows with digits printed as JSX, not through `HeadingText` |
 | 8 | `app/globals.css:60` (`--radius-xl`); § 4.4's list | 36 `rounded-xl` boxes inside tiles and modals plus `card.tsx:10` and `link-banner.tsx:41` (NOVE-19 § 10) @ b841cbd7 (38), and Accumulo's two (`pr488:PlanDraftSidePanel.tsx:43`, `:64`): 40 — 9px Egeo, 4px Orbita, rounder than the tile |
 | 9 | `components/allocation/ActionChip.tsx:37` and § 4.4b's sites | `rounded-full` bars, pills and pill chips, `rounded-[Npx]` chips on the nine pages and in the Accumulo code: round or literal under Orbita, while NOVE-19 squares the same roles on its three pages |
 | 10 | `ComposizioneTile.tsx:65`, `EvoluzioneTile.tsx:110`, `ValoreStrumentoTile.tsx:90`, `StoricoDettaglio.tsx:74`, `LaborMetricsChart.tsx:34`, `FireDettaglio.tsx:53`, `RollingLineChart.tsx:19`, `AndamentoStoricoCharts.tsx:22`, `ConfrontoAnnualeCharts.tsx:23`, `EntityTrendChart.tsx:21`, `SavingsRateLineChart.tsx:65`, `components/goals/GoalProjectionChart.tsx:75` (10) | twelve Recharts tooltips `borderRadius` 8px / 10px literal (in the chart's DOM, so in scope): rounded under Orbita |
@@ -175,16 +175,16 @@ Egeo's meander beside «Consulente»).
 
 - `data-tile=""` on `ConsulenteWizard.tsx:236`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:226` (its
   `data-generated`, `:229`, keeps the AI border and glow through NOVE-11's `:not([data-generated])`),
-  `CompravenditaWizard.tsx:111`, `:133`.
-- `costume-heading` prepended to `HEADLINE_CLASS` at `ConsulenteWizard.tsx:91`, `ConsulenteInterviewScene.tsx:35`,
-  `CompravenditaWizard.tsx:40`, and to the inline class at `ConsulenteRun.tsx:121`; their strings through
+  `components/ui/path-card.tsx:48` (`PathCard`), `:97` (`PathDoneCard`).
+- `costume-heading` prepended to `PATH_HEADLINE_CLASS` at `components/ui/path-card.tsx:20` (every scene headline
+  but the run's, 2026-11-20), and to the inline class at `ConsulenteRun.tsx:121`; their strings through
   `HeadingText`: `ConsulenteWizard.tsx:282` (the ternary's value), `ConsulenteInterviewScene.tsx:96` (`headline`),
-  `ConsulenteRun.tsx:122`, `ConsulenteBook.tsx:246` (`page.title`), `CompravenditaWizard.tsx:114`, `:137`.
+  `ConsulenteRun.tsx:122`, `ConsulenteBook.tsx:246` (`page.title`), `components/ui/path-card.tsx:52` (`question`), `:100` (`headline`).
 - Eyebrows with digits as one string: `ConsulenteWizard.tsx:266-268` →
   ``<HeadingText text={`Passo ${stepNumber} di ${ALLOCATION_ADVICE_STEPS.length} · ${copy.eyebrow}`} />``;
   `ConsulenteInterviewScene.tsx:94` → `<HeadingText text={INTERVIEW_COPY.eyebrow(roundNumber, …)} />`;
-  `CompravenditaWizard.tsx:134-136` →
-  ``<HeadingText text={`Passo ${position.index + 1} di ${position.total} · ${copy.eyebrow}`} />``;
+  `components/ui/path-card.tsx:49-51` →
+  ``<HeadingText text={`${position} · ${step.theme}`} />``;
   `ConsulenteBook.tsx:236` → `<HeadingText text={eyebrow} />` in both branches. Static eyebrows («Fatto»,
   «Consulente · in corso», «Dettaglio») print no figure and stay.
 - `ConsulenteRun.tsx:74`: `first:rounded-t-xl last:rounded-b-xl` → `first:rounded-t-[inherit]
@@ -198,7 +198,7 @@ a literal `className` becomes `cn(…, COSTUME_FRAME_RADIUS_CLASS)`:
 - **Handed by NOVE-19 § 10**: `components/ui/card.tsx:10`, `components/ui/link-banner.tsx:41`.
 - **Shared, in my surfaces**: `components/ui/question-card.tsx:95`.
 - **Consulente**: `ConsulenteInterviewScene.tsx:47`, `ConsulenteRun.tsx:66`, `ConsulenteWizard.tsx:301`.
-- **Compravendita**: `CompravenditaScreens.tsx:83`, `:267`, `:314`, `:393`, `:413`; `CompravenditaWizard.tsx:142`.
+- **Compravendita**: `CompravenditaScreens.tsx:83`, `:267`, `:314`, `:393`, `:413`; `CompravenditaWizard.tsx:131`.
 - **Assistente**: `AssistantComposer.tsx:84`, `:101`, `:114`; `AssistantConversazioneTile.tsx:130` and NOVE-15's
   (retired on 2026-11-16, PR #544) suggestion Skeleton rows in the same file (`:124`, `h-11 rounded-xl` →
   `cn('h-11', COSTUME_FRAME_RADIUS_CLASS)`: the only `rounded-xl` an earlier spec of the series adds, grep of

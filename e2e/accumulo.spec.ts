@@ -11,8 +11,8 @@
  * l'account non ne ha: `plantCriteria` li accende in `beforeAll`, `restoreCriteria` rimette ciò che ha letto e
  * toglie il modello in `afterAll`. Si asserisce la STRUTTURA, mai una cifra: i pesi seguono i prezzi del seed.
  *
- * Una vendita nel suo mese (2026-11-19): «In programma» prima del mese, «Vendi a» nell'editor, il mese di revisione del
- * Consulente. Il piano creato dalla pagina ha un id generato: `removeOwnerPlans` in `afterEach`.
+ * Una vendita nel suo mese (2026-11-19): «In programma» prima del mese, il mese di revisione del Consulente. Un piano si
+ * crea col percorso (2026-11-20): la vendita nel suo mese lì, in `accumulo.piano.spec.ts`.
  *
  * REGRESSION GUARD, visti rossi (2026-11-17): l'impronta tolta dal salvataggio; `isModelStale` sempre falso; «Modifica
  * i criteri» spento su un account che non li ha mai salvati (trovato al collaudo: non c'era modo di accenderli).
@@ -24,11 +24,9 @@ import {
   plantModel,
   plantTaxRates,
   readCriteriaEnabled,
-  readActivePlan,
   readModel,
   removeAccumuloFixture,
   removeModel,
-  removeOwnerPlans,
   removeTaxRates,
   seedAccumuloFixture,
   restoreCriteria,
@@ -191,72 +189,6 @@ test.describe('una vendita nel suo mese', () => {
     } finally {
       await removeAccumuloFixture();
     }
-  });
-
-  test.describe('un piano nuovo', () => {
-    test.afterEach(removeOwnerPlans);
-
-    test('«Vendi a» il 3° mese: la frase del pannello, e la 3ª rata scritta è più grande della 2ª', async ({ page }) => {
-      await removeOwnerPlans();
-      await openAccumulo(page);
-      await page.getByRole('button', { name: 'Crea piano' }).click();
-      const dialog = page.getByRole('dialog');
-      await expect(dialog).toBeVisible();
-
-      // Step 1: the account, no reserve — the sale's money goes to the instalments, none to a refill.
-      const account = dialog.getByRole('checkbox', { name: 'Conto Corrente' });
-      if (!(await account.isChecked())) await account.check();
-      await dialog.getByLabel('Riserva da non toccare (€)').fill('0');
-      await dialog.getByRole('button', { name: 'Avanti' }).click();
-
-      // Step 2: Bitcoin sold in the plan's 3rd month, its weight given to the rest.
-      const bitcoin = dialog.getByRole('row').filter({ hasText: 'Bitcoin' });
-      await bitcoin.getByRole('button', { name: 'Vendi', exact: true }).click();
-      await bitcoin.getByRole('combobox', { name: 'Vendi a' }).click();
-      await page.getByRole('option').nth(2).click();
-      const redistribute = dialog.getByRole('button', { name: 'Distribuisci il resto' });
-      if (await redistribute.isEnabled()) await redistribute.click();
-      await expect(dialog.locator('aside[aria-label="Effetto dei pesi"]')).toContainText('la rata sale a', { timeout: 15_000 });
-      await dialog.getByRole('button', { name: 'Avanti' }).click();
-      await dialog.getByRole('button', { name: 'Attiva piano' }).click();
-      await expect(dialog).toBeHidden({ timeout: 30_000 });
-
-      // The written plan: the sale in month 3, the 3rd instalment larger than the 2nd.
-      await expect.poll(async () => (await readActivePlan()) !== null, { timeout: 15_000 }).toBe(true);
-      const plan = await readActivePlan();
-      expect(plan!.saleMonths).toEqual([3]);
-      expect(plan!.instalmentEur[2]).toBeGreaterThan(plan!.instalmentEur[1]);
-    });
-  });
-});
-
-// A partial sale picks its month too, and keeps it when the quantity changes (owner, 2026-11-19).
-test.describe('una vendita parziale nel suo mese', () => {
-  test.afterEach(removeOwnerPlans);
-
-  test('«Vendi quote» poi «Vendi a» il 4° mese: il mese resta cambiando le quote, e il piano lo scrive', async ({ page }) => {
-    await removeOwnerPlans();
-    await openAccumulo(page);
-    await page.getByRole('button', { name: 'Crea piano' }).click();
-    const dialog = page.getByRole('dialog');
-    const account = dialog.getByRole('checkbox', { name: 'Conto Corrente' });
-    if (!(await account.isChecked())) await account.check();
-    await dialog.getByLabel('Riserva da non toccare (€)').fill('0');
-    await dialog.getByRole('button', { name: 'Avanti' }).click();
-
-    const vwce = dialog.getByRole('row').filter({ hasText: 'Vanguard FTSE All-World' });
-    await vwce.getByLabel('Vendi quote').fill('2');
-    const month = vwce.getByRole('combobox', { name: 'Vendi a' });
-    await month.click();
-    await page.getByRole('option').nth(3).click();
-    const chosen = await month.textContent();
-    await vwce.getByLabel('Vendi quote').fill('3');
-    await expect(month).toHaveText(chosen!);
-
-    await dialog.getByRole('button', { name: 'Avanti' }).click();
-    await dialog.getByRole('button', { name: 'Attiva piano' }).click();
-    await expect(dialog).toBeHidden({ timeout: 30_000 });
-    await expect.poll(async () => (await readActivePlan())?.saleMonths, { timeout: 15_000 }).toEqual([4]);
   });
 });
 

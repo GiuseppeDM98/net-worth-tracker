@@ -166,7 +166,8 @@ export const ACCUMULO_MONTH_TILE_DONE_EYEBROW = 'Piano concluso';
 export const ACCUMULO_ACTION_CREATE_PLAN = 'Crea piano';
 export const ACCUMULO_ACTION_DELETE_DRAFT = 'Elimina bozza';
 export const ACCUMULO_ACTION_DELETE_DRAFT_VERB = 'eliminare la bozza';
-export const ACCUMULO_ACTION_EDIT = 'Modifica';
+/** The draft view's link to the guided path, which continues the draft (2026-11-20). */
+export const ACCUMULO_ACTION_CONTINUE = 'Continua';
 export const ACCUMULO_ACTION_ACTIVATE = 'Attiva piano';
 export const ACCUMULO_ACTION_REGISTER = 'Registra';
 export const ACCUMULO_ACTION_REVISE = 'Rivedi il piano';

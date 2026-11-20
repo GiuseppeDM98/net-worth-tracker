@@ -46,12 +46,11 @@ import { TILE_EYEBROW_CLASS, TILE_SURFACE_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SCENE_CARD_CLASS, SCENE_GRID_CLASS } from './ConsulenteRun';
-import { HEADLINE_CLASS } from './ConsulenteWizard';
+import { PATH_BUTTON_CLASS, PATH_HEADLINE_CLASS } from '@/components/ui/path-card';
 import { InterviewBody } from './ConsulenteInterviewTile';
 import { describeRevisionAside, RevisionBody, useRevisionDraft, type RevisionDraft } from './ConsulenteRevisionTile';
 import {
   applyPieces,
-  BUTTON_CLASS,
   consulenteReportEntrance,
   goalsPieces,
   instrumentsPieces,
@@ -242,7 +241,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
                     <PageVerdict verdict={verdict} ariaLabel={VERDICT_LABEL} />
                   </div>
                 ) : (
-                  <p ref={targetRef as RefObject<HTMLParagraphElement | null>} tabIndex={-1} className={cn(HEADLINE_CLASS, 'mt-3 outline-none')}>
+                  <p ref={targetRef as RefObject<HTMLParagraphElement | null>} tabIndex={-1} className={cn(PATH_HEADLINE_CLASS, 'mt-3 outline-none')}>
                     {page.title}
                   </p>
                 )}
@@ -264,11 +263,11 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
                 <div className="flex flex-col gap-2 tablet:order-2 tablet:flex-row">
                   {page.id === 'modifica' && (
                     <>
-                      <Button type="button" className={cn(BUTTON_CLASS, 'border border-transparent tablet:order-2', AI_CONTROL_ACCENT_CLASS)} onClick={draft.primary.onClick} disabled={draft.primary.disabled}>
+                      <Button type="button" className={cn(PATH_BUTTON_CLASS, 'border border-transparent tablet:order-2', AI_CONTROL_ACCENT_CLASS)} onClick={draft.primary.onClick} disabled={draft.primary.disabled}>
                         {draft.primary.label}
                       </Button>
                       {draft.showSkip && (
-                        <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'tablet:order-1')} onClick={draft.skipQuestions} disabled={draft.revising}>
+                        <Button type="button" variant="outline" className={cn(PATH_BUTTON_CLASS, 'tablet:order-1')} onClick={draft.skipQuestions} disabled={draft.revising}>
                           Salta le domande
                         </Button>
                       )}
@@ -277,26 +276,26 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
                   {page.id === 'applica' && (
                     <>
                       {document.status === 'ready' && (
-                        <Button type="button" className={cn(BUTTON_CLASS, 'tablet:order-2')} disabled={!props.canApply || writing || done} onClick={props.onApply}>
+                        <Button type="button" className={cn(PATH_BUTTON_CLASS, 'tablet:order-2')} disabled={!props.canApply || writing || done} onClick={props.onApply}>
                           Applica alle impostazioni
                         </Button>
                       )}
-                      <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'tablet:order-1')} onClick={onRedo}>
+                      <Button type="button" variant="outline" className={cn(PATH_BUTTON_CLASS, 'tablet:order-1')} onClick={onRedo}>
                         Rifai il percorso
                       </Button>
                     </>
                   )}
                   {!isLast && (
-                    <Button type="button" variant={page.id === 'modifica' ? 'outline' : 'default'} className={cn(BUTTON_CLASS, 'tablet:order-3')} onClick={() => turnTo(index + 1)}>
+                    <Button type="button" variant={page.id === 'modifica' ? 'outline' : 'default'} className={cn(PATH_BUTTON_CLASS, 'tablet:order-3')} onClick={() => turnTo(index + 1)}>
                       {BOOK_COPY.next}
                     </Button>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 tablet:order-1 tablet:flex">
-                  <Button type="button" variant="outline" className={BUTTON_CLASS} disabled={index === 0} onClick={() => turnTo(index - 1)}>
+                  <Button type="button" variant="outline" className={PATH_BUTTON_CLASS} disabled={index === 0} onClick={() => turnTo(index - 1)}>
                     {BOOK_COPY.back}
                   </Button>
-                  <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'desktop:hidden')} onClick={() => setIndexOpen(true)}>
+                  <Button type="button" variant="outline" className={cn(PATH_BUTTON_CLASS, 'desktop:hidden')} onClick={() => setIndexOpen(true)}>
                     {BOOK_COPY.index}
                   </Button>
                 </div>

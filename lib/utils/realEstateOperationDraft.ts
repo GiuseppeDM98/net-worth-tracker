@@ -38,6 +38,7 @@ import {
   suggestCategory,
   type RealEstatePlanContext,
 } from '@/lib/utils/realEstateOperationPlan';
+import { clearStored, readStoredJson, writeStoredJson } from '@/lib/utils/pathDraftStorage';
 
 export interface RealEstateOperationDraft {
   /** The screen open, by NAME: the list of screens moves with the answers. */
@@ -260,35 +261,24 @@ export function draftStorageKey(ownerId: string): string {
   return `real-estate-operation-draft:${ownerId}`;
 }
 
-/** The draft stored on this browser, or null; one from another shape is ignored. */
+/** The draft's shape check: one from another shape is ignored. */
+function parseStoredDraft(value: unknown): RealEstateOperationDraft | null {
+  const parsed = value as Partial<RealEstateOperationDraft> | null;
+  if (!parsed || typeof parsed !== 'object') return null;
+  if (typeof parsed.screen !== 'string' || !REAL_ESTATE_OPERATION_SCREENS.includes(parsed.screen as RealEstateOperationScreen)) return null;
+  if (!parsed.answers || typeof parsed.answers !== 'object' || !('kind' in parsed.answers) || !('costs' in parsed.answers)) return null;
+  return { screen: parsed.screen as RealEstateOperationScreen, answers: parsed.answers as RealEstateOperationAnswers, preparedFor: parsed.preparedFor ?? null };
+}
+
+/** The draft stored on this browser, or null. */
 export function readStoredDraft(storage: Pick<Storage, 'getItem'> | null, ownerId: string): RealEstateOperationDraft | null {
-  if (!storage) return null;
-  try {
-    const raw = storage.getItem(draftStorageKey(ownerId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<RealEstateOperationDraft>;
-    if (typeof parsed.screen !== 'string' || !REAL_ESTATE_OPERATION_SCREENS.includes(parsed.screen as RealEstateOperationScreen)) return null;
-    if (!parsed.answers || typeof parsed.answers !== 'object' || !('kind' in parsed.answers) || !('costs' in parsed.answers)) return null;
-    return { screen: parsed.screen as RealEstateOperationScreen, answers: parsed.answers as RealEstateOperationAnswers, preparedFor: parsed.preparedFor ?? null };
-  } catch {
-    return null;
-  }
+  return readStoredJson(storage, draftStorageKey(ownerId), parseStoredDraft);
 }
 
 export function writeStoredDraft(storage: Pick<Storage, 'setItem'> | null, ownerId: string, draft: RealEstateOperationDraft): void {
-  if (!storage) return;
-  try {
-    storage.setItem(draftStorageKey(ownerId), JSON.stringify(draft));
-  } catch {
-    // A full or blocked storage loses the convenience, never the path.
-  }
+  writeStoredJson(storage, draftStorageKey(ownerId), draft);
 }
 
 export function clearStoredDraft(storage: Pick<Storage, 'removeItem'> | null, ownerId: string): void {
-  if (!storage) return;
-  try {
-    storage.removeItem(draftStorageKey(ownerId));
-  } catch {
-    // Same as above.
-  }
+  clearStored(storage, draftStorageKey(ownerId));
 }

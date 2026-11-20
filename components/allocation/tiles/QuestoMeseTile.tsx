@@ -62,6 +62,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { AccumulationPlanDialog } from '@/components/allocation/AccumulationPlanDialog';
+import Link from 'next/link';
+import { PLAN_PATH_HREF } from '@/lib/utils/accumuloCopy';
 import { AccumulationCalendarDialog } from '@/components/allocation/AccumulationCalendarDialog';
 import { TransactionDialog } from '@/components/assets/TransactionDialog';
 import { DEPS, DraftBox, ROW_ACTION_CLASS, ROW_UNDO_CLASS, LineStateChip, TILE_ACTION_CLASS, effectiveLineState } from '@/components/allocation/tiles/accumuloShared';
@@ -77,7 +79,7 @@ import {
   ACCUMULO_ACTION_CONFIRM,
   ACCUMULO_ACTION_DELETE_DRAFT,
   ACCUMULO_ACTION_DELETE_DRAFT_VERB,
-  ACCUMULO_ACTION_EDIT,
+  ACCUMULO_ACTION_CONTINUE,
   ACCUMULO_ACTION_IGNORE_MATCH,
   ACCUMULO_ACTION_MARK_EXECUTED,
   ACCUMULO_ACTION_APPLY,
@@ -177,7 +179,6 @@ export function QuestoMeseTile({
     <p className="mt-2 text-[12px] text-warning-foreground">{describePlanPastReview(reviewByIso)}</p>
   ) : null;
 
-  const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [reviseOpen, setReviseOpen] = useState(false);
   const [reviseFromModel, setReviseFromModel] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -359,26 +360,6 @@ export function QuestoMeseTile({
     />
   );
 
-  const planDialog = planDialogOpen && (
-    <AccumulationPlanDialog
-      open={planDialogOpen}
-      onClose={() => setPlanDialogOpen(false)}
-      ownerId={ownerId}
-      plan={plan}
-      allAssets={allAssets}
-      targets={targets}
-      band={band}
-      targetLeverageRatio={targetLeverageRatio}
-      idealAllocation={idealAllocation}
-      model={model}
-      onAssetsChanged={onAssetsChanged}
-      reviewByIso={reviewByIso}
-      basis={modelBasis}
-      investmentAccountId={investmentAccountId}
-      onSaved={() => setPlanDialogOpen(false)}
-    />
-  );
-
   const reviseDialog = reviseOpen && (
     <AccumulationPlanDialog
       open={reviseOpen}
@@ -451,15 +432,21 @@ export function QuestoMeseTile({
             >
               {deleteDraftArmed.armed ? armedActionLabel(ACCUMULO_ACTION_DELETE_DRAFT_VERB) : ACCUMULO_ACTION_DELETE_DRAFT}
             </Button>
-            <Button variant="outline" className={TILE_ACTION_CLASS} onClick={() => setPlanDialogOpen(true)}>
-              {ACCUMULO_ACTION_EDIT}
-            </Button>
+            {/* The draft is continued in the guided path, which overwrites and activates it (2026-11-20). */}
+            {isDemo ? (
+              <Button variant="outline" className={TILE_ACTION_CLASS} disabled>
+                {ACCUMULO_ACTION_CONTINUE}
+              </Button>
+            ) : (
+              <Button asChild variant="outline" className={TILE_ACTION_CLASS}>
+                <Link href={PLAN_PATH_HREF}>{ACCUMULO_ACTION_CONTINUE}</Link>
+              </Button>
+            )}
             <Button className={TILE_ACTION_CLASS} disabled={isDemo || draftIssues.length > 0} onClick={() => void handleActivate()}>
               {ACCUMULO_ACTION_ACTIVATE}
             </Button>
           </div>
         </Tile>
-        {planDialog}
       </>
     );
   }

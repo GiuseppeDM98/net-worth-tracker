@@ -103,6 +103,10 @@ should look like and the plan is how the monthly inflow gets closer.
 
 ## Per-page blind spots
 
+- **«Ricalcola» grey, «Raggiungibile col PAC» that does nothing** (seen on the guided verification of
+  2026-11-20): «Ricalcola» waits for the criteria to be on («Modifica i criteri» › «Attiva», under the classes), and
+  «Raggiungibile col PAC» for an amount to invest — the line under the three modes says so. «Crea un PAC con questi
+  pesi» lives only in a calculation's result.
 - **Query key**: saving the model invalidates `queryKeys.modelPortfolio.byOwner`, the key the tile and the PAC
   editor read.
 - **The optimizer weighs class, leverage, factor, instrument and group objectives only**; a class objective and a

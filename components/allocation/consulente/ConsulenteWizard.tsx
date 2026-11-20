@@ -71,6 +71,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ChoiceList } from '@/components/ui/choice-list';
 import { PathRail } from '@/components/ui/path-rail';
 import { cn } from '@/lib/utils';
+import { PATH_BUTTON_CLASS, PATH_HEADLINE_CLASS, PATH_HELP_CLASS } from '@/components/ui/path-card';
+import { numberOrNull } from '@/components/ui/path-fields';
 import { ConsulenteRun, SCENE_CARD_CLASS, SCENE_GRID_CLASS } from './ConsulenteRun';
 import { ConsulenteInterviewScene } from './ConsulenteInterviewScene';
 import { useConsulenteInterview } from './useConsulenteInterview';
@@ -88,11 +90,8 @@ interface ConsulenteWizardProps {
   run: ReturnType<typeof useConsulenteRun>;
 }
 
-export const HEADLINE_CLASS = 'text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]';
-const HELP_CLASS = 'text-[14px] leading-[1.6] text-muted-foreground desktop:text-[15px]';
-const BUTTON_CLASS = 'h-11 desktop:h-9';
 /** A control that asks the model: the hover accent on a filled button, which needs `border border-transparent` for it (2026-11-07). */
-const AI_PRIMARY_CLASS = cn(BUTTON_CLASS, 'border border-transparent', AI_CONTROL_ACCENT_CLASS);
+const AI_PRIMARY_CLASS = cn(PATH_BUTTON_CLASS, 'border border-transparent', AI_CONTROL_ACCENT_CLASS);
 
 /**
  * The exchange: a closed list of the four the instrument agent knows plus «Altra…», which opens a
@@ -118,7 +117,7 @@ function ExchangeField({ value, onChange }: { value: string; onChange: (exchange
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="consulente-exchange">Borsa di riferimento</Label>
         <Select value={selected} onValueChange={pick}>
-          <SelectTrigger id="consulente-exchange" className={BUTTON_CLASS}>
+          <SelectTrigger id="consulente-exchange" className={PATH_BUTTON_CLASS}>
             <SelectValue placeholder="Scegli la borsa…" />
           </SelectTrigger>
           <SelectContent>
@@ -150,11 +149,6 @@ const ROLE_OPTIONS_FROZEN_FIRST = [
 
 /** The rail's names: the eyebrow of every step, in the path's order. */
 const STEP_NAMES = ALLOCATION_ADVICE_STEPS.map((step) => STEP_COPY[step].eyebrow);
-
-function numberOrNull(value: string): number | null {
-  const parsed = Number(value);
-  return value.trim() === '' || !Number.isFinite(parsed) ? null : parsed;
-}
 
 export function ConsulenteWizard({ ownerId, configured, settings, goalData, assets, lastDocument, run }: ConsulenteWizardProps) {
   const storage = typeof window !== 'undefined' ? window.localStorage : null;
@@ -279,8 +273,8 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
                   exit="exit"
                   onAnimationComplete={(definition) => definition === 'center' && focusTarget(sceneTurn)}
                 >
-                  <p ref={headlineRef} tabIndex={-1} className={cn(HEADLINE_CLASS, 'mt-3 outline-none')}>{currentGoal ? (currentGoal.goalId ? `«${currentGoal.name}» è ancora un tuo obiettivo?` : 'Un nuovo obiettivo.') : copy.question}</p>
-                  <p className={cn(HELP_CLASS, 'mt-2 max-w-[600px]')}>{copy.help}</p>
+                  <p ref={headlineRef} tabIndex={-1} className={cn(PATH_HEADLINE_CLASS, 'mt-3 outline-none')}>{currentGoal ? (currentGoal.goalId ? `«${currentGoal.name}» è ancora un tuo obiettivo?` : 'Un nuovo obiettivo.') : copy.question}</p>
+                  <p className={cn(PATH_HELP_CLASS, 'mt-2 max-w-[600px]')}>{copy.help}</p>
 
                   <div className="mt-5 flex flex-col gap-4">
                     {step === 'profilo' && (
@@ -342,7 +336,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
                           <Label htmlFor="consulente-missing">Cosa manca, nelle tue parole (facoltativo)</Label>
                           <Textarea id="consulente-missing" rows={3} value={answers.newGoalsNote} onChange={(event) => patch({ newGoalsNote: event.target.value })} placeholder="es. vorrei mettere da parte per cambiare auto fra tre anni" />
                         </div>
-                        <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'w-fit gap-1.5')} onClick={() => move(1, { type: 'addGoal' })}>
+                        <Button type="button" variant="outline" className={cn(PATH_BUTTON_CLASS, 'w-fit gap-1.5')} onClick={() => move(1, { type: 'addGoal' })}>
                           <Plus className="h-4 w-4" aria-hidden="true" />
                           Aggiungi un obiettivo
                         </Button>
@@ -405,7 +399,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
               </AnimatePresence>
 
               <div className="mt-6 flex flex-col-reverse gap-2 border-t border-border pt-4 tablet:flex-row tablet:items-center tablet:justify-between">
-                <Button type="button" variant="outline" className={BUTTON_CLASS} onClick={() => move(-1, { type: 'back' })} disabled={draft.step === 0 && goalIndex === 0}>
+                <Button type="button" variant="outline" className={PATH_BUTTON_CLASS} onClick={() => move(-1, { type: 'back' })} disabled={draft.step === 0 && goalIndex === 0}>
                   Indietro
                 </Button>
                 <div className="flex flex-col gap-2 tablet:items-end">
@@ -421,7 +415,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
                     <div className="flex flex-col-reverse gap-2 tablet:flex-row tablet:items-center">
                       {interview.rounds.length === 0 ? (
                         <>
-                          <Button type="button" variant="outline" className={BUTTON_CLASS} disabled={!configured} onClick={() => run.start(answers, 'strategy', { rounds: [], skipped: true })}>
+                          <Button type="button" variant="outline" className={PATH_BUTTON_CLASS} disabled={!configured} onClick={() => run.start(answers, 'strategy', { rounds: [], skipped: true })}>
                             {INTERVIEW_COPY.skipAndRun}
                           </Button>
                           <Button type="button" className={AI_PRIMARY_CLASS} disabled={!configured} onClick={startInterview}>
@@ -430,17 +424,17 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
                         </>
                       ) : (
                         <>
-                          <Button type="button" variant="outline" className={BUTTON_CLASS} disabled={!configured} onClick={() => dispatch({ type: 'interview', action: { type: 'reset' } })}>
+                          <Button type="button" variant="outline" className={PATH_BUTTON_CLASS} disabled={!configured} onClick={() => dispatch({ type: 'interview', action: { type: 'reset' } })}>
                             {INTERVIEW_COPY.restart}
                           </Button>
-                          <Button type="button" className={BUTTON_CLASS} disabled={!configured} onClick={() => move(1, { type: 'phase', phase: 'interview' })}>
+                          <Button type="button" className={PATH_BUTTON_CLASS} disabled={!configured} onClick={() => move(1, { type: 'phase', phase: 'interview' })}>
                             {configured ? INTERVIEW_COPY.resume : INTERVIEW_COPY.notConfigured}
                           </Button>
                         </>
                       )}
                     </div>
                   ) : (
-                    <Button type="button" className={BUTTON_CLASS} disabled={block !== null} onClick={() => move(1, { type: 'next' })}>
+                    <Button type="button" className={PATH_BUTTON_CLASS} disabled={block !== null} onClick={() => move(1, { type: 'next' })}>
                       Avanti
                     </Button>
                   )}
@@ -521,7 +515,7 @@ function GoalFields({ goal, index, onChange, onRemove }: { goal: AnswerGoal; ind
         <Textarea id={idOf('note')} rows={2} value={goal.note} onChange={(event) => onChange({ note: event.target.value })} placeholder="es. le quote di SWDA sono metà per ciascuna figlia" />
       </div>
       {!goal.goalId && (
-        <Button type="button" variant="ghost" className={cn(BUTTON_CLASS, 'w-fit gap-1.5 text-destructive')} onClick={onRemove}>
+        <Button type="button" variant="ghost" className={cn(PATH_BUTTON_CLASS, 'w-fit gap-1.5 text-destructive')} onClick={onRemove}>
           <Trash2 className="h-4 w-4" aria-hidden="true" />
           Rimuovi questo obiettivo
         </Button>

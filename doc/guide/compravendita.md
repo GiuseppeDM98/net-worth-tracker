@@ -12,9 +12,10 @@
 
 - **Page**: `app/dashboard/assets/compravendita/page.tsx`, `components/assets/compravendita/CompravenditaClient.tsx`
   (the five reads, the demo gate, the failed read), `CompravenditaWizard.tsx` (the card, «Indietro»/«Avanti», the
-  summary, «Conferma», the done view), `CompravenditaScreens.tsx` (each screen's controls), `fields.tsx`
-  (`NumberField`, `DateField`, `AccountField`, `CategoryField` — a category or one of its subcategories, by allowed
-  type); the choice rows are `ChoiceList` (`components/ui/choice-list.tsx`, shared with the Consulente, 2026-11-07).
+  summary, «Conferma», the done view — on the shared `PathCard`/`PathDoneCard`, `components/ui/path-card.tsx`,
+  2026-11-20), `CompravenditaScreens.tsx` (each screen's controls), `fields.tsx` (`DateField`, `CategoryField` — a
+  category or one of its subcategories, by allowed type; `NumberField` and `AccountField` are the shared
+  `components/ui/path-fields.tsx`, the browser draft goes through `lib/utils/pathDraftStorage.ts`); the choice rows are `ChoiceList` (`components/ui/choice-list.tsx`, shared with the Consulente, 2026-11-07).
   Reached from Patrimonio's header, «Compra o vendi casa».
 - **Pure**: `types/realEstateOperation.ts` (the answers, the cost kinds and their allowed types, the screens, the
   defaults list), `lib/utils/realEstateOperationPlan.ts` (the arithmetic, what the account holds, the category

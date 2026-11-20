@@ -91,6 +91,8 @@ interface AccumuloTabProps {
   ownerId: string;
   allAssets: Asset[];
   targets: AssetAllocationTarget | null;
+  /** Targets of the owner's own or derived from the goals — never the defaults: «Crea piano» needs them. */
+  hasTargets: boolean;
   band: RebalanceBand;
   targetLeverageRatio: number;
   idealAllocation: IdealAllocationSettings | null;
@@ -106,7 +108,7 @@ interface AccumuloTabProps {
   goals: readonly InvestmentGoal[] | undefined;
 }
 
-export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageRatio, idealAllocation, onAssetsChanged, reviewByIso, settings, goals }: AccumuloTabProps) {
+export function AccumuloTab({ ownerId, allAssets, targets, hasTargets, band, targetLeverageRatio, idealAllocation, onAssetsChanged, reviewByIso, settings, goals }: AccumuloTabProps) {
   // What the model portfolio rests on, without a price in it (2026-11-12).
   const modelBasis = useMemo(() => buildModelBasis(settings, goals), [settings, goals]);
   const { plansQuery, plan, today, currentIndex } = useOpenAccumuloPlan(ownerId);
@@ -286,14 +288,9 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
                       allAssets={allAssets}
                       targets={targets}
                       band={band}
-                      targetLeverageRatio={targetLeverageRatio}
-                      idealAllocation={idealAllocation}
+                      hasTargets={hasTargets}
                       model={model}
                       today={today}
-                      onAssetsChanged={onAssetsChanged}
-                      reviewByIso={reviewByIso}
-                      modelBasis={modelBasis}
-                      investmentAccountId={investmentAccountId}
                       onGoToComposition={sections.compact ? () => sections.reveal(ACCUMULO_SECTION_IDS.modello) : undefined}
                     />
                   </div>
@@ -333,12 +330,10 @@ export function AccumuloTab({ ownerId, allAssets, targets, band, targetLeverageR
                       ownerId={ownerId}
                       allAssets={allAssets}
                       targets={targets}
-                      band={band}
                       targetLeverageRatio={targetLeverageRatio}
                       idealAllocation={idealAllocation}
                       model={model}
                       plan={plan}
-                      reviewByIso={reviewByIso}
                       modelBasis={modelBasis}
                       investmentAccountId={investmentAccountId}
                       readFailed={modelQuery.isError}

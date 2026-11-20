@@ -14,10 +14,12 @@ weight, month by month, proposes the purchases and never writes a transaction on
   deploy --only firestore:rules`); until then the tab cannot read the collection. Published by the owner before
   2026-11-17, ahead of any deploy (additive: two new collections); no migration, no plan existed in production.
 - **A plan is a list of positions** (a label, a target weight, the member instruments and the one that BUYS,
-  `buyAssetId`). Weights sum to 100. «Parti da» seeds them from today's tradable portfolio or from typed targets.
-  Step 2 also has an «Ottimizzato» view (`OptimizerPanel`, doc/guide/ottimizzatore.md): it runs on «Calcola» only and
+  `buyAssetId`). Weights sum to 100. A plan is CREATED by the guided path (§ Creare un piano: il percorso); the
+  editor only revises («Rivedi il piano»), where «Parti da» seeds them from today's tradable portfolio or from typed
+  targets. Step 2 also has an «Ottimizzato» view (`OptimizerPanel`, doc/guide/ottimizzatore.md): it runs on «Calcola» only and
   «Usa questi pesi» hands the weights and the calculation's snapshot to the draft. A plan started from outside the
-  editor — «Crea un PAC con questi pesi» in the model's dialog — arrives as ONE `PlanSeedDraft` (`positions`,
+  editor — «Crea un PAC con questi pesi» in the model's dialog — arrives as ONE `PlanSeedDraft` (since 2026-11-20 the
+  path's browser draft) (`positions`,
   `disposals?`, `optimizerSnapshot?`, 2026-11-17), never a second seed shape. «Con vendite mirate» seeds its
   `disposals` (`seedDisposalsFromSale`, 2026-11-18): the whole position of an instrument out of the model or brought
   to 0% (`soldOutKeys`: never one merely out of the model, like a money-market fund — found at the tour), and then no
@@ -38,8 +40,9 @@ weight, month by month, proposes the purchases and never writes a transaction on
 - **The reserve is the allocation's cash quota, and it is refilled before anything is bought** (owner, 2026-11-17).
   The quota (`resolvePlanReserveEur`: the cash target's fixed amount, or its percentage of today's allocated base
   rounded up to the euro) covers the whole cash class, a money-market fund too, while a plan spends only from the
-  accounts — the sources are the real accounts only (`isPlanSourceAccount`, the editor lists nothing else): a new plan's «Riserva da non toccare» starts from the quota minus the cash held outside the accounts
-  (`resolvePlanReserve` → `resolveAccountReserveEur`) and stays editable. The empty tile and the no-plan verdict print
+  accounts — the sources are the real accounts only (`isPlanSourceAccount`, the path and the editor list nothing else): the path's «Riserva» starts from the quota minus the cash held outside the TICKED accounts
+  (`resolvePlanReserve(…, sourceIds)` → `resolveAccountReserveEur`) and stays editable; the revision's «Riserva da non
+  toccare» keeps the editor's rule, without `sourceIds`. The empty tile and the no-plan verdict print
   the whole cash class against the quota («Nella liquidità hai X €, entro la quota dell'allocazione (Y €)»). When
   the source cash is below the reserve, the sales and then the monthly inflows bring it back first:
   `computeUsableLiquidity` returns `shortfallEur` and `refillMonths`, `L` = cash above the reserve + max(0, sales +
@@ -86,8 +89,8 @@ weight, month by month, proposes the purchases and never writes a transaction on
   the swap on a new quantity (untested, declared 2026-11-20: the editor goes when the guided path revises) and sets
   none.
 - **The default source account** (owner, 2026-11-19): Impostazioni › Spese › «Conto per gli investimenti»
-  (`AssetAllocationSettings.investmentCashAssetId`, doc/guide/impostazioni.md); `resolveInvestmentAccountId` ticks it
-  on a new plan while it is still a plan source account (`isPlanSourceAccount`), and nothing when it is gone.
+  (`AssetAllocationSettings.investmentCashAssetId`, doc/guide/impostazioni.md); `resolveInvestmentAccountId` — the path
+  pre-ticks it alone while it is still a plan source account (`isPlanSourceAccount`), and nothing when it is gone.
 - **The review month** (owner, 2026-11-19): a plan may carry `reviewMonthIndex`, the plan month the Consulente asks
   to look at it again — no app path writes it yet on 2026-11-19 (the Consulente's operating plan is to); in that month
   «Questo mese» shows `ACCUMULO_REVIEW_DUE_NOTE` with «Rivedi il piano» (`isPlanReviewDue`), and a revision saved in
@@ -121,6 +124,50 @@ weight, month by month, proposes the purchases and never writes a transaction on
   `openAccumulationPlan.ts`; the plans' key is persisted (`PERSISTED_QUERY_PREFIXES`).
 - **The page's money is in euros of the month**: the installment is ONE figure («Rata di ottobre»); the average is
   named only in the editor (`describeInstallmentAverage`).
+
+## Creare un piano: il percorso
+
+`/dashboard/allocation/piano` (2026-11-20; owner: «deve essere il più semplice possibile»): a PAGE, one 720px card per
+screen (`PathCard`, DESIGN.md → The Path-Scene Rule), the same shape as Compravendita. The rules are pure in
+`lib/utils/planPath.ts`, the words in `planPathNarrative.ts`.
+
+- **Eight screens, one question each**: partenza (the model, today's weights, zero; «Dai pesi che hai appena calcolato»
+  with a seed, «Dalla bozza che avevi» with a draft, chosen first) · versamento (the median's «Usa …») · durata (1–60,
+  chips 6·12·24·36; the first instalment is the month after «Conferma») · conto (checkboxes, «Conto per gli
+  investimenti» pre-ticked alone; none with several accounts and no setting; never saved as the setting) · riserva
+  (`resolvePathReserveEur`: the computed figure follows the accounts until typed, «Torna a …» clears it) · vendite
+  (quantity — empty = every share, never on a group's member — the month 1–months and the tax line) · strumenti (ONE
+  list: «oggi x%», the quota, the sum, «Ridistribuisci il resto», «Aggiungi uno strumento» with «Nuovo strumento…» →
+  `AssetDialog` `createEmpty`) · riepilogo (the editor's sentences on `buildDraftPreview`, the sales' taxes, the two
+  warnings, the review note, the model box of the editor's rule). The sales come BEFORE the instruments: a sale of
+  every share takes its row away (its quota to «Ridistribuisci»); a quantity typed after it brings the row back at 0 %.
+- **The blocks**: each screen's sentence disables «Avanti» (`describePlanPathBlock`); the summary repeats them in
+  order, then the engine's gate on the draft (`firstPlanPathRefusal` → `validateDraftAgainstAssets`).
+- **The browser draft** `plan-path-draft:v1:{ownerId}` (`pathDraftStorage`): written on every change, nothing in it
+  trusted — the proceeds are recomputed at today's price, a restored draft is reconciled with today's assets (a gone
+  account or instrument dropped, the pending «Nuovo asset» label renamed, a held buyable instrument with no row added
+  at 0 %). The open plan decides (`restorePlanPathDraft`): with a draft in Accumulo the browser draft counts only if it
+  carries that draft's id, else the server draft at the first screen. «Ricomincia» (armed) → the initial draft; a seed
+  is lost. The host mounts the wizard only on plans fetched AFTER mount (`refetchOnMount: 'always'`: a link from
+  Accumulo finds the list fresh in the cache and would never refetch — found by the browser spec).
+- **«Conferma»** creates the plan ACTIVE through `createAndActivatePlan` (and the model when the box is on). It first
+  reads the Italian month again: another month writes nothing and says «Nel frattempo è cambiato il mese…»; then it reads
+  the assets again (`getAllAssets`) and the gate runs on THAT list — an account deleted in another tab is
+  `source_missing`, nothing written (found at the guided verification: on the page's list the plan was written). Disabled
+  while it writes. An activation that fails leaves a draft: the path adopts its id, the next press overwrites it. A
+  continued draft keeps its review month, notes and snapshot (`updateDraftPlan` replaces the draft whole), and a
+  sale's swap (owner, 2026-11-20: `PlanPathSale.reinvestAssetId`, no screen asks it): a quantity or a month typed
+  again keeps it, the sale taken back takes it away, it is not written once the plan no longer buys its instrument,
+  and the summary's sale line ends «con il ricavato compri …». The plan just created keeps the done card: the
+  wizard tells the host (`onCreated`), whose refetched list would otherwise find the plan active and swap the card for
+  «Hai già un piano…» (found on the mirror tour, 2026-11-20; `pianoClient.test.tsx`, E1).
+- **The states**: loading · demo · a failed read · no targets of the owner's own or from the goals (never the
+  defaults) · an ACTIVE plan («Hai già un piano di accumulo attivo.», or the «tutte le rate chiuse» sentence, and «Apri
+  Accumulo»; the browser draft cleared) · the wizard.
+- **The entry points**: the empty tile's «Crea piano» (a link; a disabled button in demo or without targets), the
+  model dialog's «Crea un PAC con questi pesi» (writes the seed as the browser draft, then navigates — no weight in the
+  URL), the draft view's «Continua». No tab and no sidebar entry. The path offers NO groups by hand, no «Sostituisci»,
+  no «Ottimizzato» (owner, 2026-11-19): groups come only from the model portfolio, as one row.
 
 ## Il piano del Consulente
 
@@ -160,18 +207,18 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
 
 ## Files
 
-`types/accumulationPlan.ts` · `lib/utils/{accumulationPlanUtils,accumulationPlanMatching,accumulationPlanSchema,accumulationNarrative,accumuloSummary,zeroQuantityChip}.ts` · the slim read path `lib/utils/{openAccumulationPlan,planMonths,accumulationPlanDoc,accumuloMonth}.ts`, `lib/services/accumulationPlanRead.ts`, `lib/hooks/{useAccumulationPlans,usePacMonth}.ts` · `lib/services/accumulationPlanService.ts` (the transactions and the lock) · `lib/hooks/{useAccumulationPlan,useOpenAccumuloPlan,useMonthlySavingsMedian}.ts` · `components/allocation/{AccumuloTab,AccumuloTabSkeleton,AccumulationPlanDialog,AccumulationCalendarDialog,ClassDriftChart,PlanDraftSidePanel}.tsx` · the plan the Consulente's click creates: `lib/utils/advicePlan.ts`, `lib/services/advicePlanService.ts` (doc/guide/consulente-piano.md), the sentences both routes show in `lib/utils/accumuloCopy.ts` · `components/allocation/tiles/{QuestoMese,ClassiDelPiano,AccumuloVuoto,PianiConclusi}Tile.tsx` · tests `__tests__/accumul*.test.ts`, `__tests__/{questoMeseTile,accumulationPlanDialogSaleMonth}.test.tsx`, `e2e/accumulo.{mobile,tablet}.spec.ts` (fixture `e2e/accumuloFixture.ts`).
+`types/accumulationPlan.ts` · `lib/utils/{accumulationPlanUtils,accumulationPlanMatching,accumulationPlanSchema,accumulationNarrative,accumuloSummary,zeroQuantityChip}.ts` · the slim read path `lib/utils/{openAccumulationPlan,planMonths,accumulationPlanDoc,accumuloMonth}.ts`, `lib/services/accumulationPlanRead.ts`, `lib/hooks/{useAccumulationPlans,usePacMonth}.ts` · `lib/services/accumulationPlanService.ts` (the transactions and the lock) · `lib/hooks/{useAccumulationPlan,useOpenAccumuloPlan,useMonthlySavingsMedian}.ts` · `components/allocation/{AccumuloTab,AccumuloTabSkeleton,AccumulationPlanDialog,AccumulationCalendarDialog,ClassDriftChart,PlanDraftSidePanel}.tsx` · the plan the Consulente's click creates: `lib/utils/advicePlan.ts`, `lib/services/advicePlanService.ts` (doc/guide/consulente-piano.md), the sentences both routes show in `lib/utils/accumuloCopy.ts` · `components/allocation/tiles/{QuestoMese,ClassiDelPiano,AccumuloVuoto,PianiConclusi}Tile.tsx` · the guided path: `app/dashboard/allocation/piano/page.tsx`, `components/allocation/piano/{PianoClient,PianoWizard,PianoScreens}.tsx`, `lib/utils/{planPath,planPathNarrative}.ts`, the shared `components/ui/{path-card,path-fields}.tsx` and `lib/utils/pathDraftStorage.ts` · tests `__tests__/accumul*.test.ts`, `__tests__/{questoMeseTile,accumulationPlanDialogSaleMonth}.test.tsx`, `e2e/accumulo.{mobile,tablet,piano,piano.mobile}.spec.ts` (fixture `e2e/accumuloFixture.ts`, `walkPlanPath` for the path).
 
 - **Suites to run after a change here — Accumulo** (2026-11-17; the Consulente's click since 2026-11-20): `accumulationPlanUtils`, `accumulationPlanMatching`,
   `accumulationPlanSchema`, `accumulationPlanDoc`, `accumulationPlanService`, `accumulationPlanRevision`,
   `accumulationPlanReviewFlow`, `accumulationClassTrajectory`, `accumulationNarrative`, `accumulationReactivate`,
   `accumuloMonth`, `accumuloSummary`, `accumuloTileSentences`, `zeroQuantityChip`, `allocazioneNarrative`,
   `allocazioneSummary`, `mirrorCollections`, `persistCache`, `allocationAdviceHandoff`, `allocationAdviceDocument`, `advicePlan`, `advicePlanService`,
-  `advicePlanNarrative`, `effectiveTargets`, `priceUpdater`, `yahooFinanceService`, `modelPortfolioGroups`, `narrativeTextNesting` · **dom** `accumuloVuotoTile`, `planDraftSidePanel`,
+  `advicePlanNarrative`, `effectiveTargets`, `priceUpdater`, `yahooFinanceService`, `modelPortfolioGroups`, `narrativeTextNesting`, `planPath`, `pathDraftStorage` · **dom** `accumuloVuotoTile`, `pianoScreens`, `pianoWizard`, `pianoClient`, `pathCard`, `portafoglioModelloTile`, `planDraftSidePanel`,
   `assetDialogCreateEmpty`, `strumentiTile`, `consulenteBook`, `consulentePlanTick`, `useAdviceQuotes`,
   `questoMeseTile`, `accumulationPlanDialogSaleMonth` · **AI context** `assistantPortfolioContext`,
   `assistantPromptBundle`, `allocationAdviceApply`, `allocationAdvicePrompts`, `allocationAdvicePlanRead`, `allocationAdviceRun` · **Browser** `e2e/accumulo.spec.ts`,
-  `e2e/accumulo.{mobile,tablet}.spec.ts`,
+  `e2e/accumulo.{mobile,tablet,piano,piano.mobile}.spec.ts`,
   `e2e/allocation.spec.ts` (the tab, the Piano's note), `e2e/bundle.lazy.mobile.spec.ts` (the lazy landing),
   `e2e/allocation.consulente.plan.spec.ts` (the plan the Consulente's click creates).
 
@@ -192,7 +239,14 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
   revision keeps it.
 - **Query key**: every write (create, revise, interrupt, reactivate, confirm) invalidates `queryKeys.accumulationPlans.all`,
   the one key the tab and the Piano's note both read.
-- **«Parti da»** seeds from today's tradable weights, typed targets or, when one is saved, the model portfolio (doc/guide/ottimizzatore.md); on a «superato» model the option stays and the tile's stale sentence shows under it.
+- **«Parti da»** (the revision only, since 2026-11-20) seeds from today's tradable weights, typed targets or, when one is saved, the model portfolio (doc/guide/ottimizzatore.md); on a «superato» model the option stays and the tile's stale sentence shows under it — as under the path's «Dal portafoglio modello».
+- **A plan made from a model keeps the model's groups as rows** (2026-11-20): the path never edits a group; to change
+  a group, change the model.
+- **The path's computed reserve counts the ticked accounts only** (2026-11-20, README § 4 choice ac): it differs from
+  the revision's by design; typed the same in both, the instalments are the same (measured on the seed account at
+  the guided verification: twelve identical instalments).
+- **The editor's create branches are dead until the revision moves to the path** (2026-11-20, declared): every caller
+  passes `revise`; a draft is continued only in the path.
 - **No tab bar without a Piano**: with no assets, a failed read or no Piano (the page's `loadFailed` and `!hasAssets`
   branches) the page draws no `PageTabs`, so `?tab=accumulo` lands on Bilanciamento's state there — declared on
   2026-11-12, not a bug. The loading branch draws the bar.

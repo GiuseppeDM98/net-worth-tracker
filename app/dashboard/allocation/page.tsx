@@ -785,6 +785,7 @@ export default function AllocationPage() {
                 ownerId={ownerId}
                 allAssets={allAssets}
                 targets={targets}
+                hasTargets={!!settings?.targets || usingGoalTargets}
                 band={band}
                 targetLeverageRatio={targetLeverageRatio}
                 idealAllocation={settings?.idealAllocation ?? null}

@@ -6,13 +6,14 @@
  * the preview (a month's rata and where the classes would go from the model portfolio — today's
  * weights when there is none —, the default reserve and the suggested inflow — the median of the
  * monthly savings, owner 2026-11-12, named in one sentence only when there is one) and the two lists a
- * first-time reader needs before pressing «Crea piano», which opens the editor on the plan dialog. The
- * second action, «Apri il portafoglio modello», jumps to the model portfolio's tile.
+ * first-time reader needs before pressing «Crea piano», the link to the guided path
+ * (`/dashboard/allocation/piano`, 2026-11-20). In demo, or without targets, it stays a disabled button: a link
+ * ignores `disabled`. The second action, «Apri il portafoglio modello», jumps to the model portfolio's tile.
  */
-import type { ModelBasis } from '@/lib/utils/modelPortfolio';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import Link from 'next/link';
 import { useMonthlySavingsMedian } from '@/lib/hooks/useMonthlySavingsMedian';
-import type { Asset, AssetAllocationTarget, IdealAllocationSettings } from '@/types/assets';
+import type { Asset, AssetAllocationTarget } from '@/types/assets';
 import type { ModelPortfolio } from '@/types/modelPortfolio';
 import type { RebalanceBand } from '@/lib/utils/allocationUtils';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
@@ -25,9 +26,9 @@ import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { Button } from '@/components/ui/button';
-import { AccumulationPlanDialog } from '@/components/allocation/AccumulationPlanDialog';
 import { TargetTick } from '@/components/allocation/TargetTick';
 import { DEPS, TILE_ACTION_CLASS } from '@/components/allocation/tiles/accumuloShared';
+import { PLAN_PATH_HREF } from '@/lib/utils/accumuloCopy';
 import {
   ACCUMULO_ACTION_CREATE_PLAN,
   ACCUMULO_ACTION_OPEN_MODEL,
@@ -51,25 +52,18 @@ interface AccumuloVuotoTileProps {
   allAssets: Asset[];
   targets: AssetAllocationTarget | null;
   band: RebalanceBand;
-  targetLeverageRatio: number;
-  idealAllocation: IdealAllocationSettings | null;
+  /** Targets of the owner's own or from the goals (never the defaults): without them «Crea piano» stays disabled. */
+  hasTargets: boolean;
   /** The saved model portfolio, when there is one: the preview starts from its weights. */
   model: ModelPortfolio | null;
   today: Date;
-  onAssetsChanged: () => void;
-  /** The Consulente's «rivedi entro» date, for the editor's preview; null without one. */
-  reviewByIso: string | null;
-  /** What the model rests on: the plan editor's «aggiorna anche il modello» stamps it. */
-  modelBasis: ModelBasis;
-  /** Impostazioni › Spese «Conto per gli investimenti»: the new plan starts on it; null = none. */
-  investmentAccountId: string | null;
   /** Where «Apri il portafoglio modello» goes when the model is a closed row (below `desktop:`); absent = scroll to the anchor. */
   onGoToComposition?: () => void;
 }
 
-export function AccumuloVuotoTile({ ownerId, allAssets, targets, band, targetLeverageRatio, idealAllocation, model, today, onAssetsChanged, reviewByIso, onGoToComposition, modelBasis, investmentAccountId }: AccumuloVuotoTileProps) {
+export function AccumuloVuotoTile({ ownerId, allAssets, targets, band, hasTargets, model, today, onGoToComposition }: AccumuloVuotoTileProps) {
   const isDemo = useDemoMode();
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const canCreate = !isDemo && hasTargets && !!targets;
 
   // The entry the editor would suggest, so the preview matches what «Crea piano» proposes.
   const median = useMonthlySavingsMedian(ownerId, allAssets, { enabled: true });
@@ -150,33 +144,20 @@ export function AccumuloVuotoTile({ ownerId, allAssets, targets, band, targetLev
         </div>
 
         <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-3.5">
-          <Button className={TILE_ACTION_CLASS} disabled={isDemo || !targets} onClick={() => setDialogOpen(true)}>
-            {ACCUMULO_ACTION_CREATE_PLAN}
-          </Button>
+          {canCreate ? (
+            <Button asChild className={TILE_ACTION_CLASS}>
+              <Link href={PLAN_PATH_HREF}>{ACCUMULO_ACTION_CREATE_PLAN}</Link>
+            </Button>
+          ) : (
+            <Button className={TILE_ACTION_CLASS} disabled>
+              {ACCUMULO_ACTION_CREATE_PLAN}
+            </Button>
+          )}
           <Button variant="outline" className={TILE_ACTION_CLASS} onClick={goToComposition}>
             {ACCUMULO_ACTION_OPEN_MODEL}
           </Button>
         </div>
       </Tile>
-      {dialogOpen && targets && (
-        <AccumulationPlanDialog
-          open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
-          ownerId={ownerId}
-          plan={null}
-          allAssets={allAssets}
-          targets={targets}
-          band={band}
-          targetLeverageRatio={targetLeverageRatio}
-          idealAllocation={idealAllocation}
-          model={model}
-          onAssetsChanged={onAssetsChanged}
-          onSaved={() => setDialogOpen(false)}
-          reviewByIso={reviewByIso}
-          basis={modelBasis}
-          investmentAccountId={investmentAccountId}
-        />
-      )}
     </>
   );
 }

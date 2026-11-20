@@ -23,7 +23,7 @@
  * A helper, not a spec: no project collects it (`testMatch`), it only exports.
  */
 
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
 const HEADERS = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
@@ -288,4 +288,113 @@ export async function plantTaxRates(): Promise<void> {
 
 export async function removeTaxRates(): Promise<void> {
   for (const id of TAXED_ASSETS) await patchMasked(`assets/${id}`, 'taxRate', null);
+}
+
+/** Every plan of the account as written (2026-11-20, the guided path's specs): id, status, sales, instalments. */
+export async function readOwnerPlans(): Promise<Array<{ id: string; status: string; disposals: Array<{ quantity: number | null; monthIndex: number }>; instalmentEur: number[] }>> {
+  const res = await fetch(`${FIRESTORE}:runQuery`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'accumulationPlans' }],
+        where: { fieldFilter: { field: { fieldPath: 'userId' }, op: 'EQUAL', value: { stringValue: OWNER } } },
+      },
+    }),
+  });
+  expect(res.ok, `runQuery accumulationPlans: ${res.status}`).toBe(true);
+  type Value = { stringValue?: string; integerValue?: string; doubleValue?: number; nullValue?: null; mapValue?: { fields: Record<string, Value> }; arrayValue?: { values?: Value[] } };
+  const rows = (await res.json()) as Array<{ document?: { name: string; fields: Record<string, Value> } }>;
+  const num = (v: Value | undefined) => Number(v?.integerValue ?? v?.doubleValue ?? 0);
+  const items = (v: Value | undefined) => (v?.arrayValue?.values ?? []).map((item) => item.mapValue!.fields);
+  return rows
+    .filter((row) => row.document)
+    .map(({ document }) => {
+      const fields = document!.fields;
+      return {
+        id: document!.name.split('/').pop()!,
+        status: fields.status?.stringValue ?? '',
+        disposals: items(fields.disposals).map((d) => ({ quantity: d.quantity ? num(d.quantity) : null, monthIndex: num(d.monthIndex) || 1 })),
+        instalmentEur: items(fields.installments)
+          .sort((a, b) => num(a.index) - num(b.index))
+          .map((i) => Math.round(items(i.lines).reduce((sum, line) => sum + num(line.plannedAmountEur), 0) * 100) / 100),
+      };
+    });
+}
+
+/** The browser draft of the guided path, cleared: the next spec file starts from the first screen. */
+export async function clearPlanPathDraft(page: Page): Promise<void> {
+  await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('plan-path-draft')).forEach((key) => localStorage.removeItem(key)));
+}
+
+export interface PlanPathWalk {
+  /** The start's label, as the path shows it. */
+  start: string;
+  monthly: string;
+  months: string;
+  /** The accounts to tick; every other is unticked. */
+  accounts: string[];
+  /** Typed when present; absent = the computed reserve. */
+  reserve?: string;
+  /** A sale per instrument: quantity ('' = every share) and the plan month (1-based). */
+  sales?: Array<{ name: string; quantity: string; month: number }>;
+  /** Quotas by instrument name; absent = the quotas the start gave. */
+  quotas?: Record<string, string>;
+  /** Stops on this screen (1-based) instead of reaching the summary. */
+  stopAt?: number;
+}
+
+/** Walks the guided path from its first screen to the summary (or to `stopAt`), on the answers given. */
+export async function walkPlanPath(page: Page, walk: PlanPathWalk): Promise<void> {
+  const next = () => page.getByRole('button', { name: 'Avanti' }).click();
+  const at = async (n: number) => {
+    await expect(page.getByRole('region', { name: new RegExp(`^Passo ${n} di 8`) })).toBeVisible({ timeout: 30_000 });
+    return walk.stopAt === n;
+  };
+  if (await at(1)) return;
+  await page.getByRole('radio', { name: walk.start }).click();
+  await next();
+  if (await at(2)) return;
+  await page.getByLabel('Ogni mese, in euro').fill(walk.monthly);
+  await next();
+  if (await at(3)) return;
+  await page.getByLabel('Mesi', { exact: true }).fill(walk.months);
+  await next();
+  if (await at(4)) return;
+  const accounts = page.getByRole('list', { name: 'Conti' }).getByRole('listitem');
+  for (let i = 0; i < (await accounts.count()); i++) {
+    const row = accounts.nth(i);
+    const text = (await row.textContent()) ?? '';
+    const tick = walk.accounts.some((name) => text.startsWith(name));
+    const box = row.getByRole('checkbox');
+    if ((await box.getAttribute('data-state')) !== (tick ? 'checked' : 'unchecked')) await box.click();
+  }
+  await next();
+  if (await at(5)) return;
+  if (walk.reserve !== undefined) await page.getByLabel('Riserva, in euro').fill(walk.reserve);
+  await next();
+  if (await at(6)) return;
+  if (walk.sales?.length) {
+    await page.getByRole('radio', { name: 'Sì, scelgo cosa' }).click();
+    const list = page.getByRole('list', { name: 'Strumenti da vendere' });
+    for (const sale of walk.sales) {
+      await list.getByRole('checkbox', { name: `Vendi ${sale.name}` }).click();
+      const row = list.getByRole('listitem').filter({ hasText: sale.name });
+      if (sale.quantity) await row.getByLabel('Quante quote').fill(sale.quantity);
+      await row.getByRole('combobox', { name: 'In quale mese' }).click();
+      await page.getByRole('option').nth(sale.month - 1).click();
+    }
+  } else {
+    await page.getByRole('radio', { name: 'No' }).click();
+  }
+  await next();
+  if (await at(7)) return;
+  for (const [name, quota] of Object.entries(walk.quotas ?? {})) {
+    await page.getByRole('list', { name: 'Strumenti del piano' }).getByLabel(name, { exact: true }).fill(quota);
+  }
+  // A sale ticked starts on every share (the row leaves); a quantity typed brings the row back at 0 %: the rest is spread.
+  const redistribute = page.getByRole('button', { name: 'Ridistribuisci il resto' });
+  if (await redistribute.isEnabled()) await redistribute.click();
+  await next();
+  await at(8);
 }

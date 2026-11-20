@@ -5,13 +5,15 @@
  * stored fingerprint, so a stale model stays stale. The dialogs are stubbed. Invented names and figures.
  *
  * REGRESSION GUARD, seen red (2026-11-17): `isModelStale` always false; `keepFingerprint` dropped.
+ * «Crea un PAC con questi pesi» (2026-11-20) writes the seed as the guided path's browser draft and goes to the
+ * path — seen red with the write removed.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { Asset, AssetAllocationTarget } from '@/types/assets';
 import type { ModelPortfolio } from '@/types/modelPortfolio';
 
-const { saveSpy } = vi.hoisted(() => ({ saveSpy: vi.fn(async () => undefined) }));
+const { saveSpy, pushSpy } = vi.hoisted(() => ({ saveSpy: vi.fn(async () => undefined), pushSpy: vi.fn() }));
 
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
 vi.mock('@/lib/hooks/useDemoMode', () => ({ useDemoMode: () => false }));
@@ -28,13 +30,24 @@ vi.mock('@/components/assets/AssetDialog', () => ({
     </button>
   ),
 }));
-vi.mock('@/components/allocation/IdealCompositionDialog', () => ({ IdealCompositionDialog: () => null }));
-vi.mock('@/components/allocation/AccumulationPlanDialog', () => ({ AccumulationPlanDialog: () => null }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushSpy }) }));
+vi.mock('@/components/allocation/IdealCompositionDialog', () => ({
+  IdealCompositionDialog: ({ onCreatePac }: { onCreatePac: (seed: unknown) => void }) => (
+    <button
+      type="button"
+      onClick={() => onCreatePac({ positions: [{ id: 's-a', label: 'ETF-A', targetPercentage: 100, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' }] })}
+    >
+      crea pac
+    </button>
+  ),
+}));
 vi.mock('@/components/allocation/ModelEditDialog', () => ({ ModelEditDialog: () => null }));
 
 import { PortafoglioModelloTile } from '@/components/allocation/tiles/PortafoglioModelloTile';
 import { buildModelBasis, modelFingerprint } from '@/lib/utils/modelPortfolio';
 import { MODEL_STALE_ASIDE, MODEL_STALE_READING } from '@/lib/utils/weightOptimizerNarrative';
+import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
+import { planPathStorageKey } from '@/lib/utils/planPath';
 
 function makeAsset(id: string, overrides: Partial<Asset> = {}): Asset {
   return {
@@ -68,19 +81,17 @@ const model = (fingerprint: string | undefined): ModelPortfolio => ({
   updatedAt: new Date('2026-11-10T12:00:00'),
 });
 
-function renderTile(saved: ModelPortfolio) {
+function renderTile(saved: ModelPortfolio, options: { objectives?: boolean; investmentAccountId?: string } = {}) {
   return render(
     <PortafoglioModelloTile
       ownerId="owner-1"
-      investmentAccountId={null}
+      investmentAccountId={options.investmentAccountId ?? null}
       allAssets={assets}
       targets={targets}
       targetLeverageRatio={1}
-      idealAllocation={null}
-      band={{ mode: 'relative', value: 20 } as never}
+      idealAllocation={options.objectives ? { ...DEFAULT_IDEAL_ALLOCATION, enabled: true } : null}
       model={saved}
       readFailed={false}
-      reviewByIso={null}
       modelBasis={basis}
       onAssetsChanged={() => {}}
     />
@@ -89,6 +100,20 @@ function renderTile(saved: ModelPortfolio) {
 
 beforeEach(() => {
   saveSpy.mockClear();
+  pushSpy.mockClear();
+  window.localStorage.clear();
+});
+
+describe('PortafoglioModelloTile — «Crea un PAC con questi pesi»', () => {
+  it('writes the seed as the path draft, the investment account ticked, and goes to the path', () => {
+    renderTile(model(modelFingerprint(basis, assets)), { objectives: true, investmentAccountId: 'conto' });
+    fireEvent.click(screen.getByRole('button', { name: 'Ricalcola' }));
+    fireEvent.click(screen.getByRole('button', { name: 'crea pac' }));
+    const stored = JSON.parse(window.localStorage.getItem(planPathStorageKey('owner-1')) ?? 'null');
+    expect(stored).toMatchObject({ version: 1, screen: 'partenza', answers: { start: 'seed', sourceIds: ['conto'] } });
+    expect(stored.answers.positions[0].buyAssetId).toBe('etf-a');
+    expect(pushSpy).toHaveBeenCalledWith('/dashboard/allocation/piano');
+  });
 });
 
 describe('PortafoglioModelloTile — «superato»', () => {

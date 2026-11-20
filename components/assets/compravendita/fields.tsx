@@ -1,97 +1,27 @@
 'use client';
 
 /**
- * The fields the Compravendita screens share: a money or number input, the date, the account
- * picker and the category picker (a category or one of its subcategories, by allowed type). Module-level,
- * controlled, no state of their own — the draft is the reducer's (lib/utils/realEstateOperationDraft.ts).
+ * The fields only the Compravendita screens use: the date and the category picker (a category or one of
+ * its subcategories, by allowed type). Module-level, controlled, no state of their own — the draft is the
+ * reducer's (lib/utils/realEstateOperationDraft.ts). The number input and the account picker every guided
+ * path shares live in components/ui/path-fields.tsx (2026-11-20).
  * A choice as rows is the shared `ChoiceList` (components/ui/choice-list.tsx, since 2026-11-07).
  */
 
-import type { Asset } from '@/types/assets';
 import type { ExpenseCategory, ExpenseType } from '@/types/expenses';
 import { EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import type { CategoryChoice } from '@/types/realEstateOperation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatCurrency } from '@/lib/utils/formatters';
-
-export const FIELD_HEIGHT_CLASS = 'h-11 desktop:h-9';
-
-/** '' → null, a number otherwise: an empty field is «not typed», never 0. */
-export function numberOrNull(value: string): number | null {
-  const parsed = Number(value.replace(',', '.'));
-  return value.trim() === '' || !Number.isFinite(parsed) ? null : parsed;
-}
-
-/** A labelled number input; `hint` is the line under it. */
-export function NumberField({
-  id,
-  label,
-  value,
-  onChange,
-  hint,
-  step = '0.01',
-  min = 0,
-}: {
-  id: string;
-  label: string;
-  value: number | null;
-  onChange: (value: number | null) => void;
-  hint?: string | null;
-  step?: string;
-  min?: number;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        type="number"
-        inputMode="decimal"
-        step={step}
-        min={min}
-        className={FIELD_HEIGHT_CLASS}
-        value={value ?? ''}
-        onChange={(event) => onChange(numberOrNull(event.target.value))}
-        aria-describedby={hint ? `${id}-hint` : undefined}
-      />
-      {hint && (
-        <p id={`${id}-hint`} className="text-[12px] text-muted-foreground">
-          {hint}
-        </p>
-      )}
-    </div>
-  );
-}
+import { PATH_FIELD_HEIGHT_CLASS } from '@/components/ui/path-fields';
 
 /** A labelled date input; `max` refuses the future where the event must have happened. */
 export function DateField({ id, label, value, onChange, max }: { id: string; label: string; value: string; onChange: (iso: string) => void; max?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type="date" className={FIELD_HEIGHT_CLASS} value={value} max={max} onChange={(event) => onChange(event.target.value)} />
-    </div>
-  );
-}
-
-/** The cash accounts, with today's balance: where the money leaves or lands. */
-export function AccountField({ id, label, accounts, value, onChange }: { id: string; label: string; accounts: readonly Asset[]; value: string; onChange: (id: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Select value={value || undefined} onValueChange={onChange}>
-        <SelectTrigger id={id} className={FIELD_HEIGHT_CLASS}>
-          <SelectValue placeholder="Scegli il conto" />
-        </SelectTrigger>
-        <SelectContent>
-          {accounts.map((account) => (
-            <SelectItem key={account.id} value={account.id}>
-              {account.name} · {formatCurrency(account.quantity)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Input id={id} type="date" className={PATH_FIELD_HEIGHT_CLASS} value={value} max={max} onChange={(event) => onChange(event.target.value)} />
     </div>
   );
 }
@@ -128,7 +58,7 @@ export function CategoryField({
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
       <Select value={encodeChoice(value)} onValueChange={(next) => onChange(decodeChoice(next))}>
-        <SelectTrigger id={id} className={FIELD_HEIGHT_CLASS}>
+        <SelectTrigger id={id} className={PATH_FIELD_HEIGHT_CLASS}>
           <SelectValue placeholder={options.length === 0 ? 'Nessuna categoria di questo tipo' : 'Scegli la categoria'} />
         </SelectTrigger>
         <SelectContent>

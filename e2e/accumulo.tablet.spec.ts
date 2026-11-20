@@ -87,7 +87,7 @@ test.describe('Allocazione › Accumulo, composta per un tablet', () => {
       const verdict = page.getByRole('region', { name: 'Verdetto sul piano di accumulo' });
       await expect(verdict).toBeVisible({ timeout: 60_000 });
       const empty = page.locator('[data-stage="lead"]');
-      await expect(empty.getByRole('button', { name: 'Crea piano' })).toBeVisible();
+      await expect(empty.getByRole('link', { name: 'Crea piano' })).toBeVisible();
       const triggers = page.locator('main [id$="-trigger"]');
       expect(await triggers.evaluateAll((els) => els.map((el) => el.id))).toEqual(NO_PLAN_ROW_IDS.map((id) => `${id}-trigger`));
       if (isLandscape(page)) await expectLandscapeStage(page, page.locator('#page-main'), NO_PLAN_ROW_IDS);
