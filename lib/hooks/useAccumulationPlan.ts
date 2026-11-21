@@ -15,52 +15,29 @@
 
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
-import { getAllAssets } from '@/lib/services/assetService';
 import {
-  createDraftPlan,
-  updateDraftPlan,
   activatePlan,
   setInstallmentLine,
   setDisposal,
   applyRecalibration,
   dismissRecalibration,
-  revisePlan,
   closePlan,
   reactivatePlan,
   deleteDraftPlan,
   type ActivatePlanInput,
   type MeasurementInput,
   type SetInstallmentLinePatch,
-  type RevisePlanInput,
 } from '@/lib/services/accumulationPlanService';
 import type {
-  AccumulationPlanDraft,
   AccumulationPlanStatus,
   InstallmentLineStatus,
 } from '@/types/accumulationPlan';
-import type { RecalibrationLine, PlanRevisionInput } from '@/lib/utils/accumulationPlanUtils';
+import type { RecalibrationLine } from '@/lib/utils/accumulationPlanUtils';
 
 export { useAccumulationPlans, selectOpenPlan } from '@/lib/hooks/useAccumulationPlans';
 
 function invalidateAccumulationPlans(queryClient: QueryClient, ownerId: string): void {
   queryClient.invalidateQueries({ queryKey: queryKeys.accumulationPlans.all(ownerId) });
-}
-
-export function useCreateDraftPlan(ownerId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (draft: AccumulationPlanDraft) => createDraftPlan(ownerId, draft),
-    onSuccess: () => invalidateAccumulationPlans(queryClient, ownerId),
-  });
-}
-
-export function useUpdateDraftPlan(ownerId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ planId, draft }: { planId: string; draft: AccumulationPlanDraft }) =>
-      updateDraftPlan(planId, draft),
-    onSuccess: () => invalidateAccumulationPlans(queryClient, ownerId),
-  });
 }
 
 export function useActivatePlan(ownerId: string) {
@@ -122,20 +99,6 @@ export function useDismissRecalibration(ownerId: string) {
   return useMutation({
     mutationFn: ({ planId, index, quantities }: { planId: string; index: number; quantities: Record<string, number> }) =>
       dismissRecalibration(planId, index, quantities),
-    onSuccess: () => invalidateAccumulationPlans(queryClient, ownerId),
-  });
-}
-
-/**
- * «Rivedi il piano»: the assets are read AGAIN here, at the click, and the revision's gate runs on that list —
- * never on the page's, which may be stale (2026-11-20: an account deleted in another tab is refused, nothing written;
- * `__tests__/useRevisePlan.test.tsx`).
- */
-export function useRevisePlan(ownerId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ planId, revision, input }: { planId: string; revision: PlanRevisionInput; input: Omit<RevisePlanInput, 'allAssets'> }) =>
-      revisePlan(planId, revision, { allAssets: await getAllAssets(ownerId), ...input }),
     onSuccess: () => invalidateAccumulationPlans(queryClient, ownerId),
   });
 }

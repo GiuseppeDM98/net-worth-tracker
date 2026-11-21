@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * IdealCompositionDialog — «Ricalcola il portafoglio modello». Unlike the PAC's `OptimizerPanel` (whose candidates
- * are the draft's own positions), the candidates here are the whole page's base (`buildStandaloneCandidates`,
+ * IdealCompositionDialog — «Ricalcola il portafoglio modello». Unlike a plan's own positions (the PAC's
+ * optimizer panel left with the editor, 2026-11-21), the candidates here are the whole page's base (`buildStandaloneCandidates`,
  * 2026-11-12): the instruments, every property fixed at its value net of its loans, and «Liquidità» — the
  * accounts net of the personal loans — whose weight says how much stays on the accounts and is never saved.
  * The amount to invest is taken from the accounts: it does not grow the base, it cannot exceed them, and it

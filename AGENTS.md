@@ -328,6 +328,10 @@ holds it): how it was learned is `git log`'s.
 - **CSS custom property liveness — the 5-check sweep.** A token is live if ANY holds: `var(--name` in `.ts/.tsx/.css`;
   if mapped via `@theme`, the **generated utility name** appears (grep `bg-X`, not the variable); `getPropertyValue`; an
   internal chain; the vendored-surface contract. A confirmed-dead token leaves **every** theme block in one commit.
+- **A page never reads `searchParams` for a UI-only parameter** (2026-11-21, NOVE-26): it turns a prerendered route
+  dynamic (○ → ƒ) and perf:budget reads none of its chunks. Read it in the client with `useSyncExternalStore` on
+  `window.location.search`, on EVERY render — never once at mount: a client navigation mounts the page before the URL
+  changes (`components/allocation/piano/PianoClient.tsx`, `__tests__/pianoClient.test.tsx`, E3 in `e2e/accumulo.piano.spec.ts`).
 
 ### Shared Constants and Fixed Hooks
 - **Rule of Three**: a map used in 3+ files lives in `lib/constants/<domain>.ts`. The canonical symptom of a duplicated
@@ -475,7 +479,7 @@ file used to carry.
 - Sentences and figures live in `accumulationNarrative.ts` / `accumuloSummary.ts`; every write invalidates `queryKeys.accumulationPlans.all`, which the Piano's note reads too.
 - The Consulente's plan (2026-11-20) arrives ACTIVE from «Applica»: `createAndActivatePlan` validates on the given assets, writes (or replaces the open draft whole — `updateDraftPlan` clears what the draft lacks), activates, then writes the model; no editor on this path, its corrections in `advisorNotes` («Questo mese» › «Dal Consulente»).
 - A swap (2026-11-20): a sale with `reinvestAssetId` buys that instrument with its WHOLE proceeds in its own month, outside the reserve, `L` and the rates (`computeUsableLiquidity.swaps`, lines `swap: true`); every reading of «a month that buys» goes through `isRegularLine` (`accumuloMonth.ts`), never `lines.length`.
-- A plan is created by the guided path at `/dashboard/allocation/piano` (2026-11-20: eight screens, ONE «Conferma» that activates, the answers on the browser; a draft in Accumulo is continued there); the editor only revises.
+- A plan is created by the guided path at `/dashboard/allocation/piano` (2026-11-20: eight screens, ONE «Conferma» that activates, the answers on the browser; a draft in Accumulo is continued there) and revised by the same path (2026-11-21, NOVE-26: the closed instalments kept, `revisePlan` with `expectedFirstIndex`); no editor.
 - Il resto — the mobile composition (§ Composizione mobile), «Rivedi il piano», «Riattiva», the ledger matching — in `doc/guide/accumulo.md`.
 
 ### Allocazione › Portafoglio modello e ottimizzatore → `doc/guide/ottimizzatore.md`

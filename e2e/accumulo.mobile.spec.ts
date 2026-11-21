@@ -73,10 +73,12 @@ test.describe('Accumulo, composto per un telefono', () => {
     const why = page.getByRole('button', { name: /^Il perché · il rientro nella banda/ });
     await expect(why).toHaveAttribute('aria-expanded', 'false');
 
-    // «Calendario», «Rivedi il piano» e «Interrompi» restano bersagli da pollice in LA tessera.
+    // «Calendario», «Rivedi il piano» e «Interrompi» restano bersagli da pollice in LA tessera; «Rivedi il piano» è un
+    // link al percorso (NOVE-26, 2026-11-21), gli altri due bottoni.
     const month = page.getByRole('region', { name: 'Questo mese' });
     for (const name of ['Calendario', 'Rivedi il piano', 'Interrompi']) {
-      const box = (await month.getByRole('button', { name }).boundingBox())!;
+      const role = name === 'Rivedi il piano' ? 'link' : 'button';
+      const box = (await month.getByRole(role, { name }).boundingBox())!;
       expect(box.height, name).toBeGreaterThanOrEqual(TOUCH_FLOOR);
     }
 

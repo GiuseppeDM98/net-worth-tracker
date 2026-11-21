@@ -11,10 +11,7 @@ import {
   describeAccumuloPreview,
   describeAccumuloIntro,
   describeAccumuloPreviewLead,
-  describeRefillNote,
   describeQuietMonthReading,
-  describeReserveOrigin,
-  ACCUMULO_STEP1_START_MONTH,
   describeAccumulationOutcomeFooter,
   describeClosedPlansAside,
   describeMatchNote,
@@ -186,26 +183,6 @@ describe('describeAccumuloIntro — cash within the quota', () => {
   });
 });
 
-// The step 1 box and the side panel say which months only refill the reserve (2026-11-17).
-describe('describeRefillNote', () => {
-  it('names the months and the first month that buys', () => {
-    expect(flat(narrativeToText(describeRefillNote({ refillMonths: 2, months: 12, shortfallEur: 2000, firstMonth: '2027-03' })!))).toBe(
-      'Mancano 2000 € alla riserva: le entrate dei primi 2 mesi la ricostituiscono, si compra da marzo 2027.',
-    );
-    expect(flat(narrativeToText(describeRefillNote({ refillMonths: 1, months: 12, shortfallEur: 500, firstMonth: '2027-02' })!))).toContain(
-      'le entrate del primo mese',
-    );
-  });
-  it('a gap the plan cannot close', () => {
-    expect(flat(narrativeToText(describeRefillNote({ refillMonths: 12, months: 12, shortfallEur: 40000, firstMonth: '2028-01' })!))).toBe(
-      'Mancano 40.000 € alla riserva: in 12 mesi le entrate non la ricostituiscono, non c’è nulla da comprare.',
-    );
-  });
-  it('no gap, no note', () => {
-    expect(describeRefillNote({ refillMonths: 0, months: 12, shortfallEur: 0, firstMonth: '2027-01' })).toBeNull();
-  });
-});
-
 describe('describeAccumuloPreviewLead — after a refill', () => {
   it('says the months that refill before the rate', () => {
     expect(flat(narrativeToText(describeAccumuloPreviewLead({ months: 10, refillMonths: 2, reserveEur: 10000, monthlyEur: 1000, inflowEur: 1000 })))).toBe(
@@ -240,39 +217,6 @@ describe('describeAccumuloIntro — cash held outside the accounts', () => {
     expect(text).toContain("Nella liquidità hai 30.000 €, entro la quota dell'allocazione (50.000 €)");
     expect(flat(narrativeToText(describeAccumuloPreviewLead({ months: 3, refillMonths: 15, reserveEur: 29000, otherCashEur: 21000, monthlyEur: 1000, inflowEur: 1000 })))).toContain(
       "Con la quota di liquidità dell'allocazione (50.000 €)",
-    );
-  });
-});
-
-// Under «Riserva da non toccare»: where the figure comes from (owner, 2026-11-17).
-describe('describeReserveOrigin', () => {
-  // The field may hold the reader's own figure: the line names the PROPOSED one (collaudo, 2026-11-17).
-  it("the start-month field is the plan's start, not its first purchase", () => {
-    expect(ACCUMULO_STEP1_START_MONTH).toBe('Inizio del piano');
-  });
-  it('the quota minus the cash outside the accounts', () => {
-    expect(flat(narrativeToText(describeReserveOrigin({ quotaEur: 50000, otherCashEur: 30000 })!))).toBe(
-      "Proposta: 20.000 €, la quota di liquidità dell'allocazione (50.000 €) meno i 30.000 € di liquidità fuori dai conti, già nella quota.",
-    );
-  });
-  it('only accounts: the quota itself', () => {
-    expect(flat(narrativeToText(describeReserveOrigin({ quotaEur: 10000, otherCashEur: 0 })!))).toBe("Proposta: la quota di liquidità dell'allocazione (10.000 €).");
-  });
-  it('no quota, no line', () => {
-    expect(describeReserveOrigin({ quotaEur: 0, otherCashEur: 5000 })).toBeNull();
-  });
-});
-
-
-// A sale that refills the reserve with the inflows is named (owner, 2026-11-19): two months of inflows alone do not.
-// Mutation that turns it red: the sale months ignored.
-describe('describeRefillNote — with a sale', () => {
-  it('names the inflows up to the month before and the sale', () => {
-    expect(flat(narrativeToText(describeRefillNote({ refillMonths: 2, months: 12, shortfallEur: 10000, firstMonth: '2027-03', saleMonths: ['2027-03'] })!))).toBe(
-      'Mancano 10.000 € alla riserva: la ricostituiscono le entrate fino a febbraio e la vendita di marzo, si compra da marzo 2027.',
-    );
-    expect(flat(narrativeToText(describeRefillNote({ refillMonths: 3, months: 12, shortfallEur: 10000, firstMonth: '2027-04', saleMonths: ['2027-02', '2027-04', '2027-04'] })!))).toBe(
-      'Mancano 10.000 € alla riserva: la ricostituiscono le entrate fino a marzo e le vendite di febbraio e aprile, si compra da aprile 2027.',
     );
   });
 });

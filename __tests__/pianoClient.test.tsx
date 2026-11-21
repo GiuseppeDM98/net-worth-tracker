@@ -1,8 +1,8 @@
 /**
  * The plan path's host (components/allocation/piano/PianoClient.tsx): the states before the wizard, the
  * first that applies — plans restored but not fetched after mount (the skeleton), the demo, no targets, an
- * ACTIVE plan (its sentence and «Apri Accumulo»), an active plan with every instalment closed (the sentence
- * of «nothing to revise»). The hooks are mocked; the wizard is a marker.
+ * active plan with every instalment closed (the sentence of «nothing to revise»); an ACTIVE plan with an intact
+ * instalment opens the wizard in a revision (2026-11-21). The hooks are mocked; the wizard is a marker.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -36,15 +36,19 @@ vi.mock('@/lib/hooks/useAssetTransactions', () => ({ useAssetLedgerMeta: () => q
 vi.mock('@/lib/services/assetService', () => ({ calculateAssetValue: (a: { quantity: number; currentPrice: number }) => a.quantity * a.currentPrice }));
 vi.mock('@/lib/services/assetAllocationService', () => ({ compareAllocations: vi.fn(), getDefaultTargets: () => ({ equity: { targetPercentage: 100 } }), buildTargetsFromGoalAllocation: vi.fn() }));
 vi.mock('@/components/allocation/piano/PianoWizard', () => ({
-  PianoWizard: ({ onCreated }: { onCreated: () => void }) => <button type="button" onClick={onCreated}>WIZARD</button>,
+  PianoWizard: ({ onCreated, context }: { onCreated: () => void; context: { revision: { plan: { id: string; revisions?: unknown[] } } | null; fromModel: boolean } }) => (
+    <button type="button" onClick={onCreated}>
+      {context.revision ? `REVISION ${context.revision.plan.id} ${context.revision.plan.revisions?.length ?? 0} ${context.fromModel}` : 'WIZARD'}
+    </button>
+  ),
 }));
 
 import { PianoClient } from '@/components/allocation/piano/PianoClient';
 import { ACCUMULO_PLAN_NOTHING_TO_REVISE } from '@/lib/utils/accumuloCopy';
 
-function activePlan(lineStatus: 'pending' | 'executed') {
+function activePlan(lineStatus: 'pending' | 'executed', revisions: unknown[] = []) {
   return {
-    id: 'plan-1', status: 'active', startMonth: '2026-12', months: 1,
+    id: 'plan-1', status: 'active', startMonth: '2026-12', months: 1, disposals: [], revisions,
     installments: [{ index: 1, month: '2026-12', lines: [{ status: lineStatus }] }],
   };
 }
@@ -56,7 +60,7 @@ beforeEach(() => {
   state.plansFresh = true;
 });
 
-describe('PianoClient (mutation: render the wizard with an active plan)', () => {
+describe('PianoClient (mutation: keep the «Hai già un piano» screen for an active plan with an intact instalment)', () => {
   it('without plans and with targets: the wizard', () => {
     render(<PianoClient />);
     expect(screen.getByText('WIZARD')).toBeTruthy();
@@ -83,36 +87,69 @@ describe('PianoClient (mutation: render the wizard with an active plan)', () => 
     expect(screen.queryByText('WIZARD')).toBeNull();
   });
 
-  it('an active plan: its sentence and «Apri Accumulo», no wizard', () => {
+  it('an active plan with an intact instalment: the wizard in a revision, the header says so', () => {
     state.plans = [activePlan('pending')];
     render(<PianoClient />);
-    expect(screen.getByText('Hai già un piano di accumulo attivo.')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Apri Accumulo' }).getAttribute('href')).toBe('/dashboard/allocation?tab=accumulo');
-    expect(screen.queryByText('WIZARD')).toBeNull();
+    expect(screen.getByText('REVISION plan-1 0 false')).toBeTruthy();
+    expect(screen.getByText('Rivedi il piano: le rate chiuse restano come sono.')).toBeTruthy();
+  });
+
+  it('?da=modello reaches the wizard as fromModel', () => {
+    state.plans = [activePlan('pending')];
+    render(<PianoClient fromModel />);
+    expect(screen.getByText('REVISION plan-1 0 true')).toBeTruthy();
+  });
+
+  // Read from the URL on the client, never from the page's `searchParams` (it made the route dynamic: perf:budget
+  // read no prerendered page, found at the § 4.6 measure). Mutation that turns it red: the URL not read.
+  it('?da=modello in the URL, no prop: fromModel', () => {
+    window.history.pushState({}, '', '/dashboard/allocation/piano?da=modello');
+    try {
+      state.plans = [activePlan('pending')];
+      render(<PianoClient />);
+      expect(screen.getByText('REVISION plan-1 0 true')).toBeTruthy();
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
   });
 
   it('an active plan with every instalment closed: the sentence of nothing to revise', () => {
     state.plans = [activePlan('executed')];
     render(<PianoClient />);
     expect(screen.getByText(ACCUMULO_PLAN_NOTHING_TO_REVISE)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Apri Accumulo' }).getAttribute('href')).toBe('/dashboard/allocation?tab=accumulo');
     expect(screen.queryByText('WIZARD')).toBeNull();
   });
 
-  it('an active plan clears the browser draft', () => {
+  it('a plan with nothing to revise clears the browser draft; one in revision keeps it for the wizard', () => {
+    window.localStorage.setItem('plan-path-draft:v1:owner-1', '{"version":1}');
+    state.plans = [activePlan('executed')];
+    const view = render(<PianoClient />);
+    expect(window.localStorage.getItem('plan-path-draft:v1:owner-1')).toBeNull();
+    view.unmount();
     window.localStorage.setItem('plan-path-draft:v1:owner-1', '{"version":1}');
     state.plans = [activePlan('pending')];
     render(<PianoClient />);
-    expect(window.localStorage.getItem('plan-path-draft:v1:owner-1')).toBeNull();
+    expect(window.localStorage.getItem('plan-path-draft:v1:owner-1')).toBe('{"version":1}');
   });
 });
 
 describe('PianoClient after «Conferma» (mutation: let the refetched active plan replace the wizard)', () => {
-  it('the plan the wizard just created does not turn the page into «Hai già un piano»', () => {
+  it('the plan the wizard just created does not turn the page into a revision', () => {
     const view = render(<PianoClient />);
     fireEvent.click(screen.getByText('WIZARD'));
     state.plans = [activePlan('pending')];
     view.rerender(<PianoClient />);
     expect(screen.getByText('WIZARD')).toBeTruthy();
-    expect(screen.queryByText('Hai già un piano di accumulo attivo.')).toBeNull();
+    expect(screen.queryByText(/^REVISION/)).toBeNull();
+  });
+
+  it('the plan the wizard just revised: the refetched plan (one more revision) does not restart it', () => {
+    state.plans = [activePlan('pending')];
+    const view = render(<PianoClient />);
+    fireEvent.click(screen.getByText('REVISION plan-1 0 false'));
+    state.plans = [activePlan('pending', [{ fromIndex: 1 }])];
+    view.rerender(<PianoClient />);
+    expect(screen.getByText('REVISION plan-1 0 false')).toBeTruthy();
   });
 });

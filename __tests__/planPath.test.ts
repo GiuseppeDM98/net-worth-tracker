@@ -14,6 +14,9 @@ import { describeDraftIssue } from '@/lib/utils/accumulationNarrative';
 import { ACCUMULO_STEP2_PENDING_ASSET_LABEL } from '@/lib/utils/accumulationNarrative';
 import {
   PLAN_PATH_SCREENS,
+  buildPlanPathRevision,
+  planPathToRevision,
+  previewPlanPathRevision,
   describePlanPathBlock,
   firstPlanPathRefusal,
   initialPlanPathDraft,
@@ -77,6 +80,8 @@ function context(overrides: Partial<PlanPathContext> = {}): PlanPathContext {
     compare,
     deps: DEPS,
     todayMonth: '2026-11',
+    revision: null,
+    fromModel: false,
     ...overrides,
   };
 }
@@ -484,5 +489,250 @@ describe('planPath — a held instrument bought after the draft, and a start cho
     expect(byLabel(zero.answers.positions)).toEqual({ 'ETF ornitorinco': 0, 'ETF fenicottero': 0 });
     const again = planPathReducer(zero, { type: 'start', start: 'today', context: ctx });
     expect(byLabel(again.answers.positions)).toEqual({ 'ETF ornitorinco': 60, 'ETF fenicottero': 40 });
+  });
+});
+
+// ─── The revision of an ACTIVE plan (2026-11-21) ─────────────────────────────────────────────────
+
+/** An active plan of 12 months from 2026-08, the first four instalments closed, an open sale of 10 ETF fenicottero in month 6. */
+function activePlan(overrides: Partial<AccumulationPlan> = {}): AccumulationPlan {
+  const line = (positionId: string, assetId: string, closed: boolean) => ({
+    positionId, assetId, plannedQuantity: 2, priceEurAtPlan: 100, plannedAmountEur: 200,
+    status: closed ? ('executed' as const) : ('planned' as const), ...(closed ? { transactionIds: ['t'] } : {}),
+  });
+  const months = ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06', '2027-07'];
+  return {
+    id: 'plan-1', userId: 'u1', name: 'Piano airone', status: 'active', startMonth: '2026-08', months: 12,
+    liquidity: { sourceCashAssetIds: ['conto'], reserveEur: 1000, monthlyInflowEur: 500 },
+    positions: [
+      { id: 'p-a', label: 'ETF ornitorinco', targetPercentage: 60, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' },
+      { id: 'p-b', label: 'ETF fenicottero', targetPercentage: 40, memberAssetIds: ['etf-b'], buyAssetId: 'etf-b' },
+    ],
+    disposals: [{ assetId: 'etf-b', quantity: 10, monthIndex: 6, estimatedProceedsEur: 1000, status: 'planned' }],
+    installments: months.map((month, i) => ({
+      index: i + 1, month, carryInEur: {}, lines: [line('p-a', 'etf-a', i < 4), line('p-b', 'etf-b', i < 4)],
+    })),
+    createdAt: TODAY, updatedAt: TODAY,
+    ...overrides,
+  };
+}
+
+function revisionContext(plan: AccumulationPlan, overrides: Partial<PlanPathContext> = {}): PlanPathContext {
+  return context({ revision: buildPlanPathRevision(plan), ...overrides });
+}
+
+const MODEL: ModelPortfolio = {
+  userId: 'u1', origin: 'manual', updatedAt: TODAY,
+  weights: [{ assetId: 'etf-a', targetPercentage: 30 }, { assetId: 'etf-b', targetPercentage: 70 }],
+};
+
+describe('buildPlanPathRevision and the initial revision draft (mutation: take plan.months as the months left)', () => {
+  it('12 months, 4 closed: «Dal piano com’è», 8 months, the accounts, reserve, inflow, positions, the open sale in month 6, from index 5', () => {
+    const plan = activePlan();
+    const revision = buildPlanPathRevision(plan)!;
+    expect(revision).toMatchObject({ firstIndex: 5, firstMonth: '2026-12', closedCount: 4, lockedSales: [] });
+    const { screen, answers: a } = initialPlanPathDraft(revisionContext(plan));
+    expect(screen).toBe('partenza');
+    expect(a).toMatchObject({
+      start: 'plan', months: 8, monthlyInflowEur: 500, reserveEur: 1000, sourceIds: ['conto'], wantsSales: true,
+      sales: [{ assetId: 'etf-b', quantity: 10, month: 6 }], positions: plan.positions,
+      revisesPlanId: 'plan-1', revisionCount: 0, revisesFromIndex: 5, name: 'Piano airone',
+    });
+  });
+
+  it('null when every instalment is closed', () => {
+    const plan = activePlan();
+    for (const installment of plan.installments) installment.lines.forEach((l) => { l.status = 'executed'; });
+    expect(buildPlanPathRevision(plan)).toBeNull();
+  });
+
+  it('with fromModel and a model with weights: «Dal portafoglio modello» on the plan rows; without a model: «Dal piano com’è»', () => {
+    const plan = activePlan();
+    const fromModel = initialPlanPathDraft(revisionContext(plan, { fromModel: true, model: MODEL })).answers;
+    expect(fromModel.start).toBe('model');
+    expect(byLabel(fromModel.positions)).toEqual({ 'ETF ornitorinco': 30, 'ETF fenicottero': 70 });
+    expect(fromModel.positions.map((p) => p.id)).toEqual(['p-a', 'p-b']);
+    expect(initialPlanPathDraft(revisionContext(plan, { fromModel: true })).answers.start).toBe('plan');
+    expect(initialPlanPathDraft(revisionContext(plan, { fromModel: false, model: MODEL })).answers.start).toBe('plan');
+  });
+
+  it('a source account deleted since, or no longer a source account, is not ticked', () => {
+    const plan = activePlan({ liquidity: { sourceCashAssetIds: ['conto', 'conto-gone', 'mm'], reserveEur: 1000, monthlyInflowEur: 500 } });
+    const a = initialPlanPathDraft(revisionContext(plan, { assets: [conto(), etfA(), etfB(), fondoM()] })).answers;
+    expect(a.sourceIds).toEqual(['conto']);
+  });
+
+  it('an instrument bought after the activation gets its row at 0 %', () => {
+    const plan = activePlan();
+    const a = initialPlanPathDraft(revisionContext(plan, { assets: [conto(), etfA(), etfB(), etfC()] })).answers;
+    expect(byLabel(a.positions)).toEqual({ 'ETF ornitorinco': 60, 'ETF fenicottero': 40, 'ETF airone': 0 });
+  });
+
+  it('«Dai pesi di oggi» keeps the plan rows and gives them the weights of today', () => {
+    const plan = activePlan();
+    const ctx = revisionContext(plan, { assets: [conto(), etfA(60), etfB(40)] });
+    const a = initialPlanPathDraft(ctx).answers;
+    const today = seedPlanPathPositions('today', { ...a, sales: [] }, ctx);
+    expect(today.map((p) => p.id)).toEqual(['p-a', 'p-b']);
+    expect(byLabel(today)).toEqual({ 'ETF ornitorinco': 60, 'ETF fenicottero': 40 });
+  });
+});
+
+describe('planPathToRevision (mutation: send the open sales as new)', () => {
+  const plan = activePlan();
+  const ctx = revisionContext(plan);
+  const start = initialPlanPathDraft(ctx).answers;
+  const withSales = (sales: PlanPathAnswers['sales']) => planPathToRevision({ ...start, sales, wantsSales: sales.length > 0 }, ctx);
+
+  it('the open sale untouched: no diff; expectedFirstIndex 5; the answers as the revision', () => {
+    const revision = planPathToRevision(start, ctx);
+    expect(revision).toMatchObject({
+      monthlyInflowEur: 500, reserveEur: 1000, remainingMonths: 8, positions: plan.positions, sourceCashAssetIds: ['conto'],
+      disposals: [], removedDisposalAssetIds: [], movedDisposalMonthIndexes: {}, expectedFirstIndex: 5,
+    });
+  });
+
+  it('its quantity 10 → 6: removed and new; moved to month 9: moved; unticked: removed', () => {
+    const six = withSales([{ assetId: 'etf-b', quantity: 6, month: 6 }]);
+    expect(six.removedDisposalAssetIds).toEqual(['etf-b']);
+    expect(six.disposals).toMatchObject([{ assetId: 'etf-b', quantity: 6, monthIndex: 6 }]);
+    const moved = withSales([{ assetId: 'etf-b', quantity: 10, month: 9 }]);
+    expect(moved).toMatchObject({ disposals: [], removedDisposalAssetIds: [], movedDisposalMonthIndexes: { 'etf-b': 9 } });
+    expect(withSales([])).toMatchObject({ disposals: [], removedDisposalAssetIds: ['etf-b'] });
+  });
+
+  it('a new sale in month 7 is a new disposal with its month', () => {
+    const revision = withSales([{ assetId: 'etf-b', quantity: 10, month: 6 }, { assetId: 'etf-a', quantity: 5, month: 7 }]);
+    expect(revision.disposals).toMatchObject([{ assetId: 'etf-a', quantity: 5, monthIndex: 7, status: 'planned' }]);
+    expect(revision.removedDisposalAssetIds).toEqual([]);
+  });
+
+  it('a saved sale of 40 with 40 held, answered «every share» (null): no diff', () => {
+    const whole = activePlan({ disposals: [{ assetId: 'etf-b', quantity: 40, monthIndex: 6, estimatedProceedsEur: 4000, status: 'planned' }] });
+    const wctx = revisionContext(whole);
+    const revision = planPathToRevision({ ...initialPlanPathDraft(wctx).answers, sales: [{ assetId: 'etf-b', quantity: null, month: 6 }] }, wctx);
+    expect(revision).toMatchObject({ disposals: [], removedDisposalAssetIds: [], movedDisposalMonthIndexes: {} });
+  });
+
+  it('an executed sale on ETF ornitorinco and an answer that sells it again: named in none of the three fields', () => {
+    const sold = activePlan({ disposals: [{ assetId: 'etf-a', quantity: 5, monthIndex: 2, estimatedProceedsEur: 500, status: 'executed' }] });
+    const sctx = revisionContext(sold);
+    const revision = planPathToRevision({ ...initialPlanPathDraft(sctx).answers, sales: [{ assetId: 'etf-a', quantity: 3, month: 7 }] }, sctx);
+    expect(revision.disposals).toEqual([]);
+    expect(revision.removedDisposalAssetIds).toEqual([]);
+    expect(revision.movedDisposalMonthIndexes).toEqual({});
+  });
+});
+
+describe('the preview and the refusal of a revision (mutation: preview with buildDraftPreview; gate on every disposal)', () => {
+  it('valid answers: instalments 5…12 rewritten, 1…4 identical to the plan', () => {
+    const plan = activePlan();
+    const ctx = revisionContext(plan);
+    const a = { ...initialPlanPathDraft(ctx).answers, monthlyInflowEur: 800 };
+    const result = previewPlanPathRevision(a, ctx, TODAY);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.firstIndex).toBe(5);
+    expect(result.plan.installments.map((i) => i.index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(result.plan.installments.slice(0, 4)).toEqual(plan.installments.slice(0, 4));
+    expect(result.plan.installments[4].month).toBe('2026-12');
+    expect(firstPlanPathRefusal(a, ctx, TODAY)).toBeNull();
+  });
+
+  it('57 months left with 4 closed: the durata block first, the engine says months_range', () => {
+    const plan = activePlan();
+    const ctx = revisionContext(plan);
+    const a = { ...initialPlanPathDraft(ctx).answers, months: 57 };
+    expect(describePlanPathBlock('durata', a, ctx)).toBe('Scrivi quanti mesi restano, da 1 a 56.');
+    expect(firstPlanPathRefusal(a, ctx, TODAY)).toBe('Scrivi quanti mesi restano, da 1 a 56.');
+    expect(previewPlanPathRevision(a, ctx, TODAY)).toEqual({ ok: false, issue: 'months_range' });
+  });
+
+  it('a plan with an executed sale of every share of a position: no gate refusal', () => {
+    const plan = activePlan({ disposals: [{ assetId: 'etf-a', monthIndex: 2, estimatedProceedsEur: 6000, status: 'executed' }] });
+    const ctx = revisionContext(plan);
+    expect(firstPlanPathRefusal(initialPlanPathDraft(ctx).answers, ctx, TODAY)).toBeNull();
+  });
+
+  it('vendite: a sale past the new end is the sale_month_out sentence; a late saved sale blocks nothing', () => {
+    const late = activePlan({ disposals: [{ assetId: 'etf-b', quantity: 10, monthIndex: 3, estimatedProceedsEur: 1000, status: 'planned' }] });
+    const ctx = revisionContext(late);
+    const a = initialPlanPathDraft(ctx).answers;
+    expect(a.sales).toEqual([{ assetId: 'etf-b', quantity: 10, month: 3 }]);
+    expect(describePlanPathBlock('vendite', a, ctx)).toBeNull();
+    const past = { ...a, sales: [{ assetId: 'etf-b', quantity: 10, month: 13 }] };
+    expect(describePlanPathBlock('vendite', past, ctx)).toBe(describeDraftIssue({ code: 'sale_month_out', label: 'ETF fenicottero' }));
+  });
+});
+
+describe('a hand revision and the fields of the Consulente (mutation: always send advisorNotes: [])', () => {
+  it('notes on the plan → advisorNotes: []; none → the key absent', () => {
+    const noted = activePlan({ advisorNotes: ['Una nota.'] });
+    const nctx = revisionContext(noted);
+    expect(planPathToRevision(initialPlanPathDraft(nctx).answers, nctx).advisorNotes).toEqual([]);
+    const plain = activePlan();
+    const pctx = revisionContext(plain);
+    expect('advisorNotes' in planPathToRevision(initialPlanPathDraft(pctx).answers, pctx)).toBe(false);
+  });
+
+  it('review month 10: kept (key absent) while inside the plan; null when the plan ends at 8', () => {
+    const plan = activePlan({ reviewMonthIndex: 10 });
+    const ctx = revisionContext(plan);
+    const a = initialPlanPathDraft(ctx).answers;
+    expect('reviewMonthIndex' in planPathToRevision(a, ctx)).toBe(false);
+    expect(planPathToRevision({ ...a, months: 4, sales: [] }, ctx).reviewMonthIndex).toBeNull();
+  });
+});
+
+describe('restorePlanPathDraft in a revision (mutation: compare the id and the count only)', () => {
+  const plan = activePlan();
+  const ctx = revisionContext(plan);
+  const initial = initialPlanPathDraft(ctx);
+  const stored = (patch: Partial<PlanPathAnswers>, screen: PlanPathDraft['screen'] = 'riserva'): PlanPathDraft => ({
+    version: 1, screen, answers: { ...initial.answers, monthlyInflowEur: 900, ...patch },
+  });
+
+  it('the matching stored revision is kept, on its screen', () => {
+    const restored = restorePlanPathDraft(stored({}), ctx);
+    expect(restored.screen).toBe('riserva');
+    expect(restored.answers.monthlyInflowEur).toBe(900);
+  });
+
+  it('another plan id, one more revision, one more instalment closed → the initial revision draft', () => {
+    expect(restorePlanPathDraft(stored({ revisesPlanId: 'plan-0' }), ctx)).toEqual(initial);
+    expect(restorePlanPathDraft(stored({ revisionCount: 1 }), ctx)).toEqual(initial);
+    expect(restorePlanPathDraft(stored({ revisesFromIndex: 4 }), ctx)).toEqual(initial);
+  });
+
+  it('a stored create draft with an active plan → the initial revision draft', () => {
+    const create: PlanPathDraft = { version: 1, screen: 'durata', answers: answers() };
+    expect(restorePlanPathDraft(create, ctx)).toEqual(initial);
+  });
+
+  it('a stored revision draft with no active plan → the initial create draft', () => {
+    const createCtx = context();
+    expect(restorePlanPathDraft(stored({}), createCtx)).toEqual(initialPlanPathDraft(createCtx));
+  });
+
+  it('parseStoredPlanPath keeps the start «plan» and the three fields of the revision', () => {
+    const parsed = parseStoredPlanPath(JSON.parse(JSON.stringify(stored({}))));
+    expect(parsed?.answers).toMatchObject({ start: 'plan', revisesPlanId: 'plan-1', revisionCount: 0, revisesFromIndex: 5 });
+  });
+});
+
+// Found by § 7 B (2026-11-21): ticking «Vendi» sells every share and takes the row away; a partial quantity typed
+// after it brought a held row back at 0 % with a NEW id, while the closed instalments name the plan's position.
+describe('a revision: a sale ticked then made partial gives back the plan row (mutation: leave it to withHeldRows)', () => {
+  it('the row returns with its id, its label, its quota and in its place', () => {
+    const plan = activePlan({ disposals: [] });
+    const ctx = revisionContext(plan);
+    let draft = initialPlanPathDraft(ctx);
+    draft = planPathReducer(draft, { type: 'sale', sale: { assetId: 'etf-a', quantity: null, month: 5 }, context: ctx });
+    expect(draft.answers.positions.map((p) => p.id)).toEqual(['p-b']);
+    draft = planPathReducer(draft, { type: 'sale', sale: { assetId: 'etf-a', quantity: 1, month: 5 }, context: ctx });
+    expect(draft.answers.positions).toEqual(plan.positions);
+    draft = planPathReducer(draft, { type: 'sale', sale: { assetId: 'etf-a', quantity: null, month: 5 }, context: ctx });
+    draft = planPathReducer(draft, { type: 'sale', sale: { assetId: 'etf-a', remove: true }, context: ctx });
+    expect(draft.answers.positions).toEqual(plan.positions);
   });
 });

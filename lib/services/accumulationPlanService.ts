@@ -47,6 +47,7 @@ import {
   resolvePositionStates,
   proceedsOfDisposal,
   buildRevisedPlan,
+  revisedPlanGateDraft,
   computeUsableLiquidity,
   computeTotalPurchases,
   scheduleInstallments,
@@ -479,18 +480,7 @@ export async function revisePlan(planId: string, revision: PlanRevisionInput, in
       );
     }
 
-    const issues = validateDraftAgainstAssets(
-      {
-        name: result.plan.name,
-        startMonth: result.plan.startMonth,
-        months: result.plan.months,
-        liquidity: result.plan.liquidity,
-        positions: result.plan.positions,
-        // Executed sales already left the ledger: only the pending ones are checked against the held shares.
-        disposals: result.plan.disposals.filter((d) => d.status !== 'executed'),
-      },
-      assetsById
-    );
+    const issues = validateDraftAgainstAssets(revisedPlanGateDraft(result.plan), assetsById);
     if (issues.length > 0) throw userFacingError(issues[0].message);
 
     tx.update(

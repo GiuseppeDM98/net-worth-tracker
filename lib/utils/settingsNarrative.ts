@@ -632,7 +632,7 @@ export function listIdealObjectives({ classPriority, leveragePriority, targetLev
 
 /**
  * Allocazione ideale — which objectives the weight optimizer can
- * propose PAC weights from, and their priority. Spenta: the PAC's Target step stays manual.
+ * propose the model's weights from, and their priority. Spenta: the model's weights stay manual.
  */
 export function describeIdealAllocation(input: IdealAllocationInput): Narrative {
   if (!input.enabled) {

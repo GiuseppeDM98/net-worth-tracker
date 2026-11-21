@@ -15,34 +15,23 @@ import { narrativeToText } from '@/lib/utils/narrative';
 import { cachedFormatCurrencyEUR, formatPercentageIt } from '@/lib/utils/formatters';
 import { describeSaleStep } from '@/lib/utils/accumulationNarrative';
 import {
-  describeAccumulationNone,
   describeBandReentry,
   describeDriftReading,
-  describeAccumulationDraft,
-  describeAccumulationActive,
   describeReserveWarning,
-  describeAccumulationDone,
   describeAccumulationReadFailure,
   describeClassStripItem,
   describeAccumulationOutcomeFooter,
   describeMonthsBarCaption,
-  describeWeightsTotal,
-  describeRecalibration,
-  describeRecalibrationTotals,
   describeMeasuredOn,
-  describeAccumuloDialogEyebrow,
   describeAccumuloModalEyebrow,
-  describeRecalibrateTitle,
   describeInsufficientLiquidityWarning,
   describeUnpricedWarning,
-  describeAboveTargetWarning,
   monthLabelShort,
   monthLabelLong,
   trajectoryPointLabel,
   formatSignedPp,
   formatSignedCurrency,
   describePlanPastReview,
-  describeWeightsSum,
   suggestMonthlyInflow,
   describeSuggestedInflow,
 } from '@/lib/utils/accumulationNarrative';
@@ -73,84 +62,6 @@ describe('signed figures', () => {
   });
 });
 
-describe('describeAccumulationNone', () => {
-  it('names the idle cash when there is some', () => {
-    const text = narrativeToText(describeAccumulationNone(40000));
-    expect(text).toBe(
-      `Nessun piano di accumulo. Nei conti di liquidità ci sono ${eur(40000)}: un piano li ripartisce in rate mensili verso i pesi che scegli, senza vendere ciò che tieni.`,
-    );
-  });
-
-  it('never prints «0,00 €» when there is no idle cash', () => {
-    const text = narrativeToText(describeAccumulationNone(0));
-    expect(text).not.toContain(eur(0));
-    expect(text).toContain('Non hai liquidità nei conti');
-  });
-});
-
-describe('describeAccumulationDraft', () => {
-  it('names the total, the calendar and the monthly instalment', () => {
-    const text = narrativeToText(
-      describeAccumulationDraft({ totalEur: 48000, months: 12, startMonth: '2026-10' }),
-    );
-    expect(text).toBe(
-      `Bozza: ${eur(48000)} in 12 rate da ottobre 2026, ${eur(48000 / 12)} al mese. Non è ancora attivo: nessuna rata viene proposta finché non lo attivi.`,
-    );
-  });
-
-  it('uses the singular «rata» for a one-month plan', () => {
-    const text = narrativeToText(describeAccumulationDraft({ totalEur: 1000, months: 1, startMonth: '2026-01' }));
-    expect(text).toContain('1 rata da');
-    expect(text).not.toContain('1 rate');
-  });
-});
-
-describe('describeAccumulationActive', () => {
-  it('names the month, the total, the split of executed/todo and the furthest drift', () => {
-    const text = narrativeToText(
-      describeAccumulationActive({
-        monthKey: '2026-12',
-        installmentTotalEur: 4000,
-        lineCount: 5,
-        executedCount: 1,
-        todoCount: 4,
-        furthestDrift: { label: 'ETF-C', deltaPp: 0.3 },
-      }),
-    );
-    expect(text).toBe(
-      `Rata di dicembre: ${eur(4000)} in 5 acquisti, 1 già eseguito e 4 da eseguire. Sei in linea col calendario.`,
-    );
-  });
-
-  it('drops the split clause when nothing is executed or pending, and states a real gap', () => {
-    const text = narrativeToText(
-      describeAccumulationActive({
-        monthKey: '2026-01',
-        installmentTotalEur: 500,
-        lineCount: 1,
-        executedCount: 0,
-        todoCount: 0,
-        furthestDrift: { label: 'Obbligazioni', deltaPp: -2.1 },
-      }),
-    );
-    expect(text).toBe(`Rata di gennaio: ${eur(500)} in 1 acquisto. Sei a −2,1 pp dal previsto su Obbligazioni.`);
-  });
-
-  it('drops the drift clause entirely when it is unknown, never prints a false zero', () => {
-    const text = narrativeToText(
-      describeAccumulationActive({
-        monthKey: '2026-06',
-        installmentTotalEur: 0,
-        lineCount: 0,
-        executedCount: 0,
-        todoCount: 0,
-        furthestDrift: null,
-      }),
-    );
-    expect(text).toBe(`Rata di giugno: ${eur(0)} in 0 acquisti.`);
-  });
-});
-
 describe('describeReserveWarning', () => {
   it('returns null when nothing is below reserve and nothing is reduced', () => {
     expect(describeReserveWarning({ sourceCashEur: 20000, reserveEur: 10000, belowReserve: false })).toBeNull();
@@ -175,30 +86,6 @@ describe('describeReserveWarning', () => {
       describeReserveWarning({ sourceCashEur: 5000, reserveEur: 10000, belowReserve: true })!,
     );
     expect(text).toBe(`Liquidità nei conti sorgente ${eur(5000)} contro ${eur(10000)} di riserva: la riserva non si tocca.`);
-  });
-});
-
-describe('describeAccumulationDone', () => {
-  it('names the closed instalments, what was invested and the worst drift', () => {
-    const text = narrativeToText(
-      describeAccumulationDone({
-        closedCount: 12,
-        totalInstallments: 12,
-        investedEur: 47500,
-        totalEur: 48000,
-        maxDrift: { label: 'ETF-C', deltaPp: 0.6 },
-      }),
-    );
-    expect(text).toBe(
-      `Piano concluso: 12 rate su 12, ${eur(47500)} investiti su ${eur(48000)}. Il peso più lontano dal target è ETF-C, a +0,6 pp.`,
-    );
-  });
-
-  it('drops the drift clause when every position landed exactly on target', () => {
-    const text = narrativeToText(
-      describeAccumulationDone({ closedCount: 1, totalInstallments: 1, investedEur: 500, totalEur: 500, maxDrift: null }),
-    );
-    expect(text).toBe(`Piano concluso: 1 rata su 1, ${eur(500)} investiti su ${eur(500)}.`);
   });
 });
 
@@ -277,69 +164,6 @@ describe('describeMonthsBarCaption', () => {
   });
 });
 
-describe('describeWeightsTotal — above and below 100', () => {
-  it('names how many points are missing, below 100', () => {
-    expect(describeWeightsTotal(97)).toBe('Mancano 3,00 punti per arrivare al 100%');
-  });
-
-  it('names how many points are in excess, above 100', () => {
-    expect(describeWeightsTotal(102)).toBe('Hai 2,00 punti in più');
-  });
-
-  it('is silent at exactly 100 (within the schema tolerance)', () => {
-    expect(describeWeightsTotal(100)).toBe('');
-    expect(describeWeightsTotal(100.005)).toBe('');
-  });
-});
-
-describe('describeRecalibration', () => {
-  it('names the position that shrank, where the freed quotas go, and the total delta', () => {
-    const text = narrativeToText(
-      describeRecalibration({
-        lines: [
-          { label: 'ETF-B', plannedQuantity: 10, suggestedQuantity: 8 },
-          { label: 'ETF-A', plannedQuantity: 5, suggestedQuantity: 7 },
-        ],
-        plannedTotalEur: 4000,
-        suggestedTotalEur: 3950,
-      }),
-    );
-    expect(text).toBe(`ETF-B è salito più del previsto: la rata sposta 2 quote verso ETF-A. Il totale cambia di −${eur(50)}.`);
-  });
-
-  it('names a uniform shortfall when nothing gains, only shrinks', () => {
-    const text = narrativeToText(
-      describeRecalibration({
-        lines: [
-          { label: 'ETF-B', plannedQuantity: 10, suggestedQuantity: 8 },
-          { label: 'ETF-A', plannedQuantity: 5, suggestedQuantity: 4 },
-        ],
-        plannedTotalEur: 1000,
-        suggestedTotalEur: 700,
-      }),
-    );
-    expect(text).toContain('Le entrate non sono arrivate come previsto');
-    expect(text).toContain(eur(300));
-  });
-
-  it('states nothing moved when every line matches the saved calendar', () => {
-    const text = narrativeToText(
-      describeRecalibration({
-        lines: [{ label: 'ETF-A', plannedQuantity: 5, suggestedQuantity: 5 }],
-        plannedTotalEur: 500,
-        suggestedTotalEur: 500,
-      }),
-    );
-    expect(text).toBe('La rata resta come pianificata.');
-  });
-});
-
-describe('describeRecalibrationTotals', () => {
-  it('formats the planned-to-suggested arrow', () => {
-    expect(describeRecalibrationTotals(4000, 3950)).toBe(`${eur(4000)} → ${eur(3950)}`);
-  });
-});
-
 describe('describeMeasuredOn', () => {
   it('formats a DD/MM/YYYY date', () => {
     expect(describeMeasuredOn(new Date(2027, 0, 10))).toBe('misurato il 10/01/2027');
@@ -347,17 +171,11 @@ describe('describeMeasuredOn', () => {
 });
 
 describe('modal and dialog eyebrows/titles', () => {
-  it('names the step and total for the editor', () => {
-    expect(describeAccumuloDialogEyebrow(2)).toBe('Piano di accumulo · Passo 2 di 3');
-  });
 
   it('names the plan for a secondary modal', () => {
     expect(describeAccumuloModalEyebrow('Il mio piano')).toBe('Accumulo · Il mio piano');
   });
 
-  it('names the month being recalibrated', () => {
-    expect(describeRecalibrateTitle('2027-01')).toBe('Ricalibra rata di gennaio');
-  });
 });
 
 describe('editor warnings — the Italian singular/plural agreement', () => {
@@ -373,45 +191,12 @@ describe('editor warnings — the Italian singular/plural agreement', () => {
     );
   });
 
-  it('names a position already above target', () => {
-    expect(describeAboveTargetWarning(['ETF-C'])).toBe(
-      'ETF-C è già sopra il target: il piano non la vende, il peso resta più alto del previsto.',
-    );
-  });
-
   it('states the coverage share of an underfunded plan', () => {
     expect(describeInsufficientLiquidityWarning(62)).toContain('62%');
   });
 });
 
 describe('Comma Rule — every currency and percentage figure is Italian, never toFixed', () => {
-  it('never prints a toFixed-style dot decimal right before a "%" or "pp" unit', () => {
-    // The Italian THOUSANDS dot ("1.234,56 €") is always followed by three more digits, never
-    // directly by a unit — so this targets only the `toFixed` shape a stray `.toFixed()` would
-    // produce ("12.34%", "1.2 pp"), without false-positiving on legitimate grouping.
-    const samples = [
-      narrativeToText(describeAccumulationDraft({ totalEur: 1234567.5, months: 4, startMonth: '2026-03' })),
-      narrativeToText(
-        describeAccumulationActive({
-          monthKey: '2026-04',
-          installmentTotalEur: 1234.56,
-          lineCount: 2,
-          executedCount: 1,
-          todoCount: 1,
-          furthestDrift: { label: 'X', deltaPp: 1.23 },
-        }),
-      ),
-      (() => {
-        const item = describeClassStripItem({ label: 'Azioni', currentPct: 58.25, targetPct: 55.5, currentDriftPp: 1.23, finalDriftPp: -0.45, outOfBandNow: false });
-        return `${item.current} ${item.target} ${item.secondary}`;
-      })(),
-      describeWeightsTotal(96.5),
-      formatSignedPp(1.23),
-    ];
-    for (const text of samples) {
-      expect(text).not.toMatch(/\d\.\d{1,2}(%| pp)/);
-    }
-  });
 
   it('formats a percentage figure with comma decimals via formatPercentageIt, never toFixed', () => {
     const item = describeClassStripItem({ label: 'X', currentPct: 58.25, targetPct: 55.5, currentDriftPp: 0, finalDriftPp: 0, outOfBandNow: false });
@@ -421,11 +206,6 @@ describe('Comma Rule — every currency and percentage figure is Italian, never 
     expect(item.target).not.toContain('55.5%');
   });
 
-  it('formats a currency figure through cachedFormatCurrencyEUR, never a hand-rolled dot decimal', () => {
-    const text = narrativeToText(describeAccumulationDraft({ totalEur: 1234.5, months: 4, startMonth: '2026-03' }));
-    expect(text).toContain(eur(1234.5));
-    expect(text).not.toContain('1234.50');
-  });
 });
 
 // ─── Rientro in banda ───────────────────────────────────────────
@@ -479,13 +259,6 @@ describe('the review date (2026-11-12)', () => {
   });
 });
 
-describe('the editor’s preview sentences', () => {
-  it('the weights’ sum, in line or not', () => {
-    expect(describeWeightsSum(100)).toBe('Pesi a 100,0%: puoi andare avanti.');
-    expect(describeWeightsSum(90)).toBe('Pesi a 90,0%: devono fare 100%.');
-  });
-});
-
 describe('the suggested instalment: the median of the monthly savings (owner, 2026-11-12)', () => {
   const flatSpaces = (text: string) => text.replace(/[  ]/g, ' ');
 
@@ -510,6 +283,13 @@ describe('describeSaleStep', () => {
   it('names the month, the instalment without decimals and the sales joined', () => {
     expect(describeSaleStep({ month: '2027-07', instalmentEur: 1800, names: ['Fondo X', 'Fondo Y'] }).replace(/[  ]/g, ' ')).toBe(
       'Da luglio la rata sale a 1800 €: entra il ricavato di Fondo X, Fondo Y.'
+    );
+  });
+
+  // A name ending in a period (owner, 2026-11-21: «Apple Inc..»). Mutation that turns it red: the period always added.
+  it('adds no second period after a name that ends with one', () => {
+    expect(describeSaleStep({ month: '2027-07', instalmentEur: 1800, names: ['Apple Inc.'] }).replace(/[  ]/g, ' ')).toBe(
+      'Da luglio la rata sale a 1800 €: entra il ricavato di Apple Inc.'
     );
   });
 });

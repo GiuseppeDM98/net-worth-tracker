@@ -7,7 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dialog e form trasversali**: `components/ui/{responsive-modal,modal-status-line}.tsx` (`ModalWidth` sm/md/lg/xl), `lib/utils/modalOrigin.ts` (`resolveCenteredModalOrigin`), `lib/utils/dialogNarrative.ts` (`describeFormRefusal`, `describeExpenseDeleteConsequence`, `describeSeriesDeleteReading`, `describeMovementDetailReading`, `describeMovementsFilterReading`, `describeSnapshotOverwrite`), `lib/hooks/useArmedDelete.ts`, `components/expenses/SeriesDeleteDialog.tsx` (`resolveSeriesDeleteMode` = the ONE rule for «solo questa o tutte?»), `lib/constants/aiModels.ts`; `components/layout/LogoutDialog.tsx` stays an `AlertDialog` — doc/guide/dialog.md
-- **The mounts**: 49 in 47 files (`grep -rnw '<ResponsiveModal' components app`, re-measured 2026-11-20 after the Consulente's hand-off window was deleted — the word match, or
+- **The mounts**: 48 in 46 files (`grep -rnw '<ResponsiveModal' components app`, re-measured 2026-11-21 after the PAC editor was deleted — the word match, or
   the props type in `responsive-modal.tsx` counts too); the latest is «Vai a una pagina», the index of the
   Consulente's book (`components/allocation/consulente/ConsulenteBook.tsx`: rows of 44px, no footer, `returnFocusTo`
   the new page's headline, because the opener slides away with its page).

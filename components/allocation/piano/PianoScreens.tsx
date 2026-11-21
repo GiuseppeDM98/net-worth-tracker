@@ -6,15 +6,17 @@
  * «Conferma» belong to the wizard. At 390px every row stacks: name over figures over control.
  */
 
-import type { Dispatch } from 'react';
+import { useState, type Dispatch } from 'react';
 import type { PlanDisposal } from '@/types/accumulationPlan';
 import {
   listSellableAssets,
+  lockedSaleAssetIds,
   planPathQuotasTyped,
   planPathTodayWeights,
   resolvePathReserve,
   resolvePathReserveEur,
   saleMayBeWhole,
+  saleMonthIndexes,
   type PlanPathAction,
   type PlanPathAnswers,
   type PlanPathContext,
@@ -28,7 +30,9 @@ import {
   PLAN_PATH_START_REPLACES,
   describePathReserveReset,
   describePathReserveSource,
+  describeLockedSale,
   describePathSuggestionButton,
+  describeRevisionSaleMonthOption,
   describeSaleMonthOption,
   describeSellableHolding,
   estimateSale,
@@ -41,7 +45,7 @@ import { cachedFormatCurrencyEUR, formatNumberIt } from '@/lib/utils/formatters'
 import type { MonthlySavingsMedian } from '@/lib/hooks/useMonthlySavingsMedian';
 import { cn } from '@/lib/utils';
 import { ChoiceList, type ChoiceListOption } from '@/components/ui/choice-list';
-import { NumberField, PATH_FIELD_HEIGHT_CLASS } from '@/components/ui/path-fields';
+import { NumberField, PATH_FIELD_HEIGHT_CLASS, numberOrNull } from '@/components/ui/path-fields';
 import { PATH_BUTTON_CLASS } from '@/components/ui/path-card';
 import { SegmentedPill } from '@/components/ui/segmented-pill';
 import { NarrativeText } from '@/components/ui/narrative-text';
@@ -52,6 +56,37 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const NOTE_CLASS = 'text-[13px] leading-[1.5] text-muted-foreground';
+/**
+ * «Quante quote»: a sale of every share (`quantity` null) reads as the shares held (owner, 2026-11-21: the exact count typed
+ * emptied the field, which read as refused). While the field has the focus it shows what is typed, empty included,
+ * so it can be cleared and retyped; empty still means every share. `held` null (a group's member): no «tutte».
+ */
+function SaleQuantityField({ id, quantity, held, onChange }: { id: string; quantity: number | null; held: number | null; onChange: (quantity: number | null) => void }) {
+  const [typing, setTyping] = useState<string | null>(null);
+  const shown = typing ?? String(quantity ?? held ?? '');
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>Quante quote</Label>
+      <Input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        step="1"
+        min={1}
+        placeholder={held === null ? undefined : 'tutte'}
+        className={PATH_FIELD_HEIGHT_CLASS}
+        value={shown}
+        onFocus={() => setTyping(shown)}
+        onBlur={() => setTyping(null)}
+        onChange={(event) => {
+          setTyping(event.target.value);
+          onChange(numberOrNull(event.target.value));
+        }}
+      />
+    </div>
+  );
+}
+
 const WARNING_BOX_CLASS = 'rounded-lg border border-warning-border bg-warning p-3 text-[12px] text-warning-foreground';
 const LIST_CLASS = 'divide-y divide-border rounded-lg border border-border';
 const NEW_INSTRUMENT = '__new__';
@@ -67,10 +102,18 @@ export interface PianoScreenProps {
 
 export function PartenzaScreen({ answers, dispatch, context, modelUsable, modelStale }: PianoScreenProps & { modelUsable: boolean; modelStale: boolean }) {
   const options: ChoiceListOption<PlanPathStart>[] = [];
-  if (context.openDraft && answers.serverDraftId === context.openDraft.id) options.push({ value: 'draft', label: PLAN_PATH_START_LABELS.draft });
-  if (answers.seed) options.push({ value: 'seed', label: PLAN_PATH_START_LABELS.seed });
-  if (modelUsable) options.push({ value: 'model', label: PLAN_PATH_START_LABELS.model, hint: modelStale ? MODEL_STALE_READING : undefined });
-  options.push({ value: 'today', label: PLAN_PATH_START_LABELS.today }, { value: 'zero', label: PLAN_PATH_START_LABELS.zero });
+  // A revision starts from something (V2): the plan as it is, the model, today's weights — never «Da zero».
+  if (context.revision) {
+    options.push({ value: 'plan', label: PLAN_PATH_START_LABELS.plan });
+    if (modelUsable) options.push({ value: 'model', label: PLAN_PATH_START_LABELS.model, hint: modelStale ? MODEL_STALE_READING : undefined });
+    options.push({ value: 'today', label: PLAN_PATH_START_LABELS.today });
+  }
+  if (!context.revision && context.openDraft && answers.serverDraftId === context.openDraft.id) options.push({ value: 'draft', label: PLAN_PATH_START_LABELS.draft });
+  if (!context.revision) {
+    if (answers.seed) options.push({ value: 'seed', label: PLAN_PATH_START_LABELS.seed });
+    if (modelUsable) options.push({ value: 'model', label: PLAN_PATH_START_LABELS.model, hint: modelStale ? MODEL_STALE_READING : undefined });
+    options.push({ value: 'today', label: PLAN_PATH_START_LABELS.today }, { value: 'zero', label: PLAN_PATH_START_LABELS.zero });
+  }
   return (
     <>
       <ChoiceList
@@ -107,19 +150,22 @@ export function VersamentoScreen({ answers, dispatch, savingsMedian }: PianoScre
 
 // ─── durata ───────────────────────────────────────────────────────────────────
 
-export function DurataScreen({ answers, dispatch }: PianoScreenProps) {
+export function DurataScreen({ answers, dispatch, context }: PianoScreenProps) {
   return (
     <>
       <NumberField id="plan-months" label="Mesi" step="1" min={1} value={answers.months} onChange={(months) => dispatch({ type: 'set', patch: { months } })} />
-      <SegmentedPill
-        options={MONTH_CHIPS.map((value) => ({ value, label: `${value} mesi` }))}
-        value={String(answers.months ?? '')}
-        onChange={(value) => dispatch({ type: 'set', patch: { months: Number(value) } })}
-        layoutId="plan-months-chips"
-        ariaLabel="Durate frequenti"
-        semantics="radio"
-        className="self-start"
-      />
+      {/* The months left of a revision are the plan's own: no frequent durations to offer. */}
+      {!context.revision && (
+        <SegmentedPill
+          options={MONTH_CHIPS.map((value) => ({ value, label: `${value} mesi` }))}
+          value={String(answers.months ?? '')}
+          onChange={(value) => dispatch({ type: 'set', patch: { months: Number(value) } })}
+          layoutId="plan-months-chips"
+          ariaLabel="Durate frequenti"
+          semantics="radio"
+          className="self-start"
+        />
+      )}
     </>
   );
 }
@@ -166,11 +212,25 @@ export function RiservaScreen({ answers, dispatch, context }: PianoScreenProps) 
 // ─── vendite ──────────────────────────────────────────────────────────────────
 
 export function VenditeScreen({ answers, dispatch, context }: PianoScreenProps) {
-  const sellable = listSellableAssets(context);
+  const { revision } = context;
+  // An instrument with a locked sale gets no «Vendi» row: one sale per instrument (V12).
+  const locked = lockedSaleAssetIds(context);
+  const sellable = listSellableAssets(context).filter((asset) => !locked.has(asset.id));
   const months = answers.months ?? 0;
-  const monthIndexes = Array.from({ length: Math.max(0, Math.min(60, months)) }, (_, index) => index + 1);
+  const nameOf = (assetId: string) => context.assets.find((asset) => asset.id === assetId)?.name ?? assetId;
+  const monthLabel = (index: number) => (revision ? describeRevisionSaleMonthOption(revision, index) : describeSaleMonthOption(context.todayMonth, index));
+  const firstMonthIndex = revision?.firstIndex ?? 1;
   return (
     <>
+      {revision && revision.lockedSales.length > 0 && (
+        <ul className="flex flex-col gap-1" aria-label="Vendite già decise">
+          {revision.lockedSales.map((disposal) => (
+            <li key={disposal.assetId} className={NOTE_CLASS}>
+              {describeLockedSale(nameOf(disposal.assetId), disposal)}
+            </li>
+          ))}
+        </ul>
+      )}
       <ChoiceList
         mode="single"
         name="plan-sales"
@@ -195,7 +255,7 @@ export function VenditeScreen({ answers, dispatch, context }: PianoScreenProps) 
                     id={id}
                     checked={!!sale}
                     onCheckedChange={(checked) =>
-                      dispatch({ type: 'sale', sale: checked === true ? { assetId: asset.id, quantity: null, month: 1 } : { assetId: asset.id, remove: true }, context })
+                      dispatch({ type: 'sale', sale: checked === true ? { assetId: asset.id, quantity: null, month: firstMonthIndex } : { assetId: asset.id, remove: true }, context })
                     }
                     className="mt-0.5"
                     aria-label={`Vendi ${asset.name}`}
@@ -208,13 +268,10 @@ export function VenditeScreen({ answers, dispatch, context }: PianoScreenProps) 
                 {sale && (
                   <div className="flex flex-col gap-3 pl-7 tablet:flex-row tablet:items-end">
                     <div className="tablet:w-40">
-                      <NumberField
+                      <SaleQuantityField
                         id={`${id}-quantity`}
-                        label="Quante quote"
-                        step="1"
-                        min={1}
-                        placeholder={mayBeWhole ? 'tutte' : undefined}
-                        value={sale.quantity}
+                        quantity={sale.quantity}
+                        held={mayBeWhole ? asset.quantity : null}
                         onChange={(quantity) => dispatch({ type: 'sale', sale: { assetId: asset.id, quantity, month: sale.month }, context })}
                       />
                     </div>
@@ -225,9 +282,9 @@ export function VenditeScreen({ answers, dispatch, context }: PianoScreenProps) 
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {monthIndexes.map((index) => (
+                          {saleMonthIndexes(context, months, sale.month).map((index) => (
                             <SelectItem key={index} value={String(index)}>
-                              {describeSaleMonthOption(context.todayMonth, index)}
+                              {monthLabel(index)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -335,12 +392,21 @@ export function RiepilogoScreen({
   return (
     <>
       <NarrativeText segments={summary.headline} className="text-[14px] leading-[1.55] text-foreground" />
-      <p className={NOTE_CLASS}>{summary.first}</p>
+      {summary.first && <p className={NOTE_CLASS}>{summary.first}</p>}
       {summary.saleSteps.map((sentence) => (
         <p key={sentence} className={NOTE_CLASS}>
           {sentence}
         </p>
       ))}
+      {summary.changes.length > 0 && (
+        <ul className="flex flex-col gap-1" aria-label="Vendite che cambiano">
+          {summary.changes.map((sentence) => (
+            <li key={sentence} className={NOTE_CLASS}>
+              {sentence}
+            </li>
+          ))}
+        </ul>
+      )}
       {summary.sales.length > 0 && (
         <ul className="flex flex-col gap-1" aria-label="Vendite">
           {summary.sales.map((sentence) => (

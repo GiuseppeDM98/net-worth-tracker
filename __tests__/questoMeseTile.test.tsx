@@ -1,7 +1,8 @@
 /**
  * «Questo mese» and a sale in its month (2026-11-19): before its month a sale reads «In programma», names
  * its month and offers no action — a dismissed early match on the ledger falls back to it, not to a
- * to-do; in the month the Consulente asked to look at the plan again, a note and «Rivedi il piano».
+ * to-do; in the month the Consulente asked to look at the plan again, a note and «Rivedi il piano». The doors
+ * to a revision are links to the path (2026-11-21): the footer's, the review note's, «Rivedi dal modello».
  *
  * The plan's hooks, the dialogs and the services are mocked; the tile and the plan arithmetic are real.
  */
@@ -9,7 +10,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
-vi.mock('@/lib/hooks/useDemoMode', () => ({ useDemoMode: () => false }));
+const demo = vi.hoisted(() => ({ on: false }));
+vi.mock('@/lib/hooks/useDemoMode', () => ({ useDemoMode: () => demo.on }));
 const spies = vi.hoisted(() => ({ activate: vi.fn(), getAllAssets: vi.fn(), toastError: vi.fn() }));
 vi.mock('@/lib/services/assetService', () => ({
   calculateAssetValue: (a: { quantity: number; currentPrice: number }) => a.quantity * a.currentPrice,
@@ -29,16 +31,15 @@ vi.mock('@/lib/hooks/useAccumulationPlan', () => {
     useSetInstallmentLine: mutation,
   };
 });
-vi.mock('@/components/allocation/AccumulationPlanDialog', () => ({ AccumulationPlanDialog: () => null }));
 vi.mock('@/components/allocation/AccumulationCalendarDialog', () => ({ AccumulationCalendarDialog: () => null }));
 vi.mock('@/components/assets/TransactionDialog', () => ({ TransactionDialog: () => null }));
 
 import { AdvisorNotes, QuestoMeseTile } from '@/components/allocation/tiles/QuestoMeseTile';
-import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import {
   ACCUMULO_ACTION_ACTIVATE,
   ACCUMULO_ACTION_IGNORE_MATCH,
   ACCUMULO_ACTION_REGISTER,
+  ACCUMULO_ACTION_REVIEW_FROM_MODEL,
   ACCUMULO_ACTION_REVISE,
   ACCUMULO_REVIEW_DUE_NOTE,
   describeDraftIssue,
@@ -47,6 +48,7 @@ import {
 import type { LineUiState } from '@/lib/utils/accumulationPlanMatching';
 import type { AccumulationPlan } from '@/types/accumulationPlan';
 import type { Asset } from '@/types/assets';
+import type { ModelPortfolio } from '@/types/modelPortfolio';
 
 const asset = (id: string, name: string, extra: Partial<Asset> = {}): Asset =>
   ({ id, userId: 'owner-1', ticker: id.toUpperCase(), name, type: 'etf', assetClass: 'equity', currency: 'EUR', quantity: 0, currentPrice: 1,
@@ -78,7 +80,7 @@ function activePlan(overrides: Partial<AccumulationPlan> = {}): AccumulationPlan
   } as AccumulationPlan;
 }
 
-function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcoming' as LineUiState, today = new Date('2027-02-12T12:00:00'), assets = ASSETS } = {}) {
+function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcoming' as LineUiState, today = new Date('2027-02-12T12:00:00'), assets = ASSETS, model = null as ModelPortfolio | null } = {}) {
   const matches = saleState === 'toConfirm'
     ? [{ kind: 'disposal' as const, assetId: 'fondo-y', transactionIds: ['tx-1'], quantity: 10, amountEur: 6000 }]
     : [];
@@ -89,15 +91,11 @@ function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcomi
       allAssets={assets}
       targets={{} as never}
       band={{ mode: 'relative', value: 20 } as never}
-      targetLeverageRatio={1}
-      idealAllocation={DEFAULT_IDEAL_ALLOCATION}
       currentIndex={currentIndex}
       matchResult={{ matches: matches as never, lineStates: { 'disposal:fondo-y': saleState } }}
-      onAssetsChanged={() => {}}
+      model={model}
       reviewByIso={null}
-      modelBasis={{} as never}
       today={today}
-      investmentAccountId={null}
     />,
   );
 }
@@ -130,13 +128,47 @@ describe('QuestoMeseTile — the review month', () => {
     const plan = activePlan({ reviewMonthIndex: 2 });
     const { unmount } = renderTile({ plan });
     expect(screen.getByText(ACCUMULO_REVIEW_DUE_NOTE)).toBeTruthy();
-    // The note's own button beside the footer's.
-    expect(screen.getAllByRole('button', { name: ACCUMULO_ACTION_REVISE })).toHaveLength(2);
+    // The note's own link beside the footer's.
+    expect(screen.getAllByRole('link', { name: ACCUMULO_ACTION_REVISE })).toHaveLength(2);
     unmount();
 
     renderTile({ plan, currentIndex: 3, today: new Date('2027-03-12T12:00:00') });
     expect(screen.queryByText(ACCUMULO_REVIEW_DUE_NOTE)).toBeNull();
-    expect(screen.getAllByRole('button', { name: ACCUMULO_ACTION_REVISE })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: ACCUMULO_ACTION_REVISE })).toHaveLength(1);
+  });
+});
+
+// R2 (2026-11-21). Mutation that turns it red: the doors kept as buttons that open the editor (`setReviseOpen`).
+describe('QuestoMeseTile — the doors to a revision are links to the path', () => {
+  beforeEach(() => { demo.on = false; });
+  /** The model holds Fondo Y too: the plan's quotas differ from it, so «Rivedi dal modello» shows. */
+  const MODEL: ModelPortfolio = {
+    userId: 'owner-1', origin: 'manual', updatedAt: new Date(0),
+    weights: [{ assetId: 'etf-uno', targetPercentage: 50 }, { assetId: 'fondo-y', targetPercentage: 50 }],
+  };
+
+  it('the footer, the review note and «Rivedi dal modello»: links with the two hrefs', () => {
+    renderTile({ plan: activePlan({ reviewMonthIndex: 2 }), model: MODEL });
+    const revise = screen.getAllByRole('link', { name: ACCUMULO_ACTION_REVISE });
+    expect(revise.map((link) => link.getAttribute('href'))).toEqual(['/dashboard/allocation/piano', '/dashboard/allocation/piano']);
+    expect(screen.getByRole('link', { name: ACCUMULO_ACTION_REVIEW_FROM_MODEL }).getAttribute('href')).toBe('/dashboard/allocation/piano?da=modello');
+    expect(screen.queryByRole('button', { name: ACCUMULO_ACTION_REVISE })).toBeNull();
+  });
+
+  it('in demo: a disabled button and no link', () => {
+    demo.on = true;
+    renderTile({ model: MODEL });
+    expect(screen.queryByRole('link', { name: ACCUMULO_ACTION_REVISE })).toBeNull();
+    expect((screen.getByRole('button', { name: ACCUMULO_ACTION_REVISE }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('link', { name: ACCUMULO_ACTION_REVIEW_FROM_MODEL })).toBeNull();
+  });
+
+  it('every instalment closed: a disabled button and no link', () => {
+    const plan = activePlan();
+    for (const installment of plan.installments) installment.lines.forEach((line) => { line.status = 'executed'; });
+    renderTile({ plan });
+    expect(screen.queryByRole('link', { name: ACCUMULO_ACTION_REVISE })).toBeNull();
+    expect((screen.getByRole('button', { name: ACCUMULO_ACTION_REVISE }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

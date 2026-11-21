@@ -135,7 +135,7 @@ describe('validateDraftAgainstAssets — one case per code', () => {
 
   it('unassigned_tradable follows VALUE, not quantity', () => {
     // A held instrument whose price was never fetched (quantity > 0, currentPrice 0): the
-    // predicate is «valore > 0», the same one the seeder/candidates in AccumulationPlanDialog use
+    // predicate is «valore > 0», the same one the path's held rows (`withHeldRows`, lib/utils/planPath.ts) use
     // — a quantity-only check would demand it be classified while offering it no row to do so in.
     const unpriced = makeAsset({ id: 'unpriced1', name: 'ETF senza prezzo', quantity: 10, currentPrice: 0 });
     const draft = baseDraft();
