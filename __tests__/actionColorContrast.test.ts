@@ -22,9 +22,8 @@
  * ships — never a transcription that can drift.
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { THEME_MODES, themeBlockBody } from './themeBlocks';
 import { ACTION_CHART_NUMBER, ACTION_CHIP_FILL_PCT, ACTION_LIGHT_MAX_L, type AllocationAction } from '@/lib/utils/allocationUtils';
 import { clampActionLightness, parseToOklch } from '@/lib/utils/actionColor';
 
@@ -81,12 +80,11 @@ function chipBackground(colour: Rgb, pct: number, backdrop: Rgb): Rgb {
 
 // ─── The stylesheet ───────────────────────────────────────────────────────────
 
-const GLOBALS = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
-
+/** One theme block's body (the headers come from the registry: `./themeBlocks`). */
 function blockOf(selector: string): string {
-  const start = GLOBALS.indexOf(`\n${selector} {`);
-  expect(start, `block "${selector}" in app/globals.css`).toBeGreaterThan(-1);
-  return GLOBALS.slice(start, GLOBALS.indexOf('\n}', start));
+  const body = themeBlockBody(selector);
+  expect(body, `block "${selector}" in app/globals.css`).not.toBeNull();
+  return body!;
 }
 
 function oklchToken(block: string, name: string): Oklch {
@@ -106,12 +104,8 @@ function clampLightness([L, C, H]: Oklch, isDark: boolean): Oklch {
   return clamped as Oklch;
 }
 
-const THEMES = [null, 'retro-arcade', 'cyberpunk', 'solar-dusk', 'elegant-luxury', 'midnight-bloom'] as const;
-
-const BLOCKS = THEMES.flatMap((theme) => [
-  { label: `${theme ?? 'default'} · light`, selector: theme ? `[data-theme="${theme}"]` : ':root', isDark: false },
-  { label: `${theme ?? 'default'} · dark`, selector: theme ? `.dark[data-theme="${theme}"]` : '.dark', isDark: true },
-]);
+/** Every theme of the registry in both modes (`COLOR_THEMES`, lib/constants/colorTheme.ts). */
+const BLOCKS = THEME_MODES.map(({ label, header, mode }) => ({ label, selector: header, isDark: mode === 'dark' }));
 
 const ACTIONS: AllocationAction[] = ['COMPRA', 'VENDI', 'OK'];
 /** The AA floor for text that is not «large» — every surface these three land on. */

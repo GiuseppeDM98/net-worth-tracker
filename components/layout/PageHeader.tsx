@@ -1,6 +1,8 @@
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
+import { HeadingText, ThemeEmblem, ThemeEmblemLead, ThemeHeaderBand } from '@/components/ui/theme-costume';
+import type { EmblemPage } from '@/lib/constants/themeCostume';
 import type { PageFreshness } from '@/lib/hooks/useFreshness';
 
 interface PageHeaderProps {
@@ -17,6 +19,8 @@ interface PageHeaderProps {
    * phone it takes the description's line while it lasts. So nothing under it moves when it goes.
    */
   freshness?: PageFreshness;
+  /** The page's emblem in a costume theme (DESIGN.md → The Costume Rule); the theme's own when absent. */
+  emblem?: EmblemPage;
   className?: string;
 }
 
@@ -31,7 +35,7 @@ const FRESHNESS_LIVE_PROPS = { role: 'status', 'aria-live': 'polite', 'aria-atom
  * tiles' eyebrow (10px, 0.1em) so the page has a single eyebrow voice. The mobile sticky
  * navbar is one block, and its title is what the user anchors to while scrolling.
  */
-export function PageHeader({ title, label, description, actions, freshness, className }: PageHeaderProps) {
+export function PageHeader({ title, label, description, actions, freshness, emblem, className }: PageHeaderProps) {
   const freshnessSentence = freshness?.sentence ?? null;
 
   return (
@@ -52,7 +56,9 @@ export function PageHeader({ title, label, description, actions, freshness, clas
           fill with a blur let their words ghost through behind the title. */}
       <div className="-mx-4 px-4 pt-1 pb-2 flex flex-col bg-background desktop:hidden tablet-landscape:hidden">
         <div className="flex items-center justify-between">
-          <h1 className="text-[17px] font-semibold tracking-tight truncate min-w-0">{title}</h1>
+          <ThemeEmblemLead page={emblem} size={18}>
+            <h1 className="text-[17px] font-semibold tracking-tight truncate min-w-0">{title}</h1>
+          </ThemeEmblemLead>
           {actions && (
             <div className="flex shrink-0 items-center gap-1.5 ml-2">{actions}</div>
           )}
@@ -69,7 +75,12 @@ export function PageHeader({ title, label, description, actions, freshness, clas
 
       <div className="hidden desktop:flex tablet-landscape:flex items-center justify-between gap-4 min-h-9">
         <div className="flex items-baseline gap-3 min-w-0">
-          {label && <p className={cn(TILE_EYEBROW_CLASS, 'shrink-0')}>{label}</p>}
+          <ThemeEmblem page={emblem} size={22} />
+          {label && (
+            <p className={cn(TILE_EYEBROW_CLASS, 'shrink-0')}>
+              <HeadingText text={label} />
+            </p>
+          )}
           <h1 className="text-sm text-muted-foreground truncate">
             <span className="font-medium text-foreground">{title}</span>
             {description && <span> · {description}</span>}
@@ -82,6 +93,8 @@ export function PageHeader({ title, label, description, actions, freshness, clas
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
+      {/* A costume's band under the header; no height in a palette theme (components/ui/theme-costume.tsx). */}
+      <ThemeHeaderBand />
     </div>
   );
 }
@@ -110,6 +123,8 @@ export function PageHeaderSkeleton() {
       <div className="hidden desktop:flex tablet-landscape:flex min-h-9 items-center">
         <Skeleton className="h-2.5 w-24" />
       </div>
+      {/* The band's place, so the header replacing this skeleton moves nothing. */}
+      <ThemeHeaderBand />
     </div>
   );
 }

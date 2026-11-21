@@ -14,9 +14,8 @@
  * pass-through cases green.
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { THEME_MODES, themeBlockBody } from './themeBlocks';
 import { CHART_COLORS } from '@/lib/constants/colors';
 import { SPENDING_ROLE_TOKEN } from '@/lib/constants/spendingRoleColors';
 import { clampActionLightness } from '@/lib/utils/actionColor';
@@ -129,16 +128,12 @@ describe('readThemePalette — the action colours and the Sankey hexes from the 
 
 // ─── The twelve theme blocks: the live filter changes no palette shipped today ─────────────────
 
-const GLOBALS = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
-const THEMES = [null, 'retro-arcade', 'cyberpunk', 'solar-dusk', 'elegant-luxury', 'midnight-bloom'] as const;
-
-/** The `--chart-1..9` of one block as authored. */
+/** The `--chart-1..9` of one block as authored (the headers come from the registry: `./themeBlocks`). */
 function authoredSlots(selector: string): Triple[] {
-  const start = GLOBALS.indexOf(`\n${selector} {`);
-  expect(start, `block "${selector}"`).toBeGreaterThan(-1);
-  const block = GLOBALS.slice(start, GLOBALS.indexOf('\n}', start));
+  const block = themeBlockBody(selector);
+  expect(block, `block "${selector}"`).not.toBeNull();
   return Array.from({ length: 9 }, (_, i) => {
-    const match = block.match(new RegExp(`--chart-${i + 1}:\\s*(oklch\\([^)]*\\))`));
+    const match = block!.match(new RegExp(`--chart-${i + 1}:\\s*(oklch\\([^)]*\\))`));
     expect(match, `--chart-${i + 1} in "${selector}"`).not.toBeNull();
     return parseToOklch(match![1])!;
   });
@@ -157,10 +152,7 @@ function servedForm(oklch: Triple): string {
 }
 
 describe.each(
-  THEMES.flatMap((theme) => [
-    { label: `${theme ?? 'default'} · light`, selector: theme ? `[data-theme="${theme}"]` : ':root', isDark: false },
-    { label: `${theme ?? 'default'} · dark`, selector: theme ? `.dark[data-theme="${theme}"]` : '.dark', isDark: true },
-  ]),
+  THEME_MODES.map(({ label, header, mode }) => ({ label, selector: header, isDark: mode === 'dark' })),
 )('the live luminance filter on $label', ({ selector, isDark }) => {
   it('keeps every served slot: no colour of the shipped palettes falls back to the static one', () => {
     const served = Object.fromEntries(authoredSlots(selector).map((oklch, i) => [`--chart-${i + 1}`, servedForm(oklch)]));

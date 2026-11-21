@@ -730,7 +730,7 @@ export function describeAccumuloVerdict(input: AccumuloVerdictInput): PageVerdic
                 ...withinQuotaHead(input.sourceCashEur + other, input.reserveEur + other),
                 { text: 'le entrate mensili la riportano alla quota prima che un piano compri.' },
               ];
-    return { headline: 'Nessun piano di accumulo aperto.', tone: 'neutral', sentence };
+    return { headline: 'Nessun piano di accumulo.', tone: 'neutral', sentence };
   }
 
   if (input.state === 'draft') {

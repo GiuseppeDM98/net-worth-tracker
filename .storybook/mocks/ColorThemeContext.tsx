@@ -1,15 +1,8 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import type { ColorTheme } from '@/lib/constants/colorTheme';
 
 // Storybook-only stub — same public API as the real ColorThemeContext
 // but with no Firebase / AuthContext dependencies.
-
-type ColorTheme =
-  | 'default'
-  | 'solar-dusk'
-  | 'elegant-luxury'
-  | 'midnight-bloom'
-  | 'cyberpunk'
-  | 'retro-arcade';
 
 export type { ColorTheme };
 

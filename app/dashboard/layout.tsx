@@ -2,6 +2,7 @@
 
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ChartColorsProvider } from '@/contexts/ChartColorsContext';
+import { CostumeScope } from '@/contexts/CostumeScopeContext';
 import { AppSidebar } from '@/components/layout/Sidebar';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { TabletRail } from '@/components/layout/TabletRail';
@@ -34,6 +35,9 @@ export default function DashboardLayout({
 
   return (
     <ChartColorsProvider>
+      {/* The costume's boundary (DESIGN.md → The Costume Rule): a `display: contents` box around the whole
+          shell, so a costume theme dresses the dashboard and nothing outside it. */}
+      <CostumeScope>
       {/* The first Tab stop of every dashboard page: the sidebar is fourteen stops (measured on Storico,
           2026-09-20) between a keyboard reader and the page. The landing has the same link. */}
       <a
@@ -112,6 +116,7 @@ export default function DashboardLayout({
 
       {/* Bottom Navigation — mobile portrait only */}
       <BottomNavigation />
+      </CostumeScope>
     </ChartColorsProvider>
   );
 }

@@ -5,10 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getUserPreferences, setUserPreferences } from '@/lib/services/userPreferencesService';
 import {
   COLOR_THEME_ATTRIBUTE,
+  COLOR_THEME_META,
   COLOR_THEME_STORAGE_KEY,
+  COSTUME_ATTRIBUTE,
   DEFAULT_COLOR_THEME,
   isColorTheme,
   type ColorTheme,
+  type ThemeCostume,
 } from '@/lib/constants/colorTheme';
 
 export type { ColorTheme };
@@ -28,10 +31,17 @@ const ColorThemeContext = createContext<ColorThemeContextType>({
 });
 
 function applyThemeAttribute(theme: ColorTheme) {
+  const root = document.documentElement;
   if (theme === DEFAULT_COLOR_THEME) {
-    document.documentElement.removeAttribute(COLOR_THEME_ATTRIBUTE);
+    root.removeAttribute(COLOR_THEME_ATTRIBUTE);
   } else {
-    document.documentElement.setAttribute(COLOR_THEME_ATTRIBUTE, theme);
+    root.setAttribute(COLOR_THEME_ATTRIBUTE, theme);
+  }
+  // The costume's gate, the same the <head> script sets (DESIGN.md → The Costume Rule).
+  if (COLOR_THEME_META[theme].costume) {
+    root.setAttribute(COSTUME_ATTRIBUTE, '');
+  } else {
+    root.removeAttribute(COSTUME_ATTRIBUTE);
   }
 }
 
@@ -91,8 +101,11 @@ export function ColorThemeProvider({ children }: { children: ReactNode }) {
     syncedUid.current = uid;
 
     getUserPreferences(uid).then((prefs) => {
-      // Writing the same value again is a no-op in every sink (storage, attribute, snapshot).
-      if (prefs.colorTheme) writeStoredTheme(prefs.colorTheme);
+      // Writing the same value again is a no-op in every sink (storage, attribute, snapshot). A synced
+      // name the registry does not know (chosen on a newer client, a theme rolled back) leaves the
+      // stored theme alone — the acceptance `readStoredTheme` already has; without the guard
+      // `COLOR_THEME_META[theme]` is undefined and the sync throws.
+      if (isColorTheme(prefs.colorTheme)) writeStoredTheme(prefs.colorTheme);
     });
   }, [uid]);
 
@@ -112,4 +125,21 @@ export function ColorThemeProvider({ children }: { children: ReactNode }) {
 
 export function useColorTheme() {
   return useContext(ColorThemeContext);
+}
+
+/**
+ * Where a costume may be worn: `true` inside `CostumeScope` (contexts/CostumeScopeContext.tsx, the dashboard shell)
+ * and inside a `ResponsiveModal` opened there. The context lives HERE, in the module every page already loads, so
+ * `PageHeader` and `ResponsiveModal` read it without a module of their own in the shared graph: through
+ * `CostumeScopeContext.tsx` Turbopack split a new shared chunk, +0,8 KB gz on every route (2026-11-21, perf:budget).
+ */
+export const CostumeScopeContext = createContext(false);
+
+export const useCostumeScope = (): boolean => useContext(CostumeScopeContext);
+
+/** The active theme's costume where one may be worn, else `null`. */
+export function useThemeCostume(): ThemeCostume | null {
+  const inScope = useCostumeScope();
+  const { colorTheme } = useColorTheme();
+  return inScope ? COLOR_THEME_META[colorTheme].costume : null;
 }

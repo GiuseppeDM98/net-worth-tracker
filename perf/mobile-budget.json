@@ -99,7 +99,7 @@
   "budget": {
     "panoramica": {
       "390": {
-        "screens": 1.83,
+        "screens": 1.82,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 5,
@@ -130,14 +130,14 @@
     },
     "patrimonio": {
       "390": {
-        "screens": 1.75,
+        "screens": 1.78,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 7,
-        "figuresOutsideVerdict": 4,
+        "figuresOutsideVerdict": 3,
         "firstClosedRowAbovePill": false,
         "overflowX": false,
-        "raisedBy": "2026-10-17: screens 1,67 → 1,75 — la riga chiusa «Intestatari» (52 px) in coda alle righe, perché il fixture nomina un membro della famiglia tramite il fondo pensione (proprietario: la tessera su Panoramica e Patrimonio, a riga intera in coda); il primo schermo non si muove; 2026-10-14: la prima riga chiusa (Movimenti) finisce a 976 contro la pill a 767 — il verdetto è alto 243 (titolo, primo enunciato su due righe, la striscia G/P su una riga sua perché «+9183,42 €» supera i 9 caratteri e Liquidità sotto, «Il perché»), LA tessera 494 con la curva già a 120 px e il conteggio, «Il resto» 44; la riga sotto la pill registrata false con raisedBy, estesa a Patrimonio"
+        "raisedBy": "2026-11-21: Geist Sans applicato (il font era system-ui fino ad allora: le righe vanno a capo altrove) — screens 1,75 → 1,78; 2026-10-17: screens 1,67 → 1,75 — la riga chiusa «Intestatari» (52 px) in coda alle righe, perché il fixture nomina un membro della famiglia tramite il fondo pensione (proprietario: la tessera su Panoramica e Patrimonio, a riga intera in coda); il primo schermo non si muove; 2026-10-14: la prima riga chiusa (Movimenti) finisce a 976 contro la pill a 767 — il verdetto è alto 243 (titolo, primo enunciato su due righe, la striscia G/P su una riga sua perché «+9183,42 €» supera i 9 caratteri e Liquidità sotto, «Il perché»), LA tessera 494 con la curva già a 120 px e il conteggio, «Il resto» 44; la riga sotto la pill registrata false con raisedBy, estesa a Patrimonio"
       },
       "768": {
         "screens": 1.15,
@@ -150,7 +150,7 @@
         "raisedBy": "2026-10-14: deriva del giorno del mese, non del codice — la build di develop (83de3f68) misurata lo stesso giorno (2026-10-14) dà esattamente questi valori prima e dopo la sessione: 390 screens 3,23 → 3,25; 768 figuresAboveFold 25 → 26; 1024 screens 2,64 → 2,67, figuresAboveFold 18 → 19, tilesAboveFold 3 → 1 (doc/guide/prima-schermata.md § Per-page blind spots, la prova N / N+1, non fatta il 2026-10-16: resta aperta)"
       },
       "1024": {
-        "screens": 1.01,
+        "screens": 1,
         "tilesAboveFold": 6,
         "tilesFullyAboveFold": 6,
         "figuresAboveFold": 12,
@@ -182,14 +182,14 @@
         "raisedBy": "2026-10-16: riga null → false — la prima riga chiusa finisce 47 px sotto la pill a 947 — a 768 LA tessera sta a tutta larghezza dopo il verdetto, la curva già a 120 px (la riga sotto la pill registrata false, estesa a 768; a 1024 è sopra il fondo di main); 2026-10-15: deriva del giorno del mese, non del codice: il confronto «sui primi N giorni» del mese scorso prendeva le righe del seed ai giorni 5, 10, 15 e 20 una alla volta — dal 15 lo stipendio porta sulla prima schermata le due frecce del trio (la seconda ristampa il ritmo del primo enunciato); valori identici sulla build di develop prima del codice nuovo (4dc553c2) misurata il 2026-10-15, due corse. Il seed mette ora ogni mese passato al giorno 5 (scripts/seedCensusE2E.mts): dal 5 al penultimo questi sono i valori di ogni giorno. Ritiro del 2026-10-15 (PAST_DAY); la pill a 44 px dal 2026-10-10"
       },
       "1024": {
-        "screens": 1.15,
+        "screens": 1.14,
         "tilesAboveFold": 5,
         "tilesFullyAboveFold": 4,
-        "figuresAboveFold": 15,
+        "figuresAboveFold": 16,
         "figuresOutsideVerdict": 9,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-10-16: figuresAboveFold 13 → 15, figuresOutsideVerdict 7 → 9 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-16: figuresOutsideVerdict 5 → 7 — il misurato fa da tetto — a 768/1024 la metrica era informativa e l'obiettivo è il misurato del 2026-10-16 (DESIGN.md → The First-Screen Rule); 2026-10-15: deriva del giorno del mese, non del codice: il confronto «sui primi N giorni» del mese scorso prendeva le righe del seed ai giorni 5, 10, 15 e 20 una alla volta — dal 15 lo stipendio porta sulla prima schermata le due frecce del trio (la seconda ristampa il ritmo del primo enunciato); valori identici sulla build di develop prima del codice nuovo (4dc553c2) misurata il 2026-10-15, due corse. Il seed mette ora ogni mese passato al giorno 5 (scripts/seedCensusE2E.mts): dal 5 al penultimo questi sono i valori di ogni giorno. Ritiro del 2026-10-15 (PAST_DAY); la pill a 44 px dal 2026-10-10"
+        "raisedBy": "2026-11-21: Geist Sans applicato (il font era system-ui fino ad allora: le righe vanno a capo altrove) — figuresAboveFold 15 → 16; 2026-10-16: figuresAboveFold 13 → 15, figuresOutsideVerdict 7 → 9 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-16: figuresOutsideVerdict 5 → 7 — il misurato fa da tetto — a 768/1024 la metrica era informativa e l'obiettivo è il misurato del 2026-10-16 (DESIGN.md → The First-Screen Rule); 2026-10-15: deriva del giorno del mese, non del codice: il confronto «sui primi N giorni» del mese scorso prendeva le righe del seed ai giorni 5, 10, 15 e 20 una alla volta — dal 15 lo stipendio porta sulla prima schermata le due frecce del trio (la seconda ristampa il ritmo del primo enunciato); valori identici sulla build di develop prima del codice nuovo (4dc553c2) misurata il 2026-10-15, due corse. Il seed mette ora ogni mese passato al giorno 5 (scripts/seedCensusE2E.mts): dal 5 al penultimo questi sono i valori di ogni giorno. Ritiro del 2026-10-15 (PAST_DAY); la pill a 44 px dal 2026-10-10"
       }
     },
     "cashflow-budget": {
@@ -258,14 +258,14 @@
     },
     "cashflow-divisione": {
       "390": {
-        "screens": 1.63,
+        "screens": 1.66,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
-        "figuresAboveFold": 17,
+        "figuresAboveFold": 16,
         "figuresOutsideVerdict": 7,
         "firstClosedRowAbovePill": false,
         "overflowX": false,
-        "raisedBy": "2026-10-16: screens 1.62 → 1.63 — la testata più alta di 8 px: l'icona Impostazioni di Cashflow e «Crea snapshot» passano da 36 a 44 px, bersagli per il pollice; 2026-10-12: figuresOutsideVerdict 5 → 7 — le due celle della striscia (una per persona) più le cinque cifre di In comune (eroe, le due righe del pool, le due categorie); la prima riga chiusa inizia a 1015 contro la pill a 767 (LA tessera parte a 478, alta 469: registrata false con raisedBy); la pill a 44 px dal 2026-10-10"
+        "raisedBy": "2026-11-21: Geist Sans applicato (il font era system-ui fino ad allora: le righe vanno a capo altrove) — screens 1,63 → 1,66; 2026-10-16: screens 1.62 → 1.63 — la testata più alta di 8 px: l'icona Impostazioni di Cashflow e «Crea snapshot» passano da 36 a 44 px, bersagli per il pollice; 2026-10-12: figuresOutsideVerdict 5 → 7 — le due celle della striscia (una per persona) più le cinque cifre di In comune (eroe, le due righe del pool, le due categorie); la prima riga chiusa inizia a 1015 contro la pill a 767 (LA tessera parte a 478, alta 469: registrata false con raisedBy); la pill a 44 px dal 2026-10-10"
       },
       "768": {
         "screens": 1.2,
@@ -278,14 +278,14 @@
         "raisedBy": "2026-10-16: screens 1.19 → 1.2, riga null → false — la testata più alta di 8 px: l'icona Impostazioni di Cashflow e «Crea snapshot» passano da 36 a 44 px, bersagli per il pollice; la prima riga chiusa finisce 50 px sotto la pill a 947 — a 768 LA tessera sta a tutta larghezza dopo il verdetto, la curva già a 120 px (la riga sotto la pill registrata false, estesa a 768; a 1024 è sopra il fondo di main); 2026-10-10: pill a 44 px"
       },
       "1024": {
-        "screens": 1.13,
+        "screens": 1.12,
         "tilesAboveFold": 4,
         "tilesFullyAboveFold": 3,
         "figuresAboveFold": 20,
-        "figuresOutsideVerdict": 11,
+        "figuresOutsideVerdict": 12,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-10-16: figuresAboveFold 16 → 20, figuresOutsideVerdict 7 → 11 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-15: la macchina di riferimento è cambiata (il budget ne ha una sola): il budget era stato stretto sull'altra, che misura qualche centesimo in meno; la pill a 44 px dal 2026-10-10"
+        "raisedBy": "2026-11-21: Geist Sans applicato (il font era system-ui fino ad allora: le righe vanno a capo altrove) — figuresOutsideVerdict 11 → 12; 2026-10-16: figuresAboveFold 16 → 20, figuresOutsideVerdict 7 → 11 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-15: la macchina di riferimento è cambiata (il budget ne ha una sola): il budget era stato stretto sull'altra, che misura qualche centesimo in meno; la pill a 44 px dal 2026-10-10"
       }
     },
     "cashflow-dividendi": {
@@ -354,14 +354,14 @@
     },
     "rendimenti": {
       "390": {
-        "screens": 1.76,
-        "tilesAboveFold": 2,
+        "screens": 1.79,
+        "tilesAboveFold": 1,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 5,
         "figuresOutsideVerdict": 5,
         "firstClosedRowAbovePill": false,
         "overflowX": false,
-        "raisedBy": "2026-10-14: la prima riga chiusa (Benchmark) finisce a 891 contro la pill a 767 — il verdetto è alto 267 (titolo, asse 44 con l'icona del calendario, striscia di due celle, la riga «Base: …» su due righe, «Il perché»), LA tessera 377 con la curva già a 120 px e la lettura intera, «Il resto» 44; la riga sotto la pill registrata false con raisedBy, estesa a Rendimenti"
+        "raisedBy": "2026-11-21: Geist Sans applicato (il font era system-ui fino ad allora: le righe vanno a capo altrove) — screens 1,76 → 1,79, tilesAboveFold 2 → 1; 2026-10-14: la prima riga chiusa (Benchmark) finisce a 891 contro la pill a 767 — il verdetto è alto 267 (titolo, asse 44 con l'icona del calendario, striscia di due celle, la riga «Base: …» su due righe, «Il perché»), LA tessera 377 con la curva già a 120 px e la lettura intera, «Il resto» 44; la riga sotto la pill registrata false con raisedBy, estesa a Rendimenti"
       },
       "768": {
         "screens": 1.16,
@@ -405,7 +405,7 @@
         "raisedBy": "2026-10-11: deriva del giorno del mese, non del codice — il codice di develop (1629613) misurato lo stesso giorno (11, contro il 10 della prima misura del budget) dà esattamente questi valori; il fixture non è invariante al giorno come la scelta di un fixture deterministico assume (doc/guide/prima-schermata.md § Per-page blind spots)"
       },
       "1024": {
-        "screens": 1.24,
+        "screens": 1.23,
         "tilesAboveFold": 5,
         "tilesFullyAboveFold": 5,
         "figuresAboveFold": 16,
@@ -417,7 +417,7 @@
     },
     "allocazione": {
       "390": {
-        "screens": 1.71,
+        "screens": 1.7,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 17,
@@ -427,7 +427,7 @@
         "raisedBy": "2026-11-17: la barra delle tab Bilanciamento · Accumulo (PageTabs) aggiunge 68 px sopra il verdetto; contro develop @36ac3325 lo stesso giorno, stessa build, stessa macchina — screens 1,64 → 1,71, la seconda tessera scende sotto la pill (tessere 2 → 1); proprietario 2026-11-17; 2026-10-15: Bilanciamento non ha una curva da cedere: la prima riga chiusa (Per classe) finisce sotto la pill a 390; 2026-10-11: deriva del giorno del mese, non del codice — il codice di develop (1629613) misurato lo stesso giorno (11, contro il 10 della prima misura del budget) dà esattamente questi valori; il fixture non è invariante al giorno come la scelta di un fixture deterministico assume (doc/guide/prima-schermata.md § Per-page blind spots)"
       },
       "768": {
-        "screens": 1.18,
+        "screens": 1.17,
         "tilesAboveFold": 5,
         "tilesFullyAboveFold": 5,
         "figuresAboveFold": 18,
@@ -459,17 +459,17 @@
         "raisedBy": "2026-10-15: la prima riga chiusa (Rendimento) finisce sotto la pill a 390 con la curva di Il fondo oggi già a 120 px; le cifre fuori dal verdetto sono le tre celle, l'eroe e le chip di Il fondo oggi («≤ 5» non raggiunto, dichiarato e registrato come misurato); a 768 la striscia di tre celle lascia sopra la piega una tessera sola"
       },
       "768": {
-        "screens": 1.22,
+        "screens": 1.24,
         "tilesAboveFold": 5,
-        "tilesFullyAboveFold": 5,
+        "tilesFullyAboveFold": 3,
         "figuresAboveFold": 11,
         "figuresOutsideVerdict": 11,
         "firstClosedRowAbovePill": false,
         "overflowX": false,
-        "raisedBy": "2026-10-16: riga null → false — la prima riga chiusa finisce 9 px sotto la pill a 947 — a 768 LA tessera sta a tutta larghezza dopo il verdetto, la curva già a 120 px (la riga sotto la pill registrata false, estesa a 768; a 1024 è sopra il fondo di main); 2026-10-15: le cifre fuori dal verdetto sono le tre celle, l'eroe e le chip di Il fondo oggi («≤ 5» non raggiunto, dichiarato e registrato come misurato); a 768 la striscia di tre celle lascia sopra la piega una tessera sola; 2026-10-11: deriva del giorno del mese, non del codice — il codice di develop (1629613) misurato lo stesso giorno (11, contro il 10 della prima misura del budget) dà esattamente questi valori; il fixture non è invariante al giorno come la scelta di un fixture deterministico assume (doc/guide/prima-schermata.md § Per-page blind spots)"
+        "raisedBy": "2026-11-21: Geist Sans applicato (il font era system-ui fino ad allora: le righe vanno a capo altrove) — screens 1,22 → 1,24, tilesFullyAboveFold 5 → 3; 2026-10-16: riga null → false — la prima riga chiusa finisce 9 px sotto la pill a 947 — a 768 LA tessera sta a tutta larghezza dopo il verdetto, la curva già a 120 px (la riga sotto la pill registrata false, estesa a 768; a 1024 è sopra il fondo di main); 2026-10-15: le cifre fuori dal verdetto sono le tre celle, l'eroe e le chip di Il fondo oggi («≤ 5» non raggiunto, dichiarato e registrato come misurato); a 768 la striscia di tre celle lascia sopra la piega una tessera sola; 2026-10-11: deriva del giorno del mese, non del codice — il codice di develop (1629613) misurato lo stesso giorno (11, contro il 10 della prima misura del budget) dà esattamente questi valori; il fixture non è invariante al giorno come la scelta di un fixture deterministico assume (doc/guide/prima-schermata.md § Per-page blind spots)"
       },
       "1024": {
-        "screens": 1.21,
+        "screens": 1.2,
         "tilesAboveFold": 5,
         "tilesFullyAboveFold": 4,
         "figuresAboveFold": 14,
@@ -523,7 +523,7 @@
         "raisedBy": "2026-10-15: la prima riga chiusa (Afflussi) finisce sotto la pill a 390 con il grafico del Traguardo già a 120 px; le cifre fuori dal verdetto sono le due celle, l'eroe, il chip e la didascalia del Traguardo e le etichette del grafico («≤ 5» non raggiunto, dichiarato e registrato come misurato); la pill a 44 px dal 2026-10-10"
       },
       "768": {
-        "screens": 1.21,
+        "screens": 1.2,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 3,
         "figuresAboveFold": 22,
@@ -533,7 +533,7 @@
         "raisedBy": "2026-10-16: figuresOutsideVerdict 12 → 14 — il misurato fa da tetto — a 768/1024 la metrica era informativa e l'obiettivo è il misurato del 2026-10-16 (DESIGN.md → The First-Screen Rule); 2026-10-10: pill a 44 px"
       },
       "1024": {
-        "screens": 1.25,
+        "screens": 1.24,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 2,
         "figuresAboveFold": 18,
@@ -569,10 +569,10 @@
         "tilesAboveFold": 4,
         "tilesFullyAboveFold": 3,
         "figuresAboveFold": 18,
-        "figuresOutsideVerdict": 8,
+        "figuresOutsideVerdict": 10,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-10-16: figuresAboveFold 14 → 18, figuresOutsideVerdict 6 → 8 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-10: pill a 44 px"
+        "raisedBy": "2026-11-21: Geist Sans applicato (il font era system-ui fino ad allora: le righe vanno a capo altrove) — figuresOutsideVerdict 8 → 10; 2026-10-16: figuresAboveFold 14 → 18, figuresOutsideVerdict 6 → 8 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-10: pill a 44 px"
       }
     },
     "fire-monte-carlo": {
@@ -587,7 +587,7 @@
         "raisedBy": "2026-10-15: la prima riga chiusa (Distribuzione) finisce sotto la pill a 390 con il ventaglio già a 120 px; le cifre fuori dal verdetto sono le due celle; 2026-10-12: screens oscilla fra 4,87 e 4,89 a parità di codice — due corse consecutive sulla stessa build di develop (e450d00e, 2026-10-12, ritiro) leggono prima l'uno e poi l'altro; il --tighten della sessione aveva scritto 4,87 come deriva del giorno; la composizione di Monte Carlo (2026-10-15) rimisura; la pill a 44 px dal 2026-10-10"
       },
       "768": {
-        "screens": 1.18,
+        "screens": 1.17,
         "tilesAboveFold": 4,
         "tilesFullyAboveFold": 4,
         "figuresAboveFold": 6,
@@ -597,7 +597,7 @@
         "raisedBy": "2026-10-10: pill a 44 px"
       },
       "1024": {
-        "screens": 1.1,
+        "screens": 1.09,
         "tilesAboveFold": 4,
         "tilesFullyAboveFold": 4,
         "figuresAboveFold": 8,
@@ -609,9 +609,9 @@
     },
     "fire-obiettivi": {
       "390": {
-        "screens": 1.32,
+        "screens": 1.31,
         "tilesAboveFold": 4,
-        "tilesFullyAboveFold": 3,
+        "tilesFullyAboveFold": 4,
         "figuresAboveFold": 9,
         "figuresOutsideVerdict": 9,
         "firstClosedRowAbovePill": true,
@@ -651,7 +651,7 @@
         "raisedBy": "2026-10-10: la striscia (3 cifre) e il podio a cinque righe sopra la pill, la prima riga chiusa sotto la pill con il grafico già a 120 px (doc/guide/hall-of-fame.md § Composizione mobile)"
       },
       "768": {
-        "screens": 1.24,
+        "screens": 1.23,
         "tilesAboveFold": 5,
         "tilesFullyAboveFold": 5,
         "figuresAboveFold": 19,
@@ -660,7 +660,7 @@
         "overflowX": false
       },
       "1024": {
-        "screens": 1.22,
+        "screens": 1.21,
         "tilesAboveFold": 5,
         "tilesFullyAboveFold": 4,
         "figuresAboveFold": 22,
@@ -672,7 +672,7 @@
     },
     "impostazioni": {
       "390": {
-        "screens": 2.27,
+        "screens": 2.25,
         "tilesAboveFold": 2,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 2,
@@ -704,7 +704,7 @@
     },
     "allocazione-accumulo": {
       "390": {
-        "screens": 1.72,
+        "screens": 1.71,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 11,
@@ -728,10 +728,10 @@
         "tilesAboveFold": 4,
         "tilesFullyAboveFold": 3,
         "figuresAboveFold": 11,
-        "figuresOutsideVerdict": 7,
+        "figuresOutsideVerdict": 8,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-11-17: le righe chiuse «Portafoglio modello» e «Criteri del modello» (il portafoglio modello, branch feat/portafoglio-modello, riregistrata come la spec chiede); cifre e prima riga chiusa invariate, le tessere sopra la piega crescono a 768 e 1024 perché le due righe stanno nell'indice; 2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab"
+        "raisedBy": "2026-11-21: Geist Sans applicato (il font era system-ui fino ad allora: le righe vanno a capo altrove) — figuresOutsideVerdict 7 → 8; 2026-11-17: le righe chiuse «Portafoglio modello» e «Criteri del modello» (il portafoglio modello, branch feat/portafoglio-modello, riregistrata come la spec chiede); cifre e prima riga chiusa invariate, le tessere sopra la piega crescono a 768 e 1024 perché le due righe stanno nell'indice; 2026-11-17: riregistrata come misurata sul codice che entra (la tab caricata su richiesta, le correzioni D1–D11), stessa build e stessa macchina della corsa di develop @36ac3325 dello stesso giorno, che non ha la tab"
       }
     }
   }

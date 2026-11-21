@@ -19,6 +19,8 @@ import {
 import { ModalStatusLine } from '@/components/ui/modal-status-line';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+// From ColorThemeContext, not CostumeScopeContext: the shared bundle (see `CostumeScopeContext` there).
+import { useCostumeScope } from '@/contexts/ColorThemeContext';
 import { hasArmedConfirm } from '@/lib/hooks/useArmedDelete';
 import { cn } from '@/lib/utils';
 import type { ModalReading } from '@/lib/utils/dialogNarrative';
@@ -158,6 +160,10 @@ export function ResponsiveModal({
   onExitComplete,
 }: Readonly<ResponsiveModalProps>) {
   const isMobile = useMediaQuery('(max-width: 768px)');
+  // Portalled out of the shell's DOM, the content carries the costume scope itself when opened inside it
+  // (DESIGN.md → The Costume Rule). Read here, before any return: the two contents sit in two branches.
+  const inCostumeScope = useCostumeScope();
+  const costumeScopeProps = inCostumeScope ? { 'data-costume-scope': '' } : {};
 
   // The element focused when the modal opened, the fallback for `returnFocusTo`. A LAYOUT
   // effect on purpose: the parent's layout effects run before any child's passive effect, and
@@ -198,7 +204,7 @@ export function ResponsiveModal({
       // when the keyboard opens and doesn't fully restore when it closes,
       // leaving the footer buttons stuck away from the bottom edge.
       <Drawer open={open} onOpenChange={(v) => !v && onClose()} noBodyStyles repositionInputs={false}>
-        <DrawerContent onEscapeKeyDown={refuseEscapeWhileArmed} onCloseAutoFocus={handleCloseAutoFocus}>
+        <DrawerContent onEscapeKeyDown={refuseEscapeWhileArmed} onCloseAutoFocus={handleCloseAutoFocus} {...costumeScopeProps}>
           <DrawerHeader className="border-b px-4 pb-3 pt-2 text-left">
             {eyebrow && <p className={TILE_EYEBROW_CLASS}>{eyebrow}</p>}
             <DrawerTitle className="text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">
@@ -232,6 +238,7 @@ export function ResponsiveModal({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
+        {...costumeScopeProps}
         onEscapeKeyDown={refuseEscapeWhileArmed}
         onCloseAutoFocus={handleCloseAutoFocus}
         className={cn(

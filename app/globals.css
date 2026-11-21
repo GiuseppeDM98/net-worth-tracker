@@ -71,7 +71,9 @@
   --ease-spring: linear(0, 0.093 8.3%, 0.280 16.7%, 0.476 25%, 0.643 33.3%, 0.771 41.7%, 0.861 50%, 0.922 58.3%, 0.960 66.7%, 0.982 75%, 0.994 83.3%, 1);
 }
 
-:root {
+/* `[data-theme="default"]`: the swatch of Impostazioni › Aspetto applies this block to a `div`
+   (<html> never carries the default's name). */
+:root, [data-theme="default"] {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -737,6 +739,71 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --sidebar-border: oklch(0.3867 0.025 270.0000);
   --sidebar-ring: oklch(0.5676 0.2021 283.0838);
 }
+
+/* ─── Theme costume (DESIGN.md → The Costume Rule) ── */
+/* A costume theme's ground, frame, heading face, ornaments and glow (doc/guide/temi.md § Il costume).
+   Every selector starts with the gate: `data-costume` on <html> (the theme has a costume) AND a
+   `data-costume-scope` ancestor (the dashboard shell, a modal's content) — so the landing, the access
+   pages, the emails and the PDF wear the default costume, and a palette theme renders as before.
+   Unlayered on purpose: these beat a utility, so each excludes what a utility must keep. The tokens
+   are declared only in a theme's `[data-theme="<id>"] [data-costume-scope]` blocks. */
+[data-costume] [data-costume-scope] #page-main {
+  background: var(--costume-ground);
+}
+[data-costume] [data-costume-scope] [data-tile] {
+  background-image: var(--costume-tile-image);
+  background-position: var(--costume-tile-image-position);
+  background-size: var(--costume-tile-image-size);
+  background-repeat: no-repeat;
+  background-origin: border-box;
+}
+/* A generated tile keeps the AI accent's border and glow (DESIGN.md → The AI-Accent Rule). */
+[data-costume] [data-costume-scope] [data-tile]:not([data-generated]) {
+  box-shadow: var(--costume-tile-shadow);
+}
+[data-costume] [data-costume-scope] .costume-heading {
+  font-family: var(--costume-heading-font);
+  font-weight: var(--costume-heading-weight);
+  letter-spacing: var(--costume-heading-tracking);
+  text-transform: var(--costume-heading-case);
+  font-synthesis: none;
+}
+@media (width >= 1440px) {
+  [data-costume] [data-costume-scope] .costume-heading {
+    font-size: var(--costume-heading-size);
+  }
+}
+[data-costume] [data-costume-scope] .tile-eyebrow {
+  font-family: var(--costume-heading-font);
+  font-weight: var(--costume-eyebrow-weight);
+  font-synthesis: none;
+}
+/* The Mono Mandate wins over the heading font: a digit in a heading is a figure. */
+[data-costume] [data-costume-scope] .costume-figure {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+/* 16px above a band, nothing above a 0px one: a costume without a band adds no height. */
+[data-costume] [data-costume-scope] .costume-header-band {
+  height: var(--costume-header-band-height);
+  margin-top: min(16px, calc(var(--costume-header-band-height) * 1000));
+  background: var(--costume-header-band);
+}
+/* Below desktop the header is sticky: the band keeps an opaque strip, so no row shows through it. */
+@media (width < 1440px) {
+  [data-costume] [data-costume-scope] .costume-header-band {
+    box-sizing: content-box;
+    margin-top: 0;
+    background-color: var(--background);
+    border-top: min(16px, calc(var(--costume-header-band-height) * 1000)) solid var(--background);
+  }
+}
+/* Not on focus (the ring is a box-shadow too), never on a control that asks a model (The AI-Accent Rule). */
+[data-costume] [data-costume-scope] [data-slot="button"][data-variant="default"]:not(.ai-control):not(:focus-visible) {
+  box-shadow: var(--costume-primary-glow);
+}
+/* ─── End of theme costume ── */
 
 /* Disable continuous rotation for users who prefer reduced motion.
  * Tailwind's animate-spin has no built-in reduced-motion guard, so we

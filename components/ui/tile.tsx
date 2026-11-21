@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Narrative } from '@/lib/utils/narrative';
 import { sectionPanelId, sectionTriggerId } from '@/lib/utils/mobileSections';
+import { HeadingText } from '@/components/ui/heading-text';
 import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { NarrativeSegments, NarrativeText } from '@/components/ui/narrative-text';
 import { useRowAnswer } from '@/components/ui/row-answers';
@@ -65,9 +66,13 @@ type TileProps = TileBaseProps &
 export const TILE_FOOTER_ACTION_CLASS =
   'inline-flex min-h-8 -my-2 items-center text-foreground underline-offset-2 hover:underline [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:-my-3.5';
 
-/** The eyebrow every tile, every hero and the compact page header share. */
+/**
+ * The eyebrow every tile, every hero and the compact page header share. `tile-eyebrow` is the costume's
+ * hook (its heading face, globals.css → Theme costume); the colour is a costume token with today's ink as
+ * its fallback, a utility, so a caller's colour (`text-destructive`, the AI accent) still wins through `cn()`.
+ */
 export const TILE_EYEBROW_CLASS =
-  'text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground';
+  'tile-eyebrow text-[10px] font-semibold uppercase tracking-[0.1em] text-[color:var(--costume-eyebrow-color,var(--muted-foreground))]';
 
 /** A smaller eyebrow for labels INSIDE a tile (a KPI name, a list title). */
 export const TILE_SUB_EYEBROW_CLASS =
@@ -176,7 +181,7 @@ export function TileRowShell({ collapse, eyebrow, ariaLabel, asideWhenClosed, as
   const answer = open || collapse.failed ? null : pageAnswer;
   return (
     <Collapsible open={open} onOpenChange={collapse.onOpenChange} asChild>
-      <section id={id} role={role} aria-label={ariaLabel} data-generated={generated ? '' : undefined} className={cn(TILE_SURFACE_CLASS, 'scroll-mt-24', generated && AI_GENERATED_SURFACE_CLASS, className)}>
+      <section id={id} role={role} aria-label={ariaLabel} data-tile="" data-generated={generated ? '' : undefined} className={cn(TILE_SURFACE_CLASS, 'scroll-mt-24', generated && AI_GENERATED_SURFACE_CLASS, className)}>
         <h3 className="m-0">
           <CollapsibleTrigger asChild>
             <button
@@ -243,7 +248,7 @@ export function Tile(props: TileProps) {
     const label = (
       <span className={cn(TILE_EYEBROW_CLASS, 'flex min-w-0 items-center gap-1.5', generated && !collapse.failed && AI_GENERATED_EYEBROW_CLASS, collapse.failed && 'text-destructive')}>
         {collapse.failed && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
-        <span className="min-w-0">{eyebrow}</span>
+        <span className="min-w-0"><HeadingText text={eyebrow} /></span>
         {collapse.failed && <span className="sr-only">, lettura fallita</span>}
       </span>
     );
@@ -265,14 +270,14 @@ export function Tile(props: TileProps) {
   }
 
   return (
-    <section id={props.id} aria-label={ariaLabel ?? eyebrow} data-generated={generated ? '' : undefined} className={cn(TILE_SURFACE_CLASS, 'p-5', generated && AI_GENERATED_SURFACE_CLASS, className)}>
+    <section id={props.id} aria-label={ariaLabel ?? eyebrow} data-tile="" data-generated={generated ? '' : undefined} className={cn(TILE_SURFACE_CLASS, 'p-5', generated && AI_GENERATED_SURFACE_CLASS, className)}>
       {/* The head wraps: an aside that carries controls (a pill, a select, two actions) drops under the
           eyebrow on a phone instead of pushing the tile past the viewport. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
         {/* A heading, not a paragraph: a page of nine tiles listed two headings (the title and the
             verdict) to a screen reader, which navigates a long page by them. `h3` under the verdict's
             `h2`; the class carries every metric, so nothing changes on screen. */}
-        <h3 className={cn(TILE_EYEBROW_CLASS, generated && AI_GENERATED_EYEBROW_CLASS)}>{eyebrow}</h3>
+        <h3 className={cn(TILE_EYEBROW_CLASS, generated && AI_GENERATED_EYEBROW_CLASS)}><HeadingText text={eyebrow} /></h3>
         {aside && <div className="min-w-0 max-w-full shrink-0 text-[10px] text-muted-foreground">{aside}</div>}
       </div>
       {reading && (

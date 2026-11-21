@@ -16,10 +16,11 @@ export const AI_GENERATED_EYEBROW_CLASS = 'text-[color:var(--ai-accent)]';
  * A control that calls the model (The AI-Accent Rule): on hover and on keyboard focus only, the border turns the
  * accent and the glow appears, over 200 ms; never at rest, never a fill. The focus ring stays `ring-ring`.
  * A FILLED control (shadcn's `default` variant) has no border width of its own: the host adds `border
- * border-transparent` beside this class, or the hover colours nothing (2026-11-07).
+ * border-transparent` beside this class, or the hover colours nothing (2026-11-07). `ai-control` marks it for
+ * the costume's primary glow, which skips it so this hover and focus glow stay (The AI-Accent Rule, 2026-11-21).
  */
 export const AI_CONTROL_ACCENT_CLASS =
-  'transition-[border-color,color,box-shadow] duration-200 hover:border-[color:var(--ai-accent)] focus-visible:border-[color:var(--ai-accent)] hover:shadow-[0_0_14px_var(--ai-glow)] focus-visible:shadow-[0_0_14px_var(--ai-glow)]';
+  'ai-control transition-[border-color,color,box-shadow] duration-200 hover:border-[color:var(--ai-accent)] focus-visible:border-[color:var(--ai-accent)] hover:shadow-[0_0_14px_var(--ai-glow)] focus-visible:shadow-[0_0_14px_var(--ai-glow)]';
 
 /** Added to AI_CONTROL_ACCENT_CLASS on an outline or ghost control only: its label turns the accent too; a filled control keeps --primary-foreground. */
 export const AI_CONTROL_ACCENT_LABEL_CLASS = 'hover:text-[color:var(--ai-accent)] focus-visible:text-[color:var(--ai-accent)]';
