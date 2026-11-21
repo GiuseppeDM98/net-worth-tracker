@@ -65,12 +65,12 @@ export function AccumuloVuotoTile({ ownerId, allAssets, targets, band, hasTarget
   const isDemo = useDemoMode();
   const canCreate = !isDemo && hasTargets && !!targets;
 
-  // The entry the editor would suggest, so the preview matches what «Crea piano» proposes.
+  // The entry the path's «Versamento» suggests, so the preview matches what «Crea piano» proposes.
   const median = useMonthlySavingsMedian(ownerId, allAssets, { enabled: true });
   const suggestion = suggestMonthlyInflow(median?.medianEur);
   const suggestedInflow = suggestion ?? 0;
 
-  // The reserve the editor starts from: the allocation's cash quota (owner, 2026-11-17).
+  // The allocation's cash quota (owner, 2026-11-17); the path's own figure counts the ticked accounts only (2026-11-20).
   const { reserveEur, otherCashEur } = useMemo(() => resolvePlanReserve(allAssets, targets, compareAllocations, DEPS), [allAssets, targets]);
   const cashEur = useMemo(
     () => allAssets.filter(isPlanSourceAccount).reduce((sum, asset) => sum + DEPS.valueOf(asset), 0),

@@ -54,6 +54,7 @@ import {
   useSetInstallmentLine,
 } from '@/lib/hooks/useAccumulationPlan';
 import { validateDraftAgainstAssets } from '@/lib/utils/accumulationPlanSchema';
+import { getAllAssets } from '@/lib/services/assetService';
 import { toast } from 'sonner';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
@@ -149,11 +150,11 @@ interface QuestoMeseTileProps {
   onAssetsChanged: () => void;
   /** The Consulente's «rivedi entro» date: a plan ending after it says so (2026-11-12); null without one. */
   reviewByIso: string | null;
-  /** What the model rests on: the plan editor's «aggiorna anche il modello» stamps it. */
+  /** What the model rests on: the revision's «aggiorna anche il modello» stamps it. */
   modelBasis: ModelBasis;
   /** The day `currentIndex` is read on (`useOpenAccumuloPlan`): the review month's check reads its month. */
   today: Date;
-  /** Impostazioni › Spese «Conto per gli investimenti», handed to the editor (it reads it only for a new plan). */
+  /** Impostazioni › Spese «Conto per gli investimenti», handed to the editor, which revises only: unread since 2026-11-20. */
   investmentAccountId: string | null;
 }
 
@@ -400,15 +401,29 @@ export function QuestoMeseTile({
     const liquidity = computeUsableLiquidity(plan.liquidity, assetsById, plan.disposals, plan.months, DEPS);
     const draftIssues = validateDraftAgainstAssets(plan, assetsById);
 
+    // The gate runs on the assets read AGAIN at the click, never on the page's list (2026-11-20): an account deleted
+    // in another tab is `source_missing` and nothing is activated — as the path's «Conferma» and the Consulente's
+    // «Applica». `activatePlan` itself runs no gate.
     const handleActivate = async () => {
-      try {
-        await activateMutation.mutateAsync({
-          planId: plan.id,
-          input: { allAssets, targets, compare: compareAllocations, deps: DEPS, today: new Date() },
-        });
-      } catch (error) {
-        toast.error(describeWriteError(error));
+      const read = await getAllAssets(ownerId).then(
+        (assets) => ({ ok: true as const, assets }),
+        (error: unknown) => ({ ok: false as const, error })
+      );
+      if (!read.ok) {
+        toast.error(describeWriteError(read.error));
+        return;
       }
+      const issues = validateDraftAgainstAssets(plan, new Map(read.assets.map((asset) => [asset.id, asset])));
+      if (issues.length > 0) {
+        toast.error(issues[0].message);
+        return;
+      }
+      await activateMutation
+        .mutateAsync({
+          planId: plan.id,
+          input: { allAssets: read.assets, targets, compare: compareAllocations, deps: DEPS, today: new Date() },
+        })
+        .catch((error: unknown) => toast.error(describeWriteError(error)));
     };
 
     return (

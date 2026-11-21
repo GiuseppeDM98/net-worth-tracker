@@ -15,6 +15,7 @@
 
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { getAllAssets } from '@/lib/services/assetService';
 import {
   createDraftPlan,
   updateDraftPlan,
@@ -125,11 +126,16 @@ export function useDismissRecalibration(ownerId: string) {
   });
 }
 
+/**
+ * «Rivedi il piano»: the assets are read AGAIN here, at the click, and the revision's gate runs on that list —
+ * never on the page's, which may be stale (2026-11-20: an account deleted in another tab is refused, nothing written;
+ * `__tests__/useRevisePlan.test.tsx`).
+ */
 export function useRevisePlan(ownerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ planId, revision, input }: { planId: string; revision: PlanRevisionInput; input: RevisePlanInput }) =>
-      revisePlan(planId, revision, input),
+    mutationFn: async ({ planId, revision, input }: { planId: string; revision: PlanRevisionInput; input: Omit<RevisePlanInput, 'allAssets'> }) =>
+      revisePlan(planId, revision, { allAssets: await getAllAssets(ownerId), ...input }),
     onSuccess: () => invalidateAccumulationPlans(queryClient, ownerId),
   });
 }

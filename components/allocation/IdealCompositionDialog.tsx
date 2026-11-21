@@ -12,7 +12,7 @@
  * calculation per keystroke froze the dialog. The dialog is a tile lifted off the page (The Modal-Is-A-Tile
  * Rule): the eyebrow, the act as the title, the reading as the status, the actions in the footer. It writes
  * only the model, through «Salva come portafoglio modello»; «Crea un PAC» hands the seed to the CALLER, which
- * opens `AccumulationPlanDialog` itself (never two modals stacked).
+ * writes it as the guided path's browser draft and navigates there (2026-11-20; never two modals stacked).
  *
  * Third mode «Con vendite mirate» lives only here — a PAC's instalments only buy: a tax cap in euro, a «Non vendere»
  * box per row (dialog state, saved only in the run's snapshot), the estimated tax per row in sale, and the total

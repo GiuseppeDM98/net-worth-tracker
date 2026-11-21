@@ -1,6 +1,6 @@
 # NOVE-26 — The guided path revises an active plan; the editor is deleted
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-22** (the path: `planPath.ts` with `restorePlanPathDraft`
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-22** (retired on 2026-11-20, PR #563; the path: `planPath.ts` with `restorePlanPathDraft`
 > and `planPathTodayWeights`, `PathCard`, the route `/dashboard/allocation/piano`), on **NOVE-23** (retired on 2026-11-19, PR #557; a sale's month
 > is the plan's absolute instalment index, the validator's and the preview's `firstIndex`, `listSaleSteps`,
 > `reviewMonthIndex`, the note «Rivedi il piano» of the review month) and **NOVE-25** (retired on 2026-11-20, PR #561; `advisorNotes`,
@@ -27,9 +27,9 @@ on that draft (`:750`), not the calendar `revisePlan` will write.
 removed from the product: `groupPositions`, `separatePosition`, `replaceBuyAsset`
 (`lib/utils/accumulationPlanUtils.ts`), and the optimizer's panel inside step 2.
 
-**«Rivedi il piano» has three doors**: the footer button (`components/allocation/tiles/QuestoMeseTile.tsx:920-922`),
-«Rivedi dal modello» (`:746-758`) and, since NOVE-23, the review month's note — each sets two pieces of state and
-opens the modal (`reviseDialog`, `:383-402`).
+**«Rivedi il piano» has three doors**: the footer button (`components/allocation/tiles/QuestoMeseTile.tsx:922-924`),
+«Rivedi dal modello» (`:750-760`) and, since NOVE-23, the review month's note — each sets two pieces of state and
+opens the modal (`reviseDialog`, `:364-384`).
 
 ## 2. Goal and acceptance criteria
 
@@ -64,7 +64,7 @@ opens the modal (`reviseDialog`, `:383-402`).
 - **Owner 93**: a later sale refills the reserve first; the engine does it (NOVE-23), the path only says it.
 - **Owner 94**: the link reads «Apri Accumulo» (`ACCUMULO_OPEN_LINK`, `lib/utils/accumuloCopy.ts`).
 - **Owner 98**: an active plan with every instalment closed shows `ACCUMULO_PLAN_NOTHING_TO_REVISE` and «Apri
-  Accumulo» — already on the path's host since NOVE-22 (G7): this spec keeps that branch.
+  Accumulo» — already on the path's host since NOVE-22 (the active-plan screen, doc/guide/accumulo.md § Creare un piano: il percorso): this spec keeps that branch.
 - **Adopted, reversible (this spec)**:
   - V1. The mode is the open plan's: active → revise. `?da=modello` only preselects the start, and only in a
     revision with a model that has weights: in create mode, or without such a model, it is ignored.
@@ -88,7 +88,7 @@ opens the modal (`reviseDialog`, `:383-402`).
     is another — nothing is written, the sentence asks to reload.
   - V10. An account of the plan that no longer exists, or is no longer a source account, is not pre-ticked: the
     screen «conto» would not show it and the gate would refuse it (`source_missing`).
-  - V11. «Conferma» is disabled while the write runs (NOVE-22's G17): one revision per press.
+  - V11. «Conferma» is disabled while the write runs (as the path's «Conferma» since 2026-11-20): one revision per press.
   - V12. An instrument with a locked sale (executed, skipped, linked to the Registro) is not offered for another
     sale: the engine holds one sale per instrument.
 
@@ -202,7 +202,7 @@ return {
 
 ### 4.2 The screens in a revision (`components/allocation/piano/`, `lib/utils/planPathNarrative.ts`)
 
-`PianoClient`: of NOVE-22's active-plan branch (G7) one half goes — an active plan WITH an intact instalment
+`PianoClient`: of NOVE-22's active-plan branch one half goes — an active plan WITH an intact instalment
 (`buildPlanPathRevision(plan) !== null`) builds `context.revision` and renders the wizard; one WITHOUT keeps the
 tile of decision 98 (`ACCUMULO_PLAN_NOTHING_TO_REVISE`, the link `ACCUMULO_OPEN_LINK`). The wizard is mounted, as
 in NOVE-22, only on plans fetched after mount. The title stays «Piano di accumulo»; in a revision the
@@ -219,11 +219,12 @@ in NOVE-22, only on plans fetched after mount. The title stays «Piano di accumu
 | riserva | unchanged | the plan's figure as typed (V3) |
 | vendite | «Cambi le vendite?» | above the choice, the locked sales as plain lines — «{nome} · {n} quote · già venduta» (`executed`), «{nome} · {n} quote · saltata» (`skipped`), «{nome} · {n} quote · da confermare nel Registro» (`planned` with `transactionIds`); a sale without `quantity` reads «tutte le quote» in place of «{n} quote». An instrument with a locked sale has no «Vendi» row (V12). The open saved sales arrive ticked. The month select lists `firstIndex … closedCount + months` as «{mese} ({k}º)» with `k` the plan's index; for a late sale (V4) its saved month comes first, as «{mese} · in ritardo» |
 | strumenti | unchanged | — |
-| riepilogo | «Confermi la revisione?» | from `previewPlanPathRevision`, in this order: «{n} rate da {mese}: la prossima di {€}.» (`n` = the months left, the month and the planned total — Σ of the lines' `plannedAmountEur` — of the result's instalment `firstIndex`; a first instalment the reserve takes whole reads its 0 €); one `describeSaleStep` sentence per entry of `listSaleSteps({ installments: result.plan.installments.filter((i) => i.index >= firstIndex), disposals: result.plan.disposals, firstIndex, nameOf: labelOf })` (NOVE-23); one line per sale that changes — «{nome}: tolta», «{nome}: spostata a {mese}», «{nome}: nuova, {n} quote a {mese}», «{nome}: da {a} a {b} quote, a {mese}» (a saved sale whose shares change: ONE line, though the engine sees removed + new; «tutte le» in place of a number for every share); the tax line of each new sale and their total, as NOVE-22; `describeInsufficientLiquidityWarning` and `describeUnpricedWarning` on `result.liquidity` and the revised positions, as NOVE-22; the box of the model (NOVE-22 G9). Primary: «Conferma»; while it writes, «Rivedo il piano…» and disabled (V11) |
+| riepilogo | «Confermi la revisione?» | from `previewPlanPathRevision`, in this order: «{n} rate da {mese}: la prossima di {€}.» (`n` = the months left, the month and the planned total — Σ of the lines' `plannedAmountEur` — of the result's instalment `firstIndex`; a first instalment the reserve takes whole reads its 0 €); one `describeSaleStep` sentence per entry of `listSaleSteps({ installments: result.plan.installments.filter((i) => i.index >= firstIndex), disposals: result.plan.disposals, firstIndex, nameOf: labelOf })` (NOVE-23); one line per sale that changes — «{nome}: tolta», «{nome}: spostata a {mese}», «{nome}: nuova, {n} quote a {mese}», «{nome}: da {a} a {b} quote, a {mese}» (a saved sale whose shares change: ONE line, though the engine sees removed + new; «tutte le» in place of a number for every share); the tax line of each new sale and their total, as NOVE-22; `describeInsufficientLiquidityWarning` and `describeUnpricedWarning` on `result.liquidity` and the revised positions, as NOVE-22; the box of the model (the editor's rule: on when the quotas differ from the model, or no model exists). Primary: «Conferma»; while it writes, «Rivedo il piano…» and disabled (V11) |
 
 ### 4.3 «Conferma» in a revision
 
 ```ts
+const assets = await getAllAssets(ownerId);
 await revisePlan(plan.id, planPathToRevision(answers, context), { allAssets: assets, deps: DEPS, today: new Date() });
 let modelError: string | null = null;
 if (updateModel) {
@@ -232,9 +233,9 @@ if (updateModel) {
 }
 ```
 
-`weights` and `basis` as NOVE-22 (`planPositionsToModelWeights(answers.positions, …)`); `optimizerSnapshot` =
+`assets` is read AGAIN at the press (as the path's «Conferma» and the draft's «Attiva piano» since 2026-11-20, NOVE-22's retirement): the gate inside `revisePlan` runs on that list, never on the page's — an account deleted in another tab is refused, nothing written; R4 holds it, as `__tests__/useRevisePlan.test.tsx` holds the editor's. `weights` and `basis` as NOVE-22 (`planPositionsToModelWeights(answers.positions, …)`); `optimizerSnapshot` =
 `answers.start === 'model' ? context.model?.optimizerSnapshot : plan.optimizerSnapshot` — the editor's rule
-(`AccumulationPlanDialog.tsx:271`, `:367-371`). NOVE-22's month check (G16) does not run in a revision: the
+(`AccumulationPlanDialog.tsx:273`, `:367-371`). The path's month check («Nel frattempo è cambiato il mese…», 2026-11-20) does not run in a revision: the
 revision starts from the plan's first intact instalment, whatever the month.
 
 Invalidations as NOVE-22; the stored draft cleared; `PathDoneCard` (`ariaLabel="Piano rivisto"`, V8) with the
@@ -245,12 +246,12 @@ plan interrupted meanwhile — and nothing was written; the answers stay.
 
 ### 4.4 The doors (`components/allocation/tiles/QuestoMeseTile.tsx`)
 
-- The footer's «Rivedi il piano» (`:866-868`): `Button asChild` → `Link href="/dashboard/allocation/piano"`;
+- The footer's «Rivedi il piano» (`:922-924`): `Button asChild` → `Link href="/dashboard/allocation/piano"`;
   where it is disabled today (demo, no intact instalment) it stays a disabled `Button` with the same label and
   no link.
-- «Rivedi dal modello» (`:603-615`): → `/dashboard/allocation/piano?da=modello`.
+- «Rivedi dal modello» (`:750-760`): → `/dashboard/allocation/piano?da=modello`.
 - The review month's note (written by NOVE-23): its «Rivedi il piano» becomes the same link as the footer's.
-- `reviseDialog` (`:365-383`), `reviseOpen`, `reviseFromModel`, the import of the modal and every prop of
+- `reviseDialog` (`:364-384`), `reviseOpen`, `reviseFromModel`, the import of the modal and every prop of
   `QuestoMeseTileProps` that only the two dialogs read — `targetLeverageRatio`, `idealAllocation`, `modelBasis`,
   `onAssetsChanged`, `investmentAccountId` — leave the file, and `AccumuloTab` stops passing them; a prop of this
   list that `grep -w` still finds read elsewhere in the file stays.
@@ -268,10 +269,9 @@ plan interrupted meanwhile — and nothing was written; the answers stay.
   header's «Raggruppa, Separa and Sostituisci» is rewritten); the file stays for its engine cases.
 - The component tests of the deleted files: `__tests__/planDraftSidePanel.test.tsx` and
   `__tests__/accumulationPlanDialogSaleMonth.test.tsx` (written by NOVE-23). The
-  `vi.mock('@/components/allocation/AccumulationPlanDialog', …)` lines of `__tests__/accumuloVuotoTile.test.tsx`
-  (`:23`), `__tests__/portafoglioModelloTile.test.tsx` (`:32`) and `__tests__/questoMeseTile.test.tsx` are
-  removed. `__tests__/accumulationPlanRevision.test.ts` tests the pure engine and stays.
-- `lib/utils/accumulationNarrative.ts`, with their test cases: `describeModelWriteAfterPlan` (`:745`; the path
+  `vi.mock('@/components/allocation/AccumulationPlanDialog', …)` line of `__tests__/questoMeseTile.test.tsx` (`:32`) is
+  removed (those of `accumuloVuotoTile` and `portafoglioModelloTile` went on 2026-11-20). `__tests__/accumulationPlanRevision.test.ts` tests the pure engine and stays.
+- `lib/utils/accumulationNarrative.ts`, with their test cases: `describeModelWriteAfterPlan` (`:756`; the path
   reads `describeModelNotUpdated`), `describeAccumuloDialogEyebrow`,
   `ACCUMULO_STEP_READINGS`, `ACCUMULO_STEP_TITLES`, every `ACCUMULO_STEP1_*`, `ACCUMULO_STEP2_*` and
   `ACCUMULO_STEP3_*` constant, `ACCUMULO_ACTION_SAVE_DRAFT`, `ACCUMULO_ACTION_SAVE_REVISION`,
@@ -281,9 +281,13 @@ plan interrupted meanwhile — and nothing was written; the answers stay.
   `describeStep1InflowsLabel`, `describeStep2Shares`, `describeWeightsTotal`, `describeWeightsSum`,
   `describeRefillNote`, `describeReserveOrigin`, `describeAddableAsset`, `ACCUMULO_USE_SUGGESTED_INFLOW`.
 - `lib/utils/weightOptimizerNarrative.ts`: `OPTIMIZER_STEP2_ARIA_LABEL`, `describeOptimizerSnapshot`.
+- The editor's create-only branches, dead since 2026-11-20 (every caller passes `revise`; doc/guide/accumulo.md
+  § Per-page blind spots), go with the file; so do the hooks of `lib/hooks/useAccumulationPlan.ts` that only the
+  editor reads — `useCreateDraftPlan`, `useUpdateDraftPlan`, `useRevisePlan` (the path calls `revisePlan` itself,
+  § 4.3) — with `__tests__/useRevisePlan.test.tsx`; `useActivatePlan` stays (the draft view's «Attiva piano»).
 - **The rule that closes the list** (it decides, the lists above are its expected result): after the three files
-  are gone, EVERY export of `lib/utils/accumulationNarrative.ts`, `lib/utils/weightOptimizerNarrative.ts` and
-  `lib/utils/accumulationPlanUtils.ts` that `git grep -w <name> -- app components lib` finds on no line but its
+  are gone, EVERY export of `lib/utils/accumulationNarrative.ts`, `lib/utils/weightOptimizerNarrative.ts`,
+  `lib/hooks/useAccumulationPlan.ts` and `lib/utils/accumulationPlanUtils.ts` that `git grep -w <name> -- app components lib` finds on no line but its
   own definition is deleted, with its cases wherever they live (`accumulationNarrative.test.ts`,
   `accumuloTileSentences.test.ts`, `accumulationReactivate.test.ts`, `weightOptimizerNarrative.test.ts`,
   `accumulationPlanReviewFlow.test.ts`); the pass is repeated until one deletes nothing (a scratchpad script
@@ -351,7 +355,7 @@ message, not in `perf/budget.json`.
 | R1 | `__tests__/pianoScreens.test.tsx` › riepilogo in a revision: «8 rate da {mese}: la prossima di 800 €.», a `describeSaleStep` sentence for a later sale, the four lines of the changed sales (tolta, spostata, nuova, da 10 a 6 quote), the refusal in `status` | read the first instalment of the whole plan; print «tolta» and «nuova» for a changed quantity |
 | R2 | `__tests__/questoMeseTile.test.tsx` (written by NOVE-23, extended): the three doors are links with the two hrefs, the review note's included; in demo a disabled button and no link | keep `setReviseOpen` |
 | R3 | `pianoScreens.test.tsx` › vendite in a revision: the three locked lines («già venduta», «saltata», «da confermare nel Registro») without controls, «tutte le quote» without a quantity; an instrument with an executed sale has no checkbox; the month select starts at the first open month; a late open sale (month 3, first open 5) shows «{mese} · in ritardo» and «Avanti» is enabled | list month 1; block every month before the first open; list every held instrument |
-| R4 | `__tests__/pianoWizard.test.tsx` (NOVE-22's, extended; `revisePlan` and `saveModelPortfolio` mocked) › «Conferma» in a revision: a pending write → the button disabled, one call for two clicks; `revisePlan` rejecting → the sentence in `status`, no done card; the model's write rejecting → the done card with `describeModelNotUpdated` | await nothing (two calls) |
+| R4 | `__tests__/pianoWizard.test.tsx` (NOVE-22's, extended; `revisePlan` and `saveModelPortfolio` mocked) › «Conferma» in a revision: the assets read again at the press (`getAllAssets`) are the list `revisePlan` receives; a pending write → the button disabled, one call for two clicks; `revisePlan` rejecting → the sentence in `status`, no done card; the model's write rejecting → the done card with `describeModelNotUpdated` | await nothing (two calls) |
 | E1 | `e2e/accumulo.piano.spec.ts`: the active fixture `seedAccumuloFixture({ saleMonthOffset: 2 })` (its sale open, two months ahead) → «Rivedi il piano» → the path prefilled → monthly amount changed → «Conferma» → the done card; firebase-admin: the closed instalments deep-equal to before, the open ones rewritten, one more `revisions` row | pass `plan.months` as `remainingMonths` |
 | E2 | same fixture: the open sale moved one month later → its `monthIndex`; a new sale → present with its month | send no `movedDisposalMonthIndexes` |
 | E3 | same: «Rivedi dal modello» → `?da=modello`, «Dal portafoglio modello» chosen, the model's quotas on screen 7 | ignore `fromModel` |

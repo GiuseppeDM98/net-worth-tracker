@@ -32,7 +32,7 @@ vi.mock('firebase/firestore', () => ({
 
 import { reactivatePlan } from '@/lib/services/accumulationPlanService';
 import { canReactivatePlan, PLAN_REACTIVATION_DAYS } from '@/lib/utils/accumuloSummary';
-import { describeInstallmentAverage } from '@/lib/utils/accumulationNarrative';
+import { describeInstallmentAverage, describeStep3Summary } from '@/lib/utils/accumulationNarrative';
 import type { AccumulationPlan } from '@/types/accumulationPlan';
 
 const NOW = new Date('2026-10-16T12:00:00');
@@ -130,5 +130,18 @@ describe('describeInstallmentAverage', () => {
 
   it('says one figure when the two coincide', () => {
     expect(flat(describeInstallmentAverage({ averageEur: 2000, firstEur: 2000.2, firstMonth: '2026-10' }))).toMatch(/^2\.?000 € al mese$/);
+  });
+});
+
+// The plan in one line (2026-11-20, the guided path's retirement): only the FIGURES are mono — the words «in media … al
+// mese; la prima, …» read in the text's font (they were one mono segment, whole). Mutation that turns it red: the
+// average sentence handed back as a single `mono: true` segment.
+describe('describeStep3Summary', () => {
+  it('marks the amounts mono, never the words', () => {
+    const parts = describeStep3Summary({ months: 12, averageEur: 2500, firstEur: 2000, firstMonth: '2026-10', coveragePct: null, leverageRatio: 1 });
+    const mono = parts.filter((part) => part.mono).map((part) => part.text.replace(/[  ]/g, ' '));
+    expect(mono.length).toBe(2);
+    for (const text of mono) expect(text).toMatch(/^[0-9.]+ €$/);
+    expect(parts.map((part) => part.text).join('').replace(/[  ]/g, ' ')).toMatch(/^12 rate: in media 2.?500 € al mese; la prima, ottobre, 2.?000 €$/);
   });
 });

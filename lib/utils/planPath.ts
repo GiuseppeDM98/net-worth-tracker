@@ -235,6 +235,22 @@ export function seedPlanPathPositions(start: PlanPathStart, answers: PlanPathAns
   return base.map((position) => ({ ...position, targetPercentage: 0 }));
 }
 
+/**
+ * Whether the quotas differ from the ones the chosen start gives (2026-11-20): «Le quote che avevi scritto vengono
+ * sostituite.» shows only then — never at the first choice, nor on a seed or a draft just opened. Compared by the
+ * members and the quota of every row above 0 (the ids are new at each seeding; a row at 0 % is no quota typed).
+ */
+export function planPathQuotasTyped(answers: PlanPathAnswers, context: PlanPathContext): boolean {
+  if (answers.start === null) return false;
+  const quotas = (positions: readonly PlanPosition[]) =>
+    positions
+      .filter((position) => position.targetPercentage > 0)
+      .map((position) => `${[...position.memberAssetIds].sort().join('+')}:${position.targetPercentage}`)
+      .sort()
+      .join('|');
+  return quotas(answers.positions) !== quotas(seedPlanPathPositions(answers.start, answers, context));
+}
+
 // ─── The reducer ──────────────────────────────────────────────────────────────
 
 function step(screen: PlanPathScreen, by: 1 | -1): PlanPathScreen {

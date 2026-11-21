@@ -75,6 +75,11 @@
 
 ## 🐛 Bug Fixes
 
+- **Allocazione › Accumulo — «Attiva piano» e «Rivedi il piano»** — Both now check your accounts as they are at the moment you press: a plan whose account you deleted in another tab is refused with its sentence, and nothing is written.
+- **Allocazione › Piano di accumulo — il percorso** — «Le quote che avevi scritto vengono sostituite.» now appears only after you changed a quota, not at your first choice; in the summary only the amounts of «in media … al mese; la prima, …» are set in figures.
+
+- **Percorsi guidati — le scelte** — On phones and tablets the round and square choice marks now sit level with their label (Compravendita, Consulente, Piano di accumulo, Assistente).
+
 - **Allocazione › Accumulo — l'avviso della riserva** — Fixed an error the browser reported on «Questo mese» when an active plan starts with your cash below its reserve: the warning was a paragraph inside a paragraph.
 - **Cashflow › Dividendi — la cedola indicizzata del giorno** — Fixed the «Imposta il dato d'inflazione» banner disappearing on the very day an inflation-linked coupon is paid: a provisional coupon now stays in the banner through its payment day, by the Italian calendar.
 - **Cashflow › Dividendi — lo strumento dopo un rifiuto** — Fixed the instrument field ignoring what you type right after the form refused an incomplete submit: the field it brings back into focus now opens its list as you type «BTP».

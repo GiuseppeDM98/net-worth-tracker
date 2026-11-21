@@ -10,6 +10,7 @@ import type { Dispatch } from 'react';
 import type { PlanDisposal } from '@/types/accumulationPlan';
 import {
   listSellableAssets,
+  planPathQuotasTyped,
   planPathTodayWeights,
   resolvePathReserve,
   resolvePathReserveEur,
@@ -80,7 +81,7 @@ export function PartenzaScreen({ answers, dispatch, context, modelUsable, modelS
         options={options}
         onChange={(start) => dispatch({ type: 'start', start, context })}
       />
-      {answers.start !== null && answers.positions.length > 0 && <p className={NOTE_CLASS}>{PLAN_PATH_START_REPLACES}</p>}
+      {planPathQuotasTyped(answers, context) && <p className={NOTE_CLASS}>{PLAN_PATH_START_REPLACES}</p>}
     </>
   );
 }

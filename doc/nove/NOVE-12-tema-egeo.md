@@ -366,7 +366,7 @@ NOVE-11's guard).
   Dusk, Elegant Luxury, Midnight Bloom, Cyberpunk, Retro Arcade, Egeo — marble, sea and gold, which also dresses the
   dashboard: a marble ground, gold-capped tiles, an engraved face for the verdict and the labels, a frieze and a
   temple)»; «six» → «seven» at `:49`, `:97`, `:124`, `:139`. `doc/guide/temi.md` (`:66`, `:71`, `:78`, `:93`, `:107`,
-  `:183`, `:189`), `AGENTS.md:153`, `:578` and `doc/guide/allocazione.md:200`: «twelve» → «fourteen» where the sentence
+  `:183`, `:189`), `AGENTS.md:159`, `:163`, `:618` and `doc/guide/allocazione.md:200`: «twelve» → «fourteen» where the sentence
   states what the suite holds today (dated history sentences unchanged). `CLAUDE.md` «Themes»: twelve → fourteen
   theme blocks, the costume named.
 - `Draft Release Temp.md`: «**Tema Egeo** — Un settimo tema colore, «Egeo» (marmo, mare e oro). Nella dashboard e

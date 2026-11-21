@@ -465,3 +465,24 @@ describe('a continued draft keeps its swap (owner, 2026-11-20; mutation: drop re
     expect(summary.sales[0]).toContain('con il ricavato compri ETF airone');
   });
 });
+
+// Two rules of the reducer and the restore that no other case held (2026-11-20, the guided path's retirement).
+describe('planPath — a held instrument bought after the draft, and a start chosen again', () => {
+  // Mutation that turns it red: `withHeldRows` dropped from `reconcilePlanPathAnswers`.
+  it('reconcile gives a held buyable instrument with no row its row at 0 %', () => {
+    const ctx = context({ assets: [conto(), etfA(), etfB(), etfC()] });
+    const next = reconcilePlanPathAnswers(answers(), ctx);
+    expect(byLabel(next.positions)).toEqual({ 'ETF ornitorinco': 60, 'ETF fenicottero': 40, 'ETF airone': 0 });
+  });
+
+  // Mutation that turns it red: `start` keeping the positions it found (the typed quotas) instead of re-seeding.
+  it('another start re-seeds: the quotas typed are replaced', () => {
+    const ctx = context();
+    const today = planPathReducer(initialPlanPathDraft(ctx), { type: 'start', start: 'today', context: ctx });
+    const typed = planPathReducer(today, { type: 'quota', positionId: today.answers.positions[0].id, targetPercentage: 90 });
+    const zero = planPathReducer(typed, { type: 'start', start: 'zero', context: ctx });
+    expect(byLabel(zero.answers.positions)).toEqual({ 'ETF ornitorinco': 0, 'ETF fenicottero': 0 });
+    const again = planPathReducer(zero, { type: 'start', start: 'today', context: ctx });
+    expect(byLabel(again.answers.positions)).toEqual({ 'ETF ornitorinco': 60, 'ETF fenicottero': 40 });
+  });
+});
