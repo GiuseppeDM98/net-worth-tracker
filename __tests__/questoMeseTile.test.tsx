@@ -5,17 +5,22 @@
  *
  * The plan's hooks, the dialogs and the services are mocked; the tile and the plan arithmetic are real.
  */
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
 vi.mock('@/lib/hooks/useDemoMode', () => ({ useDemoMode: () => false }));
-vi.mock('@/lib/services/assetService', () => ({ calculateAssetValue: (a: { quantity: number; currentPrice: number }) => a.quantity * a.currentPrice }));
+const spies = vi.hoisted(() => ({ activate: vi.fn(), getAllAssets: vi.fn(), toastError: vi.fn() }));
+vi.mock('@/lib/services/assetService', () => ({
+  calculateAssetValue: (a: { quantity: number; currentPrice: number }) => a.quantity * a.currentPrice,
+  getAllAssets: spies.getAllAssets,
+}));
 vi.mock('@/lib/services/assetAllocationService', () => ({ compareAllocations: vi.fn() }));
+vi.mock('sonner', () => ({ toast: { error: spies.toastError, success: vi.fn() } }));
 vi.mock('@/lib/hooks/useAccumulationPlan', () => {
   const mutation = () => ({ mutateAsync: vi.fn(), isPending: false });
   return {
-    useActivatePlan: mutation,
+    useActivatePlan: () => ({ mutateAsync: spies.activate, isPending: false }),
     useApplyRecalibration: mutation,
     useDismissRecalibration: mutation,
     useClosePlan: mutation,
@@ -31,10 +36,12 @@ vi.mock('@/components/assets/TransactionDialog', () => ({ TransactionDialog: () 
 import { AdvisorNotes, QuestoMeseTile } from '@/components/allocation/tiles/QuestoMeseTile';
 import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import {
+  ACCUMULO_ACTION_ACTIVATE,
   ACCUMULO_ACTION_IGNORE_MATCH,
   ACCUMULO_ACTION_REGISTER,
   ACCUMULO_ACTION_REVISE,
   ACCUMULO_REVIEW_DUE_NOTE,
+  describeDraftIssue,
   monthLabelShort,
 } from '@/lib/utils/accumulationNarrative';
 import type { LineUiState } from '@/lib/utils/accumulationPlanMatching';
@@ -193,4 +200,40 @@ describe('QuestoMeseTile — the swap', () => {
       expect(screen.queryAllByText((text) => text.includes('BTP€i fenicottero') && !text.startsWith('Con il ricavato')).filter((el) => el.tagName === 'SPAN' && el.closest('li'))).toHaveLength(0);
     });
   }
+});
+
+// «Attiva piano» on a draft (2026-11-20, the guided path's retirement): the gate runs on the assets read AGAIN at the click,
+// never on the page's list — an account deleted in another tab is `source_missing`, nothing activated (as the path's
+// «Conferma» and the Consulente's «Applica»). Mutation that turns it red: `handleActivate` passing the page's `allAssets`.
+describe('QuestoMeseTile — «Attiva piano» reads the assets again', () => {
+  beforeEach(() => {
+    spies.activate.mockReset().mockResolvedValue(undefined);
+    spies.getAllAssets.mockReset();
+    spies.toastError.mockReset();
+  });
+  const draftPlan = () => activePlan({
+    status: 'draft', installments: [], disposals: [], activatedAt: undefined, startMonth: '2027-03',
+    positions: [
+      { id: 'p1', label: 'ETF Uno', targetPercentage: 50, memberAssetIds: ['etf-uno'], buyAssetId: 'etf-uno' },
+      { id: 'p2', label: 'Fondo Y', targetPercentage: 50, memberAssetIds: ['fondo-y'], buyAssetId: 'fondo-y' },
+    ],
+  });
+
+  it('an account gone since the page loaded → the gate\'s sentence, nothing activated', async () => {
+    spies.getAllAssets.mockResolvedValue(ASSETS.filter((a) => a.id !== 'conto'));
+    renderTile({ plan: draftPlan(), currentIndex: 0 });
+    fireEvent.click(screen.getByRole('button', { name: ACCUMULO_ACTION_ACTIVATE }));
+    await waitFor(() => expect(spies.toastError).toHaveBeenCalledWith(describeDraftIssue({ code: 'source_missing' })));
+    expect(spies.getAllAssets).toHaveBeenCalledWith('owner-1');
+    expect(spies.activate).not.toHaveBeenCalled();
+  });
+
+  it('the account still there → activated on the list just read', async () => {
+    const fresh = ASSETS.map((a) => ({ ...a }));
+    spies.getAllAssets.mockResolvedValue(fresh);
+    renderTile({ plan: draftPlan(), currentIndex: 0 });
+    fireEvent.click(screen.getByRole('button', { name: ACCUMULO_ACTION_ACTIVATE }));
+    await waitFor(() => expect(spies.activate).toHaveBeenCalledTimes(1));
+    expect(spies.activate.mock.calls[0][0].input.allAssets).toBe(fresh);
+  });
 });

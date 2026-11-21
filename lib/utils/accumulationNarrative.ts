@@ -182,7 +182,7 @@ export const ACCUMULO_ACTION_REACTIVATE = 'Riattiva';
 export const ACCUMULO_ACTION_REACTIVATE_VERB = 'riattivare il piano';
 export const ACCUMULO_REACTIVATE_REFUSED =
   'Questo piano non si può riattivare: è stato interrotto da più di 30 giorni, è già concluso o c\u2019è un altro piano aperto.';
-/** The editor's refusal when the account already has a plan in draft or active (the lock, 2026-11-12). */
+/** The service's refusal when the account already has a plan in draft or active (the lock, 2026-11-12). */
 export const ACCUMULO_ONE_OPEN_PLAN =
   'Esiste già un piano di accumulo in bozza o attivo: chiudilo prima di crearne un altro.';
 /** Column header of the closed-plans table for the reactivate action (visually empty). */
@@ -326,10 +326,20 @@ export interface InstallmentAverageInput {
  * the second half is dropped.
  */
 export function describeInstallmentAverage(input: InstallmentAverageInput): string {
+  return describeInstallmentAverageNarrative(input).map((part) => part.text).join('');
+}
+
+/** The same sentence as segments: only the amounts are mono (2026-11-20 — the words in mono read as a figure). */
+function describeInstallmentAverageNarrative(input: InstallmentAverageInput): Narrative {
   const average = cachedFormatCurrencyEUR(input.averageEur, true);
   const first = cachedFormatCurrencyEUR(input.firstEur, true);
-  if (average === first) return `${average} al mese`;
-  return `in media ${average} al mese; la prima, ${monthLabelLong(input.firstMonth, false)}, ${first}`;
+  if (average === first) return [{ text: average, mono: true }, { text: ' al mese' }];
+  return [
+    { text: 'in media ' },
+    { text: average, mono: true },
+    { text: ` al mese; la prima, ${monthLabelLong(input.firstMonth, false)}, ` },
+    { text: first, mono: true },
+  ];
 }
 
 /** Step 1 has no weights yet, so no installment: only the liquidity split evenly over the months (L ÷ N). */
@@ -600,7 +610,7 @@ export function describeStep3Summary(input: {
 }): Narrative {
   const parts: Narrative = [
     { text: `${input.months} ${input.months === 1 ? 'rata' : 'rate'}: ` },
-    { text: describeInstallmentAverage({ averageEur: input.averageEur, firstEur: input.firstEur, firstMonth: input.firstMonth }), mono: true },
+    ...describeInstallmentAverageNarrative({ averageEur: input.averageEur, firstEur: input.firstEur, firstMonth: input.firstMonth }),
   ];
   if (input.coveragePct !== null) parts.push({ text: ` · copre il ${formatPercentageIt(input.coveragePct, 0)} del piano` });
   if (input.leverageRatio > 1.01) parts.push({ text: ` · leva a fine piano ${formatNumberIt(input.leverageRatio, 2)}×` });

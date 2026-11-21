@@ -22,8 +22,9 @@ vi.mock('@/lib/utils/saleTax', () => ({
 
 import type { Asset, AllocationResult } from '@/types/assets';
 import { DEFAULT_REBALANCE_BAND } from '@/lib/utils/allocationUtils';
-import type { PlanPathAnswers, PlanPathContext } from '@/lib/utils/planPath';
-import { StrumentiScreen, VenditeScreen } from '@/components/allocation/piano/PianoScreens';
+import { initialPlanPathDraft, planPathReducer, type PlanPathAnswers, type PlanPathContext } from '@/lib/utils/planPath';
+import { PLAN_PATH_START_REPLACES } from '@/lib/utils/planPathNarrative';
+import { PartenzaScreen, StrumentiScreen, VenditeScreen } from '@/components/allocation/piano/PianoScreens';
 
 const TODAY = new Date('2026-11-20T12:00:00');
 function asset(id: string, name: string, overrides: Partial<Asset> = {}): Asset {
@@ -141,5 +142,28 @@ describe('VenditeScreen (mutation: hide the month)', () => {
     render(<VenditeScreen answers={answers({ positions, sales: [{ assetId: 'etf-b', quantity: null, month: 1 }] })} dispatch={() => {}} context={context} />);
     const row = within(screen.getByRole('list', { name: 'Strumenti da vendere' })).getAllByRole('listitem').find((r) => r.textContent?.includes('ETF fenicottero'))!;
     expect(within(row).getByLabelText('Quante quote').getAttribute('placeholder')).toBeNull();
+  });
+});
+
+// «Le quote che avevi scritto vengono sostituite.» (2026-11-20, the guided path's retirement): only once a quota was
+// typed after the start was chosen — never at the first choice, nor on a seed or a draft just opened. Mutation that
+// turns it red: the note shown whenever a start is chosen and there are positions (the condition before the fix).
+describe('PartenzaScreen — the note that typed quotas are replaced', () => {
+  const note = () => screen.queryByText(PLAN_PATH_START_REPLACES);
+  const render1 = (a: PlanPathAnswers) => render(<PartenzaScreen answers={a} dispatch={() => {}} context={context} modelUsable={false} modelStale={false} />);
+  it('absent at the first choice, present once a quota is typed', () => {
+    const started = planPathReducer(initialPlanPathDraft(context), { type: 'start', start: 'today', context });
+    expect(started.answers.positions.length).toBeGreaterThan(0);
+    const first = render1(started.answers);
+    expect(note()).toBeNull();
+    first.unmount();
+    const typed = planPathReducer(started, { type: 'quota', positionId: started.answers.positions[0].id, targetPercentage: 10 });
+    render1(typed.answers);
+    expect(note()).not.toBeNull();
+  });
+  it('absent on a seed just opened', () => {
+    const seed = { positions: [{ id: 's-a', label: 'ETF ornitorinco', targetPercentage: 100, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' }] };
+    render1(answers({ start: 'seed', seed, positions: seed.positions }));
+    expect(note()).toBeNull();
   });
 });

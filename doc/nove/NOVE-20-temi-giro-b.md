@@ -21,16 +21,16 @@ After NOVE-19 every portalled content carries `data-costume-scope`. What still m
 | 2 | `components/ui/dialog.tsx:69`; NOVE-11 § 4.3 `[data-tile]:not([data-generated])` | the modal's `rounded-2xl` follows `--radius-2xl` but has no cap or marks; `data-tile` would replace the Float shadow with `--costume-tile-shadow: none` |
 | 3 | `components/ui/drawer.tsx:74` | `rounded-t-[10px]`: a 10px sheet under 4px / 0px tiles (NOVE-19 § 10) |
 | 4 | `components/ui/alert-dialog.tsx:64`, `:110-114`; `components/layout/LogoutDialog.tsx:30-31` | the logout confirm (from `Sidebar.tsx:297`, `SecondaryMenuDrawer.tsx:345`) is in scope after NOVE-19 but has no frame and a title without hook |
-| 5 | `ConsulenteWizard.tsx:236`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:226`, `components/ui/path-card.tsx:48` (`PathCard`), `:97` (`PathDoneCard`) — Compravendita and the plan of accumulation since 2026-11-20 | five scene cards on `TILE_SURFACE_CLASS` without `data-tile`: no cap, no marks |
-| 6 | `components/ui/path-card.tsx:20` (`PATH_HEADLINE_CLASS`, since 2026-11-20 the one headline class of `ConsulenteWizard.tsx`, `ConsulenteBook.tsx`, `ConsulenteInterviewScene.tsx`, Compravendita and the plan of accumulation), `ConsulenteRun.tsx:121` | four headlines at the verdict's 24/30px in Geist beside a costumed verdict |
-| 7 | `ConsulenteWizard.tsx:266-268`, `ConsulenteInterviewScene.tsx:94`, `components/ui/path-card.tsx:49-51`, `ConsulenteBook.tsx:236` | eyebrows with digits printed as JSX, not through `HeadingText` |
+| 5 | `ConsulenteWizard.tsx:230`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:225`, `components/ui/path-card.tsx:48` (`PathCard`), `:97` (`PathDoneCard`) — Compravendita and the plan of accumulation since 2026-11-20 | five scene cards on `TILE_SURFACE_CLASS` without `data-tile`: no cap, no marks |
+| 6 | `components/ui/path-card.tsx:20` (`PATH_HEADLINE_CLASS`, since 2026-11-20 the one headline class of `ConsulenteWizard.tsx`, `ConsulenteBook.tsx`, `ConsulenteInterviewScene.tsx`, Compravendita and the plan of accumulation), `ConsulenteRun.tsx:121` | the scene headlines at the verdict's 24/30px in Geist beside a costumed verdict |
+| 7 | `ConsulenteWizard.tsx:260-262`, `ConsulenteInterviewScene.tsx:93`, `components/ui/path-card.tsx:49-51`, `ConsulenteBook.tsx:235` | eyebrows with digits printed as JSX, not through `HeadingText` |
 | 8 | `app/globals.css:60` (`--radius-xl`); § 4.4's list | 36 `rounded-xl` boxes inside tiles and modals plus `card.tsx:10` and `link-banner.tsx:41` (NOVE-19 § 10) @ b841cbd7 (38), and Accumulo's two (`pr488:PlanDraftSidePanel.tsx:43`, `:64`): 40 — 9px Egeo, 4px Orbita, rounder than the tile |
 | 9 | `components/allocation/ActionChip.tsx:37` and § 4.4b's sites | `rounded-full` bars, pills and pill chips, `rounded-[Npx]` chips on the nine pages and in the Accumulo code: round or literal under Orbita, while NOVE-19 squares the same roles on its three pages |
 | 10 | `ComposizioneTile.tsx:65`, `EvoluzioneTile.tsx:110`, `ValoreStrumentoTile.tsx:90`, `StoricoDettaglio.tsx:74`, `LaborMetricsChart.tsx:34`, `FireDettaglio.tsx:53`, `RollingLineChart.tsx:19`, `AndamentoStoricoCharts.tsx:22`, `ConfrontoAnnualeCharts.tsx:23`, `EntityTrendChart.tsx:21`, `SavingsRateLineChart.tsx:65`, `components/goals/GoalProjectionChart.tsx:75` (10) | twelve Recharts tooltips `borderRadius` 8px / 10px literal (in the chart's DOM, so in scope): rounded under Orbita |
 | 11 | `lib/utils/cashflowSankey.ts:66-92` | income, type, Budget, Risparmi hexes fixed; the ring (`ClassificaTile`, since 2026-11-12) and the phone flow (`SpendingTypesMobileFlow.tsx:44`, `:52`) paint the same types by token (`expenseTypeColors.ts:30-36`, `:61-64`): under a costume the Sankey disagrees with its neighbours |
 | 12 | `components/performance/UnderwaterDrawdownChart.tsx:102-109`, `:140-142`, `:170` | the red is a `useState` seeded with the default's oklch, read once from `<html>` in a rAF (empty deps): wrong first frame, stale after a theme switch |
 | 13 | `AssistantQuestionBlock.tsx:147-148`, `:159`; `ExpenseProposalCard.tsx:261-263`; `GoalProposalCard.tsx:212-216` | the AI eyebrow on `bg-muted/40` over the card: **4,48:1** Egeo light, **4,39** Egeo dark; `DESIGN.md:70-72` promises 4,5 there |
-| 14 | `app/globals.css:854-858`; `ConsulenteBook.tsx:347-356` | the book prints with the costume's heading face (`.tile-eyebrow`, the verdict's `.costume-heading`) and its emblem (the scene card is `print:hidden`, `ConsulenteBook.tsx:224`; the sheet is `[data-book-print]`): decision 17 says never on paper |
+| 14 | `app/globals.css:854-858`; `ConsulenteBook.tsx:346-355` | the book prints with the costume's heading face (`.tile-eyebrow`, the verdict's `.costume-heading`) and its emblem (the scene card is `print:hidden`, `ConsulenteBook.tsx:223`; the sheet is `[data-book-print]`): decision 17 says never on paper |
 | 15 | the `PageHeader` call sites of § 4.8 | no `emblem` id: Egeo draws the temple on nine pages while three have their own (NOVE-19 § 4.5) |
 
 ## 2. Goal and acceptance criteria
@@ -79,7 +79,7 @@ palette themes render exactly as today.
     swatches, round icon buttons, the radio, the grip, legend lines and `rounded-[2px]` swatches stay as they are;
   - a Recharts tooltip is a frame too; its shadow is a Float and stays (NOVE-19 § 3);
   - a scene headline is dressed whoever wrote it (the interview's `note` is a model's): a headline is a slot, the
-    face is form; the book's markdown sub-headings (`ConsulenteBookPages.tsx:49-51`, 15px) are body and stay Geist;
+    face is form; the book's markdown sub-headings (`ConsulenteBookPages.tsx:47-49`, 15px) are body and stay Geist;
   - under a costume the Sankey takes the theme's slots in the map of `EXPENSE_TYPE_COLOR_VAR` (fixed 1, variable 4,
     debt 3), Budget `--positive` (the income type's token; today's Budget green is the income green), Risparmi
     `--chart-2` (the phone's `CASHFLOW_SERIES_COLOR.income`), income categories slots 1-9 in turn; palette themes
@@ -173,19 +173,19 @@ Egeo's meander beside «Consulente»).
 
 ### 4.3 Scene cards and headlines
 
-- `data-tile=""` on `ConsulenteWizard.tsx:236`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:226` (its
+- `data-tile=""` on `ConsulenteWizard.tsx:230`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:225` (its
   `data-generated`, `:229`, keeps the AI border and glow through NOVE-11's `:not([data-generated])`),
   `components/ui/path-card.tsx:48` (`PathCard`), `:97` (`PathDoneCard`).
 - `costume-heading` prepended to `PATH_HEADLINE_CLASS` at `components/ui/path-card.tsx:20` (every scene headline
   but the run's, 2026-11-20), and to the inline class at `ConsulenteRun.tsx:121`; their strings through
-  `HeadingText`: `ConsulenteWizard.tsx:282` (the ternary's value), `ConsulenteInterviewScene.tsx:96` (`headline`),
-  `ConsulenteRun.tsx:122`, `ConsulenteBook.tsx:246` (`page.title`), `components/ui/path-card.tsx:52` (`question`), `:100` (`headline`).
-- Eyebrows with digits as one string: `ConsulenteWizard.tsx:266-268` →
+  `HeadingText`: `ConsulenteWizard.tsx:276` (the ternary's value), `ConsulenteInterviewScene.tsx:95` (`headline`),
+  `ConsulenteRun.tsx:122`, `ConsulenteBook.tsx:245` (`page.title`), `components/ui/path-card.tsx:52` (`question`), `:100` (`headline`).
+- Eyebrows with digits as one string: `ConsulenteWizard.tsx:260-262` →
   ``<HeadingText text={`Passo ${stepNumber} di ${ALLOCATION_ADVICE_STEPS.length} · ${copy.eyebrow}`} />``;
-  `ConsulenteInterviewScene.tsx:94` → `<HeadingText text={INTERVIEW_COPY.eyebrow(roundNumber, …)} />`;
+  `ConsulenteInterviewScene.tsx:93` → `<HeadingText text={INTERVIEW_COPY.eyebrow(roundNumber, …)} />`;
   `components/ui/path-card.tsx:49-51` →
   ``<HeadingText text={`${position} · ${step.theme}`} />``;
-  `ConsulenteBook.tsx:236` → `<HeadingText text={eyebrow} />` in both branches. Static eyebrows («Fatto»,
+  `ConsulenteBook.tsx:235` → `<HeadingText text={eyebrow} />` in both branches. Static eyebrows («Fatto»,
   «Consulente · in corso», «Dettaglio») print no figure and stay.
 - `ConsulenteRun.tsx:74`: `first:rounded-t-xl last:rounded-b-xl` → `first:rounded-t-[inherit]
   last:rounded-b-[inherit]` (the list's corner, `:66`: identical in every palette theme).
@@ -197,7 +197,7 @@ a literal `className` becomes `cn(…, COSTUME_FRAME_RADIUS_CLASS)`:
 
 - **Handed by NOVE-19 § 10**: `components/ui/card.tsx:10`, `components/ui/link-banner.tsx:41`.
 - **Shared, in my surfaces**: `components/ui/question-card.tsx:95`.
-- **Consulente**: `ConsulenteInterviewScene.tsx:47`, `ConsulenteRun.tsx:66`, `ConsulenteWizard.tsx:301`.
+- **Consulente**: `ConsulenteInterviewScene.tsx:46`, `ConsulenteRun.tsx:66`, `ConsulenteWizard.tsx:295`.
 - **Compravendita**: `CompravenditaScreens.tsx:83`, `:267`, `:314`, `:393`, `:413`; `CompravenditaWizard.tsx:131`.
 - **Assistente**: `AssistantComposer.tsx:84`, `:101`, `:114`; `AssistantConversazioneTile.tsx:130` and NOVE-15's
   (retired on 2026-11-16, PR #544) suggestion Skeleton rows in the same file (`:124`, `h-11 rounded-xl` →
@@ -226,8 +226,8 @@ Also: the twelve tooltips of § 1 row 10 — `GoalProjectionChart.tsx:75` `borde
 - **Storico**: `history/tiles/DriverTile.tsx:139`; `RaddoppiTile.tsx:100`, `:108`.
 - **Analisi**: `cashflow/ConfrontoAnnualeSection.tsx:123`, `:126`.
 - **Allocazione and Accumulo**: `ActionChip.tsx:37`; `pr488:` `TargetTick.tsx:70`, `:72` (`:50`, `:52` @ b841cbd7);
-  `tiles/EsposizioneTile.tsx:92`; `AccumulationPlanDialog.tsx:1560`; `OptimizerReport.tsx:108`, `:126`, `:128`;
-  `tiles/PortafoglioModelloTile.tsx:225`, `:232`, `:233`; `tiles/QuestoMeseTile.tsx:892`;
+  `tiles/EsposizioneTile.tsx:92`; `AccumulationPlanDialog.tsx:1561`; `OptimizerReport.tsx:108`, `:126`, `:128`;
+  `tiles/PortafoglioModelloTile.tsx:242`, `:249`, `:250`; `tiles/QuestoMeseTile.tsx:894`;
   `tiles/accumuloShared.tsx:38` (`CHIP_BASE`).
 - **Previdenza**: `pension/tiles/AnnoFiscaleTile.tsx:89`, `:96`.
 - **FIRE**: `fire-simulations/tiles/TraguardoTile.tsx:93`, `:102`; `coast/tiles/CoastTraguardoTile.tsx:73`, `:82`;
@@ -392,16 +392,16 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
   `DividendDialog`, `DividendRecordDetailsDialog`, `InflationRateDialog`, `CategoryMoveDialog`, `SeriesDeleteDialog`,
   `UnlinkSeriesDialog`, `BudgetItemDialog`, `AssetAssignmentDialog.tsx:193`, `:256`, `AssistantThreadList.tsx:96`,
   `:105`, `:201`, `EntityDossier.tsx:257`, `pensionStyles.ts`, and `pr488:` `AccumulationCalendarDialog.tsx:220`,
-  `AccumulationPlanDialog.tsx:1003`, `:1412`, `:1485`, `:1489`, `:1757`, `IdealCompositionDialog.tsx:377`,
-  `OptimizerPanel.tsx:162`, `QuestoMeseTile.tsx:611`, `:729`, `:745`, `:853`.
+  `AccumulationPlanDialog.tsx:1004`, `:1413`, `:1486`, `:1490`, `:1758`, `IdealCompositionDialog.tsx:377`,
+  `OptimizerPanel.tsx:162`, `QuestoMeseTile.tsx:613`, `:731`, `:747`, `:855`.
 - `CategoryManagementDialog.tsx:205` `rounded-2xl`; `CategoryDeleteConfirmDialog.tsx:391`, `CategoryMoveDialog.tsx:304`
   in-content lists `rounded-md`; `AnalisiPeriodControls.tsx:82` `max-sm:rounded-2xl`; the disclosures on the ground
   (`DettaglioDisclosure.tsx:67-73`, `ConfrontoDisclosure.tsx:91`, `PerformanceDettaglio.tsx:294`, NOVE-12 K1).
 - `AssistantMemoryPanel.tsx:48` sub-tiles are `Tile`s (cap, shadow by NOVE-11). Accumulo: the tiles are `Tile`s;
   the five dialogs (`pr488:` `AccumulationCalendarDialog.tsx:128`,
-  `AccumulationPlanDialog.tsx:829`, `IdealCompositionDialog.tsx:375`, `ModelEditDialog.tsx:107`,
+  `AccumulationPlanDialog.tsx:830`, `IdealCompositionDialog.tsx:375`, `ModelEditDialog.tsx:107`,
   `ObiettiviDialog.tsx:141`) and NOVE-15's two Assistente modals are `ResponsiveModal`s: § 4.2.
-- `ConsulenteReport.tsx:303` a generated `Tile`; `ConsulenteBookPages.tsx:158` chip `rounded-md`; `ChoiceList`'s frame
+- `ConsulenteReport.tsx:303` a generated `Tile`; `ConsulenteBookPages.tsx:156` chip `rounded-md`; `ChoiceList`'s frame
   (NOVE-19) on Compravendita and the Consulente.
 
 **Strings**: none. No UI string is added or changed.
@@ -446,7 +446,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 | E1 | `e2e/theme.costume.spec.ts` (NOVE-19) + cases: criterion 1 on Cashflow in default, Egeo, Orbita light; an eyebrow `.costume-figure` `Geist Mono`; criterion 10's emblem `path` on Storico and FIRE | `data-costume-frame` off `dialog.tsx` |
 | E2 | `e2e/theme.costume.mobile.spec.ts` + case: criterion 2 at 390; `scrollWidth ≤ innerWidth` | `rounded-t-[10px]` restored |
 | E3 | `e2e/theme.costume.tablet.spec.ts` + case: at 1024×768 the dialog has 4px / 0px and a `linear-gradient` `background-image`; at 768×1024 the drawer 4px / 0px | drop `data-costume-frame` in `dialog.tsx` (1024×768 red); `drawer.tsx` back to `rounded-t-[10px]` (768×1024 red) |
-| E4 | `e2e/theme.costume.spec.ts` + case: the Consulente's first scene (planted document) and Compravendita's first screen in Egeo light: the section `[data-tile]` 4px with a gradient, headline `Marcellus` 34px, its `.costume-figure` mono; Compravendita's eyebrow «Passo 1 di N» holds two `.costume-figure` in `Geist Mono`; `ConsulenteWizard.tsx:301`'s list 4px; in Orbita light on `/dashboard/hall-of-fame` the first `RecordRows` bar track `0px`, in Egeo > 1000px | drop `costume-heading` from `HEADLINE_CLASS` |
+| E4 | `e2e/theme.costume.spec.ts` + case: the Consulente's first scene (planted document) and Compravendita's first screen in Egeo light: the section `[data-tile]` 4px with a gradient, headline `Marcellus` 34px, its `.costume-figure` mono; Compravendita's eyebrow «Passo 1 di N» holds two `.costume-figure` in `Geist Mono`; `ConsulenteWizard.tsx:295`'s list 4px; in Orbita light on `/dashboard/hall-of-fame` the first `RecordRows` bar track `0px`, in Egeo > 1000px | drop `costume-heading` from `HEADLINE_CLASS` |
 | E5 | `e2e/theme.costume.analisi.spec.ts` (new: the name matches the `analisi` project's `/analisi\.spec\.ts/` and the desktop project's ignore, so it runs on the Analisi fixture account, whose period holds expenses; the theme through that account's `userPreferences` doc, written and restored as NOVE-12's E1): `/dashboard/analisi` at 1440, «Dettaglio» opened (its trigger clicked, the Flusso chunk awaited as `e2e/analisi.spec.ts` does — since 2026-11-12 the Sankey is the first tile inside the closed, lazy «Dettaglio»); the Sankey's `svg rect` fills include `colorToHex` of a probe `color: var(--chart-1)` in Egeo, `#3b82f6` in the default and never in Egeo | pass `DEFAULT_SANKEY_TYPE_PALETTE` always |
 | E6 | same + case: Rendimenti › Dettaglio open, the drawdown `stop` has `stop-color="var(--destructive)"`; Egeo → Default from Aspetto without reload, its computed `stop-color` equals a probe's `color: var(--destructive)` | restore the state at `:102` |
 | E7 | same + case: the book on a planted report, `page.emulateMedia({ media: 'print' })` in Egeo: `[data-book-print] h2` `font-family` starts `Geist`, `.costume-header-band` `height` `0px`, the `PageHeader`'s emblem `svg` `display: none` | drop the print block; drop `print:hidden` |

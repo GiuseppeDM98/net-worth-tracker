@@ -99,3 +99,21 @@ describe('ChoiceList, multiple', () => {
     expect((screen.getByRole('textbox', { name: 'Quale' }) as HTMLInputElement).value).toBe('ciao');
   });
 });
+
+// The control beside its label (2026-11-20, seen on the guided paths' tour): below `desktop:` a row is 44 px and a
+// label of one line sits centred in it, so the 16 px radio or box takes (44 − 16) / 2 = 14 px of top offset; with a
+// hint the label fills the row and the control stays on the title's line (`mt-1`). jsdom has no layout: the class is
+// what is held. Mutation that turns it red: the one `mt-1` for every row (the dot above the label below desktop).
+describe('ChoiceList, the control beside its label', () => {
+  it('a label of one line centres the control below desktop; a hinted one keeps it on the title', () => {
+    render(<ChoiceList mode="single" name="prova" label="Prova" options={OPTIONS} value={null} onChange={() => {}} />);
+    expect(screen.getByRole('radio', { name: 'Due' }).className).toContain('max-desktop:mt-[14px]');
+    expect(screen.getByRole('radio', { name: /^Uno/ }).className).not.toContain('max-desktop:mt-[14px]');
+  });
+
+  it('the same in the multiple mode', () => {
+    render(<ChoiceList mode="multiple" name="prova" label="Prova" options={OPTIONS} value={[]} onChange={() => {}} />);
+    expect(screen.getByRole('checkbox', { name: 'Due' }).className).toContain('max-desktop:mt-[14px]');
+    expect(screen.getByRole('checkbox', { name: /^Uno/ }).className).not.toContain('max-desktop:mt-[14px]');
+  });
+});

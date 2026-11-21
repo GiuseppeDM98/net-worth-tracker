@@ -733,7 +733,8 @@ export function AccumulationPlanDialog({
           removedDisposalAssetIds: revisionChanges.removedDisposalAssetIds,
           movedDisposalMonthIndexes: revisionChanges.movedDisposalMonthIndexes,
         },
-        input: { allAssets, deps: DEPS, today: new Date() },
+        // The hook reads the assets again at the click (2026-11-20): never this dialog's list.
+        input: { deps: DEPS, today: new Date() },
       });
     } catch (error) {
       setStatus({ phase: 'error', message: describeWriteError(error) });
