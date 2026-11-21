@@ -1,6 +1,6 @@
 # NOVE-13 — The «Orbita» theme: deep space, a console and a resource bar
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-11** (the costume contract, NOVE-11 § 4.3, used with its
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567)** (the costume contract, doc/guide/temi.md § Il costume, used with its
 > names and nothing added) **and on NOVE-12** (its contrast test, which this spec extends; `orbita` is the eighth
 > theme); **NOVE-19 and NOVE-20 are implemented after it** and carry Orbita onto every page and dialog. Written on
 > 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7. Executes the owner's point 1, decisions 4, 14 and

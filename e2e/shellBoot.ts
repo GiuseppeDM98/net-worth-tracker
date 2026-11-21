@@ -202,7 +202,8 @@ export async function expectGeistSansApplied(page: Page): Promise<void> {
 /**
  * (f) The costume's boundary is the dashboard alone (DESIGN.md → The Costume Rule, 2026-11-21): one
  * `[data-costume-scope]` on /dashboard (the shell's), none on the landing or the login — the
- * primitives they share with the dashboard stay in the default costume.
+ * primitives they share with the dashboard stay in the default costume. Seen red on 2026-11-21 with
+ * `CostumeScope` wrapped around the root layout's children: both counts fail.
  */
 export async function expectCostumeScopeInDashboard(page: Page): Promise<void> {
   await page.goto('/dashboard', { waitUntil: 'load' });

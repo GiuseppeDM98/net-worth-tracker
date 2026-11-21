@@ -1,6 +1,6 @@
 # NOVE-19 — The costume, first pass: the shell, the portals, the controls, Panoramica, Patrimonio, Cashflow
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-11, 12 and 13** (the costume contract, NOVE-11 § 4.3, and
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567), 12 and 13** (the costume contract, doc/guide/temi.md § Il costume, and
 > its two themes) and comes after 08–10, 15 and 16, whose surfaces it dresses; **NOVE-20 is implemented after it** and
 > reuses the portal mechanism and the four control properties defined here (§ 4.1-4.2, § 10). Written on 2026-11-12;
 > every `file:line` is cited on `develop` @ b841cbd7. Executes decisions 3, 4 and 17 (README.md § 3) on the shell,
@@ -13,9 +13,9 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
 | # | Site (file:line @ b841cbd7) | What it shows under Egeo / Orbita |
 | --- | --- | --- |
 | 1 | `components/ui/popover.tsx:41-42`, `select.tsx:87-88`, `dropdown-menu.tsx:53-54`, `tooltip.tsx:40-41`, `sheet.tsx:28`/`:60`, `drawer.tsx:28`/`:69`, `dialog.tsx:59-61`, `alert-dialog.tsx:55-57` | each content renders through a Radix portal into `<body>`, outside `[data-costume-scope]`: no scope property reaches it. Under Orbita a select, a menu, a tooltip keep `rounded-md` = calc(0.25rem − 2px) = 2px (the palette block's `--radius`) beside 0px tiles; a primary button in a portalled popover or drawer has no glow (dark); an eyebrow inside has no costume face |
-| 2 | `components/ui/responsive-modal.tsx:201`, `:234` (NOVE-11 § 4.4) | the only portalled surface NOVE-11 puts in scope. Drawers mounted directly — `period-picker.tsx:283`, `multi-select.tsx:1142`, `searchable-combobox.tsx:268` — and every `AlertDialog` stay outside |
+| 2 | `components/ui/responsive-modal.tsx:207`, `:241` (on `develop` @ f4b16f98) | the only portalled surface NOVE-11 puts in scope. Drawers mounted directly — `period-picker.tsx:283`, `multi-select.tsx:1142`, `searchable-combobox.tsx:268` — and every `AlertDialog` stay outside |
 | 3 | `components/ui/sidebar.tsx:189-211` | the phone-landscape sidebar is a `SheetContent` (portalled): its group labels lose the costume face the desktop sidebar has |
-| 4 | `components/layout/Sidebar.tsx:170`, `:177`; `SecondaryMenuDrawer.tsx:129` | group labels `cn(TILE_EYEBROW_CLASS, '… text-sidebar-foreground/60')`: the caller's colour wins (NOVE-11 § 4.3), so the costume face is printed at 60 % of the sidebar's ink: **3,93:1** Egeo light, **4,12:1** Orbita light on `--sidebar` |
+| 4 | `components/layout/Sidebar.tsx:170`, `:177`; `SecondaryMenuDrawer.tsx:129` | group labels `cn(TILE_EYEBROW_CLASS, '… text-sidebar-foreground/60')`: the caller's colour wins (temi.md § Il costume, «The one layered consumer»), so the costume face is printed at 60 % of the sidebar's ink: **3,93:1** Egeo light, **4,12:1** Orbita light on `--sidebar` |
 | 5 | `components/layout/BottomNavigation.tsx:130`, `:156`; `Sidebar.tsx:223`; `SecondaryMenuDrawer.tsx:263` | inactive pill labels `text-sidebar-foreground/55`: **3,41:1** Egeo light, **3,56:1** Orbita light; the account e-mail at `/50` lower still; the sidebar's two quiet icons — the collapse toggle `Sidebar.tsx:137` at `/40` (**2,32:1** Egeo light, **2,38:1** Orbita light) and the account chevron `:240` at `/50` (**2,98:1** Egeo light) — under the 3:1 a control's only glyph needs |
 | 6 | `components/layout/Sidebar.tsx:128`; `app/dashboard/layout.tsx:56` | the wordmark, 13px Geist semibold: the one piece of chrome type the costume does not reach |
 | 7 | `components/layout/BottomNavigation.tsx:62`, `:114`, `:127`, `:136`, `:153`, `:162` | the nav pill, its items, the active indicator and the «+» button `rounded-full`: under Orbita the only round shapes of a frame whose tiles are square |
@@ -24,7 +24,7 @@ After NOVE-11/12/13 the costume reaches what sits in the scope's DOM and wears N
 | 10 | `components/ui/sidebar.tsx:493`; `components/ui/multi-select.tsx:318` | `hsl(var(--sidebar-border))`, `hsl(var(--ring))` of `oklch` tokens: invalid in every theme. No caller reaches either (the only `SidebarMenuButton`s, `Sidebar.tsx:70`, `:202`, pass no `variant`; no `MultiSelect` receives a `ref`): no visual effect |
 | 11 | `components/ui/switch.tsx:14`, `:26` | `dark:data-[state=checked]:bg-blue-600` (the debt of `DESIGN.md:405-407`): a blue ON track inside Egeo's navy-and-gold dark and Orbita's cyan dark; track and thumb `rounded-full` under Orbita |
 | 12 | `components/ui/segmented-pill.tsx:104`, `:130`, `:141` | `rounded-full` container, options, indicator: the axis of Panoramica and Patrimonio (`components/dashboard/PeriodSelector.tsx`) and of Dividendi, round under Orbita |
-| 13 | `components/ui/popover.tsx:48`; `app/globals.css:785` | the popover `rounded-xl` = `--radius` + 4px: 9px Egeo, 8px Orbita today (out of scope: the palette block's `--radius`), 4px once in scope, beside 4px / 0px tiles; the phone popper sheet `10px 10px 0 0`, fixed |
+| 13 | `components/ui/popover.tsx:48`; `app/globals.css:852` (on `develop` @ f4b16f98) | the popover `rounded-xl` = `--radius` + 4px: 9px Egeo, 8px Orbita today (out of scope: the palette block's `--radius`), 4px once in scope, beside 4px / 0px tiles; the phone popper sheet `10px 10px 0 0`, fixed |
 | 14 | `components/ui/choice-list.tsx:35` | `GROUP_CLASS … rounded-xl`: the same 9px / 4px (its pages, Compravendita and Consulente, are NOVE-20's; the primitive is here) |
 | 15 | `components/dividends/DividendiDettaglio.tsx:68`; `ProvisionalCouponBanner.tsx:31` | two card-like boxes `rounded-xl` beside the tiles: 9px / 4px |
 | 16 | `components/ui/composition-list.tsx:83`, `:85`; `composition-bar.tsx:85`, `:92`; `ranked-rows.tsx:93`, `:95`; `components/dashboard/overview/ObiettivoTile.tsx:40`, `:47`; `components/cashflow/budget/BudgetTrack.tsx:45`, `:47`, `:48`; `cost-centers/tiles/CentriTile.tsx:64`, `:65`, `:82`, `:83`; `SottocategorieTile.tsx:84`, `:85` | bar tracks and fills `rounded-full` (`rounded-l-full`/`rounded-r-full` at `composition-bar.tsx:92`, `BudgetTrack.tsx:48`): round ends under Orbita |
@@ -98,7 +98,7 @@ the DOM included — with each figure in Geist Mono, every label ≥ 4,5:1, and 
    `--muted-foreground` ≥ 4,5:1 on `--sidebar`; the dark ON track ≥ 3:1 on the card and under the thumb. **Proof**:
    K3 (NOVE-12's, on Orbita since NOVE-13: green before this spec), K4, K5 with § 4.6's numbers.
 8. The twelve palette blocks render as their baseline, with six more probes recorded BEFORE any change. **Proof**:
-   `e2e/theme.neutral{,.mobile}.spec.ts` (NOVE-11 E1), extended (§ 6).
+   `e2e/theme.neutral{,.mobile}.spec.ts` (the palette themes' recorded baseline), extended (§ 6).
 9. No `hsl(var(--` remains in `components/`. **Proof**: T8.
 10. `perf:budget` and `mobile:budget` do not move. **Proof**: the two runs.
 
@@ -127,7 +127,11 @@ the DOM included — with each figure in Geist Mono, every label ≥ 4,5:1, and 
 
 ## 4. Solution
 
-### 4.1 The portal mechanism — `contexts/CostumeScopeContext.tsx`
+### 4.1 The portal mechanism — `contexts/ColorThemeContext.tsx`, re-exported by `contexts/CostumeScopeContext.tsx`
+
+Beside `useCostumeScope`, where the costume context and its hooks live since 2026-11-21: in a module of their own,
+shared by the layout, the header and the modal, Turbopack cut a new shared chunk (+0,8 KB gz on every route,
+doc/guide/temi.md § Il costume); the portalled primitives import the hook from `ColorThemeContext`.
 
 ```tsx
 /** What a portalled surface spreads on its content: the costume follows it out of the scope's DOM. */
@@ -228,7 +232,7 @@ fixes are colours of existing tokens, and the charts of these pages read tokens 
 | `CalendarDayCell.tsx:81` · `AffidabilitaTile.tsx:94` | `rounded-[4px]` · `rounded-[3px]` | `…chip-radius,4px)]` · `…chip-radius,3px)]` |
 | `ThemePicker.tsx:56`; `ExpenseTable.tsx:178` | `rounded` | `rounded-[var(--costume-control-chip-radius,0.25rem)]` |
 | `popover.tsx:48`; `choice-list.tsx:35`; `DividendiDettaglio.tsx:68`; `ProvisionalCouponBanner.tsx:31` | `rounded-xl` | `COSTUME_FRAME_RADIUS_CLASS` |
-| `app/globals.css:785` | `border-radius: 10px 10px 0 0;` | `border-radius: var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0;` |
+| `app/globals.css:852` | `border-radius: 10px 10px 0 0;` | `border-radius: var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0;` |
 | `switch.tsx:14` | `dark:data-[state=checked]:bg-blue-600` | `dark:data-[state=checked]:bg-[var(--costume-control-switch-on,oklch(54.6%_0.245_262.881))]` |
 | `tile-grid-skeleton.tsx:31` | `<div className="flex-1 rounded-2xl …">` | add `data-tile=""` |
 | `sidebar.tsx:493` · `multi-select.tsx:318` | `hsl(var(--sidebar-border))`, `hsl(var(--sidebar-accent))` · `hsl(var(--ring))` | `var(--sidebar-border)`, `var(--sidebar-accent)` · `var(--ring)` |
@@ -308,7 +312,7 @@ No new UI string.
 | # | Test | Mutation that turns it red |
 | --- | --- | --- |
 | T3 | `themeCostume.test.ts` (NOVE-11): `toHaveLength(18)` → `toHaveLength(22)`; the expected order gains `'--costume-control-frame-radius'`, `'--costume-control-pill-radius'`, `'--costume-control-chip-radius'`, `'--costume-control-switch-on'` after `'--costume-primary-glow'`; each costume theme's light scope block declares all 22 | delete `--costume-control-chip-radius` from Orbita's block; a 23rd string in the list (red on the count) |
-| T2b | `themeCostume.test.ts` (NOVE-11's T2) amended: outside the two banners the ONE rule that paints with a scope property is `[data-popper-sheet]`, whose `border-radius` reads `var(--costume-control-frame-radius, 10px)` with its fallback; any other `var(--costume-` outside a scope block's own declarations is red | a bare `var(--costume-control-frame-radius)` (no fallback) in the popper-sheet rule |
+| T2b | `themeCostume.test.ts` (its gate case) amended: outside the two banners the ONE rule that paints with a scope property is `[data-popper-sheet]`, whose `border-radius` reads `var(--costume-control-frame-radius, 10px)` with its fallback; any other `var(--costume-` outside a scope block's own declarations is red | a bare `var(--costume-control-frame-radius)` (no fallback) in the popper-sheet rule |
 | T6 | same file: `COSTUME_PILL_RADIUS_CLASS` and `COSTUME_FRAME_RADIUS_CLASS` equal § 4.2's strings; `cn(COSTUME_PILL_RADIUS_CLASS, 'px-3')` keeps the class | fallback `9999px` |
 | T7 | same file: in the nineteen files of § 4.4's pill and chip rows except `PageTabBar.tsx` and `ExpenseTable.tsx` (they keep a dot), no `rounded-full`, `rounded-l-full`, `rounded-r-full`, nor `rounded-[Npx]` with N ≠ 2 (at b841cbd7 the scan hits exactly the 41 lines § 4.4 changes); `popover.tsx`, `choice-list.tsx`, `DividendiDettaglio.tsx`, `ProvisionalCouponBanner.tsx` contain `COSTUME_FRAME_RADIUS_CLASS` and no `rounded-xl`; `ThemePicker.tsx` and `ExpenseTable.tsx` contain `rounded-[var(--costume-control-chip-radius,0.25rem)]`; `app/globals.css`'s `[data-popper-sheet]` rule contains `border-radius: var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0` | `segmented-pill.tsx:141` back to `rounded-full`; `choice-list.tsx:35` back to `rounded-xl` |
 | T10 | `__tests__/compositionBar.test.ts` (existing, `:35-37`, `toBe`): in `LEGACY_MARKUP` the track's `rounded-full` becomes `rounded-[var(--costume-control-pill-radius,calc(infinity*1px))]` and the segments' `first:rounded-l-full last:rounded-r-full` the two classes of § 4.4 — the only edits to the pinned string (same computed value in a palette theme). `__tests__/productName.test.ts` (the product-name test): the `components/layout/Sidebar.tsx` row of `NEW_NAME_SITES` becomes `'<span className="truncate costume-wordmark">Net Worth Tracker</span>'` | — (the pins are the proof); the class dropped from the span |
@@ -318,7 +322,7 @@ No new UI string.
 | K5 | same file, dark blocks: `--primary` ≥ 3 on `--card`; `--background` ≥ 3 on `--primary` | Orbita dark `--primary` set to its `--card` |
 | R5 | `__tests__/costumePortals.test.tsx` (new): inside `<CostumeScope>`, an open `Popover`, `DropdownMenu`, `Tooltip` (in its provider), `Sheet`, `Dialog`, `AlertDialog`: each primitive rendered open in its own case; the content is `[data-slot$="-content"]` for those that carry one and, for `Popover` (no `data-slot`), `document.querySelector('[data-radix-popper-content-wrapper] > [role="dialog"]')`; each has `data-costume-scope`; the same tree without `CostumeScope`: none. `Select` and `Drawer` are proved by E1/E2 (jsdom lacks their pointer and transform APIs) | drop the spread in `popover.tsx` |
 | R6 | `costumeScope.test.tsx` (NOVE-11, 12, 13; new cases beside NOVE-13's own R6): with `egeo` stored, `PageHeader emblem="patrimonio"` renders the amphora's `d`, `"cashflow"` the waves', `"panoramica"` the temple's; with `orbita`, `"patrimonio"` the planet's circle | `pages: {}` for Egeo |
-| N1 | `e2e/themeNeutral.ts` (NOVE-11 E1) gains six probes: the sidebar label «Analisi» and the account menu's content after a click on `/dashboard` (desktop); an inactive bottom-pill label and the Cashflow phone tab (390); the axis pill (its container, and its indicator as a second element) and the first `PatrimonioTile` chip on `/dashboard` (both widths). The baseline is RE-RECORDED (`THEME_NEUTRAL_RECORD=1`) on the untouched code, then compared | `PageTabBar.tsx:96` fallback `8px` |
+| N1 | `e2e/themeNeutral.ts` (the palette themes' recorded baseline) gains six probes: the sidebar label «Analisi» and the account menu's content after a click on `/dashboard` (desktop); an inactive bottom-pill label and the Cashflow phone tab (390); the axis pill (its container, and its indicator as a second element) and the first `PatrimonioTile` chip on `/dashboard` (both widths). The baseline is RE-RECORDED (`THEME_NEUTRAL_RECORD=1`) on the untouched code, then compared | `PageTabBar.tsx:96` fallback `8px` |
 | E1 | `e2e/theme.costume.spec.ts` (new, desktop; the `colorTheme` preference written and restored as NOVE-12's E1, the mode by `addInitScript`; `/` and `/login` signed out): criteria 1-3 and 6 on `/dashboard`, `/dashboard/assets`, `/dashboard/cashflow?tab=tracking` (a filter `Select` opened) in Egeo and Orbita, light and dark; on `/` and `/login` no `[data-costume-scope]` | drop the spread in `select.tsx` |
 | E2 | `e2e/theme.costume.mobile.spec.ts` (390): criterion 4; the period picker's drawer carries `data-costume-scope`; `scrollWidth ≤ innerWidth`; one case with `page.setViewportSize({ width: 844, height: 390 })` on `/dashboard` (no Playwright project has that size): the top bar's wordmark `font-family` starts with `Marcellus` (Egeo) / its `text-transform` is `uppercase` (Orbita); «Apri il menu» opens the sheet, whose `[data-sidebar="sidebar"]` carries `data-costume-scope` and whose «Analisi» label has the costume face and the eyebrow's colour | drop the spread in `drawer.tsx`; in `sheet.tsx` |
 | E3 | `e2e/theme.costume.tablet.spec.ts` (both tablet viewports): criterion 5 | `TabletRail` out of `CostumeScope` |
@@ -376,7 +380,7 @@ properties and the classes go together; a palette theme never depended on them.
   - `:1257` BEFORE: «Bar height is exactly `3px` — an accent shape, not the primary data carrier.» AFTER: «Bar
     height is exactly `3px` — an accent shape, not the primary data carrier; its ends are round, square in a
     costume theme that squares its pills.»
-  - The Heading Font line NOVE-11 § 4.8 writes, BEFORE: «the verdict's headline and the eyebrows inside the dashboard
+  - The Heading Font line of DESIGN.md (written 2026-11-21), BEFORE: «the verdict's headline and the eyebrows inside the dashboard
     take the theme's face» AFTER: «the verdict's headline, the eyebrows and the wordmark inside the dashboard take
     the theme's face».
   - `:450` (as NOVE-11 left it) BEFORE: «on the verdict's headline and the eyebrows only» AFTER: «on the verdict's
@@ -389,7 +393,7 @@ properties and the classes go together; a palette theme never depended on them.
   - `:440` BEFORE: «on the sidebar surface its colour is `text-sidebar-foreground/60`» AFTER: «on the sidebar
     surface its colour is `text-sidebar-foreground/60`, in a costume theme the eyebrow's own
     (`.costume-shell-eyebrow`)».
-  - The Costume Rule paragraph (added by NOVE-11 § 4.8 after `:359`), BEFORE: «The contract is in doc/guide/temi.md
+  - The Costume Rule paragraph (added on 2026-11-21 after the «Chart palettes …» sentence), BEFORE: «The contract is in doc/guide/temi.md
     § Il costume.» AFTER: «A surface portalled out of the page (a menu, a popover, a sheet) wears it too. The
     contract is in doc/guide/temi.md § Il costume.»
 - `doc/nove/README.md` § 7 «The costume»: `COSTUME_SCOPE_PROPS`, `useCostumeScopeProps()`, the 22 properties,

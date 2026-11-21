@@ -8,6 +8,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Temi**: `app/globals.css` (twelve theme blocks, plus the five `--role-*` aliases in `:root`), `contexts/ColorThemeContext.tsx`, `contexts/ChartColorsContext.tsx` (`ChartColorsProvider`, mounted by `app/dashboard/layout.tsx`), `lib/hooks/{useThemePaletteReader,useChartColors,useActionColors,useCssColorTokens}.ts`, pure `lib/utils/themePalette.ts` (`readThemePalette`: the slots through the luminance filter, the action colours, the `--role-*` hexes), `lib/utils/colorParse.ts` (the ONE colour parser: `oklch()`, `lab()`, `#hex`, `rgb()` → OKLCH, and OKLCH → hex), `lib/utils/cssColorToHex.ts` (a served colour → `#rrggbb` for Nivo), `lib/utils/actionColor.ts` (the COMPRA/VENDI/OK clamp), `lib/utils/costCenterColors.ts` — doc/guide/temi.md; tests `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext}.test.ts`, `e2e/motion.layout.spec.ts` (a client navigation reads no palette token)
 - **The costume** (2026-11-21, § Il costume): `lib/constants/colorTheme.ts` (`COLOR_THEME_META`, `COSTUME_ATTRIBUTE`, `COSTUME_THEMES`, `buildColorThemeInitScript`), `lib/constants/themeCostume.ts` (`COSTUME_SCOPE_PROPERTIES`, the emblem types, `THEME_EMBLEMS`, `resolveEmblem`), `contexts/CostumeScopeContext.tsx` (`CostumeScope`; `useCostumeScope` and `useThemeCostume` re-exported from `contexts/ColorThemeContext.tsx`, where they and the context live), `components/ui/theme-costume.tsx` (`EmblemSvg`, `ThemeEmblem`, `ThemeEmblemLead`, `ThemeHeaderBand`, `HeadingText` re-exported), `components/ui/heading-text.tsx`, pure `lib/utils/headingFigures.ts` (`splitHeadingFigures`); tests `__tests__/{themeBlocks.ts,themeCostume,headingFigures,colorTheme}.test.ts`, `__tests__/{aspettoTab,costumeScope,responsiveModalCostume}.test.tsx`, `e2e/theme.neutral{,.mobile}.spec.ts` on `e2e/themeNeutral.ts` + `e2e/themeNeutral.baseline.json`, `e2e/shell.boot{,.mobile}.spec.ts` (Geist, the scope's boundary)
+- **Suites to run after a change here**: `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext,mutedForegroundContrast,themeColor,colorTheme,themeCostume,headingFigures}.test.ts`, `__tests__/{aspettoTab,costumeScope,responsiveModalCostume,assistantHeader}.test.tsx`; `npx playwright test e2e/theme.neutral e2e/shell.boot` on the emulators
 - **The browser's chrome** (2026-10-17): `lib/utils/themeColor.ts` (`DEFAULT_THEME_COLORS`, `resolveThemeColor`), `components/providers/ThemeColorSync.tsx`, the `viewport.themeColor` export in `app/layout.tsx`, the `html`/`html.dark` rules in `app/globals.css`; tests `__tests__/themeColor.test.ts`, `e2e/shell.boot{,.mobile}.spec.ts` → `expectBrowserChromeFollowsTheme` (`e2e/shellBoot.ts`)
 
 ## Color Theme System
@@ -134,7 +135,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `COLOR_THEME_META` entry (`lib/constants/colorTheme.ts`: a name without an entry fails `tsc`; the union, the
   pre-hydration script and `COSTUME_THEMES` derive from it). Everything else derives: the four gate tests read their
   blocks from the registry (`__tests__/themeBlocks.ts` → `THEME_MODES`; a name without CSS turns all four red, and
-  `mutedForegroundContrast` also fails a block with no registry entry), and the swatches of Impostazioni › Aspetto
+  `mutedForegroundContrast` also fails a block with no registry entry; seen red on 2026-11-21 with `'sepia'` in
+  the list and no CSS), and the swatches of Impostazioni › Aspetto
   map `COLOR_THEMES` — each half of a preview is the theme's own block applied to a `div` (`[data-theme]`,
   `.dark[data-theme]`, which is why the default's light block also answers `[data-theme="default"]`), painted with
   `bg-background` / `bg-primary` / `bg-accent`, so a preview cannot drift from the stylesheet (until 2026-11-21 they
@@ -204,10 +206,11 @@ mechanism has a neutral default, and the palette themes are held to render exact
   shadow skips `[data-generated]` (the AI accent's glow), the primary glow skips `.ai-control` (the marker that opens
   `AI_CONTROL_ACCENT_CLASS`) and `:focus-visible` (the ring is a box-shadow too). Outside the banners a `--costume-*`
   is read only by another `--costume-*` declaration of a scope block (`--costume-tile-image: linear-gradient(var(
-  --costume-ornament), …)`). Held by `__tests__/themeCostume.test.ts` T1-T3.
+  --costume-ornament), …)`). Held by `__tests__/themeCostume.test.ts` (the palette-theme, gate and
+  scope-property cases).
 - **The one layered consumer**: `TILE_EYEBROW_CLASS` paints `text-[color:var(--costume-eyebrow-color,var(--muted-foreground))]`,
   a utility, so a caller's colour (`text-destructive`, the AI accent) still wins through `cn()` — every use is inside
-  `cn()` or the bare `className={TILE_EYEBROW_CLASS}` (T4).
+  `cn()` or the bare `className={TILE_EYEBROW_CLASS}` (`themeCostume.test.ts`, the eyebrow case).
 - **The band** is in every theme's DOM — `ThemeHeaderBand` closes `PageHeader` AND `PageHeaderSkeleton` — and only a
   costume's `--costume-header-band-height` gives it a height, with 16px above it; so the prerendered first paint holds
   it and the page replaces the skeleton without moving. Below `desktop:` the header is sticky: the band sits on an
@@ -227,13 +230,20 @@ mechanism has a neutral default, and the palette themes are held to render exact
   ['latin']`, `variable: '--font-<slug>'`, its `.variable` on `<html>` beside Geist's, named only by that theme's
   `--costume-heading-font`: the `@font-face` rules ship in the root CSS (no JS, `perf:budget` does not see them) and
   the browser fetches the file only when text in scope paints with it.
+- **What a costume must not move** (2026-11-21): the first-screen census finds a tile by `section.rounded-2xl[id]`
+  (`scripts/mobileCensus.mjs`, `isClosedRow`), so a frame comes through `--radius-2xl` and `data-tile`, never a new
+  radius class on the tile; `e2e/shellBoot.ts` observes `data-theme` on the whole document, so the swatches'
+  `data-theme` divs live on Impostazioni alone, which no shell-boot spec opens; `PageHeader` stays a module without
+  `'use client'` and without hooks — the emblem's hooks live in `theme-costume.tsx`.
 - **A costume theme's CSS** = four blocks: `[data-theme="<id>"]`, `.dark[data-theme="<id>"]` (the palette, every token
   a palette theme declares, `--radius` included), then the same two followed by ` [data-costume-scope]`.
 - **The palette themes render as before, measured**: `e2e/theme.neutral{,.mobile}.spec.ts` read eight probes (`html`,
   `body`, `#page-main`, the header label, the verdict `h2`, the first tile and its `h3`, the first primary button)
   and the «Nuova Spesa» dialog at 1440 on Panoramica, Storico and Cashflow, every palette theme in both modes, at 1440
   and 390, and compare eleven computed properties with `e2e/themeNeutral.baseline.json`, recorded on 2026-11-21 on
-  the tree with only the Geist fix applied. `THEME_NEUTRAL_RECORD=1` rewrites one viewport key — only on code the
+  the tree with only the Geist fix applied. Every string is compared exact but `color`, `background-color` and
+  `border-top-color`, compared as colours (ΔOKLab < 0.002, alpha within 0.01): the production build's minifier
+  serialises `lab()` where `next dev` writes `rgb()` for the same token (measured 2026-11-21). `THEME_NEUTRAL_RECORD=1` rewrites one viewport key — only on code the
   costume has not touched (a red is a finding, never a baseline to refresh). Seen red with the gate stripped from the
   tile-shadow rule (`box-shadow` → `none`). The repo's one recorded comparison: no snapshot tests.
 - **Geist Sans was never applied until 2026-11-21**: next/font's variables sat on `<body>`, while Tailwind's preflight

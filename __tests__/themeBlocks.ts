@@ -2,7 +2,8 @@
  * The theme blocks of `app/globals.css`, derived from the registry (`COLOR_THEMES`) — a helper the
  * four gate tests share (chartPaletteDistinctness, actionColorContrast, chartColorsContext,
  * mutedForegroundContrast), not a test. A theme added to the list is measured by all four, and a
- * name with no CSS turns all four red (doc/guide/temi.md § Adding a theme).
+ * name with no CSS turns all four red (doc/guide/temi.md § Adding a theme) — seen red on 2026-11-21
+ * with `'sepia'` added to `COLOR_THEMES` and to `COLOR_THEME_META`, no CSS: all four files failed.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
