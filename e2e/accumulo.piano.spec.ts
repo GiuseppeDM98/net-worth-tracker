@@ -1,12 +1,12 @@
 /**
  * Allocazione › Piano di accumulo a 1440px — il percorso guidato che crea un piano a mano (2026-11-20;
- * doc/guide/accumulo.md § Creare un piano: il percorso).
+ * doc/guide/accumulo.md § Il percorso: creare e rivedere).
  *
  * PERCHÉ ESISTE: solo il browser contro l'emulatore può dire che le otto schermate e UN «Conferma» scrivono
  * DAVVERO un piano attivo (e il modello), che una vendita ha il suo mese nel calendario, che il percorso riprende
  * dopo un ricaricamento, che una bozza in Accumulo è continuata e attivata come se stessa, che il seme del
  * portafoglio modello arriva sulla prima schermata e che, con un piano attivo, le tre porte di «Questo mese» aprono il
- * percorso in REVISIONE e «Conferma» riscrive le sole rate aperte (NOVE-26, 2026-11-21). Le
+ * percorso in REVISIONE e «Conferma» riscrive le sole rate aperte (2026-11-21). Le
  * regole sono di Vitest (`planPath.test.ts`, `pianoScreens.test.tsx`, `pianoWizard.test.tsx`, `pianoClient.test.tsx`).
  *
  * Account base (`test@example.com`), istruments del seed. Ogni test che scrive toglie in `afterEach` i piani
@@ -142,7 +142,7 @@ test.describe('dal portafoglio modello', () => {
   });
 });
 
-// ─── Rivedere un piano attivo nel percorso (NOVE-26, 2026-11-21) ─────────────────────────────────
+// ─── Rivedere un piano attivo nel percorso (2026-11-21) ──────────────────────────────────────────
 // La fixture attiva (`saleMonthOffset: 2`): 12 rate, le prime due chiuse, la 3ª aperta, una vendita aperta di
 // 1 Apple al 5° mese. Le porte di «Questo mese» aprono il percorso in revisione; «Conferma» chiama `revisePlan`.
 test.describe('rivedere il piano attivo', () => {
@@ -152,7 +152,7 @@ test.describe('rivedere il piano attivo', () => {
   const next = (page: Page) => page.getByRole('button', { name: 'Avanti' }).click();
   const at = (page: Page, n: number) => expect(page.getByRole('region', { name: new RegExp(`^Passo ${n} di 8`) })).toBeVisible({ timeout: 30_000 });
 
-  // E1. Mutation that turns it red: `plan.months` passed as `remainingMonths` (the plan grows by the closed ones).
+  // Mutation that turns it red: `plan.months` passed as `remainingMonths` (the plan grows by the closed ones).
   test('«Rivedi il piano» → il percorso precompilato → «Conferma»: le rate chiuse identiche, le aperte riscritte, una riga in più', async ({ page }) => {
     const before = await readFixturePlan();
     await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'load' });
@@ -182,7 +182,7 @@ test.describe('rivedere il piano attivo', () => {
     expect(after.revisions[0].fromIndex).toBe(3);
   });
 
-  // E2. Mutation that turns it red: no `movedDisposalMonthIndexes` sent (the moved sale keeps its month).
+  // Mutation that turns it red: no `movedDisposalMonthIndexes` sent (the moved sale keeps its month).
   test('la vendita aperta spostata di un mese e una vendita nuova: i loro mesi nel piano', async ({ page }) => {
     await page.goto(PIANO, { waitUntil: 'load' });
     await clearPlanPathDraft(page);
@@ -214,7 +214,7 @@ test.describe('rivedere il piano attivo', () => {
     expect(month('seed-vwce')).toBe(7);
   });
 
-  // E3. Mutation that turns it red: `fromModel` ignored (the start stays «Dal piano com’è»).
+  // Mutation that turns it red: `fromModel` ignored (the start stays «Dal piano com’è»).
   test('«Rivedi dal modello» → ?da=modello, «Dal portafoglio modello» scelto, le quote del modello alla 7ª', async ({ page }) => {
     await plantModel('e2e-revision');
     await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'load' });
@@ -231,7 +231,7 @@ test.describe('rivedere il piano attivo', () => {
     await expect(quotas.getByLabel('Apple Inc.', { exact: true })).toHaveValue('0');
   });
 
-  // E4. Mutation that turns it red: any stored draft of the same plan id kept.
+  // Mutation that turns it red: any stored draft of the same plan id kept.
   test('un ricaricamento alla 5ª tiene la revisione; una revisione scritta altrove → il percorso riparte dal piano', async ({ page }) => {
     await page.goto(PIANO, { waitUntil: 'load' });
     await clearPlanPathDraft(page);

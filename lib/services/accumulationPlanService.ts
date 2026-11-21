@@ -14,7 +14,7 @@
  * outside the app reads as free: the plans' rule lets a missing document be read.
  *
  * MONEY IN CENTS (2026-11-12): every euro field of a written plan passes through `roundPlanEuros`
- * once, here — the editor's typed amounts, the calendar's and the baseline's float sums alike.
+ * once, here — the path's typed amounts, the calendar's and the baseline's float sums alike.
  *
  * Errors meant for the user are thrown with `userFacingError` (`lib/utils/dialogNarrative.ts`), so
  * `describeWriteError` can surface them verbatim instead of a generic Firestore message.
@@ -303,9 +303,9 @@ export class PlanWriteError extends Error {
 }
 
 /**
- * A plan made outside the editor, in ONE call (2026-11-20; the Consulente's «Applica», and the path by
+ * A plan created and activated in ONE call (2026-11-20; the Consulente's «Applica», and the path by
  * hand after it): refuses a draft `validateDraftAgainstAssets` has an issue with on the assets the
- * caller re-read, before any write (`step: 'plan'` — the editor owns that gate, the services do not);
+ * caller re-read, before any write (`step: 'plan'` — the caller owns that gate, the services do not);
  * writes the draft (`createDraftPlan`, or `updateDraftPlan` on `existingDraftId`), activates it
  * (`step: 'activate'`, with the draft's `planId`: the next attempt replaces it), then writes the
  * model. Once the plan is active it NEVER throws: a model that cannot be written comes back as

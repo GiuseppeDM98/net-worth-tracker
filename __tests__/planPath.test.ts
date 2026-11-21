@@ -1,6 +1,6 @@
 /**
  * Tests for lib/utils/planPath.ts — the guided path that creates a plan of accumulation by hand
- * (2026-11-20, doc/guide/accumulo.md § Creare un piano: il percorso). Pure: the reducer, the seeding of the
+ * (2026-11-20, doc/guide/accumulo.md § Il percorso: creare e rivedere). Pure: the reducer, the seeding of the
  * quotas, the blocks of each screen, the summary's refusal, the draft the path writes and the browser draft's
  * restore. Figures invented and round; `compare` is a stub that reads the cash class off the assets.
  * Each block names the mutation that turns it red.
@@ -720,7 +720,7 @@ describe('restorePlanPathDraft in a revision (mutation: compare the id and the c
   });
 });
 
-// Found by § 7 B (2026-11-21): ticking «Vendi» sells every share and takes the row away; a partial quantity typed
+// Found on 2026-11-21: ticking «Vendi» sells every share and takes the row away; a partial quantity typed
 // after it brought a held row back at 0 % with a NEW id, while the closed instalments name the plan's position.
 describe('a revision: a sale ticked then made partial gives back the plan row (mutation: leave it to withHeldRows)', () => {
   it('the row returns with its id, its label, its quota and in its place', () => {

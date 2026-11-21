@@ -131,7 +131,7 @@ export async function seedAccumuloFixture({
         ? []
         : [{ assetId: 'seed-aapl', quantity: 1, monthIndex: 1 - startOffset + saleMonthOffset, estimatedProceedsEur: 175, status: 'planned' }],
     ...(reviewAtOpenMonth ? { reviewMonthIndex: 1 - startOffset } : {}),
-    // A draft (the editor's draft shape since 2026-11-17) has no installments, no baseline and no activation.
+    // A draft (the shape a draft has had since 2026-11-17) has no installments, no baseline and no activation.
     installments: status === 'active' ? installments : [],
     residualEur: 0,
     createdAt: now,
@@ -399,7 +399,7 @@ export async function walkPlanPath(page: Page, walk: PlanPathWalk): Promise<void
   await at(8);
 }
 
-// ─── The revision through the path (NOVE-26, 2026-11-21) ─────────────────────────────────────────
+// ─── The revision through the path (2026-11-21) ──────────────────────────────────────────────────
 
 type RestValue = Record<string, unknown>;
 
@@ -438,14 +438,14 @@ export async function readFixturePlan(): Promise<StoredFixturePlan> {
   return { ...plan, revisions: plan.revisions ?? [] };
 }
 
-/** One more `revisions` row on the fixture's plan, as another tab's revision would leave it (E4). */
+/** One more `revisions` row on the fixture's plan, as another tab's revision would leave it: the browser draft of a revision must be dropped. */
 export async function addFixtureRevisionRow(): Promise<void> {
   const plan = await readFixturePlan();
   const row = { at: new Date(), fromIndex: 3, before: { months: 12, monthlyInflowEur: 0, reserveEur: 2000 } };
   await patchMasked(`accumulationPlans/${PLAN_ID}`, 'revisions', toValue([...plan.revisions, row]));
 }
 
-/** Adds an EXECUTED sale of one share of the longest-named instrument (the pension fund): a locked line on «vendite» that must wrap at 390px (E5). */
+/** Adds an EXECUTED sale of one share of the longest-named instrument (the pension fund): a locked line on «vendite» that must wrap at 390px. */
 export async function addExecutedFixtureSale(): Promise<void> {
   const plan = await readFixturePlan();
   const sale = { assetId: 'seed-pension-legacy', quantity: 1, monthIndex: 1, estimatedProceedsEur: 100, status: 'executed' };

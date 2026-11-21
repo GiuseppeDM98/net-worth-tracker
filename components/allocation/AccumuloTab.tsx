@@ -8,7 +8,7 @@
  * different counts. The grid:
  *
  * Loaded on demand (2026-11-12): the page imports it through `lazyComponent`, with this tab's own
- * loading state as the fallback (`AccumuloTabSkeleton`), so none of the plan's engine, editor or
+ * loading state as the fallback (`AccumuloTabSkeleton`), so none of the plan's engine or
  * words is in Allocazione's initial JavaScript.
  *
  *   plan open:   Questo mese (7) | Classi del piano (5)     — a draft or a finished plan has no
@@ -24,7 +24,7 @@
  * box across both rows, so the desktop is the two stacks of before.
  *
  * The objectives' modal is opened from the Obiettivi tile and by `?obiettivi=1` (the link
- * Impostazioni, the optimizer panels and the model portfolio carry); the query is dropped once read.
+ * Impostazioni and the model portfolio carry); the query is dropped once read.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';

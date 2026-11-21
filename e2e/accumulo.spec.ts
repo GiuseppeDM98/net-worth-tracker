@@ -150,7 +150,7 @@ test.describe('le due colonne finiscono sulla stessa riga', () => {
 
 // A sale in its month (2026-11-19): before it «In programma» with no action; a new plan's «Vendi a» moves the
 // proceeds to that month; the Consulente's review month opens the revision. Vitest holds the arithmetic and the
-// words (accumulationPlanUtils, accumuloSummary, questoMeseTile): here the editor's controls, the written plan and
+// words (accumulationPlanUtils, accumuloSummary, questoMeseTile): here the path's controls, the written plan and
 // the tile's rows on the emulator.
 test.describe('una vendita nel suo mese', () => {
   const MONTHS_SHORT = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
@@ -174,7 +174,7 @@ test.describe('una vendita nel suo mese', () => {
     }
   });
 
-  // The note's «Rivedi il piano» is a link to the path in revision (NOVE-26, 2026-11-21): nothing is written here.
+  // The note's «Rivedi il piano» is a link to the path in revision (2026-11-21): nothing is written here.
   test('il mese di revisione del Consulente: la nota e «Rivedi il piano» aprono il percorso in revisione', async ({ page }) => {
     await seedAccumuloFixture({ reviewAtOpenMonth: true });
     try {

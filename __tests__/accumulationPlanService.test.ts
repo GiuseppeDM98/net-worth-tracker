@@ -259,7 +259,7 @@ describe('createDraftPlan and the advisor notes', () => {
   });
 });
 
-// ONE write path for a plan made outside the editor (2026-11-20): the gate before any write, the draft (new or an
+// ONE write path for a plan the path or the Consulente creates (2026-11-20): the gate before any write, the draft (new or an
 // open one overwritten), the activation, then the model — whose failure never undoes the plan. Mutation that turns
 // it red: validate after `createDraftPlan` (a draft with an issue is written).
 describe('createAndActivatePlan', () => {

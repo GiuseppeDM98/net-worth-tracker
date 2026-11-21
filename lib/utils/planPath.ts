@@ -2,7 +2,7 @@
  * The guided path that creates a plan of accumulation by hand (owner, 2026-11-19: «deve essere il più semplice
  * possibile»): eight screens, one question each, ONE «Conferma» that creates the plan ACTIVE. Pure — the
  * reducer the wizard runs, the seeding of the quotas, each screen's block, the summary's refusal, the draft
- * «Conferma» writes and the browser draft's restore. doc/guide/accumulo.md § Creare un piano: il percorso.
+ * «Conferma» writes and the browser draft's restore. doc/guide/accumulo.md § Il percorso: creare e rivedere.
  *
  * Nothing stored on the browser is trusted: `planPathToDraft` recomputes every sale's proceeds from today's
  * price, and a restored draft is checked against today's assets (`reconcilePlanPathAnswers`). The open plan
@@ -76,7 +76,8 @@ export interface PlanPathAnswers {
   seed?: PlanSeedDraft;
   serverDraftId?: string;
   name?: string;
-  /** A revision: the plan it was started on, its count of revisions and its first intact instalment (V6). */
+  /** A revision: the plan it was started on, its count of revisions and its first intact instalment (another
+   *  one discards a stored draft). */
   revisesPlanId?: string;
   revisionCount?: number;
   revisesFromIndex?: number;
@@ -219,14 +220,14 @@ export function buildPlanPathRevision(plan: AccumulationPlan): PlanPathRevision 
   };
 }
 
-/** `?da=modello` preselects the model only when it has weights (V1). */
+/** `?da=modello` preselects the model only when it has weights; in create mode it is ignored. */
 function revisionStartsFromModel(context: PlanPathContext): boolean {
   return context.fromModel && !!context.model && Object.keys(modelWeightMap(context.model)).length > 0;
 }
 
 /**
  * The revision's answers from the plan's first intact instalment: the months left, the plan's own inflow and
- * reserve (as typed, V3), the accounts that are still source accounts (V10), the open saved sales at their
+ * reserve (as typed), the accounts that are still source accounts (one gone is not ticked), the open saved sales at their
  * months, the quotas of the start. Reconciled with today's assets like a restored draft.
  */
 function initialRevisionDraft(context: PlanPathContext, revision: PlanPathRevision): PlanPathDraft {
@@ -293,7 +294,7 @@ export function seededPlanPathDraft(seed: PlanSeedDraft, investmentAccountId: st
 }
 
 /**
- * The quotas a start gives, with the editor's own helpers. The base is one row per held buyable instrument
+ * The quotas a start gives, with the engine's helpers. The base is one row per held buyable instrument
  * WITHOUT the ones sold whole: `applyWeightsToPositions` / `applyModelToPositions` read `sold` only not to ADD
  * a position, so a row already in the base would stay.
  */
@@ -348,7 +349,7 @@ function step(screen: PlanPathScreen, by: 1 | -1): PlanPathScreen {
 
 /**
  * A revision: the plan's own row of `assetId`, back where it stood, when a whole sale took it away and the sale
- * is now partial or gone — its id is the one the closed instalments' lines name (found by § 7 B, 2026-11-21).
+ * is now partial or gone — its id is the one the closed instalments' lines name (2026-11-21).
  */
 function restorePlanRow(positions: PlanPosition[], assetId: string, context: PlanPathContext): PlanPosition[] {
   const planPositions = context.revision?.plan.positions ?? [];
@@ -473,7 +474,7 @@ export function listSellableAssets(context: Pick<PlanPathContext, 'assets'>): As
 
 /**
  * The months a sale's select lists, as the plan's absolute indexes: 1…months in a new plan; in a revision the
- * open ones, `firstIndex … closedCount + months`, with a late sale's own month first (V4: it keeps it until moved).
+ * open ones, `firstIndex … closedCount + months`, with a late sale's own month first (it keeps it until moved).
  */
 export function saleMonthIndexes(context: Pick<PlanPathContext, 'revision'>, months: number, saleMonth: number | null): number[] {
   const first = context.revision?.firstIndex ?? 1;
@@ -482,7 +483,7 @@ export function saleMonthIndexes(context: Pick<PlanPathContext, 'revision'>, mon
   return saleMonth !== null && saleMonth < first ? [saleMonth, ...open] : open;
 }
 
-/** The instruments with a locked sale (executed, skipped, linked): one sale per instrument, so no new one (V12). */
+/** The instruments with a locked sale (executed, skipped, linked): one sale per instrument, so no new one. */
 export function lockedSaleAssetIds(context: Pick<PlanPathContext, 'revision'>): Set<string> {
   return new Set((context.revision?.lockedSales ?? []).map((disposal) => disposal.assetId));
 }
@@ -522,7 +523,7 @@ export function describePlanPathBlock(screen: PlanPathScreen, answers: PlanPathA
     case 'vendite': {
       if (answers.wantsSales === null) return 'Scegli se vendere qualcosa.';
       // A sale's month is the plan's absolute index: in a revision the last one is closedCount + the months left. A
-      // month before the first open one is never offered, but a late saved sale keeps its own (V4): no lower bound.
+      // month before the first open one is never offered, but a late saved sale keeps its own: no lower bound.
       const closed = context.revision?.closedCount ?? 0;
       const months = closed + (answers.months ?? 0);
       for (const sale of answers.sales) {
@@ -576,8 +577,8 @@ export function firstPlanPathRefusal(answers: PlanPathAnswers, context: PlanPath
 /**
  * The answers as the engine's revision of the active plan (`revisePlan`'s input, the summary's preview): the
  * saved open sales as they now read and the new ones, diffed against the plan (`diffRevisionDisposals`), the
- * first intact instalment it was built on (V9), the Consulente's notes cleared and the review month kept while
- * it is still inside the plan (V5). Throws outside a revision.
+ * first intact instalment it was built on (another one today is `plan_moved`), the Consulente's notes cleared
+ * and the review month kept while it is still inside the plan (else cleared). Throws outside a revision.
  */
 export function planPathToRevision(answers: PlanPathAnswers, context: PlanPathContext): PlanRevisionInput {
   const revision = context.revision;
@@ -614,7 +615,8 @@ export function planPathToRevision(answers: PlanPathAnswers, context: PlanPathCo
   };
 }
 
-/** The calendar `revisePlan` will write on these answers: the engine's own result (V7), refusals included. */
+/** The calendar `revisePlan` will write on these answers: the engine's own result (never `buildDraftPreview`),
+ *  refusals included. */
 export function previewPlanPathRevision(answers: PlanPathAnswers, context: PlanPathContext, today: Date): RevisedPlanResult {
   const revision = context.revision;
   if (!revision) throw new Error('previewPlanPathRevision: no plan to revise');
@@ -675,7 +677,7 @@ export function reconcilePlanPathAnswers(answers: PlanPathAnswers, context: Plan
 /** What the wizard starts from: the stored draft checked against today, or the initial one. */
 export function restorePlanPathDraft(stored: PlanPathDraft | null, context: PlanPathContext): PlanPathDraft {
   if (!stored) return initialPlanPathDraft(context);
-  // A revision's draft is kept only on the plan as it was started on (V6): another revision, or one more
+  // A revision's draft is kept only on the plan as it was started on (2026-11-21): another revision, or one more
   // instalment closed, moved what its answers were built on — and a create draft has no place here.
   const revision = context.revision;
   if (revision) {

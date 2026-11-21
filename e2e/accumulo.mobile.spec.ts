@@ -74,7 +74,7 @@ test.describe('Accumulo, composto per un telefono', () => {
     await expect(why).toHaveAttribute('aria-expanded', 'false');
 
     // «Calendario», «Rivedi il piano» e «Interrompi» restano bersagli da pollice in LA tessera; «Rivedi il piano» è un
-    // link al percorso (NOVE-26, 2026-11-21), gli altri due bottoni.
+    // link al percorso (2026-11-21), gli altri due bottoni.
     const month = page.getByRole('region', { name: 'Questo mese' });
     for (const name of ['Calendario', 'Rivedi il piano', 'Interrompi']) {
       const role = name === 'Rivedi il piano' ? 'link' : 'button';

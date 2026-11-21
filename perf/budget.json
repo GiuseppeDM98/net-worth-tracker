@@ -66,7 +66,7 @@
     },
     "/dashboard/allocation/piano": {
       "initialJsGzKB": 680,
-      "raisedBy": "la revisione nel percorso (NOVE-26, 2026-11-21): planPath e planPathNarrative imparano la revisione (initialRevisionDraft, previewPlanPathRevision, il riepilogo delle vendite che cambiano) — stessa macchina (Windows, Node 24, npm run perf:build), stesso giorno, develop @07d0c680 in un worktree con npm ci contro il branch: 678,2 → 679,4 KB gz, tetto 679 → 680 entro 1 KB (doc/guide/velocita.md § Registro dei tetti alzati). Prima: new route (the plan's guided path, 2026-11-20): 678,0 KB gz misurati con npm run perf:build sulla macchina Windows (Node 24), tetto 679, OK del proprietario 2026-11-20 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "raisedBy": "la revisione nel percorso (PR #565, 2026-11-21): planPath e planPathNarrative imparano la revisione (initialRevisionDraft, previewPlanPathRevision, il riepilogo delle vendite che cambiano) — stessa macchina (Windows, Node 24, npm run perf:build), stesso giorno, develop @07d0c680 in un worktree con npm ci contro il branch: 678,2 → 679,4 KB gz, tetto 679 → 680 entro 1 KB (doc/guide/velocita.md § Registro dei tetti alzati). Prima: new route (the plan's guided path, 2026-11-20): 678,0 KB gz misurati con npm run perf:build sulla macchina Windows (Node 24), tetto 679, OK del proprietario 2026-11-20 (doc/guide/velocita.md § Registro dei tetti alzati)"
     }
   },
   "sharedGzKB": 536,

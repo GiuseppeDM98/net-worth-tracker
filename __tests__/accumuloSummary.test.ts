@@ -15,7 +15,6 @@ import {
   summarizeDraftTotal,
   summarizePacMonth,
   summarizeBuyingInstalments,
-  listRefillSaleMonths,
 } from '@/lib/utils/accumuloSummary';
 import { ACCUMULO_CLOSED_ASIDES, describeAccumuloClosedAnswers } from '@/lib/utils/accumulationNarrative';
 import { formatStripFigure, validateStrip } from '@/lib/utils/verdictStrip';
@@ -510,8 +509,7 @@ describe('a draft with a later sale', () => {
 });
 
 ﻿
-// The step 3 reading and the side panel count the months that buy (owner, 2026-11-19), and the reserve note names
-// the sales that refill it with the inflows.
+// The path's summary counts the months that buy (owner, 2026-11-19).
 describe('the months that buy, after a refill', () => {
   const months = (euros: number[], firstIndex = 1) =>
     euros.map((eur, k) => ({
@@ -529,18 +527,4 @@ describe('the months that buy, after a refill', () => {
     expect(summarizeBuyingInstalments(months([0, 0, 0]), 3)).toBeNull();
   });
 
-  // Mutation that turns it red: a sale after the first buying month listed.
-  it('listRefillSaleMonths: the open sales that land by the first month that buys', () => {
-    const disposals: PlanDisposal[] = [
-      { assetId: 'a', monthIndex: 1, estimatedProceedsEur: 100, status: 'planned' },
-      { assetId: 'b', monthIndex: 3, estimatedProceedsEur: 9000, status: 'planned' },
-      { assetId: 'c', monthIndex: 3, estimatedProceedsEur: 500, status: 'planned' },
-      { assetId: 'd', monthIndex: 5, estimatedProceedsEur: 800, status: 'planned' },
-      { assetId: 'e', monthIndex: 2, estimatedProceedsEur: 800, status: 'skipped' },
-    ];
-    expect(listRefillSaleMonths({ disposals, startMonth: '2027-01', firstIndex: 1, refillMonths: 2 })).toEqual(['2027-03', '2027-03']);
-    expect(listRefillSaleMonths({ disposals, startMonth: '2027-01', firstIndex: 1, refillMonths: 0 })).toEqual([]);
-    // A revision from the 3rd instalment: plan month 5 is the first that buys after two refill months.
-    expect(listRefillSaleMonths({ disposals, startMonth: '2027-01', firstIndex: 3, refillMonths: 2 })).toEqual(['2027-05']);
-  });
 });

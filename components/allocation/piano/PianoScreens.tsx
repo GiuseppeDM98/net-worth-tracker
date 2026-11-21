@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The bodies of the plan's eight screens (doc/guide/accumulo.md § Creare un piano: il percorso). Each body
+ * The bodies of the plan's eight screens (doc/guide/accumulo.md § Il percorso: creare e rivedere). Each body
  * reads the answers and dispatches the reducer's actions; the card around it (`PathCard`), the blocks and
  * «Conferma» belong to the wizard. At 390px every row stacks: name over figures over control.
  */
@@ -102,7 +102,7 @@ export interface PianoScreenProps {
 
 export function PartenzaScreen({ answers, dispatch, context, modelUsable, modelStale }: PianoScreenProps & { modelUsable: boolean; modelStale: boolean }) {
   const options: ChoiceListOption<PlanPathStart>[] = [];
-  // A revision starts from something (V2): the plan as it is, the model, today's weights — never «Da zero».
+  // A revision starts from something (2026-11-21): the plan as it is, the model, today's weights — never «Da zero».
   if (context.revision) {
     options.push({ value: 'plan', label: PLAN_PATH_START_LABELS.plan });
     if (modelUsable) options.push({ value: 'model', label: PLAN_PATH_START_LABELS.model, hint: modelStale ? MODEL_STALE_READING : undefined });
@@ -213,7 +213,7 @@ export function RiservaScreen({ answers, dispatch, context }: PianoScreenProps) 
 
 export function VenditeScreen({ answers, dispatch, context }: PianoScreenProps) {
   const { revision } = context;
-  // An instrument with a locked sale gets no «Vendi» row: one sale per instrument (V12).
+  // An instrument with a locked sale gets no «Vendi» row: one sale per instrument (the engine holds one).
   const locked = lockedSaleAssetIds(context);
   const sellable = listSellableAssets(context).filter((asset) => !locked.has(asset.id));
   const months = answers.months ?? 0;

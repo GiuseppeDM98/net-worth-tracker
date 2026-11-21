@@ -48,8 +48,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   period); `budgetWindow(now)` — from the older of January and the first of the six trailing months, to December;
   `budgetSuggestionWindow(now, floor)` — whole years from the floor to last year, read by the budget dialog alone;
   `fireWindows(now, firstSnapshot)` — `recent` (January of last year → December) for every FIRE tab and for
-  Allocazione › Accumulo's suggested instalment (`useMonthlySavingsMedian`, only while the editor's first step or the
-  empty tile is on screen, 2026-11-12), and `older` (from
+  Allocazione › Accumulo's suggested instalment (`useMonthlySavingsMedian`, only while the path's «Versamento» or the
+  empty tile is on screen, 2026-11-12; the path since 2026-11-20), and `older` (from
   eleven months before the first snapshot) for the Calcolatore's «Dettaglio» only. Each guide says what its window
   holds and why.
 - **A window is the UNION of what its page reads, not its period.** The readers behind the period count: the

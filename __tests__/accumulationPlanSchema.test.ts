@@ -126,7 +126,7 @@ describe('validateDraftAgainstAssets — one case per code', () => {
 
   it('unassigned_tradable exempts cash accounts', () => {
     // resolveAllocationRole reads 'tradable' for cash by default — without the exemption a
-    // current account the reader never meant to classify would block step 2 from ever closing.
+    // current account the reader never meant to classify would block «strumenti» from ever closing.
     const cash = makeAsset({ id: 'cash1', name: 'Conto corrente', assetClass: 'cash', quantity: 1, currentPrice: 5000 });
     const draft = baseDraft();
     const issues = validateDraftAgainstAssets(draft, byId(cash));

@@ -244,7 +244,7 @@ export function selectAccumuloStrip({ verdictInput, trajectory, currentIndex }: 
 
 // ─── The empty state's preview on the reader's own numbers ──────────────
 
-/** The reserve the preview assumes: what the editor proposes first, never typed by the reader here. */
+/** The reserve the preview assumes: what the path proposes first, never typed by the reader here. */
 export const PREVIEW_MONTHS = 12;
 
 export interface AccumuloPreview {
@@ -257,7 +257,7 @@ export interface AccumuloPreview {
   reserveEur: number;
   /** Σ of the purchases over the plan divided by the months — what a month would move. */
   monthlyEur: number;
-  /** The monthly inflow the preview assumed (the editor's suggestion, 0 when none). */
+  /** The monthly inflow the preview assumed (the path's suggestion, 0 when none). */
   inflowEur: number;
   /** Where the classes would stand today and at the end of the plan, on today's prices. */
   classes: { assetClass: AssetClass; currentPct: number; targetPct: number; finalPct: number }[];
@@ -304,9 +304,9 @@ export function buildAccumuloPreview(input: {
   today: Date;
   /** The saved model's weights: the preview starts from them instead of today's holdings. */
   model?: ModelPortfolioWeight[] | null;
-  /** The entry the editor suggests (the median of the monthly savings); 0 or absent = no inflow. */
+  /** The entry the path suggests (the median of the monthly savings); 0 or absent = no inflow. */
   monthlyInflowEur?: number;
-  /** The reserve on the accounts (`resolveAccountReserveEur`), the one the editor starts from. */
+  /** The reserve on the accounts (`resolveAccountReserveEur`), the one the path starts from. */
   reserveEur: number;
   /** The cash class outside the accounts, printed with the quota. */
   otherCashEur?: number;
@@ -527,7 +527,7 @@ export function listSaleSteps(input: {
 
 /**
  * The months that buy, after the ones that only refill the reserve (owner, 2026-11-19): how many, the first and the
- * average — step 3's reading and the side panel say the same figures. `null` when no month buys.
+ * average — the path's summary reads them. `null` when no month buys.
  */
 export function summarizeBuyingInstalments(
   installments: Installment[],
@@ -543,24 +543,4 @@ export function summarizeBuyingInstalments(
     firstMonth: first.month,
     averageEur: buying.reduce((sum, installment) => sum + euros(installment), 0) / buying.length,
   };
-}
-
-/**
- * The months of the open sales that refill the reserve with the inflows (owner, 2026-11-19): after the first scheduled
- * month (`firstIndex`, whose sales count at once) and by the first month that buys (`firstIndex + refillMonths`).
- */
-export function listRefillSaleMonths(input: {
-  disposals: PlanDisposal[];
-  startMonth: MonthKey;
-  firstIndex: number;
-  refillMonths: number;
-}): MonthKey[] {
-  if (input.refillMonths <= 0) return [];
-  const lastIndex = input.firstIndex + input.refillMonths;
-  return input.disposals
-    .filter((d) => d.status !== 'executed' && d.status !== 'skipped')
-    .map(disposalMonthIndex)
-    .filter((index) => index > input.firstIndex && index <= lastIndex)
-    .sort((a, b) => a - b)
-    .map((index) => addMonths(input.startMonth, index - 1));
 }

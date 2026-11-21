@@ -81,7 +81,7 @@ function labelOf(assetId: string, assetsById: Map<string, Asset>): string {
  * Cross-referential checks that need the real portfolio. Structural checks (§ months_range,
  * negative_amount shape) are covered by `accumulationPlanDraftSchema` at the call site that owns
  * parsing; this function assumes the draft already parsed and re-checks the numeric ranges that
- * ALSO need to surface as a `DraftIssue` (so the editor's status line, not zod's own error shape,
+ * ALSO need to surface as a `DraftIssue` (so the path's refusal line, not zod's own error shape,
  * is what the user reads). `firstIndex` is the plan month of the draft's first month (1 for a new plan,
  * `k` for a revision's draft): a sale's `monthIndex` is counted from the plan's first month.
  */
@@ -225,7 +225,7 @@ export function validateDraftAgainstAssets(
     }
   }
 
-  // Only what a plan may buy is demanded here: the seeder and the editor's rows offer nothing else
+  // Only what a plan may buy is demanded here: the seeder and the path's rows offer nothing else
   // (`isPlanBuyable`), so a property, a loan or an account never blocks «Avanti».
   const assignedAssetIds = new Set(seenIn.keys());
   for (const asset of assetsById.values()) {

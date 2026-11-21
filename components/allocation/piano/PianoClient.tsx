@@ -63,7 +63,7 @@ const CARD_CLASS = cn(TILE_SURFACE_CLASS, 'mx-auto w-full max-w-[720px] p-5 desk
 
 /** `?da=modello` («Rivedi dal modello»), read in the browser: a `searchParams` prop on the page would make the route
  *  dynamic, never prerendered. Read on EVERY render, not once at mount: a client navigation from Accumulo mounts the
- *  page before the URL changes (found by E3). The server snapshot is empty and the loading state reads no answer;
+ *  page before the URL changes (found by the browser spec, 2026-11-21). The server snapshot is empty and the loading state reads no answer;
  *  the wizard mounts on plans fetched after mount, when the URL is the new one. */
 function subscribeToHistory(onChange: () => void): () => void {
   window.addEventListener('popstate', onChange);
@@ -141,7 +141,7 @@ export function PianoClient({ fromModel: fromModelProp }: { fromModel?: boolean 
     [settings, effective, goalData]
   );
 
-  // A closed plan (decision 98) made a browser draft moot; a revision's draft is the wizard's to keep or drop (V6).
+  // A closed plan (decision 98) made a browser draft moot; a revision's draft is the wizard's to keep or drop (`restorePlanPathDraft`).
   const nothingToRevise = !created && !revisedPlan && activePlan !== null && revision === null;
   useEffect(() => {
     if (nothingToRevise && ownerId && typeof window !== 'undefined') clearStored(window.localStorage, planPathStorageKey(ownerId));

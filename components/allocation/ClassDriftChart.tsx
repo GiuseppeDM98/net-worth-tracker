@@ -38,7 +38,7 @@ interface ClassDriftChartProps {
   className?: string;
   /**
    * The month the cursor sits on. Absent = no cursor: the chart is the plain plot the
-   * Calendario and the editor already had. Present with `onSelect`, the plot answers the pointer
+   * Calendario draws. Present with `onSelect`, the plot answers the pointer
    * and the left/right arrows (ONE Tab stop for the whole chart) and a reading row names the month.
    */
   selectedIndex?: number;

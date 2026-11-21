@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * ClassiDelPianoTile — «dove porta le classi il piano, mese per mese?» (,
- * the editor's preview). The right half of Allocazione's Accumulo tab with an active plan: the class trajectory in
+ * ClassiDelPianoTile — «dove porta le classi il piano, mese per mese?». The right half of Allocazione's Accumulo tab with an active plan: the class trajectory in
  * view (`ClassDriftChart` with its cursor on the month), the sentence that says when each class is
  * back in band (said once, in the page verdict, not repeated here), and under it the strip that stood alone in the old `AccumuloTile` — one row per
  * class the plan touches: today's share and the target on one line, the track under it

@@ -1,7 +1,7 @@
 /**
  * accumulationNarrative — every word the PAC (Accumulo) feature speaks.
  *
- * Everything the tab, its three-step editor and its two secondary modals print — the draft's issues
+ * Everything the tab, its dialogs and the plan's guided path print — the draft's issues
  * (`describeDraftIssue`), labels, chips, button text, eyebrows and readings alike — so no PAC
  * component carries an Italian literal of its own. Pure: no Firebase, no DOM. Money and percentages go through `formatters.ts` (the Comma
  * Rule — an Italian `Intl`, never `toFixed`); a signed figure always carries the typographic
@@ -1024,7 +1024,7 @@ export function describeSuggestedInflow(suggestedEur: number, months: number): s
   return `Il tuo risparmio mensile mediano degli ultimi ${months} mesi è di ${cachedFormatCurrencyEUR(suggestedEur, true)}.`;
 }
 
-/** The note of «Questo mese» and of the editor's preview when the plan ends after the Consulente's review date (2026-11-12). */
+/** The note of «Questo mese» and of the path's summary when the plan ends after the Consulente's review date (2026-11-12). */
 export function describePlanPastReview(reviewByIso: string): string {
   return `Il piano finisce dopo la revisione dell'allocazione (${formatDate(new Date(`${reviewByIso.slice(0, 10)}T12:00:00`))}): rivedilo quando rivedi i target.`;
 }

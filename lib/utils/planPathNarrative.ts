@@ -1,7 +1,7 @@
 /**
- * The words of the plan's guided path (doc/guide/accumulo.md § Creare un piano: il percorso): each screen's
+ * The words of the plan's guided path (doc/guide/accumulo.md § Il percorso: creare e rivedere): each screen's
  * theme, question and help, the sales' tax line, the summary's sentences, the host's states and «Conferma»'s
- * outcomes. Pure; the figures come from lib/utils/planPath.ts and the plan's engine, the editor's sentences
+ * outcomes. Pure; the figures come from lib/utils/planPath.ts and the plan's engine, the tab's sentences
  * are reused as they are (`describeStep3Summary`, `describeSaleStep`, the two warnings).
  */
 
@@ -217,7 +217,7 @@ export interface PlanPathSummary {
   firstEur: number;
 }
 
-/** The summary's sentences, on the draft «Conferma» writes: what the editor's preview showed. */
+/** The summary's sentences, on the draft «Conferma» writes. */
 export function buildPlanPathSummary(answers: PlanPathAnswers, context: PlanPathContext, today: Date = new Date(0)): PlanPathSummary {
   if (context.revision) return buildRevisionSummary(answers, context, context.revision, today);
   const draft = planPathToDraft(answers, context);
@@ -225,7 +225,7 @@ export function buildPlanPathSummary(answers: PlanPathAnswers, context: PlanPath
   const preview = buildDraftPreview({ draft, allAssets: context.assets, targets: context.targets, band: context.band, compare: context.compare, deps: context.deps, firstIndex: 1 });
   const nameOf = (assetId: string) => assetsById.get(assetId)?.name ?? assetId;
 
-  // Coverage, as the editor measures it: L against the ideal deficit Σ max(0, target% × B − value).
+  // Coverage: L against the ideal deficit Σ max(0, target% × B − value).
   const coveragePct = liquidityCoveragePct(draft.positions, draft.disposals, preview.liquidity.L, assetsById, context);
 
   const buying = summarizeBuyingInstalments(preview.schedule.installments, preview.liquidity.refillMonths);
@@ -270,7 +270,7 @@ export function buildPlanPathSummary(answers: PlanPathAnswers, context: PlanPath
   };
 }
 
-/** L against the ideal deficit Σ max(0, target% × B − value), as the editor measures it; null when it covers it. */
+/** L against the ideal deficit Σ max(0, target% × B − value); null when it covers it. */
 function liquidityCoveragePct(positions: PlanPosition[], disposals: PlanDisposal[], L: number, assetsById: Map<string, Asset>, context: PlanPathContext): number | null {
   const states = resolvePositionStates(positions, assetsById, context.deps, disposals);
   const base = states.reduce((sum, state) => sum + state.currentValueEur, 0) + L;
@@ -285,7 +285,7 @@ function changeQuantity(quantity: number | undefined): string {
 }
 
 /**
- * The revision's summary from the engine's own result (V7): the months left and the next instalment, the sale
+ * The revision's summary from the engine's own result (`buildRevisedPlan`, never `buildDraftPreview`): the months left and the next instalment, the sale
  * steps after it, one line per sale that changes (a saved sale with new shares is ONE line, though the engine
  * sees removed + new), the tax of the new sales, the warnings on the revised plan. A refused revision says why.
  */
@@ -360,7 +360,7 @@ export function describeActivationFailed(reason: string): string {
   return `Il piano è salvato ma non attivo: ${reason.replace(/[.\s]+$/, '')}. Premi di nuovo «Conferma».`;
 }
 
-/** «Piano rivisto: prossima rata a dicembre 2026, 1.500 €.» (V8) */
+/** «Piano rivisto: prossima rata a dicembre 2026, 1.500 €.»: the month and the planned total of the first revised instalment. */
 export function describePlanRevised(firstMonth: MonthKey, firstEur: number): string {
   return `Piano rivisto: prossima rata a ${monthLabelLong(firstMonth)}, ${cachedFormatCurrencyEUR(firstEur, true)}.`;
 }
