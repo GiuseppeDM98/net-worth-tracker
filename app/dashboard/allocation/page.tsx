@@ -166,7 +166,7 @@ import { AllocazioneDettaglio } from '@/components/allocation/AllocazioneDettagl
 import { usePacMonth } from '@/lib/hooks/usePacMonth';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 
-// The Accumulo tab and everything it reaches (the plan's engine, its editor, its words) stay out of
+// The Accumulo tab and everything it reaches (the plan's engine and its words) stay out of
 // the page's initial JavaScript; its fallback is the tab's own loading state (AccumuloTabSkeleton).
 const AccumuloTab = lazyComponent(() => import('@/components/allocation/AccumuloTab').then((m) => m.AccumuloTab));
 const ACCUMULO_LAZY = [AccumuloTab];

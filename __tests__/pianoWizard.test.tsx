@@ -2,7 +2,7 @@
  * The plan path's «Conferma» (components/allocation/piano/PianoWizard.tsx): the Italian month read again —
  * another month writes nothing and says so; a pending write disables the button, two clicks one call; an
  * activation that fails leaves a draft the second press adopts (`existingDraftId`); a model not written is the
- * done card's second line; in a revision, `revisePlan` on the assets read at the press (R4). `createAndActivatePlan`, `revisePlan`, `saveModelPortfolio` and the summary's figures are mocked (the summary's
+ * done card's second line; in a revision, `revisePlan` on the assets read at the press. `createAndActivatePlan`, `revisePlan`, `saveModelPortfolio` and the summary's figures are mocked (the summary's
  * arithmetic is the engine's); the month is mocked at `toMonthKey`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';

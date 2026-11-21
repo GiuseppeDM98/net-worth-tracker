@@ -147,7 +147,7 @@ interface IdealCompositionDialogProps {
   model: ModelPortfolio | null;
   /** What the model rests on: the save stamps it. */
   basis: ModelBasis;
-  /** «Crea un PAC con questi pesi»: hands the caller a fresh draft's seed — the caller opens the editor itself. */
+  /** «Crea un PAC con questi pesi»: hands the caller a fresh draft's seed — the caller writes it as the path's browser draft and navigates. */
   onCreatePac: (seed: PlanSeedDraft) => void;
 }
 

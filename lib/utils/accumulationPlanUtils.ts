@@ -617,7 +617,7 @@ export interface PlanRevisionInput {
   disposals: PlanDisposal[];
   /** The plan month to look at the plan again: absent = keep the plan's, null = clear it. */
   reviewMonthIndex?: number | null;
-  /** The app's corrections to the Consulente's plan: absent = keep the plan's (the editor's revision keeps them). */
+  /** The app's corrections to the Consulente's plan: absent = keep the plan's (the Consulente's executor passes them; a hand revision clears them). */
   advisorNotes?: string[];
   /** the source accounts, editable in a revision; absent = the plan's own. */
   sourceCashAssetIds?: string[];
@@ -657,7 +657,7 @@ export function isOpenSavedDisposal(disposal: PlanDisposal): boolean {
 
 /**
  * what a revision's sales list says about the plan's saved sales. `draftDisposals` is the list the
- * editor holds (the saved open sales it started from, with the reader's changes, and the new ones).
+ * path holds (the saved open sales it started from, with the reader's changes, and the new ones).
  * A saved open sale missing from it is removed; one whose shares changed is removed and re-entered as
  * a new sale; one that stays may carry another `monthIndex` (moved). Executed or linked sales never move.
  */
@@ -923,7 +923,7 @@ export interface ClassTrajectoryPoint {
  * The reserve a new plan starts from: the allocation's cash quota, which a plan must not spend (owner,
  * 2026-11-17). The fixed amount when the cash target is one, else its percentage of today's allocated
  * base (`compareAllocations(...).marketValue`), rounded UP to the euro so the quota is never undercut.
- * 0 without targets, without a cash target or without a base. The editor's field stays editable.
+ * 0 without targets, without a cash target or without a base. The path's field stays editable.
  */
 export function resolvePlanReserveEur(targets: AssetAllocationTarget | null, marketBaseEur: number): number {
   const cash = targets?.cash;
@@ -1330,8 +1330,8 @@ export { unitPriceEur };
 // ---------------------------------------------------------------------------
 
 /**
- * The editor's second step starts on ONE singleton position per buyable, valued holding — every euro
- * the page knows about needs a bucket the moment the editor opens, never only once the reader has
+ * A plan's positions start as ONE singleton position per buyable, valued holding — every euro
+ * the page knows about needs a bucket the moment the screen opens, never only once the reader has
  * thought to add one. The target starts at 0, not at the holding's current share: a pre-filled 100%
  * for a single-asset portfolio would hide the very total-≠-100 gate the step exists to enforce. A cash
  * account is never seeded: once picked as a source too, its value would enter the base twice.
@@ -1563,19 +1563,17 @@ export interface AddableAsset {
  * the instruments the path's «strumenti» screen can still take: tradable, not a cash account, not already in
  * the draft (a position or a sale) — also those with no shares, which the seeder never lists. In the
  * lead the never-bought ones (then the sold-out), then the ones held; by name inside each group.
- * `alsoAllow` lets a group's own members through (the «Sostituisci» of a group).
  */
 export function listAddableAssets(
   allAssets: Asset[],
   draft: { positions: PlanPosition[]; disposals: PlanDisposal[] },
-  tradedAssetIds: ReadonlySet<string> | null = null,
-  alsoAllow: ReadonlySet<string> = new Set()
+  tradedAssetIds: ReadonlySet<string> | null = null
 ): AddableAsset[] {
   const taken = new Set<string>();
   for (const position of draft.positions) for (const id of position.memberAssetIds) taken.add(id);
   for (const disposal of draft.disposals) taken.add(disposal.assetId);
   return allAssets
-    .filter((asset) => isPlanBuyable(asset, allAssets) && (!taken.has(asset.id) || alsoAllow.has(asset.id)))
+    .filter((asset) => isPlanBuyable(asset, allAssets) && !taken.has(asset.id))
     .map((asset) => {
       const held = asset.quantity > 0;
       return { asset, held, neverBought: describeZeroQuantityChip(asset, tradedAssetIds) === NEVER_BOUGHT_CHIP };
@@ -1590,7 +1588,7 @@ export function listAddableAssets(
 /**
  * An asset a plan may buy: an instrument the ledger can register (stock, etf, bond, crypto, commodity) whose role,
  * resolved with what it finances, is tradable; never an account, a money-market fund, a loan, a property or a
- * pension fund (2026-11-12). The ONE predicate of «+ Aggiungi», the editor's list and seeded positions, the
+ * pension fund (2026-11-12). The ONE predicate of the path's «Aggiungi uno strumento» and seeded positions, the
  * draft's validation and the empty tile's preview: a plan buys only what «Registra» can write.
  */
 export function isPlanBuyable(asset: Asset, allAssets: readonly Asset[]): boolean {

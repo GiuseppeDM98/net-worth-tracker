@@ -101,7 +101,7 @@ describe('PianoClient (mutation: keep the «Hai già un piano» screen for an ac
   });
 
   // Read from the URL on the client, never from the page's `searchParams` (it made the route dynamic: perf:budget
-  // read no prerendered page, found at the § 4.6 measure). Mutation that turns it red: the URL not read.
+  // read no prerendered page, found at the perf:budget measure, 2026-11-21). Mutation that turns it red: the URL not read.
   it('?da=modello in the URL, no prop: fromModel', () => {
     window.history.pushState({}, '', '/dashboard/allocation/piano?da=modello');
     try {

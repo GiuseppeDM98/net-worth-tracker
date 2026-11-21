@@ -115,7 +115,7 @@ export interface OptimizerSaleReport {
   soldEur: number; // Σ max(0, cur − w) · B on the rounded weights, the instruments only
   taxEur: number; // Σ c_i · sold_i on the rounded weights, ≤ max(taxCapEur, minTaxEur)
   /** The euros the liquidity goes down by on the rounded weights, `max(0, cur − w) · B` of its candidate;
-   *  0 when it is not a candidate (the editor's panel). Spent, never sold: out of `soldEur` and `taxEur`. */
+   *  0 when it is not a candidate. Spent, never sold: out of `soldEur` and `taxEur`. */
   liquiditySpentEur: number;
   idealTaxEur: number; // what Ideale with the same locks would cost (before rounding)
   capBinding: boolean;

@@ -9,7 +9,7 @@
  * (each correction one sentence in `notes`, shown before the click and stored on the plan). Then it
  * lays the draft the plan's services write: the positions, the sales in their months, the reserve
  * on the chosen account, in the plan's own month frame — a revision of an active plan is numbered
- * from its first intact instalment `k`, as the editor's revision is (one frame, the plan's).
+ * from its first intact instalment `k`, as the path's revision is (one frame, the plan's).
  *
  * The missing instruments are in the draft as `new:<ref>` and become real ids at the click; the
  * engine's preview reads them as synthetic assets at 0 quotes with the price the page found.

@@ -257,7 +257,7 @@ interface StrumentiTileProps {
   allAssets?: readonly Asset[];
   /**
    * The assets the ledger names, null while it is not read: a row created empty for a plan and never
-   * bought says «Mai comprato» (lib/utils/zeroQuantityChip.ts, the plan editor's rule); else «Azzerato».
+   * bought says «Mai comprato» (lib/utils/zeroQuantityChip.ts, the plan's rule); else «Azzerato».
    */
   tradedAssetIds?: ReadonlySet<string> | null;
   className?: string;

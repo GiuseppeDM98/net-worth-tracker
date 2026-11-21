@@ -1,9 +1,9 @@
 /**
  * Allocazione › Piano di accumulo a 390px — le otto schermate del percorso senza scorrimento orizzontale
- * (2026-11-20; doc/guide/accumulo.md § Creare un piano: il percorso). Ogni riga va a capo: nome sopra le cifre
+ * (2026-11-20; doc/guide/accumulo.md § Il percorso: creare e rivedere). Ogni riga va a capo: nome sopra le cifre
  * sopra il campo. La guardia dell'overflow è quella di `accumulo.mobile.spec.ts`.
  *
- * La revisione del piano attivo (NOVE-26, 2026-11-21) nelle stesse otto schermate, con una vendita già eseguita.
+ * La revisione del piano attivo (2026-11-21) nelle stesse otto schermate, con una vendita già eseguita.
  *
  * Account base, istruments del seed. Il piano scritto, il modello e la bozza del browser tolti in `afterEach`.
  */
@@ -78,7 +78,7 @@ test('le otto schermate a 390px, senza scorrimento orizzontale, fino al piano at
   expect((await measureOverflow(page)).offenders).toEqual([]);
 });
 
-// E5 (NOVE-26, 2026-11-21): the revision of the active fixture, with a sale already executed (a locked line on
+// 2026-11-21: the revision of the active fixture, with a sale already executed (a locked line on
 // «vendite») and the open one ticked. Mutation that turns it red: a locked line that does not wrap.
 test('la revisione a 390px, senza scorrimento orizzontale, fino al piano rivisto', async ({ page }) => {
   test.setTimeout(300_000);

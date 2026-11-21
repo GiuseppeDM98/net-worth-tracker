@@ -1,7 +1,7 @@
 /**
  * The engine of «Rivedi il piano»: the line labels, the instruments with no shares, the source accounts and the
- * saved sales in a revision. Raggruppa, Separa and Sostituisci left with the editor (owner 89, NOVE-26,
- * 2026-11-21): a group comes from the model and is revised as one row. Invented names.
+ * saved sales in a revision. Raggruppa, Separa and Sostituisci left with the editor (owner, 2026-11-19;
+ * deleted 2026-11-21): a group comes from the model and is revised as one row. Invented names.
  */
 import { describe, it, expect } from 'vitest';
 import type { Asset } from '@/types/assets';
@@ -91,13 +91,11 @@ describe('instruments with no shares', () => {
     expect(list[1]).toMatchObject({ held: false, neverBought: false });
   });
 
-  it('a draft position, a sale and a cash account are left out; the group\'s own members can be let through', () => {
+  it('a draft position, a sale and a cash account are left out', () => {
     const list = listAddableAssets(all, { positions: [positions[0]], disposals: [sale({ assetId: 'z' })] }, null);
     expect(list.map((e) => e.asset.id)).not.toContain('z');
     expect(list.map((e) => e.asset.id)).not.toContain('etf-a');
     expect(list.map((e) => e.asset.id)).not.toContain('conto');
-    const withMember = listAddableAssets(all, { positions: [positions[0]], disposals: [] }, null, new Set(['etf-a']));
-    expect(withMember.map((e) => e.asset.id)).toContain('etf-a');
   });
 
   it('with the Registro unread nothing is called never bought', () => {

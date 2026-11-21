@@ -3,7 +3,7 @@
 /**
  * The plan of accumulation's PATH: eight screens on the guided paths' card (`PathCard`), the answers on this
  * browser (`plan-path-draft:v1:{ownerId}`), ONE «Conferma» that creates the plan ACTIVE through
- * `createAndActivatePlan` (doc/guide/accumulo.md § Creare un piano: il percorso). The reducer and every rule
+ * `createAndActivatePlan` (doc/guide/accumulo.md § Il percorso: creare e rivedere). The reducer and every rule
  * are lib/utils/planPath.ts; the words lib/utils/planPathNarrative.ts; the bodies PianoScreens.tsx.
  *
  * «Conferma» reads the Italian month again (a press after midnight on the 1st never creates a plan that
@@ -136,7 +136,7 @@ export function PianoWizard({ ownerId, context, basis, onMonthChanged, onAssetsC
     () => (onSummary ? planPositionsToModelWeights(answers.positions, assetsById, (asset) => asset.quantity).portfolioWeights : []),
     [onSummary, answers.positions, assetsById]
   );
-  // The editor's rule: on when the quotas differ from the model, or no model exists.
+  // The rule the deleted editor had (2026-11-21): on when the quotas differ from the model, or no model exists.
   const modelDiffers = !model || comparePlanToModel(answers.positions, model).count > 0;
   const updateModel = modelWeights.length > 0 && (answers.updateModel ?? modelDiffers);
 
@@ -170,7 +170,7 @@ export function PianoWizard({ ownerId, context, basis, onMonthChanged, onAssetsC
       setRun({ kind: 'failed', message: describeWriteError(written.error) });
       return;
     }
-    // The editor's rule: the model's snapshot from the model when the quotas came from it, else the plan's.
+    // The rule the deleted editor had (2026-11-21): the model's snapshot from the model when the quotas came from it, else the plan's.
     const optimizerSnapshot = answers.start === 'model' ? context.model?.optimizerSnapshot : revision.plan.optimizerSnapshot;
     const modelError = updateModel
       ? await saveModelPortfolio(ownerId, { weights: modelWeights, origin: 'manual', optimizerSnapshot }, written.assets, basis).then(

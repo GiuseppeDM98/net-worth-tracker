@@ -20,7 +20,7 @@ should look like and the plan is how the monthly inflow gets closer.
   method (`activeSetQP.ts`, box projection in `boxProjection.ts`). Three modes: **Raggiungibile col PAC** never goes
   below what is held (a PAC's instalments only buy), **Ideale** ignores what is held, **Con vendite mirate** sells under a
   tax cap (below). The optimizer is reached from the model's dialog only (2026-11-21: the plan's step 2 panel left
-  with the editor, NOVE-26). An objective that cannot be met is
+  with the editor). An objective that cannot be met is
   reported as a conflict (`computeConflicts`), never silently dropped; caps that cannot reach 100 are
   `infeasible_bounds`, said before the solver runs. The run happens on «Calcola» / «Prova», in the handler: the
   result is stored with the key of its inputs and shown only while they match — no memo, no effect.

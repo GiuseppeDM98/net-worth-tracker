@@ -357,7 +357,7 @@ describe('describeModelTileReading', () => {
   });
 });
 
-// The PAC's Target step left with the editor (NOVE-26, owner 2026-11-21): the two sentences name the model alone.
+// The PAC's Target step left with the editor (2026-11-21): the two sentences name the model alone.
 // Mutation that turns it red: either sentence still naming «il passo Target del PAC».
 describe('the criteria sentences after the editor', () => {
   it('the criteria off and the switch hint name the model, never a Target step', async () => {

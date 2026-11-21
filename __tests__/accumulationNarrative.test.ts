@@ -2,8 +2,7 @@
  * Tests for the PAC (Accumulo) narrative (lib/utils/accumulationNarrative.ts).
  *
  * One reading per tile state (none/draft/active/done/read-failure), the Comma Rule on every
- * currency and percentage figure (Italian comma decimals, never `toFixed`'s dot), and
- * `describeWeightsTotal` above and below 100.
+ * currency and percentage figure (Italian comma decimals, never `toFixed`'s dot).
  *
  * Currency substrings are built through `cachedFormatCurrencyEUR` itself, never hand-typed: the
  * Italian `Intl` formatter pads the € with a NON-BREAKING space (not `' '`) and prints a 4-digit
@@ -178,7 +177,7 @@ describe('modal and dialog eyebrows/titles', () => {
 
 });
 
-describe('editor warnings — the Italian singular/plural agreement', () => {
+describe('the summary warnings — the Italian singular/plural agreement', () => {
   it('names a single unpriced position with singular agreement', () => {
     expect(describeUnpricedWarning(['ETF-B'])).toBe(
       'ETF-B non ha un prezzo disponibile: non riceve acquisti finché non lo aggiorni.',

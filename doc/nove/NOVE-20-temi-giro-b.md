@@ -24,7 +24,7 @@ After NOVE-19 every portalled content carries `data-costume-scope`. What still m
 | 5 | `ConsulenteWizard.tsx:230`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:225`, `components/ui/path-card.tsx:48` (`PathCard`), `:97` (`PathDoneCard`) — Compravendita and the plan of accumulation since 2026-11-20 | five scene cards on `TILE_SURFACE_CLASS` without `data-tile`: no cap, no marks |
 | 6 | `components/ui/path-card.tsx:20` (`PATH_HEADLINE_CLASS`, since 2026-11-20 the one headline class of `ConsulenteWizard.tsx`, `ConsulenteBook.tsx`, `ConsulenteInterviewScene.tsx`, Compravendita and the plan of accumulation), `ConsulenteRun.tsx:121` | the scene headlines at the verdict's 24/30px in Geist beside a costumed verdict |
 | 7 | `ConsulenteWizard.tsx:260-262`, `ConsulenteInterviewScene.tsx:93`, `components/ui/path-card.tsx:49-51`, `ConsulenteBook.tsx:235` | eyebrows with digits printed as JSX, not through `HeadingText` |
-| 8 | `app/globals.css:60` (`--radius-xl`); § 4.4's list | 36 `rounded-xl` boxes inside tiles and modals plus `card.tsx:10` and `link-banner.tsx:41` (NOVE-19 § 10) @ b841cbd7: 38 (Accumulo's two left with the editor's side panel, NOVE-26, 2026-11-21) — 9px Egeo, 4px Orbita, rounder than the tile |
+| 8 | `app/globals.css:60` (`--radius-xl`); § 4.4's list | 36 `rounded-xl` boxes inside tiles and modals plus `card.tsx:10` and `link-banner.tsx:41` (NOVE-19 § 10) @ b841cbd7: 38 (Accumulo's two left with the editor's side panel, NOVE-26, retired on 2026-11-21, PR #565) — 9px Egeo, 4px Orbita, rounder than the tile |
 | 9 | `components/allocation/ActionChip.tsx:37` and § 4.4b's sites | `rounded-full` bars, pills and pill chips, `rounded-[Npx]` chips on the nine pages and in the Accumulo code: round or literal under Orbita, while NOVE-19 squares the same roles on its three pages |
 | 10 | `ComposizioneTile.tsx:65`, `EvoluzioneTile.tsx:110`, `ValoreStrumentoTile.tsx:90`, `StoricoDettaglio.tsx:74`, `LaborMetricsChart.tsx:34`, `FireDettaglio.tsx:53`, `RollingLineChart.tsx:19`, `AndamentoStoricoCharts.tsx:22`, `ConfrontoAnnualeCharts.tsx:23`, `EntityTrendChart.tsx:21`, `SavingsRateLineChart.tsx:65`, `components/goals/GoalProjectionChart.tsx:75` (10) | twelve Recharts tooltips `borderRadius` 8px / 10px literal (in the chart's DOM, so in scope): rounded under Orbita |
 | 11 | `lib/utils/cashflowSankey.ts:66-92` | income, type, Budget, Risparmi hexes fixed; the ring (`ClassificaTile`, since 2026-11-12) and the phone flow (`SpendingTypesMobileFlow.tsx:44`, `:52`) paint the same types by token (`expenseTypeColors.ts:30-36`, `:61-64`): under a costume the Sankey disagrees with its neighbours |
@@ -225,8 +225,8 @@ Also: the twelve tooltips of § 1 row 10 — `GoalProjectionChart.tsx:75` `borde
 - **Storico**: `history/tiles/DriverTile.tsx:139`; `RaddoppiTile.tsx:100`, `:108`.
 - **Analisi**: `cashflow/ConfrontoAnnualeSection.tsx:123`, `:126`.
 - **Allocazione and Accumulo**: `ActionChip.tsx:37`; `pr488:` `TargetTick.tsx:70`, `:72` (`:50`, `:52` @ b841cbd7);
-  `tiles/EsposizioneTile.tsx:92`; `OptimizerReport.tsx:108`, `:126`, `:128`;
-  `tiles/PortafoglioModelloTile.tsx:242`, `:249`, `:250`; `tiles/QuestoMeseTile.tsx:894`;
+  `tiles/EsposizioneTile.tsx:92`; `OptimizerReport.tsx:96`, `:114`, `:116`;
+  `tiles/PortafoglioModelloTile.tsx:242`, `:249`, `:250`; `tiles/QuestoMeseTile.tsx:867`;
   `tiles/accumuloShared.tsx:38` (`CHIP_BASE`).
 - **Previdenza**: `pension/tiles/AnnoFiscaleTile.tsx:89`, `:96`.
 - **FIRE**: `fire-simulations/tiles/TraguardoTile.tsx:93`, `:102`; `coast/tiles/CoastTraguardoTile.tsx:73`, `:82`;
@@ -391,8 +391,8 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
   `DividendDialog`, `DividendRecordDetailsDialog`, `InflationRateDialog`, `CategoryMoveDialog`, `SeriesDeleteDialog`,
   `UnlinkSeriesDialog`, `BudgetItemDialog`, `AssetAssignmentDialog.tsx:193`, `:256`, `AssistantThreadList.tsx:96`,
   `:105`, `:201`, `EntityDossier.tsx:257`, `pensionStyles.ts`, and `pr488:` `AccumulationCalendarDialog.tsx:220`,
-  `IdealCompositionDialog.tsx:377`, `QuestoMeseTile.tsx:613`, `:731`, `:747`, `:855`; the plan path's summary warnings, `components/allocation/piano/PianoScreens.tsx:59`
-  (`WARNING_BOX_CLASS`, where the editor's step 3 warnings were; NOVE-26, 2026-11-21).
+  `IdealCompositionDialog.tsx:377`, `QuestoMeseTile.tsx:594`, `:712`, `:728`, `:828`; the plan path's summary warnings, `components/allocation/piano/PianoScreens.tsx:90`
+  (`WARNING_BOX_CLASS`, where the editor's step 3 warnings were; NOVE-26, retired on 2026-11-21, PR #565).
 - `CategoryManagementDialog.tsx:205` `rounded-2xl`; `CategoryDeleteConfirmDialog.tsx:391`, `CategoryMoveDialog.tsx:304`
   in-content lists `rounded-md`; `AnalisiPeriodControls.tsx:82` `max-sm:rounded-2xl`; the disclosures on the ground
   (`DettaglioDisclosure.tsx:67-73`, `ConfrontoDisclosure.tsx:91`, `PerformanceDettaglio.tsx:294`, NOVE-12 K1).
