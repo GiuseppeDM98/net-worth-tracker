@@ -579,7 +579,8 @@ rounded-[Npx] che le liste non nominano. Collaudo: § 7, la F al mio «pronto».
 solo dopo il mio OK con il riassunto del diff. SESSION_NOTES.md non si committa.
 ```
 
-Model: **Opus 5.5**, effort **medium** — an L spec that extends the shared costume contract (a 23rd property and
+Model: **Fable 5.2**, effort **high** (owner's choice, 2026-11-21: the longest session of the series, ~50 files, where
+the stronger model holds the coherence to the end; Fable starts at high) — an L spec that extends the shared costume contract (a 23rd property and
 its class, a frame attribute, a title hook, a print reset) and touches ~50 files across many pages, every value
 written and every criterion closed by a test. Estimated size: 1 long session, ~8 h (decision 35: one branch, one commit; resumed on the same branch, without committing, when the context runs out); ~40 lines of CSS, ~250 of TS
 edits, ~250 of tests, cases in four E2E files.
