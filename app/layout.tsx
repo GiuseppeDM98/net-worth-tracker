@@ -13,7 +13,8 @@
  * Font Loading Strategy:
  * - Geist Sans and Geist Mono loaded via next/font/google (optimized)
  * - CSS variables (--font-geist-sans, --font-geist-mono) for Tailwind integration
- * - Applied to body via className for global availability
+ * - Applied to <html>: Tailwind resolves --font-sans there (the preflight's `html` rule); on
+ *   <body> the sans fell back to system-ui until 2026-11-21
  *
  * Favicon Configuration:
  * - Multiple sizes (16x16, 32x32) for browser tabs and bookmarks
@@ -89,7 +90,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="it" suppressHydrationWarning>
+    <html lang="it" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
       <head>
         {/* The stored colour theme onto <html> BEFORE the first paint, the way next-themes puts
             `.dark` there: the dashboard shell is in the prerendered HTML (since 2026-09-28), so without this
@@ -99,9 +100,7 @@ export default function RootLayout({
             server did not render. The script and the key: lib/constants/colorTheme.ts. */}
         <script dangerouslySetInnerHTML={{ __html: COLOR_THEME_INIT_SCRIPT }} />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         {/* Provider hierarchy: AuthProvider → QueryClientProvider → Children
             AuthProvider MUST be outermost to ensure auth state is available
             before React Query hooks run (they may need user.uid for keys) */}

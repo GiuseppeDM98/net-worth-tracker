@@ -173,6 +173,53 @@ export async function expectBrowserChromeFollowsTheme(page: Page): Promise<void>
     .toBe('ok');
 }
 
+/**
+ * (e) Geist Sans is the face the UI reads in (2026-11-21): next/font's variables sit on <html>,
+ * where Tailwind's preflight resolves `--font-sans`. On <body> the variable was undefined there
+ * and the sans fell back to `system-ui` — masked by Segoe UI and SF, so only the computed family
+ * tells. Two halves: the body's computed family starts with Geist and not Geist Mono, and a face
+ * whose family is exactly `Geist` is loaded — never next/font's metric-adjusted «Geist Fallback»,
+ * which a family list naming Geist first would also resolve to while the file is missing.
+ */
+export async function expectGeistSansApplied(page: Page): Promise<void> {
+  await page.goto('/dashboard', { waitUntil: 'load' });
+  await expect(pageHeading(page)).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(async () => {
+        await document.fonts.ready;
+        const family = getComputedStyle(document.body).fontFamily.replace(/['"]/g, '');
+        const loaded = [...document.fonts].some(
+          (face) => face.family.replace(/['"]/g, '') === 'Geist' && face.status === 'loaded',
+        );
+        const ok = family.startsWith('Geist') && !family.startsWith('Geist Mono') && loaded;
+        return ok ? 'ok' : JSON.stringify({ family, faces: [...document.fonts].map((f) => `${f.family}:${f.status}`) });
+      }),
+    )
+    .toBe('ok');
+}
+
+/**
+ * (f) The costume's boundary is the dashboard alone (DESIGN.md → The Costume Rule, 2026-11-21): one
+ * `[data-costume-scope]` on /dashboard (the shell's), none on the landing or the login — the
+ * primitives they share with the dashboard stay in the default costume.
+ */
+export async function expectCostumeScopeInDashboard(page: Page): Promise<void> {
+  await page.goto('/dashboard', { waitUntil: 'load' });
+  await expect(pageHeading(page)).toBeVisible();
+  await expect(page.locator('[data-costume-scope]')).toHaveCount(1);
+}
+
+/** The landing and the login, read without a session (a session would send them on to the dashboard). */
+export async function expectNoCostumeScopeOutsideDashboard(page: Page): Promise<void> {
+  await page.goto('/', { waitUntil: 'load' });
+  await expect(page.locator('h1').filter({ visible: true }).first()).toBeVisible();
+  await expect(page.locator('[data-costume-scope]')).toHaveCount(0);
+  await page.goto('/login', { waitUntil: 'load' });
+  await expect(page.locator('#email')).toBeVisible();
+  await expect(page.locator('[data-costume-scope]')).toHaveCount(0);
+}
+
 /** Without a session the shell shows, the page never does, and /login follows. */
 export async function expectRedirectWithoutSession(page: Page): Promise<void> {
   await page.goto('/dashboard');

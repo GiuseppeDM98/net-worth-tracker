@@ -4,15 +4,16 @@
  * and a pill or chip (`--muted`). WCAG AA for body text is 4,5:1 on each.
  *
  * Reads `app/globals.css` itself, like `chartPaletteDistinctness` and `actionColorContrast`, so
- * what is measured is what ships, in all twelve theme blocks. Written on 2026-10-08, the day the
+ * what is measured is what ships, in every theme block. Written on 2026-10-08, the day the
  * six blocks below the floor were re-pitched (CLAUDE.md § Known Issues since 2026-09-21: the default
  * light theme at 4,34:1 on `bg-muted`, retro-arcade dark at 2,01:1, midnight-bloom at 2,93:1).
- * Seen red before the token change on those six blocks.
+ * Seen red before the token change on those six blocks. Since 2026-11-21 the blocks measured are the
+ * registry's (`THEME_MODES`, ./themeBlocks), and the stylesheet's own list of theme blocks must be
+ * exactly theirs: a theme in `COLOR_THEMES` without CSS, or a block without a registry entry, is red.
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { GLOBALS_CSS, THEME_MODES, themeBlockBody } from './themeBlocks';
 
 type Oklch = [L: number, C: number, H: number];
 type Rgb = [r: number, g: number, b: number];
@@ -20,14 +21,12 @@ type Rgb = [r: number, g: number, b: number];
 const AA_BODY_TEXT = 4.5;
 const SURFACES = ['background', 'card', 'muted'] as const;
 
-const css = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
-
-/** Every theme block, in file order: `:root`, `.dark`, and the ten `[data-theme]` pairs. */
-function themeBlocks(): Array<{ selector: string; body: string }> {
-  const re = /(?:^|\n)\s*((?::root|\.dark|\[data-theme="[^"]+"\]|\.dark\[data-theme="[^"]+"\]))\s*\{([^}]*)\}/g;
-  const blocks: Array<{ selector: string; body: string }> = [];
-  for (let m = re.exec(css); m; m = re.exec(css)) blocks.push({ selector: m[1], body: m[2] });
-  return blocks;
+/** Every theme block the stylesheet declares, in file order: the default's pair and every `[data-theme]` pair. */
+function stylesheetThemeHeaders(): string[] {
+  const re = /(?:^|\n)\s*((?::root, \[data-theme="default"\]|:root|\.dark|\[data-theme="[^"]+"\]|\.dark\[data-theme="[^"]+"\]))\s*\{/g;
+  const headers: string[] = [];
+  for (let m = re.exec(GLOBALS_CSS); m; m = re.exec(GLOBALS_CSS)) headers.push(m[1]);
+  return headers;
 }
 
 function readOklch(body: string, name: string): Oklch {
@@ -66,14 +65,15 @@ function contrastRatio(fg: Oklch, bg: Oklch): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-describe('--muted-foreground across the twelve theme blocks', () => {
-  const blocks = themeBlocks();
-
-  it('reads all twelve blocks from globals.css', () => {
-    expect(blocks.map((b) => b.selector)).toHaveLength(12);
+describe('--muted-foreground across every theme block', () => {
+  it('finds in globals.css exactly the theme blocks of the registry', () => {
+    expect([...stylesheetThemeHeaders()].sort()).toEqual(THEME_MODES.map(({ header }) => header).sort());
   });
 
-  it.each(blocks)('$selector: ≥ 4,5:1 on --background, --card and --muted', ({ body }) => {
+  it.each(THEME_MODES)('$label: ≥ 4,5:1 on --background, --card and --muted', ({ header }) => {
+    const block = themeBlockBody(header);
+    expect(block, `block "${header}" in app/globals.css`).not.toBeNull();
+    const body = block!;
     const ink = readOklch(body, 'muted-foreground');
     const ratios = Object.fromEntries(
       SURFACES.map((surface) => [surface, Number(contrastRatio(ink, readOklch(body, surface)).toFixed(2))]),

@@ -1,13 +1,17 @@
 /**
  * The colour theme constants and the pre-hydration script `app/layout.tsx` inlines in <head>
  * (since 2026-09-28): the script is a string, so it is run here in a bare VM with a fake `localStorage` and
- * `document` — what it does before any module loads is what these cases pin.
+ * `document` — what it does before any module loads is what these cases pin. Since 2026-11-21 it also
+ * puts `data-costume` on <html> for a costume theme (DESIGN.md → The Costume Rule): seen red with the
+ * script's second `indexOf` dropped.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import {
   COLOR_THEMES,
   COLOR_THEME_ATTRIBUTE,
+  COSTUME_ATTRIBUTE,
+  buildColorThemeInitScript,
   COLOR_THEME_INIT_SCRIPT,
   COLOR_THEME_STORAGE_KEY,
   DEFAULT_COLOR_THEME,
@@ -15,7 +19,7 @@ import {
 } from '@/lib/constants/colorTheme';
 
 /** Runs the inline script against a storage that answers `stored`, and returns what it set. */
-function runInitScript(stored: string | null | (() => never)) {
+function runInitScript(stored: string | null | (() => never), script: string = COLOR_THEME_INIT_SCRIPT) {
   const setAttribute = vi.fn();
   const localStorage = {
     getItem: vi.fn((key: string) => {
@@ -23,7 +27,7 @@ function runInitScript(stored: string | null | (() => never)) {
       return key === COLOR_THEME_STORAGE_KEY ? stored : null;
     }),
   };
-  runInNewContext(COLOR_THEME_INIT_SCRIPT, { localStorage, document: { documentElement: { setAttribute } } });
+  runInNewContext(script, { localStorage, document: { documentElement: { setAttribute } } });
   return { setAttribute, getItem: localStorage.getItem };
 }
 
@@ -69,5 +73,29 @@ describe('COLOR_THEME_INIT_SCRIPT', () => {
     };
 
     expect(() => runInitScript(throwing)).not.toThrow();
+  });
+});
+
+describe('buildColorThemeInitScript', () => {
+  const script = buildColorThemeInitScript(['a', 'b'], ['b']);
+
+  it('should put the costume attribute beside the theme for a costume theme', () => {
+    const { setAttribute } = runInitScript('b', script);
+
+    expect(setAttribute).toHaveBeenCalledWith(COLOR_THEME_ATTRIBUTE, 'b');
+    expect(setAttribute).toHaveBeenCalledWith(COSTUME_ATTRIBUTE, '');
+  });
+
+  it('should put only the theme on <html> for a palette theme', () => {
+    const { setAttribute } = runInitScript('a', script);
+
+    expect(setAttribute).toHaveBeenCalledWith(COLOR_THEME_ATTRIBUTE, 'a');
+    expect(setAttribute).not.toHaveBeenCalledWith(COSTUME_ATTRIBUTE, expect.anything());
+  });
+
+  it('should never set the costume attribute in the shipped script, while every theme is a palette theme', () => {
+    for (const theme of COLOR_THEMES) {
+      expect(runInitScript(theme).setAttribute).not.toHaveBeenCalledWith(COSTUME_ATTRIBUTE, expect.anything());
+    }
   });
 });

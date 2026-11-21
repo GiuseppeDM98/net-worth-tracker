@@ -11,6 +11,9 @@ import { test } from '@playwright/test';
 import {
   expectBrowserChromeFollowsTheme,
   expectCleanHydration,
+  expectCostumeScopeInDashboard,
+  expectGeistSansApplied,
+  expectNoCostumeScopeOutsideDashboard,
   expectRedirectWithoutSession,
   expectShellInHtml,
   expectThemeOnFirstFrame,
@@ -32,8 +35,20 @@ test('theme-color, color-scheme e lo sfondo di <html> seguono il tema risolto, a
   await expectBrowserChromeFollowsTheme(page);
 });
 
+test('il testo è in Geist Sans, la faccia caricata, a 390', async ({ page }) => {
+  await expectGeistSansApplied(page);
+});
+
+test('la dashboard porta un solo confine del costume', async ({ page }) => {
+  await expectCostumeScopeInDashboard(page);
+});
+
 test.describe('senza sessione', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('la landing e il login non portano il confine del costume', async ({ page }) => {
+    await expectNoCostumeScopeOutsideDashboard(page);
+  });
 
   test('/dashboard rimanda a /login', async ({ page }) => {
     await expectRedirectWithoutSession(page);

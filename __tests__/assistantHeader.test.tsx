@@ -10,6 +10,10 @@ import { createRef } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { AssistantHeader, newThreadLabel } from '@/components/assistant/AssistantHeader';
 
+// `PageHeader` draws the costume's emblem, which reads the colour theme: its context imports Firebase Auth.
+vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+
 function renderHeader(overrides: Partial<Parameters<typeof AssistantHeader>[0]> = {}) {
   const props = {
     onNewThread: vi.fn(),

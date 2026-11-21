@@ -65,7 +65,7 @@ const base = { currentIndex: 3, sourceCashEur: 40000, reserveEur: 0, hasModel: f
 describe('buildAccumuloVerdict', () => {
   it('no plan', () => {
     const verdict = buildAccumuloVerdict({ ...base, plan: undefined });
-    expect(verdict.headline).toBe('Nessun piano di accumulo aperto.');
+    expect(verdict.headline).toBe('Nessun piano di accumulo.');
     expect(verdict.tone).toBe('neutral');
     expect(flat(narrativeToText(verdict.sentence))).toBe('Nei conti di liquidità hai 40.000 €: un piano li spende in rate mensili verso i pesi che scegli.');
   });

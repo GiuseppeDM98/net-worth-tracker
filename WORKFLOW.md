@@ -162,6 +162,9 @@ count says zero.
 **Once the owner confirms an item, the agent closes its windows** (2026-11-13): the owner never has to close a window to move on.
 The helper closes its browser on SIGTERM, so the agent stops it by its root, checks the count at zero and
 only then opens the next item; the owner closing a window by hand still ends the helper, never an error.
+The comparison page opens the same way, in a window the agent drives and closes, never in the owner's default
+browser, where it stays as a tab only the owner can close (owner, 2026-11-21: «una volta vista una finestra, se non
+è più utile alle voci successive va chiusa da te»).
 
 ### Standard phases, when they make sense
 
@@ -250,6 +253,8 @@ measures in `doc/guide/collaudo.md` (moved there whole on 2026-11-18).
 - **The tour server**: `npm run dev:emulator` → `http://localhost:3000`, on the emulators: nothing seen there touches
   production data.
 - **The owner's go** (2026-10-05): say «pronto» and wait; the owner starts the tour when they can give it 20 minutes.
+- **Phase F before the commit** (owner, 2026-11-21; § 2 obligation 5): the tour first, then the diff summary and the
+  OK; the assistant opens every window itself.
 - **One `next dev` at a time** (2026-09-07): stop the :3100 server before the tour; the tour runs on the emulators
   plus ONE server.
 - **The windows: `scripts/collaudo-finestre.mts`** (2026-11-13): `npx tsx scripts/collaudo-finestre.mts

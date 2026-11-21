@@ -21,7 +21,9 @@
   `[data-stage="lead"]` and the index by its «Il resto della pagina» heading: THE tile 16px under the verdict, the index
   360px wide and 16px to its right, starting on the verdict's line and ending on THE tile's, every row in DOM order inside it
   right under the one before with a hairline, a closed one 52px — its trigger's height; THE tile ends above the fold when the
-  stage has `data-stick="true"`, starts above it otherwise); **`expectStickyStage`** (every row open, `main` scrolled to its
+  stage has `data-stick="true"` — measured STUCK, `main` scrolled until the verdict sits 16px from its top, since the rule
+  is the stack against the whole `main` and a stack that fits only without the header above it sticks too (2026-11-21) —,
+  starts above it otherwise); **`expectStickyStage`** (every row open, `main` scrolled to its
   end in steps: THE tile stays 16px under the verdict, never slides over it); an opened row that did not move nor scroll
   (`openRow` + `expectOpenedRow`: its box and `main.scrollTop` read before the tap; in landscape it stays in the index), no
   half grid row at 768 (`expectNoHalfCells`), `expectNoOverflow`; at 1440 **`expectGridAcrossMain`** (the grid as wide as `main`'s content box). Counting the grid's tracks does NOT prove the 1440 grid (2026-10-16): with `max-desktop:` taken off the stage's columns the grid kept its twelve tracks inside the 360px column and the check stayed green — the width is what went red. The specs: `e2e/overview.tablet.spec.ts` (the overview

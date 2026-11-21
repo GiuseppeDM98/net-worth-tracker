@@ -621,6 +621,10 @@ file used to carry.
   0-8 theme-aware (`--chart-9` is Storico's «Previdenza» band), 9 static.
 - **Every theme block is held to the distinctness floor** (`__tests__/chartPaletteDistinctness.test.ts`, all twelve
   since 2026-09-20): nine slots, ΔE00 ≥ 14 between any two. A new theme or a moved slot runs it first.
+- **A mechanism beyond palette and radius goes through the costume contract** (2026-11-21): `data-costume` on
+  `<html>`, `data-costume-scope` on the dashboard shell and a modal's content, the scope properties
+  (`COSTUME_SCOPE_PROPERTIES`), every rule gated by `[data-costume] [data-costume-scope]` — doc/guide/temi.md § Il costume.
+  A theme's name, description and costume live in `COLOR_THEME_META`; the gate tests and the swatches derive from it.
 - Il resto — il filtro di luminanza (vivo dal 2026-10-08), gli slot senza backfill, la tinta tenuta tra i due modi, `useActionColors`,
   i sign token per tema, `--chart-6/7/8`, `getAssetClassCssVar`, «Adding a theme» — in `doc/guide/temi.md`.
 
