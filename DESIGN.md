@@ -658,7 +658,7 @@ is the footer's secondary, and its five field names are form labels where they w
 eyebrow. And the assistant's Conversazioni (`md`) and Memoria (`lg`) in
 `components/assistant/AssistantModals.tsx`, two right-side `Sheet`s with a 14px title until then:
 no footer (a list to pick from asks for no decision), the memory's tiles as `bg-muted` sub-tiles,
-and the thread delete off its 3-second timer onto `useArmedDelete`. 49 mounts in 47 files (re-measured 2026-11-20)
+and the thread delete off its 3-second timer onto `useArmedDelete`. 48 mounts in 46 files (re-measured 2026-11-21)
 (`grep -w '<ResponsiveModal'`; «Vai a una pagina», the Consulente's book index, since 2026-11-11); the one raw primitive left is `components/layout/LogoutDialog.tsx`,
 an `AlertDialog` on purpose because it interrupts.
 

@@ -308,16 +308,11 @@ export function AccumuloTab({ ownerId, allAssets, targets, hasTargets, band, tar
                       allAssets={allAssets}
                       targets={targets}
                       band={band}
-                      targetLeverageRatio={targetLeverageRatio}
-                      idealAllocation={idealAllocation}
                       currentIndex={currentIndex}
                       matchResult={matchResult}
                       model={model}
-                      onAssetsChanged={onAssetsChanged}
                       reviewByIso={reviewByIso}
-                      modelBasis={modelBasis}
                       today={today}
-                      investmentAccountId={investmentAccountId}
                     />
                   </div>
                 )}

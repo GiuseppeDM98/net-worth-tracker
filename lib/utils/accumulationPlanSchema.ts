@@ -14,7 +14,7 @@ import { unitPriceEur } from './costBasisEur';
 import { describeDraftIssue, type DraftIssueCode } from './accumulationNarrative';
 
 /**
- * The SAME value predicate the seeder (`seedPositionsFromAssets`) and the editor's step 2 candidates use
+ * The SAME value predicate the seeder (`seedPositionsFromAssets`) and the path's held rows use
  * (`calculateAssetValue(asset) > 0`), restated here Firebase-free: `calculateAssetValue` lives in
  * `lib/services/assetService.ts`, which imports `@/lib/firebase/config`, and this module never
  * does (see the file header) — `unitPriceEur` is the same Firebase-free primitive

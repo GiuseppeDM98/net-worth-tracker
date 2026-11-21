@@ -5,7 +5,8 @@
  * PERCHÉ ESISTE: solo il browser contro l'emulatore può dire che le otto schermate e UN «Conferma» scrivono
  * DAVVERO un piano attivo (e il modello), che una vendita ha il suo mese nel calendario, che il percorso riprende
  * dopo un ricaricamento, che una bozza in Accumulo è continuata e attivata come se stessa, che il seme del
- * portafoglio modello arriva sulla prima schermata e che con un piano attivo il percorso rimanda ad Accumulo. Le
+ * portafoglio modello arriva sulla prima schermata e che, con un piano attivo, le tre porte di «Questo mese» aprono il
+ * percorso in REVISIONE e «Conferma» riscrive le sole rate aperte (NOVE-26, 2026-11-21). Le
  * regole sono di Vitest (`planPath.test.ts`, `pianoScreens.test.tsx`, `pianoWizard.test.tsx`, `pianoClient.test.tsx`).
  *
  * Account base (`test@example.com`), istruments del seed. Ogni test che scrive toglie in `afterEach` i piani
@@ -15,8 +16,11 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import {
+  addFixtureRevisionRow,
   clearPlanPathDraft,
   plantCriteria,
+  plantModel,
+  readFixturePlan,
   readModel,
   readOwnerPlans,
   removeAccumuloFixture,
@@ -138,17 +142,113 @@ test.describe('dal portafoglio modello', () => {
   });
 });
 
-test('con un piano attivo il percorso rimanda ad Accumulo; «Rivedi il piano» apre ancora l’editor', async ({ page }) => {
-  await seedAccumuloFixture({ reviewAtOpenMonth: true });
-  try {
+// ─── Rivedere un piano attivo nel percorso (NOVE-26, 2026-11-21) ─────────────────────────────────
+// La fixture attiva (`saleMonthOffset: 2`): 12 rate, le prime due chiuse, la 3ª aperta, una vendita aperta di
+// 1 Apple al 5° mese. Le porte di «Questo mese» aprono il percorso in revisione; «Conferma» chiama `revisePlan`.
+test.describe('rivedere il piano attivo', () => {
+  test.beforeEach(() => seedAccumuloFixture({ saleMonthOffset: 2 }));
+  test.afterEach(() => removeAccumuloFixture());
+
+  const next = (page: Page) => page.getByRole('button', { name: 'Avanti' }).click();
+  const at = (page: Page, n: number) => expect(page.getByRole('region', { name: new RegExp(`^Passo ${n} di 8`) })).toBeVisible({ timeout: 30_000 });
+
+  // E1. Mutation that turns it red: `plan.months` passed as `remainingMonths` (the plan grows by the closed ones).
+  test('«Rivedi il piano» → il percorso precompilato → «Conferma»: le rate chiuse identiche, le aperte riscritte, una riga in più', async ({ page }) => {
+    const before = await readFixturePlan();
+    await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'load' });
+    await clearPlanPathDraft(page);
+    await page.getByRole('link', { name: 'Rivedi il piano' }).last().click({ timeout: 60_000 });
+    await expect(page).toHaveURL(/\/dashboard\/allocation\/piano$/);
+    await expect(page.getByText('Rivedi il piano: le rate chiuse restano come sono.').filter({ visible: true }).first()).toBeVisible({ timeout: 60_000 });
+    await at(page, 1);
+    await expect(page.getByRole('radio', { name: 'Dal piano com’è' })).toBeChecked();
+    await next(page);
+    await expect(page.getByLabel('Ogni mese, in euro')).toHaveValue('0');
+    await page.getByLabel('Ogni mese, in euro').fill('300');
+    await next(page);
+    await expect(page.getByLabel('Mesi', { exact: true })).toHaveValue('10');
+    for (let screen = 3; screen <= 7; screen++) await next(page);
+    await at(page, 8);
+    await page.getByRole('button', { name: 'Conferma' }).click();
+    await expect(page.getByRole('region', { name: 'Piano rivisto' })).toBeVisible({ timeout: 30_000 });
+
+    const after = await readFixturePlan();
+    expect(after.months).toBe(12);
+    expect(after.installments.slice(0, 2)).toEqual(before.installments.slice(0, 2));
+    expect(after.installments.slice(2).map((i) => i.index)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(after.installments.slice(2)).not.toEqual(before.installments.slice(2));
+    expect(after.liquidity.monthlyInflowEur).toBe(300);
+    expect(after.revisions).toHaveLength(1);
+    expect(after.revisions[0].fromIndex).toBe(3);
+  });
+
+  // E2. Mutation that turns it red: no `movedDisposalMonthIndexes` sent (the moved sale keeps its month).
+  test('la vendita aperta spostata di un mese e una vendita nuova: i loro mesi nel piano', async ({ page }) => {
     await page.goto(PIANO, { waitUntil: 'load' });
-    await expect(page.getByText('Hai già un piano di accumulo attivo.')).toBeVisible({ timeout: 60_000 });
-    await page.getByRole('link', { name: 'Apri Accumulo' }).first().click();
-    await expect(page).toHaveURL(/tab=accumulo/);
-    const note = page.getByText('Il Consulente ha indicato questo mese per rivedere il piano', { exact: false });
-    await note.locator('..').getByRole('button', { name: 'Rivedi il piano' }).click({ timeout: 60_000 });
-    await expect(page.getByRole('dialog').getByLabel('Mesi restanti')).toBeVisible();
-  } finally {
-    await removeAccumuloFixture();
-  }
+    await clearPlanPathDraft(page);
+    await page.reload({ waitUntil: 'load' });
+    await at(page, 1);
+    for (let screen = 1; screen <= 5; screen++) await next(page);
+    await at(page, 6);
+    const list = page.getByRole('list', { name: 'Strumenti da vendere' });
+    const apple = list.getByRole('listitem').filter({ hasText: 'Apple Inc.' });
+    await expect(list.getByRole('checkbox', { name: 'Vendi Apple Inc.' })).toBeChecked();
+    await apple.getByRole('combobox', { name: 'In quale mese' }).click();
+    await page.getByRole('option', { name: /\(6º\)/ }).click();
+    await list.getByRole('checkbox', { name: 'Vendi Vanguard FTSE All-World' }).click();
+    const vanguard = list.getByRole('listitem').filter({ hasText: 'Vanguard FTSE All-World' });
+    await vanguard.getByLabel('Quante quote').fill('1');
+    await vanguard.getByRole('combobox', { name: 'In quale mese' }).click();
+    await page.getByRole('option', { name: /\(7º\)/ }).click();
+    await next(page);
+    await next(page);
+    await at(page, 8);
+    await expect(page.getByText('Apple Inc.: spostata a', { exact: false })).toBeVisible();
+    await expect(page.getByText('Vanguard FTSE All-World: nuova, 1 quota a', { exact: false })).toBeVisible();
+    await page.getByRole('button', { name: 'Conferma' }).click();
+    await expect(page.getByRole('region', { name: 'Piano rivisto' })).toBeVisible({ timeout: 30_000 });
+
+    const after = await readFixturePlan();
+    const month = (assetId: string) => after.disposals.find((d) => d.assetId === assetId)?.monthIndex;
+    expect(month('seed-aapl')).toBe(6);
+    expect(month('seed-vwce')).toBe(7);
+  });
+
+  // E3. Mutation that turns it red: `fromModel` ignored (the start stays «Dal piano com’è»).
+  test('«Rivedi dal modello» → ?da=modello, «Dal portafoglio modello» scelto, le quote del modello alla 7ª', async ({ page }) => {
+    await plantModel('e2e-revision');
+    await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'load' });
+    await clearPlanPathDraft(page);
+    await page.getByRole('link', { name: 'Rivedi dal modello' }).click({ timeout: 60_000 });
+    await expect(page).toHaveURL(/\/dashboard\/allocation\/piano\?da=modello$/);
+    await at(page, 1);
+    await expect(page.getByRole('radio', { name: 'Dal portafoglio modello' })).toBeChecked();
+    for (let screen = 1; screen <= 6; screen++) await next(page);
+    await at(page, 7);
+    const quotas = page.getByRole('list', { name: 'Strumenti del piano' });
+    await expect(quotas.getByLabel('Vanguard FTSE All-World', { exact: true })).toHaveValue('70');
+    await expect(quotas.getByLabel('BTP Valore 2030', { exact: true })).toHaveValue('30');
+    await expect(quotas.getByLabel('Apple Inc.', { exact: true })).toHaveValue('0');
+  });
+
+  // E4. Mutation that turns it red: any stored draft of the same plan id kept.
+  test('un ricaricamento alla 5ª tiene la revisione; una revisione scritta altrove → il percorso riparte dal piano', async ({ page }) => {
+    await page.goto(PIANO, { waitUntil: 'load' });
+    await clearPlanPathDraft(page);
+    await page.reload({ waitUntil: 'load' });
+    await at(page, 1);
+    await next(page);
+    await page.getByLabel('Ogni mese, in euro').fill('400');
+    for (let screen = 2; screen <= 4; screen++) await next(page);
+    await at(page, 5);
+    await page.reload({ waitUntil: 'load' });
+    await at(page, 5);
+
+    await addFixtureRevisionRow();
+    await page.reload({ waitUntil: 'load' });
+    await at(page, 1);
+    await expect(page.getByRole('radio', { name: 'Dal piano com’è' })).toBeChecked();
+    await next(page);
+    await expect(page.getByLabel('Ogni mese, in euro')).toHaveValue('0');
+  });
 });

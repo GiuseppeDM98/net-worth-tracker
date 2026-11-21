@@ -20,9 +20,8 @@
  * the month named, no action). In the month the Consulente asked to look at the plan again, a note
  * and «Rivedi il piano» above the footer (`isPlanReviewDue`, 2026-11-19).
  */
-import type { ModelBasis } from '@/lib/utils/modelPortfolio';
 import { useMemo, useRef, useState } from 'react';
-import type { Asset, AssetAllocationTarget, IdealAllocationSettings } from '@/types/assets';
+import type { Asset, AssetAllocationTarget } from '@/types/assets';
 import type { AccumulationPlan, InstallmentLine } from '@/types/accumulationPlan';
 import { addMonths, toMonthKey } from '@/lib/utils/planMonths';
 import type { ModelPortfolio } from '@/types/modelPortfolio';
@@ -62,9 +61,8 @@ import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NarrativeText } from '@/components/ui/narrative-text';
-import { AccumulationPlanDialog } from '@/components/allocation/AccumulationPlanDialog';
 import Link from 'next/link';
-import { PLAN_PATH_HREF } from '@/lib/utils/accumuloCopy';
+import { PLAN_PATH_FROM_MODEL_HREF, PLAN_PATH_HREF } from '@/lib/utils/accumuloCopy';
 import { AccumulationCalendarDialog } from '@/components/allocation/AccumulationCalendarDialog';
 import { TransactionDialog } from '@/components/assets/TransactionDialog';
 import { DEPS, DraftBox, ROW_ACTION_CLASS, ROW_UNDO_CLASS, LineStateChip, TILE_ACTION_CLASS, effectiveLineState } from '@/components/allocation/tiles/accumuloShared';
@@ -137,25 +135,35 @@ interface QuestoMeseTileProps {
   allAssets: Asset[];
   targets: AssetAllocationTarget;
   band: RebalanceBand;
-  /** deriveTargetLeverageRatio(targets) — threaded to the editor's Ottimizzato view. */
-  targetLeverageRatio: number;
-  /** The owner's "Allocazione ideale" objectives, or `null` when not yet loaded. */
-  idealAllocation: IdealAllocationSettings | null;
   /** `monthIndexOf(plan, today)`, from `useOpenAccumuloPlan`. */
   currentIndex: number;
   /** The ledger matching of the plan, computed once by the tab (its verdict reads the same states). */
   matchResult: { matches: LineMatch[]; lineStates: Record<string, LineUiState> };
-  /** The model portfolio: the editor's «Parti da» offers it. */
+  /** The model portfolio: «Rivedi dal modello» shows when the plan's quotas differ from it. */
   model?: ModelPortfolio | null;
-  onAssetsChanged: () => void;
   /** The Consulente's «rivedi entro» date: a plan ending after it says so (2026-11-12); null without one. */
   reviewByIso: string | null;
-  /** What the model rests on: the revision's «aggiorna anche il modello» stamps it. */
-  modelBasis: ModelBasis;
   /** The day `currentIndex` is read on (`useOpenAccumuloPlan`): the review month's check reads its month. */
   today: Date;
-  /** Impostazioni › Spese «Conto per gli investimenti», handed to the editor, which revises only: unread since 2026-11-20. */
-  investmentAccountId: string | null;
+}
+
+/**
+ * A door to the path's revision (2026-11-21): a link; where a revision cannot start (demo, every instalment
+ * closed) a disabled button with the same label and no link.
+ */
+function ReviseDoor({ href, disabled, variant, className, children }: { href: string; disabled: boolean; variant: 'outline' | 'link'; className: string; children: React.ReactNode }) {
+  if (disabled) {
+    return (
+      <Button variant={variant} className={className} disabled>
+        {children}
+      </Button>
+    );
+  }
+  return (
+    <Button asChild variant={variant} className={className}>
+      <Link href={href}>{children}</Link>
+    </Button>
+  );
 }
 
 export function QuestoMeseTile({
@@ -164,24 +172,19 @@ export function QuestoMeseTile({
   allAssets,
   targets,
   band,
-  targetLeverageRatio,
-  idealAllocation,
   currentIndex,
   matchResult,
   model = null,
-  onAssetsChanged,
   reviewByIso,
-  modelBasis,
   today,
-  investmentAccountId,
 }: QuestoMeseTileProps) {
   const isDemo = useDemoMode();
   const pastReviewNote = reviewByIso && planEndsAfterReview(plan, reviewByIso) ? (
     <p className="mt-2 text-[12px] text-warning-foreground">{describePlanPastReview(reviewByIso)}</p>
   ) : null;
 
-  const [reviseOpen, setReviseOpen] = useState(false);
-  const [reviseFromModel, setReviseFromModel] = useState(false);
+  // A revision needs an intact instalment (decision 98) and is never written in demo.
+  const reviseDisabled = isDemo || !findFirstIntactInstallment(plan);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarFocusIndex, setCalendarFocusIndex] = useState<number | undefined>(undefined);
   const [registerTarget, setRegisterTarget] = useState<
@@ -358,28 +361,6 @@ export function QuestoMeseTile({
       asset={registerSubject.asset}
       prefill={registerSubject.prefill}
       onCreated={(result, data, priceEur) => void handleRegistered(result, data, priceEur)}
-    />
-  );
-
-  const reviseDialog = reviseOpen && (
-    <AccumulationPlanDialog
-      open={reviseOpen}
-      onClose={() => setReviseOpen(false)}
-      ownerId={ownerId}
-      plan={plan}
-      revise
-      reviseFromModel={reviseFromModel}
-      allAssets={allAssets}
-      targets={targets}
-      band={band}
-      targetLeverageRatio={targetLeverageRatio}
-      idealAllocation={idealAllocation}
-      model={model}
-      onAssetsChanged={onAssetsChanged}
-      reviewByIso={reviewByIso}
-      basis={modelBasis}
-      investmentAccountId={investmentAccountId}
-      onSaved={() => setReviseOpen(false)}
     />
   );
 
@@ -747,17 +728,9 @@ export function QuestoMeseTile({
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-muted/40 p-3">
             <p className="text-[12px] leading-[1.5] text-foreground">{describePlanModelDivergence(divergence.count)}</p>
             {!isDemo && (
-              <Button
-                variant="outline"
-                className={ROW_ACTION_CLASS}
-                disabled={!findFirstIntactInstallment(plan)}
-                onClick={() => {
-                  setReviseFromModel(true);
-                  setReviseOpen(true);
-                }}
-              >
+              <ReviseDoor href={PLAN_PATH_FROM_MODEL_HREF} disabled={reviseDisabled} variant="outline" className={ROW_ACTION_CLASS}>
                 {ACCUMULO_ACTION_REVIEW_FROM_MODEL}
-              </Button>
+              </ReviseDoor>
             )}
           </div>
         )}
@@ -902,14 +875,9 @@ export function QuestoMeseTile({
         {isPlanReviewDue(plan, currentIndex, toMonthKey(today)) && (
           <div className="mt-3">
             <p className="text-[12px] text-muted-foreground">{ACCUMULO_REVIEW_DUE_NOTE}</p>
-            <Button
-              variant="link"
-              className="h-11 px-0 text-[12px] desktop:h-8"
-              disabled={isDemo || !findFirstIntactInstallment(plan)}
-              onClick={() => { setReviseFromModel(false); setReviseOpen(true); }}
-            >
+            <ReviseDoor href={PLAN_PATH_HREF} disabled={reviseDisabled} variant="link" className="h-11 px-0 text-[12px] desktop:h-8">
               {ACCUMULO_ACTION_REVISE}
-            </Button>
+            </ReviseDoor>
           </div>
         )}
 
@@ -919,9 +887,9 @@ export function QuestoMeseTile({
             <Button variant="outline" className={TILE_ACTION_CLASS} onClick={() => { setCalendarFocusIndex(undefined); setCalendarOpen(true); }}>
               {ACCUMULO_ACTION_CALENDAR}
             </Button>
-            <Button variant="outline" className={TILE_ACTION_CLASS} disabled={isDemo || !findFirstIntactInstallment(plan)} onClick={() => { setReviseFromModel(false); setReviseOpen(true); }}>
+            <ReviseDoor href={PLAN_PATH_HREF} disabled={reviseDisabled} variant="outline" className={TILE_ACTION_CLASS}>
               {ACCUMULO_ACTION_REVISE}
-            </Button>
+            </ReviseDoor>
             <Button
               ref={stopRef}
               variant="outline"
@@ -938,7 +906,6 @@ export function QuestoMeseTile({
 
       {calendarDialog}
       {registerDialog}
-      {reviseDialog}
     </>
   );
 }

@@ -9,13 +9,14 @@
  * basis), the plans, the model, the ledger (the «Mai comprato» rule) — and, beside them and never a reason
  * to wait or to fail, the Consulente's document («rivedi entro»). The states, the first that applies:
  * loading (the plans also fetched AFTER mount: a restored list may hold a draft another tab activated),
- * demo, a failed read, no targets, an ACTIVE plan (a sentence and «Apri Accumulo»), else the wizard.
+ * demo, a failed read, no targets, an ACTIVE plan with every instalment closed (decision 98: a sentence and
+ * «Apri Accumulo»), else the wizard — in a REVISION of the active plan when there is one (2026-11-21).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
-import type { MonthKey } from '@/types/accumulationPlan';
+import type { AccumulationPlan, MonthKey } from '@/types/accumulationPlan';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -32,12 +33,12 @@ import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 import { toMonthKey } from '@/lib/utils/planMonths';
 import { DEFAULT_REBALANCE_BAND, buildHoldings } from '@/lib/utils/allocationUtils';
-import { findFirstIntactInstallment, resolveInvestmentAccountId } from '@/lib/utils/accumulationPlanUtils';
+import { resolveInvestmentAccountId } from '@/lib/utils/accumulationPlanUtils';
 import { buildModelBasis } from '@/lib/utils/modelPortfolio';
 import { reviewDueState } from '@/lib/utils/allocationAdviceNarrative';
 import { ACCUMULO_HREF, ACCUMULO_OPEN_LINK, ACCUMULO_PLAN_NOTHING_TO_REVISE } from '@/lib/utils/accumuloCopy';
-import { planPathStorageKey, type PlanPathContext } from '@/lib/utils/planPath';
-import { PLAN_PATH_ACTIVE, PLAN_PATH_BACK_LINK, PLAN_PATH_DEMO, PLAN_PATH_NO_TARGETS, PLAN_PATH_TITLE } from '@/lib/utils/planPathNarrative';
+import { buildPlanPathRevision, planPathStorageKey, type PlanPathContext } from '@/lib/utils/planPath';
+import { PLAN_PATH_BACK_LINK, PLAN_PATH_DEMO, PLAN_PATH_NO_TARGETS, PLAN_PATH_REVISION_DESCRIPTION, PLAN_PATH_TITLE } from '@/lib/utils/planPathNarrative';
 import { clearStored } from '@/lib/utils/pathDraftStorage';
 import { resolveEffectiveTargets } from '@/lib/services/effectiveTargets';
 import { compareAllocations } from '@/lib/services/assetAllocationService';
@@ -60,7 +61,20 @@ import { PianoWizard } from './PianoWizard';
 const SKELETON_CELLS: TileSkeletonCell[] = [{ span: 12, rows: 2 }];
 const CARD_CLASS = cn(TILE_SURFACE_CLASS, 'mx-auto w-full max-w-[720px] p-5 desktop:p-6');
 
-export function PianoClient() {
+/** `?da=modello` («Rivedi dal modello»), read in the browser: a `searchParams` prop on the page would make the route
+ *  dynamic, never prerendered. Read on EVERY render, not once at mount: a client navigation from Accumulo mounts the
+ *  page before the URL changes (found by E3). The server snapshot is empty and the loading state reads no answer;
+ *  the wizard mounts on plans fetched after mount, when the URL is the new one. */
+function subscribeToHistory(onChange: () => void): () => void {
+  window.addEventListener('popstate', onChange);
+  return () => window.removeEventListener('popstate', onChange);
+}
+const readSearch = () => window.location.search;
+const noSearch = () => '';
+
+export function PianoClient({ fromModel: fromModelProp }: { fromModel?: boolean }) {
+  const search = useSyncExternalStore(subscribeToHistory, readSearch, noSearch);
+  const fromModel = fromModelProp ?? new URLSearchParams(search).get('da') === 'modello';
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
@@ -95,6 +109,14 @@ export function PianoClient() {
     [ledgerMetaQuery.data, tradesQuery.data]
   );
 
+  // The plan this page just wrote keeps the wizard's done card: the refetched list must not change its mode.
+  const [created, setCreated] = useState(false);
+  const [revisedPlan, setRevisedPlan] = useState<AccumulationPlan | null>(null);
+  const activePlan = plansFresh && openPlan?.status === 'active' ? openPlan : null;
+  // Frozen on the plan the wizard started from: the list refetched after «Conferma» never restarts it.
+  const revisionPlan = revisedPlan ?? (created ? null : activePlan);
+  const revision = useMemo(() => (revisionPlan ? buildPlanPathRevision(revisionPlan) : null), [revisionPlan]);
+
   const context = useMemo<PlanPathContext | null>(() => {
     if (!assets || !effective) return null;
     return {
@@ -110,25 +132,26 @@ export function PianoClient() {
       compare: compareAllocations,
       deps: DEPS,
       todayMonth,
+      revision,
+      fromModel,
     };
-  }, [assets, effective, modelQuery.data, settings, openPlan, tradedAssetIds, reviewByIso, todayMonth]);
+  }, [assets, effective, modelQuery.data, settings, openPlan, tradedAssetIds, reviewByIso, todayMonth, revision, fromModel]);
   const basis = useMemo(
     () => buildModelBasis({ ...(settings ?? {}), ...(effective ? { targets: effective.targets } : {}) } as AssetAllocationSettings, goalData?.goals),
     [settings, effective, goalData]
   );
 
-  // The plan this page just created keeps the wizard's done card: the refetched list must not turn it into «Hai già un piano».
-  const [created, setCreated] = useState(false);
-  const activePlan = !created && plansFresh && openPlan?.status === 'active' ? openPlan : null;
-  // The active plan made a browser draft moot.
+  // A closed plan (decision 98) made a browser draft moot; a revision's draft is the wizard's to keep or drop (V6).
+  const nothingToRevise = !created && !revisedPlan && activePlan !== null && revision === null;
   useEffect(() => {
-    if (activePlan && ownerId && typeof window !== 'undefined') clearStored(window.localStorage, planPathStorageKey(ownerId));
-  }, [activePlan, ownerId]);
+    if (nothingToRevise && ownerId && typeof window !== 'undefined') clearStored(window.localStorage, planPathStorageKey(ownerId));
+  }, [nothingToRevise, ownerId]);
 
   const header = (
     <PageHeader
       label="Allocazione"
       title={PLAN_PATH_TITLE}
+      description={revision ? PLAN_PATH_REVISION_DESCRIPTION : undefined}
       actions={
         <Button asChild variant="outline" className="hidden h-8 px-2.5 text-xs desktop:inline-flex">
           <Link href={ACCUMULO_HREF}>{PLAN_PATH_BACK_LINK}</Link>
@@ -174,10 +197,10 @@ export function PianoClient() {
       />
     );
   }
-  if (activePlan) {
+  if (nothingToRevise) {
     return page(
       <section className={CARD_CLASS} aria-label="Piano attivo">
-        <p className="text-[15px] leading-[1.55] text-foreground">{findFirstIntactInstallment(activePlan) === undefined ? ACCUMULO_PLAN_NOTHING_TO_REVISE : PLAN_PATH_ACTIVE}</p>
+        <p className="text-[15px] leading-[1.55] text-foreground">{ACCUMULO_PLAN_NOTHING_TO_REVISE}</p>
         <div className="mt-4">
           <Button asChild className={PATH_BUTTON_CLASS}>
             <Link href={ACCUMULO_HREF}>{ACCUMULO_OPEN_LINK}</Link>
@@ -189,11 +212,16 @@ export function PianoClient() {
 
   return page(
     <PianoWizard
+      // A new mode is a new wizard: its reducer starts again on the other answers.
+      key={revision ? `revision-${revision.plan.id}` : 'create'}
       ownerId={ownerId}
       context={context}
       basis={basis}
       onMonthChanged={setTodayMonth}
-      onCreated={() => setCreated(true)}
+      onCreated={() => {
+        if (revisionPlan) setRevisedPlan(revisionPlan);
+        else setCreated(true);
+      }}
       onAssetsChanged={() => void queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) })}
     />
   );

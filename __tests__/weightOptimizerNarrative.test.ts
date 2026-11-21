@@ -2,13 +2,10 @@ import { describe, it, expect } from 'vitest';
 import type { Asset } from '@/types/assets';
 import type { ConflictReport, ObjectiveReport, OptimizerSaleReport, OptimizerWarning, SecondLevelGap } from '@/lib/utils/weightOptimizer';
 import {
-  OPTIMIZER_IDEAL_BELOW_HELD_CONFIRM,
   describeConflict,
   describeModelDebtNote,
   describeObjectiveLabel,
-  describeObjectiveRow,
   describeOptimizerMode,
-  describeOptimizerSnapshot,
   describeOptimizerWarning,
   describeSecondLevelGaps,
   describeTargetedSaleTotal,
@@ -83,10 +80,6 @@ describe('gap / target / achieved formatting', () => {
     expect(formatObjectiveGap(o)).toBe('−0,04×');
   });
 
-  it('describeObjectiveRow composes target → achieved (gap)', () => {
-    const o = objective({ label: 'Azioni', targetValue: 102.0, achievedValue: 101.6, gapPp: -0.4 });
-    expect(describeObjectiveRow(o)).toBe('Azioni 102,0% → 101,6% (−0,4 pp)');
-  });
 });
 
 describe('describeConflict', () => {
@@ -150,16 +143,6 @@ describe('describeOptimizerMode', () => {
     expect(describeOptimizerMode('reachable').length).toBeGreaterThan(0);
   });
 
-  // A plan may carry planned sales since «Con vendite mirate» (2026-11-18): what never sells is the
-  // INSTALMENT, so the sentences say that — never «il PAC non vende» (owner, 2026-11-18; red on that wording).
-  it('says the instalments only buy, never that the PAC does not sell', () => {
-    expect(describeOptimizerMode('reachable')).toBe(
-      'Raggiungibile non scende sotto ciò che possiedi, perché le rate del PAC comprano soltanto.'
-    );
-    expect(OPTIMIZER_IDEAL_BELOW_HELD_CONFIRM).toBe(
-      'In modalità Ideale alcuni pesi sono sotto ciò che possiedi: le rate del PAC comprano soltanto, quindi quelle posizioni riceveranno zero acquisti.'
-    );
-  });
 });
 
 describe('the targeted mode, «Con vendite mirate»', () => {
@@ -229,35 +212,6 @@ describe('the targeted mode, «Con vendite mirate»', () => {
     expect(reading.tone).toBe('neutral');
     expect(plain(textOf(describeIdealCompositionStatus(run, [], -2000, { instrumentCount: 3, baseEur: 100000 }).narrative))).toBe(
       `Vendi 8000 €, paghi circa 400 € di tasse, usi 3000 € di liquidità (tetto 500 €). ${NEGATIVE_LIQUIDITY_NOTE}`
-    );
-  });
-});
-
-describe('describeOptimizerSnapshot', () => {
-  const snapshot = {
-    computedAt: new Date(2026, 8, 18), // 18/09
-    mode: 'reachable' as const,
-    weights: [{ key: 'p1', proposedPct: 60 }],
-  };
-
-  it('names the date and the mode when the weights are untouched', () => {
-    const positions = [{ id: 'p1', targetPercentage: 60 }];
-    expect(describeOptimizerSnapshot(snapshot, positions)).toBe(
-      "Pesi proposti dall'ottimizzatore il 18/09 (Raggiungibile col PAC)."
-    );
-  });
-
-  it('adds the hand-edited clause once a weight differs', () => {
-    const positions = [{ id: 'p1', targetPercentage: 65 }];
-    expect(describeOptimizerSnapshot(snapshot, positions)).toBe(
-      "Pesi proposti dall'ottimizzatore il 18/09 (Raggiungibile col PAC), poi modificati a mano."
-    );
-  });
-
-  it('ignores a position the snapshot never proposed a weight for', () => {
-    const positions = [{ id: 'other', targetPercentage: 40 }];
-    expect(describeOptimizerSnapshot(snapshot, positions)).toBe(
-      "Pesi proposti dall'ottimizzatore il 18/09 (Raggiungibile col PAC)."
     );
   });
 });
@@ -400,5 +354,15 @@ describe('describeModelTileReading', () => {
   it('no model, or a failed read', () => {
     expect(textOf(describeModelTileReading({ ...base, instrumentCount: null }))).toBe(MODEL_TILE_EMPTY_READING);
     expect(textOf(describeModelTileReading({ ...base, readFailed: true }))).toBe(MODEL_TILE_READ_FAILURE_READING);
+  });
+});
+
+// The PAC's Target step left with the editor (NOVE-26, owner 2026-11-21): the two sentences name the model alone.
+// Mutation that turns it red: either sentence still naming «il passo Target del PAC».
+describe('the criteria sentences after the editor', () => {
+  it('the criteria off and the switch hint name the model, never a Target step', async () => {
+    const narrative = await import('@/lib/utils/weightOptimizerNarrative');
+    expect(narrative.OBJECTIVES_OFF_READING).toBe('I criteri sono spenti: il portafoglio modello resta manuale finché non li accendi.');
+    expect(narrative.IDEAL_ALLOCATION_ENABLE_HINT).toBe('Propone i pesi degli strumenti del portafoglio modello, da cui può partire il piano di accumulo.');
   });
 });

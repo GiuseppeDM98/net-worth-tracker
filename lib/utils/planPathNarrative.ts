@@ -6,14 +6,17 @@
  */
 
 import type { Asset } from '@/types/assets';
-import type { MonthKey } from '@/types/accumulationPlan';
+import type { MonthKey, PlanDisposal, PlanPosition } from '@/types/accumulationPlan';
 import type { Narrative } from '@/lib/utils/narrative';
 import {
   buildDraftPreview,
+  disposalMonthIndex,
+  isOpenSavedDisposal,
   proceedsOfDisposal,
   resolvePositionStates,
 } from '@/lib/utils/accumulationPlanUtils';
 import {
+  describeDraftIssue,
   describeInsufficientLiquidityWarning,
   describePlanPastReview,
   describeSaleStep,
@@ -25,16 +28,28 @@ import { planEndsAfterReview } from '@/lib/utils/accumuloMonth';
 import { candidateSaleTaxPerEuro } from '@/lib/utils/saleTax';
 import { addMonths, monthLabelLong } from '@/lib/utils/planMonths';
 import { cachedFormatCurrencyEUR, formatCurrency } from '@/lib/utils/formatters';
-import { planPathToDraft, type PlanPathAnswers, type PlanPathContext, type PlanPathSale, type PlanPathScreen } from '@/lib/utils/planPath';
+import { roundToCents } from '@/lib/utils/cents';
+import {
+  planPathToDraft,
+  planPathToRevision,
+  previewPlanPathRevision,
+  type PlanPathAnswers,
+  type PlanPathContext,
+  type PlanPathRevision,
+  type PlanPathSale,
+  type PlanPathScreen,
+} from '@/lib/utils/planPath';
 
 export const PLAN_PATH_TITLE = 'Piano di accumulo';
 export const PLAN_PATH_BACK_LINK = 'Torna ad Accumulo';
 export const PLAN_PATH_DEMO = "Il piano di accumulo non si crea nell'account demo.";
 export const PLAN_PATH_NO_TARGETS = 'Prima imposta i target in Impostazioni › Allocazione: il piano va verso di essi.';
-export const PLAN_PATH_ACTIVE = 'Hai già un piano di accumulo attivo.';
 export const PLAN_PATH_START_REPLACES = 'Le quote che avevi scritto vengono sostituite.';
 export const PLAN_PATH_CONFIRM = 'Conferma';
 export const PLAN_PATH_CONFIRMING = 'Creo il piano…';
+export const PLAN_PATH_REVISING = 'Rivedo il piano…';
+/** The page header's description in a revision. */
+export const PLAN_PATH_REVISION_DESCRIPTION = 'Rivedi il piano: le rate chiuse restano come sono.';
 export const PLAN_PATH_NEXT = 'Avanti';
 export const PLAN_PATH_DONE_FOOTER = 'Ogni mese lo trovi in Allocazione › Accumulo.';
 export const PLAN_PATH_REDISTRIBUTE = 'Ridistribuisci il resto';
@@ -47,6 +62,7 @@ export const PLAN_PATH_START_LABELS = {
   model: 'Dal portafoglio modello',
   today: 'Dai pesi di oggi',
   zero: 'Da zero: le scrivo io',
+  plan: 'Dal piano com’è',
 } as const;
 
 /** «La prima rata è a dicembre 2026.» — the month after «today». */
@@ -54,7 +70,11 @@ export function firstInstalmentMonth(todayMonth: MonthKey): MonthKey {
   return addMonths(todayMonth, 1);
 }
 
-export function planPathScreenCopy(screen: PlanPathScreen, context: Pick<PlanPathContext, 'todayMonth'>): { theme: string; question: string; help: string } {
+export function planPathScreenCopy(screen: PlanPathScreen, context: Pick<PlanPathContext, 'todayMonth' | 'revision'>): { theme: string; question: string; help: string } {
+  if (context.revision) {
+    const revised = revisionScreenCopy(screen, context.revision);
+    if (revised) return revised;
+  }
   switch (screen) {
     case 'partenza':
       return { theme: 'Partenza', question: 'Da dove partono le quote?', help: 'Puoi cambiare ogni quota più avanti.' };
@@ -79,6 +99,32 @@ export function planPathScreenCopy(screen: PlanPathScreen, context: Pick<PlanPat
   }
 }
 
+/** The wording of a revision where it differs from a new plan's; null = the same screen copy. */
+function revisionScreenCopy(screen: PlanPathScreen, revision: PlanPathRevision): { theme: string; question: string; help: string } | null {
+  switch (screen) {
+    case 'partenza':
+      return { theme: 'Partenza', question: 'Da dove ripartono le quote?', help: 'Le rate già chiuse non cambiano.' };
+    case 'versamento':
+      return { theme: 'Versamento', question: 'Quanto versi ogni mese, da adesso?', help: 'Anche 0: il piano investe allora solo la liquidità che hai già.' };
+    case 'durata': {
+      const next = monthLabelLong(revision.firstMonth);
+      const closed = revision.closedCount;
+      const help = closed === 0 ? `La prossima rata è ${next}.` : `${closed} ${closed === 1 ? 'rata è chiusa' : 'rate sono chiuse'}; la prossima è ${next}.`;
+      return { theme: 'Durata', question: 'Quanti mesi restano?', help };
+    }
+    case 'vendite':
+      return {
+        theme: 'Vendite',
+        question: 'Cambi le vendite?',
+        help: 'Il ricavato entra nelle rate dal mese della vendita; se alla riserva manca qualcosa, prima la ricostituisce.',
+      };
+    case 'riepilogo':
+      return { theme: 'Riepilogo', question: 'Confermi la revisione?', help: 'Con «Conferma» il piano cambia dalla prossima rata.' };
+    default:
+      return null;
+  }
+}
+
 /** «La tua allocazione chiede 10.000 € di liquidità; 5.000 € sono già altrove.» */
 export function describePathReserveSource(quotaEur: number, otherCashEur: number): string {
   return `La tua allocazione chiede ${cachedFormatCurrencyEUR(quotaEur, true)} di liquidità; ${cachedFormatCurrencyEUR(otherCashEur, true)} sono già altrove.`;
@@ -95,6 +141,18 @@ export function describePathSuggestionButton(suggestionEur: number): string {
 /** «gennaio 2027 (2º)»: a sale's month in the select. */
 export function describeSaleMonthOption(todayMonth: MonthKey, index: number): string {
   return `${monthLabelLong(addMonths(todayMonth, index))} (${index}º)`;
+}
+
+/** A revision's sale month, the plan's index k: «gennaio 2027 (6º)»; a late sale's own month «ottobre 2026 · in ritardo». */
+export function describeRevisionSaleMonthOption(revision: Pick<PlanPathRevision, 'firstIndex' | 'firstMonth'>, index: number): string {
+  const month = monthLabelLong(addMonths(revision.firstMonth, index - revision.firstIndex));
+  return index < revision.firstIndex ? `${month} · in ritardo` : `${month} (${index}º)`;
+}
+
+/** A sale a revision cannot change, as a plain line: «ETF A · 5 quote · già venduta». */
+export function describeLockedSale(name: string, disposal: PlanDisposal): string {
+  const state = disposal.status === 'executed' ? 'già venduta' : disposal.status === 'skipped' ? 'saltata' : 'da confermare nel Registro';
+  return `${name} · ${describeQuantity(disposal.quantity ?? null)} · ${state}`;
 }
 
 /** «60 quote · 6.000 €» */
@@ -134,17 +192,24 @@ export function describePathTaxTotal(taxes: ReadonlyArray<number | null>): strin
   return `Tasse stimate delle vendite: ${formatCurrency(Math.round(total * 100) / 100)}${without}`;
 }
 
+/** «tutte le quote» for every share, else «1 quota» / «n quote». */
+function describeQuantity(quantity: number | null): string {
+  if (quantity === null) return 'tutte le quote';
+  return quantity === 1 ? '1 quota' : `${quantity} quote`;
+}
+
 function describeSaleQuantity(sale: PlanPathSale): string {
-  if (sale.quantity === null) return 'tutte le quote';
-  return sale.quantity === 1 ? '1 quota' : `${sale.quantity} quote`;
+  return describeQuantity(sale.quantity);
 }
 
 export interface PlanPathSummary {
   /** `describeStep3Summary`: the plan in one line. */
   headline: Narrative;
-  /** «La prima rata è a dicembre 2026: 1.500 €.» */
-  first: string;
+  /** «La prima rata è a dicembre 2026: 1.500 €.»; null in a revision, whose headline says the next instalment. */
+  first: string | null;
   saleSteps: string[];
+  /** A revision: one line per saved or new sale that changes («tolta», «spostata a …», «nuova, …», «da a a b quote, …»). */
+  changes: string[];
   sales: string[];
   taxTotal: string | null;
   warnings: string[];
@@ -153,18 +218,15 @@ export interface PlanPathSummary {
 }
 
 /** The summary's sentences, on the draft «Conferma» writes: what the editor's preview showed. */
-export function buildPlanPathSummary(answers: PlanPathAnswers, context: PlanPathContext): PlanPathSummary {
+export function buildPlanPathSummary(answers: PlanPathAnswers, context: PlanPathContext, today: Date = new Date(0)): PlanPathSummary {
+  if (context.revision) return buildRevisionSummary(answers, context, context.revision, today);
   const draft = planPathToDraft(answers, context);
   const assetsById = new Map<string, Asset>(context.assets.map((asset) => [asset.id, asset]));
   const preview = buildDraftPreview({ draft, allAssets: context.assets, targets: context.targets, band: context.band, compare: context.compare, deps: context.deps, firstIndex: 1 });
   const nameOf = (assetId: string) => assetsById.get(assetId)?.name ?? assetId;
 
   // Coverage, as the editor measures it: L against the ideal deficit Σ max(0, target% × B − value).
-  const states = resolvePositionStates(draft.positions, assetsById, context.deps, draft.disposals);
-  const base = states.reduce((sum, state) => sum + state.currentValueEur, 0) + preview.liquidity.L;
-  const deficit = states.filter((state) => !state.unpriced).reduce((sum, state) => sum + Math.max(0, (state.targetPercentage / 100) * base - state.currentValueEur), 0);
-  const rawCoverage = deficit <= 0.5 ? null : Math.min(100, (preview.liquidity.L / deficit) * 100);
-  const coveragePct = rawCoverage === null || rawCoverage >= 99.5 ? null : rawCoverage;
+  const coveragePct = liquidityCoveragePct(draft.positions, draft.disposals, preview.liquidity.L, assetsById, context);
 
   const buying = summarizeBuyingInstalments(preview.schedule.installments, preview.liquidity.refillMonths);
   const firstMonth = buying?.firstMonth ?? preview.schedule.installments[0]?.month ?? draft.startMonth;
@@ -199,12 +261,93 @@ export function buildPlanPathSummary(answers: PlanPathAnswers, context: PlanPath
     headline,
     first: `La prima rata è a ${monthLabelLong(firstMonth)}: ${cachedFormatCurrencyEUR(firstEur, true)}.`,
     saleSteps,
+    changes: [],
     sales,
     taxTotal: describePathTaxTotal(estimates.map(({ estimate }) => estimate.taxEur)),
     warnings,
     firstMonth,
     firstEur,
   };
+}
+
+/** L against the ideal deficit Σ max(0, target% × B − value), as the editor measures it; null when it covers it. */
+function liquidityCoveragePct(positions: PlanPosition[], disposals: PlanDisposal[], L: number, assetsById: Map<string, Asset>, context: PlanPathContext): number | null {
+  const states = resolvePositionStates(positions, assetsById, context.deps, disposals);
+  const base = states.reduce((sum, state) => sum + state.currentValueEur, 0) + L;
+  const deficit = states.filter((state) => !state.unpriced).reduce((sum, state) => sum + Math.max(0, (state.targetPercentage / 100) * base - state.currentValueEur), 0);
+  const raw = deficit <= 0.5 ? null : Math.min(100, (L / deficit) * 100);
+  return raw === null || raw >= 99.5 ? null : raw;
+}
+
+/** A revision's sale quantity in a change line: the number, «tutte le» for every share. */
+function changeQuantity(quantity: number | undefined): string {
+  return quantity === undefined ? 'tutte le' : String(quantity);
+}
+
+/**
+ * The revision's summary from the engine's own result (V7): the months left and the next instalment, the sale
+ * steps after it, one line per sale that changes (a saved sale with new shares is ONE line, though the engine
+ * sees removed + new), the tax of the new sales, the warnings on the revised plan. A refused revision says why.
+ */
+function buildRevisionSummary(answers: PlanPathAnswers, context: PlanPathContext, revision: PlanPathRevision, today: Date): PlanPathSummary {
+  const assetsById = new Map<string, Asset>(context.assets.map((asset) => [asset.id, asset]));
+  const nameOf = (assetId: string) => assetsById.get(assetId)?.name ?? assetId;
+  const monthOf = (index: number) => addMonths(revision.firstMonth, index - revision.firstIndex);
+  const result = previewPlanPathRevision(answers, context, today);
+  if (!result.ok) {
+    const reason = result.issue === 'duplicate_asset'
+      ? describeDraftIssue({ code: 'duplicate_asset', label: nameOf(result.assetId) })
+      : describeDraftIssue({ code: result.issue });
+    return { headline: [{ text: reason }], first: null, saleSteps: [], changes: [], sales: [], taxTotal: null, warnings: [], firstMonth: revision.firstMonth, firstEur: 0 };
+  }
+  const { plan } = result;
+  const upcoming = plan.installments.filter((installment) => installment.index >= result.firstIndex);
+  const next = upcoming[0];
+  const firstMonth = next?.month ?? revision.firstMonth;
+  const firstEur = roundToCents((next?.lines ?? []).reduce((sum, line) => sum + line.plannedAmountEur, 0));
+  const left = answers.months ?? upcoming.length;
+  const headline: Narrative = [
+    { text: `${left} ${left === 1 ? 'rata' : 'rate'} da ${monthLabelLong(firstMonth)}: la prossima di ` },
+    { text: cachedFormatCurrencyEUR(firstEur, true), mono: true },
+    { text: '.' },
+  ];
+  const saleSteps = listSaleSteps({ installments: upcoming, disposals: plan.disposals, firstIndex: result.firstIndex, nameOf }).map(describeSaleStep);
+
+  const input = planPathToRevision(answers, context);
+  const saved = new Map(revision.plan.disposals.filter(isOpenSavedDisposal).map((disposal) => [disposal.assetId, disposal]));
+  const added = new Map(input.disposals.map((disposal) => [disposal.assetId, disposal]));
+  const removed = input.removedDisposalAssetIds ?? [];
+  const changes: string[] = [];
+  for (const assetId of removed) {
+    const before = saved.get(assetId);
+    const after = added.get(assetId);
+    if (after && before) {
+      changes.push(`${nameOf(assetId)}: da ${changeQuantity(before.quantity)} a ${changeQuantity(after.quantity)} quote, a ${monthLabelLong(monthOf(disposalMonthIndex(after)))}.`);
+    } else {
+      changes.push(`${nameOf(assetId)}: tolta.`);
+    }
+  }
+  for (const [assetId, index] of Object.entries(input.movedDisposalMonthIndexes ?? {})) {
+    changes.push(`${nameOf(assetId)}: spostata a ${monthLabelLong(monthOf(index))}.`);
+  }
+  for (const disposal of input.disposals) {
+    if (removed.includes(disposal.assetId)) continue;
+    const quantity = disposal.quantity === undefined ? 'tutte le quote' : disposal.quantity === 1 ? '1 quota' : `${disposal.quantity} quote`;
+    changes.push(`${nameOf(disposal.assetId)}: nuova, ${quantity} a ${monthLabelLong(monthOf(disposalMonthIndex(disposal)))}.`);
+  }
+
+  // The tax lines of the sales «Conferma» adds (a changed sale is a new one for the engine).
+  const estimates = answers.sales.filter((sale) => added.has(sale.assetId)).map((sale) => ({ sale, estimate: estimateSale(sale, context) }));
+  const sales = estimates.map(({ sale, estimate }) => `${nameOf(sale.assetId)}: ${describeSaleQuantity(sale)} a ${monthLabelLong(monthOf(sale.month))}, ${estimate.line}.`);
+
+  const openDisposals = plan.disposals.filter((disposal) => disposal.status !== 'executed' && disposal.status !== 'skipped');
+  const coveragePct = liquidityCoveragePct(plan.positions, openDisposals, result.liquidity.L, assetsById, context);
+  const unpriced = resolvePositionStates(plan.positions, assetsById, context.deps, openDisposals).filter((state) => state.unpriced);
+  const warnings: string[] = [];
+  if (coveragePct !== null) warnings.push(describeInsufficientLiquidityWarning(coveragePct));
+  if (unpriced.length > 0) warnings.push(describeUnpricedWarning(unpriced.map((state) => plan.positions.find((position) => position.id === state.positionId)?.label ?? state.positionId)));
+
+  return { headline, first: null, saleSteps, changes, sales, taxTotal: describePathTaxTotal(estimates.map(({ estimate }) => estimate.taxEur)), warnings, firstMonth, firstEur };
 }
 
 /** «Conferma» after the Italian month changed: nothing written. */
@@ -215,6 +358,11 @@ export function describeMonthChanged(firstMonth: MonthKey): string {
 /** The draft was written, its activation failed: the next press overwrites it. */
 export function describeActivationFailed(reason: string): string {
   return `Il piano è salvato ma non attivo: ${reason.replace(/[.\s]+$/, '')}. Premi di nuovo «Conferma».`;
+}
+
+/** «Piano rivisto: prossima rata a dicembre 2026, 1.500 €.» (V8) */
+export function describePlanRevised(firstMonth: MonthKey, firstEur: number): string {
+  return `Piano rivisto: prossima rata a ${monthLabelLong(firstMonth)}, ${cachedFormatCurrencyEUR(firstEur, true)}.`;
 }
 
 /** «Piano attivo: prima rata a dicembre 2026, 1.500 €.» */

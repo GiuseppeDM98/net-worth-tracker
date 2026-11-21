@@ -17,8 +17,10 @@ import {
   scheduleInstallments,
   shouldProposeRecalibration,
   recalibrationQuantities,
+  revisedPlanGateDraft,
   type PlanDeps,
 } from '@/lib/utils/accumulationPlanUtils';
+import { describeDraftIssue } from '@/lib/utils/accumulationNarrative';
 import { validateDraftAgainstAssets } from '@/lib/utils/accumulationPlanSchema';
 
 let seq = 0;
@@ -379,5 +381,56 @@ describe('a revision and the months of its sales', () => {
     expect(review({})).toBe(8);
     expect(review({ reviewMonthIndex: 5 })).toBe(5);
     expect(review({ reviewMonthIndex: null })).toBeUndefined();
+  });
+});
+
+describe('a revision built on a plan that moved meanwhile', () => {
+  function afterFour() {
+    const { plan } = planOnF();
+    for (const installment of plan.installments.filter((i) => i.index <= 4)) {
+      installment.lines.forEach((l) => { l.status = 'executed'; l.transactionIds = ['t']; });
+    }
+    plan.disposals = [sale({ status: 'executed' })];
+    return { plan, assets: byId(etfA(155), etfB(143), conto(28320)) };
+  }
+  const input = (plan: AccumulationPlan, overrides = {}) => ({
+    monthlyInflowEur: 800, reserveEur: 10000, remainingMonths: 6, positions: plan.positions, disposals: [], ...overrides,
+  });
+
+  it('expectedFirstIndex 5 on a plan whose first intact instalment is the 5th: revised; on the 6th: plan_moved', () => {
+    const { plan, assets } = afterFour();
+    expect(buildRevisedPlan(plan, input(plan, { expectedFirstIndex: 5 }), assets, deps, new Date()).ok).toBe(true);
+    plan.installments[4].lines[0].status = 'executed';
+    expect(buildRevisedPlan(plan, input(plan, { expectedFirstIndex: 5, remainingMonths: 5 }), assets, deps, new Date())).toEqual({ ok: false, issue: 'plan_moved' });
+  });
+
+  it('absent: revised from whatever instalment is first intact, as before', () => {
+    const { plan, assets } = afterFour();
+    plan.installments[4].lines[0].status = 'executed';
+    const result = buildRevisedPlan(plan, input(plan, { remainingMonths: 5 }), assets, deps, new Date());
+    expect(result.ok && result.firstIndex).toBe(6);
+  });
+
+  it('describeDraftIssue names the move and asks to reload', () => {
+    expect(describeDraftIssue({ code: 'plan_moved' })).toBe('Il piano è cambiato mentre lo rivedevi: ricarica la pagina.');
+  });
+
+  it('revisedPlanGateDraft carries the plan fields and leaves the executed sales out', () => {
+    const { plan } = afterFour();
+    plan.disposals = [sale({ status: 'executed' }), sale({ assetId: 'etf-a', quantity: 10, monthIndex: 7, status: 'planned' })];
+    const gate = revisedPlanGateDraft(plan);
+    expect(gate).toEqual({
+      name: plan.name, startMonth: plan.startMonth, months: plan.months, liquidity: plan.liquidity, positions: plan.positions,
+      disposals: [plan.disposals[1]],
+    });
+  });
+
+  // A sale skipped in Questo mese sells nothing (owner, 2026-11-21, found at the guided verification: a skipped sale of
+  // every share of an instrument still held, which keeps its row, refused every revision with «… è una posizione del
+  // piano»). Mutation that turns it red: the filter on `executed` alone.
+  it('revisedPlanGateDraft leaves the skipped sales out too', () => {
+    const { plan } = afterFour();
+    plan.disposals = [sale({ status: 'skipped' }), sale({ assetId: 'etf-a', quantity: 10, monthIndex: 7, status: 'planned' })];
+    expect(revisedPlanGateDraft(plan).disposals).toEqual([plan.disposals[1]]);
   });
 });

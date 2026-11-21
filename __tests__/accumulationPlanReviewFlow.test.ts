@@ -1,7 +1,7 @@
 /**
- * «Rivedi il piano» completo: Raggruppa, Separa and
- * Sostituisci in a revision, the instruments with no shares, the source accounts and the saved sales.
- * The proof case is the owner's PAC (a group of two trend funds at 18%, the newer one buys) with invented names.
+ * The engine of «Rivedi il piano»: the line labels, the instruments with no shares, the source accounts and the
+ * saved sales in a revision. Raggruppa, Separa and Sostituisci left with the editor (owner 89, NOVE-26,
+ * 2026-11-21): a group comes from the model and is revised as one row. Invented names.
  */
 import { describe, it, expect } from 'vitest';
 import type { Asset } from '@/types/assets';
@@ -12,15 +12,12 @@ import {
   computeTotalPurchases,
   computeUsableLiquidity,
   diffRevisionDisposals,
-  groupPositions,
   installmentLineLabel,
   isOpenSavedDisposal,
   listAddableAssets,
   planMemberAssetIds,
-  replaceBuyAsset,
   resolvePositionStates,
   scheduleInstallments,
-  separatePosition,
   type PlanDeps,
 } from '@/lib/utils/accumulationPlanUtils';
 
@@ -36,7 +33,6 @@ function makeAsset(overrides: Partial<Asset> = {}): Asset {
 
 const deps: PlanDeps = { valueOf: (a) => a.quantity * unitPriceEur(a), priceOf: (a) => unitPriceEur(a) };
 const byId = (...assets: Asset[]) => new Map(assets.map((a) => [a.id, a]));
-const nameOf = (assets: Map<string, Asset>) => (id: string) => assets.get(id)?.name ?? id;
 
 const etfA = (quantity = 100) => makeAsset({ id: 'etf-a', name: 'Mondo Azionario', ticker: 'ETFA', quantity, currentPrice: 120 });
 const old = (quantity = 100) => makeAsset({ id: 'old', name: 'Trend Fenicottero', ticker: 'FNC', quantity, currentPrice: 50 });
@@ -73,95 +69,6 @@ function planAfterThreeRates(disposals: PlanDisposal[] = []) {
 
 const revision = (plan: AccumulationPlan, overrides = {}) => ({
   monthlyInflowEur: 800, reserveEur: 10000, remainingMonths: 7, positions: plan.positions, disposals: [], ...overrides,
-});
-
-describe('Raggruppa and Separa', () => {
-  it('a group takes the id of the position that buys and the sum of the weights', () => {
-    const grouped = groupPositions(positions, new Set(['etf-a', 'old']), 'old', nameOf(byId(etfA(), old())), () => 'new-id');
-    expect(grouped).toHaveLength(1);
-    expect(grouped[0]).toEqual({ id: 'po', label: 'Trend Fenicottero', targetPercentage: 100, memberAssetIds: ['old', 'etf-a'], buyAssetId: 'old' });
-  });
-
-  it('fewer than two singletons, or a buyer outside the selection, change nothing', () => {
-    expect(groupPositions(positions, new Set(['etf-a']), 'etf-a', nameOf(byId()))).toBe(positions);
-    expect(groupPositions(positions, new Set(['etf-a', 'old']), 'fresh', nameOf(byId()))).toBe(positions);
-  });
-
-  it('Separa splits the weight by value and the buyer keeps the group id', () => {
-    const group: PlanPosition[] = [{ id: 'g', label: 'G', targetPercentage: 18, memberAssetIds: ['fresh', 'old'], buyAssetId: 'fresh' }];
-    const assets = byId(old(), fresh());
-    const split = separatePosition(group, 'g', (id) => (assets.get(id) ? deps.valueOf(assets.get(id)!) : 0), nameOf(assets), () => 'x');
-    expect(split.map((p) => [p.id, p.memberAssetIds[0], p.targetPercentage])).toEqual([['g', 'fresh', 0], ['x', 'old', 18]]);
-  });
-
-  it('a group created in a revision leaves the rates closed before k deepEqual and rewrites from k', () => {
-    const plan = planAfterThreeRates();
-    const assets = byId(etfA(155), old(100), fresh(), conto(28320));
-    const closedBefore = JSON.parse(JSON.stringify(plan.installments.filter((i) => i.index <= 3)));
-    const grouped = groupPositions(plan.positions, new Set(['etf-a', 'old']), 'etf-a', nameOf(assets));
-    const result = buildRevisedPlan(plan, revision(plan, { positions: grouped }), assets, deps, new Date('2026-12-01'));
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.firstIndex).toBe(4);
-    expect(result.plan.installments.filter((i) => i.index <= 3)).toEqual(closedBefore);
-    const fromK = result.plan.installments.filter((i) => i.index >= 4);
-    expect(fromK).toHaveLength(7);
-    // One position buys now: every revised line names the buyer of the group.
-    expect(new Set(fromK.flatMap((i) => i.lines.map((l) => l.assetId)))).toEqual(new Set(['etf-a']));
-    expect(result.plan.positions).toHaveLength(1);
-  });
-});
-
-describe('Sostituisci (the owner\'s case)', () => {
-  it('a singleton becomes the group [new, old], new buys, same weight, a new id', () => {
-    const assets = byId(old(), fresh());
-    const replaced = replaceBuyAsset(positions, 'po', 'fresh', nameOf(assets), () => 'g1');
-    expect(replaced).not.toBeNull();
-    expect(replaced![1]).toEqual({ id: 'g1', label: 'Trend Ornitorinco coperto', targetPercentage: 18, memberAssetIds: ['fresh', 'old'], buyAssetId: 'fresh' });
-    expect(replaced![0]).toBe(positions[0]);
-  });
-
-  it('on a group it changes the member that buys; an instrument already elsewhere is refused', () => {
-    const group: PlanPosition[] = [
-      { id: 'g', label: 'G', targetPercentage: 18, memberAssetIds: ['fresh', 'old'], buyAssetId: 'fresh' },
-      positions[0],
-    ];
-    const assets = byId(old(), fresh());
-    const back = replaceBuyAsset(group, 'g', 'old', nameOf(assets), () => 'g2');
-    expect(back![0]).toMatchObject({ id: 'g2', memberAssetIds: ['old', 'fresh'], buyAssetId: 'old' });
-    expect(replaceBuyAsset(group, 'g', 'etf-a', nameOf(assets))).toBeNull();
-    expect(replaceBuyAsset(group, 'g', 'fresh', nameOf(assets))).toBe(group);
-    expect(replaceBuyAsset(group, 'missing', 'fresh', nameOf(assets))).toBeNull();
-  });
-
-  it('Separa undoes it: the weight goes back to the old instrument (the new one has no value)', () => {
-    const assets = byId(old(), fresh());
-    const replaced = replaceBuyAsset(positions, 'po', 'fresh', nameOf(assets), () => 'g1')!;
-    const split = separatePosition(replaced, 'g1', (id) => deps.valueOf(assets.get(id)!), nameOf(assets), () => 'z');
-    expect(split.map((p) => [p.memberAssetIds[0], p.targetPercentage])).toEqual([['etf-a', 82], ['fresh', 0], ['old', 18]]);
-  });
-
-  it('revision of 16/10: the 100 shares stay, the new instrument buys, the closed rates stay readable', () => {
-    const plan = planAfterThreeRates();
-    const assets = byId(etfA(155), old(100), fresh(0), conto(28320));
-    const replaced = replaceBuyAsset(plan.positions, 'po', 'fresh', nameOf(assets), () => 'g1')!;
-    const closedBefore = JSON.parse(JSON.stringify(plan.installments.filter((i) => i.index <= 3)));
-    const result = buildRevisedPlan(plan, revision(plan, { positions: replaced }), assets, deps, new Date('2026-12-01'));
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const plan2 = result.plan;
-    expect(plan2.installments.filter((i) => i.index <= 3)).toEqual(closedBefore);
-    const revisedBuyers = new Set(plan2.installments.filter((i) => i.index >= 4).flatMap((i) => i.lines.map((l) => l.assetId)));
-    expect(revisedBuyers).toEqual(new Set(['etf-a', 'fresh']));
-    expect(revisedBuyers.has('old')).toBe(false);
-    // The 100 shares are in the position's value: the group is 18% of the base, the 5.000 € held count.
-    const line = plan2.installments[3].lines.find((l) => l.assetId === 'fresh')!;
-    expect(line.priceEurAtPlan).toBe(60);
-    // A closed line of the old buyer keeps its instrument's name, not the id.
-    const oldLine = plan2.installments[0].lines.find((l) => l.assetId === 'old')!;
-    expect(installmentLineLabel(oldLine, plan2.positions, nameOf(assets))).toBe('Trend Fenicottero');
-    expect(installmentLineLabel(line, plan2.positions, nameOf(assets))).toBe('Trend Ornitorinco coperto');
-  });
 });
 
 describe('installmentLineLabel', () => {

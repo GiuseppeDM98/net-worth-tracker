@@ -21,10 +21,22 @@ vi.mock('@/lib/utils/saleTax', () => ({
 }));
 
 import type { Asset, AllocationResult } from '@/types/assets';
+import type { AccumulationPlan } from '@/types/accumulationPlan';
 import { DEFAULT_REBALANCE_BAND } from '@/lib/utils/allocationUtils';
-import { initialPlanPathDraft, planPathReducer, type PlanPathAnswers, type PlanPathContext } from '@/lib/utils/planPath';
-import { PLAN_PATH_START_REPLACES } from '@/lib/utils/planPathNarrative';
-import { PartenzaScreen, StrumentiScreen, VenditeScreen } from '@/components/allocation/piano/PianoScreens';
+import {
+  buildPlanPathRevision,
+  describePlanPathBlock,
+  initialPlanPathDraft,
+  planPathReducer,
+  previewPlanPathRevision,
+  saleMonthIndexes,
+  type PlanPathAnswers,
+  type PlanPathContext,
+} from '@/lib/utils/planPath';
+import { PLAN_PATH_START_REPLACES, buildPlanPathSummary } from '@/lib/utils/planPathNarrative';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { narrativeToText } from '@/lib/utils/narrative';
+import { PartenzaScreen, RiepilogoScreen, StrumentiScreen, VenditeScreen } from '@/components/allocation/piano/PianoScreens';
 
 const TODAY = new Date('2026-11-20T12:00:00');
 function asset(id: string, name: string, overrides: Partial<Asset> = {}): Asset {
@@ -45,6 +57,7 @@ const context: PlanPathContext = {
   assets: ASSETS, targets: { equity: { targetPercentage: 100 } }, band: DEFAULT_REBALANCE_BAND, model: null, investmentAccountId: 'conto',
   openDraft: null, tradedAssetIds: null, holdings: [], reviewByIso: null,
   compare: () => ({ byAssetClass: {}, marketValue: 0 }) as unknown as AllocationResult, deps: DEPS, todayMonth: '2026-11',
+  revision: null, fromModel: false,
 };
 function answers(overrides: Partial<PlanPathAnswers> = {}): PlanPathAnswers {
   return {
@@ -137,6 +150,24 @@ describe('VenditeScreen (mutation: hide the month)', () => {
     expect(within(rowOf('ETF fenicottero')).getByLabelText('Quante quote').getAttribute('placeholder')).toBe('tutte');
   });
 
+  // Every share reads as the number held (owner, 2026-11-21, on the mirror: the exact count typed emptied the field, which
+  // read as refused). While the field has the focus it holds what is typed, empty included, so it can be retyped;
+  // empty still means every share. Mutation that turns it red: the field showing `sale.quantity` alone.
+  it('a sale of every share shows the shares held; emptied while focused it stays empty and dispatches null', () => {
+    const dispatched: unknown[] = [];
+    render(<VenditeScreen answers={answers({ sales: [{ assetId: 'etf-b', quantity: null, month: 1 }] })} dispatch={(action) => dispatched.push(action)} context={context} />);
+    const row = within(screen.getByRole('list', { name: 'Strumenti da vendere' })).getAllByRole('listitem').find((r) => r.textContent?.includes('ETF fenicottero'))!;
+    const field = within(row).getByLabelText('Quante quote') as HTMLInputElement;
+    expect(field.value).toBe('40');
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: '' } });
+    expect(field.value).toBe('');
+    expect(dispatched.at(-1)).toMatchObject({ type: 'sale', sale: { assetId: 'etf-b', quantity: null } });
+    fireEvent.change(field, { target: { value: '7' } });
+    expect(field.value).toBe('7');
+    expect(dispatched.at(-1)).toMatchObject({ sale: { quantity: 7 } });
+  });
+
   it('a group’s member has no «tutte» placeholder', () => {
     const positions = [{ id: 'g', label: 'Azionario globale', targetPercentage: 100, memberAssetIds: ['etf-a', 'etf-b'], buyAssetId: 'etf-a' }];
     render(<VenditeScreen answers={answers({ positions, sales: [{ assetId: 'etf-b', quantity: null, month: 1 }] })} dispatch={() => {}} context={context} />);
@@ -165,5 +196,139 @@ describe('PartenzaScreen — the note that typed quotas are replaced', () => {
     const seed = { positions: [{ id: 's-a', label: 'ETF ornitorinco', targetPercentage: 100, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' }] };
     render1(answers({ start: 'seed', seed, positions: seed.positions }));
     expect(note()).toBeNull();
+  });
+});
+
+// ─── A revision of an ACTIVE plan (2026-11-21) ───────────────────────────────────────────────────
+
+/**
+ * Twelve months from 2026-08, four closed (instalment 5 = dicembre 2026 is the first open one). Cash at the
+ * reserve, so the instalments are the inflow (800) plus the sales from their months; the two positions held at
+ * their quotas. The plan's sales: ETF ornitorinco 10 in month 6 and ETF fenicottero 10 in month 7 (open), ETF
+ * airone 10 in month 8 (open), and three locked ones on other instruments — executed, skipped, linked. The four
+ * instruments outside the positions are held, so each has its row at 0 %.
+ */
+function revisionPlan(overrides: Partial<AccumulationPlan> = {}): AccumulationPlan {
+  const line = (positionId: string, assetId: string, closed: boolean) => ({
+    positionId, assetId, plannedQuantity: 2, priceEurAtPlan: 100, plannedAmountEur: 200,
+    status: closed ? ('executed' as const) : ('planned' as const), ...(closed ? { transactionIds: ['t'] } : {}),
+  });
+  const months = ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06', '2027-07'];
+  return {
+    id: 'plan-1', userId: 'u1', name: 'Piano airone', status: 'active', startMonth: '2026-08', months: 12,
+    liquidity: { sourceCashAssetIds: ['conto'], reserveEur: 4000, monthlyInflowEur: 800 },
+    positions: [
+      { id: 'p-a', label: 'ETF ornitorinco', targetPercentage: 50, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' },
+      { id: 'p-b', label: 'ETF fenicottero', targetPercentage: 50, memberAssetIds: ['etf-b'], buyAssetId: 'etf-b' },
+    ],
+    disposals: [
+      { assetId: 'etf-a', quantity: 10, monthIndex: 6, estimatedProceedsEur: 1000, status: 'planned' },
+      { assetId: 'etf-b', quantity: 10, monthIndex: 7, estimatedProceedsEur: 1000, status: 'planned' },
+      { assetId: 'etf-c', quantity: 10, monthIndex: 8, estimatedProceedsEur: 1000, status: 'planned' },
+      { assetId: 'etf-d', quantity: 5, monthIndex: 2, estimatedProceedsEur: 500, status: 'executed' },
+      { assetId: 'etf-e', monthIndex: 3, estimatedProceedsEur: 1000, status: 'skipped' },
+      { assetId: 'etf-f', quantity: 2, monthIndex: 4, estimatedProceedsEur: 200, status: 'planned', transactionIds: ['s1'] },
+    ],
+    installments: months.map((month, i) => ({
+      index: i + 1, month, carryInEur: {}, lines: [line('p-a', 'etf-a', i < 4), line('p-b', 'etf-b', i < 4)],
+    })),
+    createdAt: TODAY, updatedAt: TODAY,
+    ...overrides,
+  };
+}
+const REVISION_ASSETS = [
+  asset('conto', 'Conto ornitorinco', { type: 'cash', assetClass: 'cash', quantity: 4000, currentPrice: 1 }),
+  asset('etf-a', 'ETF ornitorinco', { quantity: 60 }),
+  asset('etf-b', 'ETF fenicottero', { quantity: 60 }),
+  asset('etf-c', 'ETF airone', { quantity: 10 }),
+  asset('etf-d', 'ETF garzetta', { quantity: 10 }),
+  asset('etf-e', 'ETF cormorano', { quantity: 10 }),
+  asset('etf-f', 'ETF svasso', { quantity: 10 }),
+];
+function revisionContext(plan: AccumulationPlan): PlanPathContext {
+  return { ...context, assets: REVISION_ASSETS, revision: buildPlanPathRevision(plan) };
+}
+
+describe('RiepilogoScreen in a revision (mutation: read the first instalment of the whole plan; «tolta» and «nuova» for a changed quantity)', () => {
+  it('the next instalment and its month, the sale-step sentence, one line per sale that changes', () => {
+    const plan = revisionPlan();
+    const ctx = revisionContext(plan);
+    const start = initialPlanPathDraft(ctx).answers;
+    // ETF fenicottero moved 7 → 9; ETF airone from 10 to 6 shares; ETF ornitorinco from 10 to 5, moved 6 → 7.
+    const answers1: PlanPathAnswers = {
+      ...start,
+      sales: [
+        { assetId: 'etf-b', quantity: 10, month: 9 },
+        { assetId: 'etf-c', quantity: 6, month: 8 },
+        { assetId: 'etf-a', quantity: 5, month: 7 },
+      ],
+    };
+    const preview = previewPlanPathRevision(answers1, ctx, TODAY);
+    if (!preview.ok) throw new Error('the fixture revises');
+    const nextEur = preview.plan.installments.find((i) => i.index === 5)!.lines.reduce((sum, l) => sum + l.plannedAmountEur, 0);
+    expect(nextEur).not.toBe(400);
+    const summary = buildPlanPathSummary(answers1, ctx, TODAY);
+    render(<RiepilogoScreen summary={summary} modelBox={null} />);
+    const text = flat(document.body.textContent);
+    // The headline's figure splits its «€» into a span (DESIGN → the figure unit): read it as text.
+    expect(flat(narrativeToText(summary.headline))).toBe(flat(`8 rate da dicembre 2026: la prossima di ${cachedFormatCurrencyEUR(nextEur, true)}.`));
+    expect(text).toContain('ETF fenicottero: spostata a aprile 2027');
+    expect(text).toContain('ETF airone: da 10 a 6 quote, a marzo 2027');
+    expect(text).toContain('ETF ornitorinco: da 10 a 5 quote, a febbraio 2027');
+    expect(text).not.toContain('ETF airone: tolta');
+    expect(text).not.toContain('ETF airone: nuova');
+    expect(summary.saleSteps.some((sentence) => sentence.startsWith('Da febbraio la rata sale a'))).toBe(true);
+  });
+
+  it('a saved sale unticked reads «tolta», a new one «nuova, n quote a {mese}»', () => {
+    const plan = revisionPlan({ disposals: [{ assetId: 'etf-a', quantity: 10, monthIndex: 6, estimatedProceedsEur: 1000, status: 'planned' }] });
+    const ctx = revisionContext(plan);
+    const summary = buildPlanPathSummary({ ...initialPlanPathDraft(ctx).answers, sales: [{ assetId: 'etf-c', quantity: 5, month: 7 }] }, ctx, TODAY);
+    render(<RiepilogoScreen summary={summary} modelBox={null} />);
+    const text = flat(document.body.textContent);
+    expect(text).toContain('ETF ornitorinco: tolta');
+    expect(text).toContain('ETF airone: nuova, 5 quote a febbraio 2027');
+  });
+});
+
+describe('VenditeScreen in a revision (mutation: list month 1; block every month before the first open; list every held instrument)', () => {
+  it('the locked sales as lines without controls; no «Vendi» row for their instruments; the open ones ticked', () => {
+    const plan = revisionPlan();
+    const ctx = revisionContext(plan);
+    render(<VenditeScreen answers={initialPlanPathDraft(ctx).answers} dispatch={() => {}} context={ctx} />);
+    const locked = screen.getByRole('list', { name: 'Vendite già decise' });
+    const lines = within(locked).getAllByRole('listitem').map((li) => flat(li.textContent));
+    expect(lines).toEqual([
+      'ETF garzetta · 5 quote · già venduta',
+      'ETF cormorano · tutte le quote · saltata',
+      'ETF svasso · 2 quote · da confermare nel Registro',
+    ]);
+    expect(within(locked).queryAllByRole('checkbox')).toHaveLength(0);
+    for (const name of ['ETF garzetta', 'ETF cormorano', 'ETF svasso']) expect(screen.queryByRole('checkbox', { name: `Vendi ${name}` })).toBeNull();
+    expect((screen.getByRole('checkbox', { name: 'Vendi ETF ornitorinco' }) as HTMLElement).getAttribute('data-state')).toBe('checked');
+  });
+
+  it('the month select starts at the first open month, as the plan index; ticking a new sale takes that month', () => {
+    const plan = revisionPlan();
+    const ctx = revisionContext(plan);
+    const dispatch = vi.fn();
+    const a = initialPlanPathDraft(ctx).answers;
+    render(<VenditeScreen answers={{ ...a, sales: a.sales.filter((s) => s.assetId === 'etf-a') }} dispatch={dispatch} context={ctx} />);
+    const row = within(screen.getByRole('list', { name: 'Strumenti da vendere' })).getAllByRole('listitem').find((li) => li.textContent?.includes('ETF ornitorinco'))!;
+    expect(flat(within(row).getByLabelText('In quale mese').textContent)).toBe('gennaio 2027 (6º)');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Vendi ETF fenicottero' }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'sale', sale: { assetId: 'etf-b', quantity: null, month: 5 }, context: ctx });
+    expect(saleMonthIndexes(ctx, a.months!, 6)).toEqual([5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it('a late open sale (month 3, first open 5) keeps its month first, «· in ritardo»; nothing blocks', () => {
+    const plan = revisionPlan({ disposals: [{ assetId: 'etf-a', quantity: 10, monthIndex: 3, estimatedProceedsEur: 1000, status: 'planned' }] });
+    const ctx = revisionContext(plan);
+    const a = initialPlanPathDraft(ctx).answers;
+    render(<VenditeScreen answers={a} dispatch={() => {}} context={ctx} />);
+    const row = within(screen.getByRole('list', { name: 'Strumenti da vendere' })).getAllByRole('listitem').find((li) => li.textContent?.includes('ETF ornitorinco'))!;
+    expect(flat(within(row).getByLabelText('In quale mese').textContent)).toBe('ottobre 2026 · in ritardo');
+    expect(saleMonthIndexes(ctx, a.months!, 3)).toEqual([3, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(describePlanPathBlock('vendite', a, ctx)).toBeNull();
   });
 });

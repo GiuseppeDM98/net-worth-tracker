@@ -78,11 +78,6 @@ export function formatObjectiveGap(objective: ObjectiveReport): string {
   return `${amount}${suffix}`;
 }
 
-/** «Azioni 102,0% → 101,6% (−0,4 pp)» — one line of the optimizer's report. */
-export function describeObjectiveRow(objective: ObjectiveReport): string {
-  return `${objective.label} ${formatObjectiveTarget(objective)} → ${formatObjectiveAchieved(objective)} (${formatObjectiveGap(objective)})`;
-}
-
 // ---------------------------------------------------------------------------
 // Conflicts
 // ---------------------------------------------------------------------------
@@ -143,7 +138,7 @@ export function describeOptimizerWarning(warning: OptimizerWarning, labelOf: (ke
 }
 
 // ---------------------------------------------------------------------------
-// Second-level gaps — preventive warning, IdealAllocationTile and OptimizerPanel
+// Second-level gaps — preventive warning, IdealAllocationTile and the model's dialog
 // ---------------------------------------------------------------------------
 
 /** «ETF-A, ETF-B, ETF-C e altri 2» — unique names in order of first appearance, capped at 5. */
@@ -202,72 +197,26 @@ export function describeOptimizerMode(mode: OptimizerMode): string {
   }
 }
 
-/** Shown before applying Ideale weights that would sell nothing but ask for it. */
-export const OPTIMIZER_IDEAL_BELOW_HELD_CONFIRM =
-  'In modalità Ideale alcuni pesi sono sotto ciò che possiedi: le rate del PAC comprano soltanto, quindi quelle posizioni riceveranno zero acquisti.';
-
-/** The panel's whole content when `idealAllocation` is off or unset. */
-export const OPTIMIZER_DISABLED_READING = 'Nessuna allocazione ideale impostata: definiscila in Allocazione › Accumulo.';
-
 // ---------------------------------------------------------------------------
-// Panel copy — no PAC component carries an Italian literal of its own (accumulationNarrative.ts's rule)
+// The optimizer's copy — no component carries an Italian literal of its own (accumulationNarrative.ts's rule)
 // ---------------------------------------------------------------------------
 
-export const OPTIMIZER_STEP2_MANUAL = 'Manuale';
-export const OPTIMIZER_STEP2_OPTIMIZED = 'Ottimizzato';
 /** The objectives live in Allocazione › Accumulo; the query opens their modal. */
 export { OPTIMIZER_OBJECTIVES_HREF } from '@/lib/constants/idealAllocation';
 export const OPTIMIZER_ACTION_MODIFY_IN_SETTINGS = 'Modifica i criteri';
 export const OPTIMIZER_ACTION_CALCULATE = 'Calcola';
-export const OPTIMIZER_ACTION_APPLY = 'Usa questi pesi';
-export const OPTIMIZER_COL_INSTRUMENT = 'Strumento';
-export const OPTIMIZER_COL_CURRENT = 'Peso oggi';
-export const OPTIMIZER_COL_PROPOSED = 'Proposto';
 export const OPTIMIZER_OBJECTIVES_TITLE = 'Criteri attivi';
 export const OPTIMIZER_REPORT_TITLE = 'Rapporto';
 export const OPTIMIZER_CONFLICTS_TITLE = 'Conflitti';
 export const OPTIMIZER_WARNINGS_TITLE = 'Avvisi';
 export const OPTIMIZER_STATUS_NO_CANDIDATES = 'Nessuno strumento nel piano su cui proporre pesi.';
 export const OPTIMIZER_STATUS_INFEASIBLE_BOUNDS = 'I limiti impostati non lasciano arrivare al 100%: nessun peso proponibile.';
-export const OPTIMIZER_STEP2_ARIA_LABEL = 'Come compilare i pesi target';
 export const OPTIMIZER_MODE_ARIA_LABEL = 'Modalità di calcolo dei pesi';
-
-// ---------------------------------------------------------------------------
-// The step-3 snapshot provenance row
-// ---------------------------------------------------------------------------
-
-export interface OptimizerSnapshotSummary {
-  computedAt: Date;
-  mode: OptimizerMode;
-  weights: Array<{ key: string; proposedPct: number }>;
-}
-
-/** «Pesi proposti dall'ottimizzatore il 18/09 (Raggiungibile), poi modificati a mano.» — only the
- *  clause that changes, never re-run the optimizer to know it: compares the snapshot's proposed
- *  weights against the draft's CURRENT ones by position key. */
-export function describeOptimizerSnapshot(
-  snapshot: OptimizerSnapshotSummary,
-  currentPositions: Array<{ id: string; targetPercentage: number }>
-): string {
-  const day = String(snapshot.computedAt.getDate()).padStart(2, '0');
-  const month = String(snapshot.computedAt.getMonth() + 1).padStart(2, '0');
-  const modeLabel = OPTIMIZER_MODE_LABELS[snapshot.mode];
-  const currentByKey = new Map(currentPositions.map((p) => [p.id, p.targetPercentage]));
-  const edited = snapshot.weights.some((w) => {
-    const current = currentByKey.get(w.key);
-    return current !== undefined && Math.abs(current - w.proposedPct) > 0.01;
-  });
-  const base = `Pesi proposti dall'ottimizzatore il ${day}/${month} (${modeLabel})`;
-  return edited ? `${base}, poi modificati a mano.` : `${base}.`;
-}
 
 // ---------------------------------------------------------------------------
 // The standalone tool, Allocazione's `ComposizioneIdealeTile` + `IdealCompositionDialog`
 // ---------------------------------------------------------------------------
 
-export const IDEAL_COMPOSITION_TILE_EYEBROW = 'Composizione ideale';
-export const IDEAL_COMPOSITION_TILE_OFF_READING =
-  "Imposta i criteri del modello per vedere com'è fatto il tuo portafoglio ideale, strumento per strumento.";
 export const IDEAL_COMPOSITION_TITLE = 'Ricalcola il portafoglio modello';
 export const IDEAL_COMPOSITION_AMOUNT_LABEL = 'Importo da investire (€)';
 export const IDEAL_COMPOSITION_REACHABLE_DISABLED_REASON =
@@ -352,7 +301,9 @@ export const OBJECTIVES_ACTION_TRY = 'Prova';
 export const OBJECTIVES_ACTION_SAVE = 'Salva i criteri';
 export const OBJECTIVES_ACTION_CANCEL = 'Annulla';
 export const OBJECTIVES_DIALOG_READING = 'Cambia i criteri e premi «Prova»: il calcolo gira sulla bozza e non salva nulla. «Salva i criteri» li rende quelli dell’account.';
-export const OBJECTIVES_OFF_READING = 'I criteri sono spenti: la composizione ideale e il passo Target del PAC restano manuali finché non li accendi.';
+export const OBJECTIVES_OFF_READING = 'I criteri sono spenti: il portafoglio modello resta manuale finché non li accendi.';
+/** Under the criteria's «Attiva» switch (Impostazioni and the model's «Modifica i criteri»). */
+export const IDEAL_ALLOCATION_ENABLE_HINT = 'Propone i pesi degli strumenti del portafoglio modello, da cui può partire il piano di accumulo.';
 export const OBJECTIVES_SAVED_TOAST = 'Criteri salvati';
 export const OBJECTIVES_CLASS_TARGETS_EYEBROW = 'Target di classe';
 export const OBJECTIVES_CLASS_TARGETS_READING = 'Il criterio «Classi» porta i pesi verso questi target. Si scrivono in un posto solo: Impostazioni › Allocazione.';

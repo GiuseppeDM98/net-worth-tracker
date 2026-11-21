@@ -174,18 +174,17 @@ test.describe('una vendita nel suo mese', () => {
     }
   });
 
-  test('il mese di revisione del Consulente: la nota e «Rivedi il piano» aprono la revisione', async ({ page }) => {
+  // The note's «Rivedi il piano» is a link to the path in revision (NOVE-26, 2026-11-21): nothing is written here.
+  test('il mese di revisione del Consulente: la nota e «Rivedi il piano» aprono il percorso in revisione', async ({ page }) => {
     await seedAccumuloFixture({ reviewAtOpenMonth: true });
     try {
       await openAccumulo(page);
       const note = monthTile(page).getByText('Il Consulente ha indicato questo mese per rivedere il piano', { exact: false });
       await expect(note).toBeVisible({ timeout: 60_000 });
-      await note.locator('..').getByRole('button', { name: 'Rivedi il piano' }).click();
-      const dialog = page.getByRole('dialog');
-      await expect(dialog).toBeVisible();
-      await expect(dialog.getByLabel('Mesi restanti')).toBeVisible();
-      await page.keyboard.press('Escape');
-      await expect(dialog).toBeHidden();
+      await note.locator('..').getByRole('link', { name: 'Rivedi il piano' }).click();
+      await expect(page).toHaveURL(/\/dashboard\/allocation\/piano$/);
+      await expect(page.getByRole('region', { name: /^Passo 1 di 8/ })).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByRole('radio', { name: 'Dal piano com’è' })).toBeChecked();
     } finally {
       await removeAccumuloFixture();
     }

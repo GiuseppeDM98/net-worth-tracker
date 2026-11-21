@@ -19,7 +19,8 @@ should look like and the plan is how the monthly inflow gets closer.
   the candidates and objective rows, `optimizeWeights` solves a convex quadratic program by an exact active-set
   method (`activeSetQP.ts`, box projection in `boxProjection.ts`). Three modes: **Raggiungibile col PAC** never goes
   below what is held (a PAC's instalments only buy), **Ideale** ignores what is held, **Con vendite mirate** sells under a
-  tax cap (below; only in the model's dialog, never in the PAC editor). An objective that cannot be met is
+  tax cap (below). The optimizer is reached from the model's dialog only (2026-11-21: the plan's step 2 panel left
+  with the editor, NOVE-26). An objective that cannot be met is
   reported as a conflict (`computeConflicts`), never silently dropped; caps that cannot reach 100 are
   `infeasible_bounds`, said before the solver runs. The run happens on «Calcola» / «Prova», in the handler: the
   result is stored with the key of its inputs and shown only while they match — no memo, no effect.
@@ -79,12 +80,11 @@ should look like and the plan is how the monthly inflow gets closer.
   0% with nothing else, a switched-off sub-category block and a switched-off fixed amount count as absent, since
   Impostazioni writes them on a save that changes nothing (owner, 2026-11-17). A model without a fingerprint is stale. The basis is built by `AccumuloTab` (`buildModelBasis`
   from the settings and the goals the page hands it), never by the page: its first chunk does not carry the model's module. A save that sets the
-  weights («Salva come portafoglio modello», «Modifica a mano», «Usa i pesi del piano», the editor's «Aggiorna anche
-  il portafoglio modello» — on «Attiva», on the revision and, since 2026-11-18 (owner, on the tour of the Consulente's hand-off), on «Salva
-  bozza» too: a ticked box that wrote nothing read as a broken promise) records the fingerprint of that moment; «Aggiungi strumento da valutare» keeps the stored
-  one, so a stale model stays stale. A plan's weights become the model's with every row above 0 AND every row at 0 the owner holds (`planPositionsToModelWeights`, owner 2026-11-18, on the same tour): out of the model a held instrument left the base of «Oggi», which read a weight four times its share of the portfolio. The tile, its closed row and the editor's «Parti da: modello» say «superato».
-- **Where it is used**: `PortafoglioModelloTile` compares today with the model; the PAC editor's step 2 has an
-  «Ottimizzato» view (`OptimizerPanel`) and a «Parti da» seed from the model; «Ricalcola» (`IdealCompositionDialog`,
+  weights («Salva come portafoglio modello», «Modifica a mano», «Usa i pesi del piano», the path summary's «Aggiorna anche
+  il portafoglio modello» — on «Conferma», creating or revising) records the fingerprint of that moment; «Aggiungi strumento da valutare» keeps the stored
+  one, so a stale model stays stale. A plan's weights become the model's with every row above 0 AND every row at 0 the owner holds (`planPositionsToModelWeights`, owner 2026-11-18, on the same tour): out of the model a held instrument left the base of «Oggi», which read a weight four times its share of the portfolio. The tile, its closed row and the path's «Dal portafoglio modello» say «superato».
+- **Where it is used**: `PortafoglioModelloTile` compares today with the model; the plan path's «Dal portafoglio
+  modello» starts from it, creating or revising («Rivedi dal modello», `?da=modello`); «Ricalcola» (`IdealCompositionDialog`,
   a tile-shaped modal: eyebrow, title, the status as the reading, the actions in the footer) runs the optimizer,
   saves the model or creates a PAC with its weights (`PlanSeedDraft`). The model is read only on the tab: the
   Allocazione header reads the targets of the settings or of the goals, never the model.
@@ -93,7 +93,7 @@ should look like and the plan is how the monthly inflow gets closer.
 
 ## Files
 
-`types/{optimizer,modelPortfolio}.ts` · `lib/constants/idealAllocation.ts` · `lib/utils/{weightOptimizer,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,idealAllocationEditor,runGuarded,saleTax}.ts` · `lib/services/modelPortfolioService.ts` · `lib/hooks/useModelPortfolio.ts` · `components/allocation/{OptimizerPanel,OptimizerReport,IdealCompositionDialog,ObiettiviDialog,ModelEditDialog}.tsx` · `components/allocation/tiles/{ObiettiviTile,PortafoglioModelloTile}.tsx` · `components/settings/{IdealAllocationTile,IdealAllocationSummary}.tsx` · tests `__tests__/{weightOptimizer,weightOptimizerTargeted,saleTax,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,modelPortfolioGroups,modelPortfolioService,idealAllocationEditor}.test.ts`, `__tests__/{idealCompositionDialog,obiettiviDialog,portafoglioModelloTile}.test.tsx` · E2E `e2e/accumulo.spec.ts` (the criteria and, for «Con vendite mirate», `taxRate` on two seed ETFs planted and restored by `e2e/accumuloFixture.ts`).
+`types/{optimizer,modelPortfolio}.ts` · `lib/constants/idealAllocation.ts` · `lib/utils/{weightOptimizer,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,idealAllocationEditor,runGuarded,saleTax}.ts` · `lib/services/modelPortfolioService.ts` · `lib/hooks/useModelPortfolio.ts` · `components/allocation/{OptimizerReport,IdealCompositionDialog,ObiettiviDialog,ModelEditDialog}.tsx` · `components/allocation/tiles/{ObiettiviTile,PortafoglioModelloTile}.tsx` · `components/settings/{IdealAllocationTile,IdealAllocationSummary}.tsx` · tests `__tests__/{weightOptimizer,weightOptimizerTargeted,saleTax,weightOptimizerNarrative,activeSetQP,boxProjection,modelPortfolio,modelPortfolioGroups,modelPortfolioService,idealAllocationEditor}.test.ts`, `__tests__/{idealCompositionDialog,obiettiviDialog,portafoglioModelloTile}.test.tsx` · E2E `e2e/accumulo.spec.ts` (the criteria and, for «Con vendite mirate», `taxRate` on two seed ETFs planted and restored by `e2e/accumuloFixture.ts`).
 
 - **Suites to run after a change here — Portafoglio modello** (2026-11-18): `weightOptimizer`, `weightOptimizerTargeted`, `saleTax`, `allocazioneSummary`, `accumulationPlanUtils`, `weightOptimizerNarrative`,
   `activeSetQP`, `boxProjection`, `modelPortfolio`, `modelPortfolioGroups`, `modelPortfolioService`, `idealAllocationEditor`,
@@ -107,8 +107,8 @@ should look like and the plan is how the monthly inflow gets closer.
   2026-11-20): «Ricalcola» waits for the criteria to be on («Modifica i criteri» › «Attiva», under the classes), and
   «Raggiungibile col PAC» for an amount to invest — the line under the three modes says so. «Crea un PAC con questi
   pesi» lives only in a calculation's result.
-- **Query key**: saving the model invalidates `queryKeys.modelPortfolio.byOwner`, the key the tile and the PAC
-  editor read.
+- **Query key**: saving the model invalidates `queryKeys.modelPortfolio.byOwner`, the key the tile and the plan
+  path read.
 - **The optimizer weighs class, leverage, factor, instrument and group objectives only**; a class objective and a
   leverage objective can disagree, and the report then names the conflict instead of picking a side.
 - **The model never sells**: an instrument above its model weight stays above it, and the tile says so — then points
@@ -117,6 +117,7 @@ should look like and the plan is how the monthly inflow gets closer.
   neither** (the liquidity's row sells 0, a locked fixed share is held): a guard, so mutating the filter alone stays
   green.
 - **A sale at a loss counts 0,00 € in «Tasse»**, never a credit; the estimate takes no past losses either.
-- **In the model's dialog «Liquidità» always takes the rest**: caps that cannot reach 100 show up only in the PAC
-  editor's «Ottimizzato» path, where the candidates are the plan's instruments.
+- **In the model's dialog «Liquidità» always takes the rest**: caps that cannot reach 100 are never shown (the
+  PAC's «Ottimizzato», where they could, left with the editor on 2026-11-21); `OPTIMIZER_STATUS_INFEASIBLE_BOUNDS`
+  is read by «Obiettivi» (`ObiettiviDialog`).
 - **The census fixture and the mobile budget have no model**: the tab with a model is measured by hand.

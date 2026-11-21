@@ -10,8 +10,10 @@ export const ACCUMULO_OPEN_LINK = 'Apri Accumulo';
 /** Where that link goes. */
 export const ACCUMULO_HREF = '/dashboard/allocation?tab=accumulo';
 
-/** The guided path that creates a plan by hand, or continues the draft in Accumulo (2026-11-20). */
+/** The guided path that creates a plan by hand, continues the draft in Accumulo (2026-11-20), revises the active plan (2026-11-21). */
 export const PLAN_PATH_HREF = '/dashboard/allocation/piano';
+/** «Rivedi dal modello»: the revision with «Dal portafoglio modello» chosen. */
+export const PLAN_PATH_FROM_MODEL_HREF = `${PLAN_PATH_HREF}?da=modello`;
 
 /** An active plan whose every instalment is closed: nothing left for a revision to rewrite (owner, 2026-11-19). */
 export const ACCUMULO_PLAN_NOTHING_TO_REVISE =

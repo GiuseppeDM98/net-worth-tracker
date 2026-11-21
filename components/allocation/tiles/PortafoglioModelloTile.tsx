@@ -255,7 +255,7 @@ export function PortafoglioModelloTile({
                     </td>
                     <td className={`${NUM_CELL_CLASS} pr-0 ${row.diffEur >= 1 ? 'text-positive' : 'text-muted-foreground'}`}>{signedEur(row.diffEur)}</td>
                   </tr>
-                  {/* A group is drawn as in the Target step — the buyer is the head, the others indented. */}
+                  {/* A group is drawn as one row — the buyer is the head, the others indented. */}
                   {row.memberAssetIds.slice(1).map((memberId) => (
                     <tr key={memberId} className="border-b border-border last:border-0">
                       <th scope="row" className="py-1.5 pl-5 pr-2 text-left font-normal text-foreground">

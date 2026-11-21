@@ -1,41 +1,29 @@
 'use client';
 
 /**
- * OptimizerReport / OptimizerObjectivesReport — the weight optimizer's result. `OptimizerObjectivesReport` (the per-objective report, conflicts and warnings —
- * never a weights table, whose columns differ between callers) is shared, byte for byte, between
- * `OptimizerPanel`'s "Ottimizzato" view of the PAC and Allocazione's standalone `IdealCompositionDialog`:
- * each renders its OWN weights table (the PAC's has no € column, the standalone tool's does)
- * and its own action below it — the PAC applies the weights to its draft, the standalone tool
- * offers "Crea un PAC con questi pesi" instead. `OptimizerReport` wraps `OptimizerObjectivesReport`
- * with the PAC's own table and "Usa questi pesi" action, unchanged from before this split.
+ * OptimizerObjectivesReport — the weight optimizer's result: the per-objective report, conflicts and warnings,
+ * never a weights table (its columns differ between callers). Read by the model's dialogs
+ * (`IdealCompositionDialog`, `ObiettiviDialog`), each with its OWN weights table and action below it;
+ * `ObjectiveBars` also by the Obiettivi tile. The PAC's own «Ottimizzato» view left with the editor (2026-11-21).
  */
 import type { ObjectiveReport, OptimizerResult } from '@/lib/utils/weightOptimizer';
 import { OBJECTIVE_PRIORITY_LABELS } from '@/lib/utils/settingsNarrative';
-import { formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
-import { ACCUMULO_ACTION_CANCEL } from '@/lib/utils/accumulationNarrative';
+import { formatNumberIt } from '@/lib/utils/formatters';
 import {
   describeConflict,
   formatObjectiveAchieved,
   formatObjectiveGap,
   formatObjectiveTarget,
   describeOptimizerWarning,
-  OPTIMIZER_ACTION_APPLY,
-  OPTIMIZER_COL_CURRENT,
-  OPTIMIZER_COL_INSTRUMENT,
-  OPTIMIZER_COL_PROPOSED,
   OPTIMIZER_CONFLICTS_TITLE,
-  OPTIMIZER_IDEAL_BELOW_HELD_CONFIRM,
   OPTIMIZER_REPORT_TITLE,
-  OPTIMIZER_STATUS_INFEASIBLE_BOUNDS,
-  OPTIMIZER_STATUS_NO_CANDIDATES,
   OPTIMIZER_WARNINGS_TITLE,
 } from '@/lib/utils/weightOptimizerNarrative';
-import { Button } from '@/components/ui/button';
 
 /**
  * The objectives as rows: name, priority chip, «target → raggiunto» in mono and a `TargetTick`
  * (the target as the hairline, the achieved value as the fill). One presentation for the standalone
- * tool, the PAC's Target step, the objectives' modal and the Obiettivi tile (from a saved snapshot).
+ * tool, the objectives' modal and the Obiettivi tile (from a saved snapshot).
  */
 export function ObjectiveBars({ objectives }: { objectives: ObjectiveReport[] }) {
   // The class objectives are ONE row without a track: the per-class figures are already
@@ -171,82 +159,6 @@ export function OptimizerObjectivesReport({ result, labelOf }: OptimizerObjectiv
             ))}
           </ul>
         </div>
-      )}
-    </>
-  );
-}
-
-interface OptimizerReportProps {
-  result: OptimizerResult;
-  labelOf: (key: string) => string;
-  pendingIdealConfirm: boolean;
-  onApplyClick: () => void;
-  onConfirmApply: () => void;
-  onCancelConfirm: () => void;
-}
-
-/** The PAC's own report: weights table (no € column — a PAC position moves by QUOTA, not by a
- *  fixed euro purchase) + `OptimizerObjectivesReport` + "Usa questi pesi". */
-export function OptimizerReport({
-  result,
-  labelOf,
-  pendingIdealConfirm,
-  onApplyClick,
-  onConfirmApply,
-  onCancelConfirm,
-}: OptimizerReportProps) {
-  if (result.status === 'no_candidates') {
-    return <p className="text-[12px] text-muted-foreground">{OPTIMIZER_STATUS_NO_CANDIDATES}</p>;
-  }
-  if (result.status === 'infeasible_bounds') {
-    return <p className="text-[12px] text-destructive">{OPTIMIZER_STATUS_INFEASIBLE_BOUNDS}</p>;
-  }
-
-  return (
-    <>
-      <table className="w-full text-[13px]">
-        <thead>
-          <tr className="border-b border-border text-left">
-            <th scope="col" className="py-1.5 pr-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              {OPTIMIZER_COL_INSTRUMENT}
-            </th>
-            <th scope="col" className="py-1.5 pr-2 text-right text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              {OPTIMIZER_COL_CURRENT}
-            </th>
-            <th scope="col" className="py-1.5 text-right text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              {OPTIMIZER_COL_PROPOSED}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.weights.map((w) => (
-            <tr key={w.key} className="border-b border-border last:border-0">
-              <th scope="row" className="py-1.5 pr-2 text-left font-normal text-foreground">{w.label}</th>
-              <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-muted-foreground">{formatPercentageIt(w.currentPct, 1)}</td>
-              <td className="py-1.5 text-right font-mono tabular-nums text-foreground">{formatPercentageIt(w.proposedPct, 1)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <OptimizerObjectivesReport result={result} labelOf={labelOf} />
-
-      {pendingIdealConfirm ? (
-        <div className="rounded-lg bg-muted p-3">
-          <p className="text-[12px] text-foreground">{OPTIMIZER_IDEAL_BELOW_HELD_CONFIRM}</p>
-          <div className="mt-2 flex gap-2">
-            <Button variant="outline" className="h-11 text-[12px] desktop:h-8" onClick={onCancelConfirm}>
-              {ACCUMULO_ACTION_CANCEL}
-            </Button>
-            <Button className="h-11 text-[12px] desktop:h-8" onClick={onConfirmApply}>
-              {OPTIMIZER_ACTION_APPLY}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <Button className="h-11 text-[12px] desktop:h-8" onClick={onApplyClick}>
-          {OPTIMIZER_ACTION_APPLY}
-        </Button>
       )}
     </>
   );

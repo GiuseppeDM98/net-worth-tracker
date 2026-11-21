@@ -16,19 +16,27 @@ import type { AllocatableHolding, RebalanceBand } from '@/lib/utils/allocationUt
 import {
   applyModelToPositions,
   applyWeightsToPositions,
+  buildRevisedPlan,
+  diffRevisionDisposals,
   disposalMonthIndex,
+  findFirstIntactInstallment,
+  isOpenSavedDisposal,
   isPlanBuyable,
   isPlanCashFund,
   isPlanSourceAccount,
   marketWeights,
+  modelWeightMap,
   planCashFundSaleEur,
   proceedsOfDisposal,
   redistributeRemainder,
   resolvePlanReserve,
   resolvePositionStates,
+  revisedPlanGateDraft,
   seedPositionsFromAssets,
   type AllocationCompare,
   type PlanDeps,
+  type PlanRevisionInput,
+  type RevisedPlanResult,
 } from '@/lib/utils/accumulationPlanUtils';
 import { validateDraftAgainstAssets } from '@/lib/utils/accumulationPlanSchema';
 import { ACCUMULO_STEP2_PENDING_ASSET_LABEL, describeDraftIssue } from '@/lib/utils/accumulationNarrative';
@@ -38,7 +46,9 @@ import { formatNumberIt } from '@/lib/utils/formatters';
 export type PlanPathScreen = 'partenza' | 'versamento' | 'durata' | 'conto' | 'riserva' | 'vendite' | 'strumenti' | 'riepilogo';
 /** The sales BEFORE the instruments: a sale of every share takes its row out of the list. */
 export const PLAN_PATH_SCREENS: readonly PlanPathScreen[] = ['partenza', 'versamento', 'durata', 'conto', 'riserva', 'vendite', 'strumenti', 'riepilogo'];
-export type PlanPathStart = 'model' | 'today' | 'zero' | 'seed' | 'draft';
+/** `plan`: the active plan as it is — the default start of a revision. */
+export type PlanPathStart = 'model' | 'today' | 'zero' | 'seed' | 'draft' | 'plan';
+const PLAN_PATH_STARTS: readonly PlanPathStart[] = ['model', 'today', 'zero', 'seed', 'draft', 'plan'];
 
 export interface PlanPathSale {
   assetId: string;
@@ -66,6 +76,10 @@ export interface PlanPathAnswers {
   seed?: PlanSeedDraft;
   serverDraftId?: string;
   name?: string;
+  /** A revision: the plan it was started on, its count of revisions and its first intact instalment (V6). */
+  revisesPlanId?: string;
+  revisionCount?: number;
+  revisesFromIndex?: number;
 }
 
 export interface PlanPathDraft {
@@ -94,6 +108,22 @@ export interface PlanPathContext {
   deps: PlanDeps;
   /** The month of «today», read once at mount. */
   todayMonth: MonthKey;
+  /** The account's ACTIVE plan with an intact instalment: the path revises it. */
+  revision: PlanPathRevision | null;
+  /** `?da=modello`: a revision starts from the model when it has weights; ignored elsewhere. */
+  fromModel: boolean;
+}
+
+export interface PlanPathRevision {
+  /** The account's ACTIVE open plan. */
+  plan: AccumulationPlan;
+  /** `findFirstIntactInstallment(plan)`: its index `k` and month. */
+  firstIndex: number;
+  firstMonth: MonthKey;
+  /** k − 1: the instalments a revision never touches. */
+  closedCount: number;
+  /** The saved sales a revision cannot change (`!isOpenSavedDisposal`): shown, never editable. */
+  lockedSales: PlanDisposal[];
 }
 
 export type PlanPathAction =
@@ -176,7 +206,56 @@ function isGroupMember(positions: readonly PlanPosition[], assetId: string): boo
 
 // ─── The drafts the path starts from ──────────────────────────────────────────
 
+/** What a revision starts from; null when the plan has no intact instalment (nothing to revise, decision 98). */
+export function buildPlanPathRevision(plan: AccumulationPlan): PlanPathRevision | null {
+  const first = findFirstIntactInstallment(plan);
+  if (!first) return null;
+  return {
+    plan,
+    firstIndex: first.index,
+    firstMonth: first.month,
+    closedCount: first.index - 1,
+    lockedSales: plan.disposals.filter((disposal) => !isOpenSavedDisposal(disposal)),
+  };
+}
+
+/** `?da=modello` preselects the model only when it has weights (V1). */
+function revisionStartsFromModel(context: PlanPathContext): boolean {
+  return context.fromModel && !!context.model && Object.keys(modelWeightMap(context.model)).length > 0;
+}
+
+/**
+ * The revision's answers from the plan's first intact instalment: the months left, the plan's own inflow and
+ * reserve (as typed, V3), the accounts that are still source accounts (V10), the open saved sales at their
+ * months, the quotas of the start. Reconciled with today's assets like a restored draft.
+ */
+function initialRevisionDraft(context: PlanPathContext, revision: PlanPathRevision): PlanPathDraft {
+  const { plan } = revision;
+  const assetsById = assetsByIdOf(context.assets);
+  const start: PlanPathStart = revisionStartsFromModel(context) ? 'model' : 'plan';
+  const sales = salesOfDisposals(plan.disposals.filter(isOpenSavedDisposal));
+  const base: PlanPathAnswers = {
+    ...emptyAnswers(null),
+    start,
+    months: plan.months - revision.closedCount,
+    monthlyInflowEur: plan.liquidity.monthlyInflowEur,
+    reserveEur: plan.liquidity.reserveEur,
+    sourceIds: plan.liquidity.sourceCashAssetIds.filter((id) => {
+      const account = assetsById.get(id);
+      return !!account && isPlanSourceAccount(account);
+    }),
+    sales,
+    wantsSales: sales.length > 0,
+    revisesPlanId: plan.id,
+    revisionCount: plan.revisions?.length ?? 0,
+    revisesFromIndex: revision.firstIndex,
+    name: plan.name,
+  };
+  return { version: 1, screen: 'partenza', answers: reconcilePlanPathAnswers({ ...base, positions: seedPlanPathPositions(start, base, context) }, context) };
+}
+
 export function initialPlanPathDraft(context: PlanPathContext): PlanPathDraft {
+  if (context.revision) return initialRevisionDraft(context, context.revision);
   const answers = emptyAnswers(context.investmentAccountId);
   const open = context.openDraft;
   if (!open) return { version: 1, screen: 'partenza', answers };
@@ -224,6 +303,15 @@ export function seedPlanPathPositions(start: PlanPathStart, answers: PlanPathAns
   const assetsById = assetsByIdOf(context.assets);
   const labelOf = (id: string) => assetsById.get(id)?.name ?? id;
   const sold = soldWhole(answers);
+  // A revision starts from the plan's rows: a row the plan holds (a group from the model included) stays a row.
+  const planPositions = context.revision?.plan.positions;
+  if (planPositions && (start === 'plan' || start === 'model' || start === 'today')) {
+    if (start === 'plan') return planPositions;
+    if (start === 'model') return context.model ? applyModelToPositions(planPositions, context.model, sold, labelOf) : planPositions;
+    const today = planPathTodayWeights({ ...answers, positions: planPositions }, context);
+    return planPositions.map((position) => ({ ...position, targetPercentage: today[position.id] ?? 0 }));
+  }
+  if (start === 'plan') return [];
   const base = seedPositionsFromAssets(context.assets, context.deps.valueOf).filter(
     (position) => !(position.memberAssetIds.length === 1 && sold.has(position.memberAssetIds[0]))
   );
@@ -258,10 +346,26 @@ function step(screen: PlanPathScreen, by: 1 | -1): PlanPathScreen {
   return PLAN_PATH_SCREENS[Math.max(0, Math.min(PLAN_PATH_SCREENS.length - 1, index + by))];
 }
 
+/**
+ * A revision: the plan's own row of `assetId`, back where it stood, when a whole sale took it away and the sale
+ * is now partial or gone — its id is the one the closed instalments' lines name (found by § 7 B, 2026-11-21).
+ */
+function restorePlanRow(positions: PlanPosition[], assetId: string, context: PlanPathContext): PlanPosition[] {
+  const planPositions = context.revision?.plan.positions ?? [];
+  const own = planPositions.find((position) => position.memberAssetIds.length === 1 && position.memberAssetIds[0] === assetId);
+  if (!own || positions.some((position) => position.memberAssetIds.includes(assetId))) return positions;
+  const order = (position: PlanPosition) => {
+    const index = planPositions.findIndex((candidate) => candidate.id === position.id);
+    return index === -1 ? Number.POSITIVE_INFINITY : index;
+  };
+  const at = positions.findIndex((position) => order(position) > order(own));
+  return at === -1 ? [...positions, own] : [...positions.slice(0, at), own, ...positions.slice(at)];
+}
+
 function applySale(answers: PlanPathAnswers, action: Extract<PlanPathAction, { type: 'sale' }>): PlanPathAnswers {
   const { sale, context } = action;
   const rest = answers.sales.filter((candidate) => candidate.assetId !== sale.assetId);
-  if ('remove' in sale) return withHeldRows({ ...answers, sales: rest }, context);
+  if ('remove' in sale) return withHeldRows({ ...answers, sales: rest, positions: restorePlanRow(answers.positions, sale.assetId, context) }, context);
   const asset = context.assets.find((candidate) => candidate.id === sale.assetId);
   const held = asset?.quantity ?? 0;
   const typed = sale.quantity === null ? null : Math.floor(sale.quantity);
@@ -273,7 +377,7 @@ function applySale(answers: PlanPathAnswers, action: Extract<PlanPathAction, { t
   // A sale of every share takes the asset's own row away (its quota is left to «Ridistribuisci il resto»).
   const positions = whole && isSoleMember(answers.positions, sale.assetId)
     ? answers.positions.filter((position) => !(position.memberAssetIds.length === 1 && position.memberAssetIds[0] === sale.assetId))
-    : answers.positions;
+    : whole ? answers.positions : restorePlanRow(answers.positions, sale.assetId, context);
   return withHeldRows({ ...answers, sales: [...rest, next], positions }, context);
 }
 
@@ -367,6 +471,22 @@ export function listSellableAssets(context: Pick<PlanPathContext, 'assets'>): As
   return context.assets.filter((asset) => asset.quantity > 0 && (isPlanBuyable(asset, context.assets) || isPlanCashFund(asset, context.assets)));
 }
 
+/**
+ * The months a sale's select lists, as the plan's absolute indexes: 1…months in a new plan; in a revision the
+ * open ones, `firstIndex … closedCount + months`, with a late sale's own month first (V4: it keeps it until moved).
+ */
+export function saleMonthIndexes(context: Pick<PlanPathContext, 'revision'>, months: number, saleMonth: number | null): number[] {
+  const first = context.revision?.firstIndex ?? 1;
+  const last = (context.revision?.closedCount ?? 0) + Math.max(0, Math.min(60, months));
+  const open = Array.from({ length: Math.max(0, last - first + 1) }, (_, index) => first + index);
+  return saleMonth !== null && saleMonth < first ? [saleMonth, ...open] : open;
+}
+
+/** The instruments with a locked sale (executed, skipped, linked): one sale per instrument, so no new one (V12). */
+export function lockedSaleAssetIds(context: Pick<PlanPathContext, 'revision'>): Set<string> {
+  return new Set((context.revision?.lockedSales ?? []).map((disposal) => disposal.assetId));
+}
+
 /** Whether a sale's quantity field may stay empty for «tutte»: never on a group's member. */
 export function saleMayBeWhole(answers: Pick<PlanPathAnswers, 'positions'>, assetId: string): boolean {
   return !isGroupMember(answers.positions, assetId);
@@ -388,7 +508,11 @@ export function describePlanPathBlock(screen: PlanPathScreen, answers: PlanPathA
     }
     case 'durata': {
       const months = answers.months;
-      return months === null || !Number.isInteger(months) || months < 1 || months > 60 ? 'Scrivi una durata fra 1 e 60 mesi.' : null;
+      // A revision keeps its closed instalments: the bound left is 60 minus them (`buildRevisedPlan`'s `months_range`).
+      const max = 60 - (context.revision?.closedCount ?? 0);
+      const invalid = months === null || !Number.isInteger(months) || months < 1 || months > max;
+      if (!invalid) return null;
+      return context.revision ? `Scrivi quanti mesi restano, da 1 a ${max}.` : 'Scrivi una durata fra 1 e 60 mesi.';
     }
     case 'conto':
       if (!context.assets.some(isPlanSourceAccount)) return 'Non hai un conto di liquidità: creane uno in Patrimonio.';
@@ -397,7 +521,10 @@ export function describePlanPathBlock(screen: PlanPathScreen, answers: PlanPathA
       return answers.reserveEur !== null && answers.reserveEur < 0 ? 'La riserva non può essere negativa.' : null;
     case 'vendite': {
       if (answers.wantsSales === null) return 'Scegli se vendere qualcosa.';
-      const months = answers.months ?? 0;
+      // A sale's month is the plan's absolute index: in a revision the last one is closedCount + the months left. A
+      // month before the first open one is never offered, but a late saved sale keeps its own (V4): no lower bound.
+      const closed = context.revision?.closedCount ?? 0;
+      const months = closed + (answers.months ?? 0);
       for (const sale of answers.sales) {
         const name = nameOf(sale.assetId);
         const whole = sale.quantity === null && saleMayBeWhole(answers, sale.assetId);
@@ -420,14 +547,78 @@ export function describePlanPathBlock(screen: PlanPathScreen, answers: PlanPathA
   }
 }
 
-/** The summary's refusal: the first screen's block in order, else the engine's gate on the draft. */
-export function firstPlanPathRefusal(answers: PlanPathAnswers, context: PlanPathContext): string | null {
+/**
+ * The summary's refusal: the first screen's block in order, else the engine's gate on the draft. In a revision
+ * the engine's own refusal in words, else the gate `revisePlan` runs (the whole revised plan, `firstIndex` 1).
+ * `today` only stamps the preview's revision row: no refusal reads it.
+ */
+export function firstPlanPathRefusal(answers: PlanPathAnswers, context: PlanPathContext, today: Date = new Date(0)): string | null {
   for (const screen of PLAN_PATH_SCREENS) {
     const block = describePlanPathBlock(screen, answers, context);
     if (block) return block;
   }
-  const issues = validateDraftAgainstAssets(planPathToDraft(answers, context), assetsByIdOf(context.assets));
+  const assetsById = assetsByIdOf(context.assets);
+  if (context.revision) {
+    const result = previewPlanPathRevision(answers, context, today);
+    if (!result.ok) {
+      return result.issue === 'duplicate_asset'
+        ? describeDraftIssue({ code: 'duplicate_asset', label: assetsById.get(result.assetId)?.name ?? result.assetId })
+        : describeDraftIssue({ code: result.issue });
+    }
+    return validateDraftAgainstAssets(revisedPlanGateDraft(result.plan), assetsById)[0]?.message ?? null;
+  }
+  const issues = validateDraftAgainstAssets(planPathToDraft(answers, context), assetsById);
   return issues[0]?.message ?? null;
+}
+
+// ─── The revision «Conferma» writes ───────────────────────────────────────────
+
+/**
+ * The answers as the engine's revision of the active plan (`revisePlan`'s input, the summary's preview): the
+ * saved open sales as they now read and the new ones, diffed against the plan (`diffRevisionDisposals`), the
+ * first intact instalment it was built on (V9), the Consulente's notes cleared and the review month kept while
+ * it is still inside the plan (V5). Throws outside a revision.
+ */
+export function planPathToRevision(answers: PlanPathAnswers, context: PlanPathContext): PlanRevisionInput {
+  const revision = context.revision;
+  if (!revision) throw new Error('planPathToRevision: no plan to revise');
+  const { plan, closedCount } = revision;
+  const assetsById = assetsByIdOf(context.assets);
+  const savedOpen = new Map(plan.disposals.filter(isOpenSavedDisposal).map((disposal) => [disposal.assetId, disposal]));
+  // A sale of every share typed as a number and one stored without a quantity never read as a change.
+  const disposals = salesAsDisposals(answers, context, assetsById).map((disposal) => {
+    const saved = savedOpen.get(disposal.assetId);
+    if (!saved) return disposal;
+    const held = assetsById.get(disposal.assetId)?.quantity ?? 0;
+    if ((disposal.quantity ?? held) !== (saved.quantity ?? held)) return disposal;
+    const asStored: PlanDisposal = { ...disposal };
+    delete asStored.quantity;
+    if (saved.quantity !== undefined) asStored.quantity = saved.quantity;
+    return asStored;
+  });
+  const diff = diffRevisionDisposals(plan, disposals);
+  const months = answers.months ?? 0;
+  return {
+    monthlyInflowEur: answers.monthlyInflowEur ?? 0,
+    reserveEur: resolvePathReserveEur(answers, context),
+    remainingMonths: months,
+    positions: answers.positions,
+    sourceCashAssetIds: [...answers.sourceIds],
+    disposals: diff.newDisposals,
+    removedDisposalAssetIds: diff.removedDisposalAssetIds,
+    movedDisposalMonthIndexes: diff.movedDisposalMonthIndexes,
+    expectedFirstIndex: revision.firstIndex,
+    // A hand revision changed the Consulente's plan: its notes no longer describe it.
+    ...(plan.advisorNotes?.length ? { advisorNotes: [] } : {}),
+    ...(plan.reviewMonthIndex !== undefined && plan.reviewMonthIndex > closedCount + months ? { reviewMonthIndex: null } : {}),
+  };
+}
+
+/** The calendar `revisePlan` will write on these answers: the engine's own result (V7), refusals included. */
+export function previewPlanPathRevision(answers: PlanPathAnswers, context: PlanPathContext, today: Date): RevisedPlanResult {
+  const revision = context.revision;
+  if (!revision) throw new Error('previewPlanPathRevision: no plan to revise');
+  return buildRevisedPlan(revision.plan, planPathToRevision(answers, context), assetsByIdOf(context.assets), context.deps, today);
 }
 
 // ─── The draft «Conferma» writes ──────────────────────────────────────────────
@@ -484,6 +675,18 @@ export function reconcilePlanPathAnswers(answers: PlanPathAnswers, context: Plan
 /** What the wizard starts from: the stored draft checked against today, or the initial one. */
 export function restorePlanPathDraft(stored: PlanPathDraft | null, context: PlanPathContext): PlanPathDraft {
   if (!stored) return initialPlanPathDraft(context);
+  // A revision's draft is kept only on the plan as it was started on (V6): another revision, or one more
+  // instalment closed, moved what its answers were built on — and a create draft has no place here.
+  const revision = context.revision;
+  if (revision) {
+    const same =
+      stored.answers.revisesPlanId === revision.plan.id &&
+      stored.answers.revisionCount === (revision.plan.revisions?.length ?? 0) &&
+      stored.answers.revisesFromIndex === revision.firstIndex;
+    return same ? { ...stored, answers: reconcilePlanPathAnswers(stored.answers, context) } : initialPlanPathDraft(context);
+  }
+  // The plan it revised is closed: nothing of it carries over to a new plan.
+  if (stored.answers.revisesPlanId !== undefined) return initialPlanPathDraft(context);
   // The open plan decides: a browser draft born without it would be refused by the lock at «Conferma» forever.
   if (context.openDraft && stored.answers.serverDraftId !== context.openDraft.id) return initialPlanPathDraft(context);
   const answers = reconcilePlanPathAnswers(stored.answers, context);
@@ -511,7 +714,7 @@ export function parseStoredPlanPath(value: unknown): PlanPathDraft | null {
   if (!Array.isArray(answers.sourceIds) || !Array.isArray(answers.sales) || !Array.isArray(answers.positions)) return null;
   if (answers.wantsSales !== null && typeof answers.wantsSales !== 'boolean') return null;
   if (answers.updateModel !== null && typeof answers.updateModel !== 'boolean') return null;
-  if (answers.start !== null && !['model', 'today', 'zero', 'seed', 'draft'].includes(answers.start as string)) return null;
+  if (answers.start !== null && !PLAN_PATH_STARTS.includes(answers.start as PlanPathStart)) return null;
   const snapshot = answers.seed?.optimizerSnapshot;
   const seed = snapshot ? { ...answers.seed!, optimizerSnapshot: { ...snapshot, computedAt: new Date(snapshot.computedAt) } } : answers.seed;
   return { version: 1, screen: draft.screen, answers: { ...(answers as PlanPathAnswers), ...(seed ? { seed } : {}) } };

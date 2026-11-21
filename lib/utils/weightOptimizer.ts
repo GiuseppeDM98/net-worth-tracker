@@ -1,5 +1,5 @@
 /**
- * Weight optimizer — proposes market weights for the PAC's Target step from the owner's ideal
+ * Weight optimizer — proposes the model portfolio's market weights (the plan path starts from them) from the owner's ideal
  * allocation objectives (Allocazione › Accumulo › "Criteri del modello").
  *
  * Convex QP solved by ONE exact active-set method (`./activeSetQP`;
@@ -272,7 +272,7 @@ export function buildOptimizerCandidates(input: {
 
 // ---------------------------------------------------------------------------
 // Second-level gaps: instruments the optimizer's factor objectives cannot place,
-// shown as a preventive warning (Impostazioni's IdealAllocationTile, OptimizerPanel before
+// shown as a preventive warning (Impostazioni's IdealAllocationTile, the model's dialog before
 // "Calcola") — never blocks the calculation, it just says which euros the sub-category rows will
 // silently attribute to "Senza sottocategoria" or drop as `factor_unmapped`.
 // ---------------------------------------------------------------------------
@@ -1352,9 +1352,8 @@ function optimizeTargeted(input: OptimizerInput, solverOptions?: SolverOptions):
 }
 
 // ---------------------------------------------------------------------------
-// Shared candidate + solve pipeline (extracted from OptimizerPanel's own `result` useMemo,
-// so the PAC's Ottimizzato view and Allocazione's standalone `IdealCompositionDialog` never
-// duplicate the "build candidates, then optimize" wiring).
+// Shared candidate + solve pipeline: the "build candidates, then optimize" wiring in one place
+// (the PAC's own «Ottimizzato» view, its other caller, left with the editor on 2026-11-21).
 // ---------------------------------------------------------------------------
 
 export function runOptimizer(input: {
@@ -1367,7 +1366,7 @@ export function runOptimizer(input: {
   targets: AssetAllocationTarget;
   targetLeverageRatio: number;
   /** A frozen candidate is fixed to its current share (lowerPct = upperPct); applied to the
-   *  freshly-built candidates, before `optimizeWeights` runs. `OptimizerPanel` never passes it: a
+   *  freshly-built candidates, before `optimizeWeights` runs. A PAC position never needed it: a
    *  PAC position already resolves this through `resolveCandidateBounds`'s own `fixedValueEur` term. */
   fixBounds?: (candidate: OptimizerCandidate) => Partial<Pick<OptimizerCandidate, 'lowerPct' | 'upperPct'>>;
   /** Only with mode `'targeted'`. */

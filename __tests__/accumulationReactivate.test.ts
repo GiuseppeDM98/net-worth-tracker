@@ -32,7 +32,7 @@ vi.mock('firebase/firestore', () => ({
 
 import { reactivatePlan } from '@/lib/services/accumulationPlanService';
 import { canReactivatePlan, PLAN_REACTIVATION_DAYS } from '@/lib/utils/accumuloSummary';
-import { describeInstallmentAverage, describeStep3Summary } from '@/lib/utils/accumulationNarrative';
+import { describeStep3Summary } from '@/lib/utils/accumulationNarrative';
 import type { AccumulationPlan } from '@/types/accumulationPlan';
 
 const NOW = new Date('2026-10-16T12:00:00');
@@ -117,19 +117,6 @@ describe('reactivatePlan', () => {
 
   it('refuses a plan that no longer exists', async () => {
     await expect(reactivatePlan('u', 'ghost', NOW)).rejects.toThrow();
-  });
-});
-
-describe('describeInstallmentAverage', () => {
-  const flat = (text: string) => text.replace(/[  ]/g, ' ');
-
-  it('names the average and the first month together', () => {
-    const text = flat(describeInstallmentAverage({ averageEur: 2500, firstEur: 2000, firstMonth: '2026-10' }));
-    expect(text).toMatch(/^in media 2\.?500 € al mese; la prima, ottobre, 2\.?000 €$/);
-  });
-
-  it('says one figure when the two coincide', () => {
-    expect(flat(describeInstallmentAverage({ averageEur: 2000, firstEur: 2000.2, firstMonth: '2026-10' }))).toMatch(/^2\.?000 € al mese$/);
   });
 });
 

@@ -398,3 +398,56 @@ export async function walkPlanPath(page: Page, walk: PlanPathWalk): Promise<void
   await next();
   await at(8);
 }
+
+// ─── The revision through the path (NOVE-26, 2026-11-21) ─────────────────────────────────────────
+
+type RestValue = Record<string, unknown>;
+
+/** A Firestore REST value as plain JSON; timestamps as their ISO string. */
+function fromValue(value: RestValue): unknown {
+  if ('stringValue' in value) return value.stringValue;
+  if ('integerValue' in value) return Number(value.integerValue);
+  if ('doubleValue' in value) return value.doubleValue;
+  if ('booleanValue' in value) return value.booleanValue;
+  if ('nullValue' in value) return null;
+  if ('timestampValue' in value) return value.timestampValue;
+  if ('arrayValue' in value) return ((value.arrayValue as { values?: RestValue[] }).values ?? []).map(fromValue);
+  if ('mapValue' in value) return fromFields((value.mapValue as { fields?: Record<string, RestValue> }).fields ?? {});
+  return value;
+}
+
+function fromFields(fields: Record<string, RestValue>): Json {
+  return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, fromValue(value)]));
+}
+
+export interface StoredFixturePlan {
+  installments: Array<{ index: number; month: string; lines: Array<{ positionId: string; plannedAmountEur: number }> } & Json>;
+  disposals: Array<{ assetId: string; quantity?: number; monthIndex: number; status: string }>;
+  revisions: Array<{ fromIndex: number }>;
+  liquidity: { monthlyInflowEur: number; reserveEur: number; sourceCashAssetIds: string[] };
+  positions: Array<{ id: string; label: string; targetPercentage: number }>;
+  months: number;
+}
+
+/** The fixture's plan as written, decoded. */
+export async function readFixturePlan(): Promise<StoredFixturePlan> {
+  const res = await fetch(`${FIRESTORE}/accumulationPlans/${PLAN_ID}`, { headers: HEADERS });
+  expect(res.ok, `accumulationPlans/${PLAN_ID}: ${res.status}`).toBe(true);
+  const doc = (await res.json()) as { fields: Record<string, RestValue> };
+  const plan = fromFields(doc.fields) as unknown as StoredFixturePlan;
+  return { ...plan, revisions: plan.revisions ?? [] };
+}
+
+/** One more `revisions` row on the fixture's plan, as another tab's revision would leave it (E4). */
+export async function addFixtureRevisionRow(): Promise<void> {
+  const plan = await readFixturePlan();
+  const row = { at: new Date(), fromIndex: 3, before: { months: 12, monthlyInflowEur: 0, reserveEur: 2000 } };
+  await patchMasked(`accumulationPlans/${PLAN_ID}`, 'revisions', toValue([...plan.revisions, row]));
+}
+
+/** Adds an EXECUTED sale of one share of the longest-named instrument (the pension fund): a locked line on «vendite» that must wrap at 390px (E5). */
+export async function addExecutedFixtureSale(): Promise<void> {
+  const plan = await readFixturePlan();
+  const sale = { assetId: 'seed-pension-legacy', quantity: 1, monthIndex: 1, estimatedProceedsEur: 100, status: 'executed' };
+  await patchMasked(`accumulationPlans/${PLAN_ID}`, 'disposals', toValue([...plan.disposals, sale]));
+}
