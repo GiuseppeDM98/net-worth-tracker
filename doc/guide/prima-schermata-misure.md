@@ -255,12 +255,15 @@ prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la 
   1,13 → 1,12); Rendimenti 390 `screens` 1,76 → 1,79 e `tilesAboveFold` 2 → 1; Previdenza 768 `screens` 1,22 → 1,24 e
   `tilesFullyAboveFold` 5 → 3; Tracciamento 1024 `figuresAboveFold` 15 → 16 (`screens` 1,15 → 1,14); Accumulo 1024
   `figuresOutsideVerdict` 7 → 8; What If 1024 `figuresOutsideVerdict` 8 → 10. Strette al misurato: Panoramica 390
-  `screens` 1,83 → 1,82; Storico 390 1,86 → 1,88 (sotto il tetto); Bilanciamento 390 1,71 → 1,70 e 768 1,18 → 1,17;
+  `screens` 1,83 → 1,82; Bilanciamento 390 1,71 → 1,70 e 768 1,18 → 1,17;
   Accumulo 390 1,72 → 1,71; Obiettivi 390 1,32 → 1,31 e `tilesFullyAboveFold` 3 → 4; Impostazioni 390 2,27 → 2,25;
-  Analisi 768 1,28 → 1,27 e 1024 1,44 → 1,43 (le due voci rosse su develop tornano verdi); Coast 768 1,21 → 1,20 e 1024
+  Coast 768 1,21 → 1,20 e 1024
   1,25 → 1,24; Monte Carlo 768 1,18 → 1,17 e 1024 1,10 → 1,09; Hall of Fame 768 1,24 → 1,23 e 1024 1,22 → 1,21;
   Patrimonio 1024 1,01 → 1,00; Storico 1024 1,24 → 1,23; Previdenza 1024 1,21 → 1,20. Restano rosse come su develop, con
-  la loro decisione: Centri 1024 (1,07 → 1,06, tetto 1,04) e Bilanciamento 1024 (1,21, tetto 1,16).
+  la loro decisione: Centri 1024 (1,07 → 1,06, tetto 1,04) e Bilanciamento 1024 (1,21, tetto 1,16). Mosse sotto il
+  tetto, il JSON invariato (riletto al ritiro, 2026-11-21): Storico 390 1,86 → 1,88; Analisi 768 1,28 → 1,27 e 1024
+  1,44 → 1,43 (le due voci rosse su develop tornano verdi). In `perf/mobile-budget.json` 23 voci cambiano, otto con
+  `raisedBy` «Geist Sans applicato».
 - **`2026-11-19: …`** (le vendite nel calendario del piano di accumulo, PR #557; proprietario,
   2026-11-19: alzare), `perf:build` su :3200, `census@example.com`, develop (b57ada16, worktree) e branch sulla stessa macchina lo stesso
   giorno: 59 voci su 60 identiche. **Patrimonio 1024** `figuresAboveFold` 11 → 12, `figuresOutsideVerdict` 8 → 9 — il flip noto del

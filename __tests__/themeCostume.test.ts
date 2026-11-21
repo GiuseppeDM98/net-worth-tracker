@@ -4,10 +4,11 @@
  * in the «Theme costume» section of `app/globals.css` and is gated by `[data-costume] [data-costume-scope]`,
  * so outside a costume theme — and outside the dashboard and its dialogs — nothing changes.
  *
- * Seen red on 2026-11-21: T1 with `--costume-ground` declared in `:root`; T2 with the gate stripped off
- * one selector, with `:not(.ai-control)` dropped, and with a `box-shadow: var(--costume-tile-shadow)`
- * outside the banners; T3 with a 19th string in the list; T4 with the eyebrow colour losing its
- * fallback; T5 with `resolveEmblem` ignoring `inScope`.
+ * Seen red on 2026-11-21: the palette-theme case with `--costume-ground` declared in `:root`; the gate
+ * case with the gate stripped off one selector, with `:not(.ai-control)` dropped, and with a
+ * `box-shadow: var(--costume-tile-shadow)` outside the banners; the scope-property case with a 19th
+ * string in the list; the eyebrow case with the colour losing its fallback; the emblem case with
+ * `resolveEmblem` ignoring `inScope`.
  */
 import { describe, expect, it } from 'vitest';
 import { COLOR_THEMES, COLOR_THEME_META, COSTUME_THEMES } from '@/lib/constants/colorTheme';
@@ -69,7 +70,7 @@ function walk(css: string): { rules: Rule[]; declarations: Declaration[] } {
 
 const PALETTE_THEMES = COLOR_THEMES.filter((theme) => COLOR_THEME_META[theme].costume === null);
 
-describe('T1 — a palette theme wears no costume', () => {
+describe('a palette theme wears no costume', () => {
   it.each(PALETTE_THEMES.flatMap((theme) => (['light', 'dark'] as const).map((mode) => ({ theme, mode }))))(
     '$theme · $mode: no scope block, no costume property',
     ({ theme, mode }) => {
@@ -81,7 +82,7 @@ describe('T1 — a palette theme wears no costume', () => {
   );
 });
 
-describe('T2 — every costume rule is gated, and nothing outside the section paints with one', () => {
+describe('every costume rule is gated, and nothing outside the section paints with one', () => {
   const { section, outside } = splitSection();
   const { rules } = walk(section);
 
@@ -112,7 +113,7 @@ describe('T2 — every costume rule is gated, and nothing outside the section pa
   });
 });
 
-describe('T3 — the scope properties', () => {
+describe('the scope properties', () => {
   it('lists the eighteen properties in the contract order', () => {
     expect(COSTUME_SCOPE_PROPERTIES).toHaveLength(18);
     expect(COSTUME_SCOPE_PROPERTIES).toEqual([
@@ -146,7 +147,7 @@ describe('T3 — the scope properties', () => {
   });
 });
 
-describe('T4 — the eyebrow colour is layered', () => {
+describe('the eyebrow colour is layered', () => {
   it('reads the costume colour with today’s ink as its fallback', () => {
     expect(TILE_EYEBROW_CLASS).toContain('var(--costume-eyebrow-color,var(--muted-foreground))');
   });
@@ -158,7 +159,7 @@ describe('T4 — the eyebrow colour is layered', () => {
   });
 });
 
-describe('T5 — resolveEmblem', () => {
+describe('resolveEmblem', () => {
   const art = (d: string): EmblemArt => ({ viewBox: '0 0 24 24', shapes: [{ kind: 'path', d, tone: 'ornament', strokeWidth: 1.5 }] });
   const emblems: Partial<Record<(typeof COLOR_THEMES)[number], ThemeEmblems>> = {
     cyberpunk: { fallback: art('M0 0'), pages: { storico: art('M1 1') } },

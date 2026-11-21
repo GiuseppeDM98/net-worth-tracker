@@ -1,6 +1,6 @@
 # NOVE-20 — The costume, round B: every dialog and the pages beyond the first three
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-11** (the contract, § 4.3), **NOVE-12/13** (the two themes)
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567)** (the contract, doc/guide/temi.md § Il costume), **NOVE-12/13** (the two themes)
 > and **NOVE-19**, implemented just before it, whose tools it reuses with their names: the portal mechanism
 > (`useCostumeScopeProps()`, NOVE-19 § 4.1, already spread on every dialog, drawer, sheet and alert content), the four
 > control properties and `COSTUME_FRAME_RADIUS_CLASS` / `COSTUME_PILL_RADIUS_CLASS` (§ 4.2), the emblems of Panoramica, Patrimonio and Cashflow (§ 4.5), the E2E files
@@ -18,7 +18,7 @@ After NOVE-19 every portalled content carries `data-costume-scope`. What still m
 | # | Site (file:line @ b841cbd7) | What it shows under Egeo / Orbita |
 | --- | --- | --- |
 | 1 | `components/ui/responsive-modal.tsx:203`, `:247`; `:204-206`, `:248-250` | the eyebrow prints its string bare («Passo 1 di 2» draws its digits in the heading face); the title is Geist 20px with no hook |
-| 2 | `components/ui/dialog.tsx:69`; NOVE-11 § 4.3 `[data-tile]:not([data-generated])` | the modal's `rounded-2xl` follows `--radius-2xl` but has no cap or marks; `data-tile` would replace the Float shadow with `--costume-tile-shadow: none` |
+| 2 | `components/ui/dialog.tsx:69`; the costume rule `[data-tile]:not([data-generated])` (`app/globals.css`, «Theme costume» section) | the modal's `rounded-2xl` follows `--radius-2xl` but has no cap or marks; `data-tile` would replace the Float shadow with `--costume-tile-shadow: none` |
 | 3 | `components/ui/drawer.tsx:74` | `rounded-t-[10px]`: a 10px sheet under 4px / 0px tiles (NOVE-19 § 10) |
 | 4 | `components/ui/alert-dialog.tsx:64`, `:110-114`; `components/layout/LogoutDialog.tsx:30-31` | the logout confirm (from `Sidebar.tsx:297`, `SecondaryMenuDrawer.tsx:345`) is in scope after NOVE-19 but has no frame and a title without hook |
 | 5 | `ConsulenteWizard.tsx:230`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:225`, `components/ui/path-card.tsx:48` (`PathCard`), `:97` (`PathDoneCard`) — Compravendita and the plan of accumulation since 2026-11-20 | five scene cards on `TILE_SURFACE_CLASS` without `data-tile`: no cap, no marks |
@@ -30,7 +30,7 @@ After NOVE-19 every portalled content carries `data-costume-scope`. What still m
 | 11 | `lib/utils/cashflowSankey.ts:66-92` | income, type, Budget, Risparmi hexes fixed; the ring (`ClassificaTile`, since 2026-11-12) and the phone flow (`SpendingTypesMobileFlow.tsx:44`, `:52`) paint the same types by token (`expenseTypeColors.ts:30-36`, `:61-64`): under a costume the Sankey disagrees with its neighbours |
 | 12 | `components/performance/UnderwaterDrawdownChart.tsx:102-109`, `:140-142`, `:170` | the red is a `useState` seeded with the default's oklch, read once from `<html>` in a rAF (empty deps): wrong first frame, stale after a theme switch |
 | 13 | `AssistantQuestionBlock.tsx:147-148`, `:159`; `ExpenseProposalCard.tsx:261-263`; `GoalProposalCard.tsx:212-216` | the AI eyebrow on `bg-muted/40` over the card: **4,48:1** Egeo light, **4,39** Egeo dark; `DESIGN.md:70-72` promises 4,5 there |
-| 14 | `app/globals.css:854-858`; `ConsulenteBook.tsx:346-355` | the book prints with the costume's heading face (`.tile-eyebrow`, the verdict's `.costume-heading`) and its emblem (the scene card is `print:hidden`, `ConsulenteBook.tsx:223`; the sheet is `[data-book-print]`): decision 17 says never on paper |
+| 14 | `app/globals.css:940-944` (on `develop` @ f4b16f98); `ConsulenteBook.tsx:346-355` | the book prints with the costume's heading face (`.tile-eyebrow`, the verdict's `.costume-heading`) and its emblem (the scene card is `print:hidden`, `ConsulenteBook.tsx:223`; the sheet is `[data-book-print]`): decision 17 says never on paper |
 | 15 | the `PageHeader` call sites of § 4.8 | no `emblem` id: Egeo draws the temple on nine pages while three have their own (NOVE-19 § 4.5) |
 
 ## 2. Goal and acceptance criteria
@@ -103,7 +103,7 @@ after NOVE-19's `'--costume-control-switch-on'`. Read only through a `var()` wit
 | --- | --- | --- | --- | --- | --- | --- |
 | `--costume-page-generated-fill` | the fill of an AI-generated sub-tile | `initial` | `var(--card)` | inherits | `initial` | inherits |
 
-NOVE-12's and NOVE-13's light scope blocks close with the line (NOVE-11 T3 counts 23). Beside NOVE-19's classes:
+NOVE-12's and NOVE-13's light scope blocks close with the line (`themeCostume.test.ts`'s scope-property case counts 23). Beside NOVE-19's classes:
 
 ```ts
 /** `bg-muted/40` unless a costume needs the card for the AI accent's 4.5:1 (DESIGN.md → The AI-Accent Rule). */
@@ -167,7 +167,7 @@ Egeo's meander beside «Consulente»).
   tracking-[-0.01em]"`, child `{typeof title === 'string' ? <HeadingText text={title} /> : title}`. One caller
   passes a node: `components/performance/AIAnalysisDialog.tsx:278-287`, the page's verdict and its tone dot; there
   the fragment's text becomes `<HeadingText text={verdict.headline.endsWith('.') ? verdict.headline.slice(0, -1) :
-  verdict.headline} />`, the dot `<span>` unchanged, so its figures are `.costume-figure`. Its own scope spread (NOVE-11 `:201`, `:234`) stays (NOVE-19 § 3). The footer
+  verdict.headline} />`, the dot `<span>` unchanged, so its figures are `.costume-figure`. Its own scope spread (`responsive-modal.tsx:207`, `:241` on `develop` @ f4b16f98) stays (NOVE-19 § 3). The footer
   (`:262-267`): a token border, the primary glows by NOVE-11's rule — unchanged.
 - `components/ui/sheet.tsx`: no frame — its one consumer is the sidebar's phone panel (`sidebar.tsx:191-209`), shell.
 
@@ -524,7 +524,7 @@ property, the frame attribute and the emblems go together; a palette theme never
 - **NOVE-19's surfaces** (the shell, the portalled and form primitives, Panoramica, Patrimonio, Cashflow but
   Analisi): portalled content inside my surfaces — every select, menu and popover of a dialog, the pickers'
   drawers — is served by NOVE-19's mechanism for portalled content.
-- **Per-theme `--ai-accent`**: none (NOVE-11 § 10); the fill moves instead.
+- **Per-theme `--ai-accent`**: none (temi.md § Per-page blind spots); the fill moves instead.
 - **Emails, PDF export, landing, access pages**: none (decision 17); the browser's print of the book is reset (§ 4.1).
 
 ## 11. The prompt that implements it

@@ -1,6 +1,6 @@
 # NOVE-12 — The «Egeo» theme: marble, sea and gold
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-11** (the costume contract, NOVE-11 § 4.3, used here with
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567)** (the costume contract, doc/guide/temi.md § Il costume, used here with
 > its names and nothing added); **NOVE-19 and NOVE-20 are implemented after it** and carry Egeo onto every page and
 > dialog. Written on 2026-11-12; every `file:line` is cited on `develop` @ b841cbd7. Executes the owner's point 1,
 > decisions 3 and 17 and the adopted choice (a) (README.md § 3-4), from the approved mock `Egeo-C.dc.html`
@@ -12,10 +12,10 @@
 | # | Site (file:line @ b841cbd7) | What it shows |
 | --- | --- | --- |
 | 1 | `lib/constants/colorTheme.ts:15-22` | six themes, none with a costume; after NOVE-11 `COLOR_THEME_META` has six entries, all `costume: null` |
-| 2 | `app/globals.css:302-739` | no block for a seventh theme; the costume rule set (NOVE-11 § 4.3) is inert while no theme sets `data-costume` |
+| 2 | `app/globals.css:76-741` (on `develop` @ f4b16f98) | no block for a seventh theme; the costume rule set (`app/globals.css:743-806`, temi.md § Il costume) is inert while no theme sets `data-costume` |
 | 3 | `app/layout.tsx:25`, `:39-61` | two fonts, Geist and Geist Mono; no engraved face for the headings |
 | 4 | `lib/constants/themeCostume.ts` (NOVE-11) | `THEME_EMBLEMS = {}`: no emblem to draw |
-| 5 | the mock `Egeo-C.dc.html` | five chart colours in the dark half, eight in the light: the app has nine slots (`--chart-1..9`, `app/globals.css:108-116`) and the mock's order is not the app's (§ 3) |
+| 5 | the mock `Egeo-C.dc.html` | five chart colours in the dark half, eight in the light: the app has nine slots (`--chart-1..9`, `app/globals.css:110-118` on `develop` @ f4b16f98) and the mock's order is not the app's (§ 3) |
 | 6 | the mock's `--primary` light `0.45 0.11 240` | outside sRGB (max chroma at that L and hue: 0.103): the browser would clip it |
 
 ## 2. Goal and acceptance criteria
@@ -26,7 +26,7 @@ outside the dashboard it is its palette only. Every figure stays Geist Mono.
 
 1. Impostazioni › Aspetto shows a seventh swatch, «Colore 7 di 7: Egeo», described «Marmo, mare e oro»; choosing
    it puts `data-theme="egeo"` and `data-costume` on `<html>` and persists like any theme. **Proof**:
-   `aspettoTab.test.tsx` (R1 of NOVE-11, now seven), `colorTheme.test.ts` C3; E1.
+   `aspettoTab.test.tsx` (one button per theme, now seven), `colorTheme.test.ts` C3; E1.
 2. The four gate tests measure Egeo in both modes and pass with the numbers of § 4.4. **Proof**: the four files
    green; the mutation of § 6 turns `chartPaletteDistinctness` red.
 3. Every costume token printed as text reads ≥ 4,5:1 on the surfaces it lands on, the ground's stripes included
@@ -49,7 +49,7 @@ outside the dashboard it is its palette only. Every figure stays Geist Mono.
    `document.fonts` face of family `Marcellus` is `unloaded`; on `/dashboard` with Egeo one is `loaded`.
    **Proof**: E1.
 8. The twelve existing blocks still render as their baseline. **Proof**: `e2e/theme.neutral{,.mobile}.spec.ts`
-   (NOVE-11 E1), unchanged and green.
+   (the palette themes' recorded baseline), unchanged and green.
 9. `perf:budget`: every route stays under its ceiling; expected growth ≤ 0,2 KB gz on the routes that render
    `PageHeader` (`/`, `/dashboard/*`: the emblem art) and < 0,1 KB elsewhere (one `COLOR_THEME_META` entry);
    `mobile:budget` does not move (the census reads the default theme). **Proof**: the two runs, before and after
@@ -82,7 +82,7 @@ outside the dashboard it is its palette only. Every figure stays Geist Mono.
     the token resolves, `ChartColorsProvider` on `<html>` included — and Egeo dark WRITES the `.dark` value
     `oklch(0.740 0.156 148.655)` in its own block: a token of a theme's light block reaches its dark mode by
     source order (`[data-theme="egeo"]` has the specificity of `.dark` and comes later, as `--radius` of
-    `[data-theme="retro-arcade"]`, `app/globals.css:303`, does), and the light green on Egeo dark would read
+    `[data-theme="retro-arcade"]`, `app/globals.css:304` on `develop` @ f4b16f98, does), and the light green on Egeo dark would read
     2,39:1 on `--background`, 2,13 on `--card`, 1,82 on `--muted`. The mock's «neg» is `--destructive`; the
     warning trio is the default's;
   - `--accent`, `--sidebar*` (the mock has none): derived from the ground's hue, § 4.3;
@@ -124,7 +124,7 @@ const marcellus = Marcellus({ weight: '400', subsets: ['latin'], variable: '--fo
 ```
 
 `import { Geist, Geist_Mono, Marcellus } from "next/font/google";` and `${marcellus.variable}` joins the `<html>`
-className of NOVE-11 § 4.1. Effect: `@font-face` rules (~0,3 KB gz) in the root CSS of every route, no JS; the woff2
+className (`app/layout.tsx`, temi.md § Il costume «A costume's heading face»). Effect: `@font-face` rules (~0,3 KB gz) in the root CSS of every route, no JS; the woff2
 (latin, ~25 KB) is requested only by a painting heading. Licence: SIL Open Font License 1.1, self-hosted by next/font
 at build time (no request to Google at runtime); the OFL needs no notice in the UI.
 
@@ -248,7 +248,7 @@ at build time (no request to Google at runtime); the OFL needs no notice in the 
 }
 ```
 
-The light scope block holds all 18 `COSTUME_SCOPE_PROPERTIES` in their order (NOVE-11 T3 turns binding here).
+The light scope block holds all 18 `COSTUME_SCOPE_PROPERTIES` in their order (the per-theme half of `themeCostume.test.ts`'s scope-property case turns binding here).
 
 ### 4.4 The measured numbers (computed with the gates' formulas; the tests re-measure them)
 
@@ -267,7 +267,7 @@ The light scope block holds all 18 `COSTUME_SCOPE_PROPERTIES` in their order (NO
 | eyebrow on card · background · muted · darkest stripe | 6,50 · 5,59 · 5,51 · 5,42 | 8,75 · 9,82 · 7,50 · — |
 | foreground · muted-fg on the darkest stripe (0.915 0.038 82) | 11,68 · 6,55 | — |
 | ornament on card · on the three stripes (decorative: the ≥ 3:1 guide is on the card, the cap line; the emblem and the frieze on the ground carry no floor) | 3,43 · 2,95 / 2,86 / 3,00 | 6,56 · 7,37 |
-| AI accent on a `bg-muted/40` sub-tile over the card (the known per-theme `--ai-accent` gap, NOVE-11 § 10: recorded, not fixed here) | ≈ 4,48 | ≈ 4,39 |
+| AI accent on a `bg-muted/40` sub-tile over the card (the known per-theme `--ai-accent` gap, temi.md § Per-page blind spots: recorded, not fixed here) | ≈ 4,48 | ≈ 4,39 |
 
 Every slot is inside sRGB, so the served `#rrggbb` keeps the luminance band (`chartColorsContext`). Previdenza
 (`--chart-9`, hue 285) sits 45° from the nearest chromatic slot.
@@ -278,7 +278,7 @@ Every slot is inside sRGB, so the served `#rrggbb` keeps the luminance band (`ch
 
 ## 5. Constraints and traps (AGENTS.md / DESIGN.md rules, «here it means that»)
 
-- **The Costume Rule (NOVE-11 § 4.8)**: the frieze and the temple are `aria-hidden`, carry no meaning, sit under no
+- **The Costume Rule (DESIGN.md)**: the frieze and the temple are `aria-hidden`, carry no meaning, sit under no
   text; nothing moves — no reduced-motion branch is needed.
 - **The Mono Mandate**: Marcellus has digits; here it means every figure in a headline or an eyebrow stays inside a
   `.costume-figure` (NOVE-11's `HeadingText`), and no Egeo rule sets a `font-family` on anything else.
@@ -301,12 +301,12 @@ Every slot is inside sRGB, so the served `#rrggbb` keeps the luminance band (`ch
 
 | # | Test | Mutation that turns it red |
 | --- | --- | --- |
-| G1 | the four gate tests, now on fourteen blocks (derived, NOVE-11 § 4.5) | `--chart-6` light set to `--chart-4`'s `0.64 0.13 80`: ΔE00 0 |
+| G1 | the four gate tests, now on fourteen blocks (derived, `__tests__/themeBlocks.ts` → `THEME_MODES`) | `--chart-6` light set to `--chart-4`'s `0.64 0.13 80`: ΔE00 0 |
 | T3 | `themeCostume.test.ts`: Egeo's light scope block declares the 18 properties | delete `--costume-heading-size` |
 | K1 | `themeCostumeContrast.test.ts` (new, `describe.each` over `COSTUME_THEMES` × light/dark): `--costume-eyebrow-color` ≥ 4,5 on `--card`, `--background`, `--muted` and on every opaque `oklch()` of `--costume-ground` (the page header's label, `components/layout/PageHeader.tsx:72`); `--foreground` and `--muted-foreground` ≥ 4,5 on every opaque `oklch()` in `--costume-ground` (a `var()` ground is its block's `--background`); `--costume-ornament` ≥ 3 on `--card`. Its own oklch → sRGB code, as the sibling gate tests | eyebrow `oklch(0.62 0.11 80)`: 3,43 on the card |
 | K3 | `themeCostumeContrast.test.ts`: `--positive` and `--destructive` ≥ 4,5 on K1's surfaces (each opaque ground colour, `--background`, `--card`, `--muted`), each measured on the value the BROWSER resolves: a light block's own value, else `:root`'s; a dark block's own value, else its theme's light block's (it beats `.dark` by source order), else `.dark`'s | delete Egeo light's `--positive` (4,38); delete Egeo dark's (the light value reads 2,39 on `--background`) |
 | G2 | same file, `describe.each` over `COSTUME_THEMES` × light/dark: the hue of `--chart-3` (the slot of `ACTION_CHART_NUMBER.COMPRA`) is ≥ 30° from the hue of `--destructive`, on the circle | Egeo light's `--chart-3` back to `0.56 0.15 40` (12°) |
-| C3 | `colorTheme.test.ts`: NOVE-11's C2 is rewritten «for every theme whose `COLOR_THEME_META` costume is `null`, the shipped script never sets `data-costume`»; new case: with `color-theme = egeo` the shipped script sets `data-theme` and `data-costume`, with `cyberpunk` only `data-theme` | drop `egeo`'s costume in the registry |
+| C3 | `colorTheme.test.ts`: the case «the shipped script never sets `data-costume`» is rewritten «for every theme whose `COLOR_THEME_META` costume is `null`, the shipped script never sets `data-costume`»; new case: with `color-theme = egeo` the shipped script sets `data-theme` and `data-costume`, with `cyberpunk` only `data-theme` | drop `egeo`'s costume in the registry |
 | R4 | `costumeScope.test.tsx`: `useColorTheme` mocked (`vi.mock('@/contexts/ColorThemeContext', () => ({ useColorTheme: () => ({ colorTheme: 'egeo', setColorTheme: vi.fn() }) }))`), the registry real: `<PageHeader title="Novembre" label="Panoramica" />` inside `CostumeScope` renders two `svg[aria-hidden="true"]` — `width="18"` in the phone navbar and `width="22"` right before the label — each with one `path` whose `d` is the temple's; outside `CostumeScope` no svg | `THEME_EMBLEMS.egeo` deleted |
 | E1 | `e2e/theme.egeo.spec.ts` (desktop, emulators): `beforeAll` reads `userPreferences/test-user-1` through the emulator REST (`Authorization: Bearer owner`, as `e2e/motion.layout.spec.ts:97-102`) and PATCHes `colorTheme` to `egeo` (`updateMask.fieldPaths=colorTheme`); `afterAll` writes back the value read, or removes the field when there was none; `addInitScript` sets `color-theme = egeo` and next-themes' `theme` (`light` / `dark`) for the first frame, as `e2e/themeNeutral.ts`. Criterion 4 on `/dashboard` and `/dashboard/cashflow?tab=tracking`, light and dark (the dark ground `background-image: none`; «the first tile» = `#page-main [data-tile]` first; the emblem = `xpath=preceding-sibling::*[1]` of `#page-main p.tile-eyebrow` first); criteria 6 and the `/login` half of 7 in their own `describe` with `test.use({ storageState: { cookies: [], origins: [] } })` (signed in, `/` and `/login` redirect to `/dashboard`); criterion 7's statuses (`[...document.fonts].filter(f => f.family === 'Marcellus')`) read after `document.fonts.ready` with the verdict `h2` visible | `var(--font-marcellus)` first in `@theme inline`'s `--font-sans`: a face `loaded` with the default theme |
 | E2 | `e2e/theme.egeo.mobile.spec.ts` (390; the same preference write and restore): criterion 5; the band's `background-color` is the computed `--background` (opaque under the sticky header); no horizontal overflow (`scrollWidth ≤ innerWidth`) | `--costume-header-band-height: 0px` |
@@ -327,7 +327,7 @@ name; the landing and the access pages show only the colours; the other six them
 - **D (data)**: `document.querySelectorAll('[data-costume-scope]').length` is 1 on a page, 2 with a dialog open;
   `getComputedStyle(h2).fontFamily` on Panoramica and the `.costume-figure` of the Tracciamento Periodo eyebrow on
   `/dashboard/cashflow?tab=tracking`.
-- **E**: a heading's figure with its sign stays in the mono (NOVE-11 H1 «+2.150 €»; in the browser the year of the
+- **E**: a heading's figure with its sign stays in the mono (`headingFigures.test.ts`: «+2.150 €» is one figure; in the browser the year of the
   Periodo eyebrow); a verdict without figures is all Marcellus; a reload in Egeo does not move the grid when the
   page replaces the skeleton (the frieze is in the skeleton); switching Egeo → Default from Aspetto removes ground, frieze and emblem without a reload.
 - **F (owner, at his «pronto»)**: the mirror in Egeo light and dark on his own screens.
