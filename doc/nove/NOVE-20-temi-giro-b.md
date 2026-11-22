@@ -1,6 +1,6 @@
 # NOVE-20 — The costume, round B: every dialog and the pages beyond the first three
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567)** (the contract, doc/guide/temi.md § Il costume), **NOVE-12 (retired on 2026-11-22, PR #569) and NOVE-13** (the two themes)
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567)** (the contract, doc/guide/temi.md § Il costume), **NOVE-12 (retired on 2026-11-22, PR #569) and NOVE-13 (retired on 2026-11-22, PR #572)** (the two themes)
 > and **NOVE-19**, implemented just before it, whose tools it reuses with their names: the portal mechanism
 > (`useCostumeScopeProps()`, NOVE-19 § 4.1, already spread on every dialog, drawer, sheet and alert content), the four
 > control properties and `COSTUME_FRAME_RADIUS_CLASS` / `COSTUME_PILL_RADIUS_CLASS` (§ 4.2), the emblems of Panoramica, Patrimonio and Cashflow (§ 4.5), the E2E files

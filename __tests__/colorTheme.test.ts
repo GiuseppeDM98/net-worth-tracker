@@ -109,4 +109,11 @@ describe('buildColorThemeInitScript', () => {
     expect(cyberpunk).toHaveBeenCalledWith(COLOR_THEME_ATTRIBUTE, 'cyberpunk');
     expect(cyberpunk).not.toHaveBeenCalledWith(COSTUME_ATTRIBUTE, expect.anything());
   });
+
+  // Seen red on 2026-11-22 with `orbita`'s `costume` set to `null` in the registry.
+  it('should set the theme and the costume for orbita', () => {
+    const orbita = runInitScript('orbita').setAttribute;
+    expect(orbita).toHaveBeenCalledWith(COLOR_THEME_ATTRIBUTE, 'orbita');
+    expect(orbita).toHaveBeenCalledWith(COSTUME_ATTRIBUTE, '');
+  });
 });

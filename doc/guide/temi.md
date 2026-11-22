@@ -167,7 +167,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 ## Il costume — «un tema può vestire la dashboard oltre il colore?» (2026-11-21)
 
 DESIGN.md → The Costume Rule. A *palette theme* is colours and a radius (the six of today); a *costume theme* may also
-carry a ground, a frame on the tiles, a heading face, ornaments, a glow on the primary action and an emblem — inside the
+carry a ground, a frame on the tiles, a heading face, ornaments, a glow on the primary action, an emblem and — on the Panoramica at ≥ 1440 only — a resource bar — inside the
 dashboard and its dialogs only (owner, 2026-11-12: never the emails, the PDF, the landing, the access pages). Every
 mechanism has a neutral default, and the palette themes are held to render exactly as before.
 
