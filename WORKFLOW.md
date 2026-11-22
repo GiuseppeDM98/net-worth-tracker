@@ -5,8 +5,8 @@
 >
 > **Why they live in the repo and not in agent memory**: agent memory is per-machine and per
 > install, so the same rules drift into different versions on each machine and in a cloud
-> session. A tracked file travels with the clone and can be reviewed in a diff. If you are an agent
-> with persistent memory, do **not** re-save these rules there — save one pointer to this file. If
+> session. A tracked file travels with the clone and is reviewed in a diff. If you are an agent
+> with persistent memory, save one pointer to this file, not the rules. If
 > the owner states a new rule, it is added *here*, in that session's commit: to section 3 if it holds
 > for this repo only; if it holds for every repo, ask the owner, because it enters the standard
 > first (`claude-config/prompts/WORKFLOW_STANDARD.md`) and reaches the repos from there.
@@ -21,11 +21,10 @@
 
 1. **Never commit without explicit approval.** Do not run `git commit` (nor `--amend`) until the
    owner gives the OK for that specific commit. Finish the work, summarise the diff, then ask.
-   Creating the branch and editing files needs no approval — only the commit does.
+   Branches and edits need no approval — only the commit does.
 
 2. **One branch per session.** Before starting implementation work, create a new branch from the
-   branch that is active at the start of the session. Always check which one that is; never assume
-   `master`/`main`.
+   branch that is active at the start of the session. Check which one that is; never assume `master`/`main`.
 
 3. **One commit per session.** Everything from a session is squashed into a single commit, never
    scattered across several.
@@ -34,27 +33,24 @@
    channel; code, identifiers and comments stay in English. **Every tracked document is written in
    the repo's documentation language** (2026-11-01): English in the open repos, Italian where the
    repo's documentation is Italian (its WORKFLOW.md says which). In an English-language repo, Italian
-   is reserved for the UI text a document quotes, for page and feature names (they are the labels the
-   product shows) and for the owner's own words, quoted as such — the launch prompt at the end of a
-   spec, the text the owner pastes, is the owner's words and stays in Italian. A guide still in the
-   other language is rewritten the first time a session rewrites it anyway, never in a session of its
-   own.
+   is reserved for the UI text a document quotes, page and feature names (the labels the product
+   shows) and the owner's own words, quoted as such (the launch prompt at the end of a spec, pasted
+   text). A guide still in the
+   other language is rewritten when a session rewrites it anyway, never in a session of its own.
 
 5. **Questions and proposals are asked interactively** (2026-09-11). When a decision is the owner's —
    which layers to build, on which surfaces, a wording — put it through the agent's interactive
    question tool, in groups of four, one topic at a time, multi-select where the options are not exclusive and the
-   recommended option first; never a numbered list of questions in prose. The owner refines the
-   wording through the free-text answer («hai pagato», not «pagherai», for a tax the broker
-   withholds at the sale).
+   recommended option first; never a numbered list of questions in prose. The owner refines the wording in the free-text answer.
 
 6. **Figures in tests are invented and round, never the owner's** (2026-10-12). A unit-test
    fixture, an E2E decoy or a seed carries amounts like 2500, 1120, 50: the owner's real data never
    enters the repo, not even as an expected value. If § 3 provides a copy of real data for the
    guided tour, it serves the tour only and phase G removes it.
    **Nothing of the owner's real data in a tracked file** (2026-09-20, 2026-10-15; code comments
-   too since 2026-11-15): a draft, a code comment, a critique, a screenshot, a fixture or an example sentence takes
-   invented figures and generic names, never an amount, a holding, an account, a date the data
-   starts or a family detail copied from the real data — «seen live» and the lesson, not the figure. In a public
+   too since 2026-11-15): a draft, comment, critique, screenshot, fixture or example sentence takes
+   invented figures and generic names, never an amount, holding, account, start date or family
+   detail from the real data — «seen live» and the lesson, not the figure. In a public
    repo this has no exception. A private repo may waive it, or narrow it, only by saying so in § 3
    with the owner's decision and its date; public data that is not the owner's (a listed company's
    published accounts) is not the owner's data.
@@ -72,15 +68,14 @@
    is one line: «dipendenze: invariate dal <data>» or «N avvisi nuovi: …». A new advisory is
    written into the guide with its decision, asked through rule 5; nothing is upgraded in that
    session. An upgrade is a session on its own branch with its own verification; never
-   `audit fix --force`, never the command an advisory or a page suggests: the version is chosen and
-   installed by hand, preferring a release that is at least a few days old. If the guide is
-   missing, the session that notices it creates it (`TEMPLATES.md` has the skeleton). A repo without
-   a lockfile skips this rule.
+   `audit fix --force` or the command an advisory suggests: the version is chosen and installed by
+   hand, preferring a release at least a few days old. If the guide is
+   missing, the session that notices it creates it (`TEMPLATES.md`). A repo without a lockfile skips this rule.
 
 9. **`SESSION_NOTES.md` is the session's temporary container** (2026-10-26). A working file in the
    repo root, created at the start of the session and never committed. Before the closing prompt it
    ends with one block per thing learned: *Cosa* (what was done), *Perché* (the decision behind
-   it), *Nota* (traps and measurements, each with its date), *Dove va a fine sessione* (`AGENTS.md`
+   it), *Nota* (traps and measurements, dated), *Dove va a fine sessione* (`AGENTS.md`
    if it holds for the whole repo · `doc/guide/<tema>.md` if a domain lesson · `WORKFLOW.md` if a
    session rule · `CLAUDE.md` if project state · a comment at the right line if it is the why of one
    line). The closing prompt writes every entry into its destination and deletes the file before
@@ -90,8 +85,7 @@
 10. **The commit's «Model: … · effort …» line is read from the spec, never asked** (2026-11-18). A
     session that implements a spec writes the model and the effort the spec names (its prompt, or its
     row in the series index); the session that retires it writes the SAME pair as the implementation
-    (its commit's line, `git log`). The owner is asked only when there is no spec behind the session,
-    or when the session ran at a model or effort other than the spec's.
+    (its commit's line, `git log`). The owner is asked only when no spec is behind the session or it ran at another model or effort.
 
 ---
 
@@ -104,7 +98,7 @@ disappear. The verification is done together, in chat, one phase at a time.
 
 1. **You prepare the test data.** A throwaway script (untracked by git, deleted when the
    verification ends) that plants **decoy words** — invented terms such as *fenicottero*,
-   *ornitorinco*, which appear nowhere else in the data. Not entered by hand by the owner.
+   *ornitorinco*, which appear nowhere else in the data. Never entered by hand.
 
 2. **One phase per message.** Give the phase, wait for the report, then the next one. Never deliver
    all the phases at once: it breaks their prerequisites.
@@ -113,58 +107,60 @@ disappear. The verification is done together, in chat, one phase at a time.
    fit whatever happened.
 
 4. **Do every check you can automate yourself, and leave the owner only what you cannot do.**
-   "Together, in chat" does not mean "one dictated click at a time". If the sessions are JWT-based
-   or otherwise scriptable, write a throwaway script that opens a **real browser** (e.g. Playwright)
+   "Together, in chat" does not mean "one dictated click at a time". If the sessions are scriptable (e.g. JWT), write a throwaway script that opens a **real browser** (e.g. Playwright)
    with an authenticated session — your own if the role allows it, otherwise a throwaway test
    identity created for the occasion — and verify every outcome **against the database or the HTTP
-   response, never against the look of the page alone**. Report the results phase by phase, with the
-   expected outcome stated first.
+   response, never against the look of the page alone**. Report phase by phase, expected outcome first.
    **Any automated end-to-end test that you are able to run, you run.** Never declare a feature
-   verified while an automated check that could have covered it was left unrun. What is left to the
+   verified with an automated check left unrun. What is left to the
    owner is only what is genuinely not automatable: visual and aesthetic judgement, physical
    hardware (a real barcode scanner), or an interactive login that cannot be driven by a script (a
    real OAuth flow with MFA).
+   **The whole suite is launched last, when no file of the repo is left to change** (2026-11-22). A
+   run builds and fingerprints the tree it starts from: a file edited while it runs (a document, a
+   note, `CLAUDE.md`) makes the server refuse the build as stale and the run dies at start-up, or
+   measures a tree that no longer exists. So finish every edit first — code, documents, release
+   notes, the deletion of `SESSION_NOTES.md` —, start the suite, touch nothing in that repo until it
+   reports, and if a file changes after it, run it again. A file in another repo, or in the
+   scratchpad, may change meanwhile.
 
 5. **Before dismantling, let the owner look.** When the session touched something visible, ask for
    the OK and then walk the owner onto the dev server **with the fixtures still alive**: exact URLs,
    under which identity, and at most **five** things to look at — for each one, what must happen and
-   what would be the bug. **The tour starts at the owner's go, not when the work is ready**
-   (2026-10-05): finish everything that needs no eyes, say it is ready, and wait. **A tour the spec
+   what would be the bug. **The tour starts at the owner's go** (2026-10-05): finish everything that needs no eyes, say it is ready, and wait. **A tour the spec
    plans is always done, and before the commit** (2026-11-14): never offered as optional, never
-   traded for green tests, and never begun without the owner's go. Where obligation 4
-   allows it, **open the page for the owner, already authenticated** — but one item per message and
-   one page at a time, waiting for the outcome before opening the next; two pages together only
-   when the item is a comparison (the same URL under two identities), saying which window is which.
-   The windows of a driven browser have no name: five at once turn the tour into working out which
-   belongs to which item. Only what a probe cannot say: layout, whether the screen says what it must
+   traded for green tests, and never begun without the owner's go; the diff summary and the request
+   for the commit's OK (rule 1) follow the tour, never precede it (2026-11-21). The assistant opens
+   the windows itself (2026-11-21): a before/after comparison as its two windows side by side, an
+   action as the page already on it, so the owner only looks and acts. Where obligation 4
+   allows it, **open the page for the owner, already authenticated**: one item per message, one page
+   at a time, waiting for the outcome; two pages together only for a comparison (the same URL under
+   two identities), saying which window is which.
+   Five windows at once turn the tour into working out which belongs to which item. Only what a probe cannot say: layout, whether the screen says what it must
    say, the words, whether an action gives feedback that it happened. State also **what that tour
    does not cover**, and never ask the owner to redo by hand something already verified. Whatever
-   the tour finds becomes an assertion before the session ends, or it will come back: the tour
-   exists to discover what nobody thought to assert, not to replace the tests.
+   the tour finds becomes an assertion before the session ends, or it comes back: the tour
+   discovers what nobody thought to assert, it does not replace the tests.
 
 **A before/after comparison of screenshots is shown cropped, one item at a time** (2026-10-30, after
-«I don't understand the differences between before and after, which images am I supposed to compare?»
-in front of twenty near-identical PNGs): never a folder of files to open. The agent opens a browser
-window on an HTML page with BEFORE and AFTER **cropped to the area that changes** — one above the
-other, or side by side for phone screenshots — and **enlarged** when the difference is a few pixels (a
-darker grey), with a title saying where to look; before talking about it, it checks the crop with a
-headless screenshot of the same page. The message says «Comparison N of M», what changes and which
-side is which; the window rules of obligation 5 apply (one item per message, closed and counted before
-the next).
+twenty near-identical PNGs left the owner unable to tell what to compare): never a folder of files to
+open. The agent opens a browser window on an HTML page with BEFORE and AFTER **cropped to the area that
+changes** (one above the other; side by side for phone screenshots), **enlarged** when the difference
+is a few pixels, with a title saying where to look, and checks the crop with a headless screenshot
+first. The message says «Comparison N of M», what changes and which side is which; the window rules of
+obligation 5 apply.
 
 **A window ends by itself, and is closed by its tree** (2026-11-09). The script that opens a visible
-browser for the owner exits when the owner closes the **page** — closing a driven window closes the page,
-not the browser, so `browser.on("disconnected")` alone never fires —, when the browser goes, or after a
-time limit; never an endless wait. The repo writes that wait **once**, in a helper the throwaway scripts
-import, never again in each script. And stopping the background task kills the shell, not the tree
-beneath it (`npx → tsx → node → Chromium`): a window is closed by its root with the whole tree, then the
-count says zero.
-**Once the owner confirms an item, the agent closes its windows** (2026-11-13): the owner never has to close a window to move on.
-The helper closes its browser on SIGTERM, so the agent stops it by its root, checks the count at zero and
-only then opens the next item; the owner closing a window by hand still ends the helper, never an error.
-The comparison page opens the same way, in a window the agent drives and closes, never in the owner's default
-browser, where it stays as a tab only the owner can close (owner, 2026-11-21: «una volta vista una finestra, se non
-è più utile alle voci successive va chiusa da te»).
+browser exits when the owner closes the **page** (closing a driven window closes the page, not the
+browser, so `browser.on("disconnected")` alone never fires), when the browser goes, or after a time
+limit; never an endless wait. The repo writes that wait **once**, in a helper the throwaway scripts
+import. Stopping the background task kills the shell, not the tree beneath it
+(`npx → tsx → node → Chromium`): a window is closed by its root with the whole tree, then the count
+says zero.
+**Once the owner confirms an item, the agent closes its windows** (2026-11-13; the comparison page
+too, 2026-11-21: it opens in a driven window, never in the owner's default browser, where only the
+owner could close it): the owner never closes a window to move on. The agent stops the helper by its
+root (it closes its browser on SIGTERM), checks the count at zero and only then opens the next item.
 
 ### Standard phases, when they make sense
 
@@ -189,23 +185,21 @@ Restore any configuration that was changed, remove fixtures and test attachments
 and **record the outcome somewhere that survives the session** (`CLAUDE.md` or equivalent).
 
 **No collaudo script outlives its session** (2026-11-09; the services too, 2026-11-13). `node ~/.claude/processi-collaudo.mjs` counts the
-trees of `scripts/collaudo-*` alive in the repo, and the services a session starts and forgets (the Firebase
+trees of `scripts/collaudo-*` alive in the repo and the services a session starts and forgets (the Firebase
 emulators with their JVM, the Next.js `dev`/`start` servers), and says whose they are: this session's (closed with
 `--chiudi`), another open session's (never touched), or nobody's known (named to the owner, closed with
-`--chiudi --anche-ignote` only on their yes). The count is the **first gate** of every repo's gate list:
-zero, or the gates do not start. The standard `settings.json` runs it with `--hook` at `SessionEnd`, so a
-session that ends closes its own windows and servers (a service gets SIGTERM first: the emulators export on
-exit); one that dies without ending is caught by the next gate, and by the same count at the start of every
-session (`prompts/01_SESSION_START.md`): what is alive then belongs to no session that is running now.
+`--chiudi --anche-ignote` only on their yes). The count is the **first gate** of every repo's gate list: zero, or none starts. The standard `settings.json` runs it with `--hook` at `SessionEnd`
+(a service gets SIGTERM first: the emulators export on exit); a session that dies without ending is
+caught by the next gate and by the same count at the start of every session (`prompts/01_SESSION_START.md`).
 *A verification that was not recorded counts as not done.*
 
 **The outcome is one line, the signals are not** (2026-10-19). In `CLAUDE.md` the session's status
 entry says what was done, where it is documented, what is still open and what comes next; it
 replaces the previous one. The session's signals — type-check, test counts, E2E runs, flakes,
-skipped phases, the guided tour's walk and its findings (2026-10-23) — go in the commit message
-and, where they teach something, in the area's guide, never in `CLAUDE.md`: that file is injected
-into every turn, and a status entry that collects them grows back into a diary after every trim.
-Of the tour, the status entry keeps only its outcome: done and closed, or what it left open.
+skipped phases, the guided tour's walk and findings (2026-10-23) — go in the commit message and,
+where they teach something, in the area's guide, never in `CLAUDE.md`: it is injected into every
+turn, and an entry that collects them grows back into a diary. Of the tour it keeps only the
+outcome: done and closed, or what is left open.
 
 ---
 
