@@ -22,6 +22,7 @@ import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import type { AssetPerformanceData } from '@/lib/utils/assetPerformanceDeltas';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { lazyComponent } from '@/components/ui/lazy-component';
 
 /**
@@ -76,7 +77,7 @@ export function AssetClassChip({ assetClass, className }: { assetClass: string; 
   const cssVar = getAssetClassCssVar(assetClass);
   return (
     <span
-      className={cn('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium text-foreground', className)}
+      className={cn('inline-flex items-center whitespace-nowrap px-2 py-0.5 text-[11px] font-medium text-foreground', COSTUME_PILL_RADIUS_CLASS, className)}
       style={{
         backgroundColor: `color-mix(in srgb, var(${cssVar}) 15%, transparent)`,
         border: `1px solid color-mix(in srgb, var(${cssVar}) 30%, transparent)`,
@@ -123,7 +124,8 @@ export function InstrumentClassChip({ asset }: { asset: Pick<Asset, 'assetClass'
       // On the phone row each chip starts after a ticker of its own width, so there is no column to
       // compare down, and a floor would only push the chip under the amount on a long ticker.
       className={cn(
-        'relative inline-flex items-center justify-center whitespace-nowrap rounded-full px-[9px] py-[3px] text-[11px] font-medium text-foreground',
+        'relative inline-flex items-center justify-center whitespace-nowrap px-[9px] py-[3px] text-[11px] font-medium text-foreground',
+        COSTUME_PILL_RADIUS_CLASS,
         chip.segments.length > 1 && 'desktop:min-w-[112px]',
       )}
       style={{ background: segmentGradient(chip.segments, 15) }}
@@ -136,7 +138,7 @@ export function InstrumentClassChip({ asset }: { asset: Pick<Asset, 'assetClass'
           understood, and older WebKit keeps the prefixed `xor`. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-full p-px"
+        className={cn('pointer-events-none absolute inset-0 p-px', COSTUME_PILL_RADIUS_CLASS)}
         style={{
           background: segmentGradient(chip.segments, 30),
           WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
@@ -342,7 +344,7 @@ export function AssetRow({
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-[13px] font-medium text-foreground">{asset.name}</span>
             {asset.quantity === 0 && (
-              <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              <span className={cn('shrink-0 border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground', COSTUME_PILL_RADIUS_CLASS)}>
                 {isLoanAsset(asset) ? 'Estinto' : describeZeroQuantityChip(asset, tradedAssetIds)}
               </span>
             )}

@@ -181,9 +181,40 @@ mechanism has a neutral default, and the palette themes are held to render exact
   there: in a module of their own, shared by the layout, the header and the modal, Turbopack cut a new shared chunk
   (+0,8 KB gz on every route, 2026-11-21, doc/guide/velocita.md § Registro). The landing and the access
   pages render `PageHeader` and `TILE_EYEBROW_CLASS` too, outside any scope: a mechanism keyed on the theme alone
-  would dress them. Every other portalled primitive (popover, select, menu, tooltip, sheet, alert dialog, a raw
-  `DialogContent`) and the toasts still render with the default costume.
-- **The scope properties** — `COSTUME_SCOPE_PROPERTIES` (`lib/constants/themeCostume.ts`, 18), declared ONLY in a
+  would dress them. The toasts still render with the default costume.
+- **Portals** (2026-11-22, NOVE-19): a portalled primitive spreads `useCostumeScopeProps()` on its content; a new one
+  does the same, or the costume stops at `<body>`. `COSTUME_SCOPE_PROPS` and the hook live beside `useCostumeScope`
+  in `ColorThemeContext.tsx` (re-exported by `CostumeScopeContext.tsx`); the spread sits right after the content's
+  `data-slot` (in `popover.tsx`, which has none, after `data-popper-sheet`) and before `{...props}`, in `popover`,
+  `select`, `dropdown-menu`, `tooltip`, `sheet` (so the phone-landscape sidebar too), `drawer`, `dialog` and
+  `alert-dialog`. React context crosses the portal; outside the dashboard the hook returns an empty object. The
+  primitives now import `ColorThemeContext → AuthContext → Firebase`: a component test that renders one mocks
+  `@/lib/firebase/config`, `AuthContext` and `userPreferencesService` (seven test files gained the three mocks).
+  Held by `__tests__/costumePortals.test.tsx` (Popover, DropdownMenu, Tooltip, Sheet, Dialog, AlertDialog in jsdom)
+  and `e2e/theme.costume{,.mobile}.spec.ts` (Select and Drawer).
+- **Three radii** (2026-11-22): `--costume-control-frame-radius` (a card-like box that is not a tile, and the popper
+  sheet's top corners), `--costume-control-pill-radius` (pill controls, bar tracks and fills, pill chips),
+  `--costume-control-chip-radius` (chips with a literal radius); Egeo frames at `var(--radius-2xl)` and keeps its
+  pills and chips (`initial`), Orbita squares all three. The sites read them through `COSTUME_PILL_RADIUS_CLASS`
+  (`rounded-[var(--costume-control-pill-radius,calc(infinity*1px))]`, Tailwind's `rounded-full`),
+  `COSTUME_FRAME_RADIUS_CLASS` (`rounded-[var(--costume-control-frame-radius,calc(var(--radius)_+_4px))]`,
+  `rounded-xl`) and the chip sites' arbitrary radius on the chip property, with today's px as its fallback: the bottom pill and
+  its «+», `SegmentedPill`, `Switch`, the bars of `CompositionList`, `CompositionBar`, `RankedRows`, `ObiettivoTile`,
+  `BudgetTrack`, `CentriTile`, `SottocategorieTile`, the chips of `AssetRow`, `StrumentiTile`, `ExpenseTable`,
+  `BudgetImpostazioni`, `PatrimonioTile`, `IncassoNettoTile`, `MovimentiTile`, `CalendarDayCell`, `AffidabilitaTile`,
+  `ThemePicker` and the phone tab of `PageTabBar`; the frame on `PopoverContent`, `ChoiceList`, `DividendiDettaglio`'s
+  trigger and `ProvisionalCouponBanner`. What stays round in every theme: the dots (`ExpenseTable`'s category dot,
+  `PageTabBar`'s), the avatar, the radio. A caller's later `rounded-*` through `cn()` would replace the class: none
+  passes one. Held by `themeCostume.test.ts` (T6, T7).
+- **The shell** (2026-11-22): `.costume-shell-eyebrow` (the sidebar's and «Altro»'s group labels take
+  `--costume-eyebrow-color`, not 60 % of the sidebar's ink), `.costume-shell-quiet` (the inactive pill labels, the
+  account e-mail, the collapse toggle, the account chevron on `--muted-foreground`; `:not(a:hover):not(button:hover)`
+  keeps a hovered control's ink, a span stays muted), `.costume-wordmark` (the sidebar's and the top bar's «Net Worth
+  Tracker» in the heading face, weight, tracking and case, `font-synthesis: none`). In a costume theme a dark
+  `Switch` paints its ON track `--primary` (`--costume-control-switch-on`, fallback Tailwind's blue-600 written as
+  `oklch(54.6% 0.245 262.881)`). The loading tile of `TileGridSkeleton` carries `data-tile`, so the cap line or the
+  corner marks are there before the data.
+- **The scope properties** — `COSTUME_SCOPE_PROPERTIES` (`lib/constants/themeCostume.ts`, 22), declared ONLY in a
   costume theme's `[data-theme="<id>"] [data-costume-scope]` (all of them) and `.dark[data-theme="<id>"]
   [data-costume-scope]` (those that differ); a palette theme declares none. «Off» is the value a palette theme paints:
 
@@ -201,6 +232,14 @@ mechanism has a neutral default, and the palette themes are held to render exact
   | `--costume-eyebrow-color` · `--costume-eyebrow-weight` | eyebrows | `var(--muted-foreground)` · `600` |
   | `--costume-header-band` · `--costume-header-band-height` | the band under the header | `none` · `0px` |
   | `--costume-primary-glow` | a primary button at rest | `none` |
+  | `--costume-control-frame-radius` | a card-like box that is not a tile; the popper sheet's top corners | `initial` (the site's `rounded-xl`; the sheet's `10px`) |
+  | `--costume-control-pill-radius` | pill controls, bar tracks and fills, pill chips | `initial` (`rounded-full`) |
+  | `--costume-control-chip-radius` | chips with a literal radius | `initial` (the site's px) |
+  | `--costume-control-switch-on` | the dark switch's ON track | `initial` (blue-600) |
+
+  The four `--costume-control-*` are `initial` when off — guaranteed-invalid, so a `var()` with a fallback takes the
+  fallback, while a bare `var()` would make its declaration invalid (radius 0): they are read ONLY through a `var()`
+  carrying today's value.
 - **The gated rule set** — `app/globals.css`, unlayered, between the banners `/* ─── Theme costume (DESIGN.md → The
   Costume Rule) ── */` and `/* ─── End of theme costume ── */`, after the last theme block; later rules go before
   the closing banner. Every selector starts with `[data-costume] [data-costume-scope]`; the hooks are `#page-main`,
@@ -210,11 +249,16 @@ mechanism has a neutral default, and the palette themes are held to render exact
   shadow skips `[data-generated]` (the AI accent's glow), the primary glow skips `.ai-control` (the marker that opens
   `AI_CONTROL_ACCENT_CLASS`) and `:focus-visible` (the ring is a box-shadow too). Outside the banners a `--costume-*`
   is read only by another `--costume-*` declaration of a scope block (`--costume-tile-image: linear-gradient(var(
-  --costume-ornament), …)`). Held by `__tests__/themeCostume.test.ts` (the palette-theme, gate and
-  scope-property cases).
-- **The one layered consumer**: `TILE_EYEBROW_CLASS` paints `text-[color:var(--costume-eyebrow-color,var(--muted-foreground))]`,
-  a utility, so a caller's colour (`text-destructive`, the AI accent) still wins through `cn()` — every use is inside
-  `cn()` or the bare `className={TILE_EYEBROW_CLASS}` (`themeCostume.test.ts`, the eyebrow case).
+  --costume-ornament), …)`), and by one unlayered rule that reads a scope property, `[data-popper-sheet]`, always
+  with today's fallback (`var(--costume-control-frame-radius, 10px)`). Held by `__tests__/themeCostume.test.ts` (the
+  palette-theme, gate and scope-property cases).
+- **The layered consumers** are `TILE_EYEBROW_CLASS`, `COSTUME_PILL_RADIUS_CLASS`, `COSTUME_FRAME_RADIUS_CLASS` and the
+  chip sites whose arbitrary radius reads `--costume-control-chip-radius`. A doc or a comment never quotes such a class
+  with a placeholder in its value: Tailwind scans every file and emits it as invalid CSS (2026-11-22, every page a 500
+  on `next dev`). `TILE_EYEBROW_CLASS` paints
+  `text-[color:var(--costume-eyebrow-color,var(--muted-foreground))]`, a utility, so a caller's colour
+  (`text-destructive`, the AI accent) still wins through `cn()` — every use is inside `cn()` or the bare
+  `className={TILE_EYEBROW_CLASS}` (`themeCostume.test.ts`, the eyebrow case).
 - **The band** is in every theme's DOM — `ThemeHeaderBand` closes `PageHeader` AND `PageHeaderSkeleton` — and only a
   costume's `--costume-header-band-height` gives it a height, with 16px above it; so the prerendered first paint holds
   it and the page replaces the skeleton without moving. Below `desktop:` the header is sticky: the band sits on an
@@ -252,7 +296,10 @@ mechanism has a neutral default, and the palette themes are held to render exact
   and 390, and compare eleven computed properties with `e2e/themeNeutral.baseline.json`, recorded on 2026-11-21 on
   the tree with only the Geist fix applied. Every string is compared exact but `color`, `background-color` and
   `border-top-color`, compared as colours (ΔOKLab < 0.002, alpha within 0.01): the production build's minifier
-  serialises `lab()` where `next dev` writes `rgb()` for the same token (measured 2026-11-21). `THEME_NEUTRAL_RECORD=1` rewrites one viewport key — only on code the
+  serialises `lab()` where `next dev` writes `rgb()` for the same token (measured 2026-11-21). A colour mixed with
+  alpha (the sidebar label's `/60`) is served as `oklab()`, and the production build rounds it ~0,0002 away from `next
+  dev`'s: `cssColorToOklch` reads `oklab()` since 2026-11-22 (four palette cases were red on the full run, held by
+  `chartColorsContext.test.ts`). `THEME_NEUTRAL_RECORD=1` rewrites one viewport key — only on code the
   costume has not touched (a red is a finding, never a baseline to refresh). Seen red with the gate stripped from the
   tile-shadow rule (`box-shadow` → `none`). The repo's one recorded comparison: no snapshot tests.
 - **Geist Sans was never applied until 2026-11-21**: next/font's variables sat on `<body>`, while Tailwind's preflight
@@ -296,6 +343,12 @@ Where a costume theme's numbers live; NOVE-19 and NOVE-20 add theirs here. The t
 - **Orbita light** (2026-11-22) — closest slot pair ΔE00 15,9 (Azioni–Trend Following; Materie Prime–Previdenza 17,6); slot L 0,46–0,66, hue drift 0° on all nine; slots on the card 5,21 3,62 5,52 3,09 7,00 4,47 3,52 4,20 6,65; COMPRA / VENDI / OK as text on the card 7,15 / 7,64 / 6,32, on the 8% chip 6,33 / 6,72 / 5,61; `--chart-3` 32° from `--destructive` (ΔE00 19,4); `--positive` (inherited) 4,96 and `--destructive` 5,34 on the page, `--positive` 5,49 on the card and 4,54 on muted; `--muted-foreground` 6,52 / 7,21 / 5,96 and `--foreground` 14,06 / 15,55 / 12,85 on background / card / muted; primary-foreground on primary 6,23, `--destructive` on the card 5,90, the AI accent on the card 4,99; eyebrow 6,05 / 5,46 / 5,00 on card / background / muted; ornament 6,24 on the card, the border over the card 1,59 (non-text, decorative).
 - **Orbita dark** — closest pair 17,4 (Materie Prime–Previdenza; Criptovalute–Immobili 17,6; Immobili–Materie Prime 18,9); slot L 0,52–0,80; slots on the card 7,15 9,15 5,30 9,69 5,50 7,01 3,40 7,39 4,89; COMPRA / VENDI / OK 9,60 / 8,81 / 10,49 on the card, 8,49 / 7,78 / 9,11 on the chip; `--chart-3` 30° from `--destructive` (ΔE00 20,1); `--positive` 7,95 and `--destructive` 6,48 on the nebula at its fullest; `--muted-foreground` 10,13 / 9,30 / 8,06 and `--foreground` 16,93 / 15,55 / 13,48; primary-foreground on primary 10,07, `--destructive` on the card 6,94, the AI accent 5,23; eyebrow 9,71 / 10,57 / 8,41; `--foreground`, `--muted-foreground` and the eyebrow on the nebula 14,53 / 8,69 / 9,07; ornament 9,58, border 1,75.
 - **Two values the gates moved from the approved mock** (2026-11-22, owner): the ring-fold gate (ΔE00 ≥ 14 from `--muted-foreground`, not in the spec's table) read light Trend Following `0.38 0.06 240` at 8,0 and dark Azioni at 13,8 with the mock's ink `0.75 0.035 235`. No light ink can fix it (it would have to sit at L ≤ 0,22, darker than the foreground), so light `--chart-7` is `0.62 0.03 240` (min ΔE00 15,9 to the other slots, 19,3 to the fold, 3,52:1 on the card), and dark `--muted-foreground` is `0.78 0.035 235` (tint and hue unchanged, worst slot 14,8). Run the four gates, ring-fold included, before trusting a mock's palette.
+- **The shell on `--sidebar`** (2026-11-22, NOVE-19; `themeCostumeContrast` K4, K5) — Egeo light / Egeo dark / Orbita
+  light / Orbita dark: a sidebar label before, `--sidebar-foreground` at 60 %, 3,93 / 6,28 / 4,12 / 6,31; after, the
+  eyebrow, 5,95 / 9,82 / 5,46 / 10,57; an inactive pill label before, at 55 %, 3,41 / 5,45 / 3,56 / 5,43; after,
+  `--muted-foreground`, 9,22 / 8,64 / 6,52 / 10,13 (Orbita dark measured on the ink NOVE-13 moved to `0.78`; the spec
+  read 9,11 on the mock's); `--positive` on `--muted` 6,10 / 6,49 / 4,54 / 7,38; the dark ON track, `--primary` on
+  `--card`, 8,75 (Egeo) / 9,58 (Orbita), the thumb `--background` on it 9,83 / 10,44.
 - **Orbita's `--chart-3` is the mock's Criptovalute re-pitched to hue 60** (`0.52 0.10 60` light, `0.64 0.13 60` dark), 30° from `--destructive`; `--chart-4` Immobili is the gold, `--chart-5` Liquidità the violet; Azioni light C 0.098, Immobili light `0.66 0.13 75`, `--primary` light C 0.10 and the eyebrow light C 0.115 are the mock's values pulled into the sRGB gamut. A figure a spec writes as «−1.200,00 €» is «−1200,00 €» in the app: `Intl` (it-IT) groups from five digits.
 
 ## The browser's chrome follows the page (2026-10-17)
@@ -345,4 +398,4 @@ Where a costume theme's numbers live; NOVE-19 and NOVE-20 add theirs here. The t
   entry above is about a slot used as a NON-text signal, which is a different floor and is still open.
 - **Index 9 of `useChartColors()` is still the static lime** (`CHART_COLORS[9]`): no surface uses it. Indices 0-7 are theme-aware since 2026-08-30, index 8 (`--chart-9`, Previdenza) since 2026-09-20.
 - **Sign-colour CHIPS sit below AA, structurally** (`bg-positive/10 text-positive` washes the background with the text's hue: 15 of 24 combinations at 3.34–4.40:1; deliberately not fixed). `MonthlyReturnsHeatmap` fills its cells with the sign tokens at 30/55/85% (the figure is never printed in the cell, so the AA text floor does not apply). (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
-- **Una tinta del chrome viola la Zero-Chroma Rule** (`switch.tsx` ON blu in dark; lo spinner di `ProtectedRoute` è sparito il 2026-09-28 con la shell prima dell'auth, l'attesa è lo skeleton a tessere; la mask-icon smeraldo è stata rimossa il 2026-09-13; il `text-emerald-*` di `ExpenseTable` è passato a `text-positive` il 2026-09-14); gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **Una tinta del chrome viola la Zero-Chroma Rule** (`switch.tsx` ON blu in dark — a costume theme paints it `--primary` (`--costume-control-switch-on`); lo spinner di `ProtectedRoute` è sparito il 2026-09-28 con la shell prima dell'auth, l'attesa è lo skeleton a tessere; la mask-icon smeraldo è stata rimossa il 2026-09-13; il `text-emerald-*` di `ExpenseTable` è passato a `text-positive` il 2026-09-14); gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

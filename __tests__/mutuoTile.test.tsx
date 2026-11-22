@@ -5,10 +5,15 @@
  * Seen red on 2026-11-15 with the swatches passed whatever the ring.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { MutuoTile } from '@/components/assets/tiles/MutuoTile';
 import { MORTGAGE_RING_COLORS, summarizeMortgage } from '@/lib/utils/mortgageSummary';
+
+// A portalled primitive reads the costume scope from ColorThemeContext, whose module imports AuthContext → Firebase.
+vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('@/lib/services/userPreferencesService', () => ({ getUserPreferences: vi.fn(async () => ({})), setUserPreferences: vi.fn() }));
 
 const NOW = new Date(2026, 9, 5, 12);
 const LOAN = { id: 'prestito', name: 'Mutuo Casa', debt: 50_000, debtInterestRate: 3, financedAssetName: 'Casa' };

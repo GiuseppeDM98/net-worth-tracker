@@ -19,6 +19,7 @@
 import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface SegmentedPillOption<T extends string> {
   value: T;
@@ -101,7 +102,8 @@ export function SegmentedPill<T extends string>({
       role={semantics === 'radio' ? 'radiogroup' : 'tablist'}
       aria-label={ariaLabel}
       className={cn(
-        'inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'inline-flex max-w-full items-center gap-1 overflow-x-auto bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        COSTUME_PILL_RADIUS_CLASS,
         disabled && 'opacity-50',
         className
       )}
@@ -127,7 +129,8 @@ export function SegmentedPill<T extends string>({
             }}
             onKeyDown={(e) => handleKeyDown(e, index)}
             className={cn(
-              'relative shrink-0 px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
+              'relative shrink-0 px-3 py-1.5 text-sm font-medium transition-colors',
+              COSTUME_PILL_RADIUS_CLASS,
               // The inactive label is the foreground at 70%, not `text-muted-foreground`: that
               // token is tuned against `--background`, and on the pill's `bg-muted` surface it
               // measured 4,34:1 in light (below AA) on the Panoramica's period pill, 2026-09-13.
@@ -138,7 +141,7 @@ export function SegmentedPill<T extends string>({
             {isSelected && (
               <motion.span
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-full bg-background shadow-sm"
+                className={cn('absolute inset-0 bg-background shadow-sm', COSTUME_PILL_RADIUS_CLASS)}
                 transition={{ type: 'spring', stiffness: 400, damping: 35 }}
               />
             )}

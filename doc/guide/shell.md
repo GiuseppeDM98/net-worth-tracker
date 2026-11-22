@@ -62,7 +62,8 @@ rules below name.
 - **The shell's label is the tiles' eyebrow**: sidebar group labels, the drawer's section labels and the compact
   `PageHeader` all use `TILE_EYEBROW_CLASS` (`components/ui/tile.tsx`) — on the sidebar surface with
   `text-sidebar-foreground/60`, because `text-muted-foreground` is tuned against `--background`, not `--sidebar`.
-  Do not reintroduce a 12px label in the chrome (DESIGN.md → The One-Eyebrow Rule).
+  In a costume theme the shell's labels take the eyebrow's colour and its quiet text `--muted-foreground`
+  (doc/guide/temi.md § Il costume). Do not reintroduce a 12px label in the chrome (DESIGN.md → The One-Eyebrow Rule).
 - **`PageHeader` has ONE variant, the compact one**: `variant="legacy"` was deleted on 2026-08-26 with Previdenza, the
   last page that declared it (DESIGN.md; the pre-redesign 30px title survives only in `git log`). The desktop title is
   `text-sm` and the phone navbar's `h1` 17px, so never put an icon sized for the old title inside it (FIRE's 32px flame

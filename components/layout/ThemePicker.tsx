@@ -53,7 +53,7 @@ export function ThemePicker() {
           onClick={(e) => applyThemeWithTransition(value, e, setTheme)}
           title={label}
           className={cn(
-            'flex size-6 items-center justify-center rounded transition-colors',
+            'flex size-6 items-center justify-center rounded-[var(--costume-control-chip-radius,0.25rem)] transition-colors',
             activeTheme === value
               ? 'bg-background text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'

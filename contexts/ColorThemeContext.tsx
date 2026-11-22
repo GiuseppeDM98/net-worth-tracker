@@ -137,6 +137,15 @@ export const CostumeScopeContext = createContext(false);
 
 export const useCostumeScope = (): boolean => useContext(CostumeScopeContext);
 
+/** What a portalled surface spreads on its content: the costume follows it out of the scope's DOM. */
+export const COSTUME_SCOPE_PROPS = Object.freeze({ 'data-costume-scope': '' } as const);
+const NO_SCOPE_PROPS = Object.freeze({});
+
+/** The scope attribute inside the dashboard, nothing elsewhere (React context crosses the portal). */
+export function useCostumeScopeProps(): Readonly<{ 'data-costume-scope'?: '' }> {
+  return useCostumeScope() ? COSTUME_SCOPE_PROPS : NO_SCOPE_PROPS;
+}
+
 /** The active theme's costume where one may be worn, else `null`. */
 export function useThemeCostume(): ThemeCostume | null {
   const inScope = useCostumeScope();

@@ -17,6 +17,11 @@ import { Button } from '@/components/ui/button';
 import { describeRevisionAside, RevisionBody, useRevisionDraft } from '@/components/allocation/consulente/ConsulenteRevisionTile';
 import { useConsulenteRevision } from '@/components/allocation/consulente/useConsulenteRevision';
 
+// A portalled primitive reads the costume scope from ColorThemeContext, whose module imports AuthContext → Firebase.
+vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('@/lib/services/userPreferencesService', () => ({ getUserPreferences: vi.fn(async () => ({})), setUserPreferences: vi.fn() }));
+
 const { authenticatedFetch } = vi.hoisted(() => ({ authenticatedFetch: vi.fn() }));
 vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch }));
 

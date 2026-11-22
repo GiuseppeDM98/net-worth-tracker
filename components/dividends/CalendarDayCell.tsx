@@ -78,7 +78,7 @@ export function CalendarDayCell({
               {dividends[0].assetTicker || dividends[0].assetName}
             </span>
           ) : (
-            <span className="hidden w-fit rounded-[4px] bg-background px-1 font-mono text-[10px] tabular-nums text-muted-foreground desktop:block">
+            <span className="hidden w-fit rounded-[var(--costume-control-chip-radius,4px)] bg-background px-1 font-mono text-[10px] tabular-nums text-muted-foreground desktop:block">
               {dividends.length}
             </span>
           )}

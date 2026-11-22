@@ -10,6 +10,11 @@ import type { CategoryDeltaRow } from '@/lib/utils/comparisonDeltas';
 import { summarizeCategoryChanges } from '@/lib/utils/analisiSummary';
 import { CambiatoTile } from '@/components/cashflow/analisi/tiles/CambiatoTile';
 
+// A portalled primitive reads the costume scope from ColorThemeContext, whose module imports AuthContext → Firebase.
+vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('@/lib/services/userPreferencesService', () => ({ getUserPreferences: vi.fn(async () => ({})), setUserPreferences: vi.fn() }));
+
 const delta = (label: string, value: number, status: CategoryDeltaRow['status'] = 'ongoing'): CategoryDeltaRow => ({
   key: `variable:${label}`,
   expenseType: 'variable',

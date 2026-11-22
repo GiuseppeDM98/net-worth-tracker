@@ -4,6 +4,8 @@ import * as React from "react"
 import { Popover as PopoverPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { usePopperSheet } from "@/components/ui/popper-sheet"
+import { useCostumeScopeProps } from "@/contexts/ColorThemeContext"
+import { COSTUME_FRAME_RADIUS_CLASS } from "@/lib/constants/themeCostume"
 
 /**
  * Whether this popover opens as a bottom sheet below 769px (components/ui/popper-sheet.ts).
@@ -37,6 +39,7 @@ const PopoverContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
 >(({ className, align = "end", sideOffset = 6, ...props }, ref) => {
   const sheet = React.useContext(PopoverSheetContext)
+  const scopeProps = useCostumeScopeProps()
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
@@ -44,8 +47,10 @@ const PopoverContent = React.forwardRef<
         align={align}
         sideOffset={sideOffset}
         data-popper-sheet={sheet ? "" : undefined}
+        {...scopeProps}
         className={cn(
-          "z-50 w-72 rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-md outline-none",
+          "z-50 w-72 border border-border bg-popover p-4 text-popover-foreground shadow-md outline-none",
+          COSTUME_FRAME_RADIUS_CLASS,
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",

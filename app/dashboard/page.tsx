@@ -397,7 +397,7 @@ export default function DashboardPage() {
   const entranceInitial = playsEntrance ? 'hidden' : false;
 
   const pageChrome = (
-    <PageHeader label="Panoramica" title={header.title} description={header.date} freshness={freshness} />
+    <PageHeader label="Panoramica" title={header.title} description={header.date} freshness={freshness} emblem="panoramica" />
   );
 
   if (overviewState === 'loading') {
@@ -514,6 +514,7 @@ export default function DashboardPage() {
       <div className="space-y-4">
         <PageHeader
           label="Panoramica"
+          emblem="panoramica"
           title={header.title}
           description={header.date}
           actions={snapshotAction}

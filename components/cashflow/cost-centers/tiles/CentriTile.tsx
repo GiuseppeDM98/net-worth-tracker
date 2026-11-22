@@ -11,6 +11,7 @@ import { formatPercentage } from '@/lib/services/chartService';
 import { Tile, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { CenterChip } from '@/components/cashflow/cost-centers/CenterChip';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface CentriTileProps {
   rows: CenterRankedRow[];
@@ -61,8 +62,8 @@ function CenterRow({ row, palette, now, onOpen }: { row: CenterRankedRow; palett
           </span>
           <span className="flex w-[120px] shrink-0 flex-col items-end gap-1.5">
             <span className="font-mono text-[13px] font-semibold tabular-nums text-foreground">{cachedFormatCurrencyEUR(summary.total, true)}</span>
-            <span className="h-[3px] w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
-              <span className="block h-full rounded-full" style={{ width: `${rank}%`, background: color }} />
+            <span className={`h-[3px] w-full overflow-hidden bg-muted ${COSTUME_PILL_RADIUS_CLASS}`} aria-hidden="true">
+              <span className={`block h-full ${COSTUME_PILL_RADIUS_CLASS}`} style={{ width: `${rank}%`, background: color }} />
             </span>
           </span>
           <span className="w-[34px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">{formatPercentage(share, 0)}</span>
@@ -79,8 +80,8 @@ function CenterRow({ row, palette, now, onOpen }: { row: CenterRankedRow; palett
             <NarrativeText segments={caption} className="min-w-0 flex-1 text-[11px] text-muted-foreground" figureClassName="font-medium" />
             {chip && <CenterChip chip={chip} />}
           </span>
-          <span className="ml-4 h-[3px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
-            <span className="block h-full rounded-full" style={{ width: `${rank}%`, background: color }} />
+          <span className={`ml-4 h-[3px] overflow-hidden bg-muted ${COSTUME_PILL_RADIUS_CLASS}`} aria-hidden="true">
+            <span className={`block h-full ${COSTUME_PILL_RADIUS_CLASS}`} style={{ width: `${rank}%`, background: color }} />
           </span>
         </span>
       </button>

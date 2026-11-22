@@ -59,6 +59,19 @@ describe('PageHeader in Orbita', () => {
     expect(container.querySelectorAll('svg')).toHaveLength(0);
   });
 
+  // 2026-11-22: Egeo draws a page's own art on Patrimonio; Orbita keeps the planet there too.
+  it('draws the planet on Patrimonio', () => {
+    const { container } = render(
+      <ColorThemeProvider>
+        <CostumeScope>
+          <PageHeader title="Novembre" label="Patrimonio" emblem="patrimonio" />
+        </CostumeScope>
+      </ColorThemeProvider>,
+    );
+    const circles = [...container.querySelectorAll('svg[aria-hidden="true"] circle')];
+    expect(circles.map((circle) => circle.getAttribute('r'))).toEqual(['5', '5']);
+  });
+
   it('registers the planet as the fallback of every page', () => {
     expect(THEME_EMBLEMS.orbita?.fallback.shapes).toHaveLength(2);
     expect(THEME_EMBLEMS.orbita?.pages).toEqual({});

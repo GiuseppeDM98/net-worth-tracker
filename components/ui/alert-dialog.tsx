@@ -4,6 +4,7 @@ import * as React from "react"
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { useCostumeScopeProps } from "@/contexts/ColorThemeContext"
 import { Button } from "@/components/ui/button"
 
 function AlertDialog({
@@ -51,11 +52,13 @@ function AlertDialogContent({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
   size?: "default" | "sm"
 }) {
+  const scopeProps = useCostumeScopeProps()
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
+        {...scopeProps}
         data-size={size}
         className={cn(
           // Same surface as the Dialog — `bg-card`, 16px radius, the Float shadow: the two are

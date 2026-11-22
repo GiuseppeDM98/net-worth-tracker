@@ -11,7 +11,7 @@
 import type { ReactNode } from 'react';
 import { CostumeScopeContext } from '@/contexts/ColorThemeContext';
 
-export { useCostumeScope, useThemeCostume } from '@/contexts/ColorThemeContext';
+export { COSTUME_SCOPE_PROPS, useCostumeScope, useCostumeScopeProps, useThemeCostume } from '@/contexts/ColorThemeContext';
 
 /** The dashboard's costume boundary: a `display: contents` box, so no layout moves (temi.md § Il costume). */
 export function CostumeScope({ children }: { children: ReactNode }) {

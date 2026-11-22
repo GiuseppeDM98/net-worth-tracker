@@ -15,6 +15,11 @@ import { QuestionCard } from '@/components/ui/question-card';
 import { AI_GENERATED_SURFACE_CLASS } from '@/lib/constants/aiAccent';
 import { QUESTION_DECLINE_VALUE, type Question, type QuestionAnswerValue } from '@/lib/utils/questionSet';
 
+// A portalled primitive reads the costume scope from ColorThemeContext, whose module imports AuthContext → Firebase.
+vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('@/lib/services/userPreferencesService', () => ({ getUserPreferences: vi.fn(async () => ({})), setUserPreferences: vi.fn() }));
+
 const SINGLE: Question = {
   id: 'reddito',
   kind: 'single',

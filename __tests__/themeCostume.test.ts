@@ -9,14 +9,40 @@
  * `box-shadow: var(--costume-tile-shadow)` outside the banners; the scope-property case with a 19th
  * string in the list; the eyebrow case with the colour losing its fallback; the emblem case with
  * `resolveEmblem` ignoring `inScope`.
+ *
+ * The controls (2026-11-22): four more scope properties, read ONLY through a `var()` whose fallback is today's
+ * value — `COSTUME_PILL_RADIUS_CLASS`, `COSTUME_FRAME_RADIUS_CLASS`, the chip sites' arbitrary radius on the chip property, the
+ * popper sheet's top corners, the dark switch track. Seen red that day: the popper-sheet case with a bare
+ * `var(--costume-control-frame-radius)`; the count with a 23rd string; the light-block case with
+ * `--costume-control-chip-radius` deleted from Orbita's; the class case with the fallback `9999px`; the site scan
+ * with `segmented-pill.tsx`'s indicator back to `rounded-full` and `choice-list.tsx` back to `rounded-xl`; the
+ * hsl() scan with `sidebar.tsx`'s `hsl(var(--sidebar-border))` restored; the switch case with the fallback dropped.
  */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { COLOR_THEMES, COLOR_THEME_META, COSTUME_THEMES } from '@/lib/constants/colorTheme';
 import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
-import { COSTUME_SCOPE_PROPERTIES, resolveEmblem, type EmblemArt, type ThemeEmblems } from '@/lib/constants/themeCostume';
+import {
+  COSTUME_FRAME_RADIUS_CLASS,
+  COSTUME_PILL_RADIUS_CLASS,
+  COSTUME_SCOPE_PROPERTIES,
+  resolveEmblem,
+  type EmblemArt,
+  type ThemeEmblems,
+} from '@/lib/constants/themeCostume';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cn } from '@/lib/utils';
 import { GLOBALS_CSS, themeBlockBody, themeBlockHeader } from './themeBlocks';
+
+const ROOT = resolve(__dirname, '..');
+const source = (file: string) => readFileSync(resolve(ROOT, file), 'utf8');
+/** Every `.ts`/`.tsx` under a folder of the repo, as repo-relative paths. */
+function listFiles(folder: string): string[] {
+  return readdirSync(resolve(ROOT, folder), { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+    .map((entry) => relative(ROOT, join(entry.parentPath, entry.name)).replace(/\\/g, '/'));
+}
 
 const OPEN_BANNER = '/* ─── Theme costume (DESIGN.md → The Costume Rule) ── */';
 const CLOSE_BANNER = '/* ─── End of theme costume ── */';
@@ -103,19 +129,26 @@ describe('every costume rule is gated, and nothing outside the section paints wi
     expect(AI_CONTROL_ACCENT_CLASS.split(' ')[0]).toBe('ai-control');
   });
 
-  it('reads a costume token outside the section only inside a scope block, to compose another costume token', () => {
+  it('reads a costume token outside the section only inside a scope block, to compose another costume token — and in the popper sheet’s radius', () => {
     const readers = walk(outside).declarations.filter(({ value }) => value.includes('var(--costume-'));
-    for (const { selectors, property } of readers) {
+    const painters = readers.filter(({ selectors }) => !SCOPE_BLOCK.test(selectors[selectors.length - 1]));
+    // The ONE rule outside the banners that paints with a scope property, always with today's value as fallback.
+    expect(painters.map(({ selectors, property, value }) => `${selectors[selectors.length - 1]} { ${property}: ${value} }`)).toEqual([
+      `[data-popper-sheet] { border-radius: ${POPPER_SHEET_RADIUS} }`,
+    ]);
+    for (const { selectors, property } of readers.filter((reader) => !painters.includes(reader))) {
       const block = selectors[selectors.length - 1];
       expect(property.startsWith('--costume-'), `${block} { ${property} }`).toBe(true);
-      expect(block, `${property} read in «${block}»`).toMatch(SCOPE_BLOCK);
     }
   });
 });
 
+/** The popper sheet's top corners: the costume's frame radius, else the 10px of every palette theme. */
+const POPPER_SHEET_RADIUS = 'var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0';
+
 describe('the scope properties', () => {
-  it('lists the eighteen properties in the contract order', () => {
-    expect(COSTUME_SCOPE_PROPERTIES).toHaveLength(18);
+  it('lists the twenty-two properties in the contract order', () => {
+    expect(COSTUME_SCOPE_PROPERTIES).toHaveLength(22);
     expect(COSTUME_SCOPE_PROPERTIES).toEqual([
       '--radius',
       '--radius-2xl',
@@ -135,6 +168,10 @@ describe('the scope properties', () => {
       '--costume-header-band',
       '--costume-header-band-height',
       '--costume-primary-glow',
+      '--costume-control-frame-radius',
+      '--costume-control-pill-radius',
+      '--costume-control-chip-radius',
+      '--costume-control-switch-on',
     ]);
   });
 
@@ -144,6 +181,85 @@ describe('the scope properties', () => {
       expect(body, `${theme}'s light scope block`).not.toBeNull();
       for (const property of COSTUME_SCOPE_PROPERTIES) expect(body, `${theme}: ${property}`).toContain(`${property}:`);
     }
+  });
+});
+
+describe('the control radii are layered', () => {
+  it('reads each costume radius with today’s value as its fallback', () => {
+    expect(COSTUME_PILL_RADIUS_CLASS).toBe('rounded-[var(--costume-control-pill-radius,calc(infinity*1px))]');
+    expect(COSTUME_FRAME_RADIUS_CLASS).toBe('rounded-[var(--costume-control-frame-radius,calc(var(--radius)_+_4px))]');
+  });
+
+  it('survives a caller’s padding through cn()', () => {
+    expect(cn(COSTUME_PILL_RADIUS_CLASS, 'px-3').split(' ')).toContain(COSTUME_PILL_RADIUS_CLASS);
+    expect(cn(COSTUME_FRAME_RADIUS_CLASS, 'p-4').split(' ')).toContain(COSTUME_FRAME_RADIUS_CLASS);
+  });
+});
+
+describe('the sites read the costume radii, not a literal', () => {
+  // The pill and chip sites (temi.md § Il costume, «Three radii»); `PageTabBar.tsx` and `ExpenseTable.tsx` are
+  // read apart, because each keeps a round dot.
+  const PILL_AND_CHIP_FILES = [
+    'components/layout/BottomNavigation.tsx',
+    'components/ui/segmented-pill.tsx',
+    'components/ui/switch.tsx',
+    'components/ui/composition-list.tsx',
+    'components/ui/composition-bar.tsx',
+    'components/ui/ranked-rows.tsx',
+    'components/dashboard/overview/ObiettivoTile.tsx',
+    'components/cashflow/budget/BudgetTrack.tsx',
+    'components/cashflow/cost-centers/tiles/CentriTile.tsx',
+    'components/cashflow/cost-centers/tiles/SottocategorieTile.tsx',
+    'components/assets/AssetRow.tsx',
+    'components/assets/StrumentiTile.tsx',
+    'components/cashflow/budget/BudgetImpostazioni.tsx',
+    'components/dashboard/overview/PatrimonioTile.tsx',
+    'components/dividends/tiles/IncassoNettoTile.tsx',
+    'components/assets/tiles/MovimentiTile.tsx',
+    'components/dividends/CalendarDayCell.tsx',
+    'components/dividends/tiles/AffidabilitaTile.tsx',
+    'components/layout/ThemePicker.tsx',
+  ];
+  const FRAME_FILES = [
+    'components/ui/popover.tsx',
+    'components/ui/choice-list.tsx',
+    'components/dividends/DividendiDettaglio.tsx',
+    'components/dividends/ProvisionalCouponBanner.tsx',
+  ];
+  // A literal pill end, or a literal radius other than a legend swatch's 2px.
+  const LITERAL_RADIUS = /\brounded-(?:[lr]-)?full\b|\brounded-\[(?!2px\])\d+px\]/;
+  const CHIP_ROUNDED = 'rounded-[var(--costume-control-chip-radius,0.25rem)]';
+
+  it.each(PILL_AND_CHIP_FILES)('%s has no literal pill end nor literal chip radius', (file) => {
+    const hits = source(file).split('\n').filter((line) => LITERAL_RADIUS.test(line));
+    expect(hits, file).toEqual([]);
+  });
+
+  it.each(FRAME_FILES)('%s takes the frame class and no rounded-xl', (file) => {
+    const text = source(file);
+    expect(text).toContain('COSTUME_FRAME_RADIUS_CLASS');
+    expect(text).not.toMatch(/\brounded-xl\b/);
+  });
+
+  it.each(['components/layout/ThemePicker.tsx', 'components/expenses/ExpenseTable.tsx'])('%s squares its 0.25rem chip through the chip radius', (file) => {
+    expect(source(file)).toContain(CHIP_ROUNDED);
+  });
+
+  it('gives the popper sheet the frame radius on its top corners', () => {
+    const rule = /\n\[data-popper-sheet\] \{([^}]*)\}/.exec(GLOBALS_CSS);
+    expect(rule, 'the [data-popper-sheet] rule').not.toBeNull();
+    expect(rule![1]).toContain(`border-radius: ${POPPER_SHEET_RADIUS};`);
+  });
+
+  it('has no hsl() around an oklch token under components/', () => {
+    const offenders = listFiles('components').filter((file) => source(file).includes('hsl(var(--'));
+    expect(offenders).toEqual([]);
+  });
+
+  it('paints the dark switch track through the costume, today’s blue as the fallback', () => {
+    const text = source('components/ui/switch.tsx');
+    expect(text).toContain('dark:data-[state=checked]:bg-[var(--costume-control-switch-on,oklch(54.6%_0.245_262.881))]');
+    expect(text).not.toContain('blue-600');
   });
 });
 

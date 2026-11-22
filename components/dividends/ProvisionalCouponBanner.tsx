@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Dividend } from '@/types/dividend';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { formatDate } from '@/lib/utils/formatters';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface ProvisionalCouponBannerProps {
   /** Future, isProvisional coupons, sorted by payment date ascending. */
@@ -28,7 +29,7 @@ interface ProvisionalCouponBannerProps {
 
 export function ProvisionalCouponBanner({ coupons, isDemo, onSelect }: ProvisionalCouponBannerProps) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-warning-border bg-warning p-3.5">
+    <div className={`flex items-start gap-3 ${COSTUME_FRAME_RADIUS_CLASS} border border-warning-border bg-warning p-3.5`}>
       <Clock className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground" aria-hidden="true" />
       <div className="min-w-0 flex-1 space-y-2">
         <div className="space-y-0.5 text-warning-foreground">

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface BudgetTrackProps {
   /** spent / budget, 0-1+ (the fill clamps at 100%). */
@@ -42,10 +43,10 @@ export function BudgetTrack({ ratio, scheduledRatio = 0, calendarPct, color, lab
       aria-valuemax={100}
       aria-valuetext={valueText ?? `${totalPct}%`}
       aria-label={label}
-      className={cn('relative flex h-[3px] w-full rounded-full bg-muted', className)}
+      className={cn('relative flex h-[3px] w-full bg-muted', COSTUME_PILL_RADIUS_CLASS, className)}
     >
-      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-      {scheduledPct > 0 && <div className="h-full rounded-r-full opacity-40" style={{ width: `${scheduledPct}%`, background: color }} />}
+      <div className={cn('h-full', COSTUME_PILL_RADIUS_CLASS)} style={{ width: `${pct}%`, background: color }} />
+      {scheduledPct > 0 && <div className="h-full rounded-r-[var(--costume-control-pill-radius,calc(infinity*1px))] opacity-40" style={{ width: `${scheduledPct}%`, background: color }} />}
       {calendarPct != null && (
         <div
           aria-hidden="true"

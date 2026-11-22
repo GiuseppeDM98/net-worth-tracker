@@ -9,6 +9,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { createRef } from 'react';
 
+// A portalled primitive reads the costume scope from ColorThemeContext, whose module imports AuthContext → Firebase.
+vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('@/lib/services/userPreferencesService', () => ({ getUserPreferences: vi.fn(async () => ({})), setUserPreferences: vi.fn() }));
+
 vi.mock('@/components/ui/responsive-modal', () => ({
   ResponsiveModal: ({ open, eyebrow, title, reading, children, footer }: Record<string, React.ReactNode> & { open: boolean }) =>
     open ? (

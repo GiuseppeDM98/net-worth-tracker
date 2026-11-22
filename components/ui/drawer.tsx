@@ -4,6 +4,7 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
+import { useCostumeScopeProps } from "@/contexts/ColorThemeContext"
 
 function Drawer({
   ...props
@@ -63,11 +64,13 @@ function DrawerContent({
 }: React.ComponentProps<typeof DrawerPrimitive.Content> & {
   minHeight?: keyof typeof minHeightMap
 }) {
+  const scopeProps = useCostumeScopeProps()
   return (
     <DrawerPortal>
       <DrawerOverlay />
       <DrawerPrimitive.Content
         data-slot="drawer-content"
+        {...scopeProps}
         className={cn(
           // `bg-card`, like the Dialog: the two are one surface at two widths, and a sheet the
           // colour of the page under it reads as part of that page (DESIGN.md §2).

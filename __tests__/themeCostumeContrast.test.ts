@@ -16,6 +16,13 @@
  *     (`[data-theme]` has the specificity of `.dark` and comes later, so it beats it), else `.dark`'s.
  *   - G2: `--chart-3` (the slot of COMPRA, `ACTION_CHART_NUMBER`) keeps ≥ 30° of hue from `--destructive`, on
  *     the circle, so a chip that says «compra» never wears the red of a loss.
+ *   - K4 (2026-11-22): the eyebrow ink and `--muted-foreground` ≥ 4,5:1 on `--sidebar` — the shell's group labels
+ *     and its quiet text, in a costume theme (`.costume-shell-eyebrow`, `.costume-shell-quiet`).
+ *   - K5 (2026-11-22): in dark, `--primary` ≥ 3:1 on `--card` and `--background` ≥ 3:1 on `--primary` — the
+ *     switch's ON track (`--costume-control-switch-on`) and its thumb.
+ *
+ * Seen red on 2026-11-22: K4 with Egeo light's `--sidebar` at `oklch(0.62 0.05 87)`; K5 with Orbita dark's
+ * `--primary` set to its `--card`.
  *
  * Reads `app/globals.css` itself, over `COSTUME_THEMES`, so a theme that becomes a costume is measured from
  * the day it does. Own oklch → sRGB code, as the sibling gate tests.
@@ -232,6 +239,23 @@ describe.each(CASES)('the costume of $label', ({ theme, mode }) => {
       const ratio = contrast(ink, surface);
       expect(ratio, `${token} on ${name}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
     }
+  });
+
+  // K4 (2026-11-22): the shell's labels take the eyebrow's ink and its quiet text the muted token, on the sidebar.
+  it.each(['--costume-eyebrow-color', '--muted-foreground'])('prints %s at 4,5:1 on --sidebar', (token) => {
+    const ink = token === '--costume-eyebrow-color' ? scopeColour(theme, mode, token) : resolveToken(theme, mode, token);
+    const ratio = contrast(ink, resolveToken(theme, mode, '--sidebar'));
+    expect(ratio, `${token} on --sidebar: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+  });
+
+  // K5 (2026-11-22): in dark the switch's ON track is `--primary` (`--costume-control-switch-on`), a non-text signal
+  // on the card, under a `--background` thumb.
+  it.runIf(mode === 'dark')('draws the ON track (--primary) at 3:1 on the card, and the thumb (--background) at 3:1 on it', () => {
+    const track = resolveToken(theme, mode, '--primary');
+    const onCard = contrast(track, resolveToken(theme, mode, '--card'));
+    const thumb = contrast(resolveToken(theme, mode, '--background'), track);
+    expect(onCard, `the track on the card: ${onCard.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_NON_TEXT_CONTRAST);
+    expect(thumb, `the thumb on the track: ${thumb.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_NON_TEXT_CONTRAST);
   });
 
   it('keeps COMPRA (--chart-3) 30° of hue from --destructive, so a chip never wears the red of a loss', () => {

@@ -112,7 +112,7 @@ export function VariationChip({
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <span
         className={cn(
-          'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[9px] px-[11px] py-[6px]',
+          'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] px-[11px] py-[6px]',
           'font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
           signChipClass(value),
         )}
@@ -193,7 +193,7 @@ export function PatrimonioTile({
             />
           )}
           {isNewATH && (
-            <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-[9px] bg-positive/10 px-[11px] py-[6px] text-[12px] font-semibold leading-none text-positive">
+            <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] bg-positive/10 px-[11px] py-[6px] text-[12px] font-semibold leading-none text-positive">
               <Trophy className="h-[13px] w-[13px]" aria-hidden="true" />
               Massimo storico
             </span>

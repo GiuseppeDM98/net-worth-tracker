@@ -106,6 +106,14 @@ export function parseToOklch(css: string): Triple | null {
     return [l, c, ((parseFloat(oklch[3]) % 360) + 360) % 360];
   }
 
+  // `oklab()` is what a browser serialises for a colour mixed with alpha (`text-sidebar-foreground/60`, 2026-11-22).
+  const oklab = value.match(/^oklab\(\s*([\d.]+%?)\s+([-\d.e]+)\s+([-\d.e]+)/i);
+  if (oklab) {
+    const l = oklab[1].endsWith('%') ? parseFloat(oklab[1]) / 100 : parseFloat(oklab[1]);
+    const [a, b] = [parseFloat(oklab[2]), parseFloat(oklab[3])];
+    return [l, Math.hypot(a, b), ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360];
+  }
+
   const lab = value.match(/^lab\(\s*([\d.]+)%?\s+([-\d.]+)\s+([-\d.]+)/i);
   if (lab) {
     const xyzD50 = labD50ToXyzD50([parseFloat(lab[1]), parseFloat(lab[2]), parseFloat(lab[3])]);
@@ -148,7 +156,7 @@ export function srgbChannelsToOklch(channels: Triple): Triple {
 }
 
 /**
- * Any colour a computed custom property can hand over — `oklch()`, `lab()`, `#hex`, `rgb()` — as
+ * Any colour a computed custom property can hand over — `oklch()`, `oklab()`, `lab()`, `#hex`, `rgb()` — as
  * OKLCH. `null` for a form none of these is (a keyword, `color-mix()`, `color(display-p3 …)`).
  */
 export function cssColorToOklch(css: string): Triple | null {

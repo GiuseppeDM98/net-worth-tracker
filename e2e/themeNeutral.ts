@@ -2,6 +2,9 @@
  * The palette themes render exactly as before the costume contract (DESIGN.md → The Costume Rule,
  * 2026-11-21): a computed-style signature of eight probes on three pages — and the «Nuova Spesa»
  * dialog at 1440 —, every palette theme in both modes, compared with `e2e/themeNeutral.baseline.json`.
+ * Since 2026-11-22 six more, the surfaces the costume reaches outside the tiles: the sidebar's group
+ * label and the account menu (1440), an inactive bottom-pill label and the Cashflow phone tab (390),
+ * the axis pill with its indicator and the first PatrimonioTile chip (both widths).
  * A helper, not a spec (the FILENAME chooses the project): `theme.neutral.spec.ts` runs it at 1440,
  * `theme.neutral.mobile.spec.ts` at 390.
  *
@@ -58,6 +61,27 @@ const PROBES: Record<string, string> = {
   tile: 'main section.rounded-2xl',
   tileHeading: 'main section.rounded-2xl h3',
   primaryButton: 'main [data-slot="button"][data-variant="default"]',
+};
+
+/** The Panoramica's axis pill (`PeriodSelector`), its first PatrimonioTile chip: probed at both widths. */
+const AXIS_PILL = 'main [role="radiogroup"][aria-label="Periodo del grafico"]';
+const BOTH_WIDTHS_PROBES: Record<string, string> = {
+  axisPill: AXIS_PILL,
+  axisIndicator: `${AXIS_PILL} [role="radio"][aria-checked="true"] > span:first-child`,
+  patrimonioChip: 'main section[aria-label="Patrimonio"] span.inline-flex.whitespace-nowrap',
+};
+
+/**
+ * The shell's probes, each where it is drawn (2026-11-22, before the costume reached the shell): the sidebar's
+ * «Analisi» group label at 1440; an inactive label of the bottom pill and the Cashflow phone tab at 390.
+ */
+const VIEWPORT_PROBES: Record<ViewportKey, Record<string, string>> = {
+  '1440': { ...BOTH_WIDTHS_PROBES, sidebarLabel: '[data-sidebar="group-label"]' },
+  '390': {
+    ...BOTH_WIDTHS_PROBES,
+    bottomPillLabel: 'nav[data-nav="pill"] a:not([aria-current])',
+    phoneTab: 'main [role="tablist"][class*="desktop:hidden"] > [role="tab"]',
+  },
 };
 
 type Signature = Record<string, Record<string, string> | null>;
@@ -165,7 +189,17 @@ export function describeThemeNeutrality(viewport: ViewportKey): void {
             dark: document.documentElement.classList.contains('dark'),
           }));
           expect(root).toEqual({ theme: theme === DEFAULT_COLOR_THEME ? null : theme, dark: mode === 'dark' });
-          const signature = await readSignature(page, PROBES);
+          const signature = await readSignature(page, { ...PROBES, ...VIEWPORT_PROBES[viewport] });
+          // The account menu is a portalled DropdownMenu: opened from the sidebar's footer at 1440, closed by Escape.
+          if (viewport === '1440' && path === '/dashboard') {
+            await page.locator('[data-sidebar="footer"] [aria-haspopup="menu"]').click();
+            const menu = page.locator('[data-slot="dropdown-menu-content"]');
+            await expect(menu).toBeVisible();
+            await page.waitForTimeout(400);
+            Object.assign(signature, await readSignature(page, { accountMenu: '[data-slot="dropdown-menu-content"]' }));
+            await page.keyboard.press('Escape');
+            await expect(menu).toBeHidden();
+          }
           // «Nuova Spesa» is a desktop control (hidden below `desktop:`): the dialog is probed at 1440, closed unsent.
           if (viewport === '1440' && path.includes('cashflow')) {
             await page.getByRole('button', { name: 'Nuova Spesa', exact: true }).click();
