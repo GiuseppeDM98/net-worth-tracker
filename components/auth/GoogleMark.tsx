@@ -3,7 +3,7 @@
  *
  * The four hexes are Google's own brand colours and are deliberately NOT theme tokens:
  * they identify a third party's mark, which must look the same on every one of the app's
- * twelve theme combinations (DESIGN.md → The Data Owns Color Rule governs the app's own
+ * theme and mode combinations (DESIGN.md → The Data Owns Color Rule governs the app's own
  * chrome, not somebody else's logo).
  */
 export function GoogleMark() {

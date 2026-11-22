@@ -126,7 +126,7 @@ describe('readThemePalette — the action colours and the Sankey hexes from the 
   });
 });
 
-// ─── The twelve theme blocks: the live filter changes no palette shipped today ─────────────────
+// ─── Every theme block: the live filter changes no palette shipped today ─────────────────
 
 /** The `--chart-1..9` of one block as authored (the headers come from the registry: `./themeBlocks`). */
 function authoredSlots(selector: string): Triple[] {

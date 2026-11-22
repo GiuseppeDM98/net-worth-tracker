@@ -14,7 +14,7 @@
  * theme whose chart colours would vanish into the page. The old filter matched `/oklch\(/` on the
  * SERVED string, which is `lab(…)` or `#rrggbb` (lib/utils/colorParse.ts), so it never fired; it
  * now reads the served form through `cssColorToOklch`. `__tests__/chartPaletteDistinctness.test.ts`
- * holds every authored slot of the twelve blocks inside the band, so on today's themes the filter
+ * holds every authored slot of every theme block inside the band, so on today's themes the filter
  * changes nothing — it exists for the next theme.
  */
 

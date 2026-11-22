@@ -80,7 +80,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   Composizione bar, and the hero's rising curve wore the hue of `--destructive`) onto blue · green · amber · violet ·
   coral with L and C set for white. **The floor is a test**, `__tests__/chartPaletteDistinctness.test.ts`: it reads
   `globals.css` itself, ΔE00 ≥ 14 between any two slots of a mode, every slot inside the `useChartColors` luminance
-  guard, each slot ≤ 30° of hue from its twin in the other mode. **All twelve blocks since 2026-09-20** (below). A slot
+  guard, each slot ≤ 30° of hue from its twin in the other mode. **Every theme block since 2026-09-20** (twelve then, fourteen with Egeo; below). A slot
   change re-derives `PRINT_CHART_HEX` (`__tests__/printTokens.test.ts` says the new hex); `PRINT_RANK_HEX` moved to
   slot 7 the same day because slot 3 became crypto's amber.
 - **The named themes are held to the same floor** (2026-09-20, from the owner's tour of Storico on solar-dusk).

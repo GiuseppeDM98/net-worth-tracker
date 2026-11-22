@@ -17,7 +17,7 @@ import type { AllocationAction } from '@/lib/utils/allocationUtils';
  *
  * The band is NOT a guess: these three colours are printed as text (a 10px chip label, an 18px
  * plan amount, a 13px gap figure), so they are held to WCAG AA 4.5:1 on `--card` AND on the chip's
- * own tinted fill, in all twelve theme blocks, by `__tests__/actionColorContrast.test.ts`. Until
+ * own tinted fill, in every theme block, by `__tests__/actionColorContrast.test.ts`. Until
  * 2026-09-21 this docstring claimed to guarantee contrast and the default light palette measured
  * 2,39:1.
  *
