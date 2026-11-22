@@ -1,14 +1,14 @@
 # NOVE-20 — The costume, round B: every dialog and the pages beyond the first three
 
 > Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567)** (the contract, doc/guide/temi.md § Il costume), **NOVE-12 (retired on 2026-11-22, PR #569) and NOVE-13 (retired on 2026-11-22, PR #572)** (the two themes)
-> and **NOVE-19**, implemented just before it, whose tools it reuses with their names: the portal mechanism
-> (`useCostumeScopeProps()`, NOVE-19 § 4.1, already spread on every dialog, drawer, sheet and alert content), the four
-> control properties and `COSTUME_FRAME_RADIUS_CLASS` / `COSTUME_PILL_RADIUS_CLASS` (§ 4.2), the emblems of Panoramica, Patrimonio and Cashflow (§ 4.5), the E2E files
+> and **NOVE-19 (retired on 2026-11-22, PR #574)**, whose tools it reuses with their names (doc/guide/temi.md § Il costume, «Portals», «Three radii», «The shell»): the portal mechanism
+> (`useCostumeScopeProps()` in `contexts/ColorThemeContext.tsx`, already spread on every dialog, drawer, sheet and alert content), the four
+> control properties and `COSTUME_FRAME_RADIUS_CLASS` / `COSTUME_PILL_RADIUS_CLASS` (`lib/constants/themeCostume.ts`), the emblems of Panoramica, Patrimonio and Cashflow (`THEME_EMBLEMS.egeo`), the E2E files
 > `e2e/theme.costume{,.mobile,.tablet}.spec.ts` and `e2e/themeNeutral.ts`'s probes. It dresses NOVE-10's (retired on 2026-11-16, PR #540) Analisi,
 > NOVE-15's (retired on 2026-11-16, PR #544) Assistente and NOVE-16/17/18's Accumulo as they leave them.
 > Written on 2026-11-12; every `file:line` is
 > cited on `develop` @ b841cbd7, the Accumulo code as `pr488:file:line` (`refs/tmp/pr488`, holding #486 and #487). The cites of `ConsulenteBook{,Pages}.tsx`, `ConsulenteReport.tsx`, `QuestoMeseTile.tsx` and `PianoTile.tsx` re-read on `develop` @ 0a2e2851 (PR #561, the one-click «Applica») at its retirement, 2026-11-20.
-> Executes decisions 3, 4, 16, 17 and the adopted choice (a) (README.md § 3-4) on what NOVE-19 § 10 hands over;
+> Executes decisions 3, 4, 16, 17 and the adopted choice (a) (README.md § 3-4) on what NOVE-19 handed over (the list of § 1 and § 4 below);
 > respects 14 (no resource bar on these pages).
 
 ## 1. The problem today (evidence on the code)
@@ -19,19 +19,19 @@ After NOVE-19 every portalled content carries `data-costume-scope`. What still m
 | --- | --- | --- |
 | 1 | `components/ui/responsive-modal.tsx:203`, `:247`; `:204-206`, `:248-250` | the eyebrow prints its string bare («Passo 1 di 2» draws its digits in the heading face); the title is Geist 20px with no hook |
 | 2 | `components/ui/dialog.tsx:69`; the costume rule `[data-tile]:not([data-generated])` (`app/globals.css`, «Theme costume» section) | the modal's `rounded-2xl` follows `--radius-2xl` but has no cap or marks; `data-tile` would replace the Float shadow with `--costume-tile-shadow: none` |
-| 3 | `components/ui/drawer.tsx:74` | `rounded-t-[10px]`: a 10px sheet under 4px / 0px tiles (NOVE-19 § 10) |
+| 3 | `components/ui/drawer.tsx:74` | `rounded-t-[10px]`: a 10px sheet under 4px / 0px tiles (doc/guide/temi.md § Per-page blind spots, «A select sheet opened inside a drawer»: this spec removes that entry) |
 | 4 | `components/ui/alert-dialog.tsx:64`, `:110-114`; `components/layout/LogoutDialog.tsx:30-31` | the logout confirm (from `Sidebar.tsx:297`, `SecondaryMenuDrawer.tsx:345`) is in scope after NOVE-19 but has no frame and a title without hook |
 | 5 | `ConsulenteWizard.tsx:230`, `ConsulenteRun.tsx:119`, `ConsulenteBook.tsx:225`, `components/ui/path-card.tsx:48` (`PathCard`), `:97` (`PathDoneCard`) — Compravendita and the plan of accumulation since 2026-11-20 | five scene cards on `TILE_SURFACE_CLASS` without `data-tile`: no cap, no marks |
 | 6 | `components/ui/path-card.tsx:20` (`PATH_HEADLINE_CLASS`, since 2026-11-20 the one headline class of `ConsulenteWizard.tsx`, `ConsulenteBook.tsx`, `ConsulenteInterviewScene.tsx`, Compravendita and the plan of accumulation), `ConsulenteRun.tsx:121` | the scene headlines at the verdict's 24/30px in Geist beside a costumed verdict |
 | 7 | `ConsulenteWizard.tsx:260-262`, `ConsulenteInterviewScene.tsx:93`, `components/ui/path-card.tsx:49-51`, `ConsulenteBook.tsx:235` | eyebrows with digits printed as JSX, not through `HeadingText` |
-| 8 | `app/globals.css:60` (`--radius-xl`); § 4.4's list | 36 `rounded-xl` boxes inside tiles and modals plus `card.tsx:10` and `link-banner.tsx:41` (NOVE-19 § 10) @ b841cbd7: 38 (Accumulo's two left with the editor's side panel, NOVE-26, retired on 2026-11-21, PR #565) — 9px Egeo, 4px Orbita, rounder than the tile |
+| 8 | `app/globals.css:60` (`--radius-xl`); § 4.4's list | 36 `rounded-xl` boxes inside tiles and modals plus `card.tsx:10` and `link-banner.tsx:41` (handed over by NOVE-19) @ b841cbd7: 38 (Accumulo's two left with the editor's side panel, NOVE-26, retired on 2026-11-21, PR #565) — 9px Egeo, 4px Orbita, rounder than the tile |
 | 9 | `components/allocation/ActionChip.tsx:37` and § 4.4b's sites | `rounded-full` bars, pills and pill chips, `rounded-[Npx]` chips on the nine pages and in the Accumulo code: round or literal under Orbita, while NOVE-19 squares the same roles on its three pages |
 | 10 | `ComposizioneTile.tsx:65`, `EvoluzioneTile.tsx:110`, `ValoreStrumentoTile.tsx:90`, `StoricoDettaglio.tsx:74`, `LaborMetricsChart.tsx:34`, `FireDettaglio.tsx:53`, `RollingLineChart.tsx:19`, `AndamentoStoricoCharts.tsx:22`, `ConfrontoAnnualeCharts.tsx:23`, `EntityTrendChart.tsx:21`, `SavingsRateLineChart.tsx:65`, `components/goals/GoalProjectionChart.tsx:75` (10) | twelve Recharts tooltips `borderRadius` 8px / 10px literal (in the chart's DOM, so in scope): rounded under Orbita |
 | 11 | `lib/utils/cashflowSankey.ts:66-92` | income, type, Budget, Risparmi hexes fixed; the ring (`ClassificaTile`, since 2026-11-12) and the phone flow (`SpendingTypesMobileFlow.tsx:44`, `:52`) paint the same types by token (`expenseTypeColors.ts:30-36`, `:61-64`): under a costume the Sankey disagrees with its neighbours |
 | 12 | `components/performance/UnderwaterDrawdownChart.tsx:102-109`, `:140-142`, `:170` | the red is a `useState` seeded with the default's oklch, read once from `<html>` in a rAF (empty deps): wrong first frame, stale after a theme switch |
 | 13 | `AssistantQuestionBlock.tsx:147-148`, `:159`; `ExpenseProposalCard.tsx:261-263`; `GoalProposalCard.tsx:212-216` | the AI eyebrow on `bg-muted/40` over the card: **4,48:1** Egeo light, **4,39** Egeo dark; `DESIGN.md:70-72` promises 4,5 there |
 | 14 | `app/globals.css:940-944` (on `develop` @ f4b16f98); `ConsulenteBook.tsx:346-355` | the book prints with the costume's heading face (`.tile-eyebrow`, the verdict's `.costume-heading`) and its emblem (the scene card is `print:hidden`, `ConsulenteBook.tsx:223`; the sheet is `[data-book-print]`): decision 17 says never on paper |
-| 15 | the `PageHeader` call sites of § 4.8 | no `emblem` id: Egeo draws the temple on nine pages while three have their own (NOVE-19 § 4.5) |
+| 15 | the `PageHeader` call sites of § 4.8 | no `emblem` id: Egeo draws the temple on nine pages while three have their own (`THEME_EMBLEMS.egeo.pages`: `patrimonio`, `cashflow`; Panoramica the fallback temple) |
 
 ## 2. Goal and acceptance criteria
 
@@ -70,14 +70,14 @@ palette themes render exactly as today.
   - the modal wears the tile's image layers through its own `data-costume-frame`, never `data-tile`: the Float
     shadow is the one thing a modal adds to a tile (DESIGN.md:262) and stays;
   - the modal's title takes the heading face (font, weight, tracking, case) at its own 20px — no costume size;
-  - a `rounded-xl` box inside a tile or a modal is a *frame* in NOVE-19's sense (§ 4.2 there): 4px / 0px;
+  - a `rounded-xl` box inside a tile or a modal is a *frame* in NOVE-19's sense (doc/guide/temi.md § Il costume, «Three radii»): 4px / 0px;
     `rounded-lg` and `rounded-md` boxes keep following `--radius`: 5px / 3px in Egeo (a `rounded-lg` box is 1px
     rounder than the 4px tile, accepted: NOVE-19's rail target is 5px too), 0px in Orbita;
   - the pills, bars and chips of the nine pages and of Accumulo take NOVE-19's roles (§ 4.4b): a bar, a pill
     control and a pill chip `COSTUME_PILL_RADIUS_CLASS`, a literal chip `--costume-control-chip-radius`, a
     literal-radius box inside a tile the frame; dots, spinners, avatars, count badges, numbered circles, colour
     swatches, round icon buttons, the radio, the grip, legend lines and `rounded-[2px]` swatches stay as they are;
-  - a Recharts tooltip is a frame too; its shadow is a Float and stays (NOVE-19 § 3);
+  - a Recharts tooltip is a frame too; its shadow is a Float and stays (as NOVE-19 kept it on every floating surface, 2026-11-22);
   - a scene headline is dressed whoever wrote it (the interview's `note` is a model's): a headline is a slot, the
     face is form; the book's markdown sub-headings (`ConsulenteBookPages.tsx:47-49`, 15px) are body and stay Geist;
   - under a costume the Sankey takes the theme's slots in the map of `EXPENSE_TYPE_COLOR_VAR` (fixed 1, variable 4,
@@ -89,7 +89,7 @@ palette themes render exactly as today.
   - a print resets every scope property to «off»: paper is the palette's, as an email is;
   - Egeo gets its own emblem on each of the nine pages (NOVE-19's precedent: a theme with «emblemi» draws one per
     page, else the temple would mean «Panoramica and the rest»); Orbita keeps the planet;
-  - Compravendita passes `patrimonio` (NOVE-19 § 10), the Consulente `allocazione`, Impostazioni's headers one id.
+  - Compravendita passes `patrimonio` (handed over by NOVE-19), the Consulente `allocazione`, Impostazioni's headers one id.
 
 ## 4. Solution
 
@@ -97,7 +97,7 @@ palette themes render exactly as today.
 
 `lib/constants/themeCostume.ts`: `COSTUME_SCOPE_PROPERTIES` gains a 23rd entry, `'--costume-page-generated-fill'`,
 after NOVE-19's `'--costume-control-switch-on'`. Read only through a `var()` with today's fallback, so «off» is
-`initial` (NOVE-19 § 4.2's convention):
+`initial` (the four `--costume-control-*` convention, doc/guide/temi.md § Il costume, «The scope properties»):
 
 | Property | Paints | Off | Egeo light | Egeo dark | Orbita light | Orbita dark |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -154,12 +154,12 @@ The emblem is React, the reset cannot reach it: `components/ui/theme-costume.tsx
 `print:hidden` (the book's `PageHeader`, `ConsulenteClient.tsx:81-91`, stays in `#page-main` on paper and would draw
 Egeo's meander beside «Consulente»).
 
-### 4.2 The primitives (after NOVE-19's spread at `dialog.tsx:61`, `drawer.tsx:69`, `alert-dialog.tsx:57`)
+### 4.2 The primitives (after NOVE-19's `{...scopeProps}` spread in `dialog.tsx`, `drawer.tsx`, `alert-dialog.tsx`, right after each content's `data-slot`)
 
 - `components/ui/dialog.tsx:69` (`DialogContent`): `data-costume-frame=""` beside `data-slot`; the class is unchanged
   (`rounded-2xl` follows `--radius-2xl`).
 - `components/ui/drawer.tsx:74`: `data-costume-frame=""`; `rounded-t-[10px]` →
-  `rounded-t-[var(--costume-control-frame-radius,10px)]` (NOVE-19 § 10, as its popper sheet). The handle stays round.
+  `rounded-t-[var(--costume-control-frame-radius,10px)]` (as the popper sheet's `[data-popper-sheet]` rule in `app/globals.css`). The handle stays round.
 - `components/ui/alert-dialog.tsx:57`: `data-costume-frame=""`; `:113` `"costume-title text-lg font-semibold …"`;
   the surface comment `:61-63` gains «and its costume frame».
 - `components/ui/responsive-modal.tsx`: `:203`, `:247` → `<p className={TILE_EYEBROW_CLASS}><HeadingText
@@ -167,7 +167,7 @@ Egeo's meander beside «Consulente»).
   tracking-[-0.01em]"`, child `{typeof title === 'string' ? <HeadingText text={title} /> : title}`. One caller
   passes a node: `components/performance/AIAnalysisDialog.tsx:278-287`, the page's verdict and its tone dot; there
   the fragment's text becomes `<HeadingText text={verdict.headline.endsWith('.') ? verdict.headline.slice(0, -1) :
-  verdict.headline} />`, the dot `<span>` unchanged, so its figures are `.costume-figure`. Its own scope spread (`responsive-modal.tsx:207`, `:241` on `develop` @ f4b16f98) stays (NOVE-19 § 3). The footer
+  verdict.headline} />`, the dot `<span>` unchanged, so its figures are `.costume-figure`. Its own scope spread (`responsive-modal.tsx:207`, `:241` on `develop` @ f4b16f98) stays (same value as the primitives' spread). The footer
   (`:262-267`): a token border, the primary glows by NOVE-11's rule — unchanged.
 - `components/ui/sheet.tsx`: no frame — its one consumer is the sidebar's phone panel (`sidebar.tsx:191-209`), shell.
 
@@ -190,12 +190,12 @@ Egeo's meander beside «Consulente»).
 - `ConsulenteRun.tsx:74`: `first:rounded-t-xl last:rounded-b-xl` → `first:rounded-t-[inherit]
   last:rounded-b-[inherit]` (the list's corner, `:66`: identical in every palette theme).
 
-### 4.4 The frames — `rounded-xl` → `COSTUME_FRAME_RADIUS_CLASS` (NOVE-19 § 4.2)
+### 4.4 The frames — `rounded-xl` → `COSTUME_FRAME_RADIUS_CLASS` (`lib/constants/themeCostume.ts`)
 
 The list is the spec (`grep -rn "rounded-xl"` over `components app` @ b841cbd7 and pr488, NOVE-19's sites out);
 a literal `className` becomes `cn(…, COSTUME_FRAME_RADIUS_CLASS)`:
 
-- **Handed by NOVE-19 § 10**: `components/ui/card.tsx:10`, `components/ui/link-banner.tsx:41`.
+- **Handed over by NOVE-19**: `components/ui/card.tsx:10`, `components/ui/link-banner.tsx:41`.
 - **Shared, in my surfaces**: `components/ui/question-card.tsx:95`.
 - **Consulente**: `ConsulenteInterviewScene.tsx:46`, `ConsulenteRun.tsx:66`, `ConsulenteWizard.tsx:295`.
 - **Compravendita**: `CompravenditaScreens.tsx:83`, `:267`, `:314`, `:393`, `:413`; `CompravenditaWizard.tsx:131`.
@@ -409,7 +409,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 
 - **The palette themes render as today**: every rule is gated, every new property read with today's fallback,
   `rounded-t-[inherit]` of a `rounded-xl` list is that list's corner, `var(--destructive)` is what the state read.
-- **`initial` is not «zero»** (NOVE-19 § 5): `--costume-page-generated-fill` is read only through its class.
+- **`initial` is not «zero»** (doc/guide/temi.md § Il costume, «The scope properties»): `--costume-page-generated-fill` is read only through its class.
 - **The Modal-Is-A-Tile Rule**: the Float is the modal's; here it means no `data-tile` on a modal, ever.
 - **The AI-Accent Rule**: no rule sets `--ai-accent` or `--ai-glow`; the fill moves under the accent.
 - **The Mono Mandate**: every heading string goes through `HeadingText`; a `ReactNode` title is the caller's, and
@@ -431,9 +431,9 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 | # | Test | Mutation that turns it red |
 | --- | --- | --- |
 | R1 | `__tests__/responsiveModalCostume.test.tsx` (NOVE-11) + cases: eyebrow «Nuova voce · Passo 1 di 2» holds two `.costume-figure`; title «Elimina 50 movimenti» has `costume-title` and one `.costume-figure` «50»; a `ReactNode` title renders as passed; the content has `data-costume-frame`; `AIAnalysisDialog`'s title with a verdict «Il portafoglio rende il 5% l'anno» holds one `.costume-figure` «5%» | render `{title}` bare; render `verdict.headline` bare |
-| R2 | `__tests__/costumePortals.test.tsx` (NOVE-19 R5) + case: the open `AlertDialog`'s content has `data-costume-frame`, its title `costume-title`; the `Dialog`'s content `data-costume-frame` | drop the attribute in `alert-dialog.tsx` |
+| R2 | `__tests__/costumePortals.test.tsx` (NOVE-19's portal cases) + case: the open `AlertDialog`'s content has `data-costume-frame`, its title `costume-title`; the `Dialog`'s content `data-costume-frame` | drop the attribute in `alert-dialog.tsx` |
 | R3 | `consulenteBook.test.tsx` + case: the card is `[data-tile]`, a generated page `[data-tile][data-generated]`; the headline has `costume-heading` | drop `data-tile` at `:226` |
-| R4 | `costumeScope.test.tsx` (NOVE-19 R6) + cases: with `egeo`, each of the nine ids renders its § 4.8 `d` (previdenza two circles), the twelve Egeo arts (the temple, the amphora, the waves and § 4.8's nine) pairwise distinct; with `orbita`, every id the planet | `EGEO_FLAME` given `EGEO_LAMP`'s `d` |
+| R4 | `costumeScopeEgeo.test.tsx` and `costumeScopeOrbita.test.tsx` (NOVE-19's page-emblem cases, on the real registry; their pins of `THEME_EMBLEMS.egeo.pages` — `['cashflow', 'patrimonio']` — and of Orbita's `pages: {}` change with the nine ids) + cases: with `egeo`, each of the nine ids renders its § 4.8 `d` (previdenza two circles), the twelve Egeo arts (the temple, the amphora, the waves and § 4.8's nine) pairwise distinct; with `orbita`, every id the planet | `EGEO_FLAME` given `EGEO_LAMP`'s `d` |
 | U1 | `cashflowSankey.test.ts` + cases: `buildBudgetFlowData(x)` colours equal today's literals (`#3b82f6`, `#8b5cf6`, `#f59e0b`, `#10b981`); with `costumeSankeyPalette(hex)` fixed `slot1`, variable `slot4`, debt `slot3`, Budget `positive`, Risparmi `slot2`, the k-th income slot `k % 9 + 1`; the roles flow's Budget `positive` | map variable to `slot2` |
 | U2 | `chartColorsContext.test.ts:120` updated: `THEME_HEX_TOKENS` = role tokens then `SANKEY_COSTUME_TOKEN` values | drop the spread |
 | C1 | `themeCostume.test.ts` + T11: the section's `@media print` block declares each of the 23 `COSTUME_SCOPE_PROPERTIES` (`--radius` with `inherit`), each `!important`; `theme-costume.tsx`'s `EmblemSvg` class holds `print:hidden`; T3: `toHaveLength(22)` → `toHaveLength(23)`, the order gains `'--costume-page-generated-fill'` last; T6 + `COSTUME_GENERATED_FILL_CLASS` equals § 4.1's string | delete `--costume-ground` from the print block |
@@ -441,7 +441,7 @@ card or on a generated sub-tile (checked, `ConsulenteRevisionTile.tsx:119` on th
 | C3 | same file + T13: in the files of § 4.4b the only `rounded-full` / `rounded-[Npx]` (N ≠ 2) left are the «stay as they are» lines § 4.4b names in those files (`goals/tiles/ObiettiviTile.tsx`, `settings/page.tsx`, `EvoluzioneTile.tsx`, `AspettoTab.tsx`, `TargetTick.tsx`, `GeneraleTab.tsx`, `RendimentoTile.tsx`, `PerformancePeriodPicker.tsx`: one each); every other file of the list has none | `RecordRows.tsx:119` back to `rounded-full` |
 | K6 | `themeCostumeContrast.test.ts`: `--warning-foreground` ≥ 4,5 on K3's surfaces and on `--warning` | Egeo light `--warning-foreground` `oklch(0.62 0.11 80)` |
 | K7 | same file: `--ai-accent` ≥ 4,5 on `--card` and on `--costume-page-generated-fill` over `--card` (`var(--card)` is the card, `initial` is `--muted` at 40% over it) | Egeo light's fill `initial` (4,48) |
-| N2 | `e2e/themeNeutral.ts` (NOVE-11, NOVE-19 N1) gains two probes: the «Nuova Spesa» title and content (desktop), the same drawer (390). The Sankey's neutrality is E5's default-theme case. Baseline RE-RECORDED (`THEME_NEUTRAL_RECORD=1`) on the untouched code, then compared | drawer fallback `12px` |
+| N2 | `e2e/themeNeutral.ts` (NOVE-11, and NOVE-19's six shell and control probes) gains two probes: the «Nuova Spesa» title and content (desktop), the same drawer (390). The Sankey's neutrality is E5's default-theme case. Baseline RE-RECORDED (`THEME_NEUTRAL_RECORD=1`) on the untouched code, then compared | drawer fallback `12px` |
 | E1 | `e2e/theme.costume.spec.ts` (NOVE-19) + cases: criterion 1 on Cashflow in default, Egeo, Orbita light; an eyebrow `.costume-figure` `Geist Mono`; criterion 10's emblem `path` on Storico and FIRE | `data-costume-frame` off `dialog.tsx` |
 | E2 | `e2e/theme.costume.mobile.spec.ts` + case: criterion 2 at 390; `scrollWidth ≤ innerWidth` | `rounded-t-[10px]` restored |
 | E3 | `e2e/theme.costume.tablet.spec.ts` + case: at 1024×768 the dialog has 4px / 0px and a `linear-gradient` `background-image`; at 768×1024 the drawer 4px / 0px | drop `data-costume-frame` in `dialog.tsx` (1024×768 red); `drawer.tsx` back to `rounded-t-[10px]` (768×1024 red) |

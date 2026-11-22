@@ -167,8 +167,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 ## Il costume — «un tema può vestire la dashboard oltre il colore?» (2026-11-21)
 
 DESIGN.md → The Costume Rule. A *palette theme* is colours and a radius (the six of today); a *costume theme* may also
-carry a ground, a frame on the tiles, a heading face, ornaments, a glow on the primary action, an emblem and — on the Panoramica at ≥ 1440 only — a resource bar — inside the
-dashboard and its dialogs only (owner, 2026-11-12: never the emails, the PDF, the landing, the access pages). Every
+carry a ground, a frame on the tiles, a heading face, ornaments, a glow on the primary action, the radius of its pills, chips and card-like boxes, the dark switch's ON track, the shell labels' colour, an emblem and — on the Panoramica at ≥ 1440 only — a resource bar — inside the
+dashboard, its dialogs and its portalled surfaces only (owner, 2026-11-12: never the emails, the PDF, the landing, the access pages). Every
 mechanism has a neutral default, and the palette themes are held to render exactly as before.
 
 - **Two attributes.** `data-costume` on `<html>` says the active theme has a costume: set by the `<head>` script
@@ -182,7 +182,7 @@ mechanism has a neutral default, and the palette themes are held to render exact
   (+0,8 KB gz on every route, 2026-11-21, doc/guide/velocita.md § Registro). The landing and the access
   pages render `PageHeader` and `TILE_EYEBROW_CLASS` too, outside any scope: a mechanism keyed on the theme alone
   would dress them. The toasts still render with the default costume.
-- **Portals** (2026-11-22, NOVE-19): a portalled primitive spreads `useCostumeScopeProps()` on its content; a new one
+- **Portals** (2026-11-22): a portalled primitive spreads `useCostumeScopeProps()` on its content; a new one
   does the same, or the costume stops at `<body>`. `COSTUME_SCOPE_PROPS` and the hook live beside `useCostumeScope`
   in `ColorThemeContext.tsx` (re-exported by `CostumeScopeContext.tsx`); the spread sits right after the content's
   `data-slot` (in `popover.tsx`, which has none, after `data-popper-sheet`) and before `{...props}`, in `popover`,
@@ -202,10 +202,12 @@ mechanism has a neutral default, and the palette themes are held to render exact
   its «+», `SegmentedPill`, `Switch`, the bars of `CompositionList`, `CompositionBar`, `RankedRows`, `ObiettivoTile`,
   `BudgetTrack`, `CentriTile`, `SottocategorieTile`, the chips of `AssetRow`, `StrumentiTile`, `ExpenseTable`,
   `BudgetImpostazioni`, `PatrimonioTile`, `IncassoNettoTile`, `MovimentiTile`, `CalendarDayCell`, `AffidabilitaTile`,
-  `ThemePicker` and the phone tab of `PageTabBar`; the frame on `PopoverContent`, `ChoiceList`, `DividendiDettaglio`'s
+  `ThemePicker`, the phone tab of `PageTabBar` and `Chip` (the period picker's presets; added at the retirement of
+  2026-11-22, which found it left round); the frame on `PopoverContent`, `ChoiceList`, `DividendiDettaglio`'s
   trigger and `ProvisionalCouponBanner`. What stays round in every theme: the dots (`ExpenseTable`'s category dot,
   `PageTabBar`'s), the avatar, the radio. A caller's later `rounded-*` through `cn()` would replace the class: none
-  passes one. Held by `themeCostume.test.ts` (T6, T7).
+  passes an unprefixed one; Analisi's period control gives `SegmentedPill` a `max-sm:rounded-2xl`, the tile's radius below
+  `sm:`, which follows the costume through `--radius-2xl` (2026-11-22). Held by `themeCostume.test.ts` (the class case and the site scan).
 - **The shell** (2026-11-22): `.costume-shell-eyebrow` (the sidebar's and «Altro»'s group labels take
   `--costume-eyebrow-color`, not 60 % of the sidebar's ink), `.costume-shell-quiet` (the inactive pill labels, the
   account e-mail, the collapse toggle, the account chevron on `--muted-foreground`; `:not(a:hover):not(button:hover)`
@@ -226,7 +228,7 @@ mechanism has a neutral default, and the palette themes are held to render exact
   | `--costume-ornament` | band, cap, corners, emblem strokes | `var(--muted-foreground)` |
   | `--costume-tile-image` · `-position` · `-size` | layers over a tile (cap line, corner marks) | `none` · `0 0` · `auto` |
   | `--costume-tile-shadow` | a tile's shadow | `0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a` |
-  | `--costume-heading-font` | verdict headline, eyebrows | `var(--font-geist-sans), system-ui, sans-serif` |
+  | `--costume-heading-font` | verdict headline, eyebrows, the wordmark | `var(--font-geist-sans), system-ui, sans-serif` |
   | `--costume-heading-weight` · `-tracking` · `-case` | verdict headline | `600` · `-0.025em` · `none` |
   | `--costume-heading-size` | verdict headline at ≥ 1440 | `30px` |
   | `--costume-eyebrow-color` · `--costume-eyebrow-weight` | eyebrows | `var(--muted-foreground)` · `600` |
@@ -314,7 +316,7 @@ mechanism has a neutral default, and the palette themes are held to render exact
 
 ## Per-theme measures (2026-11-22)
 
-Where a costume theme's numbers live; NOVE-19 and NOVE-20 add theirs here. The tests re-measure every figure
+Where a costume theme's numbers live, the shell's included; a later pass adds its own here. The tests re-measure every figure
 (`__tests__/{chartPaletteDistinctness,actionColorContrast,mutedForegroundContrast,themeCostumeContrast}.test.ts`).
 
 - **Egeo light** — closest slot pair ΔE00 16,7 (Immobili–Materie Prime; Azioni–Previdenza 17,0); slot L 0,42–0,64, hue
@@ -343,11 +345,11 @@ Where a costume theme's numbers live; NOVE-19 and NOVE-20 add theirs here. The t
 - **Orbita light** (2026-11-22) — closest slot pair ΔE00 15,9 (Azioni–Trend Following; Materie Prime–Previdenza 17,6); slot L 0,46–0,66, hue drift 0° on all nine; slots on the card 5,21 3,62 5,52 3,09 7,00 4,47 3,52 4,20 6,65; COMPRA / VENDI / OK as text on the card 7,15 / 7,64 / 6,32, on the 8% chip 6,33 / 6,72 / 5,61; `--chart-3` 32° from `--destructive` (ΔE00 19,4); `--positive` (inherited) 4,96 and `--destructive` 5,34 on the page, `--positive` 5,49 on the card and 4,54 on muted; `--muted-foreground` 6,52 / 7,21 / 5,96 and `--foreground` 14,06 / 15,55 / 12,85 on background / card / muted; primary-foreground on primary 6,23, `--destructive` on the card 5,90, the AI accent on the card 4,99; eyebrow 6,05 / 5,46 / 5,00 on card / background / muted; ornament 6,24 on the card, the border over the card 1,59 (non-text, decorative).
 - **Orbita dark** — closest pair 17,4 (Materie Prime–Previdenza; Criptovalute–Immobili 17,6; Immobili–Materie Prime 18,9); slot L 0,52–0,80; slots on the card 7,15 9,15 5,30 9,69 5,50 7,01 3,40 7,39 4,89; COMPRA / VENDI / OK 9,60 / 8,81 / 10,49 on the card, 8,49 / 7,78 / 9,11 on the chip; `--chart-3` 30° from `--destructive` (ΔE00 20,1); `--positive` 7,95 and `--destructive` 6,48 on the nebula at its fullest; `--muted-foreground` 10,13 / 9,30 / 8,06 and `--foreground` 16,93 / 15,55 / 13,48; primary-foreground on primary 10,07, `--destructive` on the card 6,94, the AI accent 5,23; eyebrow 9,71 / 10,57 / 8,41; `--foreground`, `--muted-foreground` and the eyebrow on the nebula 14,53 / 8,69 / 9,07; ornament 9,58, border 1,75.
 - **Two values the gates moved from the approved mock** (2026-11-22, owner): the ring-fold gate (ΔE00 ≥ 14 from `--muted-foreground`, not in the spec's table) read light Trend Following `0.38 0.06 240` at 8,0 and dark Azioni at 13,8 with the mock's ink `0.75 0.035 235`. No light ink can fix it (it would have to sit at L ≤ 0,22, darker than the foreground), so light `--chart-7` is `0.62 0.03 240` (min ΔE00 15,9 to the other slots, 19,3 to the fold, 3,52:1 on the card), and dark `--muted-foreground` is `0.78 0.035 235` (tint and hue unchanged, worst slot 14,8). Run the four gates, ring-fold included, before trusting a mock's palette.
-- **The shell on `--sidebar`** (2026-11-22, NOVE-19; `themeCostumeContrast` K4, K5) — Egeo light / Egeo dark / Orbita
+- **The shell on `--sidebar`** (2026-11-22; `themeCostumeContrast` K4, K5) — Egeo light / Egeo dark / Orbita
   light / Orbita dark: a sidebar label before, `--sidebar-foreground` at 60 %, 3,93 / 6,28 / 4,12 / 6,31; after, the
   eyebrow, 5,95 / 9,82 / 5,46 / 10,57; an inactive pill label before, at 55 %, 3,41 / 5,45 / 3,56 / 5,43; after,
-  `--muted-foreground`, 9,22 / 8,64 / 6,52 / 10,13 (Orbita dark measured on the ink NOVE-13 moved to `0.78`; the spec
-  read 9,11 on the mock's); `--positive` on `--muted` 6,10 / 6,49 / 4,54 / 7,38; the dark ON track, `--primary` on
+  `--muted-foreground`, 9,22 / 8,64 / 6,52 / 10,13 (Orbita dark measured on the ink the Orbita gates moved to `0.78`,
+  above; 9,11 on the mock's); `--positive` on `--muted` 6,10 / 6,49 / 4,54 / 7,38; the dark ON track, `--primary` on
   `--card`, 8,75 (Egeo) / 9,58 (Orbita), the thumb `--background` on it 9,83 / 10,44.
 - **Orbita's `--chart-3` is the mock's Criptovalute re-pitched to hue 60** (`0.52 0.10 60` light, `0.64 0.13 60` dark), 30° from `--destructive`; `--chart-4` Immobili is the gold, `--chart-5` Liquidità the violet; Azioni light C 0.098, Immobili light `0.66 0.13 75`, `--primary` light C 0.10 and the eyebrow light C 0.115 are the mock's values pulled into the sRGB gamut. A figure a spec writes as «−1.200,00 €» is «−1200,00 €» in the app: `Intl` (it-IT) groups from five digits.
 
@@ -382,6 +384,14 @@ Where a costume theme's numbers live; NOVE-19 and NOVE-20 add theirs here. The t
   `--ai-accent`, a decision on those themes' look.
 - **The AI accent on a `bg-muted/40` sub-tile over the card reads ≈ 4,48:1 in Egeo light and ≈ 4,39:1 in Egeo dark**
   (2026-11-22): the same per-theme `--ai-accent` gap as the entry above, recorded, not fixed.
+- **The default theme's quiet shell labels read 4,35:1** (2026-11-22): the inactive bottom-pill labels,
+  `text-sidebar-foreground/55`, on `--sidebar` in default light. `.costume-shell-quiet` lifts them to `--muted-foreground`
+  in a costume theme only: a palette theme renders as before by contract, and a palette contrast fix is a decision on
+  that theme's look, not a costume rule. The toaster (`app/layout.tsx`, outside the dashboard layout) and the
+  landing's `ThemePicker` are out of the scope too: palette only, by the owner's rule of 2026-11-12.
+- **A select sheet opened inside a drawer has the costume's top corners inside a 10px drawer** (2026-11-22): the
+  popper sheet reads `--costume-control-frame-radius`, the drawer's own frame (`drawer.tsx`, `rounded-t-[10px]`) does
+  not yet; the dialog and drawer frames are the costume's next pass.
 - **Retro-arcade dark prints its `--foreground` on a pill at 4,02:1** (2026-10-08): the theme's foreground is a light
   teal (L 0.70) and the pill (`--muted`) now sits at L 0.36 — lowering it further would make it indistinguishable from
   the card (L 0.31). Only `--muted-foreground` is held to the floor on `--muted` (`mutedForegroundContrast`); an active

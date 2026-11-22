@@ -17,6 +17,7 @@
  * `--costume-control-chip-radius` deleted from Orbita's; the class case with the fallback `9999px`; the site scan
  * with `segmented-pill.tsx`'s indicator back to `rounded-full` and `choice-list.tsx` back to `rounded-xl`; the
  * hsl() scan with `sidebar.tsx`'s `hsl(var(--sidebar-border))` restored; the switch case with the fallback dropped.
+ * `chip.tsx` joined the site scan the same day, at the retirement, seen red on its `rounded-full`.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -219,6 +220,9 @@ describe('the sites read the costume radii, not a literal', () => {
     'components/dividends/CalendarDayCell.tsx',
     'components/dividends/tiles/AffidabilitaTile.tsx',
     'components/layout/ThemePicker.tsx',
+    // The period picker's preset chips on Cashflow (2026-11-22: the list of that day had read the primitive as
+    // having no caller, and they stayed round under Orbita).
+    'components/ui/chip.tsx',
   ];
   const FRAME_FILES = [
     'components/ui/popover.tsx',
