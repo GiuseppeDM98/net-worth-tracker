@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useCountUp } from '@/lib/utils/useCountUp';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, withTypographicMinus } from '@/lib/utils/formatters';
 
 interface OverviewAnimatedCurrencyProps {
   /** Final value to display. Passed as a stable computed prop from the page. */
@@ -95,7 +95,8 @@ export function OverviewAnimatedCurrency({
 
   const formatted = format === 'integer'
     ? String(Math.round(displayValue))
-    : cachedFormatCurrencyEUR(displayValue);
+    // The typographic minus, as the resource bar prints the same figure (The Comma Rule).
+    : withTypographicMinus(displayValue, cachedFormatCurrencyEUR(Math.abs(displayValue)));
 
   return (
     <span className={cn('tabular-nums', className)}>

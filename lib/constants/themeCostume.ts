@@ -77,9 +77,19 @@ const EGEO_TEMPLE: EmblemArt = {
   shapes: [{ kind: 'path', d: 'M2 8 L11 2 L20 8 M4 8 V18 M8 8 V18 M14 8 V18 M18 8 V18 M2 20 H20', tone: 'ornament', strokeWidth: 1.6 }],
 };
 
-/** Filled by each costume theme: one temple for every page (a page's own art is a later addition). */
+/** A planet with a tilted ring: the Orbita costume's mark (decorative, DESIGN.md → The Costume Rule). */
+const ORBITA_PLANET: EmblemArt = {
+  viewBox: '0 0 22 22',
+  shapes: [
+    { kind: 'circle', cx: 11, cy: 11, r: 5, tone: 'primary', strokeWidth: 1.6 },
+    { kind: 'ellipse', cx: 11, cy: 11, rx: 10, ry: 3.6, rotate: -24, tone: 'eyebrow', strokeWidth: 1.3 },
+  ],
+};
+
+/** Filled by each costume theme: one mark for every page (a page's own art is a later addition). */
 export const THEME_EMBLEMS: Partial<Record<ColorTheme, ThemeEmblems>> = {
   egeo: { fallback: EGEO_TEMPLE, pages: {} },
+  orbita: { fallback: ORBITA_PLANET, pages: {} },
 };
 
 /** The art beside a page's name: none out of scope (the landing, the access pages), the page's own over the theme's. */

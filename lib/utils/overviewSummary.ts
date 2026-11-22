@@ -129,6 +129,38 @@ export function selectOverviewStrip(overview: DashboardOverviewPayload): StripFi
   return figures.every((figure) => figure.value === null) ? [] : figures;
 }
 
+/** A cell of the resource bar: a strip figure that opens nothing. */
+export type ResourceFigure = Omit<StripFigure, 'opens' | 'lifts'>;
+
+/**
+ * The four figures a costume theme with a resource bar prints under the Panoramica's header at
+ * ≥ 1440 (DESIGN.md → The Costume Rule). Each repeats a tile's figure with the tile's rounding
+ * (The Lifted-Figure Rule): the hero's and Sintesi's cents, the Cashflow tile's «Risparmio», the
+ * year's chip. No asset, or a total at or below zero (Sintesi prints no rows there) → no bar.
+ */
+export function selectResourceBar(overview: DashboardOverviewPayload): ResourceFigure[] {
+  if (overview.flags.assetCount === 0 || overview.metrics.totalValue <= 0) return [];
+  const month = overview.expenseStats?.currentMonth;
+  const yearly = overview.variations.yearly;
+  return [
+    { label: 'Patrimonio', value: overview.metrics.totalValue, format: 'currency', decimals: 2 },
+    { label: 'Liquidità', value: overview.metrics.cashNetWorth, format: 'currency', decimals: 2 },
+    {
+      label: 'Risparmio',
+      value: month ? month.net : null,
+      format: 'currency',
+      ...(month ? {} : { reason: 'nessun movimento nel mese' }),
+    },
+    {
+      label: 'Da inizio anno',
+      value: yearly ? yearly.percentage : null,
+      format: 'signed-percent',
+      decimals: 2,
+      ...(yearly ? {} : { reason: "nessuno snapshot da cui contare l'anno" }),
+    },
+  ];
+}
+
 /**
  * Whether the verdict's sentence names the market — then the digest «Mercato:» of THE tile is
  * lifted on a phone (its words are in «Il perché»), otherwise the digest stays. True iff the

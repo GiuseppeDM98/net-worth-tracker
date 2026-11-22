@@ -39,6 +39,13 @@ describe('AspettoTab — the colour swatches', () => {
     });
   });
 
+  it('should offer eight themes, the eighth «Colore 8 di 8: Orbita» described «Spazio profondo e ambra»', () => {
+    renderTab();
+    expect(COLOR_THEMES).toHaveLength(8);
+    const orbita = screen.getByRole('button', { name: 'Colore 8 di 8: Orbita' });
+    expect(orbita.textContent).toContain('Spazio profondo e ambra');
+  });
+
   it('should preview each theme with its own blocks, light row then dark row, and no inline colour', () => {
     renderTab();
     COLOR_THEMES.forEach((theme, index) => {
