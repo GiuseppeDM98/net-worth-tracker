@@ -21,6 +21,7 @@ export const COLOR_THEMES = [
   'midnight-bloom',
   'cyberpunk',
   'retro-arcade',
+  'egeo',
 ] as const;
 
 export type ColorTheme = (typeof COLOR_THEMES)[number];
@@ -48,6 +49,7 @@ export const COLOR_THEME_META: Record<ColorTheme, ColorThemeMeta> = {
   'midnight-bloom': { name: 'Midnight Bloom', description: 'Viola profondo', costume: null },
   cyberpunk: { name: 'Cyberpunk', description: 'Neon pink & teal', costume: null },
   'retro-arcade': { name: 'Retro Arcade', description: 'Rosso & teal vintage', costume: null },
+  egeo: { name: 'Egeo', description: 'Marmo, mare e oro', costume: { resourceBar: false } },
 };
 
 /** `'default'` is the `:root` block: no attribute on `<html>`. */

@@ -1,14 +1,14 @@
 # Temi colore (Color Theme System)
 
-> **When to open this guide** — whoever touches `app/globals.css` (the twelve theme blocks: `:root` + `.dark` and the five named themes, each as `[data-theme="name"]` + `.dark[data-theme="name"]`), `contexts/ColorThemeContext.tsx`, `lib/hooks/useChartColors.ts`, `lib/hooks/useActionColors.ts`, `lib/hooks/useCssColorTokens.ts` (with `lib/utils/cssColorToHex.ts`), `contexts/ChartColorsContext.tsx`, `lib/hooks/useThemePaletteReader.ts`, `lib/utils/{themePalette,colorParse}.ts`, `lib/utils/costCenterColors.ts`, `lib/constants/colors.ts`, `components/layout/ThemePicker.tsx`, the registry `COLOR_THEME_META` in `lib/constants/colorTheme.ts`, the swatches in `components/settings/tabs/AspettoTab.tsx`, or the costume contract (§ Il costume: `lib/constants/themeCostume.ts`, `contexts/CostumeScopeContext.tsx`, `components/ui/{theme-costume,heading-text}.tsx`, the «Theme costume» section of `app/globals.css`). The palette itself is in `DESIGN.md` → §2 (Colors: The Zero-Chroma Foundation). `AGENTS.md` keeps the stub with the essentials plus the repo-wide token rules (`AGENTS.md § Layout and Color Tokens`, `doc/guide/grafici.md § Recharts`); here is the full rule.
+> **When to open this guide** — whoever touches `app/globals.css` (the fourteen theme blocks: `:root` + `.dark`, the five palette themes and Egeo, each as `[data-theme="name"]` + `.dark[data-theme="name"]`), `contexts/ColorThemeContext.tsx`, `lib/hooks/useChartColors.ts`, `lib/hooks/useActionColors.ts`, `lib/hooks/useCssColorTokens.ts` (with `lib/utils/cssColorToHex.ts`), `contexts/ChartColorsContext.tsx`, `lib/hooks/useThemePaletteReader.ts`, `lib/utils/{themePalette,colorParse}.ts`, `lib/utils/costCenterColors.ts`, `lib/constants/colors.ts`, `components/layout/ThemePicker.tsx`, the registry `COLOR_THEME_META` in `lib/constants/colorTheme.ts`, the swatches in `components/settings/tabs/AspettoTab.tsx`, or the costume contract (§ Il costume: `lib/constants/themeCostume.ts`, `contexts/CostumeScopeContext.tsx`, `components/ui/{theme-costume,heading-text}.tsx`, the «Theme costume» section of `app/globals.css`). The palette itself is in `DESIGN.md` → §2 (Colors: The Zero-Chroma Foundation). `AGENTS.md` keeps the stub with the essentials plus the repo-wide token rules (`AGENTS.md § Layout and Color Tokens`, `doc/guide/grafici.md § Recharts`); here is the full rule.
 
 ## Files
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Temi**: `app/globals.css` (twelve theme blocks, plus the five `--role-*` aliases in `:root`), `contexts/ColorThemeContext.tsx`, `contexts/ChartColorsContext.tsx` (`ChartColorsProvider`, mounted by `app/dashboard/layout.tsx`), `lib/hooks/{useThemePaletteReader,useChartColors,useActionColors,useCssColorTokens}.ts`, pure `lib/utils/themePalette.ts` (`readThemePalette`: the slots through the luminance filter, the action colours, the `--role-*` hexes), `lib/utils/colorParse.ts` (the ONE colour parser: `oklch()`, `lab()`, `#hex`, `rgb()` → OKLCH, and OKLCH → hex), `lib/utils/cssColorToHex.ts` (a served colour → `#rrggbb` for Nivo), `lib/utils/actionColor.ts` (the COMPRA/VENDI/OK clamp), `lib/utils/costCenterColors.ts` — doc/guide/temi.md; tests `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext}.test.ts`, `e2e/motion.layout.spec.ts` (a client navigation reads no palette token)
-- **The costume** (2026-11-21, § Il costume): `lib/constants/colorTheme.ts` (`COLOR_THEME_META`, `COSTUME_ATTRIBUTE`, `COSTUME_THEMES`, `buildColorThemeInitScript`), `lib/constants/themeCostume.ts` (`COSTUME_SCOPE_PROPERTIES`, the emblem types, `THEME_EMBLEMS`, `resolveEmblem`), `contexts/CostumeScopeContext.tsx` (`CostumeScope`; `useCostumeScope` and `useThemeCostume` re-exported from `contexts/ColorThemeContext.tsx`, where they and the context live), `components/ui/theme-costume.tsx` (`EmblemSvg`, `ThemeEmblem`, `ThemeEmblemLead`, `ThemeHeaderBand`, `HeadingText` re-exported), `components/ui/heading-text.tsx`, pure `lib/utils/headingFigures.ts` (`splitHeadingFigures`); tests `__tests__/{themeBlocks.ts,themeCostume,headingFigures,colorTheme}.test.ts`, `__tests__/{aspettoTab,costumeScope,responsiveModalCostume}.test.tsx`, `e2e/theme.neutral{,.mobile}.spec.ts` on `e2e/themeNeutral.ts` + `e2e/themeNeutral.baseline.json`, `e2e/shell.boot{,.mobile}.spec.ts` (Geist, the scope's boundary)
-- **Suites to run after a change here**: `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext,mutedForegroundContrast,themeColor,colorTheme,themeCostume,headingFigures}.test.ts`, `__tests__/{aspettoTab,costumeScope,responsiveModalCostume,assistantHeader}.test.tsx`; `npx playwright test e2e/theme.neutral e2e/shell.boot` on the emulators
+- **Temi**: `app/globals.css` (fourteen theme blocks, plus the five `--role-*` aliases in `:root`), `contexts/ColorThemeContext.tsx`, `contexts/ChartColorsContext.tsx` (`ChartColorsProvider`, mounted by `app/dashboard/layout.tsx`), `lib/hooks/{useThemePaletteReader,useChartColors,useActionColors,useCssColorTokens}.ts`, pure `lib/utils/themePalette.ts` (`readThemePalette`: the slots through the luminance filter, the action colours, the `--role-*` hexes), `lib/utils/colorParse.ts` (the ONE colour parser: `oklch()`, `lab()`, `#hex`, `rgb()` → OKLCH, and OKLCH → hex), `lib/utils/cssColorToHex.ts` (a served colour → `#rrggbb` for Nivo), `lib/utils/actionColor.ts` (the COMPRA/VENDI/OK clamp), `lib/utils/costCenterColors.ts` — doc/guide/temi.md; tests `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext}.test.ts`, `e2e/motion.layout.spec.ts` (a client navigation reads no palette token)
+- **The costume** (2026-11-21, § Il costume): `lib/constants/colorTheme.ts` (`COLOR_THEME_META`, `COSTUME_ATTRIBUTE`, `COSTUME_THEMES`, `buildColorThemeInitScript`), `lib/constants/themeCostume.ts` (`COSTUME_SCOPE_PROPERTIES`, the emblem types, `THEME_EMBLEMS`, `resolveEmblem`), `contexts/CostumeScopeContext.tsx` (`CostumeScope`; `useCostumeScope` and `useThemeCostume` re-exported from `contexts/ColorThemeContext.tsx`, where they and the context live), `components/ui/theme-costume.tsx` (`EmblemSvg`, `ThemeEmblem`, `ThemeEmblemLead`, `ThemeHeaderBand`, `HeadingText` re-exported), `components/ui/heading-text.tsx`, pure `lib/utils/headingFigures.ts` (`splitHeadingFigures`); tests `__tests__/{themeBlocks.ts,themeCostume,headingFigures,colorTheme}.test.ts`, `__tests__/{aspettoTab,costumeScope,costumeScopeEgeo,responsiveModalCostume}.test.tsx`, `__tests__/themeCostumeContrast.test.ts` (generic over `COSTUME_THEMES`), `e2e/theme.neutral{,.mobile}.spec.ts` on `e2e/themeNeutral.ts` + `e2e/themeNeutral.baseline.json`, `e2e/theme.egeo{,.mobile}.spec.ts` on `e2e/themeEgeo.ts` (they write `userPreferences/test-user-1.colorTheme` and put it back), `e2e/shell.boot{,.mobile}.spec.ts` (Geist, the scope's boundary)
+- **Suites to run after a change here**: `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext,mutedForegroundContrast,themeColor,colorTheme,themeCostume,themeCostumeContrast,headingFigures}.test.ts`, `__tests__/{aspettoTab,costumeScope,costumeScopeEgeo,responsiveModalCostume,assistantHeader}.test.tsx`; `npx playwright test e2e/theme.neutral e2e/theme.egeo e2e/shell.boot` on the emulators
 - **The browser's chrome** (2026-10-17): `lib/utils/themeColor.ts` (`DEFAULT_THEME_COLORS`, `resolveThemeColor`), `components/providers/ThemeColorSync.tsx`, the `viewport.themeColor` export in `app/layout.tsx`, the `html`/`html.dark` rules in `app/globals.css`; tests `__tests__/themeColor.test.ts`, `e2e/shell.boot{,.mobile}.spec.ts` → `expectBrowserChromeFollowsTheme` (`e2e/shellBoot.ts`)
 
 ## Color Theme System
@@ -64,13 +64,16 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Action/semantic colors that must follow the theme: clamp lightness, do not index-fallback.** `useActionColors` clamps
   only the oklch L channel, preserving hue and chroma; `useChartColors`' same-index fallback would lose the theme hue and
   can collapse two states onto one colour. Resolve **once per section** and pass the colour down.
-- **Sign tokens must be verified per theme**: `--positive` is declared twice and no theme overrides it, so one value fixes
-  all twelve combinations, while `--destructive` is declared **twelve times** (cyberpunk's is orange) and must be
-  measured per theme. Never assume a token change lands globally without counting its declarations.
+- **Sign tokens must be verified per theme**: `--positive` is declared in `:root`, `.dark` and both Egeo blocks (Egeo
+  light's own green, its dark block repeating the `.dark` value); a light-block token reaches dark mode by source order,
+  so a theme that overrides a sign token writes it in both blocks. `--destructive` is declared in every block
+  (cyberpunk's is orange) and must be measured per theme (`themeCostumeContrast` does it for the costume themes). Never
+  assume a token change lands globally without counting its declarations. In a costume theme the COMPRA slot
+  (`--chart-3`) keeps ≥ 30° of hue from `--destructive`: a chip that says «compra» never wears the red of a loss (G2).
 - **A user-chosen identity colour is a SLOT, not a hex** (`'chart-1'..'chart-8'`, resolved by `resolveCostCenterColor`).
   Three rules: **migrate without a backfill** (`LEGACY_HEX_SLOTS` maps each old hex to the slot at the same position);
   **derive the no-colour fallback from the document id** (FNV-1a), never from the row's rank, which repaints half the
-  list on every period switch; **indices 0-7 are theme-aware** since 2026-08-30 (`--chart-1..8` in all twelve blocks),
+  list on every period switch; **indices 0-7 are theme-aware** since 2026-08-30 (`--chart-1..8` in all fourteen blocks),
   index 8 (`--chart-9`) since 2026-09-20, only 9 pads from the static `CHART_COLORS`.
 - **The default theme's light slots hold the dark hue bands** (2026-09-13): `:root --chart-1..5` were re-pitched from
   the shadcn preset (three oranges and two teals — Liquidità measured ΔE00 10.1 from Immobili on the
@@ -97,8 +100,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   The owner chose a pine green: `oklch(0.42 0.08 170)` in light (7,4:1 on the card), `oklch(0.53 0.105 170)` in dark
   (3,05:1), ΔE00 ≥ 25 from every slot and from the fold in both modes, found by the same kind of search. Held by
   `__tests__/chartPaletteDistinctness.test.ts` («the ring fold of …»: every slot ΔE00 ≥ 14 from the block's
-  `--muted-foreground`, all twelve blocks). No neutral slot is left, so the test's hue exemption covers nothing today.
-- **`--muted-foreground` is held to 4,5:1 on THREE surfaces, in all twelve blocks** (2026-10-08,
+  `--muted-foreground`, all fourteen blocks). No neutral slot is left, so the test's hue exemption covers nothing today.
+- **`--muted-foreground` is held to 4,5:1 on THREE surfaces, in all fourteen blocks** (2026-10-08,
   `__tests__/mutedForegroundContrast.test.ts`, reading `globals.css`): `--background`, `--card` and `--muted` — the
   reading line, the eyebrow and every inactive label are printed on all three, and the pill (`bg-muted`) is where the
   floor was lowest. Measured that day from the file (WCAG from oklch, the same arithmetic as `actionColorContrast`):
@@ -112,7 +115,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (the throwaway `mutedSuggest.mjs` of that session, the idea of the chart annealing above). A new theme runs this test
   first; a token that fails it is a surface problem as often as an ink problem — look at `--muted` before darkening
   the ink past the theme's `--foreground`.
-- **`--chart-9` is Storico's «Previdenza» band, in all twelve blocks** (2026-09-20). It was the static indigo
+- **`--chart-9` is Storico's «Previdenza» band, in all fourteen blocks** (2026-09-20). It was the static indigo
   `#6366F1` from `CHART_COLORS[8]`, a ninth colour no theme had been measured against: ΔE00 3.8 from midnight-bloom's
   Azioni, 8.4 from retro-arcade dark's Liquidità, 10.3 from the DEFAULT theme's Azioni. `useChartColors` now resolves
   indices 0-8 from the theme (only 9 pads from the static palette) and the test measures nine slots. Its hue is one per
@@ -130,7 +133,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (`--chart-${slot + 1}`), because the hand-written map was a second source that disagreed with the first: crypto's chip
   was `--chart-4` while its chart slot was 2, so one class wore two hues on one screen. `cash` keeps
   `--muted-foreground` on purpose — liquidity is the absence of a position, not a series.
-- **Adding a theme** (rewritten 2026-11-21): its CSS blocks — `[data-theme="name"]` + `.dark[data-theme="name"]`, and
+- **Adding a theme** (rewritten 2026-11-21; the themes today: Default, Solar Dusk, Elegant Luxury, Midnight Bloom,
+  Cyberpunk, Retro Arcade and Egeo, the costume theme — Marcellus, frieze, temple): its CSS blocks — `[data-theme="name"]` + `.dark[data-theme="name"]`, and
   for a costume theme the two scope blocks after them (§ Il costume) — the name in `COLOR_THEMES` and its
   `COLOR_THEME_META` entry (`lib/constants/colorTheme.ts`: a name without an entry fails `tsc`; the union, the
   pre-hydration script and `COSTUME_THEMES` derive from it). Everything else derives: the four gate tests read their
@@ -237,6 +241,8 @@ mechanism has a neutral default, and the palette themes are held to render exact
   `'use client'` and without hooks — the emblem's hooks live in `theme-costume.tsx`.
 - **A costume theme's CSS** = four blocks: `[data-theme="<id>"]`, `.dark[data-theme="<id>"]` (the palette, every token
   a palette theme declares, `--radius` included), then the same two followed by ` [data-costume-scope]`.
+- **A test of the emblem mocks the provider's STORAGE, not the hook** (2026-11-22, `__tests__/costumeScopeEgeo.test.tsx`): `useThemeCostume` calls its own module's `useColorTheme`, which a `vi.mock` of `ColorThemeContext` does not reach, so the scope read `default` and no temple drew. The test mounts the real `ColorThemeProvider` with `color-theme = egeo` in `localStorage`; the sibling `costumeScope.test.tsx` stubs the registry instead, so the real-registry half lives in its own file (`vi.mock` is per file).
+- **A new costume theme runs the ring-fold gate too** (2026-11-22): the four gate tests are not four tests; `chartPaletteDistinctness` also holds every slot ΔE00 ≥ 14 from `--muted-foreground`, and the mock's ink failed it (Egeo light, 11,8 and 12,5). Run all four before trusting a palette, and read the numbers § Per-theme measures records.
 - **The palette themes render as before, measured**: `e2e/theme.neutral{,.mobile}.spec.ts` read eight probes (`html`,
   `body`, `#page-main`, the header label, the verdict `h2`, the first tile and its `h3`, the first primary button)
   and the «Nuova Spesa» dialog at 1440 on Panoramica, Storico and Cashflow, every palette theme in both modes, at 1440
@@ -255,6 +261,34 @@ mechanism has a neutral default, and the palette themes are held to render exact
   accumulo aperto.» took two lines and the tile landed 28px under its placeholder (now «Nessun piano di accumulo.»,
   owner); in landscape the empty tile, 3,5px shorter, made the stack sticky, and the stage check now measures it stuck
   (doc/guide/e2e-playwright.md).
+
+## Per-theme measures (2026-11-22)
+
+Where a costume theme's numbers live; NOVE-13, NOVE-19 and NOVE-20 add theirs here. The tests re-measure every figure
+(`__tests__/{chartPaletteDistinctness,actionColorContrast,mutedForegroundContrast,themeCostumeContrast}.test.ts`).
+
+- **Egeo light** — closest slot pair ΔE00 16,7 (Immobili–Materie Prime; Azioni–Previdenza 17,0); slot L 0,42–0,64, hue
+  drift 0° on all nine; slots on the card 6,27 4,32 5,28 3,18 8,51 4,66 3,53 5,15 5,83; COMPRA / VENDI / OK as text on
+  the card 6,84 / 8,51 / 6,34, on the 8% chip 6,07 / 7,45 / 5,66; `--chart-3` 32° from `--destructive` (ΔE00 19,3);
+  `--positive` 6,00 and `--destructive` 5,78 on the darkest stripe of the ground (6,19 / 7,19 / 6,10 positive on
+  background / card / muted); `--foreground` 12,05 / 14,00 / 11,88 and **`--muted-foreground` 8,68 / 10,08 / 8,55** on
+  background / card / muted (8,41 on the darkest stripe); eyebrow 6,50 on the card, 5,59 on the background, 5,51 on
+  muted, 5,42 on the darkest stripe; ornament 3,43 on the card (2,95 / 2,86 / 3,00 on the three stripes: decorative, the
+  ≥ 3:1 guide is on the card).
+- **Egeo dark** — closest pair 17,1 (Criptovalute–Immobili; Liquidità–Carry 17,6); slot L 0,58–0,80; slots on the card
+  5,80 7,43 5,10 8,69 4,88 5,34 7,93 7,70 3,69; COMPRA / VENDI / OK 8,53 / 8,21 / 9,15 on the card; `--chart-3` 30° from
+  `--destructive` (ΔE00 19,1); `--positive` 8,50 and `--destructive` 6,96 on the ground; `--muted-foreground` 8,64 /
+  7,69 / 6,59; eyebrow 8,75 on the card; ornament 6,56 on the card.
+- **`--muted-foreground` light is 0.36, not the mock's 0.42** (2026-11-22): the ring-fold gate (ΔE00 ≥ 14 from every
+  slot, the fold's ink) read Azioni at 11,8 and Previdenza at 12,5 with the mock's ink. The owner chose the darker ink
+  (worst slot now 15,0) over moving two slots of the approved mock; tint and hue unchanged.
+- **Egeo's own sign tokens**: light `--positive` `oklch(0.43 0.11 145)` in the palette block (the inherited green read
+  4,38:1 on the darkest stripe); the dark block writes the `.dark` value, because `[data-theme="egeo"]` has the
+  specificity of `.dark` and comes later (a light-block token reaches dark by source order).
+- **COMPRA keeps ≥ 30° of hue from `--destructive`**: `--chart-3` is the mock's crypto colour re-pitched from hue 40
+  to 60 (`0.52 0.10 60` light, `0.66 0.13 60` dark), so a «compra» chip never wears the red of a loss.
+- **Four slots re-pitched from the mock for the gates**: Azioni light C 0.12 → 0.107 (gamut), Immobili light
+  `0.68 0.14` → `0.64 0.13` (card contrast), Materie Prime light L 0.60 → 0.54, Trend Following light L 0.56 → 0.60.
 
 ## The browser's chrome follows the page (2026-10-17)
 
@@ -285,19 +319,21 @@ mechanism has a neutral default, and the palette themes are held to render exact
   value per mode by the owner's choice of 2026-11-01, so an AI eyebrow reads under AA there; Midnight
   Bloom's `--primary` (hue 283) also sits 22° from the accent, Cyberpunk's (341) 36°. The fix is a per-theme
   `--ai-accent`, a decision on those themes' look.
+- **The AI accent on a `bg-muted/40` sub-tile over the card reads ≈ 4,48:1 in Egeo light and ≈ 4,39:1 in Egeo dark**
+  (2026-11-22): the same per-theme `--ai-accent` gap as the entry above, recorded, not fixed.
 - **Retro-arcade dark prints its `--foreground` on a pill at 4,02:1** (2026-10-08): the theme's foreground is a light
   teal (L 0.70) and the pill (`--muted`) now sits at L 0.36 — lowering it further would make it indistinguishable from
   the card (L 0.31). Only `--muted-foreground` is held to the floor on `--muted` (`mutedForegroundContrast`); an active
   pill label in that theme is the one place a foreground reads under AA, and the fix is a lighter foreground for the
   whole theme, a decision on its look rather than a token.
 
-- **The chart slots are measured for DISTANCE, not for every surface they land on** (2026-09-20): ΔE00 ≥ 14 and the luminance guard hold on all twelve blocks, and the re-pitched slots were searched at ≥ 3:1 against their card — but that contrast is NOT asserted by the suite, the default theme's two slots under 3:1 (next entry) are untouched, and a colour-blind reader is not modelled: a composition is never readable by colour alone, which is why every band is also a named row.
+- **The chart slots are measured for DISTANCE, not for every surface they land on** (2026-09-20): ΔE00 ≥ 14 and the luminance guard hold on all fourteen blocks, and the re-pitched slots were searched at ≥ 3:1 against their card — but that contrast is NOT asserted by the suite, the default theme's two slots under 3:1 (next entry) are untouched, and a colour-blind reader is not modelled: a composition is never readable by colour alone, which is why every band is also a named row.
 - **Two DEFAULT-theme chart slots and the row focus ring sit under 3:1 as non-text signals** (measured 2026-09-18 on a
   card, re-derived by hand): `--chart-3` light `#da8b00` on white 2,74:1, `--chart-1` dark `#1447e6` on `#171717` 2,62:1,
   `ring-ring` `#a1a1a1` on white 2,58:1 — against AGENTS.md's «worst case 3.38:1». Theme tokens: a `doc/guide/temi.md` session. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
   **Where a slot is printed as TEXT the floor is 4,5:1 and it is now enforced**: `useActionColors` clamps
   COMPRA/VENDI/OK into a measured lightness band before they reach a chip label, a plan amount or a gap column
-  (`lib/utils/actionColor.ts`, all twelve blocks held by `__tests__/actionColorContrast.test.ts`, 2026-09-21). The
+  (`lib/utils/actionColor.ts`, all fourteen blocks held by `__tests__/actionColorContrast.test.ts`, 2026-09-21). The
   entry above is about a slot used as a NON-text signal, which is a different floor and is still open.
 - **Index 9 of `useChartColors()` is still the static lime** (`CHART_COLORS[9]`): no surface uses it. Indices 0-7 are theme-aware since 2026-08-30, index 8 (`--chart-9`, Previdenza) since 2026-09-20.
 - **Sign-colour CHIPS sit below AA, structurally** (`bg-positive/10 text-positive` washes the background with the text's hue: 15 of 24 combinations at 3.34–4.40:1; deliberately not fixed). `MonthlyReturnsHeatmap` fills its cells with the sign tokens at 30/55/85% (the figure is never printed in the cell, so the AA text floor does not apply). (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

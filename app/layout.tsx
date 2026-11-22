@@ -11,7 +11,8 @@
  * - Toaster - UI notification system (placed inside providers to access context)
  *
  * Font Loading Strategy:
- * - Geist Sans and Geist Mono loaded via next/font/google (optimized)
+ * - Geist Sans and Geist Mono loaded via next/font/google (optimized); Marcellus (the Egeo costume's headings)
+ *   registered with `preload: false`, fetched only when a heading paints with it
  * - CSS variables (--font-geist-sans, --font-geist-mono) for Tailwind integration
  * - Applied to <html>: Tailwind resolves --font-sans there (the preflight's `html` rule); on
  *   <body> the sans fell back to system-ui until 2026-11-21
@@ -23,7 +24,7 @@
  * - Safari mask icon with brand color (#10B981 emerald-500)
  */
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Marcellus } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ActiveAccountProvider } from "@/contexts/ActiveAccountContext";
@@ -61,6 +62,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// The Egeo costume's heading face (OFL, Astigmatic): only `--costume-heading-font` names it, so the file is fetched
+// only when a heading paints with it — never for the other themes, never outside the dashboard (doc/guide/temi.md
+// § Il costume).
+const marcellus = Marcellus({ weight: '400', subsets: ['latin'], variable: '--font-marcellus', preload: false });
+
 export const metadata: Metadata = {
   title: "Net Worth Tracker - Gestisci il tuo Patrimonio",
   description: "Traccia e monitora il tuo portafoglio di investimenti",
@@ -90,7 +96,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="it" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="it" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${marcellus.variable}`}>
       <head>
         {/* The stored colour theme onto <html> BEFORE the first paint, the way next-themes puts
             `.dark` there: the dashboard shell is in the prerendered HTML (since 2026-09-28), so without this

@@ -740,6 +740,122 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --sidebar-ring: oklch(0.5676 0.2021 283.0838);
 }
 
+/* Egeo — marble, sea and gold (costume theme: DESIGN.md → The Costume Rule) */
+[data-theme="egeo"] {
+  --radius: 0.3125rem;
+  --background: oklch(0.925 0.035 85);
+  --foreground: oklch(0.27 0.045 250);
+  --card: oklch(0.975 0.012 90);
+  --card-foreground: oklch(0.27 0.045 250);
+  --popover: oklch(0.975 0.012 90);
+  --popover-foreground: oklch(0.27 0.045 250);
+  --primary: oklch(0.45 0.10 240);
+  --primary-foreground: oklch(0.98 0.012 90);
+  --secondary: oklch(0.92 0.025 88);
+  --secondary-foreground: oklch(0.27 0.045 250);
+  --muted: oklch(0.92 0.025 88);
+  --muted-foreground: oklch(0.36 0.035 250);
+  --accent: oklch(0.895 0.04 85);
+  --accent-foreground: oklch(0.27 0.045 250);
+  --destructive: oklch(0.47 0.17 28);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
+  --positive: oklch(0.43 0.11 145);
+  --border: oklch(0.78 0.05 80);
+  --input: oklch(0.78 0.05 80);
+  --ring: oklch(0.45 0.10 240);
+  --chart-1: oklch(0.47 0.107 240);
+  --chart-2: oklch(0.55 0.11 140);
+  --chart-3: oklch(0.52 0.10 60);
+  --chart-4: oklch(0.64 0.13 80);
+  --chart-5: oklch(0.42 0.14 330);
+  --chart-6: oklch(0.54 0.11 105);
+  --chart-7: oklch(0.60 0.09 200);
+  --chart-8: oklch(0.54 0.16 0);
+  --chart-9: oklch(0.50 0.13 285);
+  --sidebar: oklch(0.945 0.025 87);
+  --sidebar-foreground: oklch(0.27 0.045 250);
+  --sidebar-primary: oklch(0.45 0.10 240);
+  --sidebar-primary-foreground: oklch(0.98 0.012 90);
+  --sidebar-accent: oklch(0.885 0.04 85);
+  --sidebar-accent-foreground: oklch(0.27 0.045 250);
+  --sidebar-border: oklch(0.78 0.05 80);
+  --sidebar-ring: oklch(0.45 0.10 240);
+}
+
+.dark[data-theme="egeo"] {
+  --background: oklch(0.19 0.035 250);
+  --foreground: oklch(0.95 0.015 85);
+  --card: oklch(0.24 0.04 250);
+  --card-foreground: oklch(0.95 0.015 85);
+  --popover: oklch(0.24 0.04 250);
+  --popover-foreground: oklch(0.95 0.015 85);
+  --primary: oklch(0.80 0.11 85);
+  --primary-foreground: oklch(0.22 0.04 250);
+  --secondary: oklch(0.29 0.04 250);
+  --secondary-foreground: oklch(0.95 0.015 85);
+  --muted: oklch(0.29 0.04 250);
+  --muted-foreground: oklch(0.76 0.03 240);
+  --accent: oklch(0.32 0.045 250);
+  --accent-foreground: oklch(0.95 0.015 85);
+  --destructive: oklch(0.72 0.16 30);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
+  --positive: oklch(0.740 0.156 148.655);
+  --border: oklch(0.45 0.06 80);
+  --input: oklch(0.45 0.06 80);
+  --ring: oklch(0.80 0.11 85);
+  --chart-1: oklch(0.68 0.13 240);
+  --chart-2: oklch(0.74 0.12 140);
+  --chart-3: oklch(0.66 0.13 60);
+  --chart-4: oklch(0.80 0.13 80);
+  --chart-5: oklch(0.66 0.16 330);
+  --chart-6: oklch(0.66 0.10 105);
+  --chart-7: oklch(0.76 0.09 200);
+  --chart-8: oklch(0.78 0.14 0);
+  --chart-9: oklch(0.58 0.13 285);
+  --sidebar: oklch(0.19 0.035 250);
+  --sidebar-foreground: oklch(0.95 0.015 85);
+  --sidebar-primary: oklch(0.80 0.11 85);
+  --sidebar-primary-foreground: oklch(0.22 0.04 250);
+  --sidebar-accent: oklch(0.32 0.045 250);
+  --sidebar-accent-foreground: oklch(0.95 0.015 85);
+  --sidebar-border: oklch(0.45 0.06 80);
+  --sidebar-ring: oklch(0.80 0.11 85);
+}
+
+/* The Egeo costume, worn only inside the dashboard and its dialogs. */
+[data-theme="egeo"] [data-costume-scope] {
+  --radius: 0.3125rem;
+  --radius-2xl: 0.25rem;
+  --costume-ground: repeating-linear-gradient(92deg, oklch(0.925 0.035 85) 0 3px, oklch(0.915 0.038 82) 3px 4px,
+    oklch(0.93 0.033 88) 4px 9px);
+  --costume-ornament: oklch(0.62 0.11 80);
+  --costume-tile-image: linear-gradient(var(--costume-ornament), var(--costume-ornament));
+  --costume-tile-image-position: left top;
+  /* 4px: the tile's 1px border covers the top one, the cap shows 3px. */
+  --costume-tile-image-size: 100% 4px;
+  --costume-tile-shadow: none;
+  --costume-heading-font: var(--font-marcellus), var(--font-geist-sans), system-ui, sans-serif;
+  --costume-heading-weight: 400;
+  --costume-heading-tracking: 0.01em;
+  --costume-heading-case: none;
+  --costume-heading-size: 34px;
+  --costume-eyebrow-color: oklch(0.47 0.10 70);
+  --costume-eyebrow-weight: 400;
+  --costume-header-band: repeating-linear-gradient(90deg, var(--costume-ornament) 0 9px, transparent 9px 15px);
+  --costume-header-band-height: 7px;
+  --costume-primary-glow: none;
+}
+
+.dark[data-theme="egeo"] [data-costume-scope] {
+  --costume-ground: var(--background);
+  --costume-ornament: oklch(0.72 0.11 82);
+  --costume-eyebrow-color: oklch(0.80 0.09 82);
+}
+
 /* ─── Theme costume (DESIGN.md → The Costume Rule) ── */
 /* A costume theme's ground, frame, heading face, ornaments and glow (doc/guide/temi.md § Il costume).
    Every selector starts with the gate: `data-costume` on <html> (the theme has a costume) AND a

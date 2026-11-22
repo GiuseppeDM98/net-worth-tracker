@@ -75,6 +75,8 @@
 - **Cashflow › Nuova voce** — Added transfers between an account and a house: the deposit on a house you are buying leaves the account and becomes value of the house, and a sale or a deposit you receive leaves the house and lands on the account — nothing counts as spending or income. The house never gives more than it is worth (the form says so and points to Patrimonio to raise its value first), and such a transfer takes no bank fee.
 - **Cashflow › Nuova voce** — Added «Legata all'immobile» in the advanced settings of an entry, and «Collega la serie a un immobile…» in a series entry's detail: a home or CPI policy tied to its house is proposed to stop when you sell it. A mortgage instalment needs no link — its detail reads «Immobile: Casa · dal mutuo».
 
+- **Impostazioni › Aspetto — Egeo** — Added a seventh colour theme, «Egeo» (marble, sea and gold): inside the dashboard and its dialogs it also gives the page a marble ground, gold-capped tiles, an engraved face for the verdict and the labels (every figure stays in the mono), a frieze under the header and a small temple beside the page's name. The landing and the sign-in pages take its colours only.
+
 ## 🐛 Bug Fixes
 
 - **Ogni pagina — il carattere** — The app now reads in Geist Sans, the typeface it was designed in: until now the text fell back to your system's font (Segoe UI on Windows, SF on Apple devices). Some lines break in a slightly different place; on Allocazione › Accumulo without a plan the title now reads «Nessun piano di accumulo.», which fits one line on a phone.

@@ -3,13 +3,14 @@
  * (since 2026-09-28): the script is a string, so it is run here in a bare VM with a fake `localStorage` and
  * `document` — what it does before any module loads is what these cases pin. Since 2026-11-21 it also
  * puts `data-costume` on <html> for a costume theme (DESIGN.md → The Costume Rule): seen red with the
- * script's second `indexOf` dropped.
+ * script's second `indexOf` dropped; the shipped-script cases read the registry (a theme's costume is null or not).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import {
   COLOR_THEMES,
   COLOR_THEME_ATTRIBUTE,
+  COLOR_THEME_META,
   COSTUME_ATTRIBUTE,
   buildColorThemeInitScript,
   COLOR_THEME_INIT_SCRIPT,
@@ -93,9 +94,19 @@ describe('buildColorThemeInitScript', () => {
     expect(setAttribute).not.toHaveBeenCalledWith(COSTUME_ATTRIBUTE, expect.anything());
   });
 
-  it('should never set the costume attribute in the shipped script, while every theme is a palette theme', () => {
-    for (const theme of COLOR_THEMES) {
+  it('should never set the costume attribute in the shipped script for a theme whose costume is null', () => {
+    for (const theme of COLOR_THEMES.filter((name) => COLOR_THEME_META[name].costume === null)) {
       expect(runInitScript(theme).setAttribute).not.toHaveBeenCalledWith(COSTUME_ATTRIBUTE, expect.anything());
     }
+  });
+
+  it('should set the theme and the costume for egeo, and only the theme for cyberpunk', () => {
+    const egeo = runInitScript('egeo').setAttribute;
+    expect(egeo).toHaveBeenCalledWith(COLOR_THEME_ATTRIBUTE, 'egeo');
+    expect(egeo).toHaveBeenCalledWith(COSTUME_ATTRIBUTE, '');
+
+    const cyberpunk = runInitScript('cyberpunk').setAttribute;
+    expect(cyberpunk).toHaveBeenCalledWith(COLOR_THEME_ATTRIBUTE, 'cyberpunk');
+    expect(cyberpunk).not.toHaveBeenCalledWith(COSTUME_ATTRIBUTE, expect.anything());
   });
 });
