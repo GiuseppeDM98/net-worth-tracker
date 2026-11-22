@@ -246,6 +246,7 @@ qui, la più recente in cima. Le eccezioni ammesse sono queste e nessun'altra: L
 prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la pill di `PageTabBar` portata a 44 px
 (2026-10-10), la deriva del giorno o della macchina provata sul codice di develop dello stesso giorno.
 
+- **`2026-11-22: le due voci rosse allargate`** (proprietario, 2026-11-22: «Allargare i due tetti»; direttamente su develop @7cfca25f), `perf:build` su :3200, `census@example.com`, develop @2ff9395a e il branch del tema Orbita sulla stessa macchina (Windows, Node 24) lo stesso giorno: 60 voci su 60 identiche, 0 differenze. **Centri 1024** `screens` 1,04 → 1,06 (la deriva del Geist del 2026-11-21, 1,07 → 1,06) e **Bilanciamento 1024** `screens` 1,16 → 1,21 (la nuova Esposizione, #407, e il Geist): rosse su develop da allora, con la loro decisione presa oggi. `mobile:budget` verde, 60 misure dentro il budget; in `perf/mobile-budget.json` due voci cambiano, entrambe con `raisedBy`.
 - **`2026-11-21: Geist Sans applicato …`** (le variabili di next/font su `<html>`: fino ad allora la UI leggeva in
   `system-ui`; la causa nominata dalla spec dei temi, riregistrata senza chiedere, decisione 33), `perf:build` su :3200,
   `census@example.com`, develop (fb164f56, lo stesso albero) e branch col solo font sulla stessa macchina lo stesso

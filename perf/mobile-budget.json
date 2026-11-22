@@ -246,14 +246,14 @@
         "raisedBy": "2026-10-10: pill a 44 px"
       },
       "1024": {
-        "screens": 1.04,
+        "screens": 1.06,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 2,
         "figuresAboveFold": 11,
         "figuresOutsideVerdict": 6,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-10-16: figuresAboveFold 10 → 11, figuresOutsideVerdict 5 → 6 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-10: pill a 44 px"
+        "raisedBy": "2026-11-22: screens 1,04 → 1,06 — misurato 1,06 su develop @2ff9395a e sul branch del tema Orbita, due build, stessa macchina (Windows, Node 24), stesso giorno: la deriva del Geist del 2026-11-21 (1,07 → 1,06), rimasta rossa da allora; OK del proprietario 2026-11-22; 2026-10-16: figuresAboveFold 10 → 11, figuresOutsideVerdict 5 → 6 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; 2026-10-10: pill a 44 px"
       }
     },
     "cashflow-divisione": {
@@ -437,14 +437,14 @@
         "raisedBy": "2026-11-17: la barra delle tab Bilanciamento · Accumulo (PageTabs) aggiunge 68 px sopra il verdetto; contro develop @36ac3325 lo stesso giorno, stessa build, stessa macchina — screens 1,12 → 1,18; proprietario 2026-11-17; 2026-10-16: la cella «Fuori posizione» stampa lo 0,0% che la lettura stampa (sul fixture la casa e il conto stanno in classi senza target) e dal tablet il KPI resta intero accanto alla striscia: una cifra in più sopra la piega e fuori dal verdetto; a 390 il KPI è sollevato e nulla si muove"
       },
       "1024": {
-        "screens": 1.16,
+        "screens": 1.21,
         "tilesAboveFold": 5,
         "tilesFullyAboveFold": 5,
         "figuresAboveFold": 19,
         "figuresOutsideVerdict": 18,
         "firstClosedRowAbovePill": true,
         "overflowX": false,
-        "raisedBy": "2026-10-16: screens 1,07 → 1,16, figuresAboveFold 18 → 19, figuresOutsideVerdict 16 → 18 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; LA tessera arriva alla piega sotto il verdetto: la colonna sinistra è alta quanto lo schermo e ciò che segue lo stage parte sotto; 2026-10-16: la cella «Fuori posizione» stampa lo 0,0% che la lettura stampa (sul fixture la casa e il conto stanno in classi senza target) e dal tablet il KPI resta intero accanto alla striscia: una cifra in più sopra la piega e fuori dal verdetto; a 390 il KPI è sollevato e nulla si muove; 2026-10-16: a parità di codice, un giorno dopo, sulla macchina di riferimento (census in 2,0 min) tre corse identiche leggono un centesimo in più di schermate o una tessera intera in meno — il --tighten del 2026-10-15 aveva stretto Patrimonio 1024 1,58 → 1,57 e Budget 768 1,36 → 1,35 senza dichiararlo in doc/guide/prima-schermata-misure.md; nello stesso giro Budget 390, Storico 390 e Impostazioni leggono 0,02 SOTTO il budget: la differenza fra le due macchine del 2026-10-15 è una deriva di ±0,01–0,02 per cella, in entrambi i versi; 2026-10-11: deriva del giorno del mese, non del codice — il codice di develop (1629613) misurato lo stesso giorno (11, contro il 10 della prima misura del budget) dà esattamente questi valori; il fixture non è invariante al giorno come la scelta di un fixture deterministico assume (doc/guide/prima-schermata.md § Per-page blind spots)"
+        "raisedBy": "2026-11-22: screens 1,16 → 1,21 — misurato 1,21 su develop @2ff9395a e sul branch del tema Orbita, due build, stessa macchina (Windows, Node 24), stesso giorno: la nuova Esposizione (#407) e il Geist, rimasta rossa da allora; OK del proprietario 2026-11-22; 2026-10-16: screens 1,07 → 1,16, figuresAboveFold 18 → 19, figuresOutsideVerdict 16 → 18 — lo stage in orizzontale: ogni riga chiusa dell'indice stampa la sua risposta (DESIGN.md → The Closed-Row Rule), una cifra che il censimento conta sopra la piega; LA tessera arriva alla piega sotto il verdetto: la colonna sinistra è alta quanto lo schermo e ciò che segue lo stage parte sotto; 2026-10-16: la cella «Fuori posizione» stampa lo 0,0% che la lettura stampa (sul fixture la casa e il conto stanno in classi senza target) e dal tablet il KPI resta intero accanto alla striscia: una cifra in più sopra la piega e fuori dal verdetto; a 390 il KPI è sollevato e nulla si muove; 2026-10-16: a parità di codice, un giorno dopo, sulla macchina di riferimento (census in 2,0 min) tre corse identiche leggono un centesimo in più di schermate o una tessera intera in meno — il --tighten del 2026-10-15 aveva stretto Patrimonio 1024 1,58 → 1,57 e Budget 768 1,36 → 1,35 senza dichiararlo in doc/guide/prima-schermata-misure.md; nello stesso giro Budget 390, Storico 390 e Impostazioni leggono 0,02 SOTTO il budget: la differenza fra le due macchine del 2026-10-15 è una deriva di ±0,01–0,02 per cella, in entrambi i versi; 2026-10-11: deriva del giorno del mese, non del codice — il codice di develop (1629613) misurato lo stesso giorno (11, contro il 10 della prima misura del budget) dà esattamente questi valori; il fixture non è invariante al giorno come la scelta di un fixture deterministico assume (doc/guide/prima-schermata.md § Per-page blind spots)"
       }
     },
     "previdenza": {
