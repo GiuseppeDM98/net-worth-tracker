@@ -856,6 +856,129 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --costume-eyebrow-color: oklch(0.80 0.09 82);
 }
 
+/* Orbita — deep space and amber (costume theme: DESIGN.md → The Costume Rule) */
+[data-theme="orbita"] {
+  --radius: 0.25rem;
+  --background: oklch(0.955 0.012 240);
+  --foreground: oklch(0.25 0.04 255);
+  --card: oklch(0.99 0.004 240);
+  --card-foreground: oklch(0.25 0.04 255);
+  --popover: oklch(0.99 0.004 240);
+  --popover-foreground: oklch(0.25 0.04 255);
+  --primary: oklch(0.48 0.10 235);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.925 0.015 240);
+  --secondary-foreground: oklch(0.25 0.04 255);
+  --muted: oklch(0.925 0.015 240);
+  --muted-foreground: oklch(0.45 0.035 250);
+  --accent: oklch(0.925 0.015 240);
+  --accent-foreground: oklch(0.25 0.04 255);
+  --destructive: oklch(0.52 0.19 28);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
+  --border: oklch(0.48 0.10 235 / 30%);
+  --input: oklch(0.48 0.10 235 / 30%);
+  --ring: oklch(0.48 0.10 235);
+  --chart-1: oklch(0.52 0.098 225);
+  --chart-2: oklch(0.60 0.12 165);
+  --chart-3: oklch(0.52 0.10 60);
+  --chart-4: oklch(0.66 0.13 75);
+  --chart-5: oklch(0.48 0.19 300);
+  --chart-6: oklch(0.56 0.11 105);
+  --chart-7: oklch(0.62 0.03 240);
+  --chart-8: oklch(0.60 0.17 345);
+  --chart-9: oklch(0.46 0.11 135);
+  --sidebar: oklch(0.955 0.012 240);
+  --sidebar-foreground: oklch(0.25 0.04 255);
+  --sidebar-primary: oklch(0.48 0.10 235);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.90 0.03 235);
+  --sidebar-accent-foreground: oklch(0.25 0.04 255);
+  --sidebar-border: oklch(0.48 0.10 235 / 30%);
+  --sidebar-ring: oklch(0.48 0.10 235);
+}
+
+.dark[data-theme="orbita"] {
+  --background: oklch(0.13 0.03 260);
+  --foreground: oklch(0.94 0.015 230);
+  --card: oklch(0.19 0.04 258);
+  --card-foreground: oklch(0.94 0.015 230);
+  --popover: oklch(0.19 0.04 258);
+  --popover-foreground: oklch(0.94 0.015 230);
+  --primary: oklch(0.78 0.12 215);
+  --primary-foreground: oklch(0.16 0.03 258);
+  --secondary: oklch(0.25 0.045 258);
+  --secondary-foreground: oklch(0.94 0.015 230);
+  --muted: oklch(0.25 0.045 258);
+  --muted-foreground: oklch(0.78 0.035 235);
+  --accent: oklch(0.27 0.05 258);
+  --accent-foreground: oklch(0.94 0.015 230);
+  --destructive: oklch(0.72 0.17 30);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
+  --border: oklch(0.78 0.12 215 / 26%);
+  --input: oklch(0.78 0.12 215 / 26%);
+  --ring: oklch(0.78 0.12 215);
+  --chart-1: oklch(0.70 0.13 225);
+  --chart-2: oklch(0.76 0.14 165);
+  --chart-3: oklch(0.64 0.13 60);
+  --chart-4: oklch(0.80 0.15 75);
+  --chart-5: oklch(0.66 0.19 300);
+  --chart-6: oklch(0.70 0.12 105);
+  --chart-7: oklch(0.52 0.08 240);
+  --chart-8: oklch(0.74 0.17 345);
+  --chart-9: oklch(0.60 0.12 135);
+  --sidebar: oklch(0.13 0.03 260);
+  --sidebar-foreground: oklch(0.94 0.015 230);
+  --sidebar-primary: oklch(0.78 0.12 215);
+  --sidebar-primary-foreground: oklch(0.16 0.03 258);
+  --sidebar-accent: oklch(0.27 0.05 258);
+  --sidebar-accent-foreground: oklch(0.94 0.015 230);
+  --sidebar-border: oklch(0.78 0.12 215 / 26%);
+  --sidebar-ring: oklch(0.78 0.12 215);
+}
+
+/* The Orbita costume, worn only inside the dashboard and its dialogs. */
+[data-theme="orbita"] [data-costume-scope] {
+  --radius: 0rem;
+  --radius-2xl: 0rem;
+  --costume-ground: var(--background);
+  --costume-ornament: oklch(0.48 0.10 235);
+  /* Console corner marks: two strokes top-left, two bottom-right. */
+  --costume-tile-image: linear-gradient(var(--costume-ornament), var(--costume-ornament)),
+    linear-gradient(var(--costume-ornament), var(--costume-ornament)),
+    linear-gradient(var(--costume-ornament), var(--costume-ornament)),
+    linear-gradient(var(--costume-ornament), var(--costume-ornament));
+  --costume-tile-image-position: left top, left top, right bottom, right bottom;
+  --costume-tile-image-size: 14px 2px, 2px 14px, 14px 2px, 2px 14px;
+  --costume-tile-shadow: none;
+  --costume-heading-font: var(--font-chakra-petch), var(--font-geist-sans), system-ui, sans-serif;
+  --costume-heading-weight: 600;
+  --costume-heading-tracking: 0.02em;
+  --costume-heading-case: uppercase;
+  --costume-heading-size: 28px;
+  --costume-eyebrow-color: oklch(0.50 0.115 60);
+  --costume-eyebrow-weight: 500;
+  --costume-header-band: none;
+  --costume-header-band-height: 0px;
+  --costume-primary-glow: none;
+}
+
+.dark[data-theme="orbita"] [data-costume-scope] {
+  --costume-ground: radial-gradient(1px 1px at 12% 18%, oklch(0.95 0.02 230 / 70%) 50%, transparent 51%),
+    radial-gradient(1px 1px at 34% 62%, oklch(0.95 0.02 230 / 55%) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 58% 9%, oklch(0.9 0.06 215 / 70%) 50%, transparent 51%),
+    radial-gradient(1px 1px at 77% 41%, oklch(0.95 0.02 230 / 60%) 50%, transparent 51%),
+    radial-gradient(1px 1px at 91% 83%, oklch(0.95 0.02 230 / 55%) 50%, transparent 51%),
+    radial-gradient(900px 500px at 85% -10%, oklch(0.26 0.08 265 / 70%), transparent 70%),
+    oklch(0.13 0.03 260);
+  --costume-ornament: oklch(0.78 0.12 215);
+  --costume-eyebrow-color: oklch(0.80 0.14 75);
+  --costume-primary-glow: 0 6px 20px oklch(0.78 0.12 215 / 35%);
+}
+
 /* ─── Theme costume (DESIGN.md → The Costume Rule) ── */
 /* A costume theme's ground, frame, heading face, ornaments and glow (doc/guide/temi.md § Il costume).
    Every selector starts with the gate: `data-costume` on <html> (the theme has a costume) AND a

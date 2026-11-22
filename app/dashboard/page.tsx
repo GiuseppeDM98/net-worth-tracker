@@ -38,6 +38,7 @@ import {
   OVERVIEW_PATRIMONIO_ID,
   OVERVIEW_SECTION_IDS,
   selectOverviewStrip,
+  selectResourceBar,
   verdictNamesMarket,
 } from '@/lib/utils/overviewSummary';
 import { useMobileSections, type SectionSpec } from '@/lib/hooks/useMobileSections';
@@ -59,6 +60,7 @@ import {
   resolveHeroValueClass,
   type PatrimonioLiftedBlock,
 } from '@/components/dashboard/overview/PatrimonioTile';
+import { ResourceBar } from '@/components/dashboard/overview/ResourceBar';
 import { SintesiTile } from '@/components/dashboard/overview/SintesiTile';
 import { CashflowTile } from '@/components/dashboard/overview/CashflowTile';
 import { ComposizioneTile } from '@/components/dashboard/overview/ComposizioneTile';
@@ -517,6 +519,9 @@ export default function DashboardPage() {
           actions={snapshotAction}
           freshness={freshness}
         />
+
+        {/* A costume theme's four-figure bar, at ≥ 1440 only: nothing in any other theme (DESIGN.md → The Costume Rule). */}
+        <ResourceBar figures={selectResourceBar(overview)} />
 
         {/* The stage: the verdict over the grid; on a tablet in landscape the answer on the left
             (verdict and THE tile) and the index on the right (lib/utils/tabletComposition.ts). */}
