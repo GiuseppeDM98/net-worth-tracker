@@ -71,6 +71,7 @@ import { computeTopWeightShare, computeUnrealizedGain, hasCostBasis, isHeld } fr
 import { describeInstruments } from '@/lib/utils/patrimonioNarrative';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
@@ -494,7 +495,7 @@ export function StrumentiTile({
               ) : null}
             </div>
             {asset.quantity === 0 && (
-              <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              <span className={cn('shrink-0 border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground', COSTUME_PILL_RADIUS_CLASS)}>
                 {isLoanAsset(asset) ? 'Estinto' : describeZeroQuantityChip(asset, tradedAssetIds)}
               </span>
             )}

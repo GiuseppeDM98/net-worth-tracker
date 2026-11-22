@@ -12,6 +12,7 @@ import type { BudgetAllocationValidation } from '@/lib/utils/budgetUtils';
 import { DEFAULT_ALERT_THRESHOLDS } from '@/types/budget';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import {
   ALERTS_SETTING_FOOTER,
   ALERTS_SETTING_READING,
@@ -138,7 +139,8 @@ export function BudgetImpostazioni({
                       disabled={isDemo || !alertsEnabled}
                       onClick={() => toggleThreshold(t)}
                       className={cn(
-                        'h-11 min-w-11 rounded-full border px-3.5 font-mono text-[12px] tabular-nums transition-colors disabled:opacity-50 desktop:h-8 desktop:min-w-0 desktop:px-3',
+                        COSTUME_PILL_RADIUS_CLASS,
+                        'h-11 min-w-11 border px-3.5 font-mono text-[12px] tabular-nums transition-colors disabled:opacity-50 desktop:h-8 desktop:min-w-0 desktop:px-3',
                         active ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground',
                       )}
                     >

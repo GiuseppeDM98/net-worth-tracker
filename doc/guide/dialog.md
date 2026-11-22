@@ -22,6 +22,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   body · footer. `ResponsiveModal` owns the whole shell, so a caller passes content and never chrome — and never
   branches on `useMediaQuery` to order two buttons: the footer is `justify-end` on a dialog and `flex-col-reverse` at
   `h-11` on a drawer, so writing «Annulla» then the primary in DOM order puts the primary on TOP on a phone.
+- **The costume follows a portal** (2026-11-22): the dialog, alert, drawer and sheet primitives carry
+  `data-costume-scope` themselves, as do the popover, select, menu and tooltip contents (`useCostumeScopeProps()`,
+  doc/guide/temi.md § Il costume); a new portalled primitive spreads it too. A component test that renders one mocks
+  `@/lib/firebase/config`, `AuthContext` and `userPreferencesService`.
 - **Four widths, and no others**: `sm` 420 · `md` 560 · `lg` 720 · `xl` 960. `dialogClassName` survives as an escape
   hatch and currently has no user; reach for a width name first.
 - **A dropdown below 769px is a bottom sheet** (owner, 2026-11-06: «every dropdown in a separate window on a phone»;

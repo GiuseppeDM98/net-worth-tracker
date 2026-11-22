@@ -848,6 +848,10 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --costume-header-band: repeating-linear-gradient(90deg, var(--costume-ornament) 0 9px, transparent 9px 15px);
   --costume-header-band-height: 7px;
   --costume-primary-glow: none;
+  --costume-control-frame-radius: var(--radius-2xl);
+  --costume-control-pill-radius: initial;
+  --costume-control-chip-radius: initial;
+  --costume-control-switch-on: var(--primary);
 }
 
 .dark[data-theme="egeo"] [data-costume-scope] {
@@ -964,6 +968,10 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --costume-header-band: none;
   --costume-header-band-height: 0px;
   --costume-primary-glow: none;
+  --costume-control-frame-radius: var(--radius-2xl);
+  --costume-control-pill-radius: 0px;
+  --costume-control-chip-radius: 0px;
+  --costume-control-switch-on: var(--primary);
 }
 
 .dark[data-theme="orbita"] [data-costume-scope] {
@@ -1042,6 +1050,16 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
 [data-costume] [data-costume-scope] [data-slot="button"][data-variant="default"]:not(.ai-control):not(:focus-visible) {
   box-shadow: var(--costume-primary-glow);
 }
+/* The shell's labels: the eyebrow's colour, not 60 % of the sidebar's ink (DESIGN.md → The Costume Rule). */
+[data-costume] [data-costume-scope] .costume-shell-eyebrow { color: var(--costume-eyebrow-color); }
+/* The shell's quiet text and icons — inactive pill labels, the account e-mail, the collapse toggle, the account
+   chevron — on the muted token; a hovered link or button keeps its ink. */
+[data-costume] [data-costume-scope] .costume-shell-quiet:not(a:hover):not(button:hover) { color: var(--muted-foreground); }
+/* The wordmark wears the heading face at its own size. */
+[data-costume] [data-costume-scope] .costume-wordmark {
+  font-family: var(--costume-heading-font); font-weight: var(--costume-heading-weight);
+  letter-spacing: var(--costume-heading-tracking); text-transform: var(--costume-heading-case); font-synthesis: none;
+}
 /* ─── End of theme costume ── */
 
 /* Disable continuous rotation for users who prefer reduced motion.
@@ -1088,7 +1106,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   width: 100%;
   max-width: none;
   max-height: 70dvh;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0;
   border-bottom-width: 0;
   background: var(--card);
   color: var(--card-foreground);

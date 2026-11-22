@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { PATH_FIELD_HEIGHT_CLASS } from '@/components/ui/path-fields';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRovingFocus } from '@/lib/hooks/useRovingFocus';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface ChoiceListOption<T extends string> {
   value: T;
@@ -32,7 +33,7 @@ export interface ChoiceListOption<T extends string> {
 
 export const CHOICE_ROW_CLASS = 'flex items-start gap-3 px-4 py-3';
 
-const GROUP_CLASS = 'divide-y divide-border rounded-xl border border-border';
+const GROUP_CLASS = `divide-y divide-border ${COSTUME_FRAME_RADIUS_CLASS} border border-border`;
 const LABEL_CLASS = 'flex min-h-11 flex-1 cursor-pointer flex-col items-start justify-center gap-0.5 text-left desktop:min-h-0';
 const TITLE_CLASS = 'text-[14px] font-medium text-foreground';
 const HINT_CLASS = 'text-[13px] font-normal leading-[1.45] text-muted-foreground';

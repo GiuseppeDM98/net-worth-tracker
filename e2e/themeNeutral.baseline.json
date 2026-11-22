@@ -93,7 +93,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "lab(96.52 -0.0000596046 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "lab(100 0 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.144787 0.00000661612 0.00000289828 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "default·dark": {
         "html": {
@@ -187,7 +240,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "lab(15.204 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "lab(2.75381 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.984998 -0.00000956655 0.0000230074 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "solar-dusk·light": {
         "html": {
@@ -281,7 +387,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "lab(92.6849 0.930488 8.34674)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "lab(98.6887 0.170499 2.16728)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.366 0.0162601 0.0191247 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "solar-dusk·dark": {
         "html": {
@@ -375,7 +534,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(10.9561 4.09194 6.59829)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(8.99438 4.11474 6.11712)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "elegant-luxury·light": {
         "html": {
@@ -469,7 +681,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "lab(93.3771 1.36057 2.09852)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "lab(97.4255 0.77793 1.34106)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.2178 -0.00000218302 0.0000050962 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "elegant-luxury·dark": {
         "html": {
@@ -563,7 +828,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(10.3984 5.66069 2.68282)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(8.88486 5.72593 2.435)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "midnight-bloom·light": {
         "html": {
@@ -657,7 +975,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "lab(88.5118 -0.143707 8.19852)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "lab(97.9236 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.321099 -0.00000318885 0.00000751019 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "midnight-bloom·dark": {
         "html": {
@@ -751,7 +1122,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "lab(28.6962 0.574768 -9.27358)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "lab(10.5235 0.334077 -10.8785)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.921898 -0.00000888109 0.0000214577 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "cyberpunk·light": {
         "html": {
@@ -845,7 +1269,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "lab(95.1242 2.03899 -7.23548)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "lab(97.8653 -0.210166 -0.600767)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.164898 0.00721252 -0.0344472 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "cyberpunk·dark": {
         "html": {
@@ -939,7 +1416,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "lab(7.98623 7.04604 -18.3314)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "lab(3.79387 2.93769 -10.5157)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.951297 -0.00120133 -0.00728071 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "retro-arcade·light": {
         "html": {
@@ -1033,7 +1563,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "lab(97.053 0.0833571 10.0704)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.309197 -0.039884 -0.0330465 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "retro-arcade·dark": {
         "html": {
@@ -1127,7 +1710,60 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "lab(25.926 -7.03828 -6.69944)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "lab(15.2474 -11.0581 -11.392)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.697898 -0.0152277 -0.00457764 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       }
     },
     "/dashboard/history": {
@@ -1223,7 +1859,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.144787 0.00000661612 0.00000289828 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "default·dark": {
         "html": {
@@ -1317,7 +1970,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.984998 -0.00000956655 0.0000230074 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "solar-dusk·light": {
         "html": {
@@ -1411,7 +2081,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.366 0.0162601 0.0191247 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "solar-dusk·dark": {
         "html": {
@@ -1505,7 +2192,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "elegant-luxury·light": {
         "html": {
@@ -1599,7 +2303,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.2178 -0.00000218302 0.0000050962 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "elegant-luxury·dark": {
         "html": {
@@ -1693,7 +2414,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "midnight-bloom·light": {
         "html": {
@@ -1787,7 +2525,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.321099 -0.00000318885 0.00000751019 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "midnight-bloom·dark": {
         "html": {
@@ -1881,7 +2636,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.921898 -0.00000888109 0.0000214577 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "cyberpunk·light": {
         "html": {
@@ -1975,7 +2747,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.164898 0.00721252 -0.0344472 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "cyberpunk·dark": {
         "html": {
@@ -2069,7 +2858,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.951297 -0.00120133 -0.00728071 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "retro-arcade·light": {
         "html": {
@@ -2163,7 +2969,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.309197 -0.039884 -0.0330465 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       },
       "retro-arcade·dark": {
         "html": {
@@ -2257,7 +3080,24 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.697898 -0.0152277 -0.00457764 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": null
       }
     },
     "/dashboard/cashflow?tab=tracking": {
@@ -2365,6 +3205,35 @@
           "border-top-color": "rgb(229, 229, 229)",
           "border-top-left-radius": "8px",
           "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.144787 0.00000661612 0.00000289828 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
         }
       },
       "default·dark": {
@@ -2470,6 +3339,35 @@
           "background-image": "none",
           "border-top-color": "lab(100 0 0 / 0.1)",
           "border-top-left-radius": "8px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.984998 -0.00000956655 0.0000230074 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "6px",
           "box-shadow": "none"
         }
       },
@@ -2577,6 +3475,35 @@
           "border-top-color": "lab(87.0262 0.435174 15.7629)",
           "border-top-left-radius": "2.8px",
           "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.366 0.0162601 0.0191247 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
         }
       },
       "solar-dusk·dark": {
@@ -2682,6 +3609,35 @@
           "background-image": "none",
           "border-top-color": "lab(27.3153 5.54103 10.3981)",
           "border-top-left-radius": "2.8px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "6px",
           "box-shadow": "none"
         }
       },
@@ -2789,6 +3745,35 @@
           "border-top-color": "lab(92.6054 1.91969 12.4222)",
           "border-top-left-radius": "4px",
           "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.2178 -0.00000218302 0.0000050962 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
         }
       },
       "elegant-luxury·dark": {
@@ -2895,6 +3880,35 @@
           "border-top-color": "lab(27.1426 7.94655 3.3935)",
           "border-top-left-radius": "4px",
           "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
         }
       },
       "midnight-bloom·light": {
@@ -2997,6 +4011,35 @@
           "text-transform": "none",
           "color": "lab(100 0 0)",
           "background-color": "lab(46.7807 35.3524 -69.906)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.321099 -0.00000318885 0.00000751019 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "rgba(0, 0, 0, 0)",
           "background-image": "none",
           "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
           "border-top-left-radius": "6px",
@@ -3107,6 +4150,35 @@
           "border-top-color": "lab(28.6962 0.574768 -9.27358)",
           "border-top-left-radius": "6px",
           "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.921898 -0.00000888109 0.0000214577 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
         }
       },
       "cyberpunk·light": {
@@ -3209,6 +4281,35 @@
           "text-transform": "none",
           "color": "lab(100 0 0)",
           "background-color": "lab(57.7998 88.5379 -33.2537)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.164898 0.00721252 -0.0344472 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "rgba(0, 0, 0, 0)",
           "background-image": "none",
           "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
           "border-top-left-radius": "6px",
@@ -3319,6 +4420,35 @@
           "border-top-color": "lab(21.0039 11.3406 -29.2132)",
           "border-top-left-radius": "6px",
           "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.951297 -0.00120133 -0.00728071 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
         }
       },
       "retro-arcade·light": {
@@ -3425,6 +4555,35 @@
           "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
           "border-top-left-radius": "2px",
           "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.309197 -0.039884 -0.0330465 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
         }
       },
       "retro-arcade·dark": {
@@ -3530,6 +4689,35 @@
           "background-image": "none",
           "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
           "border-top-left-radius": "2px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "bottomPillLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "oklab(0.697898 -0.0152277 -0.00457764 / 0.55)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "phoneTab": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "6px",
           "box-shadow": "none"
         }
       }
@@ -3629,7 +4817,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "lab(96.52 -0.0000596046 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "lab(100 0 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.144787 0.00000661612 0.00000289828 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "8px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "lab(100 0 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "8px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "default·dark": {
         "html": {
@@ -3723,7 +4976,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "lab(15.204 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "lab(2.75381 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.984998 -0.00000956654 0.0000230074 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "8px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "lab(7.78201 -0.0000149012 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "8px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "solar-dusk·light": {
         "html": {
@@ -3817,7 +5135,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "lab(92.6849 0.930488 8.34674)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "lab(98.6887 0.170499 2.16728)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.366 0.0162601 0.0191247 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "2.8px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "lab(96.3802 0.616372 3.41275)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "2.8px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "solar-dusk·dark": {
         "html": {
@@ -3911,7 +5294,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(10.9561 4.09194 6.59829)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(8.99438 4.11474 6.11712)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "2.8px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(15.0133 5.99495 7.47473)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "2.8px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "elegant-luxury·light": {
         "html": {
@@ -4005,7 +5453,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "lab(93.3771 1.36057 2.09852)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "lab(97.4255 0.77793 1.34106)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.2178 -0.00000218302 0.0000050962 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "4px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "lab(97.4255 0.77793 1.34106)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "4px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "elegant-luxury·dark": {
         "html": {
@@ -4099,7 +5612,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(10.3984 5.66069 2.68282)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(8.88486 5.72593 2.435)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "4px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(14.9164 7.06771 2.7149)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "4px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "midnight-bloom·light": {
         "html": {
@@ -4193,7 +5771,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "lab(88.5118 -0.143707 8.19852)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "lab(97.9236 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.321099 -0.00000318885 0.00000751018 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "lab(100 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "midnight-bloom·dark": {
         "html": {
@@ -4287,7 +5930,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "lab(28.6962 0.574768 -9.27358)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "lab(10.5235 0.334077 -10.8785)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.921898 -0.00000888109 0.0000214577 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "lab(21.0401 0.612825 -11.0262)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "cyberpunk·light": {
         "html": {
@@ -4381,7 +6089,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "lab(95.1242 2.03899 -7.23548)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "lab(97.8653 -0.210166 -0.600767)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.164898 0.00721252 -0.0344472 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "lab(100 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "cyberpunk·dark": {
         "html": {
@@ -4475,7 +6248,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "lab(7.98623 7.04604 -18.3314)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "lab(3.79387 2.93769 -10.5157)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.951297 -0.00120133 -0.00728071 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "lab(12.7432 8.19375 -21.4592)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "retro-arcade·light": {
         "html": {
@@ -4569,7 +6407,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "lab(97.053 0.0833571 10.0704)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(42.2119 -59.6597 44.0724)",
+          "background-color": "oklab(0.481998 -0.166652 0.0992975 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.309197 -0.039884 -0.0330465 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "2px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "lab(92.0886 -0.266433 10.0248)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "2px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       },
       "retro-arcade·dark": {
         "html": {
@@ -4663,7 +6566,72 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "lab(25.926 -7.03828 -6.69944)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "none"
+        },
+        "axisIndicator": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "500",
+          "font-size": "14px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "lab(15.2474 -11.0581 -11.392)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "3.35544e+07px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+        },
+        "patrimonioChip": {
+          "font-family": "\"Geist Mono\", \"Geist Mono Fallback\"",
+          "font-weight": "600",
+          "font-size": "12px",
+          "letter-spacing": "-0.12px",
+          "text-transform": "none",
+          "color": "lab(71.7951 -46.1777 32.2901)",
+          "background-color": "oklab(0.739998 -0.133227 0.0811599 / 0.1)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "9px",
+          "box-shadow": "none"
+        },
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.697898 -0.0152277 -0.00457764 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "2px",
+          "box-shadow": "none"
+        },
+        "accountMenu": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "2px",
+          "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px"
+        }
       }
     },
     "/dashboard/history": {
@@ -4759,7 +6727,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.144787 0.00000661612 0.00000289828 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "8px",
+          "box-shadow": "none"
+        }
       },
       "default·dark": {
         "html": {
@@ -4853,7 +6837,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.984998 -0.00000956654 0.0000230074 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "8px",
+          "box-shadow": "none"
+        }
       },
       "solar-dusk·light": {
         "html": {
@@ -4947,7 +6947,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.366 0.0162601 0.0191247 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "2.8px",
+          "box-shadow": "none"
+        }
       },
       "solar-dusk·dark": {
         "html": {
@@ -5041,7 +7057,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "2.8px",
+          "box-shadow": "none"
+        }
       },
       "elegant-luxury·light": {
         "html": {
@@ -5135,7 +7167,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.2178 -0.00000218302 0.0000050962 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "4px",
+          "box-shadow": "none"
+        }
       },
       "elegant-luxury·dark": {
         "html": {
@@ -5229,7 +7277,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "4px",
+          "box-shadow": "none"
+        }
       },
       "midnight-bloom·light": {
         "html": {
@@ -5323,7 +7387,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.321099 -0.00000318885 0.00000751018 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        }
       },
       "midnight-bloom·dark": {
         "html": {
@@ -5417,7 +7497,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.921898 -0.00000888109 0.0000214577 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        }
       },
       "cyberpunk·light": {
         "html": {
@@ -5511,7 +7607,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.164898 0.00721252 -0.0344472 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        }
       },
       "cyberpunk·dark": {
         "html": {
@@ -5605,7 +7717,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.951297 -0.00120133 -0.00728071 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        }
       },
       "retro-arcade·light": {
         "html": {
@@ -5699,7 +7827,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.309197 -0.039884 -0.0330465 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "2px",
+          "box-shadow": "none"
+        }
       },
       "retro-arcade·dark": {
         "html": {
@@ -5793,7 +7937,23 @@
           "border-top-left-radius": "0px",
           "box-shadow": "none"
         },
-        "primaryButton": null
+        "primaryButton": null,
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.697898 -0.0152277 -0.00457764 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "2px",
+          "box-shadow": "none"
+        }
       }
     },
     "/dashboard/cashflow?tab=tracking": {
@@ -5897,6 +8057,22 @@
           "text-transform": "none",
           "color": "lab(98.26 0 0)",
           "background-color": "lab(7.78201 -0.0000149012 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "8px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.144787 0.00000661612 0.00000289828 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
           "background-image": "none",
           "border-top-color": "rgb(229, 229, 229)",
           "border-top-left-radius": "8px",
@@ -6021,6 +8197,22 @@
           "border-top-left-radius": "8px",
           "box-shadow": "none"
         },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.984998 -0.00000956654 0.0000230074 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "8px",
+          "box-shadow": "none"
+        },
         "dialog": {
           "font-family": "Geist, \"Geist Fallback\"",
           "font-weight": "400",
@@ -6135,6 +8327,22 @@
           "text-transform": "none",
           "color": "lab(100 0 0)",
           "background-color": "lab(47.4615 37.7706 54.9001)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "2.8px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.366 0.0162601 0.0191247 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
           "background-image": "none",
           "border-top-color": "lab(87.0262 0.435174 15.7629)",
           "border-top-left-radius": "2.8px",
@@ -6259,6 +8467,22 @@
           "border-top-left-radius": "2.8px",
           "box-shadow": "none"
         },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "2.8px",
+          "box-shadow": "none"
+        },
         "dialog": {
           "font-family": "Geist, \"Geist Fallback\"",
           "font-weight": "400",
@@ -6373,6 +8597,22 @@
           "text-transform": "none",
           "color": "lab(100 0 0)",
           "background-color": "lab(36.4615 46.4364 28.1014)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "4px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.2178 -0.00000218302 0.0000050962 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
           "background-image": "none",
           "border-top-color": "lab(92.6054 1.91969 12.4222)",
           "border-top-left-radius": "4px",
@@ -6497,6 +8737,22 @@
           "border-top-left-radius": "4px",
           "box-shadow": "none"
         },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.969898 -0.00037697 0.00126952 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "4px",
+          "box-shadow": "none"
+        },
         "dialog": {
           "font-family": "Geist, \"Geist Fallback\"",
           "font-weight": "400",
@@ -6611,6 +8867,22 @@
           "text-transform": "none",
           "color": "lab(100 0 0)",
           "background-color": "lab(46.7807 35.3524 -69.906)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.321099 -0.00000318885 0.00000751018 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
           "background-image": "none",
           "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
           "border-top-left-radius": "6px",
@@ -6735,6 +9007,22 @@
           "border-top-left-radius": "6px",
           "box-shadow": "none"
         },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.921898 -0.00000888109 0.0000214577 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
         "dialog": {
           "font-family": "Geist, \"Geist Fallback\"",
           "font-weight": "400",
@@ -6849,6 +9137,22 @@
           "text-transform": "none",
           "color": "lab(100 0 0)",
           "background-color": "lab(57.7998 88.5379 -33.2537)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.164898 0.00721252 -0.0344472 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
           "background-image": "none",
           "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
           "border-top-left-radius": "6px",
@@ -6973,6 +9277,22 @@
           "border-top-left-radius": "6px",
           "box-shadow": "none"
         },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.951297 -0.00120133 -0.00728071 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
         "dialog": {
           "font-family": "Geist, \"Geist Fallback\"",
           "font-weight": "400",
@@ -7092,6 +9412,22 @@
           "border-top-left-radius": "2px",
           "box-shadow": "none"
         },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.309197 -0.039884 -0.0330465 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "2px",
+          "box-shadow": "none"
+        },
         "dialog": {
           "font-family": "Geist, \"Geist Fallback\"",
           "font-weight": "400",
@@ -7206,6 +9542,22 @@
           "text-transform": "none",
           "color": "lab(100 0 0)",
           "background-color": "lab(50.0904 64.9574 -4.65869)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "2px",
+          "box-shadow": "none"
+        },
+        "axisPill": null,
+        "axisIndicator": null,
+        "patrimonioChip": null,
+        "sidebarLabel": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "10px",
+          "letter-spacing": "1px",
+          "text-transform": "uppercase",
+          "color": "oklab(0.697898 -0.0152277 -0.00457764 / 0.6)",
+          "background-color": "rgba(0, 0, 0, 0)",
           "background-image": "none",
           "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
           "border-top-left-radius": "2px",

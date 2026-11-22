@@ -11,6 +11,7 @@ import { isAddExpenseFabShown, isNavItemActive } from '@/lib/utils/navUtils';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { primaryNav, secondaryHrefs } from '@/lib/constants/navigation';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 /**
  * Where the pill is on screen: the complement of `desktop:hidden max-desktop:landscape:hidden`
@@ -59,7 +60,7 @@ function AddExpenseFab({ pathname }: { pathname: string }) {
           exit={{ scale: 0.6, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 28 }}
           onClick={() => window.dispatchEvent(new CustomEvent('cashflow:add-expense'))}
-          className="flex size-14 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+          className={cn('flex size-14 flex-none items-center justify-center bg-primary text-primary-foreground shadow-lg', COSTUME_PILL_RADIUS_CLASS)}
         >
           <Plus className="size-5" aria-hidden="true" />
         </motion.button>
@@ -111,7 +112,7 @@ export function BottomNavigation() {
             // The landscape icon rail is the same landmark (`TabletRail`, 2026-10-16, never visible with
             // the pill): the census and the specs that mean THE PILL select this attribute.
             data-nav="pill"
-            className="flex rounded-full"
+            className={cn('flex', COSTUME_PILL_RADIUS_CLASS)}
             style={PILL_STYLE}
             transition={pillTransition}
           >
@@ -124,16 +125,17 @@ export function BottomNavigation() {
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
                     className={cn(
-                      'relative flex flex-col items-center justify-center gap-1 rounded-full px-3 py-2 transition-colors',
+                      'relative flex flex-col items-center justify-center gap-1 px-3 py-2 transition-colors',
+                      COSTUME_PILL_RADIUS_CLASS,
                       isActive
                         ? 'text-sidebar-foreground'
-                        : 'text-sidebar-foreground/55 hover:text-sidebar-foreground'
+                        : 'text-sidebar-foreground/55 hover:text-sidebar-foreground costume-shell-quiet'
                     )}
                   >
                     {isActive && (
                       <motion.div
                         layoutId={activePillLayoutId}
-                        className="absolute inset-0 rounded-full bg-[var(--sidebar-foreground)]/[0.12]"
+                        className={cn('absolute inset-0 bg-[var(--sidebar-foreground)]/[0.12]', COSTUME_PILL_RADIUS_CLASS)}
                         transition={pillTransition}
                       />
                     )}
@@ -150,16 +152,17 @@ export function BottomNavigation() {
                 aria-current={isAltroActive ? 'page' : undefined}
                 onClick={() => setDrawerOpen(true)}
                 className={cn(
-                  'relative flex flex-col items-center justify-center gap-1 rounded-full px-3 py-2 transition-colors',
+                  'relative flex flex-col items-center justify-center gap-1 px-3 py-2 transition-colors',
+                  COSTUME_PILL_RADIUS_CLASS,
                   isAltroActive
                     ? 'text-sidebar-foreground'
-                    : 'text-sidebar-foreground/55 hover:text-sidebar-foreground'
+                    : 'text-sidebar-foreground/55 hover:text-sidebar-foreground costume-shell-quiet'
                 )}
               >
                 {isAltroActive && (
                   <motion.div
                     layoutId={activePillLayoutId}
-                    className="absolute inset-0 rounded-full bg-[var(--sidebar-foreground)]/[0.12]"
+                    className={cn('absolute inset-0 bg-[var(--sidebar-foreground)]/[0.12]', COSTUME_PILL_RADIUS_CLASS)}
                     transition={pillTransition}
                   />
                 )}

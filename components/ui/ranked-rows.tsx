@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { useRovingFocus } from '@/lib/hooks/useRovingFocus';
 
@@ -90,9 +91,9 @@ export function RankedRows({ rows, color, remainders, bars = true, labelClassNam
   const roving = useRovingFocus(onRowClick ? rows.length : 0);
 
   const bar = (row: RankedRow, trackClass: string) => (
-    <div className={cn('h-[3px] overflow-hidden rounded-full bg-muted', trackClass)} role="presentation">
+    <div className={cn('h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS, trackClass)} role="presentation">
       <div
-        className="h-full rounded-full"
+        className={cn('h-full', COSTUME_PILL_RADIUS_CLASS)}
         style={{
           width: `${maxAmount > 0 ? (row.amount / maxAmount) * 100 : 0}%`,
           background: color,

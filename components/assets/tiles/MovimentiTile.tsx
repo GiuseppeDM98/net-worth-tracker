@@ -92,7 +92,7 @@ export function MovimentiTile({ summary, month, ledgerReady, loading = false, as
                 </span>
                 <span
                   className={cn(
-                    'shrink-0 rounded-[7px] px-[7px] py-[3px] text-[10px] font-semibold leading-none',
+                    'shrink-0 rounded-[var(--costume-control-chip-radius,7px)] px-[7px] py-[3px] text-[10px] font-semibold leading-none',
                     isBuy ? 'bg-positive/10 text-positive' : 'bg-destructive/10 text-destructive',
                   )}
                 >

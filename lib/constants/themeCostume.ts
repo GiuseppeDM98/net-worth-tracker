@@ -30,7 +30,18 @@ export const COSTUME_SCOPE_PROPERTIES = [
   '--costume-header-band',
   '--costume-header-band-height',
   '--costume-primary-glow',
+  '--costume-control-frame-radius',
+  '--costume-control-pill-radius',
+  '--costume-control-chip-radius',
+  '--costume-control-switch-on',
 ] as const;
+
+// The four control properties are read ONLY through a `var()` whose fallback is today's value: «off» is `initial`,
+// guaranteed-invalid, so the fallback applies — a bare `var()` would make the declaration invalid (radius 0).
+/** `rounded-full` unless a costume squares its pills (temi.md § Il costume). Same computed value as today. */
+export const COSTUME_PILL_RADIUS_CLASS = 'rounded-[var(--costume-control-pill-radius,calc(infinity*1px))]';
+/** `rounded-xl` unless a costume gives a card-like box the tile's radius. */
+export const COSTUME_FRAME_RADIUS_CLASS = 'rounded-[var(--costume-control-frame-radius,calc(var(--radius)_+_4px))]';
 
 export type EmblemPage =
   | 'panoramica'
@@ -77,6 +88,21 @@ const EGEO_TEMPLE: EmblemArt = {
   shapes: [{ kind: 'path', d: 'M2 8 L11 2 L20 8 M4 8 V18 M8 8 V18 M14 8 V18 M18 8 V18 M2 20 H20', tone: 'ornament', strokeWidth: 1.6 }],
 };
 
+/** An amphora, its two handles: Egeo's mark on Patrimonio (decorative, DESIGN.md → The Costume Rule). */
+const EGEO_AMPHORA: EmblemArt = {
+  viewBox: '0 0 22 22',
+  shapes: [{ kind: 'path', d: 'M8 2 H14 M9 2 V5 M13 2 V5 M9 5 C4 7 4 14 8 18 H14 C18 14 18 7 13 5 M9 20 H13 '
+    + 'M10 18 V20 M12 18 V20 M9 3.5 C6 4 5.5 7 7 9 M13 3.5 C16 4 16.5 7 15 9', tone: 'ornament', strokeWidth: 1.6 }],
+};
+
+/** Two waves: Egeo's mark on Cashflow, every tab (decorative, DESIGN.md → The Costume Rule). */
+const EGEO_WAVES: EmblemArt = {
+  viewBox: '0 0 22 22',
+  shapes: [{ kind: 'path', d: 'M2 9 C4 6 6 6 7 9 C8 12 10 12 11 9 C12 6 14 6 15 9 C16 12 18 12 20 9 '
+    + 'M2 15 C4 12 6 12 7 15 C8 18 10 18 11 15 C12 12 14 12 15 15 C16 18 18 18 20 15', tone: 'ornament',
+    strokeWidth: 1.6 }],
+};
+
 /** A planet with a tilted ring: the Orbita costume's mark (decorative, DESIGN.md → The Costume Rule). */
 const ORBITA_PLANET: EmblemArt = {
   viewBox: '0 0 22 22',
@@ -86,9 +112,9 @@ const ORBITA_PLANET: EmblemArt = {
   ],
 };
 
-/** Filled by each costume theme: one mark for every page (a page's own art is a later addition). */
+/** Filled by each costume theme: one mark for every page, and the pages that have their own (Egeo, 2026-11-22). */
 export const THEME_EMBLEMS: Partial<Record<ColorTheme, ThemeEmblems>> = {
-  egeo: { fallback: EGEO_TEMPLE, pages: {} },
+  egeo: { fallback: EGEO_TEMPLE, pages: { patrimonio: EGEO_AMPHORA, cashflow: EGEO_WAVES } },
   orbita: { fallback: ORBITA_PLANET, pages: {} },
 };
 

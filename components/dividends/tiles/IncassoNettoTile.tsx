@@ -102,7 +102,7 @@ export function IncassoNettoTile({
             <div className="flex min-w-0 flex-col gap-1.5">
               <span
                 className={cn(
-                  'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[9px] px-[11px] py-[6px]',
+                  'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] px-[11px] py-[6px]',
                   'font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
                   printed === 0 ? 'bg-muted text-muted-foreground' : signChipClass(deltaValue),
                 )}
@@ -123,7 +123,7 @@ export function IncassoNettoTile({
           )}
           {upcomingNet > 0 && (
             <div className="flex min-w-0 flex-col gap-1.5">
-              <span className="inline-flex w-fit items-center whitespace-nowrap rounded-[9px] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground">
+              <span className="inline-flex w-fit items-center whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground">
                 {cachedFormatCurrencyEUR(upcomingNet, true)}
               </span>
               <span className="text-[11px] text-muted-foreground">già annunciati</span>

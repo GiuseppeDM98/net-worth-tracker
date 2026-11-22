@@ -32,9 +32,9 @@ const SEGMENTS = [
 ];
 
 const LEGACY_MARKUP =
-  '<div><div class="flex h-2.5 w-full overflow-hidden rounded-full bg-muted" role="img" aria-label="Composizione attuale">' +
-  '<div class="h-full first:rounded-l-full last:rounded-r-full" title="Azioni · 60,50%" style="background-color:var(--chart-1);width:0px"></div>' +
-  '<div class="h-full first:rounded-l-full last:rounded-r-full" title="Obbligazioni · 44,00%" style="background-color:var(--chart-2);width:0px"></div></div>' +
+  '<div><div class="flex h-2.5 w-full overflow-hidden rounded-[var(--costume-control-pill-radius,calc(infinity*1px))] bg-muted" role="img" aria-label="Composizione attuale">' +
+  '<div class="h-full first:rounded-l-[var(--costume-control-pill-radius,calc(infinity*1px))] last:rounded-r-[var(--costume-control-pill-radius,calc(infinity*1px))]" title="Azioni · 60,50%" style="background-color:var(--chart-1);width:0px"></div>' +
+  '<div class="h-full first:rounded-l-[var(--costume-control-pill-radius,calc(infinity*1px))] last:rounded-r-[var(--costume-control-pill-radius,calc(infinity*1px))]" title="Obbligazioni · 44,00%" style="background-color:var(--chart-2);width:0px"></div></div>' +
   '<ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5"><li class="flex items-center gap-1.5">' +
   '<span class="h-2 w-2 shrink-0 rounded-[2px]" style="background-color:var(--chart-1)" aria-hidden="true"></span>' +
   '<span class="text-[11px] text-muted-foreground">Azioni</span><span class="font-mono text-[11px] tabular-nums text-foreground">60,50%</span></li>' +

@@ -2,6 +2,7 @@ import type { DashboardOverviewGoalProgress } from '@/types/dashboardOverview';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { describeGoal } from '@/lib/utils/overviewNarrative';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import type { TileCollapse } from '@/components/ui/tile';
 import { OverviewTile } from './OverviewTile';
 
@@ -37,14 +38,14 @@ function GoalRow({ goal, hero }: { goal: DashboardOverviewGoalProgress; hero: bo
         </span>
       </div>
       <div
-        className="h-[3px] overflow-hidden rounded-full bg-muted"
+        className={cn('h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(progress)}
         aria-label={`Avanzamento ${goal.goalName}`}
       >
-        <div className="h-full rounded-full" style={{ width: `${progress}%`, background: goal.goalColor }} />
+        <div className={cn('h-full', COSTUME_PILL_RADIUS_CLASS)} style={{ width: `${progress}%`, background: goal.goalColor }} />
       </div>
       <p className="text-[11px] text-muted-foreground">
         <span className="font-mono tabular-nums text-foreground">{cachedFormatCurrencyEUR(goal.currentValue, true)}</span>

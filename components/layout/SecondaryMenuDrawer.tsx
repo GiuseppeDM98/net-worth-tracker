@@ -126,7 +126,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
     );
 
   // The tiles' eyebrow, on the sidebar surface: the same label the desktop sidebar uses.
-  const sectionLabel = cn(TILE_EYEBROW_CLASS, 'px-3 pb-1 text-sidebar-foreground/60');
+  const sectionLabel = cn(TILE_EYEBROW_CLASS, 'px-3 pb-1 text-sidebar-foreground/60', 'costume-shell-eyebrow');
 
   return (
     <>
@@ -260,7 +260,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                             Vedi: {getAccountLabel(activeAccount)}
                           </p>
                         ) : (
-                          <p className="truncate text-[11px] text-sidebar-foreground/50">{user.email}</p>
+                          <p className="truncate text-[11px] text-sidebar-foreground/50 costume-shell-quiet">{user.email}</p>
                         )}
                       </div>
                     </>

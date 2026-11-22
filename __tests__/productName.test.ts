@@ -15,7 +15,7 @@ const OLD_NAME = /portfolio[ -]tracker/i;
 const NEW_NAME_SITES: ReadonlyArray<readonly [string, string]> = [
   ['app/layout.tsx', 'title: "Net Worth Tracker - Gestisci il tuo Patrimonio"'],
   ['app/dashboard/layout.tsx', '>Net Worth Tracker</span>'],
-  ['components/layout/Sidebar.tsx', '<span className="truncate">Net Worth Tracker</span>'],
+  ['components/layout/Sidebar.tsx', '<span className="truncate costume-wordmark">Net Worth Tracker</span>'],
   ['components/auth/AuthShell.tsx', '<p className={TILE_EYEBROW_CLASS}>Net Worth Tracker</p>'],
   ['app/login/page.tsx', 'verdictAriaLabel="Che cos’è Net Worth Tracker"'],
   ['app/page.tsx', 'label="Net Worth Tracker"'],

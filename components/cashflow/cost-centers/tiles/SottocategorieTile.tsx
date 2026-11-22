@@ -5,6 +5,7 @@ import type { CostCenterSubCategorySlice } from '@/types/costCenters';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { Tile, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { ringSwatchAt, type RingSegment } from '@/lib/utils/ringChart';
@@ -81,8 +82,8 @@ export function SottocategorieTile({ slices, excludedKeys, netTotal, ring, aside
                 {hasMultipleCategories && <span className="truncate text-[11px] text-muted-foreground">{slice.categoryName}</span>}
               </span>
               {!ring && (
-                <span className="h-[3px] min-w-[40px] flex-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-                  {!excluded && <span className="block h-full rounded-full" style={{ width: `${maxIncluded > 0 ? (slice.total / maxIncluded) * 100 : 0}%`, background: color }} />}
+                <span className={cn('h-[3px] min-w-[40px] flex-1 overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)} aria-hidden="true">
+                  {!excluded && <span className={cn('block h-full', COSTUME_PILL_RADIUS_CLASS)} style={{ width: `${maxIncluded > 0 ? (slice.total / maxIncluded) * 100 : 0}%`, background: color }} />}
                 </span>
               )}
               <span className={cn('w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums', excluded ? 'line-through' : 'text-foreground')}>

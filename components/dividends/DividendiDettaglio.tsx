@@ -24,6 +24,7 @@ import { getMetricValueColor } from '@/lib/utils/metricColors';
 import { formatPercentage } from '@/lib/services/chartService';
 import { formatNumber } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import type { AssetDividendGrowth, DividendStatsPayload } from '@/types/dividend';
 import { summarizeDpsGrowth, summarizeTotalReturn } from '@/lib/utils/dividendAnalytics';
 import { describeDpsGrowth, describeTotalReturn } from '@/lib/utils/dividendiNarrative';
@@ -65,7 +66,7 @@ export function DividendiDettaglio({ stats, now }: DividendiDettaglioProps) {
   return (
     <>
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted/40">
+        <CollapsibleTrigger className={cn('flex w-full items-center justify-between gap-3 border border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-muted/40', COSTUME_FRAME_RADIUS_CLASS)}>
           <span>Dettaglio · crescita del dividendo e rendimento totale</span>
           <ChevronDown
             className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}

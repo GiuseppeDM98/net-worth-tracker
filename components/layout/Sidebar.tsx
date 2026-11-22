@@ -125,7 +125,7 @@ export function AppSidebar() {
               onClick={closeMobile}
               className="flex h-8 flex-1 min-w-0 items-center rounded-md px-2 text-[13px] font-semibold tracking-[-0.01em] hover:bg-sidebar-accent transition-colors group-data-[state=collapsed]:hidden"
             >
-              <span className="truncate">Net Worth Tracker</span>
+              <span className="truncate costume-wordmark">Net Worth Tracker</span>
             </SceneLink>
             <TooltipProvider delayDuration={300}>
               <Tooltip>
@@ -134,7 +134,7 @@ export function AppSidebar() {
                     type="button"
                     onClick={toggleSidebar}
                     aria-label={state === 'expanded' ? 'Comprimi sidebar' : 'Espandi sidebar'}
-                    className="hidden desktop:flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors group-data-[state=collapsed]:mx-auto group-data-[state=collapsed]:size-11"
+                    className="hidden desktop:flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/40 costume-shell-quiet hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors group-data-[state=collapsed]:mx-auto group-data-[state=collapsed]:size-11"
                   >
                     {state === 'expanded'
                       ? <PanelLeftClose className="size-4" />
@@ -167,14 +167,14 @@ export function AppSidebar() {
           <div className="mx-3 border-t border-sidebar-border" />
 
           <SidebarGroup>
-            <SidebarGroupLabel className={cn(TILE_EYEBROW_CLASS, 'h-6 text-sidebar-foreground/60')}>Analisi</SidebarGroupLabel>
+            <SidebarGroupLabel className={cn(TILE_EYEBROW_CLASS, 'h-6 text-sidebar-foreground/60', 'costume-shell-eyebrow')}>Analisi</SidebarGroupLabel>
             <SidebarGroupContent>
               <NavItems items={analysisNav} />
             </SidebarGroupContent>
           </SidebarGroup>
 
           <SidebarGroup>
-            <SidebarGroupLabel className={cn(TILE_EYEBROW_CLASS, 'h-6 text-sidebar-foreground/60')}>Pianificazione</SidebarGroupLabel>
+            <SidebarGroupLabel className={cn(TILE_EYEBROW_CLASS, 'h-6 text-sidebar-foreground/60', 'costume-shell-eyebrow')}>Pianificazione</SidebarGroupLabel>
             <SidebarGroupContent>
               <NavItems items={planningNav} />
             </SidebarGroupContent>
@@ -220,7 +220,7 @@ export function AppSidebar() {
                             </span>
                           ) : (
                             /* text-sidebar-foreground/50: footer sits on --sidebar, not --background */
-                            <span className="truncate text-[11px] text-sidebar-foreground/50">{user.email}</span>
+                            <span className="truncate text-[11px] text-sidebar-foreground/50 costume-shell-quiet">{user.email}</span>
                           )}
                         </div>
                       </>
@@ -237,7 +237,7 @@ export function AppSidebar() {
                         </div>
                       </>
                     )}
-                    <ChevronsUpDown className="ml-auto size-4 shrink-0 text-sidebar-foreground/50" />
+                    <ChevronsUpDown className="ml-auto size-4 shrink-0 text-sidebar-foreground/50 costume-shell-quiet" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" className="w-56">

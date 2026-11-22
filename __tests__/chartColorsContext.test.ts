@@ -92,6 +92,16 @@ describe('readThemePalette — the chart slots as the browser serves them', () =
     expect(cssColorToOklch(unmodelled)).toBeNull();
     expect(resolveChartPalette(servedStyle({ ...SERVED_LIGHT, '--chart-2': unmodelled }), false)[1]).toBe(unmodelled);
   });
+
+  it('reads an oklab() colour, the form a colour mixed with alpha is served in, as the same OKLCH', () => {
+    // oklch(0.6 0.1 135) written as its a/b pair, alpha and a negative axis included (2026-11-22, the
+    // e2e/themeNeutral.ts colour comparison: a sidebar label at 60 % is served as oklab()).
+    const [l, c, h] = cssColorToOklch('oklab(0.6 -0.0707107 0.0707107 / 0.6)')!;
+    expect(l).toBeCloseTo(0.6, 6);
+    expect(c).toBeCloseTo(0.1, 6);
+    expect(h).toBeCloseTo(135, 4);
+    expect(cssColorToOklch('oklab(60% 0 0)')![0]).toBeCloseTo(0.6, 6);
+  });
 });
 
 describe('readThemePalette — the action colours and the Sankey hexes from the same read', () => {

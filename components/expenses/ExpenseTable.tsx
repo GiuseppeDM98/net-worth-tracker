@@ -54,6 +54,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
 import { resolveOwnerLabel } from '@/lib/utils/movementsOwnerFilter';
@@ -166,7 +167,7 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
         {singleType ? (
           <span className="text-xs text-muted-foreground">{EXPENSE_TYPE_LABELS[expense.type]}</span>
         ) : (
-          <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold', EXPENSE_TYPE_BADGE_CLASS[expense.type])}>
+          <span className={cn('inline-flex items-center border px-2.5 py-0.5 text-xs font-semibold', COSTUME_PILL_RADIUS_CLASS, EXPENSE_TYPE_BADGE_CLASS[expense.type])}>
             {EXPENSE_TYPE_LABELS[expense.type]}
           </span>
         )}
@@ -175,7 +176,7 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
         <div className="flex items-center gap-2">
           {CatIcon ? (
             <div
-              className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded"
+              className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-[var(--costume-control-chip-radius,0.25rem)]"
               style={{ backgroundColor: categoryMeta?.color ? `${categoryMeta.color}20` : 'var(--muted)' }}
             >
               <Suspense fallback={null}>

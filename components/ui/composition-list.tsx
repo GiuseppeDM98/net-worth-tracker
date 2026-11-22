@@ -25,6 +25,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface CompositionListItem {
   /** Stable key for key/click — normally the same value as `name`. */
@@ -80,9 +81,9 @@ export function CompositionList({
             <span className="w-[30%] desktop:w-[22%] min-w-0 shrink-0 truncate text-sm font-medium text-foreground">
               {item.name}
             </span>
-            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <span className={cn('h-1.5 flex-1 overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}>
               <motion.span
-                className="block h-full rounded-full"
+                className={cn('block h-full', COSTUME_PILL_RADIUS_CLASS)}
                 style={{ backgroundColor: item.color, opacity: item.barOpacity ?? 1 }}
                 initial={reducedMotion ? false : { width: 0 }}
                 animate={{ width: `${widthPct}%` }}

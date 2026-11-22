@@ -2,6 +2,7 @@ import * as React from "react"
 import { Switch as SwitchPrimitives } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { COSTUME_PILL_RADIUS_CLASS } from "@/lib/constants/themeCostume"
 
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
@@ -10,8 +11,10 @@ const Switch = React.forwardRef<
   <SwitchPrimitives.Root
     className={cn(
       // In dark mode --primary is near-white (oklch 0.922); override to blue so the
-      // ON state is clearly distinguishable from the background.
-      "peer relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary dark:data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-input",
+      // ON state is clearly distinguishable from the background; a costume theme paints it `--primary`
+      // (`--costume-control-switch-on`).
+      "peer relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary dark:data-[state=checked]:bg-[var(--costume-control-switch-on,oklch(54.6%_0.245_262.881))] data-[state=unchecked]:bg-input",
+      COSTUME_PILL_RADIUS_CLASS,
       // The painted control stays 36×20 (shadcn's), the TARGET is 44×44 (AGENTS.md § Accessibility):
       // a pseudo-element grows the button's hit box by 12px above and below and 4px on each
       // side without moving a label beside it. It paints before the thumb, so it never covers it.
@@ -23,7 +26,8 @@ const Switch = React.forwardRef<
   >
     <SwitchPrimitives.Thumb
       className={cn(
-        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0"
+        COSTUME_PILL_RADIUS_CLASS,
+        "pointer-events-none block h-4 w-4 bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0"
       )}
     />
   </SwitchPrimitives.Root>

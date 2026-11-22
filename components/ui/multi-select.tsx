@@ -315,7 +315,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 						buttonRef.current.focus();
 						const originalOutline = buttonRef.current.style.outline;
 						const originalOutlineOffset = buttonRef.current.style.outlineOffset;
-						buttonRef.current.style.outline = "2px solid hsl(var(--ring))";
+						buttonRef.current.style.outline = "2px solid var(--ring)";
 						buttonRef.current.style.outlineOffset = "2px";
 						setTimeout(() => {
 							if (buttonRef.current) {
