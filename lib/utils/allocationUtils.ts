@@ -190,7 +190,7 @@ export const ACTION_CHART_NUMBER: Record<AllocationAction, 1 | 2 | 3 | 4 | 5> = 
  * old clamp only fired above L 0.72, above every value the palette holds.
  *
  * Here rather than in `useActionColors` so `__tests__/actionColorContrast.test.ts` can hold all
- * twelve theme blocks to the same numbers without importing the hook, which reaches the Firebase
+ * theme blocks to the same numbers without importing the hook, which reaches the Firebase
  * SDK through the theme context.
  */
 export const ACTION_LIGHT_MAX_L = 0.46;

@@ -49,8 +49,8 @@ colors:
   chart-6-light: "oklch(0.600 0.118 100)"
   chart-7-light: "oklch(0.550 0.092 215)"
   chart-8-light: "oklch(0.560 0.205 340)"
-  # Semantic — sign colours. These are the DEFAULT theme's LIGHT values; the five named themes
-  # override destructive (positive they inherit). All are chosen to clear WCAG AA 4.5:1 as
+  # Semantic — sign colours. These are the DEFAULT theme's LIGHT values; the named themes
+  # override destructive (positive they inherit, Egeo apart: its own, see Positive Jade). All are chosen to clear WCAG AA 4.5:1 as
   # text against their own theme's --card, which a chart slot is never constrained to do.
   destructive: "oklch(0.577 0.245 27.325)"
   positive: "oklch(0.482 0.194 149.214)"
@@ -348,8 +348,8 @@ Slots 6-8 differ from the first five in one way, and it is deliberate: each hold
 
 ### Semantic
 
-- **Destructive Flame** (`oklch(0.577 0.245 27.325)`): Destructive actions **and** the negative half of every sign colour. Saturated enough to demand attention without being an emergency siren. The five named themes each declare their own; seven of those twelve declarations were raised or lowered on 2026-08-13 to clear 4.5:1 as text against their own `--card` — the default theme already did and was left untouched.
-- **Positive Jade** (`oklch(0.482 0.194 149.214)` light / `oklch(0.740 0.156 148.655)` dark): the positive half of every sign colour. **No named theme overrides it**, so one pair of values serves all twelve combinations. The light value was darkened from `0.627` on 2026-08-13: at that lightness it measured 2.62–3.22:1 across the light themes, so the reassuring half of every verdict read fainter than the alarming half — an asymmetry in what the interface was emphasising, not just a contrast number.
+- **Destructive Flame** (`oklch(0.577 0.245 27.325)`): Destructive actions **and** the negative half of every sign colour. Saturated enough to demand attention without being an emergency siren. The named themes each declare their own; seven of the twelve declarations of 2026-08-13 declarations were raised or lowered on 2026-08-13 to clear 4.5:1 as text against their own `--card` — the default theme already did and was left untouched.
+- **Positive Jade** (`oklch(0.482 0.194 149.214)` light / `oklch(0.740 0.156 148.655)` dark): the positive half of every sign colour. **Only Egeo overrides it** (2026-11-22: its own light green `oklch(0.43 0.11 145)`, because the inherited one read 4.38:1 on the darkest stripe of its ground; its dark block repeats this dark value), so one pair serves every other theme and `__tests__/themeCostumeContrast.test.ts` verifies the sign tokens per theme. The light value was darkened from `0.627` on 2026-08-13: at that lightness it measured 2.62–3.22:1 across the light themes, so the reassuring half of every verdict read fainter than the alarming half — an asymmetry in what the interface was emphasising, not just a contrast number.
 - **Warning surface** (`--warning` `oklch(0.986 0.022 90)` light / `oklch(0.260 0.038 78)` dark, `--warning-border` `oklch(0.855 0.062 85)` / `oklch(0.460 0.085 75)`, with `--warning-foreground` `oklch(0.468 0.098 75)` / `oklch(0.854 0.090 82)` as the text and the tone): the third tone of the verdict's full stop, the Budget Track's fill from 90%, the toast's rule, the «I risultati sopra usano i parametri dell'ultima esecuzione» line. A near-white fill with a faint hue, never a chart slot — declared in the frontmatter on 2026-09-06 after two propagations had used it undeclared.
 - **AI accent** (`--ai-accent`: `oklch(0.65 0.2 305)` in `.dark`, `oklch(0.56 0.2 305)` in `:root`): the one accent of the chrome. It marks what a model wrote — the border, the eyebrow and the hover glow of a question card, a proposal card, a report page and the run's active stage — and, on hover and focus only, every control that asks a model, Rendimenti's «Analizza con AI» (`app/dashboard/performance/page.tsx:299`) the oldest of them (The AI-Accent Rule); no other surface takes it.
 

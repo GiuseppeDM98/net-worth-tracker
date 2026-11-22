@@ -9,13 +9,16 @@
  * `oklch(` (doc/guide/temi.md: the token you author is not the token the browser returns).
  *
  * Seen red (2026-11-22) with `var(--font-marcellus)` first in `@theme inline`'s `--font-sans` (a face `loaded`
- * with the default theme), and with the band's height token at 0px.
+ * with the default theme), with the band's height token at 0px and (2026-11-22) with a Marcellus face in `error`
+ * on `/login` (the old «not loaded» check passed it; «every face unloaded» is red).
  */
 import { expect, test, type Page } from '@playwright/test';
 import { restoreColorTheme, settle, setAccountColorTheme, startWith, styleOf } from './themeEgeo';
 
 const MODES = ['light', 'dark'] as const;
 const MARCELLUS = /^"?Marcellus/;
+// Geist Sans, not Geist Mono (a heading is never the mono) and not a fallback face.
+const GEIST_SANS = /^"?Geist(?! Mono)/;
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
@@ -140,9 +143,14 @@ test.describe('Egeo, signed out: the palette alone', () => {
         expect(bands.every((height) => height === '0px'), bands.join(',')).toBe(true);
         const families = await page.locator('h1, h2, h3').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fontFamily));
         expect(families.length).toBeGreaterThan(0);
-        for (const family of families) expect(family).not.toMatch(MARCELLUS);
+        for (const family of families) expect(family).toMatch(GEIST_SANS);
         expect((await styleOf(page, 'body', ['background-color']))?.['background-color']).toBe(expected);
-        if (path === '/login') expect(await marcellusStatuses(page)).not.toContain('loaded');
+        if (path === '/login') {
+          // `unloaded`, not merely «not loaded»: an `error` status would mean the file was requested and failed.
+          const statuses = await marcellusStatuses(page);
+          expect(statuses.length, 'the @font-face rules are in the root CSS').toBeGreaterThan(0);
+          expect(statuses.every((status) => status === 'unloaded'), statuses.join(',')).toBe(true);
+        }
       });
     }
   }

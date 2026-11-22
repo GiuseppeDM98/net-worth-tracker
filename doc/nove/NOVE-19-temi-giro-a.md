@@ -1,6 +1,6 @@
 # NOVE-19 — The costume, first pass: the shell, the portals, the controls, Panoramica, Patrimonio, Cashflow
 
-> Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567), 12 and 13** (the costume contract, doc/guide/temi.md § Il costume, and
+> Series `doc/nove/` (README.md § 5): **depends on NOVE-11 (retired on 2026-11-21, PR #567), 12 (retired on 2026-11-22, PR #569) and 13** (the costume contract, doc/guide/temi.md § Il costume, and
 > its two themes) and comes after 08–10, 15 and 16, whose surfaces it dresses; **NOVE-20 is implemented after it** and
 > reuses the portal mechanism and the four control properties defined here (§ 4.1-4.2, § 10). Written on 2026-11-12;
 > every `file:line` is cited on `develop` @ b841cbd7. Executes decisions 3, 4 and 17 (README.md § 3) on the shell,
@@ -164,7 +164,7 @@ site's value of today, so «off» is `initial` (guaranteed-invalid: the fallback
 | `--costume-control-chip-radius` | chips with a literal radius | `initial` | `initial` | inherits | `0px` | inherits |
 | `--costume-control-switch-on` | the switch's ON track in dark | `initial` | `var(--primary)` | inherits | `var(--primary)` | inherits |
 
-Four lines close each light scope block (NOVE-12 § 4.3, NOVE-13 § 4.3), after `--costume-primary-glow`, one
+Four lines close each light scope block (Egeo's in `app/globals.css`, NOVE-13 § 4.3), after `--costume-primary-glow`, one
 property per line, no comment. Egeo's:
 
 ```css
@@ -220,7 +220,7 @@ fixes are colours of existing tokens, and the charts of these pages read tokens 
 | `Sidebar.tsx:170`, `:177`; `SecondaryMenuDrawer.tsx:129` | `cn(TILE_EYEBROW_CLASS, '… text-sidebar-foreground/60')` | add `'costume-shell-eyebrow'` |
 | `BottomNavigation.tsx:130`, `:156` | `'text-sidebar-foreground/55 hover:text-sidebar-foreground'` | add `costume-shell-quiet` to that branch |
 | `Sidebar.tsx:223`; `SecondaryMenuDrawer.tsx:263` | `text-sidebar-foreground/50` | add `costume-shell-quiet` |
-| `Sidebar.tsx:137` (the collapse toggle); `:240` (`ChevronsUpDown`) | `text-sidebar-foreground/40`; `/50` | add `costume-shell-quiet` (7,18 / 6,52:1) |
+| `Sidebar.tsx:137` (the collapse toggle); `:240` (`ChevronsUpDown`) | `text-sidebar-foreground/40`; `/50` | add `costume-shell-quiet` (9,22 / 6,52:1) |
 | `Sidebar.tsx:128`; `app/dashboard/layout.tsx:56` | the wordmark `<span>` | add `costume-wordmark` |
 | `BottomNavigation.tsx:62`, `:114`, `:127`, `:136`, `:153`, `:162` | `rounded-full` | `COSTUME_PILL_RADIUS_CLASS` |
 | `segmented-pill.tsx:104`, `:130`, `:141`; `switch.tsx:14`, `:26` | `rounded-full` | `COSTUME_PILL_RADIUS_CLASS` |
@@ -271,7 +271,7 @@ five tabs). Panoramica's id is passed although it resolves to the fallback: a la
 | sidebar label today: `--sidebar-foreground` 60 % on `--sidebar` | 3,93 | 6,28 | 4,12 | 6,31 |
 | after: `--costume-eyebrow-color` on `--sidebar` | 5,95 | 9,82 | 5,46 | 10,57 |
 | inactive pill label today: 55 % | 3,41 | 5,45 | 3,56 | 5,43 |
-| after: `--muted-foreground` on `--sidebar` | 7,18 | 8,64 | 6,52 | 9,11 |
+| after: `--muted-foreground` on `--sidebar` | 9,22 | 8,64 | 6,52 | 9,11 |
 | `--positive` on the darkest ground (Egeo's own, NOVE-12; Orbita inherits) | 6,00 | 8,50 | 4,96 | 7,95 (nebula) |
 | `--positive` on `--muted` | 6,10 | 6,49 | 4,54 | 7,38 |
 | `--destructive` on the darkest ground | 5,78 | 6,96 | 5,34 | 6,48 (nebula) |
@@ -323,7 +323,7 @@ No new UI string.
 | R5 | `__tests__/costumePortals.test.tsx` (new): inside `<CostumeScope>`, an open `Popover`, `DropdownMenu`, `Tooltip` (in its provider), `Sheet`, `Dialog`, `AlertDialog`: each primitive rendered open in its own case; the content is `[data-slot$="-content"]` for those that carry one and, for `Popover` (no `data-slot`), `document.querySelector('[data-radix-popper-content-wrapper] > [role="dialog"]')`; each has `data-costume-scope`; the same tree without `CostumeScope`: none. `Select` and `Drawer` are proved by E1/E2 (jsdom lacks their pointer and transform APIs) | drop the spread in `popover.tsx` |
 | R6 | `costumeScope.test.tsx` (NOVE-11, 12, 13; new cases beside NOVE-13's own R6): with `egeo` stored, `PageHeader emblem="patrimonio"` renders the amphora's `d`, `"cashflow"` the waves', `"panoramica"` the temple's; with `orbita`, `"patrimonio"` the planet's circle | `pages: {}` for Egeo |
 | N1 | `e2e/themeNeutral.ts` (the palette themes' recorded baseline) gains six probes: the sidebar label «Analisi» and the account menu's content after a click on `/dashboard` (desktop); an inactive bottom-pill label and the Cashflow phone tab (390); the axis pill (its container, and its indicator as a second element) and the first `PatrimonioTile` chip on `/dashboard` (both widths). The baseline is RE-RECORDED (`THEME_NEUTRAL_RECORD=1`) on the untouched code, then compared | `PageTabBar.tsx:96` fallback `8px` |
-| E1 | `e2e/theme.costume.spec.ts` (new, desktop; the `colorTheme` preference written and restored as NOVE-12's E1, the mode by `addInitScript`; `/` and `/login` signed out): criteria 1-3 and 6 on `/dashboard`, `/dashboard/assets`, `/dashboard/cashflow?tab=tracking` (a filter `Select` opened) in Egeo and Orbita, light and dark; on `/` and `/login` no `[data-costume-scope]` | drop the spread in `select.tsx` |
+| E1 | `e2e/theme.costume.spec.ts` (new, desktop; the `colorTheme` preference written and restored as `e2e/theme.egeo.spec.ts` does (`e2e/themeEgeo.ts`), the mode by `addInitScript`; `/` and `/login` signed out): criteria 1-3 and 6 on `/dashboard`, `/dashboard/assets`, `/dashboard/cashflow?tab=tracking` (a filter `Select` opened) in Egeo and Orbita, light and dark; on `/` and `/login` no `[data-costume-scope]` | drop the spread in `select.tsx` |
 | E2 | `e2e/theme.costume.mobile.spec.ts` (390): criterion 4; the period picker's drawer carries `data-costume-scope`; `scrollWidth ≤ innerWidth`; one case with `page.setViewportSize({ width: 844, height: 390 })` on `/dashboard` (no Playwright project has that size): the top bar's wordmark `font-family` starts with `Marcellus` (Egeo) / its `text-transform` is `uppercase` (Orbita); «Apri il menu» opens the sheet, whose `[data-sidebar="sidebar"]` carries `data-costume-scope` and whose «Analisi» label has the costume face and the eyebrow's colour | drop the spread in `drawer.tsx`; in `sheet.tsx` |
 | E3 | `e2e/theme.costume.tablet.spec.ts` (both tablet viewports): criterion 5 | `TabletRail` out of `CostumeScope` |
 
