@@ -160,7 +160,7 @@ holds it): how it was learned is `git log`'s.
   1..8; but on 2026-09-18 `--chart-3` light measured 2,74:1 and `--chart-1` dark 2,62:1 ON A CARD — re-measure before
   leaning on that floor, doc/guide/temi.md § Per-page blind spots). The semantic amber is `--warning-foreground`; only
   `ExpenseTable`'s chips are exempt. **A chart slot used as TEXT is held to 4,5:1**: `__tests__/actionColorContrast.test.ts`
-  measures COMPRA/VENDI/OK across all twelve theme blocks, on `--card` and on the chip's own `color-mix` fill (the
+  measures COMPRA/VENDI/OK across all fourteen theme blocks, on `--card` and on the chip's own `color-mix` fill (the
   HARDER surface).
 - **A computed custom property comes back as `lab()`, never as the `oklch()` you authored**: anything that READS a
   colour token parses `lab()` (and `#hex`) too and never asserts `/^oklch\(/` — through `lib/utils/colorParse.ts`, the
@@ -620,7 +620,7 @@ file used to carry.
 - **A user-chosen identity colour is a SLOT, not a hex** (`'chart-1'..'chart-8'`, `resolveCostCenterColor`); indices
   0-8 theme-aware (`--chart-9` is Storico's «Previdenza» band), 9 static.
 - **Every theme block is held to the distinctness floor** (`__tests__/chartPaletteDistinctness.test.ts`, all twelve
-  since 2026-09-20): nine slots, ΔE00 ≥ 14 between any two. A new theme or a moved slot runs it first.
+  since 2026-09-20, fourteen with Egeo): nine slots, ΔE00 ≥ 14 between any two. A new theme or a moved slot runs it first.
 - **A mechanism beyond palette and radius goes through the costume contract** (2026-11-21): `data-costume` on
   `<html>`, `data-costume-scope` on the dashboard shell and a modal's content, the scope properties
   (`COSTUME_SCOPE_PROPERTIES`), every rule gated by `[data-costume] [data-costume-scope]` — doc/guide/temi.md § Il costume.

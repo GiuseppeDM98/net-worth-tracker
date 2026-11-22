@@ -71,8 +71,16 @@ export const EMBLEM_TONE_COLOR: Record<EmblemTone, string> = {
   eyebrow: 'var(--costume-eyebrow-color)',
 };
 
-/** Filled by each costume theme; empty while no theme has a costume. */
-export const THEME_EMBLEMS: Partial<Record<ColorTheme, ThemeEmblems>> = {};
+/** A pediment on four columns: the Egeo costume's mark (decorative, DESIGN.md → The Costume Rule). */
+const EGEO_TEMPLE: EmblemArt = {
+  viewBox: '0 0 22 22',
+  shapes: [{ kind: 'path', d: 'M2 8 L11 2 L20 8 M4 8 V18 M8 8 V18 M14 8 V18 M18 8 V18 M2 20 H20', tone: 'ornament', strokeWidth: 1.6 }],
+};
+
+/** Filled by each costume theme: one temple for every page (a page's own art is a later addition). */
+export const THEME_EMBLEMS: Partial<Record<ColorTheme, ThemeEmblems>> = {
+  egeo: { fallback: EGEO_TEMPLE, pages: {} },
+};
 
 /** The art beside a page's name: none out of scope (the landing, the access pages), the page's own over the theme's. */
 export function resolveEmblem(
