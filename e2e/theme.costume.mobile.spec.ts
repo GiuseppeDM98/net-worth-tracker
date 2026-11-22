@@ -2,14 +2,14 @@
  * The costume's first pass at 390 (DESIGN.md → The Costume Rule, doc/guide/temi.md § Il costume, 2026-11-22): the
  * bottom pill's inactive labels on `--muted-foreground`, the pill and the «+» square under Orbita, the «Altro»
  * section label in the costume face, the account menu opened from «Altro» — a popper sheet below 769px — in scope
- * with the frame radius on its top corners, the period picker's drawer in scope, nothing overflowing; and a phone
- * turned sideways (844×390, no project has that size): the top bar's wordmark and the sheet sidebar's labels wear
- * the costume.
+ * with the frame radius on its top corners, the period picker's drawer in scope with its preset chips square under
+ * Orbita, nothing overflowing; and a phone turned sideways (844×390, no project has that size): the top bar's
+ * wordmark and the sheet sidebar's labels wear the costume.
  *
  * The account's `colorTheme` is written for the run and put back (`e2e/themeEgeo.ts`).
  *
  * Seen red on 2026-11-22 with the spread dropped from `drawer.tsx` (the period picker) and from `sheet.tsx` (the
- * sheet sidebar).
+ * sheet sidebar); the chip case on the same day, at the retirement, with `chip.tsx` back to `rounded-full`.
  */
 import { expect, test } from '@playwright/test';
 import { restoreColorTheme, settle, setAccountColorTheme, startWith, styleOf } from './themeEgeo';
@@ -49,6 +49,10 @@ for (const costume of COSTUMES) {
         const drawer = page.locator('[data-slot="drawer-content"]', { hasText: 'Seleziona periodo' });
         await expect(drawer).toBeVisible();
         expect(await drawer.evaluate((node) => node.hasAttribute('data-costume-scope'))).toBe(true);
+        // Its preset chips (`chip.tsx`) are pills: square under Orbita, round in Egeo.
+        const chip = await cornerOf(page, '[data-slot="drawer-content"] button[aria-pressed]');
+        if (costume === 'orbita') expect(chip).toBe('0px');
+        else expect(isRoundPill(chip ?? undefined), `${chip}`).toBe(true);
         await page.keyboard.press('Escape');
         await expect(drawer).toBeHidden();
 

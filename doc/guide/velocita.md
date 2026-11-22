@@ -77,7 +77,7 @@ stati verificati nell'analizzatore: il dubbio sul tree-shaking di `radix-ui` res
   `ranked-rows.tsx` ha portato +1,3 KB gz a Previdenza, misurata solo Analisi): si misurano TUTTE le route prima e
   dopo. Il genitore si misura sullo stesso checkout — `git stash`, `git checkout <genitore>`, `npm run build` +
   `perf:budget`, poi di nuovo il branch e `git stash pop` —, senza copiare `node_modules` in un worktree. **Un
-  `next dev` rimasto acceso durante lo stash serve ancora il CSS del genitore dopo il `pop`** (2026-11-22, NOVE-19:
+  `next dev` rimasto acceso durante lo stash serve ancora il CSS del genitore dopo il `pop`** (2026-11-22, #574:
   `e2e/theme.costume.spec.ts` rosso sulle etichette della sidebar, gli screenshot del collaudo presi sul CSS vecchio):
   dopo il `pop` si ferma il server, si cancella la sua cartella `dev` (`.next-e2e/dev`) e lo si riavvia, prima di
   qualsiasi prova nel browser.

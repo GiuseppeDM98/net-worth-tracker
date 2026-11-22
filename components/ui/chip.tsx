@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +14,7 @@ export interface ChipProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 /**
- * Chip — pill-shaped toggle button.
+ * Chip — pill-shaped toggle button (square in a costume theme that squares its pills, doc/guide/temi.md § Il costume).
  *
  * Intended for horizontal, flex-wrap lists of selectable options (e.g. period
  * presets, filter tags). Active state uses primary brand colors; inactive state
@@ -25,7 +26,8 @@ export function Chip({ label, active = false, className, ...props }: ChipProps) 
       type="button"
       aria-pressed={active}
       className={cn(
-        'px-3 py-1.5 rounded-full text-sm border transition-colors motion-reduce:transition-none',
+        'px-3 py-1.5 text-sm border transition-colors motion-reduce:transition-none',
+        COSTUME_PILL_RADIUS_CLASS,
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         active
           ? 'bg-primary text-primary-foreground border-primary'
