@@ -185,7 +185,7 @@ export function QuestoMeseTile({
     <p className="mt-2 text-[12px] text-warning-foreground">{describePlanPastReview(reviewByIso)}</p>
   ) : null;
 
-  // A revision needs an intact instalment (decision 98) and is never written in demo.
+  // A revision needs an intact instalment (with none, the plan is closed in Accumulo first) and is never written in demo.
   const reviseDisabled = isDemo || !findFirstIntactInstallment(plan);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarFocusIndex, setCalendarFocusIndex] = useState<number | undefined>(undefined);

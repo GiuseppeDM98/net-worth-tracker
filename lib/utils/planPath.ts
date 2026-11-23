@@ -207,7 +207,7 @@ function isGroupMember(positions: readonly PlanPosition[], assetId: string): boo
 
 // ─── The drafts the path starts from ──────────────────────────────────────────
 
-/** What a revision starts from; null when the plan has no intact instalment (nothing to revise, decision 98). */
+/** What a revision starts from; null when the plan has no intact instalment (nothing to revise: `ACCUMULO_PLAN_NOTHING_TO_REVISE`). */
 export function buildPlanPathRevision(plan: AccumulationPlan): PlanPathRevision | null {
   const first = findFirstIntactInstallment(plan);
   if (!first) return null;

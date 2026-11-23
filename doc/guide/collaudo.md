@@ -160,7 +160,9 @@ The app **is** locally runnable; there is no fallback to declare.
   2026-10-08, `doc/mobile/` on 2026-10-17): before the delete, each operative piece of the index goes to ONE home — a rule
   to AGENTS.md or the guide, a measure table to a guide, a live artefact (a budget file) moved with `git mv` and never
   deleted —, every numbered decision cited in code, tests and guides is rewritten as its rule and date (a number outlives
-  the document that numbered it), and the series' history goes to README.md § Documentation. A text-only defect found there is fixed in the retirement with `tsc`, lint
+  the document that numbered it), and the series' history goes to README.md § Documentation. **A spec's label never
+  enters the code in the first place** (2026-11-12): no spec name or number in a file, function or test name nor in a
+  comment, no «decision N», «criterion N» or section sign of a spec — a comment cites the rule and its date. A text-only defect found there is fixed in the retirement with `tsc`, lint
   and Vitest, no Playwright; a runtime one only on the owner's call, with the area suite and the full Playwright; a
   deferral nobody wrote goes where its theme lives (a guide's blind spots, the speed manual); a tour done in the
   implementation session is recorded by the dossier's index (outside a series: one line of CLAUDE.md «Latest»). **`Draft Release Temp.md` never says a spec was retired**
@@ -168,7 +170,9 @@ The app **is** locally runnable; there is no fallback to declare.
   user-visible changes only** (owner, 2026-10-10): a developer tool — a census, a budget, a seed, a script — gets no
   row, not even a «dev» one; its home is the guide (and one line of CLAUDE.md «Latest» when it is the session's work).
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
-  before the commit); its outcome goes into `CLAUDE.md`'s "Latest" entry as one line (§ 2, Closing a verification: the
+  before the commit); its outcome goes into `CLAUDE.md`'s "Latest" entry as one line — the entry is REPLACED, an
+  area's line is rewritten at equal or shorter length, and the file's 20.000 characters are counted with `node -e
+  "console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` (`wc -m` in Git Bash counts bytes; 2026-11-19) — (§ 2, Closing a verification: the
   signals go in the commit message and the guide) and, when the user sees it, into `Draft Release Temp.md`,
   before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what
   was implemented), *Perché* (the decision behind it), *Nota* (gotchas and measures, each with its date),

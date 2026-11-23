@@ -38,7 +38,7 @@ le opzioni lette. **Una chiave di `--surfaces` o un valore di `--viewports` scon
 sovrascriveva `last-run.json`; `validateSelection`, `__tests__/mobileCensusOptions.test.ts`). L'uscita è `.mobile-census/` (gitignored): `last-run.json` con la durata in coda e due screenshot per
 superficie × viewport (`<viewport>/<superficie>-fold.png` e `-full.png`).
 
-**Il confronto con `develop` dello stesso giorno** (2026-11-14, decisione 33 della serie `doc/nove/`): si costruisce `develop` in un worktree (`git worktree add <cartella> develop`) con `cp -Rc node_modules <cartella>/node_modules` — un symlink fuori dalla root rompe Turbopack — più `.env.local`, si fa `perf:build` + `perf:serve` lì, si copia `.mobile-census/last-run.json`, poi lo stesso sul branch; le due corse si confrontano voce per voce (57 voci, `results`), e il worktree si rimuove con `git worktree remove --force`. Non tocca il working tree della sessione.
+**Il confronto con `develop` dello stesso giorno** (2026-11-14; proprietario, 2026-11-12 per una serie di spec, regola del repo dal 2026-11-23: un lavoro che tocca ciò che una pagina composta mostra per prima chiude su questo confronto — ogni voce che il lavoro NON nomina legge uguale sulle due corse, le voci che nomina si ri-registrano con `raisedBy` senza chiedere, e la sessione si ferma solo su una voce non nominata che si muove): si costruisce `develop` in un worktree (`git worktree add <cartella> develop`) con `cp -Rc node_modules <cartella>/node_modules` — un symlink fuori dalla root rompe Turbopack — più `.env.local`, si fa `perf:build` + `perf:serve` lì, si copia `.mobile-census/last-run.json`, poi lo stesso sul branch; le due corse si confrontano voce per voce (`results`), e il worktree si rimuove con `git worktree remove --force`. Non tocca il working tree della sessione.
 **Su Windows** (2026-11-16): `node_modules` si copia con `robocopy <repo>\node_modules <cartella>\node_modules /E /MT:16`;
 `git worktree remove --force` si ferma su «Filename too long» dentro `node_modules`, quindi la cartella si cancella con
 `Remove-Item -LiteralPath '\\?\<cartella>' -Recurse -Force` e poi `git worktree prune`. In uno script PowerShell della
@@ -101,7 +101,7 @@ non è di `census@example.com`, se una superficie è `missing` o `unsettled`, se
 (`yahooCalled` o un `source=yahoo` di riga) o se la corsa è parziale — ogni voce di `budget.json` deve essere stata
 misurata (2026-10-10: prima un `--tighten` su `--surfaces` scriveva il file e POI andava rosso su «non misurata»).
 Dopo una stretta il `raisedBy` resta sulla voce (può scusare una metrica che la misura non ha stretto; `perfBudget` lo
-toglie quando abbassa un tetto: scelta diversa, voluta). **Allargare** si fa a mano, con l'OK del proprietario:
+toglie quando abbassa un tetto: scelta diversa, voluta). **Allargare** si fa a mano, con l'OK del proprietario (senza chiederlo solo per le voci che il lavoro nomina, dopo «Il confronto con `develop` dello stesso giorno», qui sopra):
 `"raisedBy": "<data>: perché"` sulla voce (superficie × viewport), concatenato ai motivi che la voce già portava e mai
 sovrascritto, e una riga in `doc/guide/prima-schermata-misure.md` § Registro delle voci allargate, nello stesso commit;
 `mobile:budget` confronta con `git show HEAD:perf/mobile-budget.json` e un valore allargato senza un `raisedBy`

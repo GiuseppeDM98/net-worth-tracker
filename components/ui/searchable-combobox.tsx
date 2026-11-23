@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/drawer';
 import { usePopperSheet } from '@/components/ui/popper-sheet';
 import { cn } from '@/lib/utils';
+import { HeadingText } from '@/components/ui/heading-text';
 
 export interface ComboboxOption {
   value: string;
@@ -270,7 +271,7 @@ export function SearchableCombobox({
           </DrawerTrigger>
           <DrawerContent id={sheetId} minHeight="medium">
             <DrawerHeader className="border-b px-4 pb-3 pt-2 text-left">
-              <DrawerTitle className="text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">{label}</DrawerTitle>
+              <DrawerTitle className="costume-title text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]"><HeadingText text={label} /></DrawerTitle>
               <DrawerDescription className="sr-only">Cerca nell’elenco e tocca una voce per sceglierla.</DrawerDescription>
               <Input
                 aria-label={`Cerca ${label.toLowerCase()}`}

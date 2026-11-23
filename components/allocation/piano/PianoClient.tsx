@@ -9,7 +9,7 @@
  * basis), the plans, the model, the ledger (the «Mai comprato» rule) — and, beside them and never a reason
  * to wait or to fail, the Consulente's document («rivedi entro»). The states, the first that applies:
  * loading (the plans also fetched AFTER mount: a restored list may hold a draft another tab activated),
- * demo, a failed read, no targets, an ACTIVE plan with every instalment closed (decision 98: a sentence and
+ * demo, a failed read, no targets, an ACTIVE plan with every instalment closed (2026-11-19: one sentence and
  * «Apri Accumulo»), else the wizard — in a REVISION of the active plan when there is one (2026-11-21).
  */
 
@@ -141,7 +141,7 @@ export function PianoClient({ fromModel: fromModelProp }: { fromModel?: boolean 
     [settings, effective, goalData]
   );
 
-  // A closed plan (decision 98) made a browser draft moot; a revision's draft is the wizard's to keep or drop (`restorePlanPathDraft`).
+  // A plan with every instalment closed made a browser draft moot; a revision's draft is the wizard's to keep or drop (`restorePlanPathDraft`).
   const nothingToRevise = !created && !revisedPlan && activePlan !== null && revision === null;
   useEffect(() => {
     if (nothingToRevise && ownerId && typeof window !== 'undefined') clearStored(window.localStorage, planPathStorageKey(ownerId));

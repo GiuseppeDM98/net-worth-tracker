@@ -27,6 +27,7 @@ import { usePeriodPicker } from '@/lib/hooks/usePeriodPicker';
 import { type Period, currentMonthPeriod, currentYtdPeriod, MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { cn } from '@/lib/utils';
 import { Chip } from '@/components/ui/chip';
+import { HeadingText } from '@/components/ui/heading-text';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -282,7 +283,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className, 
         <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
         <DrawerContent className="max-h-[92dvh]">
           <DrawerHeader className="pb-2">
-            <DrawerTitle>Seleziona periodo</DrawerTitle>
+            <DrawerTitle className="costume-title"><HeadingText text="Seleziona periodo" /></DrawerTitle>
             <DrawerDescription className="sr-only">
               Scegli un periodo preimpostato o seleziona un intervallo personalizzato dal calendario.
             </DrawerDescription>

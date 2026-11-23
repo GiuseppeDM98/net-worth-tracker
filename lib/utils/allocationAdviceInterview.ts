@@ -46,7 +46,7 @@ export function interviewReducer(interview: AllocationAdviceInterview, action: I
   }
 }
 
-/** Criterion 3: a next round can be asked — not skipped, and the last round (if any) left something open under the cap. */
+/** A next round can be asked — not skipped, and the last round (if any) left something open under the cap. */
 export function canRequestRound(interview: AllocationAdviceInterview): boolean {
   if (interview.skipped) return false;
   const last = interview.rounds[interview.rounds.length - 1];

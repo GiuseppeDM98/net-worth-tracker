@@ -28,6 +28,10 @@
  * `bg-muted/40`, the model dialog's options back to `max-desktop:rounded-xl`; the pill scan with `RecordRows.tsx`
  * and `CambiatoTile.tsx` back to `rounded-full` and `RendimentoTile.tsx`'s chip back to a literal 9px; the
  * header case with the plan path's `emblem` dropped.
+ *
+ * The selector sheets (2026-11-23, found by the closing read of the dialogs' pass): the title of the period
+ * picker's, the searchable combobox's and the multi-select's drawer takes `.costume-title` and prints through
+ * `HeadingText`, as `ResponsiveModal`'s. Seen red that day on the three files as they were (a bare `DrawerTitle`).
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -439,6 +443,42 @@ describe('the bars, pills and chips of the pages read the costume radii', () => 
     const hits = literals(file);
     expect(hits, file).toHaveLength(1);
     expect(hits[0]).toContain(stays);
+  });
+});
+
+describe('every visible modal title wears the costume face', () => {
+  // A selector's sheet is a modal too: its title takes `.costume-title` and prints its string through
+  // `HeadingText`, as `ResponsiveModal`'s does. `AlertDialogTitle` adds the class itself; `command.tsx`'s title
+  // sits in an `sr-only` header, where no face is read.
+  const PRIMITIVES = ['components/ui/dialog.tsx', 'components/ui/drawer.tsx', 'components/ui/alert-dialog.tsx'];
+  const UNSEEN = ['components/ui/command.tsx'];
+  const titles = [...listFiles('components'), ...listFiles('app')]
+    .filter((file) => !PRIMITIVES.includes(file) && !UNSEEN.includes(file) && !file.endsWith('.stories.tsx'))
+    .flatMap((file) =>
+      [...source(file).matchAll(/<(DrawerTitle|DialogTitle)\b([^>]*)>([\s\S]*?)<\/\1>/g)].map((match) => ({
+        file,
+        tag: match[2].trim(),
+        body: match[3].trim(),
+      })),
+    );
+
+  it('reads the two shells of `ResponsiveModal` and the three selector sheets', () => {
+    expect(titles.map(({ file }) => file).sort()).toEqual([
+      'components/ui/multi-select.tsx',
+      'components/ui/period-picker.tsx',
+      'components/ui/responsive-modal.tsx',
+      'components/ui/responsive-modal.tsx',
+      'components/ui/searchable-combobox.tsx',
+    ]);
+  });
+
+  it.each(titles)('$file: the title carries the class and its string goes through HeadingText', ({ tag, body }) => {
+    expect(tag).toContain('costume-title');
+    expect(body).toContain('<HeadingText text=');
+  });
+
+  it('the alert dialog’s title carries the class in the primitive', () => {
+    expect(source('components/ui/alert-dialog.tsx')).toContain('"costume-title ');
   });
 });
 

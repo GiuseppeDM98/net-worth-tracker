@@ -159,14 +159,16 @@ screen (`PathCard`, DESIGN.md → The Path-Scene Rule), the same shape as Compra
   wizard tells the host (`onCreated`), whose refetched list would otherwise find the plan active and swap the card for
   «Hai già un piano…» (found on the mirror tour, 2026-11-20; `pianoClient.test.tsx`, E1).
 - **The states**: loading · demo · a failed read · no targets of the owner's own or from the goals (never the
-  defaults) · an ACTIVE plan with every instalment closed (decision 98: the «tutte le rate chiuse» sentence and «Apri
+  defaults) · an ACTIVE plan with every instalment closed (owner, 2026-11-19: the «tutte le rate chiuse» sentence and «Apri
   Accumulo»; the browser draft cleared) · the wizard, creating, or revising an active plan with an intact instalment.
 - **The entry points**: the empty tile's «Crea piano» (a link; a disabled button in demo or without targets), the
   model dialog's «Crea un PAC con questi pesi» (writes the seed as the browser draft, then navigates — no weight in the
   URL), the draft view's «Continua», «Questo mese»'s «Rivedi il piano» (the footer and the review month's note: links,
   a disabled button in demo or with no intact instalment) and «Rivedi dal modello» (`?da=modello`). No tab and no
   sidebar entry. The path offers NO groups by hand, no «Sostituisci»,
-  no «Ottimizzato» (owner, 2026-11-19): groups come only from the model portfolio, as one row.
+  no «Ottimizzato» (owner, 2026-11-19): groups come only from the model portfolio, as one row. No «Salva bozza»
+  either (same day): the unfinished path lives in the browser and the app creates no draft in Accumulo; a draft left
+  by a failed activation, or one older than that day, is continued in the path or deleted.
 
 ### Rivedere
 
@@ -282,7 +284,7 @@ landscape the stage and the icon rail. At 1440 nothing changes: two columns, no 
   confirmed since, and the path restarts from the plan without saying so.
 - **A plan made from a model keeps the model's groups as rows** (2026-11-20): the path never edits a group; to change
   a group, change the model.
-- **The path's computed reserve counts the ticked accounts only** (2026-11-20, README § 4 choice ac): it differs from
+- **The path's computed reserve counts the ticked accounts only** (2026-11-20): it differs from
   a plan's stored reserve by design; typed the same in both, the instalments are the same (measured on the seed account at
   the guided verification: twelve identical instalments).
 - **What the path does not ask** (declared on 2026-11-20): the start month (always the month after «Conferma»), a review
