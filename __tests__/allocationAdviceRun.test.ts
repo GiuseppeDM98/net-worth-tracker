@@ -1,9 +1,12 @@
 /**
- * The Consulente's run (lib/server/allocationAdvice/run.ts): the three model calls in order
+ * The Consulente's run (lib/server/allocationAdvice/run.ts): the model calls in order (the
+ * operating plan the fourth since 2026-11-19)
  * with their models, efforts, tools and answer formats, the document persisted after every
  * stage, a proposal the schema refuses that fails the strategy, a `max_tokens` cut said in the
- * product's words, the review's proposal falling back to the strategy's, a paused turn resumed.
- * The SDK is answered by hand-written final messages (`beta.messages.stream(...).finalMessage()`).
+ * product's words, the review's proposal falling back to the strategy's, a paused turn resumed;
+ * the operating plan (2026-11-19), the fourth request, which writes `operatingPlan` only.
+ * The SDK is answered by hand-written final messages (`beta.messages.stream(...).finalMessage()`);
+ * a call no test answered THROWS, so no stage ever reaches the real API.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,7 +14,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { AllocationAdviceAnswers } from '@/lib/utils/allocationAdviceProposal';
 
 let firstWrite: unknown = null;
-const { setMock, patchMock, getMock, ytdMock, cashflowMock, profilesMock, archiveMock, historyMock } = vi.hoisted(() => ({
+const { setMock, patchMock, getMock, ytdMock, cashflowMock, profilesMock, archiveMock, historyMock, planMock, assetsMock, settingsMock } = vi.hoisted(() => ({
+  // The operating plan's reads (2026-11-19): no asset and no settings unless a test says otherwise.
+  assetsMock: vi.fn(async () => [] as unknown[]),
+  settingsMock: vi.fn(async () => null as unknown),
+  // The plan of accumulation's read (owner, 2026-11-12): «no active plan» unless a test says otherwise.
+  // Without this mock the real reader would meet `adminDb: {}` and every run would take its failed path.
+  planMock: vi.fn(),
   setMock: vi.fn(),
   patchMock: vi.fn(),
   getMock: vi.fn(),
@@ -33,7 +42,10 @@ vi.mock('@/lib/server/allocationAdvice/store', () => ({
   archiveAllocationAdviceAdmin: archiveMock,
   listAllocationAdviceHistoryAdmin: historyMock,
 }));
-vi.mock('@/lib/services/assistantMonthContextService', () => ({ buildAssistantYtdContext: ytdMock, fetchCashflowBlockInputs: cashflowMock }));
+vi.mock('@/lib/server/allocationAdvice/accumulationPlan', () => ({ readAccumulationPlanForAdvice: planMock }));
+vi.mock('@/lib/services/assistantMonthContextService', () => ({ buildAssistantYtdContext: ytdMock, fetchCashflowBlockInputs: cashflowMock, fetchSettings: settingsMock }));
+vi.mock('@/lib/server/assetAdminRepository', () => ({ getUserAssetsAdmin: assetsMock }));
+vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch: vi.fn() }));
 vi.mock('@/lib/server/exposure/instrumentProfileService', () => ({ resolveInstrumentProfiles: profilesMock }));
 // Partial: the strategy prints the cashflow block through the real `formatCashflowBlockSection`.
 vi.mock('@/lib/server/assistant/prompts', async (importOriginal) => ({
@@ -50,6 +62,7 @@ import {
   ALLOCATION_ADVICE_INTERVIEW_MAX_TOKENS,
   ALLOCATION_ADVICE_MAX_CONTINUATIONS,
   ALLOCATION_ADVICE_MAX_TOKENS,
+  ALLOCATION_ADVICE_PLAN_MAX_TOKENS,
 } from '@/lib/server/allocationAdvice/run';
 import type { AllocationAdviceDocument, AllocationAdviceInterview, AllocationAdviceInterviewRound } from '@/types/allocationAdvice';
 import {
@@ -107,10 +120,19 @@ function message(text: string, stopReason = 'end_turn', model = 'answered-model'
 const strategyText = (proposal: unknown) => JSON.stringify({ markdown: '# La situazione\nTesto strategia.', proposal });
 const instrumentsText = '- All World: trovato.\n\n```instrument-candidates\n{"sleeves": [{"assetClass": "equity", "subTarget": "All World", "candidates": [{"name": "ETF Mondo", "exchange": "Borsa Italiana", "note": "ok"}]}]}\n```';
 const reviewText = (proposal: unknown) => JSON.stringify({ markdown: '# In una frase\nReport.', proposal });
+const planText = JSON.stringify({
+  summary: 'Un anno di versamenti.',
+  monthlyInflowEur: 500,
+  months: 12,
+  rows: [{ ref: 'S1', action: 'buy', targetPercentage: 100, reason: 'Il nucleo.' }],
+  reviewReason: '',
+  departures: [],
+});
 
-/** Answers each `beta.messages.stream` call, in order, with one final message. */
+/** Answers each `beta.messages.stream` call, in order, with one final message; a call past them throws (never the real API). */
 function answerWith(...messages: unknown[]) {
   const spy = vi.spyOn(Anthropic.Beta.Messages.prototype, 'stream');
+  spy.mockImplementation(() => { throw new Error('no answer planned for this call'); });
   for (const m of messages) spy.mockReturnValueOnce({ finalMessage: async () => m } as never);
   return spy;
 }
@@ -148,18 +170,25 @@ describe('runAllocationAdvice', () => {
     historyMock.mockResolvedValue([]);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
-  it('runs the three stages in order, on their models, efforts and formats, with web search only for the instruments, and persists each', async () => {
+  it('runs the stages in order (the operating plan the last), on their models, efforts and formats, with web search only for the instruments, and persists each', async () => {
     const reviewed = { ...PROPOSAL, summary: 'Rivista.' };
-    const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(reviewed), 'end_turn', 'opus'));
+    const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(reviewed), 'end_turn', 'opus'), message(planText, 'end_turn', 'opus'));
+    assetsMock.mockResolvedValueOnce([ORNITORINCO]);
     const stages: string[] = [];
 
     const document = await runAllocationAdvice({ userId: 'u1', answers: ANSWERS, onStage: (stage) => stages.push(stage), now: new Date('2026-10-20T10:00:00.000Z') });
 
-    expect(stages).toEqual(['context', 'strategy', 'instruments', 'review']);
-    expect(calls).toHaveBeenCalledTimes(3);
-    const [strategyCall, instrumentsCall, reviewCall] = calls.mock.calls.map((call) => call[0] as unknown as Params);
+    expect(stages).toEqual(['context', 'strategy', 'instruments', 'review', 'plan']);
+    expect(calls).toHaveBeenCalledTimes(4);
+    const [strategyCall, instrumentsCall, reviewCall, planCall] = calls.mock.calls.map((call) => call[0] as unknown as Params);
+    expect(planCall.model).toBe(ALLOCATION_ADVICE_STRATEGY_MODEL);
+    expect(planCall.max_tokens).toBe(ALLOCATION_ADVICE_PLAN_MAX_TOKENS);
+    expect(planCall.output_config.effort).toBe(ALLOCATION_ADVICE_STRATEGY_EFFORT);
+    expect(planCall.tools).toBeUndefined();
+    expect(Object.keys(planCall.output_config.format?.schema.properties as object)).toEqual(['summary', 'monthlyInflowEur', 'months', 'rows', 'reviewMonth', 'reviewReason', 'departures']);
     expect(strategyCall.model).toBe(ALLOCATION_ADVICE_STRATEGY_MODEL);
     expect(strategyCall.max_tokens).toBe(ALLOCATION_ADVICE_MAX_TOKENS);
     expect(strategyCall.tools).toBeUndefined();
@@ -189,8 +218,24 @@ describe('runAllocationAdvice', () => {
     expect(setMock).toHaveBeenCalledTimes(1);
     expect(firstWrite).toMatchObject({ userId: 'u1', status: 'running', stage: 'context' });
     const patches = patchMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
-    expect(patches.map((patch) => Object.keys(patch)[0])).toEqual(['stage', 'strategy', 'stage', 'instruments', 'stage', 'report']);
+    // The plan's two patches are `operatingPlan` alone, sent without moving `updatedAt` (2026-11-19).
+    expect(patches.map((patch) => Object.keys(patch).join('+'))).toEqual(['stage+status+error', 'strategy', 'stage+status+error', 'instruments', 'stage+status+error', 'report+status', 'operatingPlan', 'operatingPlan']);
     expect(patches[5]).toMatchObject({ status: 'ready' });
+    expect(patches[6].operatingPlan).toMatchObject({ status: 'running', plan: null, error: null, reportFinishedAt: document.report?.finishedAt });
+    expect(patches[7].operatingPlan).toMatchObject({ status: 'ready', model: 'opus', plan: { months: 12, monthlyInflowEur: 500, usable: true, rows: [expect.objectContaining({ ref: 'S1', targetPercentage: 100 })] } });
+    for (const call of patchMock.mock.calls.slice(6)) expect(call[2]).toEqual({ keepUpdatedAt: true });
+    expect(document.status).toBe('ready');
+    expect(document.operatingPlan?.status).toBe('ready');
+  });
+
+  // Mutation: the plan's failure let through runAllocationAdvice.
+  it('a plan that fails leaves the run finished on its report', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    answerWith(message(strategyText(PROPOSAL)), message(instrumentsText), message(reviewText(PROPOSAL)), message('Non è un piano.'));
+    const document = await runAllocationAdvice({ userId: 'u1', answers: ANSWERS, onStage: vi.fn() });
+    expect(document.status).toBe('ready');
+    expect(document.report?.markdown).toBe('# In una frase\nReport.');
+    expect(patchMock.mock.calls.at(-1)?.[1]).toMatchObject({ operatingPlan: { status: 'failed' } });
   });
 
   it("keeps the strategy's proposal when the review's breaks a sum, and its markdown", async () => {
@@ -253,6 +298,7 @@ describe('runAllocationAdviceStage', () => {
     historyMock.mockResolvedValue([]);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('the strategy creates the document and stops there; the instruments continue the persisted one from the store', async () => {
@@ -359,6 +405,9 @@ describe('runAllocationAdviceStage', () => {
     expect(userContent).toContain('Prima versione.');
     expect(userContent).toContain('1. meno cripto\n2. solo bond singoli');
     expect(patchMock.mock.calls.at(-1)?.[1]).toMatchObject({ status: 'ready', revisions: [expect.objectContaining({ request: 'meno cripto' }), expect.objectContaining({ request: 'solo bond singoli' })] });
+    // A new report: the plan of the old one goes (2026-11-19). Mutation: omit it.
+    expect(patchMock.mock.calls.at(-1)?.[1]).toHaveProperty('operatingPlan', null);
+    expect(revised.operatingPlan).toBeNull();
   });
 
   it('revise refuses a document with no report, and an empty request, without calling a model', async () => {
@@ -383,14 +432,15 @@ describe('runAllocationAdviceStage', () => {
   });
   // ── The CASHFLOW 12 MESI block (2026-11): read once per strategy, never by the later stages ──
 
-  it('a whole run reads the cashflow block ONCE, with the owner and the run clock, and only the strategy carries it', async () => {
+  it('a whole run reads the cashflow block for the strategy and the plan only, with the owner and the run clock', async () => {
     const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(PROPOSAL), 'end_turn', 'opus'));
     await runAllocationAdvice({ userId: 'u1', answers: ANSWERS, onStage: vi.fn(), now: NOW });
-    expect(cashflowMock).toHaveBeenCalledTimes(1);
-    expect(cashflowMock).toHaveBeenCalledWith('u1', NOW);
+    // Twice since 2026-11-19: the strategy and the operating plan (its fourth call answered by no test, so it fails, swallowed).
+    expect(cashflowMock).toHaveBeenCalledTimes(2);
+    for (const call of cashflowMock.mock.calls) expect(call).toEqual(['u1', NOW]);
     const [strategy, instruments, review] = calls.mock.calls.map(userTurn);
     expect(strategy).toContain('--- CASHFLOW 12 MESI (');
-    expect(strategy).toContain('FAMIGLIA, OBBLIGAZIONI e CASHFLOW 12 MESI sono esaustivi');
+    expect(strategy).toContain('OBBLIGAZIONI, PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi');
     expect(instruments).not.toContain('CASHFLOW 12 MESI');
     expect(review).not.toContain('CASHFLOW 12 MESI');
   });
@@ -419,6 +469,40 @@ describe('runAllocationAdviceStage', () => {
     expect(calls).not.toHaveBeenCalled();
     expect(patchMock.mock.calls.at(-1)?.[1]).toMatchObject({ status: 'failed', stage: 'context' });
   });
+  // ── The PIANO DI ACCUMULO block (owner, 2026-11-12): read by the strategy and the review, never by the instruments ──
+  // Mutation that turns it red: the block skipped in `runReview`.
+  it('a whole run prints the plan block to the strategy and the review, never to the instruments, read with the owner and the run clock', async () => {
+    const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(PROPOSAL), 'end_turn', 'opus'));
+    await runAllocationAdvice({ userId: 'u1', answers: ANSWERS, onStage: vi.fn(), now: NOW });
+    const [strategy, instruments, review] = calls.mock.calls.map(userTurn);
+    expect(strategy).toContain('--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.');
+    expect(review).toContain('--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.\n\nScrivi il report finale come descritto.');
+    expect(instruments).not.toContain('PIANO DI ACCUMULO');
+    // Three since 2026-11-19: the strategy, the review, the operating plan.
+    expect(planMock).toHaveBeenCalledTimes(3);
+    for (const call of planMock.mock.calls) expect(call).toEqual(['u1', NOW]);
+  });
+
+  it('a plan that was not read still completes the run, and the block says so', async () => {
+    planMock.mockResolvedValue({ read: false });
+    const calls = answerWith(message(strategyText(PROPOSAL), 'end_turn', 'opus'), message(instrumentsText, 'end_turn', 'sonnet', true), message(reviewText(PROPOSAL), 'end_turn', 'opus'));
+    const document = await runAllocationAdvice({ userId: 'u1', answers: ANSWERS, onStage: vi.fn(), now: NOW });
+    expect(document.status).toBe('ready');
+    expect(userTurn(calls.mock.calls[2])).toContain("Il piano di accumulo non è stato letto in questa corsa: non so se ce n'è uno.");
+  });
+
+  it('a revision and an interview round carry the block too', async () => {
+    const withReport = { ...afterStrategy(), instruments: { markdown: '- trovato.', candidates: null, model: 'sonnet', webSearchUsed: true, finishedAt: NOW }, report: { markdown: 'r', proposal: PROPOSAL as never, model: 'o', finishedAt: NOW } };
+    const revise = answerWith(message(reviewText(PROPOSAL)));
+    await runAllocationAdviceStage({ userId: 'u1', stage: 'revise', document: withReport, request: 'meno cripto', onStage: vi.fn(), now: NOW });
+    expect(userTurn(revise.mock.calls[0])).toContain("--- PIANO DI ACCUMULO ---\nNessun piano di accumulo attivo.\n\nRiscrivi il report intero");
+    expect(planMock).toHaveBeenCalledWith('u1', NOW);
+    vi.restoreAllMocks();
+    getMock.mockResolvedValue(null);
+    const round = answerWith(message(JSON.stringify({ note: 'n', satisfied: true, questions: [] })));
+    await runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn(), now: NOW });
+    expect(userTurn(round.mock.calls[0])).toContain('--- PIANO DI ACCUMULO ---');
+  });
 });
 
 // ── The interview round (2026-11-08: no write, the format, the revision mode) ──────────────
@@ -438,6 +522,7 @@ describe('runInterviewRound', () => {
     getMock.mockResolvedValue(null);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('calls the strategy model ONCE with its effort, the interview budget and the round\'s schema, writes nothing, and hands the round on', async () => {
@@ -554,6 +639,7 @@ describe('the interview on the run (the IL COLLOQUIO block and the document, 202
     getMock.mockResolvedValue(null);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('the strategy writes the interview on the new document and prints it; the review prints it too, the instruments never', async () => {
@@ -618,7 +704,6 @@ describe('the bond block in the Consulente context', () => {
     ],
     dividends: { coupons: [] },
   };
-  const YAHOO = { response: { profiles: { 'BEUR.MI': { ticker: 'BEUR.MI', fund: { fetchedAt: '2026-11-01T10:00:00.000Z', schema: 2, holdingsBasis: 'fund', family: null, bond: { durationYears: 2.42, maturityYears: 9.807 } } } }, oldestFetchedAt: null } };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -629,6 +714,7 @@ describe('the bond block in the Consulente context', () => {
     historyMock.mockResolvedValue([]);
     getMock.mockResolvedValue(null);
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('with no bond in the portfolio the block says so, under the data, and no profile is asked', async () => {
@@ -636,39 +722,28 @@ describe('the bond block in the Consulente context', () => {
     const calls = answerWith(message(roundText([], 'Nota.', true)));
     await runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn(), now: NOW });
     expect(profilesMock).not.toHaveBeenCalled();
-    expect(userTurn(calls.mock.calls[0])).toContain('DATI\n\n--- OBBLIGAZIONI: SCADENZE E DURATION ---\nNessun titolo né ETF obbligazionario in portafoglio.');
+    expect(userTurn(calls.mock.calls[0])).toContain('DATI\n\n--- OBBLIGAZIONI: SCADENZE ---\nNessun titolo né ETF obbligazionario in portafoglio.');
   });
 
-  it("asks the profile cache for the bond ETFs only (module fund, raw ticker, the run clock) and prints Yahoo's duration to the strategy and the instruments alike", async () => {
+  // Yahoo's duration proved wrong on real ETFs (owner, 2026-11-20): no profile is read, no duration is printed, the
+  // search verifies it. Mutation that turns it red: the profile read put back.
+  it('prints the bond ETFs with no duration to the strategy and the instruments alike, and asks Yahoo nothing', async () => {
     ytdMock.mockResolvedValue({ portfolio: BOND_PORTFOLIO });
-    profilesMock.mockResolvedValue(YAHOO);
     const calls = answerWith(message(strategyText(PROPOSAL)), message(instrumentsText, 'end_turn', 'sonnet', true));
     const first = await runAllocationAdviceStage({ userId: 'u1', stage: 'strategy', answers: ANSWERS, onStage: vi.fn(), now: NOW });
     await runAllocationAdviceStage({ userId: 'u1', stage: 'instruments', document: first, onStage: vi.fn(), now: NOW });
 
-    expect(profilesMock).toHaveBeenCalledTimes(2);
-    expect(profilesMock.mock.calls[0][0]).toEqual([{ ticker: 'BEUR.MI', module: 'fund' }]);
-    expect(profilesMock.mock.calls[0][1]).toEqual({ now: NOW });
+    expect(profilesMock).not.toHaveBeenCalled();
     expect(calls).toHaveBeenCalledTimes(2);
     for (const call of calls.mock.calls) {
       const turn = userTurn(call);
-      expect(turn).toContain('--- OBBLIGAZIONI: SCADENZE E DURATION (1 titolo, 1 ETF o fondo; le scadenze degli obiettivi sono nelle risposte del percorso) ---');
+      expect(turn).toContain('--- OBBLIGAZIONI: SCADENZE (1 titolo, 1 ETF o fondo; le scadenze degli obiettivi sono nelle risposte del percorso) ---');
       expect(turn).toContain(`- BTP Esempio 2030: scade il 2030-03-01 (3,4 anni), valore ${eur(5000)}, negoziabile`);
-      expect(turn).toContain(`- ETF Bond Euro (BEUR): duration 2,4 anni, scadenza media 9,8 anni, letto il 2026-11-01, valore ${eur(10000)}, negoziabile`);
-      expect(turn).not.toContain('ETF Mondo (MONDO.MI): duration');
+      expect(turn).toContain(`- ETF Bond Euro (BEUR): valore ${eur(10000)}, negoziabile`);
+      expect(turn).not.toContain('ETF Mondo');
     }
     // The instruments read the holdings and, under them, the block.
     expect(userTurn(calls.mock.calls[1])).toContain('STRUMENTI\n\n--- OBBLIGAZIONI');
-  });
-
-  it('a failed profile read never fails the round: the block says the durations were not read', async () => {
-    ytdMock.mockResolvedValue({ portfolio: BOND_PORTFOLIO });
-    profilesMock.mockRejectedValue(new Error('yahoo down'));
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const calls = answerWith(message(roundText([], 'Nota.', true)));
-    await runInterviewRound({ userId: 'u1', answers: ANSWERS, previousRounds: [], onRound: vi.fn(), now: NOW });
-    expect(userTurn(calls.mock.calls[0])).toContain(`- ETF Bond Euro (BEUR): duration non letta (profili non disponibili in questa corsa), valore ${eur(10000)}, negoziabile`);
-    expect(errorSpy).toHaveBeenCalledWith('[consulente] bond profiles not read', expect.any(Error));
   });
 });
 
@@ -692,6 +767,7 @@ describe('the previous paths: the archive and the block', () => {
     historyMock.mockResolvedValue([]);
     ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
     cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
   });
 
   it('the strategy archives the replaced document when it has a report, BEFORE writing the new one, and lists it with the archive, the most recent first', async () => {
@@ -759,5 +835,107 @@ describe('the previous paths: the archive and the block', () => {
     expect(userTurn(calls.mock.calls[0])).toContain("(1 percorso, dal più recente; il report del primo è il piano in vigore) ---\nL'archivio dei percorsi non è stato letto in questa corsa: qui c'è solo l'ultimo.");
     expect(errorSpy).toHaveBeenCalledWith('[consulente] history not read', expect.any(Error));
     expect(errorSpy).toHaveBeenCalledWith('[consulente] previous path not archived', expect.any(Error));
+  });
+});
+
+// ── The operating plan, the fourth request (2026-11-19, doc/guide/consulente-piano.md) ───────────────
+const ORNITORINCO = { id: 'a-orn', userId: 'u1', ticker: 'ORN', name: 'ETF ornitorinco', type: 'etf', assetClass: 'equity', currency: 'EUR', quantity: 10, currentPrice: 100, lastPriceUpdate: NOW, createdAt: NOW, updatedAt: NOW };
+const CONTO = { id: 'a-conto', userId: 'u1', ticker: '', name: 'Conto castoro', type: 'cash', assetClass: 'cash', currency: 'EUR', quantity: 1, currentPrice: 5000, lastPriceUpdate: NOW, createdAt: NOW, updatedAt: NOW };
+const REPORT_AT = new Date('2026-10-20T11:00:00.000Z');
+const finishedReport = (status: AllocationAdviceDocument['status'] = 'ready'): AllocationAdviceDocument => ({
+  ...afterStrategy(),
+  status,
+  stage: 'review',
+  instruments: { markdown: '- trovato.', candidates: null, model: 'sonnet', webSearchUsed: true, finishedAt: NOW },
+  report: { markdown: '# In una frase\nReport.', proposal: PROPOSAL as never, model: 'opus', finishedAt: REPORT_AT },
+});
+
+describe('the operating plan stage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    patchMock.mockResolvedValue(undefined);
+    ytdMock.mockResolvedValue({ portfolio: EMPTY_PORTFOLIO });
+    cashflowMock.mockResolvedValue(EMPTY_CASHFLOW_INPUTS);
+    planMock.mockResolvedValue({ read: true, plan: null });
+    assetsMock.mockResolvedValue([ORNITORINCO, CONTO]);
+    settingsMock.mockResolvedValue({ investmentCashAssetId: 'a-conto', idealAllocation: { instrumentLimits: [] } });
+  });
+
+  it('prints the facts block and the cashflow to the plan, and writes operatingPlan alone, twice, keeping updatedAt', async () => {
+    const calls = answerWith(message(planText, 'end_turn', 'opus'));
+    const stages: string[] = [];
+    const document = await runAllocationAdviceStage({ userId: 'u1', stage: 'plan', document: finishedReport('applied'), onStage: (stage) => stages.push(stage), now: NOW });
+    expect(stages).toEqual(['plan']);
+    const turn = userTurn(calls.mock.calls[0]);
+    expect(turn).toContain('--- DATI PER IL PIANO OPERATIVO ---\nMese 1 del piano: novembre 2026.');
+    expect(turn).toContain('Conto per gli investimenti: Conto castoro, saldo €5.000.');
+    expect(turn).toContain('S1 · ETF ornitorinco · Azioni · 10 quote · €100,00 · €1.000');
+    expect(turn).toContain('--- CASHFLOW 12 MESI (');
+    expect(turn).toContain('```allocation-proposal');
+    expect(settingsMock).toHaveBeenCalledWith('u1');
+    expect(assetsMock).toHaveBeenCalledWith('u1');
+    expect(patchMock).toHaveBeenCalledTimes(2);
+    for (const call of patchMock.mock.calls) {
+      expect(Object.keys(call[1] as object)).toEqual(['operatingPlan']);
+      expect(call[2]).toEqual({ keepUpdatedAt: true });
+    }
+    expect(document.status).toBe('applied');
+    expect(document.operatingPlan).toMatchObject({ status: 'ready', reportFinishedAt: REPORT_AT, error: null });
+    expect(document.operatingPlan?.finishedAt).toBeInstanceOf(Date);
+  });
+
+  // 2026-11-19. Mutation that turned it red: the generic catch lets the plan's failure patch the document's status.
+  it('an unreadable answer fails the plan alone: operatingPlan failed, the status untouched, the error retryable', async () => {
+    answerWith(message('Non è un piano.'));
+    const document = finishedReport();
+    await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'plan', document, onStage: vi.fn(), now: NOW })).rejects.toMatchObject({
+      stage: 'plan',
+      retryable: true,
+      message: 'Il Consulente non ha scritto un piano leggibile. Premi «Scrivi il piano operativo»: di norma la seconda volta rientra.',
+    });
+    expect(document.status).toBe('ready');
+    expect(document.error).toBeNull();
+    const patches = patchMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
+    expect(patches.map((patch) => Object.keys(patch))).toEqual([['operatingPlan'], ['operatingPlan']]);
+    expect(patches[1].operatingPlan).toMatchObject({ status: 'failed', plan: null, error: expect.stringContaining('piano leggibile') });
+    for (const call of patchMock.mock.calls) expect(call[2]).toEqual({ keepUpdatedAt: true });
+  });
+
+  it("an unexpected error after the running patch is said in the plan's words, and never touches the document", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    answerWith(message(planText));
+    patchMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('the ready patch failed'));
+    await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'plan', document: finishedReport(), onStage: vi.fn(), now: NOW })).rejects.toMatchObject({
+      stage: 'plan',
+      retryable: true,
+      message: 'Il piano operativo si è interrotto per un errore imprevisto. Premi «Scrivi il piano operativo».',
+    });
+    for (const call of patchMock.mock.calls) expect(Object.keys(call[1] as object)).toEqual(['operatingPlan']);
+    expect((patchMock.mock.calls.at(-1)?.[1] as { operatingPlan: { status: string } }).operatingPlan.status).toBe('failed');
+  });
+
+  // The facts, the account and the reserve are computed BEFORE the `running` patch, like the reads
+  // (2026-11-19, found at the retirement: they ran after it, so a failure there wrote a failed plan).
+  // Mutation that turned it red: the running patch moved back above `buildOperatingPlanFacts`.
+  it('a failure computing the facts patches nothing and calls no model', async () => {
+    const calls = answerWith(message(planText));
+    assetsMock.mockResolvedValueOnce(null as never);
+    await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'plan', document: finishedReport(), onStage: vi.fn(), now: NOW })).rejects.toBeDefined();
+    expect(patchMock).not.toHaveBeenCalled();
+    expect(calls).not.toHaveBeenCalled();
+  });
+
+  it('refuses a document running, failed or without a report, with nothing patched and no model called', async () => {
+    const calls = vi.spyOn(Anthropic.Beta.Messages.prototype, 'stream');
+    for (const document of [finishedReport('running'), finishedReport('failed'), { ...finishedReport(), report: null }]) {
+      await expect(runAllocationAdviceStage({ userId: 'u1', stage: 'plan', document, onStage: vi.fn(), now: NOW })).rejects.toMatchObject({
+        stage: 'plan',
+        retryable: false,
+        message: "Non c'è un report finito su cui scrivere il piano. Avvia la ricerca.",
+      });
+    }
+    expect(patchMock).not.toHaveBeenCalled();
+    expect(calls).not.toHaveBeenCalled();
   });
 });

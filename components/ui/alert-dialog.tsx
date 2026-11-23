@@ -4,6 +4,7 @@ import * as React from "react"
 import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { useCostumeScopeProps } from "@/contexts/ColorThemeContext"
 import { Button } from "@/components/ui/button"
 
 function AlertDialog({
@@ -51,14 +52,17 @@ function AlertDialogContent({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
   size?: "default" | "sm"
 }) {
+  const scopeProps = useCostumeScopeProps()
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
+        data-costume-frame=""
+        {...scopeProps}
         data-size={size}
         className={cn(
-          // Same surface as the Dialog — `bg-card`, 16px radius, the Float shadow: the two are
+          // Same surface as the Dialog — `bg-card`, 16px radius, the Float shadow and its costume frame: the two are
           // one material at two levels of insistence, and a confirm that looked like a
           // different kind of object would read as coming from somewhere else (DESIGN.md §2, §4).
           "group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border bg-card p-6 shadow-[0_4px_24px_rgba(0,0,0,0.28)] duration-200 data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-[420px]",
@@ -110,7 +114,7 @@ function AlertDialogTitle({
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
       className={cn(
-        "text-lg font-semibold sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2",
+        "costume-title text-lg font-semibold sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2",
         className
       )}
       {...props}

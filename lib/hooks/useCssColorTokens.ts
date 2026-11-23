@@ -22,7 +22,8 @@ import { useThemePaletteReader } from '@/lib/hooks/useThemePaletteReader';
  *
  * Pass module-level constants: the result is memoized on the objects' identity.
  *
- * Used by: components/cashflow/analisi/tiles/FlussoTile.tsx (the 50/30/20 Sankey's role colours).
+ * Used by: components/cashflow/analisi/tiles/FlussoTile.tsx (the 50/30/20 Sankey's role colours and, under a
+ * costume theme, the type flow's slots).
  */
 export function useCssColorTokens<K extends string>(
   tokens: Readonly<Record<K, string>>,

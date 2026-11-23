@@ -18,7 +18,7 @@ import { useReducedMotion } from 'framer-motion';
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { PeriodMonth } from '@/lib/utils/storicoSummary';
-import { reconcileRemainder, describeLabor, describeLaborTaxes, describeLaborWindow, describeMonthlyDrivers, describeNotes, describeOtherIncome, describeYearlyVariation, DIVIDENDS_OUTSIDE_CASHFLOW, formatPeriodMonth, type LaborMetricsInput, type MonthlyDriverRow, type YearlyVariationRow } from '@/lib/utils/storicoNarrative';
+import { reconcileRemainder, describeLabor, describeLaborTaxes, describeLaborWindow, describeMonthlyDrivers, describeNotes, describeOtherIncome, describeYearlyVariation, DIVIDENDS_OUTSIDE_CASHFLOW, DRIVER_MONTHLY_NO_BAR_NOTE, formatPeriodMonth, type LaborMetricsInput, type MonthlyDriverRow, type YearlyVariationRow } from '@/lib/utils/storicoNarrative';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
@@ -71,7 +71,7 @@ interface StoricoDettaglioProps {
   disabled?: boolean;
 }
 
-const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)', fontSize: 12 } as const;
+const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--costume-control-frame-radius, 8px)', color: 'var(--card-foreground)', fontSize: 12 } as const;
 const TOOLTIP_LABEL_STYLE = { color: 'var(--card-foreground)', fontWeight: 600 } as const;
 const TOOLTIP_ITEM_STYLE = { color: 'var(--card-foreground)' } as const;
 const CURSOR_FILL = { fill: 'var(--foreground)', fillOpacity: 0.06 } as const;
@@ -140,11 +140,11 @@ function YearlyVariationTile({ rows, currentYear }: { rows: YearlyVariationRow[]
 type MonthlyDriverDatum = MonthlyDriverRow & { period: string; taxBar: number };
 
 /**
- * Every part of the hovered month — the three drawn as bars and the three that are not (mortgage,
- * pension contributions, other changes: owner, 2026-09-19, «riga + tooltip, niente barra»). A
+ * Every part of the hovered month — the three drawn as bars and the ones that are not (mortgage,
+ * pension contributions, the three parts of «altre»: owner, 2026-09-19, «riga + tooltip, niente barra»). A
  * module-level component, cloned by Recharts with its props (an inline arrow would remount it).
  */
-function DriverMonthTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: MonthlyDriverDatum }> }) {
+export function DriverMonthTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: MonthlyDriverDatum }> }) {
   const row = active ? payload?.[0]?.payload : undefined;
   if (!row) return null;
   const parts: Array<{ label: string; value: number }> = [
@@ -153,7 +153,9 @@ function DriverMonthTooltip({ active, payload }: { active?: boolean; payload?: A
     { label: 'Tasse sulle vendite', value: -row.taxes },
     { label: 'Mutuo rimborsato', value: row.debtRepaid },
     { label: 'Versamenti al fondo pensione', value: row.pensionContributions },
-    { label: 'Altre variazioni', value: row.other },
+    { label: 'Fondo pensione non tracciato', value: row.otherPension },
+    { label: 'Quantità fuori dal registro', value: row.otherHoldings },
+    { label: 'Saldi dei conti', value: row.otherAccounts },
   ].filter((part, i) => i < 2 || Math.abs(Math.round(part.value)) >= 1);
   return (
     <div style={TOOLTIP_CONTENT_STYLE} className="px-2.5 py-2">
@@ -237,7 +239,7 @@ function MonthlyDriversTile({ rows, years, startYear }: { rows: MonthlyDriverRow
       )}
       <TileMethodNote subject="Risparmio e mercato per mese" summary={`La scomposizione del Driver, mese per mese, dal ${startYear}.`}>
         <span>Il {startYear} è l&apos;anno da cui il cashflow è completo: prima non ci sono entrate e spese da cui misurare il risparmio.</span>
-        <span>Mutuo rimborsato, versamenti al fondo pensione e altre variazioni non hanno una barra: sono nel dettaglio di ogni mese, passando sul grafico.</span>
+        <span>{DRIVER_MONTHLY_NO_BAR_NOTE}</span>
       </TileMethodNote>
     </Tile>
   );

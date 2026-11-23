@@ -30,13 +30,13 @@
  *    quantity 0 is a closed position (handled inside `attributeSelectedChange`).
  *
  * COVERAGE IS SAID, NEVER ASSUMED
- * Snapshots before `byAsset` existed (2025-11 on the real account) cannot be attributed. The
+ * Snapshots before `byAsset` existed (older accounts) cannot be attributed. The
  * result carries how many of the period's months were, and the reading names the window it
  * covers («sui 10 mesi con il dettaglio per strumento») instead of pretending the sum is the
  * whole period's.
  *
  * THE RESIDUAL GUARD (2026-09-07, the structural answer to issue #320)
- * A period's residual is a sum, and a sum hides where it came from: −2.326 € over nine months can
+ * A period's residual is a sum, and a sum hides where it came from: −2.000 € over nine months can
  * be nine small corrections or one balance typed wrong in March. So the residual is also read
  * MONTH BY MONTH against the month's starting base (`prev.totalNetWorth`), and every month whose
  * unattributed part exceeds `RESIDUAL_ALERT_SHARE` of it is returned in `residualMonths` for the

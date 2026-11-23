@@ -9,7 +9,7 @@
  *   the WHOLE collection, by declared need (2026-09-30, when Cashflow and FIRE moved to a window
  *   of their own — lib/utils/expenseWindows.ts): the Scheda, the Confronto, the Dettaglio and the
  *   search span the history from the floor on and the Andamento ranks its categories on the rows
- *   after this year too, so on the owner's account a window left out 48 rows of 1547.
+ *   after this year too, so on a lived account a window left rows out.
  * - cashflowHistoryStartYear + spendingRolesEnabled: `useSettings` (the ONE settings key, 2026-09-29;
  *   non-fatal, safe defaults on failure)
  *

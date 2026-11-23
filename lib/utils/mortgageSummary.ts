@@ -24,6 +24,7 @@
 import type { Expense } from '@/types/expenses';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { splitInstalment } from '@/lib/utils/mortgageRepayment';
+import { isRingWhole, type RingSegment } from '@/lib/utils/ringChart';
 
 /** The fields of a linked instalment the summary reads. */
 export type MortgageRow = Pick<Expense, 'id' | 'amount' | 'isDebtPayoff' | 'debtPrincipalRepaid' | 'debtInterestPaid' | 'balancePending'> & { date: Date };
@@ -84,6 +85,26 @@ export interface MortgageSummary {
 }
 
 const toCents = (value: number) => Math.round(value * 100) / 100;
+
+/**
+ * The ring's two slots on Patrimonio, where every slot is also a class's: 7 and 8 are the two rarest
+ * classes (Trend following, Carry), so the loan's split rarely shares a hue with the classes' ring.
+ */
+export const MORTGAGE_RING_COLORS = { interest: 'var(--chart-8)', principal: 'var(--chart-7)' } as const;
+
+/** What the year's settled instalments paid, as interest and principal; null unless both are above zero. */
+export function mortgageRingSegments(summary: MortgageSummary): RingSegment[] | null {
+  const segments: RingSegment[] = [
+    { key: 'interest', label: `Interessi ${summary.year}`, value: summary.yearInterest, color: MORTGAGE_RING_COLORS.interest },
+    { key: 'principal', label: `Capitale ${summary.year}`, value: summary.yearPrincipal, color: MORTGAGE_RING_COLORS.principal },
+  ];
+  return isRingWhole(segments) ? segments : null;
+}
+
+/** What the year's settled instalments paid, interest and principal together — the ring's centre. */
+export function mortgageYearPaid(summary: MortgageSummary): number {
+  return toCents(summary.yearInterest + summary.yearPrincipal);
+}
 
 /** Whether the app has settled the row: it moved the debt and stored what it repaid. */
 export function isSettled(row: Pick<MortgageRow, 'balancePending' | 'debtPrincipalRepaid'>): boolean {

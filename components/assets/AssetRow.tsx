@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Pencil, Trash2, Calculator, ArrowLeftRight, ScrollText, PiggyBank, Info } from 'lucide-react';
 import { isLoanAsset, type Asset } from '@/types/assets';
+import { describeZeroQuantityChip } from '@/lib/utils/zeroQuantityChip';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
@@ -21,6 +22,7 @@ import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import type { AssetPerformanceData } from '@/lib/utils/assetPerformanceDeltas';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { lazyComponent } from '@/components/ui/lazy-component';
 
 /**
@@ -75,7 +77,7 @@ export function AssetClassChip({ assetClass, className }: { assetClass: string; 
   const cssVar = getAssetClassCssVar(assetClass);
   return (
     <span
-      className={cn('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium text-foreground', className)}
+      className={cn('inline-flex items-center whitespace-nowrap px-2 py-0.5 text-[11px] font-medium text-foreground', COSTUME_PILL_RADIUS_CLASS, className)}
       style={{
         backgroundColor: `color-mix(in srgb, var(${cssVar}) 15%, transparent)`,
         border: `1px solid color-mix(in srgb, var(${cssVar}) 30%, transparent)`,
@@ -122,7 +124,8 @@ export function InstrumentClassChip({ asset }: { asset: Pick<Asset, 'assetClass'
       // On the phone row each chip starts after a ticker of its own width, so there is no column to
       // compare down, and a floor would only push the chip under the amount on a long ticker.
       className={cn(
-        'relative inline-flex items-center justify-center whitespace-nowrap rounded-full px-[9px] py-[3px] text-[11px] font-medium text-foreground',
+        'relative inline-flex items-center justify-center whitespace-nowrap px-[9px] py-[3px] text-[11px] font-medium text-foreground',
+        COSTUME_PILL_RADIUS_CLASS,
         chip.segments.length > 1 && 'desktop:min-w-[112px]',
       )}
       style={{ background: segmentGradient(chip.segments, 15) }}
@@ -135,7 +138,7 @@ export function InstrumentClassChip({ asset }: { asset: Pick<Asset, 'assetClass'
           understood, and older WebKit keeps the prefixed `xor`. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-full p-px"
+        className={cn('pointer-events-none absolute inset-0 p-px', COSTUME_PILL_RADIUS_CLASS)}
         style={{
           background: segmentGradient(chip.segments, 30),
           WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
@@ -226,6 +229,8 @@ interface AssetRowProps {
   financedAssetName?: string | null;
   /** The owner part of the sub-line («di Marco», the quotas by name — `describeAssetOwnerLabel`); null for a shared asset. */
   ownerLabel?: string | null;
+  /** The assets the ledger names (the page's trades), null while it is not read: the chip says «Mai comprato» only with it. */
+  tradedAssetIds?: ReadonlySet<string> | null;
 }
 
 /**
@@ -255,6 +260,7 @@ export function AssetRow({
   mortgage = null,
   financedAssetName = null,
   ownerLabel = null,
+  tradedAssetIds = null,
 }: AssetRowProps) {
   const [open, setOpen] = useState(false);
   // The sparkline is born at the first opening and stays: unmounting it on close would empty the
@@ -291,7 +297,7 @@ export function AssetRow({
   const actionCount = 2 + (onCalculateTaxes ? 1 : 0) + (showLedgerActions ? 2 : 0) + (asset.type === 'pensionFund' ? 1 : 0);
   const deleteSpansRow = actionCount % 2 === 1;
 
-  // The EUR PMC (fees included, the G/P's basis) and, on a foreign row, the native one beside it.
+  // The EUR PMC (no fee, the G/P's basis) and, on a foreign row, the native one beside it.
   const pmcEur = isHandValued ? undefined : costBasisPerUnitEur(asset);
   const nativePmc = !isHandValued && !isEurNative(asset) && asset.averageCost ? asset.averageCost : undefined;
   const details: Array<{ label: string; value: string; className?: string }> = [
@@ -338,8 +344,8 @@ export function AssetRow({
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-[13px] font-medium text-foreground">{asset.name}</span>
             {asset.quantity === 0 && (
-              <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {isLoanAsset(asset) ? 'Estinto' : 'Azzerato'}
+              <span className={cn('shrink-0 border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground', COSTUME_PILL_RADIUS_CLASS)}>
+                {isLoanAsset(asset) ? 'Estinto' : describeZeroQuantityChip(asset, tradedAssetIds)}
               </span>
             )}
           </span>

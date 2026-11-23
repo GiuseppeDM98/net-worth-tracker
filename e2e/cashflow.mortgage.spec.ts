@@ -23,6 +23,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { PERSISTED_CACHE_DB_NAME, PERSISTED_CACHE_RECORD_KEY, PERSISTED_CACHE_STORE_NAME } from './persistedCache';
+import { expectRingFiguresInside } from './ringFit';
 
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 process.env.GCLOUD_PROJECT = 'demo-net-worth';
@@ -223,6 +224,9 @@ test('Patrimonio\'s «Mutuo» tile reads the interest and the principal the year
   await expect(tile).toContainText('TAN 3,6%.');
   // One measured year is the KPIs: no «Per anno» table yet (anchored on the KPI just seen).
   await expect(tile.getByRole('table')).toHaveCount(0);
+  // The year's interest and principal are a 96px ring (The Ring Rule, 2026-11-12): «1012 €» stays inside its hole.
+  await expectRingFiguresInside(tile);
+  await expect(tile.locator('[data-ring-center="hole"]')).toHaveText(/^1\.?012[\s ]*€$/);
 });
 
 test('from the second measured year the tile lists every year, the partial ones captioned', async ({ page }) => {

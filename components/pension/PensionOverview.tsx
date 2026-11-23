@@ -63,6 +63,7 @@ import {
   summarizeLedger,
   summarizePensionMembers,
   summarizeVersato,
+  versatoRing,
   type LedgerRow,
   type PensionSummaryInput,
 } from '@/lib/utils/pensionSummary';
@@ -192,6 +193,7 @@ export function PensionOverview() {
   const today = useMemo(() => summarizeFundToday({ ...offAxisInput, taxYear: 0 }), [offAxisInput]);
   const blocks = useMemo(() => summarizePensionMembers(summaryInput), [summaryInput]);
   const versato = useMemo(() => summarizeVersato(contributions, activeYear), [contributions, activeYear]);
+  const versatoRingSegments = useMemo(() => versatoRing(versato), [versato]);
   const ledger = useMemo(() => summarizeLedger(contributions, funds, assets, activeYear), [contributions, funds, assets, activeYear]);
 
   // ─── The words ───────────────────────────────────────────────────────────────
@@ -408,6 +410,8 @@ export function PensionOverview() {
               aside="per natura"
               footer={describeVersatoFooter(versato)}
               rows={versato.rows}
+              ring={versatoRingSegments}
+              total={versato.total}
             />
           )}
         </div>

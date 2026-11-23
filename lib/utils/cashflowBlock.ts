@@ -36,7 +36,7 @@
 import type { Expense, ExpenseCategory, ExpenseType, RecurrenceFrequency } from '@/types/expenses';
 import { EXPENSE_TYPE_LABELS, NO_SUBCATEGORY_KEY, NO_SUBCATEGORY_LABEL } from '@/types/expenses';
 import type { Asset, AssetAllocationSettings } from '@/types/assets';
-import { isCashAccount, isLoanAsset } from '@/types/assets';
+import { isLoanAsset } from '@/types/assets';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 import {
   getCategoryKey,
@@ -47,7 +47,8 @@ import {
 } from '@/lib/utils/expenseGrouping';
 import { resolveRecurrenceFrequency } from '@/lib/utils/recurrenceDates';
 import { roundToCents } from '@/lib/utils/cents';
-import { cachedFormatCurrencyEUR, formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatNumberIt, formatPercentageIt, withTypographicMinus } from '@/lib/utils/formatters';
+import { meaningfulSavingsRate } from '@/lib/utils/savingsRate';
 
 export const CASHFLOW_BLOCK_AGGREGATE_MONTHS = 12;   // full months before the current one
 export const CASHFLOW_BLOCK_FUTURE_MONTHS = 12;      // read past the current month, commitments only
@@ -70,7 +71,9 @@ export interface CashflowBlockInput {
   assetValueOf: (asset: Asset) => number;
 }
 
-export interface CashAccountLine { id: string; name: string; balance: number; roles: ('addebito' | 'accredito')[] }
+import type { CashAccountLine } from '@/lib/utils/cashAccountLines';
+import { buildCashAccountLines } from '@/lib/utils/cashAccountLines';
+export { buildCashAccountLines, type CashAccountLine } from '@/lib/utils/cashAccountLines';
 
 export type IncomeReading = 'una fonte dominante' | 'due fonti principali' | 'fonti diversificate' | 'nessuna entrata';
 export interface IncomeSource {
@@ -90,7 +93,7 @@ export interface MonthRow {
   income: number;                               // signed, dividends included
   necessary: number; nonNecessary: number; debt: number; unclassified: number;   // magnitudes ≥ 0
   savings: number;                              // income − the four spending figures
-  savingsRate: number | null;                   // 0-100; null when income ≤ 0
+  savingsRate: number | null;                   // percent, ≥ −100, `null` when not a rate (`meaningfulSavingsRate`)
   rows: number;                                 // counted rows (no transfers); 0 ⇒ «nessuna riga»
 }
 export interface Quartiles { q1: number; median: number; q3: number }
@@ -191,27 +194,6 @@ function compareLabels(a: string, b: string): number {
 
 // ─── Accounts ─────────────────────────────────────────────────────────────────
 
-/**
- * EVERY cash account (`isCashAccount`: a money-market ETF with `assetClass: 'cash'` is an instrument,
- * not an account), a closed one included — the register's account list names it too. The balance is
- * the Patrimonio's (`assetValueOf`), the roles are the two default accounts of the expense form.
- */
-export function buildCashAccountLines(
-  assets: readonly Asset[],
-  settings: Pick<AssetAllocationSettings, 'defaultDebitCashAssetId' | 'defaultCreditCashAssetId'> | null,
-  assetValueOf: (asset: Asset) => number,
-): CashAccountLine[] {
-  return assets
-    .filter(isCashAccount)
-    .map((asset) => {
-      const roles: CashAccountLine['roles'] = [];
-      if (settings?.defaultDebitCashAssetId === asset.id) roles.push('addebito');
-      if (settings?.defaultCreditCashAssetId === asset.id) roles.push('accredito');
-      return { id: asset.id, name: asset.name?.trim() || asset.id, balance: assetValueOf(asset), roles };
-    })
-    .sort((a, b) => b.balance - a.balance || compareLabels(a.name, b.name));
-}
-
 // ─── The builder ──────────────────────────────────────────────────────────────
 
 interface SourceAccumulator { key: string; name: string; total: number; months: Set<string> }
@@ -309,7 +291,7 @@ export function buildCashflowBlock(expenses: readonly Expense[], input: Cashflow
     month.debt = roundToCents(month.debt);
     month.unclassified = roundToCents(month.unclassified);
     month.savings = roundToCents(month.income - month.necessary - month.nonNecessary - month.debt - month.unclassified);
-    month.savingsRate = month.income > 0 ? (month.savings / month.income) * 100 : null;
+    month.savingsRate = meaningfulSavingsRate(month.income, month.income - month.savings);
   }
 
   const inProgress = series[series.length - 1];
@@ -602,7 +584,7 @@ export function buildCashflowBlock(expenses: readonly Expense[], input: Cashflow
       byCategory,
       subCategoriesCut: { count: cutSubs.length, total: roundToCents(cutSubs.reduce((sum, e) => sum + e.sub.total, 0)) },
     },
-    savings: { total: savingsTotal, rate: roundedIncome > 0 ? (savingsTotal / roundedIncome) * 100 : null },
+    savings: { total: savingsTotal, rate: meaningfulSavingsRate(roundedIncome, roundedIncome - savingsTotal) },
     currentMonth,
     series,
     volatility,
@@ -632,10 +614,17 @@ function num(value: number): string {
   return formatNumberIt(Math.round(value) || 0, 0);
 }
 
-/** A whole percentage; rounded first so a −0,3% never reads «-0%». */
+/** A whole percentage with the typographic minus; rounded first so a −0,3% never reads «−0%». */
 function pct(value: number): string {
-  return formatPercentageIt(Math.round(value) || 0, 0);
+  const rounded = Math.round(value) || 0;
+  return withTypographicMinus(rounded, formatPercentageIt(Math.abs(rounded), 0));
 }
+
+/**
+ * What «—» means in the rate column and beside the aggregate: below −100% a percentage of the
+ * income stops being readable (`readSavings`, 2026-11-12). User content, never system text.
+ */
+const SAVINGS_RATE_DASH_LEGEND = 'tasso —: entrate nulle o negative, oppure spese oltre il doppio delle entrate';
 
 function count(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
@@ -710,7 +699,7 @@ function formatSpending(block: CashflowBlock): string {
 function formatSavings(block: CashflowBlock): string {
   const { savings } = block;
   const rate = savings.rate === null
-    ? ' (tasso —: entrate nulle o negative)'
+    ? ` (${SAVINGS_RATE_DASH_LEGEND})`
     : `, il ${pct(savings.rate)} delle entrate`;
   return `Risparmio: ${eur(savings.total)} in ${CASHFLOW_BLOCK_AGGREGATE_MONTHS} mesi${rate}; `
     + 'le rate contano per intero: la quota capitale riduce il debito.';
@@ -742,6 +731,7 @@ function formatSeries(block: CashflowBlock): string[] {
   const columns = ['entrate', EXPENSE_TYPE_LABELS.fixed, EXPENSE_TYPE_LABELS.variable, EXPENSE_TYPE_LABELS.debt,
     ...(untyped ? ['Non classificate'] : []), 'risparmio', 'tasso di risparmio'];
   const lines = [`Serie mensile in euro (${columns.join(' / ')}):`];
+  let printedDash = false;
   for (const month of block.series) {
     const head = month.state === 'in-progress'
       ? `${month.ym} (in corso, fino al ${block.windows.todayIso})`
@@ -757,8 +747,10 @@ function formatSeries(block: CashflowBlock): string[] {
     const figures = [num(month.income), num(month.necessary), num(month.nonNecessary), num(month.debt),
       ...(untyped ? [num(month.unclassified)] : []), num(month.savings),
       month.savingsRate === null ? '—' : pct(month.savingsRate)];
+    if (month.savingsRate === null) printedDash = true;
     lines.push(`${head}: ${figures.join(' / ')}`);
   }
+  if (printedDash) lines.push(SAVINGS_RATE_DASH_LEGEND);
   return lines;
 }
 

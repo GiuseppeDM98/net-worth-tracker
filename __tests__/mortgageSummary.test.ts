@@ -9,7 +9,16 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { interestPaidOf, isSettled, projectPayoff, summarizeMortgage, type MortgageRow } from '@/lib/utils/mortgageSummary';
+import {
+  MORTGAGE_RING_COLORS,
+  interestPaidOf,
+  isSettled,
+  mortgageRingSegments,
+  mortgageYearPaid,
+  projectPayoff,
+  summarizeMortgage,
+  type MortgageRow,
+} from '@/lib/utils/mortgageSummary';
 
 const NOW = new Date(2026, 9, 5, 12);
 const HOME = { id: 'mutuo-casa', name: 'Mutuo Casa', debt: 65_608.36, debtInterestRate: 0.7, financedAssetName: 'Casa' };
@@ -132,5 +141,26 @@ describe('projectPayoff — the French amortisation', () => {
   it('should say never when the instalment does not cover the interest, and repaid on no debt', () => {
     expect(projectPayoff(200_000, 500, 3.6, new Date(2026, 0, 1))).toEqual({ kind: 'never' });
     expect(projectPayoff(0, 500, 3.6, new Date(2026, 0, 1))).toEqual({ kind: 'repaid' });
+  });
+});
+
+// The tile's ring (The Ring Rule, 2026-11-12): what the year's settled instalments paid, interest and
+// principal. Figures invented and round. Seen red on 2026-11-15 with `isRingWhole` skipped.
+describe('mortgageRingSegments and mortgageYearPaid', () => {
+  const ROUND_LOAN = { id: 'prestito', name: 'Prestito', debt: 50_000, debtInterestRate: 3, financedAssetName: 'Casa' };
+
+  it('M1: 1.200 € of interest and 3.000 € of principal are two parts, 4.200 € paid', () => {
+    const summary = summarizeMortgage(ROUND_LOAN, [{ id: 'a', date: new Date(2026, 8, 28, 12), amount: -4200, debtPrincipalRepaid: 3000, debtInterestPaid: 1200 }], NOW);
+    expect(mortgageRingSegments(summary)).toEqual([
+      { key: 'interest', label: 'Interessi 2026', value: 1200, color: MORTGAGE_RING_COLORS.interest },
+      { key: 'principal', label: 'Capitale 2026', value: 3000, color: MORTGAGE_RING_COLORS.principal },
+    ]);
+    expect(mortgageYearPaid(summary)).toBe(4200);
+  });
+
+  it('M1: no ring with no interest, nor with no settled instalment in the year', () => {
+    const payoffOnly = summarizeMortgage(ROUND_LOAN, [{ id: 'a', date: new Date(2026, 8, 28, 12), amount: -3000, isDebtPayoff: true, debtPrincipalRepaid: 3000, debtInterestPaid: 0 }], NOW);
+    expect(mortgageRingSegments(payoffOnly)).toBeNull();
+    expect(mortgageRingSegments(summarizeMortgage(ROUND_LOAN, [], NOW))).toBeNull();
   });
 });

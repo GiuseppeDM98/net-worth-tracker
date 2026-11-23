@@ -22,8 +22,8 @@ import {
 
 const NOW = new Date('2026-10-20T12:00:00.000Z');
 
-const GIUSEPPE: FamilyMember = { id: 'm-1', name: 'Giuseppe', grossAnnualIncome: 40000 };
-const MARCELLA: FamilyMember = { id: 'm-2', name: 'Marcella' };
+const PAOLO: FamilyMember = { id: 'm-1', name: 'Paolo', grossAnnualIncome: 40000 };
+const ELENA: FamilyMember = { id: 'm-2', name: 'Elena' };
 
 function asset(overrides: Partial<Asset> & Pick<Asset, 'id' | 'name' | 'type' | 'assetClass' | 'quantity' | 'currentPrice'>): Asset {
   return {
@@ -123,7 +123,7 @@ function transaction(overrides: Partial<AssetTransaction> & Pick<AssetTransactio
 }
 
 const TRANSACTIONS: AssetTransaction[] = [
-  transaction({ id: 't-2', assetId: 'a-etf', type: 'sell', date: new Date('2026-09-10T00:00:00.000Z'), quantity: 20, priceEur: 118, fees: 2 }),
+  transaction({ id: 't-2', assetId: 'a-etf', type: 'sell', date: new Date('2026-09-10T00:00:00.000Z'), quantity: 20, priceEur: 118, fees: 2, feeExpenseId: 'fee-1' }),
   transaction({ id: 't-1', assetId: 'a-etf', type: 'buy', date: new Date('2026-01-10T00:00:00.000Z'), quantity: 120, priceEur: 100, isBaseline: true }),
   transaction({ id: 't-3', assetId: 'a-gone', type: 'buy', date: new Date('2025-05-05T00:00:00.000Z'), quantity: 1, priceEur: 10 }),
 ];
@@ -180,7 +180,7 @@ function build(overrides: Partial<BuildPortfolioContextInput> = {}) {
       { goalId: 'g1', assetId: 'a-etf', percentage: 50 },
       { goalId: 'g2', assetId: 'a-bond', units: 5000 },
     ],
-    familyMembers: [GIUSEPPE, MARCELLA],
+    familyMembers: [PAOLO, ELENA],
     ownerAge: 35,
     assetValueOf: valueOf,
     now: NOW,
@@ -193,6 +193,24 @@ describe('buildAssistantPortfolioContext — holdings', () => {
     const { holdings } = build();
     expect(holdings.map((row) => row.name)).toEqual(['Casa', 'Fondo pensione', 'Conto corrente', 'ETF Mondo', 'BTP Esempio 2030', 'Mutuo casa']);
     expect(holdings.find((row) => row.name === 'ETF Venduto')).toBeUndefined();
+  });
+
+  // Choice u (owner, 2026-11-12): an instrument created empty for a plan and never bought is a row the
+  // Assistente and the Consulente can name; one sold off (SOLD: no flag) stays history.
+  // Seen red with the createdEmpty condition dropped (SOLD becomes a row).
+  it('keeps an instrument created empty and never bought as a «mai comprato» row', () => {
+    const NEW = asset({ id: 'a-new', name: 'ETF Nuovo', type: 'etf', assetClass: 'equity', quantity: 0, currentPrice: 100, createdEmpty: true });
+    const { holdings } = build({ assets: [...ASSETS, NEW] });
+    expect(holdings.find((row) => row.assetId === 'a-new')).toMatchObject({ neverBought: true, quantity: 0, valueEur: 0 });
+    expect(holdings.find((row) => row.assetId === 'a-sold')).toBeUndefined();
+    expect(holdings.filter((row) => row.neverBought)).toHaveLength(1);
+  });
+
+  it('leaves it out once the ledger names it (bought, then sold)', () => {
+    const NEW = asset({ id: 'a-new', name: 'ETF Nuovo', type: 'etf', assetClass: 'equity', quantity: 0, currentPrice: 100, createdEmpty: true });
+    const traded = transaction({ id: 't-new', assetId: 'a-new', type: 'buy', date: new Date('2026-09-01T10:00:00.000Z'), quantity: 10, priceEur: 100 });
+    const { holdings } = build({ assets: [...ASSETS, NEW], transactions: [...TRANSACTIONS, traded] });
+    expect(holdings.find((row) => row.assetId === 'a-new')).toBeUndefined();
   });
 
   it('resolves the role within the list: a mortgage follows the excluded home it finances', () => {
@@ -220,8 +238,8 @@ describe('buildAssistantPortfolioContext — holdings', () => {
 
   it('names the owner through the ownership rule and keeps the ticker only when it says more than the name', () => {
     const { holdings } = build();
-    expect(holdings.find((row) => row.name === 'ETF Mondo')).toMatchObject({ ticker: 'MONDO.MI', owner: 'di Giuseppe' });
-    expect(holdings.find((row) => row.name === 'Fondo pensione')).toMatchObject({ owner: 'di Marcella', isLiquid: false });
+    expect(holdings.find((row) => row.name === 'ETF Mondo')).toMatchObject({ ticker: 'MONDO.MI', owner: 'di Paolo' });
+    expect(holdings.find((row) => row.name === 'Fondo pensione')).toMatchObject({ owner: 'di Elena', isLiquid: false });
     expect(holdings.find((row) => row.name === 'Conto corrente')).toMatchObject({ owner: null, isLiquid: true });
     expect(holdings.find((row) => row.name === 'Conto corrente')?.ticker).toBeUndefined();
   });
@@ -309,14 +327,15 @@ describe('buildAssistantPortfolioContext — allocation on the page\'s base', ()
 });
 
 describe('buildAssistantPortfolioContext — ledger and registers', () => {
-  it('orders the ledger by date, names the asset or says it is gone, carries fees and the baseline flag', () => {
+  it('orders the ledger by date, names the asset or says it is gone, carries fees, their spending row and the baseline flag', () => {
     const { ledger } = build();
     expect(ledger.totalRows).toBe(3);
     expect(ledger.omittedRows).toBe(0);
     expect(ledger.rows.map((row) => row.dateIso)).toEqual(['2025-05-05', '2026-01-10', '2026-09-10']);
     expect(ledger.rows[0]).toMatchObject({ assetName: 'Strumento non più in portafoglio', type: 'buy' });
-    expect(ledger.rows[1]).toMatchObject({ assetName: 'ETF Mondo', ticker: 'MONDO.MI', isBaseline: true, amountEur: 12000, feesEur: 0 });
-    expect(ledger.rows[2]).toMatchObject({ type: 'sell', quantity: 20, priceEur: 118, feesEur: 2, amountEur: 2360 });
+    expect(ledger.rows[1]).toMatchObject({ assetName: 'ETF Mondo', ticker: 'MONDO.MI', isBaseline: true, amountEur: 12000, feesEur: 0, feeIsSpendingRow: false });
+    // The sale's fee has its spending row (2026-11-12): the AI must not count it twice.
+    expect(ledger.rows[2]).toMatchObject({ type: 'sell', quantity: 20, priceEur: 118, feesEur: 2, feeIsSpendingRow: true, amountEur: 2360 });
   });
 
   it('keeps the most recent rows when the ledger exceeds the cap and counts what it left out', () => {
@@ -353,7 +372,7 @@ describe('buildAssistantPortfolioContext — pension, loans, family', () => {
   it('rolls the contributions of each fund up by tax year and nature, the member named', () => {
     const { pension } = build();
     expect(pension).toHaveLength(1);
-    expect(pension[0]).toMatchObject({ name: 'Fondo pensione', valueEur: 30000, memberName: 'Marcella', role: 'frozen' });
+    expect(pension[0]).toMatchObject({ name: 'Fondo pensione', valueEur: 30000, memberName: 'Elena', role: 'frozen' });
     expect(pension[0].byYear).toEqual([
       { taxYear: 2025, tfr: 1500, voluntary: 500, employer: 0, total: 2000 },
       { taxYear: 2026, tfr: 0, voluntary: 0, employer: 300, total: 300 },
@@ -373,8 +392,8 @@ describe('buildAssistantPortfolioContext — pension, loans, family', () => {
     expect(family).toEqual({
       ownerAge: 35,
       members: [
-        { name: 'Giuseppe', grossAnnualIncome: 40000 },
-        { name: 'Marcella', grossAnnualIncome: null },
+        { name: 'Paolo', grossAnnualIncome: 40000 },
+        { name: 'Elena', grossAnnualIncome: null },
       ],
     });
   });
@@ -385,5 +404,37 @@ describe('buildAssistantPortfolioContext — pension, loans, family', () => {
     expect(empty.allocation).toMatchObject({ baseTotal: 0, targets: null });
     expect(empty.ledger).toEqual({ rows: [], totalRows: 0, omittedRows: 0 });
     expect(empty.family).toEqual({ ownerAge: null, members: [] });
+  });
+});
+
+// A contribution moves the fund's value in the month it is RECORDED (`valueEffectMonth`), not in its
+// month of competence (owner, 2026-11-16: September's contributions recorded in October read as a
+// jump of the bond class in October that the assistant could not explain).
+describe('the pension contributions with an effect on the period', () => {
+  const RECORDED: PensionContribution[] = [
+    { id: 'q-1', userId: 'u1', assetId: 'a-pension', source: 'tfr', amount: 700, date: new Date('2026-09-30T10:00:00.000Z'), taxYear: 2026, deductible: false, createdAt: new Date('2026-10-13T10:00:00.000Z') },
+    { id: 'q-2', userId: 'u1', assetId: 'a-pension', source: 'voluntary', amount: 150, date: new Date('2026-09-30T10:00:00.000Z'), taxYear: 2026, deductible: true, createdAt: new Date('2026-10-13T10:00:00.000Z') },
+    // Recorded in November: not October's.
+    { id: 'q-3', userId: 'u1', assetId: 'a-pension', source: 'employer', amount: 200, date: new Date('2026-10-31T10:00:00.000Z'), taxYear: 2026, deductible: true, createdAt: new Date('2026-11-02T10:00:00.000Z') },
+    // Recorded in September: not October's.
+    { id: 'q-4', userId: 'u1', assetId: 'a-pension', source: 'tfr', amount: 600, date: new Date('2026-06-30T10:00:00.000Z'), taxYear: 2026, deductible: false, createdAt: new Date('2026-09-10T10:00:00.000Z') },
+  ];
+
+  it("should total the contributions recorded in the period's months, each with its date and the day it was recorded", () => {
+    const fund = build({ pensionContributions: RECORDED, period: { afterKey: '2026-09', throughKey: '2026-10', label: 'ottobre 2026' } }).pension[0];
+    expect(fund.paidInPeriod).toEqual({
+      label: 'ottobre 2026',
+      total: 850,
+      rows: [
+        { source: 'tfr', amount: 700, dateIso: '2026-09-30', recordedIso: '2026-10-13' },
+        { source: 'voluntary', amount: 150, dateIso: '2026-09-30', recordedIso: '2026-10-13' },
+      ],
+    });
+  });
+
+  it('should say a period with none, and carry nothing without a period', () => {
+    const none = build({ pensionContributions: RECORDED, period: { afterKey: '2026-07', throughKey: '2026-08', label: 'agosto 2026' } }).pension[0];
+    expect(none.paidInPeriod).toEqual({ label: 'agosto 2026', total: 0, rows: [] });
+    expect(build({ pensionContributions: RECORDED }).pension[0].paidInPeriod).toBeNull();
   });
 });

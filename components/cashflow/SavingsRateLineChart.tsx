@@ -5,28 +5,38 @@
  * savings rate against the 20% target. A module of its own so the disclosure, closed by default,
  * loads it — and recharts with it — only when it is opened (2026-09-30).
  *
- * connectNulls={false} creates visible gaps for months without income — this correctly represents
- * "no data" rather than "zero savings". YAxis domain={['auto', 'auto']} scales to the actual data
- * range to prevent the flat-line problem (doc/guide/grafici.md § Recharts).
+ * connectNulls={false} leaves a gap at a month that is not a rate (no income, or a deficit beyond the
+ * floor) — "no data" rather than "zero savings" — and a dashed segment bridges it, from the month
+ * before to the month after (`buildSavingsRateBridges`; owner, 2026-11-23: the bare gap read as a
+ * broken line); the tooltip of the month says which of the two it is. The YAxis scales to the actual
+ * data range to prevent the flat-line problem (doc/guide/grafici.md § Recharts).
  */
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer } from '@/components/ui/charts/recharts';
 import { formatPercentage } from '@/lib/services/chartService';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
+import { SAVINGS_RATE_FLOOR } from '@/lib/utils/savingsRate';
+import { buildSavingsRateBridges } from '@/lib/utils/analisiSummary';
 
 // 20% is the commonly cited minimum savings target for Italian households.
 // Above this line = "on track"; below = "needs attention" (red zone).
 const SAVINGS_TARGET = 20;
+
+/** What a month without a rate is, in the chart's description and in its tooltip. */
+const gapLabel = (overspent: boolean) => (overspent ? 'spese oltre le entrate' : 'nessuna entrata');
 
 export function SavingsRateLineChart({
   data,
   colors,
   height,
 }: {
-  data: Array<{ label: string; rate: number | null }>;
+  data: Array<{ label: string; rate: number | null; overspent: boolean }>;
   colors: string[];
   height: number;
 }) {
+  const stroke = colors[0] ?? '#6366f1';
+  const bridges = buildSavingsRateBridges(data);
+
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart
@@ -34,7 +44,7 @@ export function SavingsRateLineChart({
         margin={{ top: 4, right: 16, left: -16, bottom: 0 }}
         role="img"
         accessibilityLayer={false}
-        aria-label={`Tasso di risparmio per mese, obiettivo ${SAVINGS_TARGET}%. ${data.map((point) => `${point.label}: ${point.rate === null ? 'nessuna entrata' : formatPercentage(point.rate, 1)}`).join('; ')}`}
+        aria-label={`Tasso di risparmio per mese, obiettivo ${SAVINGS_TARGET}%. ${data.map((point) => `${point.label}: ${point.rate === null ? gapLabel(point.overspent) : formatPercentage(point.rate, 1)}`).join('; ')}`}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
 
@@ -46,20 +56,25 @@ export function SavingsRateLineChart({
           tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
-          domain={['auto', 'auto']}
+          // The floor of the savings rate (`SAVINGS_RATE_FLOOR`): a point is never below it, and the
+          // axis never reaches past it on its own rounding.
+          domain={[(min: number) => Math.max(Math.floor(min), SAVINGS_RATE_FLOOR), 'auto']}
         />
 
         {/* CSS vars for tooltip — never hardcoded hex (doc/guide/grafici.md § Recharts — tooltip style props) */}
         <Tooltip
-          formatter={(value) =>
-            value != null ? [formatPercentage(Number(value), 1), 'Tasso di risparmio'] : ['—', '']
-          }
+          formatter={(value) => [formatPercentage(Number(value), 1), 'Tasso di risparmio']}
+          // A month without a rate has no item to format (recharts drops a null value): its label says why.
+          labelFormatter={(label) => {
+            const point = data.find((entry) => entry.label === label);
+            return point && point.rate === null ? `${label} · ${gapLabel(point.overspent)}` : label;
+          }}
           contentStyle={{
             backgroundColor: 'var(--card)',
             border: '1px solid var(--border)',
             color: 'var(--card-foreground)',
             fontSize: 12,
-            borderRadius: 8,
+            borderRadius: 'var(--costume-control-frame-radius, 8px)',
           }}
           labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}
         />
@@ -81,10 +96,27 @@ export function SavingsRateLineChart({
           }}
         />
 
+        {/* A gap is bridged, never drawn as a rate: dashed, in the line's own colour, under it. */}
+        {bridges.map(({ from, to }) => (
+          <ReferenceLine
+            key={`${from.label}-${to.label}`}
+            segment={[
+              { x: from.label, y: from.rate },
+              { x: to.label, y: to.rate },
+            ]}
+            stroke={stroke}
+            strokeWidth={2}
+            strokeDasharray="2 5"
+            strokeOpacity={0.7}
+            strokeLinecap="round"
+            className="savings-bridge"
+          />
+        ))}
+
         <Line
           type="monotone"
           dataKey="rate"
-          stroke={colors[0] ?? '#6366f1'}
+          stroke={stroke}
           strokeWidth={2}
           dot={false}
           activeDot={{ r: 5, strokeWidth: 0 }}

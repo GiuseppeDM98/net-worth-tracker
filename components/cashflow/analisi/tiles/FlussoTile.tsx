@@ -11,7 +11,10 @@ import {
   buildSpendingRolesFlowData,
   buildSpendingRolesFlowDataWithSubcategories,
   buildTypeDrillDownData,
+  COLORS,
+  costumeSankeyPalette,
   countSankeyLayers,
+  DEFAULT_SANKEY_TYPE_PALETTE,
   DEFAULT_SPENDING_ROLE_PALETTE,
   resolveSankeyHeight,
   MAX_SUBCATEGORY_CATEGORIES,
@@ -20,14 +23,16 @@ import {
   type SpendingRolePalette,
 } from '@/lib/utils/cashflowSankey';
 import { SPENDING_BUCKET_LABELS, type SpendingBucket, type SpendingRoleSource, type SpendingRolesSummary } from '@/lib/utils/spendingRoles';
-import { buildTypeFlowBreakdown, type FlowSummary } from '@/lib/utils/analisiSummary';
+import { buildTypeFlowBreakdown, type FlowSummary, type FlussoLiftedBlock } from '@/lib/utils/analisiSummary';
 import type { ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 import { useCssColorTokens } from '@/lib/hooks/useCssColorTokens';
+import { SANKEY_COSTUME_TOKEN, type SankeyCostumeKey } from '@/lib/constants/sankeyCostumeColors';
 import { SPENDING_ROLE_TOKEN } from '@/lib/constants/spendingRoleColors';
+// From ColorThemeContext, not CostumeScopeContext: the shared bundle (see `CostumeScopeContext` there).
+import { useThemeCostume } from '@/contexts/ColorThemeContext';
 import { narrativeToText } from '@/lib/utils/narrative';
 import { cn } from '@/lib/utils';
-import { Tile, type TileCollapse } from '@/components/ui/tile';
-import { ANALISI_CLOSED_ASIDES } from '@/lib/utils/analisiNarrative';
+import { Tile } from '@/components/ui/tile';
 import { AsideToggle } from '@/components/ui/aside-toggle';
 import { DrillBreadcrumb } from '@/components/ui/drill-breadcrumb';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,7 +47,7 @@ export interface SpendingRolesFlowInput {
   reading: Narrative | null;
 }
 
-interface FlussoTileProps {
+export interface FlussoTileProps {
   /** The period's rows (income + spending); transfers are not flows. */
   expenses: Expense[];
   /** In a cell narrower than a 640px phone's (and in the landscape index): a share bar and rows, never a Sankey. */
@@ -61,12 +66,6 @@ interface FlussoTileProps {
    */
   onEntityClick: (target: { expenseType: ExpenseType; categoryKey: string; subCategoryKey?: string }) => void;
   /**
-   * The row below `desktop:` (`useMobileSections().collapse(id)`). Closed it says its view in words
-   * («per ruolo» / «per tipo»), which only this tile knows; the toggle is a control, so it opens the
-   * panel. The view is the tile's own state: not in the page's memory, «Per ruolo» at every mount.
-   */
-  collapse?: TileCollapse;
-  /**
    * The strip's «Risparmio» cell prints the surplus (The Lifted-Figure Rule): in a cell narrower than
    * 608px (the share bar's drawing, since 2026-10-16) the blocks that print it again hide — the type
    * view's «Risparmio», the roles view's note (and «Risparmi» whole without a saving row). The bar
@@ -78,19 +77,12 @@ interface FlussoTileProps {
   className?: string;
 }
 
-/** The blocks of the Flusso a phone's strip repeats (since 2026-10-14). */
-export type FlussoLiftedBlock = 'risparmio';
-
-/** Narrows the `string[]` of `liftedBlocks(strip, section)` to this tile's blocks at the call site. */
-export function isFlussoLiftedBlock(block: string): block is FlussoLiftedBlock {
-  return block === 'risparmio';
-}
-
 /**
  * The Sankey (`@nivo/sankey`, d3-sankey and react-spring) is its own chunk, requested only where
  * the tile draws it — from 640px: a phone, which gets the share bar and rows, never downloads it
- * (2026-09-30; pinned by `e2e/bundle.lazy{,.mobile}.spec.ts`). Declared at MODULE level,
- * never in a render (AGENTS.md § Dynamic Imports). The wait fills the box the plot is given: the
+ * (2026-09-30; pinned by `e2e/bundle.lazy{,.mobile}.spec.ts`). The tile itself is loaded on demand
+ * inside «Dettaglio» since 2026-11-12 (`DettaglioDisclosure`), so this module is evaluated at idle.
+ * Declared at MODULE level, never in a render (AGENTS.md § Dynamic Imports). The wait fills the box the plot is given: the
  * caller wraps it in a container of the view's own height (`resolveSankeyHeight`), so the chart
  * lands in place and nothing under the tile moves.
  *
@@ -99,16 +91,21 @@ export function isFlussoLiftedBlock(block: string): block is FlussoLiftedBlock {
  * `lazyComponent`, not a `next/dynamic`: with the chunk already in memory the chart draws in the
  * same render as the figures, where a Suspense fallback held the placeholder ~275 ms longer
  * (measured on the mirror, the same day). The width test is where the Sankey is DRAWN: a cell of
- * 608px or more (AnalisiTab, `FLUSSO_SANKEY_MIN_CELL`) — from a 640px viewport up to the landscape
- * stage, which starts at a content box of 880px (a 912px viewport: there the Flusso is a row of the
- * 360px index and draws bar and rows, 2026-10-16), and again at 1440. Elsewhere nothing is fetched;
+ * 608px or more (`DettaglioDisclosure`, `FLUSSO_SANKEY_MIN_CELL`) — from a 640px viewport up: «Dettaglio»
+ * sits below the grid at the page's whole width, the landscape stage included (2026-11-12). Elsewhere nothing is fetched;
  * a rotation that brings the Sankey back downloads it at its first draw.
  */
-const SANKEY_DRAWN_QUERY = '(min-width: 640px) and (max-width: 911px), (min-width: 1440px)';
+const SANKEY_DRAWN_QUERY = '(min-width: 640px)';
 const CashflowSankeyChart = lazyComponent(() => import('@/components/cashflow/CashflowSankeyChart').then((m) => m.CashflowSankeyChart));
 if (typeof window !== 'undefined' && window.matchMedia(SANKEY_DRAWN_QUERY).matches) {
   CashflowSankeyChart.preload().catch(() => {}); // a failure is retried by the first draw
 }
+
+/** What a costumed flow paints with until the theme's slots are read: today's hexes, slot by slot. */
+const SANKEY_COSTUME_FALLBACK: Record<SankeyCostumeKey, string> = {
+  slot1: COLORS[0], slot2: COLORS[1], slot3: COLORS[2], slot4: COLORS[3], slot5: COLORS[4],
+  slot6: COLORS[5], slot7: COLORS[6], slot8: COLORS[7], slot9: COLORS[8], positive: '#10b981',
+};
 
 type FlowMode = 'types' | 'roles';
 
@@ -136,13 +133,13 @@ type DrillState =
  *
  * THE FLUSSO PICKS ITS DRAWING BY ITS CELL (owner's decision, 2026-09-27, at a 640px viewport; by the
  * cell since 2026-10-16): a legibility threshold of the chart, not a second composition. In a cell of
- * 608px or more (`FLUSSO_SANKEY_MIN_CELL` in AnalisiTab: a 640px viewport's cell) the Sankey; in a
- * narrower one — a phone, where a four-column flow gets ~80px a column, and the landscape index — the
+ * 608px or more (`FLUSSO_SANKEY_MIN_CELL` in DettaglioDisclosure: a 640px viewport's cell) the Sankey; in a
+ * narrower one — a phone, where a four-column flow gets ~80px a column — the
  * SAME figures as a share bar and ranked rows — SpendingRolesMobileFlow for the roles view,
  * SpendingTypesMobileFlow for the type view, both drawn by FlowShareMobile. In a narrow cell no Sankey
  * model is built at all (no view, no height, no label), and the role colours are not read.
  */
-export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, scheduled, scheduledHorizon, onEntityClick, collapse, liftedFigures = [], printedFigures, className }: FlussoTileProps) {
+export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, scheduled, scheduledHorizon, onEntityClick, liftedFigures = [], printedFigures, className }: FlussoTileProps) {
   const savingsLifted = liftedFigures.includes('risparmio');
   const [showSubcategories, setShowSubcategories] = useState(false);
   const [preferredMode, setPreferredMode] = useState<FlowMode>('roles');
@@ -163,24 +160,29 @@ export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, s
   const rolesSankeyDrawn = !isMobile && spendingRoles !== null && mode === 'roles';
   // SPENDING_ROLE_TOKEN is a module-level constant, so the hook's effect sees a stable identity.
   const palette: SpendingRolePalette = useCssColorTokens(SPENDING_ROLE_TOKEN, DEFAULT_SPENDING_ROLE_PALETTE, rolesSankeyDrawn);
+  // Under a costume theme the flow takes the theme's slots, as the ring beside it does; in a palette theme the
+  // module constant, so no memo below ever rebuilds for it.
+  const costumed = useThemeCostume() !== null;
+  const slotHex = useCssColorTokens(SANKEY_COSTUME_TOKEN, SANKEY_COSTUME_FALLBACK, costumed && !isMobile);
+  const typePalette = useMemo(() => (costumed ? costumeSankeyPalette(slotHex) : DEFAULT_SANKEY_TYPE_PALETTE), [costumed, slotHex]);
 
-  // Every view that does NOT read the palette — the type flow and both drills (a drill takes its
-  // colour from the clicked node) — so a palette read never rebuilds them. Null on a phone.
+  // Every view that does NOT read the role palette — the type flow and both drills (a drill takes its
+  // colour from the clicked node) — so a role-palette read never rebuilds them. Null on a phone.
   const plainView = useMemo((): SankeyView | null => {
     if (isMobile) return null;
     if (drill?.kind === 'type') return buildTypeDrillDownData(expenses, drill.expenseType, drill.color);
     if (drill?.kind === 'role' && spendingRoles) return buildSpendingRoleDrillDownData(expenses, spendingRoles.categories, drill.bucket, drill.color);
     if (mode === 'roles') return null;
-    return showSubcategories ? buildBudgetFlowDataWithSubcategories(expenses) : buildBudgetFlowData(expenses);
-  }, [isMobile, drill, expenses, spendingRoles, mode, showSubcategories]);
+    return showSubcategories ? buildBudgetFlowDataWithSubcategories(expenses, typePalette) : buildBudgetFlowData(expenses, typePalette);
+  }, [isMobile, drill, expenses, spendingRoles, mode, showSubcategories, typePalette]);
 
   // The roles flow, the one view painted with the theme's role colours.
   const rolesView = useMemo((): SankeyView | null => {
     if (!rolesSankeyDrawn || drill || !spendingRoles) return null;
     return showSubcategories
-      ? buildSpendingRolesFlowDataWithSubcategories(expenses, spendingRoles.categories, palette)
-      : buildSpendingRolesFlowData(expenses, spendingRoles.categories, palette);
-  }, [rolesSankeyDrawn, drill, spendingRoles, showSubcategories, expenses, palette]);
+      ? buildSpendingRolesFlowDataWithSubcategories(expenses, spendingRoles.categories, palette, typePalette)
+      : buildSpendingRolesFlowData(expenses, spendingRoles.categories, palette, typePalette);
+  }, [rolesSankeyDrawn, drill, spendingRoles, showSubcategories, expenses, palette, typePalette]);
 
   const view = rolesView ?? plainView;
 
@@ -233,8 +235,6 @@ export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, s
   return (
     <Tile
       eyebrow="Flusso"
-      collapse={collapse}
-      asideWhenClosed={mode === 'roles' ? ANALISI_CLOSED_ASIDES.flussoRoles : ANALISI_CLOSED_ASIDES.flussoTypes}
       aside={
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
           {view && (

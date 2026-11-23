@@ -12,6 +12,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { formatPercentage } from '@/lib/services/chartService';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface CompositionBarSegment {
   key: string;
@@ -82,14 +83,14 @@ export function CompositionBar({ segments, ariaLabel, showLegend = true, ticks, 
 
   const bar = (
     <div
-      className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
+      className={`flex h-2.5 w-full overflow-hidden ${COSTUME_PILL_RADIUS_CLASS} bg-muted`}
       role="img"
       aria-label={ariaLabel}
     >
       {segments.map((seg, i) => (
         <motion.div
           key={seg.key}
-          className="h-full first:rounded-l-full last:rounded-r-full"
+          className="h-full first:rounded-l-[var(--costume-control-pill-radius,calc(infinity*1px))] last:rounded-r-[var(--costume-control-pill-radius,calc(infinity*1px))]"
           style={{ backgroundColor: seg.color }}
           title={`${seg.label} · ${printed(seg)}`}
           initial={reducedMotion ? false : { width: 0 }}

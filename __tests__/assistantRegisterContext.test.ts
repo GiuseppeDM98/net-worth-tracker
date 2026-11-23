@@ -376,6 +376,8 @@ describe('buildAssistantRegisterContext — PATTERN', () => {
     const rows = [
       ...spread(3, {}),
       row({ date: italian('2026-10-11'), categoryId: 'cat-cibo', amount: -1, linkedCashAssetId: 'acc-empty', feeOfTransferId: 'exp-x' }),
+      // A trade's fee row (2026-11-12): written by its trade, never a habit to propose.
+      row({ date: italian('2026-10-11'), categoryId: 'cat-cibo', amount: -5, feeOfTradeId: 'trade-x' }),
       row({ date: italian('2026-10-12'), type: 'transfer', categoryId: 'cat-giro', categoryName: 'Giroconto', amount: -100, linkedCashAssetId: 'acc-main' }),
     ];
     const block = formatRegisterContextForPrompt(buildAssistantRegisterContext(input({ recentExpenses: rows })));

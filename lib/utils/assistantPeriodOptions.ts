@@ -1,19 +1,12 @@
 /**
- * Pure helpers for the assistant's single period axis: selectable month/year
- * options and the human-readable labels derived from the current selection.
- *
- * Extracted from AssistantPageClient so the page stays
- * an orchestrator and these date-window rules become unit-testable. All "now"
- * reads go through the Italy-timezone helpers — never Date.getMonth().
+ * Pure helpers for the assistant's periods: the selectable month/year options of the chooser
+ * «cambia» opens, the label of a thread's mode, and the composer's length cap. The period axis
+ * and its derived labels left with the chat-only page (2026-11-12). All "now" reads go through
+ * the Italy-timezone helpers — never Date.getMonth().
  */
-import { getItalyDateIso, getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
-import {
-  AssistantChatContextType,
-  AssistantMode,
-  AssistantMonthSelectorValue,
-  AssistantThread,
-} from '@/types/assistant';
+import { AssistantMode, AssistantMonthSelectorValue } from '@/types/assistant';
 
 /**
  * Builds the list of selectable months (current month + 3 years back).
@@ -33,21 +26,6 @@ export function buildMonthOptions(): AssistantMonthSelectorValue[] {
   }
 
   return options;
-}
-
-/**
- * Returns the previous completed month relative to Italy "now".
- *
- * Used as the default monthly selection: the current month is still in progress
- * (often without a snapshot yet), so analysing it greets the user with an empty
- * period. The last closed month always has data and is the natural review target.
- */
-export function getPreviousCompletedMonth(): AssistantMonthSelectorValue {
-  const { year, month } = getItalyMonthYear(new Date());
-  if (month === 1) {
-    return { year: year - 1, month: 12 };
-  }
-  return { year, month: month - 1 };
 }
 
 /**
@@ -103,107 +81,4 @@ export function describePromptLength(length: number): string | null {
   // `useGrouping: 'always'`: it-IT leaves a four-digit number ungrouped («3812») by default.
   const format = (value: number) => new Intl.NumberFormat('it-IT', { useGrouping: 'always' }).format(value);
   return `${format(length)} / ${format(ASSISTANT_PROMPT_MAX_LENGTH)} caratteri`;
-}
-
-/**
- * Today's register thread: Registra keeps ONE thread per Italian day («Registrazioni · 1 nov
- * 2026»), so entering the mode resumes it and the day's rows stay in one conversation. A thread
- * created at 23:30 Italian time yesterday is yesterday's, whatever the process zone.
- */
-export function findRegisterThread(threads: AssistantThread[], todayIso: string): AssistantThread | undefined {
-  return threads.find((thread) => thread.mode === 'register' && getItalyDateIso(thread.createdAt) === todayIso);
-}
-
-/**
- * Finds an existing thread pinned to the given mode + period, so a period
- * switch can resume the matching conversation instead of starting a duplicate.
- * chat (Libera) mode returns undefined by design — a free question always
- * starts fresh.
- */
-export function findThreadForPeriod(
-  threads: AssistantThread[],
-  mode: AssistantMode,
-  selectedMonth: AssistantMonthSelectorValue,
-  selectedYear: number
-): AssistantThread | undefined {
-  if (mode === 'month_analysis') {
-    return threads.find(
-      (t) =>
-        t.mode === 'month_analysis' &&
-        t.pinnedMonth?.year === selectedMonth.year &&
-        t.pinnedMonth?.month === selectedMonth.month
-    );
-  }
-  if (mode === 'year_analysis') {
-    return threads.find((t) => t.mode === 'year_analysis' && t.pinnedYear === selectedYear);
-  }
-  if (mode === 'ytd_analysis') {
-    return threads.find((t) => t.mode === 'ytd_analysis');
-  }
-  if (mode === 'history_analysis') {
-    return threads.find((t) => t.mode === 'history_analysis');
-  }
-  // Registra has no period: its thread is the day's (`findRegisterThread`).
-  if (mode === 'register') return undefined;
-  return undefined;
-}
-
-/**
- * Maps the live selection to the mode whose builder should feed the scheda
- * preview. In Libera mode an attached context maps to the matching analysis
- * builder, so the scheda shows that period's numbers before asking; with no
- * context attached it stays 'chat' (no numeric period — the "patrimonio oggi"
- * card stands in).
- */
-export function resolveAssistantPreviewMode(
-  mode: AssistantMode,
-  chatContextType: AssistantChatContextType
-): AssistantMode {
-  if (mode !== 'chat') return mode;
-  if (chatContextType === 'month') return 'month_analysis';
-  if (chatContextType === 'year') return 'year_analysis';
-  if (chatContextType === 'ytd') return 'ytd_analysis';
-  if (chatContextType === 'history') return 'history_analysis';
-  return 'chat';
-}
-
-/**
- * Composer placeholder reflecting the active period (the selector lives above it).
- * In Libera mode it hints the optionally attached context.
- */
-export function buildComposerPlaceholder(
-  mode: AssistantMode,
-  chatContextType: AssistantChatContextType,
-  selectedMonth: AssistantMonthSelectorValue,
-  selectedYear: number
-): string {
-  const monthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
-  if (mode === 'register') return 'Scrivi cosa hai speso, incassato o spostato…';
-  if (mode === 'month_analysis') return `Scrivi la tua domanda su ${monthLabel}…`;
-  if (mode === 'year_analysis') return `Scrivi la tua domanda sull'anno ${selectedYear}…`;
-  if (mode === 'ytd_analysis') return "Scrivi la tua domanda sull'andamento da inizio anno…";
-  if (mode === 'history_analysis') return 'Scrivi la tua domanda sullo storico del portafoglio…';
-  if (chatContextType === 'month') return `Scrivi la tua domanda — contesto: ${monthLabel}…`;
-  if (chatContextType === 'year') return `Scrivi la tua domanda — contesto: anno ${selectedYear}…`;
-  if (chatContextType === 'ytd') return 'Scrivi la tua domanda — contesto: da inizio anno…';
-  if (chatContextType === 'history') return 'Scrivi la tua domanda — contesto: storico totale…';
-  return 'Scrivi una domanda libera sul tuo portafoglio…';
-}
-
-/**
- * Empty-state heading phrased per period — explicit copy reads better than
- * string-surgery on the conversation-header label.
- */
-export function buildEmptyStateQuestion(
-  mode: AssistantMode,
-  selectedMonth: AssistantMonthSelectorValue,
-  selectedYear: number
-): string {
-  const monthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
-  if (mode === 'chat') return 'Cosa vuoi chiedere?';
-  if (mode === 'register') return 'Cosa vuoi registrare?';
-  if (mode === 'month_analysis') return `Cosa vuoi sapere su ${monthLabel}?`;
-  if (mode === 'year_analysis') return `Cosa vuoi sapere sul ${selectedYear}?`;
-  if (mode === 'ytd_analysis') return "Cosa vuoi sapere sull'andamento da inizio anno?";
-  return 'Cosa vuoi sapere sullo storico del portafoglio?';
 }

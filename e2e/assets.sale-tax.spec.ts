@@ -14,7 +14,9 @@
  * Falsified once each (the spec went red): the tax dropped from `computeCashDelta`; the prefill
  * effect ignoring `isTaxTyped`; the clear-guard removed from `updateAssetMetadata`.
  *
- * The test plants its own instrument and account (decoy names absent from the seed) and removes
+ * The sale's fee is a spending row of its own since 2026-11-12: the test plants a fee category
+ * (and names it in the settings, whose WHOLE document it restores), and the tax base deducts the
+ * fee. The test plants its own instrument and account (decoy names absent from the seed) and removes
  * what it and the app created in `finally` — data-only, never a re-seed
  * (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
  */
@@ -27,6 +29,7 @@ process.env.GCLOUD_PROJECT = 'demo-net-worth';
 const UID = 'test-user-1';
 const ETF_ID = 'e2e-saletax-tapiro';
 const ACCOUNT_ID = 'e2e-saletax-fenicottero';
+const FEE_CATEGORY_ID = 'e2e-saletax-fee-category';
 
 test.setTimeout(240_000);
 
@@ -53,11 +56,18 @@ async function plant(db: FirebaseFirestore.Firestore) {
     userId: UID, ticker: '', name: 'Fenicottero Broker', type: 'cash', assetClass: 'cash', currency: 'EUR',
     quantity: 1000, currentPrice: 1, isLiquid: true, autoUpdatePrice: false, createdAt: now, updatedAt: now, lastPriceUpdate: now,
   });
+  await db.collection('expenseCategories').doc(FEE_CATEGORY_ID).set({
+    userId: UID, name: 'Commissioni Tapiro', type: 'variable', subCategories: [], createdAt: now, updatedAt: now,
+  });
+  await db.collection('assetAllocationTargets').doc(UID).set({ transferFeeCategoryId: FEE_CATEGORY_ID }, { merge: true });
 }
 
 async function remove(db: FirebaseFirestore.Firestore) {
   const trades = await db.collection('assetTransactions').where('userId', '==', UID).where('assetId', '==', ETF_ID).get();
   for (const trade of trades.docs) await trade.ref.delete();
+  const fees = await db.collection('expenses').where('userId', '==', UID).where('categoryId', '==', FEE_CATEGORY_ID).get();
+  for (const fee of fees.docs) await fee.ref.delete();
+  await db.collection('expenseCategories').doc(FEE_CATEGORY_ID).delete();
   await db.collection('assets').doc(ETF_ID).delete();
   await db.collection('assets').doc(ACCOUNT_ID).delete();
 }
@@ -70,6 +80,9 @@ async function openPatrimonio(page: Page) {
 test('a sale credits its account net of the withheld tax, and an instrument keeps its dividend account', async ({ page }) => {
   const db = await admin();
   await remove(db);
+  // The document as it was read, restored whole in `finally`: other fixtures write it too.
+  const settingsRef = db.collection('assetAllocationTargets').doc(UID);
+  const savedSettings = (await settingsRef.get()).data();
   const metaRef = db.collection('assetTransactionsMeta').doc(UID);
   const plantedMeta = !(await metaRef.get()).exists;
   if (plantedMeta) {
@@ -95,7 +108,7 @@ test('a sale credits its account net of the withheld tax, and an instrument keep
     // Half the position: a sold-out instrument leaves the Strumenti table, and step 3 edits it.
     await dialog.locator('#trade-quantity').fill('5');
     await dialog.locator('#trade-fees').fill('5');
-    await expect(tax).toHaveValue('65'); // (750 − 500) × 26%: the tax base carries no commission
+    await expect(tax).toHaveValue('63.7'); // (750 − 5 − 500) × 26%: the tax base deducts the sale's fee
 
     // ── 2. Typed, the owner's figure stays; the summary prints what the account receives ──
     await tax.fill('70');
@@ -113,6 +126,9 @@ test('a sale credits its account net of the withheld tax, and an instrument keep
     const sell = trades.docs.map((d) => d.data()).find((t) => t.type === 'sell');
     expect(sell?.withheldTaxEur).toBe(70);
     expect((await db.collection('assets').doc(ACCOUNT_ID).get()).data()?.quantity).toBeCloseTo(1675, 9); // 1000 + 750 − 5 − 70
+    // The fee is one spending row of −5 that moves no account (the settlement already debited it).
+    const feeRows = await db.collection('expenses').where('userId', '==', UID).where('categoryId', '==', FEE_CATEGORY_ID).get();
+    expect(feeRows.docs.map((d) => d.data().amount)).toEqual([-5]);
 
     // ── 3. The asset form: the dividend account is written, then REMOVED on «Predefinito» ──
     await row.getByRole('button', { name: /^Modifica / }).click();
@@ -133,6 +149,8 @@ test('a sale credits its account net of the withheld tax, and an instrument keep
     expect((await db.collection('assets').doc(ETF_ID).get()).data()).not.toHaveProperty('dividendCashAssetId');
   } finally {
     await remove(db);
+    if (savedSettings) await settingsRef.set(savedSettings);
+    else await settingsRef.delete();
     if (plantedMeta) await metaRef.delete();
   }
 });

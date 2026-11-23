@@ -260,6 +260,7 @@ export function CashflowPageClient({ assistantConfigured }: { assistantConfigure
     <PageContainer>
       <PageHeader
         label="Operatività"
+        emblem="cashflow"
         title="Cashflow"
         description="Traccia e analizza le tue entrate e uscite nel tempo"
         freshness={freshness}

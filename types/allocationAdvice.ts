@@ -20,6 +20,8 @@ import type {
   InstrumentCandidates,
 } from '@/lib/utils/allocationAdviceProposal';
 
+import type { OperatingPlan } from '@/lib/utils/operatingPlan';
+
 export type { AllocationAdviceAnswers, AllocationAdviceInterview, AllocationAdviceInterviewRound, AllocationAdviceProposal, InstrumentCandidates };
 
 /**
@@ -54,18 +56,20 @@ export type AllocationAdviceStep = (typeof ALLOCATION_ADVICE_STEPS)[number];
 /** Where a run is, in order; `ready` and `failed` are terminal, `applied` follows `ready`. */
 export type AllocationAdviceStatus = 'draft' | 'running' | 'ready' | 'failed' | 'applied';
 
-export type AllocationAdviceStage = 'context' | 'strategy' | 'instruments' | 'review';
+/** The fifth, `plan` (2026-11-19), writes the operating plan on the finished report and never moves the document's status. */
+export type AllocationAdviceStage = 'context' | 'strategy' | 'instruments' | 'review' | 'plan';
 
-export const ALLOCATION_ADVICE_STAGES: readonly AllocationAdviceStage[] = ['context', 'strategy', 'instruments', 'review'];
+export const ALLOCATION_ADVICE_STAGES: readonly AllocationAdviceStage[] = ['context', 'strategy', 'instruments', 'review', 'plan'];
 
 /**
- * The three REQUESTS a run is made of, one model call each (2026-10-20): Vercel's Hobby plan
+ * The REQUESTS a run is made of, one model call each (2026-10-20): Vercel's Hobby plan
  * stops a function at 300 s and the whole run takes six to seven minutes, so the client chains
  * one request per stage and a failed stage is retried from itself. «context» runs inside the first.
+ * The plan (2026-11-19) is the chain's fourth request; it never fails the run.
  */
-export type AllocationAdviceRunStage = 'strategy' | 'instruments' | 'review' | 'revise';
+export type AllocationAdviceRunStage = 'strategy' | 'instruments' | 'review' | 'plan' | 'revise';
 /** The chain «Avvia la ricerca» runs; `revise` is the one request «Chiedi una modifica» sends on a finished report. */
-export const ALLOCATION_ADVICE_RUN_STAGES: readonly AllocationAdviceRunStage[] = ['strategy', 'instruments', 'review'];
+export const ALLOCATION_ADVICE_RUN_STAGES: readonly AllocationAdviceRunStage[] = ['strategy', 'instruments', 'review', 'plan'];
 
 /** One agent's answer: the prose it wrote and the structure parsed out of it (null when it got the block wrong). */
 export interface AllocationAdviceStrategy {
@@ -117,6 +121,27 @@ export interface AllocationAdviceApplied {
   targetsWritten: boolean;
   rolesChanged: number;
   goalsWritten: number;
+  /** The plan of accumulation the same document created (2026-11-20), and what the click did to the open one. */
+  planId?: string;
+  planAction?: 'create' | 'replace' | 'revise';
+}
+
+/**
+ * The operating plan the «Piano» stage wrote on the finished report (2026-11-19), with its OWN
+ * status: the stage never touches the document's `status`, `stage`, `error` or `updatedAt`, so a
+ * failed plan leaves the report readable and applicable.
+ */
+export interface AllocationAdviceOperatingPlan {
+  status: 'running' | 'ready' | 'failed';
+  /** 'ready' only. */
+  plan: OperatingPlan | null;
+  /** 'failed' only: the product's sentence. */
+  error: string | null;
+  model: string | null;
+  startedAt: Date;
+  finishedAt: Date | null;
+  /** `report.finishedAt` of the report it was written on: a plan of another report is not this report's. */
+  reportFinishedAt: Date;
 }
 
 export interface AllocationAdviceDocument {
@@ -140,6 +165,8 @@ export interface AllocationAdviceDocument {
   interview: AllocationAdviceInterview | null;
   /** The round asked before the last «Chiedi una modifica», from the revise's body. */
   revisionInterview?: AllocationAdviceInterview | null;
+  /** The operating plan (2026-11-19); null when absent — an older document, a dropped plan. */
+  operatingPlan?: AllocationAdviceOperatingPlan | null;
 }
 
 /**

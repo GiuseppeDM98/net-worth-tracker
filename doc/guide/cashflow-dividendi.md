@@ -11,7 +11,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility}.ts` (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` (`useDividendRegistry` for the page's list, `useDividendStats` for the tab's measures: ONE request) → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
 - **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendAccount`, `dividendIncomeService`, `floatNoise` · **Email** `monthlyEmailService`
-- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles) · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
+- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles), `pagatoriTile`, `searchableComboboxRefocus` (the picker after a refusal) · **Browser** `e2e/cashflow.dividendi{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts` · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
 
 ## Cashflow › Dividendi (`components/dividends/DividendTrackingTab.tsx`, `components/dividends/tiles/*`)
 - **RECEIVED AND ANNOUNCED ARE NEVER ONE FIGURE.** A dividend whose `paymentDate` is in the future is
@@ -84,10 +84,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   più answer in the present tense («posso contare su questo reddito?»), so they measure the
   instruments STILL HELD — `computeReliability` and `rankPayerShares` take `heldAssetIds` (the page's
   assets with `quantity > 0`) — and name what the sold ones paid in their own clause: the reading
-  («altri 186 € da 2 strumenti venduti»), the residual row («2 strumenti venduti», so the shares still
+  («altri 200 € da 2 strumenti venduti»), the residual row («2 strumenti venduti», so the shares still
   add up to the aside's total, which stays the period's), the footer (`describeSoldIncomeNote`) and,
-  when every payer was sold, the empty copy of Affidabilità. On the owner's mirror «Concentrazione
-  alta: SPM.MI vale il 47% del netto» was a risk warning on a stock already sold. The window's length
+  when every payer was sold, the empty copy of Affidabilità. On a tour «Concentrazione
+  alta: ABC.MI vale il 50% del netto» was a risk warning on a stock already sold. The window's length
   never follows the subset: two months paid out of nine is «2 su 9», not «2 su 2».
 - **The verdict's yield clause names its window and its population.** «; l'unico strumento con costo
   medio rende l'1,3% lordo sul costo negli ultimi 12 mesi» (or «; i 7 strumenti con costo medio
@@ -126,6 +126,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The type labels are the readings' words**: «Acconto» and «Saldo» (`dividendTypeLabels`), the one
   map the select, the table and the two detail dialogs read — the article map `LARGEST_TYPE_PREFIX`
   and `dividendTypeNoun` («la cedola», «il dividendo») live in `dividendiNarrative.ts`.
+- **«Chi paga di più» is a ring when the payers are one positive whole** (2026-11-15; The Ring Rule, 2026-11-12):
+  `payerRingSegments(ranking)` — the held rows by rank (`RING_CATEGORY_COLORS`), then the remainder («Altri N strumenti» /
+  «N strumenti venduti») in `RING_REST_COLOR`; `null` with fewer than two parts above zero (one held payer and nothing else,
+  or only sold instruments) or a part that prints below zero — a remainder below zero enters the segments so the whole is
+  refused (the centre prints `ranking.total`, which counts it); one at zero is left out, as `RankedRows` leaves it. One held
+  payer beside a sold one's remainder is a ring of two. The centre is `total` «netti» (the aside's figure again, declared);
+  the rows its legend, the swatch of their key. In the `desktop:col-span-4` cell the ring stands above its rows. Tests
+  `dividendAnalytics.test.ts` (V1), `__tests__/pagatoriTile.test.tsx`; browser `e2e/ring-chart.dividendi.spec.ts`.
 
 ## Dividends and Coupons
 - **A bond may pay ONE coupon, with the redemption** (`CouponFrequency 'maturity'`, 2026-10-10 — the BTP Valore
@@ -156,7 +164,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   account, or is in another currency than the row, is skipped and the row written without a link. The BALANCE the
   credit lands on is rounded to the cent too (2026-10-07, doc/guide/cashflow.md § Expense Sign Convention).
 - **A coupon per unit is stored as the decimal it is, not its binary neighbour** (2026-10-07,
-  `lib/utils/floatNoise.ts`): `(1,3 / 100 / 2) × 1000` is 6.500000000000001 in binary, and the owner's BTP Valore showed
+  `lib/utils/floatNoise.ts`): `(1,3 / 100 / 2) × 1000` is 6.500000000000001 in binary, and a BTP Valore showed
   it in «Importo lordo per unità». It cannot be cents — a BTP€i per 1 € of nominal has five or six meaningful decimals —
   so `stripFloatNoise` keeps twelve significant digits: in `calculateCouponPerShare`, in `resolveCoupon`'s indexed
   coupon (× coefficient, + FOI inflation) and in the final premium (`couponScheduling`). Records saved before keep their
@@ -205,7 +213,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   takes the coupon's day, else the latest of its month; `latestIndexationCoefficient(entries, asOf)` feeds the
   valuation and the provisional estimate; `upsertIndexationCoefficient` replaces the same day only). The dialog that
   finalises a provisional coupon is ONE component for both mechanisms (`InflationRateDialog`: FOI % or coefficient,
-  copy from `MECHANISM_COPY`), and the banner/button say «dato d'inflazione», never «tasso FOI».
+  copy from `MECHANISM_COPY`), and the banner/button say «dato d'inflazione», never «tasso FOI». The banner lists
+  a provisional coupon through its payment day by the ITALIAN calendar (`isPendingProvisionalCoupon`,
+  `lib/utils/couponUtils.ts`, 2026-11-15): a coupon is stored at the UTC midnight of its date, and an instant
+  comparison with `now` dropped it on the very day it is paid.
 - **A zero-coupon bond (rate 0) saves its details and materialises nothing** (issue #340): `buildBondDetailsFromForm`
   (`lib/utils/bondDetailsForm.ts`, pure, tested against the real function) treats only an EMPTY rate as missing, and
   `scheduleNextCoupon` returns `{ scheduled: false }` through `hasCouponPayments` (rate 0 and no positive tier). Cron
@@ -283,11 +294,11 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 
 - **No strip on a phone** (2026-10-12): under the title there is the period pill and the «+», then the verdict's one sentence — received and announced are never one figure, and the two already open THE tile; a reader looking for the three cells the other tabs show finds none here, by design. Not proven in a browser: Pagamenti open by default while a provisional coupon asks for its rate, and the «nothing recorded» state on a phone (no axis, no rows, no memory) — the fixtures' coupons are past and not provisional.
 - **Rendimento's failure is spoken once, by the page** (2026-10-12): on a phone the row's notice and the Dettaglio's are silent (`live={false}`), `PageRest`'s one sentence says «1 sezione non è stata letta: Rendimento.»; a reader who closed the row sees the red eyebrow and nothing else until the next visit, when it opens again.
-- **`e2e/cashflow.dividendi.spec.ts` › «the form refuses…» is red after `cashflow.accounts` + `cashflow.budget`** (2026-09-30:
-  3/3 on a clean `develop` worktree, 2/3 on the branch of PR #418, green alone): after the refusal the dialog stays open
-  with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red; green in
-  the evening's full run of the same day (162/162). (moved from `CLAUDE.md` → Known Issues on 2026-10-07) Returned on
-  2026-11-03 (desktop project, once in 108): the BTP row detached from the picker as it was clicked; green ×3 alone.
+- **A refused submit focuses the picker back, and it stays open to typing** (2026-11-19): the click on «Registra
+  pagamento» blurs the field the dialog focused at open, and the refusal focuses it again inside the combobox's 200 ms
+  blur delay; `SearchableCombobox`'s `handleFocus` clears that pending blur (`__tests__/searchableComboboxRefocus.test.tsx`).
+  Before, «BTP» typed right after a refusal opened no list — the intermittent red of `e2e/cashflow.dividendi.spec.ts`
+  «the form refuses…» since 2026-09-30 (doc/guide/e2e-suite.md).
 
 - **A coupon recovered the day after a missed cron is NOT credited to its account** — by the owner's rule (only a
   payment dated today or later credits, so arrears never count twice). The income row is there, without an account:

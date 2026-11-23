@@ -7,7 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dialog e form trasversali**: `components/ui/{responsive-modal,modal-status-line}.tsx` (`ModalWidth` sm/md/lg/xl), `lib/utils/modalOrigin.ts` (`resolveCenteredModalOrigin`), `lib/utils/dialogNarrative.ts` (`describeFormRefusal`, `describeExpenseDeleteConsequence`, `describeSeriesDeleteReading`, `describeMovementDetailReading`, `describeMovementsFilterReading`, `describeSnapshotOverwrite`), `lib/hooks/useArmedDelete.ts`, `components/expenses/SeriesDeleteDialog.tsx` (`resolveSeriesDeleteMode` = the ONE rule for «solo questa o tutte?»), `lib/constants/aiModels.ts`; `components/layout/LogoutDialog.tsx` stays an `AlertDialog` — doc/guide/dialog.md
-- **The mounts**: 42 in 41 files (`grep -rnw '<ResponsiveModal' components app`, 2026-11-11 — the word match, or
+- **The mounts**: 48 in 46 files (`grep -rnw '<ResponsiveModal' components app`, re-measured 2026-11-21 after the PAC editor was deleted: a session that adds or deletes a modal runs the grep again, the figure is never derived from the written one — the word match, or
   the props type in `responsive-modal.tsx` counts too); the latest is «Vai a una pagina», the index of the
   Consulente's book (`components/allocation/consulente/ConsulenteBook.tsx`: rows of 44px, no footer, `returnFocusTo`
   the new page's headline, because the opener slides away with its page).
@@ -22,6 +22,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   body · footer. `ResponsiveModal` owns the whole shell, so a caller passes content and never chrome — and never
   branches on `useMediaQuery` to order two buttons: the footer is `justify-end` on a dialog and `flex-col-reverse` at
   `h-11` on a drawer, so writing «Annulla» then the primary in DOM order puts the primary on TOP on a phone.
+- **The costume follows a portal** (2026-11-22): the dialog, alert, drawer and sheet primitives carry
+  `data-costume-scope` themselves, as do the popover, select, menu and tooltip contents (`useCostumeScopeProps()`,
+  doc/guide/temi.md § Il costume); a new portalled primitive spreads it too. A component test that renders one mocks
+  `@/lib/firebase/config`, `AuthContext` and `userPreferencesService`.
 - **Four widths, and no others**: `sm` 420 · `md` 560 · `lg` 720 · `xl` 960. `dialogClassName` survives as an escape
   hatch and currently has no user; reach for a width name first.
 - **A dropdown below 769px is a bottom sheet** (owner, 2026-11-06: «every dropdown in a separate window on a phone»;
@@ -130,6 +134,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   ref); what proves it is a `[role=dialog][data-state="closed"]` frame watched from BEFORE the Escape
   (`e2e/assets.rows.spec.ts`). On a hand-over to another modal, clear the closing one's opener (or move it to the next
   modal), or its restore sends the focus behind the modal that is opening.
+- **A modal in costume** (2026-11-23; DESIGN.md → The Costume Rule, doc/guide/temi.md § Il costume): the dialog,
+  the alert dialog and the drawer carry `data-costume-frame`, which gives them the tile's corner and its cap or
+  marks and keeps the Float shadow (never `data-tile`: the tile's shadow would replace it); the title is
+  `.costume-title` — the costume's face, its 20px unchanged —, a string title and the eyebrow go through
+  `HeadingText` so a figure stays mono, a node title is the host's (it wraps its own figures); the drawer's top
+  corners read the frame radius with their 10px. A box inside a modal that is not a tile takes
+  `COSTUME_FRAME_RADIUS_CLASS` through `cn()`, never a bare `rounded-xl` (`themeCostume.test.ts` scans the listed
+  files). A palette theme renders as before: the neutral baseline holds the dialog, the drawer and both titles.
 - **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
   comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
   shadow; assert the modal's surface equals a TILE's instead.
@@ -178,7 +190,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   focus stays on the opener behind the sheet, and after a hand-over between two drawers (a detail → its edit form)
   it lands on `body` because the opener has unmounted. A dialog above 768 focuses itself as Radix does. Not
   changed: `autoFocus` on a phone opens the keyboard on every form's first field, which is why vaul ships it off —
-  it is a decision for all 42 mounts at once, not a polish.
+  it is a decision for every mount at once, not a polish.
   NO two-click confirm auto-disarms on a timer any more — that was not true until 2026-09-22, when Impostazioni's two
   (the category delete and the dividend sync, 3 s each) went to `useArmedDelete` with its revoke of an access. Before
   them the last one (`AssistantThreadList`, kept BY DESIGN while
@@ -200,11 +212,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   replaces it. **Since 2026-10-08 `ResponsiveModal` keeps its own fallback**: a layout effect on `open` records
   `document.activeElement` (before Radix's FocusScope moves it into the content from a passive effect) and
   `onCloseAutoFocus` restores it — skipped when it is `body` or has since unmounted — so every keyboard opener and
-  every Chrome click gets its focus back on all 42 modals without a prop (pinned by `e2e/pension.spec.ts`, seen red with
+  every Chrome click gets its focus back on every modal without a prop (pinned by `e2e/pension.spec.ts`, seen red with
   the fallback removed). `returnFocusTo` still wins and is still needed where the opener NEVER held the focus: Safari
   does not focus a clicked button, and a row opened from a window event or a non-focusable cell leaves `body` focused at
   open. Fed from `event.currentTarget` at the click (a `PageHeader` action is mounted twice; only `currentTarget` is the
-  copy that was pressed). Pinned by `e2e/performance.degraded.spec.ts`. **`ExpenseDialog` takes `returnFocusTo` and
+  copy that was pressed). Pinned by `e2e/performance.degraded.spec.ts`. **A jsdom test of `returnFocusTo` opens with
+  `fireEvent.click`, never `userEvent.click`** (2026-11-17): `userEvent` focuses the opener, so the fallback covers it and
+  the test stays green with the prop removed; `fireEvent` focuses nothing, as Safari's click
+  (`__tests__/assistantCompanionScene.test.tsx`, seen red without the prop). **`ExpenseDialog` takes `returnFocusTo` and
   answers `onSuccess(saved)`** (2026-10-12): `saved` is `{ id, row }` — on a create the first parent row written
   (`createExpenseSettledOnDate().parents`, fees excluded), on an edit the row rebuilt from the form's data with plain
   values; the type admits `null`, which no path produces today — and Tracciamento on a phone points `returnFocusTo` at the saved row's
@@ -215,4 +230,4 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   on macOS with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. An
   origin off the button's centre is NOT this flake: the spec reads the box after the entrance (doc/guide/e2e-playwright.md).
   (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
-- **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per 42 mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per tutti i mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

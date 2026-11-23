@@ -10,12 +10,16 @@ import { getAllocationAdviceAdmin, patchAllocationAdviceAdmin } from '@/lib/serv
  * client through their own services before this call; this route only records what was
  * applied, on a document the client cannot write (the rules say so).
  *
- * Body: { userId, applied: { targetsWritten, rolesChanged, goalsWritten } }.
+ * Body: { userId, applied: { targetsWritten, rolesChanged, goalsWritten, planId?, planAction? } }. A second
+ * POST on an applied document (the plan of accumulation created later from «Applica», 2026-11-20)
+ * keeps the first `applied.at`: «applicato il …» stays the day the settings were applied.
  */
 const appliedSchema = z.object({
   targetsWritten: z.boolean(),
   rolesChanged: z.number().int().nonnegative(),
   goalsWritten: z.number().int().nonnegative(),
+  planId: z.string().min(1).optional(),
+  planAction: z.enum(['create', 'replace', 'revise']).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nessun percorso concluso da applicare.' }, { status: 409 });
     }
 
-    const applied = { at: new Date(), ...parsed.data };
+    const applied = { at: document.status === 'applied' && document.applied ? document.applied.at : new Date(), ...parsed.data };
     await patchAllocationAdviceAdmin(userId, { status: 'applied', applied });
     return NextResponse.json({ applied });
   } catch (error) {

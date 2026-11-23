@@ -27,6 +27,7 @@ import {
   describePurchases,
   describeSales,
   taxedGrowthHeadline,
+  saleCarriesMonthSplit,
 } from '@/lib/utils/salesNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 import type { MonthFlows } from '@/lib/utils/marketEffect';
@@ -177,8 +178,8 @@ function resolveHeadline(input: PatrimonioVerdictInput): ResolvedHeadline {
     return { headline: `Il tuo portafoglio ${withPrepositionA(monthInSentence(input.month))}.`, tone: 'neutral' };
   }
   // Grown only on paper: the tax on a sale took at least half of the growth — the same rule as
-  // the Panoramica's (`resolveTaxedGrowth`). It outranks the record: on the real account settembre
-  // 2026 was a new high at +0,04%, with 4.089 € of withholding on a VWCE sale.
+  // the Panoramica's (`resolveTaxedGrowth`). It outranks the record: a month can be a new
+  // high at a near-zero change while a sale's withholding took almost all of the growth.
   const taxedGrowth = resolveTaxedGrowth({
     delta: input.monthlyVariation.value,
     deltaPct: input.monthlyVariation.percentage,
@@ -304,7 +305,7 @@ export function buildPatrimonioVerdict(input: PatrimonioVerdictInput): Patrimoni
     input.monthlyVariation && input.marketEffect !== null
       ? { delta: input.monthlyVariation.value, marketEffect: input.marketEffect, savings: input.savings ?? null, flows: input.monthFlows ?? null }
       : undefined;
-  const saleCarriesSplit = split !== undefined && (input.sales?.estimatedTax ?? 0) > 0;
+  const saleCarriesSplit = saleCarriesMonthSplit(input.sales, split);
   const hasSplit = split !== undefined && !saleCarriesSplit;
   if (split && !saleCarriesSplit) {
     sentence.push(prose(' '), ...describeMonthSplit(split));

@@ -9,7 +9,7 @@
 > Modules and files: § *Files* below.
 >
 > The Assistente's card writes through the same services and the same field rules: every rule here holds there
-> (2026-11, doc/guide/assistente.md § Registra).
+> (2026-11, doc/guide/assistente-registra.md § Registra).
 
 ## Files
 
@@ -35,9 +35,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Tracciamento, Divisione, Budget and FIRE read a WINDOW of the expenses, never the collection** (2026-09-30).
   The pure functions of each page did not change — they still slice and bucket the list they are handed — what
   changed is the list: `useExpensesInRange(ownerId, window)`, one key per window under the `expenses.all` prefix.
-  Until then every one of them read the whole collection to show a month (1547 documents on the owner's account),
+  Until then every one of them read the whole collection to show a month (the whole history of a real-size account),
   and the cost was the SDK deserialising them on the main thread: Cashflow's cold load took 1,9 s to its first figure
-  and takes 1,0 with 838.
+  and takes 1,0 with the window's rows alone.
 - **The one whole-history read is the server's, for the AI** (2026-11-07): `fetchCashflowBlockInputs`
   (lib/services/assistantMonthContextService.ts) reads every row up to the Italian end of the month 12 ahead, no
   lower bound, for the CASHFLOW 12 MESI block of every Assistente mode, of the Consulente's interview and strategy and of the
@@ -47,7 +47,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   twelve months before the period starts to the end of the MONTH it ends in (Tracciamento; Divisione on its own
   period); `budgetWindow(now)` — from the older of January and the first of the six trailing months, to December;
   `budgetSuggestionWindow(now, floor)` — whole years from the floor to last year, read by the budget dialog alone;
-  `fireWindows(now, firstSnapshot)` — `recent` (January of last year → December) for every FIRE tab and `older` (from
+  `fireWindows(now, firstSnapshot)` — `recent` (January of last year → December) for every FIRE tab and for
+  Allocazione › Accumulo's suggested instalment (`useMonthlySavingsMedian`, only while the path's «Versamento» or the
+  empty tile is on screen, 2026-11-12; the path since 2026-11-20), and `older` (from
   eleven months before the first snapshot) for the Calcolatore's «Dettaglio» only. Each guide says what its window
   holds and why.
 - **A window is the UNION of what its page reads, not its period.** The readers behind the period count: the
@@ -69,7 +71,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Who has NO window, by declared need**: Storico (the Driver spans every year), Centri di Costo and «Collega
   spese…» (a centre is lifetime), Hall of Fame's recalculation — and Analisi, by the owner's decision of 2026-09-30:
   its Scheda, Confronto, Dettaglio and search span the history from the floor on and the Andamento ranks its categories
-  on the rows after this year too, so a window left out 48 rows of 1547 on the real account, for one more list in
+  on the rows after this year too, so a window left out the rows dated after this year, for one more list in
   memory and in the persisted record. They share the one `useExpenses` list. **Measure before giving a page a
   window**: a window pays where the page reads a small part of the collection, and costs a key everywhere.
 - **Every expense write invalidates `queryKeys.expenses.all`, and that is enough**: it is the prefix of every window
@@ -116,12 +118,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (rent, utilities, groceries, the car, the children, health, taxes) and `variable` «Spese Non Necessarie» (eating out,
   subscriptions, hobbies, clothes, gifts, holidays). The stored ids stay `fixed`/`variable`, every reader of the type is
   untouched, and the Budget's pace rule (`budgetUtils` — a `fixed` category is what is booked, never paced) keeps its
-  name. The owner's production categories were rationalised the same day with a one-off scratchpad script (40 → 30,
-  727 rows re-pointed), outside the repo. Blind spot: «necessarie» is a substring of «non necessarie», so a search for
+  name. The owner's categories were rationalised the same day with a one-off scratchpad script (fewer categories,
+  their rows re-pointed), outside the repo. Blind spot: «necessarie» is a substring of «non necessarie», so a search for
   that token matches both types; the discriminating token is «non» (`__tests__/entitySearch.test.ts`).
 - **A cash account's balance is stored to the cent, not only the movement** (2026-10-07): every movement was already
   `roundToCents`, but `balance + movement` in binary floats left a residue that grew at each write and surfaced raw in
-  the asset form's «Saldo» («4033,050000000001» on the owner's account). Every writer of a cash account's `quantity`
+  the asset form's «Saldo» (e.g. «1234,050000000001»). Every writer of a cash account's `quantity`
   rounds the RESULT — `lib/server/cashSettlement.ts`, `lib/server/assetTransactionUseCase.ts`, `assetService`'s
   `updateCashAssetBalance` and `updateCashAssetBalancesAtomic`, `dividendIncomeService`'s credit, difference and
   give-back; the list and the why in `lib/utils/cents.ts`. A new writer of a balance goes there too. A balance saved
@@ -187,6 +189,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   delete left a fee's debit behind until the spec found it) and `deleteSeriesDocuments` removes each occurrence's fee.
   Without a category the field is disabled and LINKS the setting; the edit form refuses to save while the saved fee is
   unread (it could only guess: a duplicate, or an orphan).
+- **A trade's fee is a row too, written by the ledger** (owner, 2026-11-12; `Expense.feeOfTradeId`,
+  `lib/utils/tradeFeeExpense.ts`, doc/guide/registro-operazioni.md § The fee as a spending row): in the same fee
+  category, on the trade's date, with NO account (the trade's settlement already debited it). Its trade owns amount,
+  date and account, so the row's form hides type, amount, date and account and prints `TRADE_FEE_ROW_NOTE` in their
+  place (`isTradeFeeRow`); its delete is disabled in the table and in the detail («Si elimina con la sua operazione, in
+  Patrimonio»), and the detail's reading appends the same note. `isFeeRow` is true on it (it takes no fee of its own,
+  the AI's patterns skip it). Category, subcategory, member, centre and note stay editable. A row whose trade or asset
+  was deleted wholesale loses `feeOfTradeId` and is a plain spending row again.
 - **A `debt` row can repay a LOAN — by its PRINCIPAL** (2026-09-25 on the property's own debt, on a `loan` asset since
   2026-10-10 — doc/guide/patrimonio.md; `lib/utils/mortgageRepayment.ts`). `debtAssetId` names the loan; on the row's
   date (the SAME `balancePending` as its account: `hasDatedEffects`) the loan's principal falls by `instalment − debt
@@ -270,8 +280,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   type)**, never the name alone. `transfer` rows are rejected and cash balances are never touched by an import.
 
 ## Cashflow Drill-Down: One Landing Path
-- **There is ONE drill destination and ONE transaction list**: every entity entry point on Analisi (a category row, a
-  Fuori scala row, a Spese maggiori row, a Sankey node, `EntitySearch`, a Confronto row) lands through
+- **There is ONE drill destination and ONE transaction list**: every entity entry point on Analisi (a ranking row of
+  «Dove vanno i soldi», a Spese maggiori row, a row of «Cosa è cambiato», an «Entrate» legend row, a Sankey node,
+  `EntitySearch`, a Confronto row; the anomalies are a sentence since 2026-11-12, no entry point) lands through
   `handleEntitySelect` in `AnalisiTab.tsx`, which resolves labels exactly like a URL-restored focus and opens the
   Scheda tile. A new entry point calls that handler only.
 

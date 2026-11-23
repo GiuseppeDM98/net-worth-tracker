@@ -8,7 +8,7 @@
  * - No row mounts its chart until it is opened: 0 `svg.recharts-surface` once the sparkline's chunk
  *   is in (the phone preloads it when idle — this chunk arriving is the positive anchor of
  *   `assets.rows.spec.ts`, which asserts the desktop never fetches it), 1 after opening a row.
- *   Before 2026-10-07 every closed row drew one (15 on the owner's 18 instruments). Seen red by
+ *   Before 2026-10-07 every closed row drew one (one per closed row). Seen red by
  *   mounting `AssetSparkline` without the `hasOpened` gate: the count read one per row.
  * - The line lands without moving the row: with the sparkline's chunk HELD, the opened panel shows
  *   its 32px slot; released, the chart replaces it at the same height. A separate test, because a
@@ -20,14 +20,12 @@
  * mounted closed, so the sparkline's idle preload still runs: the first test's positive anchor.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { holdChunks, probeChunks } from './chunkProbe';
+import { SPARKLINE_SIGNATURE, holdChunks, probeChunks } from './chunkProbe';
 
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 process.env.GCLOUD_PROJECT = 'demo-net-worth';
 
 const UID = 'test-user-1';
-/** A function only `components/assets/AssetSparkline.tsx` defines (a dev chunk keeps the names). */
-const SPARKLINE_SIGNATURE = 'function AssetSparkline';
 /** The base seed's VWCE: monthly snapshots give it a unit-price series, so its row has a line. */
 const VWCE_ID = 'seed-vwce';
 

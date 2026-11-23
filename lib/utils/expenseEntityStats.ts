@@ -346,7 +346,7 @@ export interface EntityRunRate {
   livedMonths: number | null;
   /**
    * livedTotal / livedMonths — the pace actually held, never a calendar total divided by the
-   * months lived (on the real account that printed «746 € al mese» for a 559 € mortgage:
+   * months lived (seen live: a pace well above the actual mortgage instalment —
    * twelve months of instalments over nine months, 2026-09-14). Null for the all-history period.
    */
   periodMonthlyAverage: number | null;

@@ -5,15 +5,16 @@
  *
  * What a browser alone can prove here: the Scheda is a row that OPENS BY ITSELF — from a deep link
  * (focus on its trigger), and again after its chevron closed it and the page reloaded (the URL
- * keeps the focus); from a category row it opens and «Chiudi» hands the focus back to that row;
- * Escape on its trigger does nothing, inside its panel closes it; the calendar is the verdict's
- * `scope`, under the strip; the Periodo trio is lifted; the DOM order is the vertical order with no
- * `order-*`.
+ * keeps the focus); from a ranking row of THE tile («Dove vanno i soldi», 2026-11-12) it opens and
+ * «Chiudi» hands the focus back to that row; Escape on its trigger does nothing, inside its panel
+ * closes it; the calendar is the verdict's `scope`, under the strip; «Risparmio» opens the Periodo,
+ * whose amounts are lifted; the DOM order is the vertical order with no `order-*`.
  *
  * Seen red on 2026-10-14: (1) the `reveal` removed from the URL restore (`landOnScheda` scrolling
  * only) — the Scheda stayed closed after the reload; (2) the panel test dropped from the Scheda's
  * Escape handler — Escape on the trigger closed the focus; (3) `expensesDeltaLifted` dropped from
- * the Periodo — «↓ 13,3%» visible under the sentence that prints it.
+ * the Periodo — «↓ 13,3%» visible under the sentence that prints it (since 2026-11-12 the `lifted` of
+ * the Periodo's spending delta, M2).
  *
  * A race of this test, not of the page (traced on 2026-11-11, red once on 2026-10-15, twice on
  * 2026-11-11): on the SECOND opening the Scheda row is remembered open, so `aria-expanded` is true at
@@ -67,10 +68,9 @@ test.describe('Analisi, composed for a phone', () => {
     await expect(trigger(page, 'analisi-scheda')).toHaveAttribute('aria-expanded', 'true', { timeout: 30_000 });
   });
 
-  test('a category row opens the Scheda; «Chiudi» hands the focus back to that row; Escape inside closes it', async ({ page }) => {
+  test('a ranking row opens the Scheda; «Chiudi» hands the focus back to that row; Escape inside closes it', async ({ page }) => {
     await openAnalisi(page);
-    await trigger(page, 'analisi-spese').click();
-    const row = page.locator('#analisi-spese-panel').getByRole('button', { name: /^Casa, / });
+    const row = page.getByRole('region', { name: 'Dove vanno i soldi', exact: true }).getByRole('button', { name: /^Casa, / });
     await row.click();
     await expect(trigger(page, 'analisi-scheda')).toHaveAttribute('aria-expanded', 'true', { timeout: 30_000 });
     await page.locator('#analisi-scheda-panel').getByRole('button', { name: 'Chiudi la scheda' }).click();
@@ -86,7 +86,7 @@ test.describe('Analisi, composed for a phone', () => {
     await expect(trigger(page, 'analisi-scheda')).toHaveCount(0);
   });
 
-  test('the first screen: the first sentence, Entrate and Risparmio, the Periodo trio lifted, the rows closed in DOM order', async ({ page }) => {
+  test('M1 — the first screen: the first sentence, Entrate and Risparmio, THE tile open, the rows closed in DOM order', async ({ page }) => {
     await openAnalisi(page);
     const verdict = verdictOf(page);
     await expect(verdict.getByText(/hai speso/)).toBeVisible();
@@ -95,26 +95,63 @@ test.describe('Analisi, composed for a phone', () => {
     await expect(cells).toHaveCount(2);
     await expect(cells.nth(0)).toContainText(/^Entrate2000\s?€/);
     await expect(cells.nth(1)).toContainText(/^Risparmio1220\s?€/);
-    // The trio's values are the strip's and the sentence's: lifted; the rate and the coverage stay.
-    const periodo = page.getByRole('region', { name: 'Periodo', exact: true });
-    await expect(periodo.getByText(/^2000\s?€$/)).toBeHidden();
-    await expect(periodo.getByText(/^61,0%$/)).toBeVisible();
-    // The spending delta is the first sentence's pacing (−13,3% su 2025): lifted (since 2026-10-14); the
-    // income delta, which nothing above prints, stays.
-    await expect(verdict.getByText(/−13,3%/)).toBeVisible();
-    await expect(periodo.getByText('↓ 13,3%')).toBeHidden();
-    await expect(periodo.getByText('↑ 5,3%')).toBeVisible();
+    await expect(cells.nth(1)).toHaveAccessibleName(/, apre Periodo$/);
+    // Above the sentence, the headline and the axis; under the strip, «Il perché», closed (2026-11-12:
+    // headline · axis · first sentence · strip · scope · «Il perché» · THE tile · «Il resto della pagina»
+    // · the rows). Seen red with `PageRest` removed from AnalisiTab (no «Il resto della pagina»).
+    await expect(verdict.getByRole('heading', { level: 2 })).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'Periodo di analisi' })).toBeVisible();
+    const perche = page.getByRole('button', { name: /^Il perché/ });
+    await expect(perche).toHaveAttribute('aria-expanded', 'false');
+
+    // THE tile is open, never a row: its ranking is on the first screen.
+    const classifica = page.getByRole('region', { name: 'Dove vanno i soldi', exact: true });
+    await expect(classifica.getByRole('button', { name: /^Casa, / })).toBeVisible();
+    await expect(page.locator('#analisi-classifica-trigger')).toHaveCount(0);
+    for (const id of ['analisi-maggiori', 'analisi-cambiato', 'analisi-entrate', 'analisi-periodo']) {
+      await expect(trigger(page, id)).toHaveAttribute('aria-expanded', 'false');
+    }
+    // No focus, no Scheda row.
+    await expect(trigger(page, 'analisi-scheda')).toHaveCount(0);
+    const rest = page.getByRole('heading', { level: 2, name: 'Il resto della pagina' });
+    await expect(rest).toBeVisible();
+    const [percheTop, classificaBox, restTop, firstRowTop] = await Promise.all([
+      perche.evaluate((el) => el.getBoundingClientRect().top),
+      classifica.evaluate((el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }),
+      rest.evaluate((el) => el.getBoundingClientRect().top),
+      trigger(page, 'analisi-maggiori').evaluate((el) => el.getBoundingClientRect().top),
+    ]);
+    expect(percheTop).toBeLessThan(classificaBox.top);
+    expect(restTop).toBeGreaterThanOrEqual(classificaBox.bottom - 1);
+    expect(restTop).toBeLessThan(firstRowTop);
 
     const order = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>('main section.rounded-2xl')]
         .filter((el) => el.checkVisibility())
         .map((el) => ({ name: el.getAttribute('aria-label'), top: Math.round(el.getBoundingClientRect().top) })),
     );
-    expect(order.map((s) => s.name)).toEqual(['Periodo', 'Fuori scala', 'Spese maggiori', 'Spese per categoria', 'Entrate per categoria', 'Flusso']);
+    expect(order.map((s) => s.name)).toEqual(['Dove vanno i soldi', 'Spese maggiori', 'Cosa è cambiato', 'Entrate', 'Periodo']);
     expect(order.every((s, i) => i === 0 || s.top >= order[i - 1].top - 1), JSON.stringify(order)).toBe(true);
     expect(
       await page.evaluate(() => [...document.querySelector('main')!.querySelectorAll('*')].flatMap((el) => [...el.classList]).filter((name) => /^(?:[a-z-]+:)*order-/.test(name))),
     ).toEqual([]);
+  });
+
+  test('M2 — «Risparmio» opens the Periodo: the amounts and the spending delta lifted, the income delta and the reading shown', async ({ page }) => {
+    await openAnalisi(page);
+    await page.getByRole('list', { name: 'Le cifre del verdetto' }).getByRole('button', { name: /^Risparmio/ }).click();
+    await expect(trigger(page, 'analisi-periodo')).toHaveAttribute('aria-expanded', 'true');
+    const periodo = page.getByRole('region', { name: 'Periodo', exact: true });
+    await expect(periodo.getByText('Hai messo da parte il 61% delle entrate.')).toBeVisible();
+    // The amounts are the strip's and the first sentence's (the `trio` block «Entrate» lifts).
+    await expect(periodo.getByText(/^2000\s?€$/)).toBeHidden();
+    await expect(periodo.getByText(/^780\s?€$/)).toBeHidden();
+    await expect(periodo.getByText(/^1220\s?€$/)).toBeHidden();
+    // The spending delta is the first sentence's pacing (−13,3% su 2025): lifted; the income delta stays.
+    await expect(verdictOf(page).getByText(/−13,3%/)).toBeVisible();
+    await expect(periodo.getByText('↓ 13,3%')).toBeHidden();
+    await expect(periodo.getByText('↑ 5,3%')).toBeVisible();
+    await expect(periodo.getByText(/61,0%/)).toHaveCount(0);
   });
 
   test.describe('with a row still in the calendar', () => {

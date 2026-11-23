@@ -236,13 +236,14 @@ export default function AssetsPage() {
   // ─── averageCostEur backfill trigger ──────────────────────────────────────────
   // One-shot, post-migration: projects the EUR-side PMC onto ledger assets written before the
   // field existed, so G/P on a foreign-currency position stops comparing a native-currency PMC
-  // against a EUR value. Silent, same posture as the migration above. Gated on the demo like every
+  // against a EUR value. Re-run once on 2026-11-12: it writes the fee-free PMC and the fiscal cost
+  // beside it. Silent, same posture as the migration above. Gated on the demo like every
   // other write (useDemoMode): the demo account's docs stay as seeded.
   const averageCostEurBackfillAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!ownerId || isDemo || isLedgerMetaLoading || !ledgerMeta) return;
-    if (ledgerMeta.averageCostEurBackfilledAt) return;
+    if (ledgerMeta.averageCostEurFeeFreeAt) return; // re-run once on 2026-11-12: the PMC lost the fees
     if (averageCostEurBackfillAttemptedRef.current === ownerId) return;
     averageCostEurBackfillAttemptedRef.current = ownerId;
 
@@ -285,6 +286,8 @@ export default function AssetsPage() {
   // invalidates this cache (doc/guide/registro-operazioni.md § Asset Trade Ledger).
   const tradesQuery = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
   const { data: trades = [], isLoading: loadingTrades, isError: tradesError } = tradesQuery;
+  // The assets the ledger names: STRUMENTI's «Mai comprato» chip reads it, «Azzerato» while unread.
+  const tradedAssetIds = useMemo(() => (tradesQuery.data ? new Set(tradesQuery.data.map((t) => t.assetId)) : null), [tradesQuery.data]);
   // A failed read of the ledger (or of its meta) is not «nessuna operazione»: Movimenti says so at
   // every width (2026-10-14) — until then the tile printed the month as empty.
   const movimentiFailed = ledgerMetaError || tradesError;
@@ -603,7 +606,7 @@ export default function AssetsPage() {
   if (loadingAssets || loadingOverview || loadingSnapshots || isLedgerMetaLoading || loadingMortgage) {
     return (
       <PageContainer>
-        <PageHeader label="Patrimonio" title="Strumenti e conti" freshness={freshness} />
+        <PageHeader label="Patrimonio" title="Strumenti e conti" freshness={freshness} emblem="patrimonio" />
         <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
     );
@@ -612,7 +615,7 @@ export default function AssetsPage() {
   if (assetsError) {
     return (
       <PageContainer>
-        <PageHeader label="Patrimonio" title="Strumenti e conti" freshness={freshness} />
+        <PageHeader label="Patrimonio" title="Strumenti e conti" freshness={freshness} emblem="patrimonio" />
         <ErrorNotice
           className="max-w-[920px]"
           notice={describeReadFailure({
@@ -664,6 +667,7 @@ export default function AssetsPage() {
       <div className="space-y-4">
         <PageHeader
           label="Patrimonio"
+          emblem="patrimonio"
           title="Strumenti e conti"
           description={lastPriceUpdate ?? undefined}
           actions={headerActions}
@@ -916,6 +920,7 @@ export default function AssetsPage() {
               onCalculateTaxes={setTaxAsset}
               members={familyMembers}
               allAssets={assets}
+              tradedAssetIds={tradedAssetIds}
             />
           </motion.div>
           </div>

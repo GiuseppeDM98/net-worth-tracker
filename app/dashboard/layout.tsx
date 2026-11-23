@@ -2,6 +2,7 @@
 
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ChartColorsProvider } from '@/contexts/ChartColorsContext';
+import { CostumeScope } from '@/contexts/CostumeScopeContext';
 import { AppSidebar } from '@/components/layout/Sidebar';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { TabletRail } from '@/components/layout/TabletRail';
@@ -34,6 +35,9 @@ export default function DashboardLayout({
 
   return (
     <ChartColorsProvider>
+      {/* The costume's boundary (DESIGN.md → The Costume Rule): a `display: contents` box around the whole
+          shell, so a costume theme dresses the dashboard and nothing outside it. */}
+      <CostumeScope>
       {/* The first Tab stop of every dashboard page: the sidebar is fourteen stops (measured on Storico,
           2026-09-20) between a keyboard reader and the page. The landing has the same link. */}
       <a
@@ -53,7 +57,7 @@ export default function DashboardLayout({
               target and the bar 4 + 44 + 4 + 1 = 53px (doc/guide/shell.md § Navigation). */}
           <div className="flex shrink-0 items-center gap-2 border-b bg-background px-4 py-1 desktop:hidden max-desktop:portrait:hidden max-desktop:landscape:flex tablet-landscape:hidden">
             <SidebarTrigger aria-label="Apri il menu" />
-            <span className="text-[13px] font-semibold tracking-[-0.01em]">Portfolio Tracker</span>
+            <span className="text-[13px] font-semibold tracking-[-0.01em] costume-wordmark">Net Worth Tracker</span>
           </div>
 
           {isDemo && (
@@ -112,6 +116,7 @@ export default function DashboardLayout({
 
       {/* Bottom Navigation — mobile portrait only */}
       <BottomNavigation />
+      </CostumeScope>
     </ChartColorsProvider>
   );
 }

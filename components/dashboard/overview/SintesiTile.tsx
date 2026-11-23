@@ -1,5 +1,5 @@
 import type { DashboardOverviewPayload } from '@/types/dashboardOverview';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, withTypographicMinus } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { describeLiquidity } from '@/lib/utils/overviewNarrative';
 import { signTextClass } from '@/lib/utils/metricColors';
@@ -44,7 +44,8 @@ export function SintesiTile({ metrics, hasCostBasisTracking, collapse, asideWhen
               <span className="text-[13px] text-muted-foreground">{row.label}</span>
               <span className="flex items-baseline gap-2.5 whitespace-nowrap">
                 <span className="font-mono text-[14px] tabular-nums text-foreground">
-                  {cachedFormatCurrencyEUR(row.value)}
+                  {/* The typographic minus: cash goes below zero with a card in the red, and the resource bar prints the same text. */}
+                  {withTypographicMinus(row.value, cachedFormatCurrencyEUR(Math.abs(row.value)))}
                 </span>
                 <span className="w-[44px] text-right font-mono text-[11px] tabular-nums text-muted-foreground">
                   {formatPercentage((row.value / total) * 100, 1)}

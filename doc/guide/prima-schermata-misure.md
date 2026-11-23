@@ -231,6 +231,13 @@ di Tracciamento — Patrimonio 1024
 (`figuresOutsideVerdict` 10 su 8). Non allargate: restano l'aperto di CLAUDE.md («`mobile:budget` non rimisurato dopo le
 etichette più lunghe»), da decidere voce per voce in una sessione sua.
 
+**Rimisurata il 2026-11-14 al ritiro delle scritture del registro in transazione** (il codice mergiato di #526 contro
+`develop` prima del merge, 3fdf11a1; due build `perf:build` sulla stessa macchina, :3200): 57 voci identiche, le stesse
+12 rosse. **Patrimonio 1024 legge 11 o 12 sulla STESSA build**: i primi tre census di HEAD (il primo sull'account
+`census` appena migrato) hanno dato `figuresAboveFold` 11, i nove successivi 12 come la base; nello screenshot del
+run a 11 la riga «Strumenti» era ancora sbiadita. Una voce che si muove di una cifra su Patrimonio 1024 si ripete prima
+di fermarsi.
+
 ## Registro delle voci allargate (`raisedBy`)
 
 Una voce di `perf/mobile-budget.json` si allarga solo a mano, con l'OK del proprietario, e porta la ragione nel suo
@@ -239,6 +246,56 @@ qui, la più recente in cima. Le eccezioni ammesse sono queste e nessun'altra: L
 prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la pill di `PageTabBar` portata a 44 px
 (2026-10-10), la deriva del giorno o della macchina provata sul codice di develop dello stesso giorno.
 
+- **`2026-11-22: le due voci rosse allargate`** (proprietario, 2026-11-22: «Allargare i due tetti»; direttamente su develop @7cfca25f), `perf:build` su :3200, `census@example.com`, develop @2ff9395a e il branch del tema Orbita sulla stessa macchina (Windows, Node 24) lo stesso giorno: 60 voci su 60 identiche, 0 differenze. **Centri 1024** `screens` 1,04 → 1,06 (la deriva del Geist del 2026-11-21, 1,07 → 1,06) e **Bilanciamento 1024** `screens` 1,16 → 1,21 (la nuova Esposizione, #407, e il Geist): rosse su develop da allora, con la loro decisione presa oggi. `mobile:budget` verde, 60 misure dentro il budget; in `perf/mobile-budget.json` due voci cambiano, entrambe con `raisedBy`.
+- **`2026-11-21: Geist Sans applicato …`** (le variabili di next/font su `<html>`: fino ad allora la UI leggeva in
+  `system-ui`; la causa nominata dalla spec dei temi, riregistrata senza chiedere: la regola del confronto con `develop`, doc/guide/prima-schermata.md), `perf:build` su :3200,
+  `census@example.com`, develop (fb164f56, lo stesso albero) e branch col solo font sulla stessa macchina lo stesso
+  giorno; una seconda corsa sulla build col font identica 60/60, quindi ogni voce mossa è del font. **27 voci su 60 si
+  muovono.** Allargate, con `raisedBy`: Patrimonio 390 `screens` 1,75 → 1,78 (e `figuresOutsideVerdict` 4 → 3);
+  Divisione 390 `screens` 1,63 → 1,66 (`figuresAboveFold` 17 → 16), 1024 `figuresOutsideVerdict` 11 → 12 (`screens`
+  1,13 → 1,12); Rendimenti 390 `screens` 1,76 → 1,79 e `tilesAboveFold` 2 → 1; Previdenza 768 `screens` 1,22 → 1,24 e
+  `tilesFullyAboveFold` 5 → 3; Tracciamento 1024 `figuresAboveFold` 15 → 16 (`screens` 1,15 → 1,14); Accumulo 1024
+  `figuresOutsideVerdict` 7 → 8; What If 1024 `figuresOutsideVerdict` 8 → 10. Strette al misurato: Panoramica 390
+  `screens` 1,83 → 1,82; Bilanciamento 390 1,71 → 1,70 e 768 1,18 → 1,17;
+  Accumulo 390 1,72 → 1,71; Obiettivi 390 1,32 → 1,31 e `tilesFullyAboveFold` 3 → 4; Impostazioni 390 2,27 → 2,25;
+  Coast 768 1,21 → 1,20 e 1024
+  1,25 → 1,24; Monte Carlo 768 1,18 → 1,17 e 1024 1,10 → 1,09; Hall of Fame 768 1,24 → 1,23 e 1024 1,22 → 1,21;
+  Patrimonio 1024 1,01 → 1,00; Storico 1024 1,24 → 1,23; Previdenza 1024 1,21 → 1,20. Restano rosse come su develop, con
+  la loro decisione: Centri 1024 (1,07 → 1,06, tetto 1,04) e Bilanciamento 1024 (1,21, tetto 1,16). Mosse sotto il
+  tetto, il JSON invariato (riletto al ritiro, 2026-11-21): Storico 390 1,86 → 1,88; Analisi 768 1,28 → 1,27 e 1024
+  1,44 → 1,43 (le due voci rosse su develop tornano verdi). In `perf/mobile-budget.json` 23 voci cambiano, otto con
+  `raisedBy` «Geist Sans applicato».
+- **`2026-11-19: …`** (le vendite nel calendario del piano di accumulo, PR #557; proprietario,
+  2026-11-19: alzare), `perf:build` su :3200, `census@example.com`, develop (b57ada16, worktree) e branch sulla stessa macchina lo stesso
+  giorno: 59 voci su 60 identiche. **Patrimonio 1024** `figuresAboveFold` 11 → 12, `figuresOutsideVerdict` 8 → 9 — il flip noto del
+  2026-11-17, ora provato sulla build di develop: tre corse a 11/8, poi 12/9 con le stesse dodici cifre del branch (il branch non tocca
+  Patrimonio). La voce si registra al valore alto, che entrambe le build leggono.
+- **`2026-11-17: …`** (il portafoglio modello, branch `feat/portafoglio-modello`; proprietario, 2026-11-17: Impostazioni registrata come misurata), Next 16.4.6, due corse (Patrimonio 1024 12/9 nella prima, 11/8 nella seconda: il flip noto), stessa
+  macchina, `perf:build` su :3200, `census@example.com`. **Accumulo** (`allocazione-accumulo`, riregistrata come la spec chiede): le righe chiuse
+  «Portafoglio modello» e «Criteri del modello» entrano in «Il resto della pagina» — 390 `screens` 1,56 → 1,72, 768 1,21 → 1,27 e tessere 2/1 → 3/1,
+  1024 1,27 invariato e tessere 2/1 → 4/3 (le due righe nell'indice); cifre e prima riga chiusa invariate. **Impostazioni** (la voce che la spec non
+  nominava): la tessera in sola lettura «Criteri del modello» in fondo alla scheda Allocazione — 390 2,10 → 2,27, 768 1,38 → 1,50, 1024 1,56 → 1,75,
+  la prima schermata identica. Restano rosse come su develop Centri 1024, Analisi 768 e 1024, Bilanciamento 1024; develop non rimisurato sulla
+  stessa build (le altre voci uguali al registro).
+- **`2026-11-17: …`** (Allocazione › Accumulo, branch `feat/accumulo`; proprietario, 2026-11-17: riregistrate come misurate), contro la build di
+  develop @36ac3325 dello stesso giorno, stessa macchina, `census@example.com`. **Bilanciamento** (`allocazione`, la voce che la spec non nominava):
+  la barra delle tab Bilanciamento · Accumulo aggiunge 68 px sopra il verdetto — a 390 `screens` 1,64 → 1,71 e la seconda tessera sotto la pill
+  (tessere 2 → 1), a 768 `screens` 1,12 → 1,18; a 1024 1,23 → 1,21, ancora sopra il tetto di 1,16 come su develop (non allargata). **Accumulo**
+  (`allocazione-accumulo`, riregistrata come la spec chiede): 390 1,56 · 1/0 · 11/7, 768 1,21 · 2/1 · 13/10, 1024 1,27 · 2/1 · 11/7 (la riga chiusa
+  sopra la pill solo a 1024, come nella prima misura). Patrimonio 1024 legge 12/9 o 11/8 secondo la corsa (tre corse: 12, 11, 12; la dissolvenza
+  della riga «Strumenti»), non una voce mossa. Le altre voci identiche alla corsa di develop; restano rosse come su develop Centri 1024, Analisi
+  768 e 1024, Bilanciamento 1024.
+  **2026-11-20, il percorso guidato del piano** (branch `feat/piano-percorso-guidato`): «Crea piano» della tessera vuota diventa un link della
+  stessa misura; `allocazione-accumulo` legge come develop @a3d7a0ef dello stesso giorno (stessa macchina, `census@example.com`), e così le
+  60 voci, una per una; rosse come su develop Centri 1024, Analisi 768 e 1024, Bilanciamento 1024.
+- **`2026-11-12: Analisi «Classifica» …`** (#540; proprietario, 2026-11-15: registrate come misurate), le tre voci di Analisi contro la build di develop dello stesso giorno, stessa macchina,
+  `census@example.com`: a 390 `screens` 1,86 → 2,11 e `figuresOutsideVerdict` 5 → 4 (LA tessera «Dove vanno i soldi», alta 654 px con l'anello e la
+  classifica intera, contro i 392 del Periodo; una cifra in meno fuori dal verdetto perché il centro dell'anello non è una cifra sollevata), la prima riga
+  chiusa sotto la pill com'era; a 768 `screens` 1,22 → 1,27, tessere 6/6 → 5/3, cifre 9/5 → 14/11 e la prima riga chiusa SOTTO la pill (era sopra:
+  LA tessera senza una curva da cedere, l'eccezione ammessa sopra); a 1024 `screens` 1,14 → 1,43, tessere 6/6 → 5/4, cifre 11/8 → 14/10 (le risposte
+  delle righe chiuse dell'indice e la classifica). Ogni altra voce identica alla corsa di develop (la prima corsa del «dopo» aveva What If 768/1024
+  non assestata e Patrimonio 1024 12/9 → 11/8: ri-censite, uguali al «prima»).
+- **`2026-10-20: allocazione-accumulo`** (prima misura di Allocazione › Accumulo sul fixture, con un piano attivo di 12 rate e nessun portafoglio modello; LA tessera «Questo mese» senza una curva da cedere), due voci: 390 e 768 registrano `firstClosedRowAbovePill: false`, perché l'unica riga chiusa (Classi del piano) sta sotto la pill; 1024 `true`. Misura: 390 1,64 · 1/0 · 10 / 6; 768 1,2 · 2/1 · 13 / 10; 1024 1,27 · 2/1 · 11 / 8.
 - **`2026-10-17: …`** (la tessera «Intestatari»; proprietario: la tessera su Panoramica e Patrimonio, a riga intera in coda), due voci a 390
   contro HEAD: `screens` sale su Panoramica 1,75 → 1,83 e su Patrimonio 1,67 → 1,75 — una riga chiusa in più (52 px) in coda alle righe,
   perché il fixture nomina un membro della famiglia tramite il fondo pensione (il suo intestatario È il membro di Previdenza,
@@ -409,4 +466,8 @@ prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la 
 
 ## Per-page blind spots
 
+- **Patrimonio at 1024 flips between 12 and 11 figures above the fold on the same build** (2026-11-15, the minor tiles' rings, #538: 11, 11, 12 in
+  three runs of `--viewports=1024 --surfaces=patrimonio`; `figuresOutsideVerdict` 9 / 8 with it): the «Strumenti» row of the
+  landscape index is caught still loading (dimmed) or not. A run that reads 11 turns that develop-red entry green; neither
+  reading is a change of the code.
 - **La tabella del fixture è il budget, non la misura di un giorno**: le celle sono i valori di `perf/mobile-budget.json`, e una corsa che legge qualche centesimo più in basso resta verde senza stringere (la deriva del giorno e della macchina, `doc/guide/prima-schermata.md` § Per-page blind spots).

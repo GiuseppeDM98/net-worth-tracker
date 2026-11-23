@@ -476,40 +476,40 @@ describe('describePayerRanking', () => {
     ).toBeNull();
   });
 
-  // The mirror of the real account on 2026-09-14: Eni and Saipem paid in May and were sold since,
-  // the BTP is the only payer still held. The rows rank what is held; the sold money is named.
+  // Seen on a mirror on 2026-09-14: two shares paid in spring and were sold since, the bond is
+  // the only payer still held. The rows rank what is held; the sold money is named.
   it('ranks the held payers and names what the sold ones paid, in its own clause', () => {
     const ranking: PayerRanking = {
-      rows: [{ key: 'a-btp', label: 'BTP Valore', amount: 114, percentage: 37.9 }],
-      remainder: { label: '2 strumenti venduti', amount: 186, percentage: 62.1 },
+      rows: [{ key: 'a-orn', label: 'Ornitorinco', amount: 120, percentage: 40 }],
+      remainder: { label: '2 strumenti venduti', amount: 180, percentage: 60 },
       total: 300,
       payerCount: 3,
       heldPayerCount: 1,
       soldPayerCount: 2,
-      soldNet: 186,
-      top: { assetId: 'a-btp', assetTicker: 'BTP Valore', assetName: 'BTP Valore Marzo 2032', net: 114, count: 2 },
+      soldNet: 180,
+      top: { assetId: 'a-orn', assetTicker: 'Ornitorinco', assetName: 'Ornitorinco 2035', net: 120, count: 2 },
     };
     expect(plain(describePayerRanking(ranking, 'nel 2026'))).toBe(
-      'Ha pagato un solo strumento ancora in portafoglio nel 2026: BTP Valore, 114 € in 2 stacchi; altri 186 € da 2 strumenti venduti.'
+      'Ha pagato un solo strumento ancora in portafoglio nel 2026: Ornitorinco, 120 € in 2 stacchi; altri 180 € da 2 strumenti venduti.'
     );
     expect(plain(describePayerRanking({ ...ranking, heldPayerCount: 2 }, 'nel 2026'))).toBe(
-      '2 strumenti in portafoglio hanno pagato nel 2026; BTP Valore ha pagato di più, 114 € in 2 stacchi; altri 186 € da 2 strumenti venduti.'
+      '2 strumenti in portafoglio hanno pagato nel 2026; Ornitorinco ha pagato di più, 120 € in 2 stacchi; altri 180 € da 2 strumenti venduti.'
     );
   });
 
   it('says so when every payer of the period has been sold', () => {
     const ranking: PayerRanking = {
       rows: [],
-      remainder: { label: '2 strumenti venduti', amount: 186, percentage: 100 },
-      total: 186,
+      remainder: { label: '2 strumenti venduti', amount: 180, percentage: 100 },
+      total: 180,
       payerCount: 2,
       heldPayerCount: 0,
       soldPayerCount: 2,
-      soldNet: 186,
+      soldNet: 180,
       top: null,
     };
     expect(plain(describePayerRanking(ranking, 'nel 2026'))).toBe(
-      'Nessuno strumento ancora in portafoglio ha pagato nel 2026: 186 € vengono da 2 strumenti venduti.'
+      'Nessuno strumento ancora in portafoglio ha pagato nel 2026: 180 € vengono da 2 strumenti venduti.'
     );
     expect(plain(describePayerRanking({ ...ranking, payerCount: 1, soldPayerCount: 1, soldNet: 44, total: 44 }, 'nel 2026'))).toBe(
       'Nessuno strumento ancora in portafoglio ha pagato nel 2026: 44 € viene da uno strumento venduto.'
@@ -519,7 +519,7 @@ describe('describePayerRanking', () => {
 
 describe('describeSoldIncomeNote', () => {
   it('says where the sold income went, and that it is not income to count on', () => {
-    expect(plain(describeSoldIncomeNote(186, 2))).toBe('I 186 € da 2 strumenti venduti restano fuori: non sono reddito su cui contare.');
+    expect(plain(describeSoldIncomeNote(180, 2))).toBe('I 180 € da 2 strumenti venduti restano fuori: non sono reddito su cui contare.');
     expect(plain(describeSoldIncomeNote(44, 1))).toBe('I 44 € da uno strumento venduto restano fuori: non sono reddito su cui contare.');
   });
 

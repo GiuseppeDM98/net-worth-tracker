@@ -309,6 +309,12 @@ describe('the tile readings', () => {
     expect(plain(describeSavingsRecords(null))).toBe('Nessun mese con entrate registrate, per ora.');
   });
 
+  // A savings rate keeps its minus (owner, 2026-11-12), and «il» before it: «il −8,0%», never «l'8,0%».
+  it('keeps the minus of a negative savings rate, with «il» before it', () => {
+    const top = monthEntry({ key: '2026-03', year: 2026, month: 3, label: 'mar 2026', longLabel: 'marzo 2026', value: -160, percentage: -8, income: 2000 });
+    expect(plain(describeSavingsRecords(top))).toBe('Il mese in cui hai messo da parte di più è marzo 2026: −160 € su 2000 € di entrate, il −8,0%.');
+  });
+
   /**
    * The verdict already says WHERE the running year stands («il secondo anno migliore»); the
    * tile says how far it is from the place above — a figure the verdict does not print.
@@ -546,6 +552,8 @@ describe('describeHallOfFameClosedAnswers', () => {
     expect(answerText(answers[HOF_SECTION_IDS.risparmio])).toBe('40,0% delle entrate');
     expect(answerText(answers[HOF_SECTION_IDS.anni])).toBe('2025 +9500 €');
     expect(answers[HOF_SECTION_IDS.note]).toBeNull();
+    const negative = describeHallOfFameClosedAnswers({ ...input, savingsTop: { ...savingsTop, value: -900, percentage: -30 } });
+    expect(answerText(negative[HOF_SECTION_IDS.risparmio])).toBe('−30,0% delle entrate');
   });
 
   it('fits in 22 characters with one figure; only the year\'s growth is coloured', () => {

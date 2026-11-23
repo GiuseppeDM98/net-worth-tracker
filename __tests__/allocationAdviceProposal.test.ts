@@ -220,6 +220,18 @@ describe('parseInstrumentCandidatesLenient (2026-10-20)', () => {
     expect(parseInstrumentCandidatesLenient('nessun blocco')).toEqual({ candidates: null, refused: [] });
     expect(parseInstrumentCandidatesLenient('```instrument-candidates\n{"sleeves": 3}\n```').candidates).toBeNull();
   });
+
+  // The Yahoo symbols (2026-11-19). Mutation: `.max(2)`.
+  it('keeps a candidate with up to three Yahoo symbols, drops one with four, keeps its sleeve and a candidate with none', () => {
+    const three = { name: 'ETF ornitorinco', exchange: 'Borsa Italiana', note: '', yahooSymbols: ['ORN.MI', 'ORN.DE', 'ORN.AS'] };
+    const four = { name: 'ETF fenicottero', exchange: 'Borsa Italiana', note: '', yahooSymbols: ['FEN.MI', 'FEN.DE', 'FEN.AS', 'FEN.PA'] };
+    const sleeve = { ...good, candidates: [three, four, good.candidates[0]] };
+    const { candidates, refused } = parseInstrumentCandidatesLenient('```instrument-candidates\n' + JSON.stringify({ sleeves: [sleeve] }) + '\n```');
+    expect(candidates?.sleeves[0].candidates.map((c) => c.name)).toEqual(['ETF ornitorinco', 'ETF Mondo']);
+    expect(candidates?.sleeves[0].candidates[0].yahooSymbols).toEqual(['ORN.MI', 'ORN.DE', 'ORN.AS']);
+    expect(candidates?.sleeves[0].candidates[1].yahooSymbols).toBeUndefined();
+    expect(refused[0]).toMatch(/1 candidati rifiutati/);
+  });
 });
 
 // ── The interview round (2026-11-08) ──────────────────────────────────────────────────

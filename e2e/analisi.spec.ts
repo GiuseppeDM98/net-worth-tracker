@@ -14,6 +14,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { expectRingFiguresInside } from './ringFit';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const PREVIOUS_YEAR = CURRENT_YEAR - 1;
@@ -42,6 +43,13 @@ function perYearTable(page: Page) {
   return page.getByText('Per anno', { exact: true }).locator('..');
 }
 
+/** «Dettaglio» below the grid, where the Flusso lives since 2026-11-12: opened before any Flusso assertion. */
+async function openDettaglio(page: Page): Promise<void> {
+  const trigger = page.getByRole('button', { name: 'Dettaglio', exact: true });
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+}
+
 async function gotoAnalisi(page: Page, query = ''): Promise<void> {
   await page.goto(`/dashboard/analisi${query}`);
   // The verdict is the first thing rendered once the data lands.
@@ -61,16 +69,17 @@ test('opens with the verdict and states the seeded KPI totals with their YoY pac
   await expect(verdict).toContainText(`−13,3% su ${PREVIOUS_YEAR}`);
   await expect(verdict).not.toContainText('su gen–');
 
-  // January-only fixture: Entrate 2000, Spese 780, Risparmio 1220 — the transfer row (+150)
-  // must be inside none of them. `.first()`: the income repeats in its category row.
+  // G0 — January-only fixture: Entrate 2000, Spese 780, Risparmio 1220 — the transfer row (+150)
+  // must be inside none of them. The rows print no savings rate: the reading says it.
   const periodo = page.getByRole('region', { name: 'Periodo', exact: true });
-  await expect(periodo.getByText(euro('2000')).first()).toBeVisible();
+  await expect(periodo.getByText(euro('2000'))).toBeVisible();
   await expect(periodo.getByText(euro('780'))).toBeVisible();
   await expect(periodo.getByText(euro('1220'))).toBeVisible();
-  await expect(periodo.getByText('61,0%')).toBeVisible();
+  await expect(periodo).toContainText('Hai messo da parte il 61% delle entrate.');
+  await expect(periodo.getByText('61,0%')).toHaveCount(0);
 
   // Pacing from comparisonDeltas: spese (780−900)/900, entrate (2000−1900)/1900 — the Comma
-  // Rule, and ONE caption for both under the trio, verbatim from the module.
+  // Rule, and ONE caption for both under the rows, verbatim from the module.
   await expect(periodo.getByText('↓ 13,3%')).toBeVisible();
   await expect(periodo.getByText('↑ 5,3%')).toBeVisible();
   // Same reason: on «Anno corrente» the caption is the bare year, with no «stessi mesi» clause.
@@ -80,18 +89,29 @@ test('opens with the verdict and states the seeded KPI totals with their YoY pac
 test('lays the tiles on the 12-column grid at 1440 with nothing scrolling sideways', async ({ page }) => {
   await gotoAnalisi(page);
 
-  for (const name of ['Periodo', 'Fuori scala', 'Spese maggiori', 'Spese per categoria', 'Entrate per categoria', 'Flusso']) {
-    await expect(page.getByRole('region', { name, exact: true })).toBeVisible();
-  }
+  // G1 — Dove vanno i soldi 7 · Spese maggiori 5 / Cosa è cambiato 5 · Entrate 3 · Periodo 4; the
+  // Flusso is no tile of the grid (it opens in «Dettaglio»).
+  const names = ['Dove vanno i soldi', 'Spese maggiori', 'Cosa è cambiato', 'Entrate', 'Periodo'];
+  for (const name of names) await expect(page.getByRole('region', { name, exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Flusso', exact: true })).toHaveCount(0);
 
-  // Periodo spans two rows beside Fuori scala + Spese maggiori: it starts at the grid's top and
-  // is taller than its right-hand neighbour.
-  const [periodo, fuoriScala] = await page.evaluate(() => {
-    const rect = (name: string) => document.querySelector(`section[aria-label="${name}"]`)!.getBoundingClientRect();
-    return [rect('Periodo'), rect('Fuori scala')];
-  });
-  expect(Math.abs(periodo.top - fuoriScala.top)).toBeLessThan(2);
-  expect(periodo.height).toBeGreaterThan(fuoriScala.height * 1.5);
+  const boxes = await page.evaluate((labels) => labels.map((name) => {
+    const rect = document.querySelector(`section[aria-label="${name}"]`)!.getBoundingClientRect();
+    return { top: rect.top, left: rect.left, width: rect.width };
+  }), names);
+  const [classifica, maggiori, cambiato, entrate, periodoBox] = boxes;
+  // The first row: the ranking left, Spese maggiori beside it, the ranking the wider (7 against 5).
+  expect(Math.abs(classifica.top - maggiori.top)).toBeLessThan(2);
+  expect(maggiori.left).toBeGreaterThan(classifica.left + classifica.width - 2);
+  expect(classifica.width).toBeGreaterThan(maggiori.width * 1.3);
+  // The second row, under the first, in the order 5 · 3 · 4.
+  expect(cambiato.top).toBeGreaterThan(classifica.top + 10);
+  expect(Math.abs(cambiato.top - entrate.top)).toBeLessThan(2);
+  expect(Math.abs(entrate.top - periodoBox.top)).toBeLessThan(2);
+  expect(cambiato.left).toBeLessThan(entrate.left);
+  expect(entrate.left).toBeLessThan(periodoBox.left);
+  expect(cambiato.width).toBeGreaterThan(periodoBox.width);
+  expect(periodoBox.width).toBeGreaterThan(entrate.width);
 
   // `main` is the horizontal scroll container (AGENTS.md): measure it and every element in it.
   const overflow = await page.evaluate(() => {
@@ -103,11 +123,33 @@ test('lays the tiles on the 12-column grid at 1440 with nothing scrolling sidewa
   expect(overflow).toEqual({ scroll: 0, culprits: 0 });
 });
 
+test('without «Cosa è cambiato» the second row reads Entrate 5 · Periodo 7', async ({ page }) => {
+  await gotoAnalisi(page);
+  // Storico has neither a comparison nor a month to run the anomalies on: «Cosa è cambiato» leaves
+  // the grid and its five columns go to Entrate and Periodo (2026-11-12). Seen red with Entrate held
+  // at `desktop:col-span-3` and Periodo at `desktop:col-span-4` whatever the third tile.
+  await page.getByRole('radiogroup', { name: 'Periodo di analisi' }).getByRole('radio', { name: 'Storico' }).click();
+  await expect(page.getByRole('region', { name: 'Cosa è cambiato' })).toHaveCount(0);
+  const names = ['Dove vanno i soldi', 'Spese maggiori', 'Entrate', 'Periodo'];
+  for (const name of names) await expect(page.getByRole('region', { name, exact: true })).toBeVisible();
+
+  const [classifica, maggiori, entrate, periodoBox] = await page.evaluate((labels) => labels.map((name) => {
+    const rect = document.querySelector(`section[aria-label="${name}"]`)!.getBoundingClientRect();
+    return { top: rect.top, left: rect.left, width: rect.width };
+  }), names);
+  // Entrate takes Spese maggiori's five columns, Periodo the ranking's seven, on one row under the first.
+  expect(entrate.top).toBeGreaterThan(classifica.top + 10);
+  expect(Math.abs(entrate.top - periodoBox.top)).toBeLessThan(2);
+  expect(entrate.left).toBeLessThan(periodoBox.left);
+  expect(Math.abs(entrate.width - maggiori.width)).toBeLessThan(2);
+  expect(Math.abs(periodoBox.width - classifica.width)).toBeLessThan(2);
+});
+
 test('drills category → Scheda → subcategory transactions, writing the focus to the URL', async ({ page }) => {
   await gotoAnalisi(page);
 
   // Level 1 → Casa (aria-label from RankedRows: "name, value, share" on a real button).
-  await page.getByRole('region', { name: 'Spese per categoria' }).getByRole('button', { name: /^Casa, / }).click();
+  await page.getByRole('region', { name: 'Dove vanno i soldi' }).getByRole('button', { name: /^Casa, / }).click();
 
   // The Scheda: reading, period hero + per-year table + its own subcategory ranking.
   await expect(scheda(page)).toBeVisible();
@@ -120,7 +162,7 @@ test('drills category → Scheda → subcategory transactions, writing the focus
   await expect(page).toHaveURL(/focusType=fixed/);
   await expect(page).toHaveURL(/focusCat=e2e-cat-casa/);
   // The focused row is marked in its tile.
-  await expect(page.getByRole('region', { name: 'Spese per categoria' }).getByRole('button', { name: /^Casa, / })).toHaveAttribute('aria-current', 'true');
+  await expect(page.getByRole('region', { name: 'Dove vanno i soldi' }).getByRole('button', { name: /^Casa, / })).toHaveAttribute('aria-current', 'true');
 
   // Level 2 → Condominio: the condominio question, answered in place.
   await scheda(page).getByRole('button', { name: /^Condominio, / }).click();
@@ -160,11 +202,11 @@ test('keeps the focus across a period switch — the period is a cursor, not a c
   // The axis picks a value the whole page reads: a radiogroup, not a tablist with no panel.
   await page.getByRole('radiogroup', { name: 'Periodo di analisi' }).getByRole('radio', { name: 'Storico' }).click();
 
-  // Same entity, re-scoped: 300 (CY) + 250 (PY) over the whole tracked history. In Storico the
-  // month tile has no month to run on, so it is absent and Spese maggiori widens.
+  // Same entity, re-scoped: 300 (CY) + 250 (PY) over the whole tracked history. In Storico there is
+  // neither a comparison nor a month to run the anomalies on: «Cosa è cambiato» is absent.
   await expect(dossierHero(page, 'Storico completo').getByText(/^550[\s ]*€$/)).toBeVisible();
   await expect(page).toHaveURL(/focusSub=e2e-sub-cond/);
-  await expect(page.getByRole('region', { name: 'Fuori scala' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Cosa è cambiato' })).toHaveCount(0);
 });
 
 test('reaches a zero-spend entity through the search — one interaction, honest empty Scheda', async ({ page }) => {
@@ -229,13 +271,31 @@ test('ranks the YoY drivers in the Confronto disclosure, ceased categories inclu
   await expect(page).toHaveURL(/focusCat=e2e-cat-alimentari/);
 });
 
-test('keeps both category tiles usable while an entity is focused', async ({ page }) => {
+test('says what changed: the movers that explain the fall, the ceased category, a row landing on its Scheda', async ({ page }) => {
+  await gotoAnalisi(page);
+
+  // G2 — Casa +40, Palestra −60 (ceased), Alimentari −100 on a total of −120.
+  const cambiato = page.getByRole('region', { name: 'Cosa è cambiato', exact: true });
+  await expect(cambiato).toContainText('Alimentari e Palestra spiegano tutto il calo.');
+  const rows = cambiato.getByRole('list', { name: 'Categorie che si sono mosse' }).getByRole('button');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toHaveAccessibleName(/^Casa \+40[\s\u00a0]*€$/);
+  await expect(rows.nth(1)).toHaveAccessibleName(/^Palestra cessata −60[\s\u00a0]*€$/);
+  await expect(rows.nth(2)).toHaveAccessibleName(/^Alimentari −100[\s\u00a0]*€$/);
+  await expect(cambiato).toContainText('Cessate: Palestra.');
+
+  await rows.nth(2).click();
+  await expect(dossierHero(page, String(CURRENT_YEAR)).getByText(/^400[\s\u00a0]*€$/)).toBeVisible();
+  await expect(page).toHaveURL(/focusCat=e2e-cat-alimentari/);
+});
+
+test('keeps the ranking and «Entrate» usable while an entity is focused', async ({ page }) => {
   await gotoAnalisi(page, '?focusType=fixed&focusCat=e2e-cat-casa');
   await expect(dossierHero(page, String(CURRENT_YEAR)).getByText(/^380[\s ]*€$/)).toBeVisible();
 
-  // The Scheda is its own tile: the category lists stay where they were, the income one included.
-  await expect(page.getByRole('region', { name: 'Entrate per categoria' }).getByRole('button', { name: /^Stipendio, / })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Spese per categoria' }).getByRole('button', { name: /^Alimentari, / })).toBeVisible();
+  // The Scheda is its own tile: the ranking and the income keep their rows.
+  await expect(page.getByRole('region', { name: 'Entrate', exact: true }).getByRole('button', { name: /^Stipendio, / })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Dove vanno i soldi' }).getByRole('button', { name: /^Alimentari, / })).toBeVisible();
 });
 
 test('breaks a category year row down by subcategory, with the previous year alongside', async ({ page }) => {
@@ -303,6 +363,7 @@ test.describe('Flusso by 50/30/20 role', () => {
 
   test('opens on «Per ruolo»: the roles reading and the roles Sankey, a split category once per role', async ({ page }) => {
     await gotoAnalisi(page);
+    await openDettaglio(page);
     const flusso = page.getByRole('region', { name: 'Flusso', exact: true });
 
     // The view switch is the tile-aside AsideToggle: a named group, ONE Tab stop on the pressed option.
@@ -328,6 +389,7 @@ test.describe('Flusso by 50/30/20 role', () => {
 
   test('«Per tipo» is one tap away and gives back today\'s view', async ({ page }) => {
     await gotoAnalisi(page);
+    await openDettaglio(page);
     const flusso = page.getByRole('region', { name: 'Flusso', exact: true });
 
     await flusso.getByRole('button', { name: 'Per tipo' }).click();
@@ -390,5 +452,48 @@ test.describe('the calendar at 1440', () => {
       scope.evaluate((el) => el.getBoundingClientRect().top),
     ]);
     expect(scopeTop).toBeGreaterThanOrEqual(sentenceBottom - 1);
+  });
+});
+
+// ── Both rings fit (every centre inside its hole, owner 2026-11-12; DESIGN → The Ring Rule) ─────
+//
+// The fixture has one income category, and one category is no ring: ONE second income row is planted
+// in January of this year at noon UTC and removed after, so «Entrate» draws its ring. The LAST block
+// of the file: no other test sees the row.
+
+const RING_ROW_ID = 'e2e-exp-ring-fenicottero';
+
+test.describe('the rings fit', () => {
+  test.beforeAll(async () => {
+    const date = new Date(Date.UTC(CURRENT_YEAR, 0, 20, 12)).toISOString();
+    const res = await fetch(`${FIRESTORE}/expenses/${RING_ROW_ID}`, {
+      method: 'PATCH',
+      headers: OWNER,
+      body: JSON.stringify({
+        fields: {
+          userId: { stringValue: 'test-user-analisi' },
+          type: { stringValue: 'income' },
+          categoryId: { stringValue: 'e2e-cat-rimborsi' },
+          categoryName: { stringValue: 'Rimborsi' },
+          amount: { doubleValue: 500 },
+          currency: { stringValue: 'EUR' },
+          notes: { stringValue: 'fenicottero' },
+          date: { timestampValue: date },
+          createdAt: { timestampValue: date },
+          updatedAt: { timestampValue: date },
+        },
+      }),
+    });
+    expect(res.ok).toBe(true);
+  });
+  test.afterAll(async () => {
+    await fetch(`${FIRESTORE}/expenses/${RING_ROW_ID}`, { method: 'DELETE', headers: OWNER });
+    expect((await fetch(`${FIRESTORE}/expenses/${RING_ROW_ID}`, { headers: OWNER })).status).toBe(404);
+  });
+
+  test('«Dove vanno i soldi» and «Entrate» hold their totals inside their holes', async ({ page }) => {
+    await gotoAnalisi(page);
+    await expectRingFiguresInside(page.getByRole('region', { name: 'Dove vanno i soldi', exact: true }));
+    await expectRingFiguresInside(page.getByRole('region', { name: 'Entrate', exact: true }));
   });
 });

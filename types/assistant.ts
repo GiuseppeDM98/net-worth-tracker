@@ -7,11 +7,13 @@
 // - webSearchPolicy.ts (STRUCTURED_ANALYSIS_MODES, resolveAssistantWebSearchPolicy)
 // - store.ts (getDefaultThreadTitle, buildThreadTitleFromPrompt)
 // - assistantFollowUps.ts (CURATED_FOLLOW_UPS, a Record<AssistantMode, …>)
-// - assistantPeriodOptions.ts (getActivePeriodLabel, buildComposerPlaceholder, buildEmptyStateQuestion,
-//   findThreadForPeriod, getModeBadgeLabel)
-// - AssistantPeriodSelector.tsx (PERIOD_TABS: a mode with no period is NOT a tab)
+// - assistantPeriodOptions.ts (getActivePeriodLabel, getModeBadgeLabel)
+// - lib/utils/assistantChatNarrative.ts (describeRoute)
 // - useAssistantStreaming.ts (buildStreamRequestBody) and useAssistantPeriodContext.ts (the period preview)
 // - AssistantPageClient.tsx (MODE_ORDER, shouldFetchContext) and assistantNarrative.ts (describeConversation)
+// - lib/utils/assistantRoute.ts (ASSISTANT_MODES, checkRouteConsistency, routeToSelection,
+//   routeToChooserDraft, chooserDraftToOverride) and
+//   lib/server/assistant/router.ts (the intents of its system prompt)
 export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'chat' | 'register';
 
 /**
@@ -43,15 +45,6 @@ export interface AssistantRegisterSummary {
   costCentersEnabled: boolean;
   membersEnabled: boolean;
   recent: { rows: number; cut: number } | null; // null: computed in the browser, before the server answered
-}
-
-export interface AssistantPromptChip {
-  id: string;
-  label: string;
-  prompt: string;
-  mode: AssistantMode;
-  requiresMonthContext: boolean;
-  webContextHint?: 'none' | 'optional' | 'macro';
 }
 
 export interface AssistantMonthSelectorValue {
@@ -96,6 +89,44 @@ export interface AssistantMessage {
   // The outcome of each card of this message, keyed `proposalKey(kind, index)` — «expense:0»,
   // «goal:0» (lib/utils/expenseProposal.ts). Absent until a card is confirmed or ignored.
   proposals?: Record<string, AssistantProposalState>;
+  // How the server read the message this one answers (2026-11): only on an assistant message of a
+  // request sent with `mode: 'auto'`; absent on every older message and on an explicit mode's.
+  routeReading?: AssistantRouteReading;
+}
+
+/**
+ * The period of a reading (2026-11): the five kinds a free question can carry
+ * (`AssistantChatContextType`), each analysis owning one of them, Registra none.
+ */
+export type AssistantRoutePeriod =
+  | { kind: 'none' }
+  | { kind: 'month'; year: number; month: number }
+  | { kind: 'year'; year: number }
+  | { kind: 'ytd' }
+  | { kind: 'history' };
+
+/** How one message was read: which of today's modes, on which period, with or without the web. */
+export interface AssistantRoute {
+  intent: AssistantMode;
+  period: AssistantRoutePeriod;
+  webSearch: boolean;
+  /** 0..1; 1 for an override. */
+  confidence: number;
+}
+
+/** A reading the client sends (the request's `route`): taken as is and stamped `confidence: 1`. */
+export type AssistantRouteOverride = Omit<AssistantRoute, 'confidence'>;
+
+/** 'carried': a route the client re-sent from the previous turn's reading (the request's `routeCarried`). */
+export type AssistantRouteSource = 'router' | 'override' | 'carried' | 'fallback';
+
+export type AssistantRouteFallbackReason = 'error' | 'timeout' | 'invalid' | 'low-confidence';
+
+export interface AssistantRouteReading {
+  route: AssistantRoute;
+  source: AssistantRouteSource;
+  /** Only with `source: 'fallback'`. */
+  reason?: AssistantRouteFallbackReason;
 }
 
 export interface AssistantMemoryItem {
@@ -216,7 +247,8 @@ export interface AssistantCreateThreadInput {
 }
 
 // Full numeric context bundle for a selected period, built server-side.
-// Client sends the period selector; server regenerates this from Firestore — never trust client-supplied numbers.
+// The period selector comes from the client on an explicit mode and from the router's reading on mode 'auto' (the
+// page's only mode since 2026-11-16); the server regenerates this from Firestore — never trust client-supplied numbers.
 //
 // The `selector.month` field encodes the period type:
 //   month > 0  → monthly analysis (standard)
@@ -248,6 +280,12 @@ export interface AssistantMonthContextBundle {
     currentValue: number | null;
     absoluteChange: number;
     percentagePointsChange: number | null;
+    /**
+     * The pension funds inside the class (2026-11-16): their change, from both snapshots'
+     * `pension.byAssetClass`, and the contributions recorded in the period split by each fund's
+     * composition. Null when a snapshot does not record the funds' part or they never touch the class.
+     */
+    pension?: { change: number; paidIn: number } | null;
   }[];
   // EXHAUSTIVE spending tree for the period: every category, every subcategory used.
   // Replaced a top-5 flat list that made the assistant answer "N/D" on subcategories
@@ -327,6 +365,11 @@ export interface AssistantMonthContextBundle {
   // contributions; the loans; the household. REQUIRED, like `goals`: every builder fills it
   // from the same documents, and the prompt prints each list whole or says what it cut.
   portfolio: import('@/lib/utils/assistantPortfolioContext').AssistantPortfolioContext;
+  /**
+   * The change of the period split as Storico's Driver splits it (2026-11-16); null without both
+   * snapshots or across a month without one; absent on a bundle with no period (today's).
+   */
+  netWorthDrivers?: import('@/lib/utils/assistantNetWorthDrivers').AssistantNetWorthDrivers | null;
   // Full category/subcategory taxonomy configured by the user (Settings → Categorie),
   // independent of the analysis period. Lets Claude suggest where to file a new
   // expense or whether a new category is warranted, instead of only seeing the
@@ -363,7 +406,8 @@ export type AssistantChatContextType = 'none' | 'month' | 'year' | 'ytd' | 'hist
 
 export interface AssistantStreamRequest {
   userId: string;
-  mode: AssistantMode;
+  // 'auto' (2026-11): the server reads mode, period and web search (lib/server/assistant/router.ts).
+  mode: AssistantMode | 'auto';
   prompt: string;
   threadId?: string;
   // Used for month_analysis and chat modes
@@ -373,10 +417,16 @@ export interface AssistantStreamRequest {
   // Used only in chat mode to specify the context period type
   chatContext?: AssistantChatContextType;
   preferences?: AssistantPreferences;
+  // Only with mode 'auto': a reading chosen by the client, so the router is not called.
+  route?: AssistantRouteOverride;
+  // Only beside `route`: the route was inherited from the previous turn, never picked by the owner.
+  routeCarried?: boolean;
 }
 
 export type AssistantStreamEvent =
   | { type: 'meta'; threadId?: string; title?: string }
+  // Only for mode 'auto', right after `meta`: how the server read the message.
+  | { type: 'route'; reading: AssistantRouteReading }
   // Sent once before text streaming starts, carrying the server-built context bundle.
   // Client uses this to render the numeric panel without a separate fetch.
   | { type: 'context'; bundle: AssistantMonthContextBundle }

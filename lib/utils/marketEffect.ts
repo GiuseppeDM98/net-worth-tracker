@@ -10,6 +10,7 @@
 import type { AssetTransaction } from '@/types/assetTransactions';
 import type { PensionContribution } from '@/types/pension';
 import { valueEffectMonth } from '@/lib/utils/pensionReturn';
+import { feeOutsideCashflow } from '@/lib/utils/tradeFeeExpense';
 
 /** A position at one valuation: EUR value and the quantity it was held in. */
 export interface PositionValue {
@@ -22,11 +23,11 @@ export interface PositionValue {
  *
  *   Δvalue − net money put in − quantity the ledger does not explain × today's unit value
  *
- * where «money put in» is Σ buys (quantity × priceEur + fees) − Σ sells (quantity × priceEur −
- * fees). For a held quote this is the old `q_prev × Δu`; for a bought one `q × (u_now − p) − fees`;
+ * where «money put in» is `tradeMoneyIn`: Σ buys (quantity × priceEur + fees no row carries) −
+ * Σ sells (quantity × priceEur − fees no row carries). For a held quote this is the old `q_prev × Δu`; for a bought one `q × (u_now − p) − fees`;
  * for a sold one `q × (p − u_prev) − fees`. A quantity change no BUY/SELL explains — a migration
  * baseline, an adjustment, a hand-edited quantity — moves no money the ledger knows, so it is
- * valued at the current unit price and kept OUT of the market (it lands in «altre variazioni»).
+ * valued at the current unit price and kept OUT of the market (it lands in «altre variazioni»; Storico's Driver names it «Quantità fuori dal registro»).
  *
  * `trades` must already be scoped to the window between the two valuations. Returns null when the
  * instrument has no BUY/SELL in it (the caller keeps `q_prev × Δu`), and for a position closed
@@ -40,18 +41,9 @@ export function tradeAwarePriceEffect(
   const moneyTrades = trades.filter((t) => (t.type === 'buy' && !t.isBaseline) || t.type === 'sell');
   if (moneyTrades.length === 0) return null;
 
-  let moneyIn = 0;
   let tradedQuantity = 0;
-  for (const trade of moneyTrades) {
-    const fees = trade.fees ?? 0;
-    if (trade.type === 'buy') {
-      moneyIn += trade.quantity * trade.priceEur + fees;
-      tradedQuantity += trade.quantity;
-    } else {
-      moneyIn -= trade.quantity * trade.priceEur - fees;
-      tradedQuantity -= trade.quantity;
-    }
-  }
+  for (const trade of moneyTrades) tradedQuantity += trade.type === 'buy' ? trade.quantity : -trade.quantity;
+  const moneyIn = tradeMoneyIn(moneyTrades);
 
   const previousQuantity = previous?.quantity ?? 0;
   const currentQuantity = current?.quantity ?? 0;
@@ -63,6 +55,20 @@ export function tradeAwarePriceEffect(
 
   const valueChange = (current?.totalValue ?? 0) - (previous?.totalValue ?? 0);
   return valueChange - moneyIn - (hasUnexplained ? unexplainedQuantity * currentUnit! : 0);
+}
+
+/**
+ * Net money the recorded trades put into an instrument (buys in, sells out). A fee counts only while no spending
+ * row carries it (`feeOutsideCashflow`): with a row «risparmio» names it, and counting it here too would push the
+ * same euros into «mercato» and back out of «altre» (2026-11-12).
+ */
+export function tradeMoneyIn(trades: AssetTransaction[]): number {
+  let moneyIn = 0;
+  for (const t of trades) {
+    if (t.type === 'buy' && !t.isBaseline) moneyIn += t.quantity * t.priceEur + feeOutsideCashflow(t);
+    else if (t.type === 'sell') moneyIn -= t.quantity * t.priceEur - feeOutsideCashflow(t);
+  }
+  return moneyIn;
 }
 
 /**
@@ -90,7 +96,7 @@ export function pensionPaidInBetween(
  * «versati nel fondo pensione» of the Panoramica, Patrimonio and the email, and Storico's
  * «versamenti al fondo pensione». 0 before `startMonth` (`resolvePensionReturnStart`): the
  * contributions are complete only from there, and naming half of them would push the rest of
- * the fund's growth into a negative «altre variazioni».
+ * the fund's growth into a negative «altre variazioni» (in Storico's Driver, «Fondo pensione non tracciato»).
  */
 export function pensionPaidInAcross(
   contributions: PensionContribution[],

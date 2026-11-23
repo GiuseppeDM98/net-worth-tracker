@@ -28,6 +28,8 @@ import {
 import { getDummyDataCount, deleteAllDummyData, type DummyDataCount } from '@/lib/services/dummyDataService';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 interface DeleteDummyDataDialogProps {
   open: boolean;
@@ -139,7 +141,7 @@ export function DeleteDummyDataDialog({
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
         </div>
       ) : dataCount && dataCount.total > 0 ? (
-        <div className="rounded-xl bg-muted p-3.5">
+        <div className={cn('bg-muted p-3.5', COSTUME_FRAME_RADIUS_CLASS)}>
           <p className={TILE_SUB_EYEBROW_CLASS}>Che cosa sparisce</p>
           <dl className="mt-2 divide-y divide-border text-sm">
             <div className="flex items-baseline justify-between gap-3 py-1.5">

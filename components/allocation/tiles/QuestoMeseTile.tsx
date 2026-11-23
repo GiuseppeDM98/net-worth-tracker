@@ -1,0 +1,944 @@
+'use client';
+
+/**
+ * QuestoMeseTile — «cosa compro questo mese?».
+ *
+ * The left half of Allocazione's Accumulo tab: the plan's own installment. It used to be the first
+ * half of `AccumuloTile`, which also drew the class strip — now `ClassiDelPianoTile`; the
+ * loading/failed/none states moved up to `AccumuloTab`, which owns the plan read and the verdict
+ * (the tile no longer carries a reading of its own: the tab's verdict IS the reading). Three
+ * states remain, all with a plan: `draft`, `active`, `done`. Every figure comes from
+ * `accumulationPlanUtils.ts`, every word from `accumulationNarrative.ts`.
+ *
+ * The ledger matching arrives as `matchResult`: a `planned` line's state is the richer
+ * `LineUiState` (`todo`/`toConfirm`/`late`), with the actions of each state —
+ * `toConfirm` → Conferma · Ignora (Ignora is a session-local dismiss only, never a write),
+ * `executed` (ledger-linked) → Scollega, `late` → the manual actions, `lostLink` → Rivedi (opens the
+ * Calendario on that rata). `todo`/`skipped` carry no action, on purpose: the tile nudges towards
+ * recording the trade in the Registro rather than pre-empting it by hand. The same vocabulary
+ * covers the disposals («Vendite fuori piano»), each in its month: before it `upcoming` («In programma»,
+ * the month named, no action). In the month the Consulente asked to look at the plan again, a note
+ * and «Rivedi il piano» above the footer (`isPlanReviewDue`, 2026-11-19).
+ */
+import { useMemo, useRef, useState } from 'react';
+import type { Asset, AssetAllocationTarget } from '@/types/assets';
+import type { AccumulationPlan, InstallmentLine } from '@/types/accumulationPlan';
+import { addMonths, toMonthKey } from '@/lib/utils/planMonths';
+import type { ModelPortfolio } from '@/types/modelPortfolio';
+import type { RebalanceBand } from '@/lib/utils/allocationUtils';
+import {
+  computeUsableLiquidity,
+  disposalMonthIndex,
+  summarizeReserve,
+  buildRegisteredLinePatch,
+  findFirstIntactInstallment,
+  projectPlanOutcome,
+  recalibrateInstallment,
+  recalibrationQuantities,
+  resolvePositionStates,
+  shouldProposeRecalibration,
+} from '@/lib/utils/accumulationPlanUtils';
+import type { LineMatch, LineUiState } from '@/lib/utils/accumulationPlanMatching';
+import { isPlanDone } from '@/lib/utils/accumuloSummary';
+import { countPlanInstalments, findFirstBuyingInstallment, isInstalmentClosed, isRegularLine, isPlanReviewDue, locateOpenMonth, planEndsAfterReview } from '@/lib/utils/accumuloMonth';
+import { compareAllocations } from '@/lib/services/assetAllocationService';
+import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import {
+  useActivatePlan,
+  useApplyRecalibration,
+  useDismissRecalibration,
+  useClosePlan,
+  useDeleteDraftPlan,
+  useSetDisposal,
+  useSetInstallmentLine,
+} from '@/lib/hooks/useAccumulationPlan';
+import { validateDraftAgainstAssets } from '@/lib/utils/accumulationPlanSchema';
+import { getAllAssets } from '@/lib/services/assetService';
+import { toast } from 'sonner';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { NarrativeText } from '@/components/ui/narrative-text';
+import Link from 'next/link';
+import { PLAN_PATH_FROM_MODEL_HREF, PLAN_PATH_HREF } from '@/lib/utils/accumuloCopy';
+import { AccumulationCalendarDialog } from '@/components/allocation/AccumulationCalendarDialog';
+import { TransactionDialog } from '@/components/assets/TransactionDialog';
+import { DEPS, DraftBox, ROW_ACTION_CLASS, ROW_UNDO_CLASS, LineStateChip, TILE_ACTION_CLASS, effectiveLineState } from '@/components/allocation/tiles/accumuloShared';
+import { cachedFormatCurrencyEUR, formatNumberIt } from '@/lib/utils/formatters';
+import { armedActionLabel, describeWriteError } from '@/lib/utils/dialogNarrative';
+import {
+  ACCUMULO_ACTION_ACTIVATE,
+  describePlanPastReview,
+  ACCUMULO_ACTION_CALENDAR,
+  ACCUMULO_ACTION_CANCEL,
+  ACCUMULO_ACTION_CLOSE,
+  ACCUMULO_ACTION_CLOSE_VERB,
+  ACCUMULO_ACTION_CONFIRM,
+  ACCUMULO_ACTION_DELETE_DRAFT,
+  ACCUMULO_ACTION_DELETE_DRAFT_VERB,
+  ACCUMULO_ACTION_CONTINUE,
+  ACCUMULO_ACTION_IGNORE_MATCH,
+  ACCUMULO_ACTION_MARK_EXECUTED,
+  ACCUMULO_ACTION_APPLY,
+  ACCUMULO_ACTION_KEEP_AS_IS,
+  ACCUMULO_ACTION_REGISTER,
+  ACCUMULO_ACTION_REVISE,
+  ACCUMULO_ACTION_REVIEW,
+  ACCUMULO_ACTION_SAVE,
+  ACCUMULO_ACTION_SKIP,
+  ACCUMULO_ACTION_STOP,
+  ACCUMULO_ACTION_STOP_VERB,
+  ACCUMULO_ACTION_UNDO_EXECUTED,
+  ACCUMULO_ACTION_UNLINK,
+  ACCUMULO_DISPOSALS_SECTION_TITLE,
+  ACCUMULO_SWAP_ROW_PREFIX,
+  ACCUMULO_DONE_BOX_DRIFT,
+  ACCUMULO_DONE_BOX_EXECUTED,
+  ACCUMULO_DONE_BOX_RESIDUAL,
+  ACCUMULO_DRAFT_BOX_DISPOSALS,
+  ACCUMULO_DRAFT_BOX_INFLOWS,
+  ACCUMULO_DRAFT_BOX_LIQUIDITY,
+  ACCUMULO_DRAFT_BOX_POSITIONS,
+  ACCUMULO_LINE_STATUS_LABEL,
+  ACCUMULO_REVIEW_DUE_NOTE,
+  monthLabelShort,
+  describeMatchNote,
+  describeMonthTileAside,
+  describeUnpricedWarning,
+  ACCUMULO_MANUAL_AMOUNT_LABEL,
+  ACCUMULO_MANUAL_QUANTITY_LABEL,
+  ACCUMULO_MONTH_TILE_DONE_EYEBROW,
+  ACCUMULO_MONTH_TILE_DRAFT_EYEBROW,
+  ACCUMULO_MONTH_TILE_EYEBROW,
+  describeAccumulationOutcomeFooter,
+  describeMonthsBarCaption,
+  describeMonthReading,
+  describeQuietMonthReading,
+  describePriceChangeNotice,
+  describeRegisterNote,
+  describeRegisterSaleNote,
+  describeReserveWarning,
+  describePlanModelDivergence,
+  ACCUMULO_ACTION_REVIEW_FROM_MODEL,
+  ACCUMULO_ADVISOR_NOTES_EYEBROW,
+  ACCUMULO_ADVISOR_NOTES_VISIBLE,
+  describeMoreAdvisorNotes,
+} from '@/lib/utils/accumulationNarrative';
+import { comparePlanToModel } from '@/lib/utils/modelPortfolio';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
+
+interface QuestoMeseTileProps {
+  ownerId: string;
+  /** The open plan (`draft`, `active` or finished): the tab handles «no plan». */
+  plan: AccumulationPlan;
+  allAssets: Asset[];
+  targets: AssetAllocationTarget;
+  band: RebalanceBand;
+  /** `monthIndexOf(plan, today)`, from `useOpenAccumuloPlan`. */
+  currentIndex: number;
+  /** The ledger matching of the plan, computed once by the tab (its verdict reads the same states). */
+  matchResult: { matches: LineMatch[]; lineStates: Record<string, LineUiState> };
+  /** The model portfolio: «Rivedi dal modello» shows when the plan's quotas differ from it. */
+  model?: ModelPortfolio | null;
+  /** The Consulente's «rivedi entro» date: a plan ending after it says so (2026-11-12); null without one. */
+  reviewByIso: string | null;
+  /** The day `currentIndex` is read on (`useOpenAccumuloPlan`): the review month's check reads its month. */
+  today: Date;
+}
+
+/**
+ * A door to the path's revision (2026-11-21): a link; where a revision cannot start (demo, every instalment
+ * closed) a disabled button with the same label and no link.
+ */
+function ReviseDoor({ href, disabled, variant, className, children }: { href: string; disabled: boolean; variant: 'outline' | 'link'; className: string; children: React.ReactNode }) {
+  if (disabled) {
+    return (
+      <Button variant={variant} className={className} disabled>
+        {children}
+      </Button>
+    );
+  }
+  return (
+    <Button asChild variant={variant} className={className}>
+      <Link href={href}>{children}</Link>
+    </Button>
+  );
+}
+
+export function QuestoMeseTile({
+  ownerId,
+  plan,
+  allAssets,
+  targets,
+  band,
+  currentIndex,
+  matchResult,
+  model = null,
+  reviewByIso,
+  today,
+}: QuestoMeseTileProps) {
+  const isDemo = useDemoMode();
+  const pastReviewNote = reviewByIso && planEndsAfterReview(plan, reviewByIso) ? (
+    <p className="mt-2 text-[12px] text-warning-foreground">{describePlanPastReview(reviewByIso)}</p>
+  ) : null;
+
+  // A revision needs an intact instalment (with none, the plan is closed in Accumulo first) and is never written in demo.
+  const reviseDisabled = isDemo || !findFirstIntactInstallment(plan);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarFocusIndex, setCalendarFocusIndex] = useState<number | undefined>(undefined);
+  const [registerTarget, setRegisterTarget] = useState<
+    { kind: 'line'; installmentIndex: number; positionId: string } | { kind: 'disposal'; assetId: string } | null
+  >(null);
+  const [manualLine, setManualLine] = useState<{ installmentIndex: number; positionId: string; qty: string; amount: string } | null>(null);
+  const [manualDisposal, setManualDisposal] = useState<{ assetId: string; amount: string } | null>(null);
+  const [ignoredMatches, setIgnoredMatches] = useState<Set<string>>(new Set());
+
+  const deleteDraftRef = useRef<HTMLButtonElement>(null);
+  const stopRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const deleteDraftMutation = useDeleteDraftPlan(ownerId);
+  const closeMutation = useClosePlan(ownerId);
+  const activateMutation = useActivatePlan(ownerId);
+  const setLineMutation = useSetInstallmentLine(ownerId);
+  const setDisposalMutation = useSetDisposal(ownerId);
+  const applyRecalibrationMutation = useApplyRecalibration(ownerId);
+  const dismissRecalibrationMutation = useDismissRecalibration(ownerId);
+
+  const deleteDraftArmed = useArmedDelete(deleteDraftRef, () => {
+    void deleteDraftMutation.mutateAsync(plan.id);
+  });
+  const stopArmed = useArmedDelete(stopRef, () => {
+    void closeMutation.mutateAsync({ planId: plan.id, status: 'cancelled' });
+  });
+  const closeArmed = useArmedDelete(closeRef, () => {
+    void closeMutation.mutateAsync({ planId: plan.id, status: 'completed' });
+  });
+
+  const assetsById = useMemo(() => new Map(allAssets.map((asset) => [asset.id, asset])), [allAssets]);
+
+  const measurementInput = { allAssets, targets, compare: compareAllocations, today: new Date() };
+
+  const setStatus = async (installmentIndex: number, positionId: string, status: 'skipped' | 'planned') => {
+    await setLineMutation.mutateAsync({ planId: plan.id, index: installmentIndex, positionId, patch: { status }, measurementInput });
+  };
+
+  const saveManual = async () => {
+    if (!manualLine) return;
+    const executedQuantity = Number(manualLine.qty);
+    const executedAmountEur = Number(manualLine.amount);
+    if (!Number.isFinite(executedQuantity) || !Number.isFinite(executedAmountEur)) return;
+    await setLineMutation.mutateAsync({
+      planId: plan.id,
+      index: manualLine.installmentIndex,
+      positionId: manualLine.positionId,
+      patch: { status: 'executed', executedQuantity, executedAmountEur },
+      measurementInput,
+    });
+    setManualLine(null);
+  };
+
+  /** «Conferma»: link the proposed ledger trades and close the line. */
+  const confirmMatch = async (installmentIndex: number, positionId: string, match: LineMatch) => {
+    await setLineMutation.mutateAsync({
+      planId: plan.id,
+      index: installmentIndex,
+      positionId,
+      patch: { status: 'executed', transactionIds: match.transactionIds, executedQuantity: match.quantity, executedAmountEur: match.amountEur },
+      measurementInput,
+    });
+  };
+
+  /** «Scollega»: undo a ledger-linked confirmation, clearing its transaction ids. */
+  const unlinkLine = async (installmentIndex: number, positionId: string) => {
+    await setLineMutation.mutateAsync({
+      planId: plan.id,
+      index: installmentIndex,
+      positionId,
+      patch: { status: 'planned', transactionIds: undefined, executedQuantity: undefined, executedAmountEur: undefined },
+      measurementInput,
+    });
+  };
+
+  const confirmDisposalMatch = async (assetId: string, match: LineMatch) => {
+    await setDisposalMutation.mutateAsync({
+      planId: plan.id,
+      assetId,
+      patch: { status: 'executed', transactionIds: match.transactionIds, executedAmountEur: match.amountEur },
+    });
+  };
+
+  const unlinkDisposal = async (assetId: string) => {
+    await setDisposalMutation.mutateAsync({
+      planId: plan.id,
+      assetId,
+      patch: { status: 'planned', transactionIds: undefined, executedAmountEur: undefined },
+    });
+  };
+
+  const setDisposalStatus = async (assetId: string, status: 'skipped' | 'planned') => {
+    await setDisposalMutation.mutateAsync({ planId: plan.id, assetId, patch: { status } });
+  };
+
+  const saveManualDisposal = async () => {
+    if (!manualDisposal) return;
+    const executedAmountEur = Number(manualDisposal.amount);
+    if (!Number.isFinite(executedAmountEur)) return;
+    await setDisposalMutation.mutateAsync({ planId: plan.id, assetId: manualDisposal.assetId, patch: { status: 'executed', executedAmountEur } });
+    setManualDisposal(null);
+  };
+
+  const openCalendarOn = (installmentIndex: number) => {
+    setCalendarFocusIndex(installmentIndex);
+    setCalendarOpen(true);
+  };
+
+  /** the «Registra» dialog's prefill for the targeted line or sale, and what it links when the trade is saved. */
+  const registerSubject = (() => {
+    if (!registerTarget) return null;
+    if (registerTarget.kind === 'line') {
+      const installment = plan.installments.find((i) => i.index === registerTarget.installmentIndex);
+      const line = installment?.lines.find((l) => l.positionId === registerTarget.positionId);
+      const asset = line ? assetsById.get(line.assetId) : undefined;
+      if (!installment || !line || !asset) return null;
+      const sources = plan.liquidity.sourceCashAssetIds.map((id) => assetsById.get(id)).filter((a): a is Asset => !!a);
+      const source = sources.find((a) => DEPS.valueOf(a) >= line.plannedAmountEur) ?? sources[0];
+      return {
+        asset,
+        prefill: {
+          type: 'buy' as const,
+          quantity: line.plannedQuantity,
+          linkedCashAssetId: source?.id,
+          note: describeRegisterNote(plan.name, installment.index, plan.months),
+        },
+      };
+    }
+    const disposal = plan.disposals.find((d) => d.assetId === registerTarget.assetId);
+    const asset = assetsById.get(registerTarget.assetId);
+    if (!disposal || !asset) return null;
+    const sources = plan.liquidity.sourceCashAssetIds.map((id) => assetsById.get(id)).filter((a): a is Asset => !!a);
+    return {
+      asset,
+      prefill: {
+        type: 'sell' as const,
+        quantity: disposal.quantity ?? asset.quantity,
+        linkedCashAssetId: sources[0]?.id,
+        note: describeRegisterSaleNote(plan.name),
+      },
+    };
+  })();
+
+  const handleRegistered = async (result: { transactionId: string }, data: { quantity: number }, priceEur: number) => {
+    if (!registerTarget) return;
+    const amount = data.quantity * priceEur;
+    try {
+      if (registerTarget.kind === 'line') {
+        const installmentIndex = registerTarget.installmentIndex;
+        await setLineMutation.mutateAsync({
+          planId: plan.id,
+          index: installmentIndex,
+          positionId: registerTarget.positionId,
+          patch: buildRegisteredLinePatch(result.transactionId, data.quantity, priceEur),
+          measurementInput,
+        });
+      } else {
+        await setDisposalMutation.mutateAsync({
+          planId: plan.id,
+          assetId: registerTarget.assetId,
+          patch: { status: 'executed', transactionIds: [result.transactionId], executedAmountEur: amount },
+        });
+      }
+    } catch (error) {
+      // The trade is saved; only the link failed — the matching proposes it again from the ledger.
+      toast.error(describeWriteError(error));
+    }
+  };
+
+  const registerDialog = registerSubject && (
+    <TransactionDialog
+      open
+      onClose={() => setRegisterTarget(null)}
+      asset={registerSubject.asset}
+      prefill={registerSubject.prefill}
+      onCreated={(result, data, priceEur) => void handleRegistered(result, data, priceEur)}
+    />
+  );
+
+  const calendarDialog = calendarOpen && (
+    <AccumulationCalendarDialog
+      open={calendarOpen}
+      onClose={() => { setCalendarOpen(false); setCalendarFocusIndex(undefined); }}
+      plan={plan}
+      ownerId={ownerId}
+      allAssets={allAssets}
+      targets={targets}
+      band={band}
+      initialExpandedIndex={calendarFocusIndex}
+    />
+  );
+
+  // ── draft ────────────────────────────────────────────────────────────────
+  if (plan.status === 'draft') {
+    const liquidity = computeUsableLiquidity(plan.liquidity, assetsById, plan.disposals, plan.months, DEPS);
+    const draftIssues = validateDraftAgainstAssets(plan, assetsById);
+
+    // The gate runs on the assets read AGAIN at the click, never on the page's list (2026-11-20): an account deleted
+    // in another tab is `source_missing` and nothing is activated — as the path's «Conferma» and the Consulente's
+    // «Applica». `activatePlan` itself runs no gate.
+    const handleActivate = async () => {
+      const read = await getAllAssets(ownerId).then(
+        (assets) => ({ ok: true as const, assets }),
+        (error: unknown) => ({ ok: false as const, error })
+      );
+      if (!read.ok) {
+        toast.error(describeWriteError(read.error));
+        return;
+      }
+      const issues = validateDraftAgainstAssets(plan, new Map(read.assets.map((asset) => [asset.id, asset])));
+      if (issues.length > 0) {
+        toast.error(issues[0].message);
+        return;
+      }
+      await activateMutation
+        .mutateAsync({
+          planId: plan.id,
+          input: { allAssets: read.assets, targets, compare: compareAllocations, deps: DEPS, today: new Date() },
+        })
+        .catch((error: unknown) => toast.error(describeWriteError(error)));
+    };
+
+    return (
+      <>
+        <Tile eyebrow={ACCUMULO_MONTH_TILE_DRAFT_EYEBROW}>
+          {pastReviewNote}
+          <div className="mt-3 grid grid-cols-2 gap-3 tablet:grid-cols-4">
+            <DraftBox label={ACCUMULO_DRAFT_BOX_LIQUIDITY} value={cachedFormatCurrencyEUR(liquidity.availableNowEur)} />
+            <DraftBox label={ACCUMULO_DRAFT_BOX_DISPOSALS} value={cachedFormatCurrencyEUR(liquidity.disposalProceedsEur)} />
+            <DraftBox label={ACCUMULO_DRAFT_BOX_INFLOWS} value={cachedFormatCurrencyEUR(liquidity.inflowTotalEur)} />
+            <DraftBox label={ACCUMULO_DRAFT_BOX_POSITIONS} value={`${plan.positions.length}`} />
+          </div>
+          <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-3.5">
+            <Button
+              ref={deleteDraftRef}
+              variant="outline"
+              className={TILE_ACTION_CLASS}
+              disabled={isDemo}
+              onClick={deleteDraftArmed.onClick}
+              onBlur={deleteDraftArmed.onBlur}
+            >
+              {deleteDraftArmed.armed ? armedActionLabel(ACCUMULO_ACTION_DELETE_DRAFT_VERB) : ACCUMULO_ACTION_DELETE_DRAFT}
+            </Button>
+            {/* The draft is continued in the guided path, which overwrites and activates it (2026-11-20). */}
+            {isDemo ? (
+              <Button variant="outline" className={TILE_ACTION_CLASS} disabled>
+                {ACCUMULO_ACTION_CONTINUE}
+              </Button>
+            ) : (
+              <Button asChild variant="outline" className={TILE_ACTION_CLASS}>
+                <Link href={PLAN_PATH_HREF}>{ACCUMULO_ACTION_CONTINUE}</Link>
+              </Button>
+            )}
+            <Button className={TILE_ACTION_CLASS} disabled={isDemo || draftIssues.length > 0} onClick={() => void handleActivate()}>
+              {ACCUMULO_ACTION_ACTIVATE}
+            </Button>
+          </div>
+        </Tile>
+      </>
+    );
+  }
+
+  // ── active / done ────────────────────────────────────────────────────────
+  const done = isPlanDone(plan, currentIndex);
+  const states = resolvePositionStates(plan.positions, assetsById, DEPS, plan.disposals);
+  const outcome = projectPlanOutcome(states, plan.installments, plan.residualEur ?? 0, assetsById, plan.positions, DEPS);
+  // A position to buy whose instrument has no price receives nothing until it has one (an instrument the
+  // Consulente's «Applica» created when no listing quoted it, or one a plan by hand left unpriced).
+  const unpricedLabels = states.filter((state) => state.unpriced && state.targetPercentage > 0).map((state) => state.label);
+
+  if (done) {
+    const { closed: closedCount, total: instalmentCount } = countPlanInstalments(plan);
+    const avgAbsDrift = outcome.positions.length > 0 ? outcome.positions.reduce((sum, p) => sum + Math.abs(p.driftPp), 0) / outcome.positions.length : 0;
+
+    return (
+      <>
+        <Tile eyebrow={ACCUMULO_MONTH_TILE_DONE_EYEBROW}>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <DraftBox label={ACCUMULO_DONE_BOX_EXECUTED} value={`${closedCount} / ${instalmentCount}`} />
+            <DraftBox label={ACCUMULO_DONE_BOX_RESIDUAL} value={cachedFormatCurrencyEUR(outcome.residualEur)} />
+            <DraftBox label={ACCUMULO_DONE_BOX_DRIFT} value={formatNumberIt(avgAbsDrift, 1) + ' pp'} />
+          </div>
+          <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-3.5">
+            <Button variant="outline" className={TILE_ACTION_CLASS} onClick={() => { setCalendarFocusIndex(undefined); setCalendarOpen(true); }}>
+              {ACCUMULO_ACTION_CALENDAR}
+            </Button>
+            <Button
+              ref={closeRef}
+              className={TILE_ACTION_CLASS}
+              disabled={isDemo}
+              onClick={closeArmed.onClick}
+              onBlur={closeArmed.onBlur}
+            >
+              {closeArmed.armed ? armedActionLabel(ACCUMULO_ACTION_CLOSE_VERB) : ACCUMULO_ACTION_CLOSE}
+            </Button>
+          </div>
+        </Tile>
+        {calendarDialog}
+      </>
+    );
+  }
+
+  // ── active ───────────────────────────────────────────────────────────────
+  const currentInstallment = plan.installments.find((installment) => installment.index === currentIndex);
+  const lateLines = plan.installments
+    .filter((installment) => installment.index < currentIndex)
+    .flatMap((installment) => installment.lines.filter((line) => line.status === 'planned' && isRegularLine(line)).map((line) => ({ installment, line })));
+  const currentLines = currentInstallment ? currentInstallment.lines.filter((line) => isRegularLine(line) && (line.plannedQuantity > 0 || line.status !== 'planned')) : [];
+  // A swap's purchase is read with the sales that pay it, registrable as soon as they are (owner, 2026-11-20).
+  const swapRows = plan.installments.flatMap((installment) =>
+    installment.lines.filter((line) => line.swap && (line.plannedQuantity > 0 || line.status !== 'planned')).map((line) => ({ installment, line })));
+
+  const { sourceCashEur: planSourceCashEur, belowReserve } = summarizeReserve(plan.liquidity, assetsById, DEPS);
+
+  /**
+   * One planned line with its state and actions: a rata's line, or a swap's purchase under the sales that pay it
+   * (`prefix` «Con il ricavato: », `upcoming` before its month; owner, 2026-11-20).
+   */
+  const renderLine = (installmentIndex: number, line: InstallmentLine, upcoming = false, prefix = '') => {
+              const key = `${installmentIndex}:${line.positionId}`;
+              const isLateRow = installmentIndex < currentIndex;
+              const status = effectiveLineState(matchResult.lineStates[key] ?? 'todo', key, ignoredMatches, isLateRow, upcoming);
+              const match = matchResult.matches.find((m) => m.kind === 'installment' && m.index === installmentIndex && m.positionId === line.positionId);
+              const isManual = manualLine?.installmentIndex === installmentIndex && manualLine.positionId === line.positionId;
+              const asset = assetsById.get(line.assetId);
+              return (
+                <li key={key} className="py-2">
+                  {/* The name takes the room and wraps (never cut —); the state
+                      and its actions stack at the right on a phone and sit in one line from
+                      `desktop:`. A wrapping row put «Scollega» on a line of its own at 390. */}
+                  <div className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-2 break-words text-[13px] text-foreground">
+                        {prefix}{plan.positions.find((p) => p.id === line.positionId)?.label ?? asset?.name ?? line.positionId}
+                      </span>
+                      <span className="mt-0.5 block font-mono text-[11px] tabular-nums text-muted-foreground">
+                        {asset && `${getAssetDisplayTicker(asset)} · `}
+                        {formatNumberIt(line.plannedQuantity, 0)} · {cachedFormatCurrencyEUR(line.plannedAmountEur)}
+                      </span>
+                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1 desktop:flex-row desktop:items-center desktop:gap-3">
+                    <LineStateChip state={status} label={ACCUMULO_LINE_STATUS_LABEL[status]} />
+                    {!isDemo && status === 'toConfirm' && match && (
+                      <span className="flex shrink-0 gap-1.5">
+                        <Button
+                          variant="outline"
+                          className={ROW_ACTION_CLASS}
+                          onClick={() => setIgnoredMatches((prev) => new Set(prev).add(key))}
+                        >
+                          {ACCUMULO_ACTION_IGNORE_MATCH}
+                        </Button>
+                        <Button className={ROW_ACTION_CLASS} onClick={() => void confirmMatch(installmentIndex, line.positionId, match)}>
+                          {ACCUMULO_ACTION_CONFIRM}
+                        </Button>
+                      </span>
+                    )}
+                    {!isDemo && (status === 'todo' || status === 'late') && (
+                      <Button
+                        className={ROW_ACTION_CLASS}
+                        onClick={() => setRegisterTarget({ kind: 'line', installmentIndex, positionId: line.positionId })}
+                      >
+                        {ACCUMULO_ACTION_REGISTER}
+                      </Button>
+                    )}
+                    {!isDemo && status === 'late' && (
+                      <span className="flex shrink-0 gap-1.5">
+                        <Button
+                          variant="outline"
+                          className={ROW_ACTION_CLASS}
+                          onClick={() =>
+                            setManualLine({
+                              installmentIndex,
+                              positionId: line.positionId,
+                              qty: String(line.plannedQuantity),
+                              amount: line.plannedAmountEur.toFixed(2),
+                            })
+                          }
+                        >
+                          {ACCUMULO_ACTION_MARK_EXECUTED}
+                        </Button>
+                        <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => void setStatus(installmentIndex, line.positionId, 'skipped')}>
+                          {ACCUMULO_ACTION_SKIP}
+                        </Button>
+                      </span>
+                    )}
+                    {!isDemo && status === 'executed' && !!line.transactionIds?.length && (
+                      <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void unlinkLine(installmentIndex, line.positionId)}>
+                        {ACCUMULO_ACTION_UNLINK}
+                      </Button>
+                    )}
+                    {!isDemo && status === 'executed' && !line.transactionIds?.length && (
+                      <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void setStatus(installmentIndex, line.positionId, 'planned')}>
+                        {ACCUMULO_ACTION_UNDO_EXECUTED}
+                      </Button>
+                    )}
+                    {!isDemo && status === 'lostLink' && (
+                      <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => openCalendarOn(installmentIndex)}>
+                        {ACCUMULO_ACTION_REVIEW}
+                      </Button>
+                    )}
+                  </div>
+                  </div>
+                  {status === 'toConfirm' && match && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">{describeMatchNote(match.quantity, match.amountEur)}</p>
+                  )}
+                  {isManual && (
+                    <div className="mt-1.5 flex items-end gap-2 rounded-lg bg-muted p-2.5">
+                      <label className="flex-1 text-[11px] text-muted-foreground">
+                        {ACCUMULO_MANUAL_QUANTITY_LABEL}
+                        <Input type="number" value={manualLine.qty} onChange={(event) => setManualLine({ ...manualLine, qty: event.target.value })} className="mt-1 h-11 font-mono desktop:h-8" />
+                      </label>
+                      <label className="flex-1 text-[11px] text-muted-foreground">
+                        {ACCUMULO_MANUAL_AMOUNT_LABEL}
+                        <Input type="number" value={manualLine.amount} onChange={(event) => setManualLine({ ...manualLine, amount: event.target.value })} className="mt-1 h-11 font-mono desktop:h-8" />
+                      </label>
+                      <Button variant="ghost" className={ROW_ACTION_CLASS} onClick={() => setManualLine(null)}>
+                        {ACCUMULO_ACTION_CANCEL}
+                      </Button>
+                      <Button className={ROW_ACTION_CLASS} onClick={() => void saveManual()}>
+                        {ACCUMULO_ACTION_SAVE}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              );
+  };
+
+
+  const maxDrift = outcome.maxDriftPositionId
+    ? { label: outcome.positions.find((p) => p.positionId === outcome.maxDriftPositionId)?.label ?? '', deltaPp: outcome.maxAbsDriftPp }
+    : null;
+
+  const instalments = countPlanInstalments(plan);
+  const monthsCaption = describeMonthsBarCaption({
+    startMonth: plan.startMonth,
+    endMonth: plan.installments[plan.installments.length - 1]?.month ?? plan.startMonth,
+    closedCount: instalments.closed,
+    totalMonths: instalments.total,
+  });
+
+  // the open installment's recalibration, proposed in the tile whenever the figures move.
+  const recalibration = currentInstallment ? recalibrateInstallment(plan, currentIndex, assetsById, DEPS) : null;
+  const proposal =
+    currentInstallment && recalibration && shouldProposeRecalibration(recalibration, currentInstallment.recalibrationDismissed)
+      ? {
+          result: recalibration,
+          reading: describePriceChangeNotice({
+            lines: recalibration.lines.map((line) => ({
+              // The notice names instruments by ticker, as the render does («9 VWCE invece di 10»).
+              label: (() => {
+                const position = plan.positions.find((p) => p.id === line.positionId);
+                const buyAsset = position ? assetsById.get(position.buyAssetId) : undefined;
+                return buyAsset ? getAssetDisplayTicker(buyAsset) : (position?.label ?? line.positionId);
+              })(),
+              plannedQuantity: line.plannedQuantity,
+              suggestedQuantity: line.suggestedQuantity,
+            })),
+            plannedTotalEur: recalibration.plannedTotalEur,
+            suggestedTotalEur: recalibration.suggestedTotalEur,
+          }),
+        }
+      : null;
+
+  const applyProposal = async () => {
+    if (!proposal) return;
+    try {
+      await applyRecalibrationMutation.mutateAsync({ planId: plan.id, index: currentIndex, lines: proposal.result.lines });
+    } catch (error) {
+      toast.error(describeWriteError(error));
+    }
+  };
+
+  const dismissProposal = async () => {
+    if (!proposal) return;
+    try {
+      await dismissRecalibrationMutation.mutateAsync({
+        planId: plan.id,
+        index: currentIndex,
+        quantities: recalibrationQuantities(proposal.result),
+      });
+    } catch (error) {
+      toast.error(describeWriteError(error));
+    }
+  };
+
+  // The month's own reading: the lines of the open installment still waiting to be registered.
+  const openMonthLines = currentLines.filter((line) => {
+    const state = effectiveLineState(matchResult.lineStates[`${currentIndex}:${line.positionId}`] ?? 'todo', `${currentIndex}:${line.positionId}`, ignoredMatches, false);
+    return state === 'todo' || state === 'toConfirm' || state === 'late';
+  });
+  // Does the plan still say what the model says?
+  const divergence = model ? comparePlanToModel(plan.positions, model) : null;
+  // A month with no line and nothing late: the reserve refilling, or a share below one quota (2026-11-17).
+  const quietMonth = !!currentInstallment && currentInstallment.lines.length === 0 && lateLines.length === 0;
+  const refilling = quietMonth && (plan.baseline?.sourceCashEur ?? Infinity) < plan.liquidity.reserveEur - 0.005;
+  const monthReading = quietMonth
+    ? describeQuietMonthReading({ refilling, nextMonth: findFirstBuyingInstallment(plan, currentIndex + 1)?.month })
+    : describeMonthReading(
+        openMonthLines.length,
+        openMonthLines.reduce((sum, line) => sum + line.plannedAmountEur, 0),
+      );
+
+  return (
+    <>
+      <Tile
+        eyebrow={ACCUMULO_MONTH_TILE_EYEBROW}
+        reading={monthReading}
+        aside={describeMonthTileAside(currentInstallment?.month ?? plan.startMonth, locateOpenMonth(plan, currentIndex))}
+      >
+        {pastReviewNote}
+        {belowReserve && !refilling && (
+          <div className="mt-2 text-[12px] text-warning-foreground">
+            <NarrativeText
+              segments={describeReserveWarning({ sourceCashEur: planSourceCashEur, reserveEur: plan.liquidity.reserveEur, belowReserve: true }) ?? []}
+              className="inline"
+            />
+          </div>
+        )}
+
+        {unpricedLabels.length > 0 && <p className="mt-2 text-[12px] text-warning-foreground">{describeUnpricedWarning(unpricedLabels)}</p>}
+
+        <AdvisorNotes notes={plan.advisorNotes ?? []} />
+
+        {proposal && (
+          <div className="mt-3 rounded-lg border border-warning-border bg-warning p-3">
+            <NarrativeText segments={proposal.reading} className="text-[12px] leading-[1.5] text-warning-foreground" />
+            {!isDemo && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button className={ROW_ACTION_CLASS} disabled={applyRecalibrationMutation.isPending} onClick={() => void applyProposal()}>
+                  {ACCUMULO_ACTION_APPLY}
+                </Button>
+                <Button variant="outline" className={ROW_ACTION_CLASS} disabled={dismissRecalibrationMutation.isPending} onClick={() => void dismissProposal()}>
+                  {ACCUMULO_ACTION_KEEP_AS_IS}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {divergence && divergence.count > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-muted/40 p-3">
+            <p className="text-[12px] leading-[1.5] text-foreground">{describePlanModelDivergence(divergence.count)}</p>
+            {!isDemo && (
+              <ReviseDoor href={PLAN_PATH_FROM_MODEL_HREF} disabled={reviseDisabled} variant="outline" className={ROW_ACTION_CLASS}>
+                {ACCUMULO_ACTION_REVIEW_FROM_MODEL}
+              </ReviseDoor>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3 min-w-0">
+        {/* Lines of the current installment, late lines first. */}
+        <ul className="divide-y divide-border">
+          {[...lateLines.map(({ installment, line }) => ({ installmentIndex: installment.index, line })), ...currentLines.map((line) => ({ installmentIndex: currentIndex, line }))].map(
+            ({ installmentIndex, line }) => renderLine(installmentIndex, line),
+          )}
+        </ul>
+
+        {/* Disposals — held instruments left out of the plan, sold in their month (the ledger matching of the disposals). */}
+        {plan.disposals.length > 0 && (
+          <div className="mt-3">
+            <p className={TILE_SUB_EYEBROW_CLASS}>{ACCUMULO_DISPOSALS_SECTION_TITLE}</p>
+            <ul className="mt-1.5 divide-y divide-border">
+              {plan.disposals.map((disposal) => {
+                const key = `disposal:${disposal.assetId}`;
+                const saleIndex = disposalMonthIndex(disposal);
+                const isLateRow = currentIndex > saleIndex;
+                const status = effectiveLineState(matchResult.lineStates[key] ?? 'todo', key, ignoredMatches, isLateRow, saleIndex > Math.max(currentIndex, 1));
+                const match = matchResult.matches.find((m) => m.kind === 'disposal' && m.assetId === disposal.assetId);
+                const isManual = manualDisposal?.assetId === disposal.assetId;
+                const asset = assetsById.get(disposal.assetId);
+                return (
+                  <li key={key} className="py-2">
+                    <div className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 break-words text-[13px] text-foreground">{asset?.name ?? disposal.assetId}</span>
+                        <span className="mt-0.5 block font-mono text-[11px] tabular-nums text-muted-foreground">
+                          {asset && `${getAssetDisplayTicker(asset)} · `}
+                          {disposal.quantity !== undefined && `${formatNumberIt(disposal.quantity, 0)} quote · `}
+                          {cachedFormatCurrencyEUR(disposal.executedAmountEur ?? disposal.estimatedProceedsEur)}
+                          {status === 'upcoming' && ` · ${monthLabelShort(addMonths(plan.startMonth, saleIndex - 1))}`}
+                        </span>
+                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-1 desktop:flex-row desktop:items-center desktop:gap-3">
+                      <LineStateChip state={status} label={ACCUMULO_LINE_STATUS_LABEL[status]} />
+                      {!isDemo && status === 'toConfirm' && match && (
+                        <span className="flex shrink-0 gap-1.5">
+                          <Button
+                            variant="outline"
+                            className={ROW_ACTION_CLASS}
+                            onClick={() => setIgnoredMatches((prev) => new Set(prev).add(key))}
+                          >
+                            {ACCUMULO_ACTION_IGNORE_MATCH}
+                          </Button>
+                          <Button className={ROW_ACTION_CLASS} onClick={() => void confirmDisposalMatch(disposal.assetId, match)}>
+                            {ACCUMULO_ACTION_CONFIRM}
+                          </Button>
+                        </span>
+                      )}
+                      {!isDemo && (status === 'todo' || status === 'late') && (
+                        <Button className={ROW_ACTION_CLASS} onClick={() => setRegisterTarget({ kind: 'disposal', assetId: disposal.assetId })}>
+                          {ACCUMULO_ACTION_REGISTER}
+                        </Button>
+                      )}
+                      {!isDemo && status === 'late' && (
+                        <span className="flex shrink-0 gap-1.5">
+                          <Button
+                            variant="outline"
+                            className={ROW_ACTION_CLASS}
+                            onClick={() => setManualDisposal({ assetId: disposal.assetId, amount: disposal.estimatedProceedsEur.toFixed(2) })}
+                          >
+                            {ACCUMULO_ACTION_MARK_EXECUTED}
+                          </Button>
+                          <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => void setDisposalStatus(disposal.assetId, 'skipped')}>
+                            {ACCUMULO_ACTION_SKIP}
+                          </Button>
+                        </span>
+                      )}
+                      {!isDemo && status === 'executed' && !!disposal.transactionIds?.length && (
+                        <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void unlinkDisposal(disposal.assetId)}>
+                          {ACCUMULO_ACTION_UNLINK}
+                        </Button>
+                      )}
+                      {!isDemo && status === 'executed' && !disposal.transactionIds?.length && (
+                        <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void setDisposalStatus(disposal.assetId, 'planned')}>
+                          {ACCUMULO_ACTION_UNDO_EXECUTED}
+                        </Button>
+                      )}
+                      {/* lostLink: no Calendario surface for disposals — the only recovery is unlinking. */}
+                      {!isDemo && status === 'lostLink' && (
+                        <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => void unlinkDisposal(disposal.assetId)}>
+                          {ACCUMULO_ACTION_UNLINK}
+                        </Button>
+                      )}
+                    </div>
+                    </div>
+                    {status === 'toConfirm' && match && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">{describeMatchNote(match.quantity, match.amountEur)}</p>
+                    )}
+                    {isManual && (
+                      <div className="mt-1.5 flex items-end gap-2 rounded-lg bg-muted p-2.5">
+                        <label className="flex-1 text-[11px] text-muted-foreground">
+                          {ACCUMULO_MANUAL_AMOUNT_LABEL}
+                          <Input
+                            type="number"
+                            value={manualDisposal.amount}
+                            onChange={(event) => setManualDisposal({ ...manualDisposal, amount: event.target.value })}
+                            className="mt-1 h-11 font-mono desktop:h-8"
+                          />
+                        </label>
+                        <Button variant="ghost" className={ROW_ACTION_CLASS} onClick={() => setManualDisposal(null)}>
+                          {ACCUMULO_ACTION_CANCEL}
+                        </Button>
+                        <Button className={ROW_ACTION_CLASS} onClick={() => void saveManualDisposal()}>
+                          {ACCUMULO_ACTION_SAVE}
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+              {swapRows.map(({ installment, line }) => renderLine(installment.index, line, installment.index > Math.max(currentIndex, 1), ACCUMULO_SWAP_ROW_PREFIX))}
+            </ul>
+          </div>
+        )}
+        </div>
+
+        {/* Months bar: one 3px segment per month. A closed month takes the theme's
+            progress fill (`--progress-fill`, the foreground by default, mid slate in Lime Frost —
+            «no near-black bar anywhere»). */}
+        <div className="mt-3 flex gap-[3px]" role="img" aria-label={monthsCaption}>
+          {plan.installments.map((installment) => {
+            const hasLate = installment.index < currentIndex && installment.lines.some((line) => line.status === 'planned');
+            // A month with no line only refills the reserve: never filled as a closed instalment (owner, 2026-11-19).
+            const closed = isInstalmentClosed(installment);
+            const isCurrent = installment.index === currentIndex;
+            return (
+              <div
+                key={installment.index}
+                className={cn('h-[3px] flex-1', COSTUME_PILL_RADIUS_CLASS, hasLate ? 'bg-destructive' : closed ? 'bg-[var(--progress-fill)]' : isCurrent ? 'bg-muted-foreground/60' : 'bg-muted')}
+              />
+            );
+          })}
+        </div>
+        <p className="mt-1.5 font-mono text-[10px] tabular-nums text-muted-foreground">{monthsCaption}</p>
+
+
+        {isPlanReviewDue(plan, currentIndex, toMonthKey(today)) && (
+          <div className="mt-3">
+            <p className="text-[12px] text-muted-foreground">{ACCUMULO_REVIEW_DUE_NOTE}</p>
+            <ReviseDoor href={PLAN_PATH_HREF} disabled={reviseDisabled} variant="link" className="h-11 px-0 text-[12px] desktop:h-8">
+              {ACCUMULO_ACTION_REVISE}
+            </ReviseDoor>
+          </div>
+        )}
+
+        <div className="mt-auto border-t border-border pt-3.5">
+          <NarrativeText segments={describeAccumulationOutcomeFooter({ maxDrift, residualEur: outcome.residualEur, reserve: { eur: plan.liquidity.reserveEur, intact: !belowReserve } })} className="text-[11px] leading-[1.5] text-muted-foreground" />
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <Button variant="outline" className={TILE_ACTION_CLASS} onClick={() => { setCalendarFocusIndex(undefined); setCalendarOpen(true); }}>
+              {ACCUMULO_ACTION_CALENDAR}
+            </Button>
+            <ReviseDoor href={PLAN_PATH_HREF} disabled={reviseDisabled} variant="outline" className={TILE_ACTION_CLASS}>
+              {ACCUMULO_ACTION_REVISE}
+            </ReviseDoor>
+            <Button
+              ref={stopRef}
+              variant="outline"
+              className={TILE_ACTION_CLASS}
+              disabled={isDemo}
+              onClick={stopArmed.onClick}
+              onBlur={stopArmed.onBlur}
+            >
+              {stopArmed.armed ? armedActionLabel(ACCUMULO_ACTION_STOP_VERB) : ACCUMULO_ACTION_STOP}
+            </Button>
+          </div>
+        </div>
+      </Tile>
+
+      {calendarDialog}
+      {registerDialog}
+    </>
+  );
+}
+
+/**
+ * The corrections the Consulente's «Applica» made to its operating plan when it created this plan
+ * (2026-11-20): three in sight, the rest behind «Altre n». Nothing without notes.
+ */
+export function AdvisorNotes({ notes }: { notes: readonly string[] }) {
+  if (notes.length === 0) return null;
+  const shown = notes.slice(0, ACCUMULO_ADVISOR_NOTES_VISIBLE);
+  const rest = notes.slice(ACCUMULO_ADVISOR_NOTES_VISIBLE);
+  const list = (items: readonly string[]) => (
+    <ul className="divide-y divide-border">
+      {items.map((note) => (
+        <li key={note} className="py-1.5 text-[12px] leading-[1.45] text-muted-foreground">
+          {note}
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <div className="mt-3">
+      <p className={TILE_SUB_EYEBROW_CLASS}>{ACCUMULO_ADVISOR_NOTES_EYEBROW}</p>
+      {list(shown)}
+      {rest.length > 0 && (
+        <details>
+          <summary className="min-h-11 cursor-pointer py-2 text-[12px] text-muted-foreground desktop:min-h-0">{describeMoreAdvisorNotes(rest.length)}</summary>
+          {list(rest)}
+        </details>
+      )}
+    </div>
+  );
+}

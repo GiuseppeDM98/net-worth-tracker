@@ -6,9 +6,9 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Cashflow › Divisione**: Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`, `CommonSpending.toSplit`/`surplus`, `describeBasisRemedy`, `describeMemberCalendar`, `describeCommonIncome`, `describeIncomeConsumed`)
-- **Browser**: `e2e/cashflow.split{,.mobile}.spec.ts` on its own account, fixture `scripts/seedSplitE2E.mts` (`npm run e2e:seed:split`), session `e2e/auth.split.setup.ts`, progetti `split` e `split-mobile`
-- **Suites to run after a change here — Cashflow › Divisione** (moved from `AGENTS.md` § Commands on 2026-09-30): `expenseSplitSummary`, `expenseSplitNarrative` (with `describeSplitClosedAnswers`, the landscape index), `tabletComposition` (+ `cashflowNarrative` for the scheduled clause, `settingsRoundTrip` for the flag) · **Browser** `e2e/cashflow.split{,.mobile}.spec.ts` (own account, `npm run e2e:seed:split`)
+- **Cashflow › Divisione**: Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`, `CommonSpending.toSplit`/`surplus`, `describeBasisRemedy`, `describeMemberCalendar`, `describeCommonIncome`, `describeIncomeConsumed`), the Quota's body `components/cashflow/tiles/SplitQuotaBody.tsx` (`splitRingSegments`, the incomes' ring)
+- **Browser**: `e2e/cashflow.split{,.mobile}.spec.ts` on its own account (the Quota's ring: `e2e/ring-chart.split{,.mobile}.spec.ts`), fixture `scripts/seedSplitE2E.mts` (`npm run e2e:seed:split`), session `e2e/auth.split.setup.ts`, progetti `split` e `split-mobile`
+- **Suites to run after a change here — Cashflow › Divisione** (moved from `AGENTS.md` § Commands on 2026-09-30): `expenseSplitSummary`, `splitQuotaBody`, `expenseSplitNarrative` (with `describeSplitClosedAnswers`, the landscape index), `tabletComposition` (+ `cashflowNarrative` for the scheduled clause, `settingsRoundTrip` for the flag) · **Browser** `e2e/cashflow.split{,.mobile}.spec.ts`, `e2e/ring-chart.split{,.mobile}.spec.ts` (own account, `npm run e2e:seed:split`)
 
 ## Cashflow › Divisione (`components/cashflow/ExpenseSplitTab.tsx`, `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts`)
 - **Opt-in, like Centri di Costo** (`expenseSplitEnabled`), on **Tracciamento's period axis** — a division is a fact of a
@@ -24,7 +24,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **ONE field carries the whole feature**: `Expense.personalMemberId`. **Absent (or `null`) MEANS «in comune»** — that
   default is why there is no migration (every row ever written is already shared) and why the normal case costs no
   interaction. A value is a `FamilyMember` id, the SAME people as Previdenza's RAL: never a second list of names.
-  It applies to `income` too, and that is where the shares come from.
+  It applies to `income` too, and that is where the shares come from. A trade's fee row (`feeOfTradeId`, owner
+  2026-11-12, `tradeFeeOwner`) is personal to the sole holder of the asset; with a shared or split asset, to the sole
+  holder of the settlement account; else in comune — written once at the row's creation, a member set by hand
+  survives every later edit of the trade.
 - **Deliberately NOT denormalized to a name**, unlike `costCenterName`: the members live in the settings document every
   consumer already loads, so a rename costs no bulk update. The price is that every reader resolves the label itself.
   The readers outside this tab are two, both in `lib/utils/movementsOwnerFilter.ts` (2026-09-11): Tracciamento's
@@ -140,6 +143,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   with it, deliberately: Tracciamento's axis is not URL-addressable, and a link that landed on a
   different month would be worse than no link.
 
+- **The Quota is a ring of the incomes** (2026-11-15; The Ring Rule, 2026-11-12): `splitRingSegments(basis)` — one part
+  per person in SETTINGS order (a person keeps a colour whatever the period; the reading and the strip use the same
+  order), `RING_CATEGORY_COLORS` by that order, `null` without a computed basis — drawn by `SplitQuotaBody` beside the
+  person blocks, each name led by its arc's swatch (`ringSwatchAt`: past six people the sixth block on wears the fold's
+  grey). The parts are the incomes because a share IS `income / totalIncome`: the ring of the incomes is the ring of the
+  shares, and its centre can print a total — `totalIncome` «entrate», the income the shares are measured on (the reading
+  under it names the income left in comune). Tests `expenseSplitSummary.test.ts` (D1), `__tests__/splitQuotaBody.test.tsx`;
+  the figure inside its hole in `e2e/ring-chart.split{,.mobile}.spec.ts`.
 ## Composizione mobile
 
 Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log -- doc/mobile/`; the primitives in doc/guide/hall-of-fame.md § Composizione mobile): below `desktop:` one sequence, the desktop DOM (DESIGN.md → The First-Screen Rule), on the tab's OWN period axis. Not reached, and declared (doc/guide/prima-schermata-misure.md § Il fixture): the spec's «≤ 1,5 screens» at 390 (the fixture measures 1,62: the pool's `<dl>` under the hero, ~40px a row) and its «≤ 5 figures outside the verdict» (7: the two cells and five of In comune, `raisedBy`). The rules are DESIGN.md's (§ 5 → Small-Screen Composition: The First-Screen, Lifted-Figure, Closed-Row and Binding-Clause Rules); here is what this tab does with them.
@@ -160,6 +171,7 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 
 ## Per-page blind spots
 
+- **The ring's sixth colour is `--chart-4`, the slot of «Spese Non Necessarie» on Cashflow** (2026-11-15; the owner's six rank colours of 2026-11-12): on a household of six the sixth person shares a hue with a spending type.
 - **A fifth person empties the strip** (2026-10-12): past four members no cell is drawn (a row of 44px cells would not hold them), and the people's heroes come back below `tablet:`. No cell ever says «senza base» today: the basis is one for the whole period, so without it the strip is empty and the verdict says why. A residual between −0,5 € and 0,5 € prints «0 €», unsigned and uncoloured, on the tile and in the cell alike (since 2026-10-12; before, the tile printed «−0 €» in red and coloured an exact zero green).
 - **Divisione**: the shares follow the PERIOD's salaries, so a thirteenth month moves them and a month without one recorded has no shares at all (said by name); income attributed to a person counts in THEIR share whatever its category (a refund moves the percentage, 2026-09-27); a running year's pool carries scheduled rows (declared, like Tracciamento); a member deleted after the fact leaves rows in «Senza intestatario»; there is no bulk attribution, so history stays «all in comune» until edited row by row; the per-person tile spans 6 columns at two people and 4 at three or more; Tracciamento's «Intestatario» filter and the owner chips exist only with the flag on, and the filter's «Senza intestatario» option appears only when the PERIOD holds an orphaned row.
 - **Every income row left «in comune» reduces the common spending — a salary nobody attributed included** (2026-09-27). A household that records both salaries without attributing them sees «Entrate in comune −4000 €» under the pool, a surplus and no shares: that is the model working on the data as entered, not a bug. Attribute the salaries (Tracciamento, «Intestatario») and the pool is split again. The Quota tile keeps declaring the same salary as «non intestato» — the two clauses describe one row from two sides.

@@ -10,11 +10,14 @@ import {
   AssistantMode,
   AssistantPreferences,
   AssistantProposalState,
+  AssistantRouteReading,
   AssistantThread,
   AssistantThreadDetail,
   AssistantThreadsResponse,
 } from '@/types/assistant';
 import { ITALY_TIMEZONE, toDate } from '@/lib/utils/dateHelpers';
+import { assistantRouteReadingSchema } from '@/lib/utils/assistantRoute';
+import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { getDefaultAssistantPreferences } from './webSearchPolicy';
 
 const THREADS_COLLECTION = 'assistantThreads';
@@ -50,7 +53,8 @@ function formatRegisterTitleDate(now: Date): string {
 }
 
 function buildThreadTitleFromPrompt(prompt: string, mode: AssistantMode, now: Date = new Date()): string {
-  // Registra keeps one thread per Italian day, named by the day and never by a row's sentence.
+  // A thread that opens with a registration is named by its Italian day («Registrazioni · 1 nov 2026»), never by a
+  // row's sentence; since 2026-11-16 no thread is looked up by day, so one day may hold several of them.
   if (mode === 'register') {
     return `${getDefaultThreadTitle(mode)} · ${formatRegisterTitleDate(now)}`;
   }
@@ -90,7 +94,18 @@ function mapMessage(threadId: string, docId: string, data: DocumentData): Assist
     monthContext: data.monthContext ?? null,
     webSearchUsed: data.webSearchUsed,
     ...(data.proposals ? { proposals: mapProposals(data.proposals) } : {}),
+    ...readRouteReading(data.routeReading),
   };
+}
+
+/**
+ * The reading stored on an assistant message (2026-11), validated on the way back: a malformed
+ * document loses the reading line, never the message.
+ */
+function readRouteReading(raw: unknown): { routeReading?: AssistantRouteReading } {
+  if (raw === undefined) return {};
+  const parsed = assistantRouteReadingSchema.safeParse(raw);
+  return parsed.success ? { routeReading: parsed.data } : {};
 }
 
 /** The cards' outcomes as stored on the message: each `at` a Timestamp turned back into a Date. */
@@ -324,17 +339,20 @@ export async function getAssistantThreadDetail(
   userId: string
 ): Promise<AssistantThreadDetail> {
   const thread = await getAssistantThread(threadId, userId);
+  // The thread's LAST 100 messages (2026-11; the first 100 until then): the router's previous turn,
+  // the history replayed to the model and the page all read the thread's end. Read newest first,
+  // then reversed into ascending order.
   const messagesSnapshot = await adminDb
     .collection(THREADS_COLLECTION)
     .doc(threadId)
     .collection('messages')
-    .orderBy('createdAt', 'asc')
+    .orderBy('createdAt', 'desc')
     .limit(100)
     .get();
 
   return {
     thread,
-    messages: messagesSnapshot.docs.map((doc) => mapMessage(threadId, doc.id, doc.data())),
+    messages: messagesSnapshot.docs.map((doc) => mapMessage(threadId, doc.id, doc.data())).reverse(),
   };
 }
 
@@ -356,6 +374,8 @@ export async function appendAssistantMessage(
     monthContext: message.monthContext ?? null,
     webSearchUsed: message.webSearchUsed ?? false,
     createdAt: now,
+    // Deep-cleaned: a reading without a `reason` must not carry an `undefined` field to Firestore.
+    ...(message.routeReading ? { routeReading: removeUndefinedDeep(message.routeReading) } : {}),
   };
 
   // Persist the message and atomically increment the thread's messageCount

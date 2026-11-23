@@ -17,14 +17,14 @@
  */
 
 import type { Narrative, NarrativeSegment } from '@/lib/utils/narrative';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatNumberIt } from '@/lib/utils/formatters';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { resolveRitaUnlockAge, DEFAULT_INPS_RETIREMENT_AGE } from '@/lib/utils/pensionUnlock';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { CHECKING_ACCOUNT_STAMP_DUTY_EUR, CHECKING_ACCOUNT_STAMP_DUTY_THRESHOLD_EUR } from '@/lib/constants/stampDuty';
 import type { ExpenseType } from '@/types/expenses';
 import type { CategoryClassificationCounts } from '@/lib/utils/spendingRoles';
-import type { AssetClass } from '@/types/assets';
+import type { AssetClass, IdealAllocationSettings, ObjectivePriority } from '@/types/assets';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import type { TargetProblem } from '@/lib/utils/allocationTargetValidation';
 
@@ -246,7 +246,7 @@ export function describeAssistantPreferences({
   if (memoryEnabled !== undefined) clauses.push(memoryEnabled ? 'apprendimento attivo' : 'apprendimento spento');
   if (macroContextEnabled !== undefined) clauses.push(macroContextEnabled ? 'ricerca web attiva' : 'ricerca web spenta');
   if (clauses.length === 0) {
-    return [prose('Preferenze non ancora sincronizzate: si leggono e modificano accanto alla conversazione.')];
+    return [prose("Preferenze non ancora sincronizzate: si leggono e modificano dall'Assistente, nel menu «⋯» → Preferenze.")];
   }
   const sentence = clauses.join(', ');
   return [prose(`${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`)];
@@ -561,6 +561,119 @@ export function describeClassTargets({ classCount, withSubcategories, problem }:
   return segments;
 }
 
+export const OBJECTIVE_PRIORITY_LABELS: Record<ObjectivePriority, string> = {
+  essential: 'essenziale',
+  high: 'alta',
+  medium: 'media',
+  low: 'bassa',
+};
+
+export interface IdealAllocationFactorInput {
+  /** Italian asset-class label (ASSET_CLASS_LABELS), already resolved by the caller. */
+  classLabel: string;
+  priority: ObjectivePriority;
+}
+
+export interface IdealAllocationInput {
+  enabled: boolean;
+  classPriority: ObjectivePriority;
+  leveragePriority: ObjectivePriority | 'off';
+  /** deriveTargetLeverageRatio(targets), the leva target the leverage objective aims at. */
+  targetLeverageRatio: number;
+  factorObjectives: IdealAllocationFactorInput[];
+}
+
+/**
+ * The ONE translation of a saved `IdealAllocationSettings` into the words the readings print: class
+ * labels from `ASSET_CLASS_LABELS`. Every surface that reads the criteria calls it (among them
+ * Impostazioni, the criteria tile, the PAC's Ottimizzato step, the model portfolio's dialog and the tab's
+ * criteria count), and each would otherwise build this by hand.
+ */
+export function buildIdealAllocationInput(value: IdealAllocationSettings, targetLeverageRatio: number): IdealAllocationInput {
+  return {
+    enabled: value.enabled,
+    classPriority: value.classPriority,
+    leveragePriority: value.leveragePriority,
+    targetLeverageRatio,
+    factorObjectives: value.factorObjectives.map((f) => ({
+      classLabel: ASSET_CLASS_LABELS[f.assetClass] ?? f.assetClass,
+      priority: f.priority,
+    })),
+  };
+}
+
+// The criteria rows name what is respected, the select its priority: «Leva · Alta» read as a high leverage
+// (owner, 2026-11-17).
+export const IDEAL_CLASS_ROW_LABEL = 'Rispetto dei target di classe';
+export const IDEAL_PRIORITY_PREFIX = 'Priorità';
+export function describeLeverageRowLabel(targetLeverageRatio: number): string {
+  return `Rispetto della leva ${formatNumberIt(targetLeverageRatio, 2)}×`;
+}
+
+/** «classi (priorità essenziale)», «leva 1,3× (priorità alta)», … — one entry per objective that is on. */
+export function listIdealObjectives({ classPriority, leveragePriority, targetLeverageRatio, factorObjectives }: IdealAllocationInput): string[] {
+  const objectiveTexts: string[] = [`classi (priorità ${OBJECTIVE_PRIORITY_LABELS[classPriority]})`];
+
+  if (leveragePriority !== 'off') {
+    objectiveTexts.push(
+      `leva ${numTrim(targetLeverageRatio)}× (priorità ${OBJECTIVE_PRIORITY_LABELS[leveragePriority]})`
+    );
+  }
+
+  if (factorObjectives.length > 0) {
+    const factorText = factorObjectives
+      .map((f) => `${f.classLabel} (priorità ${OBJECTIVE_PRIORITY_LABELS[f.priority]})`)
+      .join(', ');
+    objectiveTexts.push(`secondo livello di ${factorText}`);
+  }
+
+  return objectiveTexts;
+}
+
+/**
+ * Allocazione ideale — which objectives the weight optimizer can
+ * propose the model's weights from, and their priority. Spenta: the model's weights stay manual.
+ */
+export function describeIdealAllocation(input: IdealAllocationInput): Narrative {
+  if (!input.enabled) {
+    return [prose('Spenta: nel portafoglio modello e nel PAC i pesi si inseriscono solo a mano.')];
+  }
+  const objectiveTexts = listIdealObjectives(input);
+  const count = objectiveTexts.length;
+  return [
+    prose(
+      `Il portafoglio modello e il PAC possono proporre i pesi da ${count} ${count === 1 ? 'criterio' : 'criteri'}: ${objectiveTexts.join(', ')}.`
+    ),
+  ];
+}
+
+/**
+ * Composizione ideale (Allocazione, and its dialog) — the same objectives read as the tile's own
+ * answer, «com'è fatto il mio portafoglio ideale, strumento per strumento?», not as what the PAC
+ * can do: the tool stands on its own, with or without a plan (owner's wording, 2026-09-25).
+ * Called only with the objectives on; the tile says «spenta» with its own sentence.
+ */
+export function describeIdealComposition(input: IdealAllocationInput): Narrative {
+  const objectiveTexts = listIdealObjectives(input);
+  const whose = objectiveTexts.length === 1 ? 'il tuo criterio' : `i tuoi ${objectiveTexts.length} criteri`;
+  return [prose(`Il portafoglio che rispetta meglio ${whose}, strumento per strumento: ${objectiveTexts.join(', ')}.`)];
+}
+
+/**
+ * A class with a target > 0 but sub-categories still OFF cannot carry a second-level
+ * objective yet; this guided hint (under the tile's "Secondo livello" row) says what to turn on,
+ * one sentence per class, so the reader is not left guessing why the checkbox never appears.
+ */
+export function describeSecondLevelSetupHint(classLabels: string[]): string | null {
+  if (classLabels.length === 0) return null;
+  return (
+    `Per usare un secondo livello su ${classLabels.join(', ')}, attiva le sue sottocategorie nei ` +
+    `target qui sopra e assegna a ogni strumento la sua (Patrimonio → Modifica; nei compositi, ogni ` +
+    `componente ha la sua).`
+  );
+}
+
+
 // ─── Spese ────────────────────────────────────────────────────────────────────
 
 export interface SpendingRolesSettingInput {
@@ -605,10 +718,18 @@ export function describeSpendingRolesSetting({ enabled, classification, categori
 export interface DefaultAccountsInput {
   debitName?: string;
   creditName?: string;
+  /** «Conto per gli investimenti»: the account a plan of accumulation draws from by default. */
+  investmentName?: string;
 }
 
 /** Conti di default — where expenses and income land without a choice. */
-export function describeDefaultAccounts({ debitName, creditName }: DefaultAccountsInput): Narrative {
+/** The two defaults of the expense form, then the plan of accumulation's account when one is set (2026-11-19). */
+export function describeDefaultAccounts({ debitName, creditName, investmentName }: DefaultAccountsInput): Narrative {
+  const reading = describeExpenseDefaults(debitName, creditName);
+  return investmentName ? [...reading, prose(` Il piano di accumulo attinge da ${investmentName}.`)] : reading;
+}
+
+function describeExpenseDefaults(debitName: string | undefined, creditName: string | undefined): Narrative {
   if (debitName && creditName) {
     if (debitName === creditName) {
       return [prose(`Spese ed entrate passano entrambe da ${debitName}.`)];
@@ -689,9 +810,9 @@ export function describeExpenseCategories(counts: ExpenseCategoryCounts): Narrat
   }
   const parts: Narrative[] = [];
   if (counts.income > 0) parts.push([figure(String(counts.income)), prose(' di entrate')]);
-  if (counts.fixed > 0) parts.push([figure(String(counts.fixed)), prose(counts.fixed === 1 ? ' fissa' : ' fisse')]);
+  if (counts.fixed > 0) parts.push([figure(String(counts.fixed)), prose(counts.fixed === 1 ? ' necessaria' : ' necessarie')]);
   if (counts.variable > 0)
-    parts.push([figure(String(counts.variable)), prose(counts.variable === 1 ? ' variabile' : ' variabili')]);
+    parts.push([figure(String(counts.variable)), prose(counts.variable === 1 ? ' non necessaria' : ' non necessarie')]);
   if (counts.debt > 0) parts.push([figure(String(counts.debt)), prose(' di debito')]);
 
   const segments: Narrative = [figure(String(total)), prose(total === 1 ? ' categoria: ' : ' categorie: ')];

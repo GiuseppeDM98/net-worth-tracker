@@ -458,6 +458,7 @@ export default function HistoryPage() {
 
   const header = (
     <PageHeader
+      emblem="storico"
       label="Analisi"
       title="Storico"
       description={describeStoricoHeader(growth)}

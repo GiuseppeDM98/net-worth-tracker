@@ -12,7 +12,7 @@
 
 - **Page**: `app/dashboard/allocation/consulente/page.tsx` (the gate on the `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` flag, as
   for the Assistente, and `configured` = the key read on the server), `components/allocation/consulente/ConsulenteClient.tsx`
-  (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens and the interview's scene),
+  (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens and the interview's scene; its card classes and `numberOrNull` from `components/ui/path-{card,fields}.tsx`),
   `ConsulenteInterviewScene.tsx` (the rounds' cards, the skeleton, the scene's footer; 2026-11-08),
   `useConsulenteInterview.ts` (one round per gesture, aborted by «Salta il colloquio»), `ConsulenteRun.tsx` (the
   run's screen and `StageRows`, which the report's running view shares), `ConsulenteReport.tsx` (the running view,
@@ -22,7 +22,7 @@
 - **Primitives**: `components/ui/choice-list.tsx` (`ChoiceList`, every choice of the path and of the Compravendita),
   `components/ui/question-card.tsx` (`QuestionCard`: ONE question a model asks, shared with the Assistente's in-chat
   questions), `components/ui/path-rail.tsx` (`PathRail`: the path's eight ticks, the interview's three, the run's
-  four segments, the book's pages (buttons from `desktop:`)), `Tile`'s `generated`
+  stages (five since 2026-11-19), the book's pages (buttons from `desktop:`)), `Tile`'s `generated`
   and the classes of `lib/constants/aiAccent.ts`, `sceneVariants` in `lib/utils/motionVariants.ts`.
 - **Pure**: `lib/utils/questionSet.ts` (the one question schema — kinds, options, the reserved rows «Altro…» and
   «Preferisco non dire», the lenient parser, the describer of an answer, the prompt lines — shared with the
@@ -37,17 +37,17 @@
   for both SDKs), `lib/utils/sseReader.ts`, `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, shared with
   every mode of the Assistente and the emails' AI comments since 2026-11-07).
 - **Server**: `lib/server/allocationAdvice/prompts.ts` (the builders of the strategy, the instruments, the revision and the review, the interview's and the IL COLLOQUIO
-  block), `run.ts` (the orchestration: context → strategy → instruments → review, persisted at every stage;
+  block), `run.ts` (the orchestration: context → strategy → instruments → review → plan, persisted at every stage;
   `runInterviewRound`, which persists nothing; the OBBLIGAZIONI block and the previous paths read beside the
-  context, 2026-11-08), `store.ts` (Admin, `allocationAdvice/{uid}` and the archive `allocationAdvice/{uid}/history`);
+  context, 2026-11-08, the PIANO DI ACCUMULO block too since 2026-11-12), `accumulationPlan.ts` (Admin, its read), `store.ts` (Admin, `allocationAdvice/{uid}` and the archive `allocationAdvice/{uid}/history`);
   `lib/utils/allocationAdviceBonds.ts` (pure: which holdings are the bond part, which cost a profile read, the block);
   `app/api/allocation-advice/run/route.ts` (SSE, `maxDuration = 300`, 12 model requests an hour per warm instance:
-  interview rounds, strategy, revise), `applied/route.ts`.
+  interview rounds, strategy, revise, plan), `applied/route.ts`.
 - **Client**: `lib/services/allocationAdviceService.ts` (the read under the rules), `lib/hooks/useAllocationAdvice.ts`
   (`queryKeys.allocationAdvice.all`), `lib/services/assetService.ts → updateAssetAllocationRole` (the ONLY field
   «Applica» touches on an asset), `firestore.rules` (`read: canAccess`, `write: false`).
 - **Models**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5: the interview, the
-  strategy, the review) and `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
+  strategy, the review, the operating plan) and `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
 - **Suites to run after a change here**: `questionSet`, `allocationAdviceInterview`, `allocationAdviceProposal`, `allocationAdviceBook`,
   `allocationAdviceDraft`, `allocationAdviceDocument`, `allocationAdviceBonds`, `allocationAdviceApply`, `allocationAdviceNarrative`,
   `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes`, `cashflowBlock`,
@@ -114,9 +114,12 @@
 
 ## The run
 
-- **Three calls in series, persisted at every stage** (`runAllocationAdvice`; on the owner's account, mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
+- **A fifth stage writes the operating plan** (2026-11-19): after the review, on its own status in
+  `document.operatingPlan`, never failing the run — doc/guide/consulente-piano.md.
+- **The model calls in series, persisted at every stage** (`runAllocationAdvice`; the plan the fourth since
+  2026-11-19, above; on the mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
   of the Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, portfolio block included) and the
-  CASHFLOW 12 MESI block, read beside it before the strategy stage (2026-11); the strategy
+  CASHFLOW 12 MESI block, read beside it before the strategy stage (2026-11), and the PIANO DI ACCUMULO block (below); the strategy
   on Opus 5.5 (effort `medium`, `max_tokens` 32 000, no tool); the instruments on Sonnet 5.5 (effort `high`) with
   `web_search_20260209` (`max_uses` 20, `ALLOCATION_ADVICE_WEB_SEARCH_MAX_USES`); the review on Opus 5.5. Each call is a stream read to the
   end by the SDK's accumulator (`beta.messages.stream(...).finalMessage()`): `stop_reason` and the model that
@@ -137,30 +140,52 @@
   anche le loro duration … per proporre un altro ETF che copra una duration diversa»): `lib/utils/allocationAdviceBonds.ts`
   (pure) over the holdings of the YTD bundle — the single bonds by TYPE (`bond`, with `maturityIso` from
   `bondDetails.maturityDate` and the coupon the DIVIDENDI facts know), the funds by CLASS (`bonds`, never an account or
-  a loan) with the effective duration and the average maturity Yahoo publishes (`topHoldings.bondHoldings`, read as
-  `InstrumentFundProfile.bond` through the Esposizione's shared profile cache, `resolveInstrumentProfiles` with the
-  `fund` module, one request per bond ETF with a raw ticker: a cached document written before the field existed is
-  asked once more whatever its age, `schema` in `yahooSource.ts`). The block closes the data of the interview and
-  the strategy (`buildConsulenteContext`) and the holdings of the instrument search; three absences are named apart
-  («scadenza non registrata», «duration non pubblicata da Yahoo», «duration non letta» when the profile read threw —
-  a failed read never fails the run). Yahoo's figures are «secondo Yahoo, non verificate»: the instruments contract
-  makes the second agent confirm a bond ETF's duration with the web search and write it in the candidate's
-  `duration` (years, 0–40, `instrumentCandidateSchema`; the report prints « · duration 2,4 anni»), the strategy
-  contract makes every bond sub-target say which horizon and which goal it covers (and which horizon stays
-  uncovered), the interview contract asks what the bond part is for and whether singles or ETFs when the block has
-  rows or the class will weigh. Not a fixed screen of the path (the eight screens stay as drawn on 2026-11-06): a reading rule.
+  a loan) by value and role, «--- OBBLIGAZIONI: SCADENZE ---». The block closes the data of the interview and
+  the strategy (`buildConsulenteContext`) and the holdings of the instrument search; a single without a date reads
+  «scadenza non registrata». **No duration in the block, and no Yahoo read** (owner, 2026-11-20, on the mirror
+  tour of the one-click «Applica»): Yahoo's `topHoldings.bondHoldings` proved wrong on real ETFs — an inflation-linked fund at
+  1,08 years of duration against about 7 verified by the search, a 1-3 year fund at 9,8 years of average maturity —
+  and the strategy had written its reasoning on the wrong figure. The funds' line says the second agent verifies it
+  (`BOND_FUNDS_LINE`); the strategy and the interview contracts forbid a duration in figures; the instruments
+  contract makes the second agent verify a bond ETF's duration with the web search, the held ones too, and write it
+  in the candidate's `duration` (years, 0–40, `instrumentCandidateSchema`; the report prints « · duration 2,4
+  anni»). `InstrumentFundProfile.bond` is still written by `yahooSource.ts` into the Esposizione's cache, read by
+  nobody. The strategy contract makes every bond sub-target say which horizon and which goal it covers (and which
+  horizon stays uncovered), the interview contract asks what the bond part is for and whether singles or ETFs when
+  the block has rows or the class will weigh. **A goal with a date and an amount wants a government bond held to
+  maturity** (owner, 2026-11-20): the interview offers a single bond expiring near that date among the options, with
+  why (the sum at maturity is known, an ETF's price on that date is not); the strategy proposes a BTP — a BTP€i when
+  the sum must keep up with inflation — expiring by the goal's year, in a sub-target that names the goal and the year,
+  an ETF in its place only when the user chose ETFs for that goal, saying what it loses; the instrument search lists
+  government bonds expiring by that year, never after, the nearest first, the date in the candidate's `note`. A
+  revision («Chiedi una modifica») reruns only the review on the same candidates, with no search: a new bond needs a
+  new path. Not a fixed screen of the path (the eight screens stay as drawn on 2026-11-06): a reading rule.
 - **The previous paths** (owner, 2026-11-08: «tra un anno ha paura e lo rifa … il consulente nota nelle sue parole
   della paura o della fomo»): a new path's interview rounds and strategy read «--- I PERCORSI PRECEDENTI ---»
   (`formatPreviousPathsForPrompt`): the live document when it has a report — nothing has replaced it during the
   interview; at the strategy it is read before the new one — then the archive, the most recent first, at most
   `ALLOCATION_ADVICE_HISTORY_LIMIT` (6). Per path: its dates, the answers of then in two lines, the user's own
   words (what was missing, the notes, the goals' notes), the interview of then with its answers
-  (`formatQuestionAnswersForPrompt`), the requests for changes, the proposal in one line. The plan in force stays
+  (`formatQuestionAnswersForPrompt`), the requests for changes, the proposal in one line and its NEW goals («Obiettivi nuovi proposti allora, creati da «Applica»» or «mai creati», 2026-11-20: the Consulente had read its own new goal as the user's novelty). The plan in force stays
   printed whole before it (IL PIANO IN VIGORE); the revision's round reads neither (its report is the context). The
   reading rule in both contracts: a change in tolerance, horizon, goals or constraints the data do not explain is a
   question (interview) or a sentence of «La situazione» (strategy); fear, haste or euphoria read in the words — of
   then or of today — are said with the sentence that shows them, never judged. A failed archive read never fails a
   path: the block says it and lists the live one alone.
+- **The PIANO DI ACCUMULO block** (2026-11-12): `readAccumulationPlanForAdvice(userId, now)`
+  (`lib/server/allocationAdvice/accumulationPlan.ts`, Admin SDK) + `formatAccumulationPlanForPrompt` (`prompts.ts`),
+  printed after OBBLIGAZIONI in `userContent` of the interview and the strategy (through `buildConsulenteContext`), of
+  the review and of the revision (`opts.accumulationPlan`); never the instruments' stage nor the Assistente (declared, 2026-11-12). Three states: not read (a
+  failed read logs and never fails the run), no active plan (a draft or a completed one count as none), an active
+  plan — month k of n («non ancora partito: parte a …» before its start), the instalment, what it buys as SHARES OF ITS
+  MONEY (Σ of the lines not skipped by position, «Compra, in parti dei soldi del piano: X 60% (… €)»), the positions
+  kept at their weight apart («Tiene al loro peso, senza comprarli»), the sales with their month and status (a swap adds «, e con il ricavato compra X nello stesso mese», 2026-11-20; a swap line is never counted among the buys). A plan
+  that refills the reserve first names it: «fino a 2027-10 ricostituiscono solo la riserva (11 mesi senza acquisti),
+  prima rata 800 € a 2027-11» (`OpenPlanForAdvice.firstBuy`; owner, 2026-11-20, on the mirror tour of the click: the
+  Consulente had read «prima rata di 0 €» and the held positions' end weights as buys). Sections 5 and 6 of the contracts carry the path in words: what to accumulate or
+  sell, an indicative time, the monthly instalment as an order of magnitude, and with an active plan whether it goes
+  toward the targets — never a table, never the plan's figures recomputed; the review names «Crea un piano di
+  accumulo verso questa allocazione» (owner, 2026-11-12).
 - **The CASHFLOW 12 MESI block** (2026-11): `lib/utils/cashflowBlock.ts` (pure; `buildCashflowBlock` +
   `formatCashflowBlockForPrompt`) over `fetchCashflowBlockInputs(userId, now)` (lib/services/assistantMonthContextService.ts),
   ONE expense query with no lower bound up to the Italian end of the month 12 ahead. The 12 full Italian months are
@@ -203,7 +228,10 @@
   the percentages of the classes WITHOUT `fixedAmount` add up to 100 (±0,5); a class's sub-targets add up to 100 or
   are empty; a class appears once; a goal's `recommendedAllocation` adds up to 100; each `assetName`
   is the EXACT name from the STRUMENTI block (the model copies it; `findAssetByName` is case- and space-insensitive and also recognises the
-  `displayTicker` alias, which the block prints in place of the ticker: without it, on 2026-10-23 «Applica» lost the quotas of two ETCs).
+  `displayTicker` alias, which the block prints in place of the ticker: without it, on 2026-10-23 «Applica» lost the quotas of two ETCs;
+  a held instrument wins over one at quantity 0 with the same name or ticker, 2026-11-12). A row «0 quote, mai comprato» is an
+  instrument created empty for an accumulation plan (`Asset.createdEmpty`, no ledger row): the strategy's «Vincoli» sentence says it
+  is not held and weighs nothing, but a sub-target that matches it names it in `instrument` — one constant sentence of the system.
 - **The document** `allocationAdvice/{uid}` is ONE per account, rewritten whole at the start (`setAllocationAdviceAdmin`)
   and then updated per stage (`patchAllocationAdviceAdmin`, `merge: true`, `removeUndefinedDeep`); the dates travel
   as Timestamp and come back as Date field by field (`mapAllocationAdviceData`, shared by the two SDKs). States:
@@ -230,11 +258,11 @@
   devono stare sotto il minuto, vero?»). Vercel Hobby stops a function at 300 s with Fluid compute (60 s without: it
   must be turned on in Vercel → Settings → Functions), and the third run on the mirror lasted 396 s in one request,
   with the strategy alone at 210 s. So `runAllocationAdviceStage` runs ONE stage (`AllocationAdviceRunStage`: `strategy`,
-  which creates the document from the answers and includes the context · `instruments` · `review`, which read the
-  persisted document — `document` passed in memory by the whole run, read from the store by the route) and the route
+  which creates the document from the answers and includes the context · `instruments` · `review` · `plan` (2026-11-19),
+  which read the persisted document — `document` passed in memory by the whole run, read from the store by the route) and the route
   (`maxDuration = 300`, body `{ userId, stage, answers?, request?, interview?, revision? }`, the rate limit counts
-  the interview rounds, the `strategy` and `revise`: 12 an hour per warm instance) streams
-  `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from, interview)`) chains the three, reads
+  the interview rounds, the `strategy`, `revise` and `plan`: 12 an hour per warm instance) streams
+  `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from, interview)`) chains the stages, reads
   each stream to its `done`, rereads the document after every stage; a failed or cut stage stays
   `resumeFrom` and «Riprova» (`retry`) restarts from there on the persisted document, never from scratch — a request
   that throws (a non-ok status, a stream the network drops) is remembered by the stage in flight too, never by the
@@ -263,11 +291,17 @@
   rail beside it (DESIGN.md → The Path-Scene Rule). The pages, in order, are `buildBookPages`
   (lib/utils/allocationAdviceBook.ts): «In una frase» (the cover: the verdict, then the text's first section;
   «La situazione» when the text is the strategy alone) · «L'allocazione proposta» · «Gli strumenti» · «Gli obiettivi» ·
-  «Casa, fondi pensione e illiquidi» · «Cosa fare adesso» · «Rischi e revisione» · «Il colloquio» · «Chiedi una
-  modifica» · «Applica». A page exists when it has text or figures: the proposal's two with a proposal (the review
+  «Casa, fondi pensione e illiquidi» · «Cosa fare adesso» · «Il piano operativo» (2026-11-19, only with a usable plan
+  of this report: doc/guide/consulente-piano.md) · «Rischi e revisione» · «Il colloquio» · «Chiedi una modifica» ·
+  «Applica». A page exists when it has text or figures: the proposal's two with a proposal (the review
   date is required, so «Rischi e revisione» always follows a proposal), «Gli strumenti» with the instruments,
   «Gli obiettivi» with the proposal's goals, the roles' page with a change or a name not found, «Il colloquio» with a
   round, «Chiedi una modifica» with a report, «Cosa fare adesso» only with its section; the cover and «Applica» always.
+- **Under a costume theme the scene cards and the book's cards are tiles** (2026-11-23; doc/guide/temi.md § Il
+  costume): the wizard's, the interview's and the run's cards and every card of the book carry `data-tile`, the
+  headlines `.costume-heading`, a model's page `[data-tile][data-generated]`; the boxes inside them are frames. The
+  book printed from the browser is the palette's — the print reset, the emblem `print:hidden`
+  (`e2e/theme.costume.spec.ts`, on a planted report).
 - **The text splits by its sections onto the page of the tile it explains** (`splitReportSections`,
   `assignSections`): three heading shapes open a section — an ATX heading (`#`–`####`), a line that is only bold
   («**Gli strumenti**», «2. **…**»), and the contracts' own list shape «1. **In una frase** — testo» when the bold IS a
@@ -284,7 +318,7 @@
   report».
 - **The pager** is the card's footer on every width: «Indietro» (disabled on the first page) and, below `desktop:`,
   «Indice»; the page's own buttons — «Avanti» (absent on «Applica»), on «Chiedi una modifica» «Rivedi il report» and
-  «Salta le domande» with «Avanti» as an outline, on «Applica» «Applica alle impostazioni» and «Rifai il percorso».
+  «Salta le domande» with «Avanti» as an outline, on «Applica» «Applica alle impostazioni» and «Rifai il percorso»; the plan of accumulation's tick and, once applied, «Crea il piano di accumulo» live in the page's body (2026-11-20, doc/guide/consulente-piano.md § The book and «Applica»).
   Below `tablet:` a column, the page's buttons full width on top. From `desktop:` the rail's labels are buttons, ONE
   Tab stop (the arrows move along the rail); below it «Indice» opens «Vai a una pagina», a `ResponsiveModal` of 44px
   rows — the route's one modal. The WHOLE page slides along the turn, the leaving page `inert`; after a turn the
@@ -350,16 +384,8 @@
   revisione» (the aside «rivedi entro il …», the reason, `proposal.risks` as rows), «Chiedi una modifica», «Applica».
   The generated card — the 1px `--ai-accent` border, the accented eyebrow — follows § The report as a book above;
   «Le fasi» of the running view wears it.
-- **«Applica» shows the plans BEFORE writing, one tick per item** (owner, 2026-10-20): the targets
-  (`buildTargetsFromProposal` → `setSettings({ targets })`, which REPLACES the targets document as Impostazioni does;
-  a class absent from the proposal disappears from the targets), the roles (`updateAssetAllocationRole`, an `updateDoc`
-  on the field alone: `updateAsset` and `updateAssetMetadata` delete `taxRate`/`displayTicker` absent from the
-  partial), the goals (`planGoalDocument` → `saveGoalData`, the whole document as FIRE › Obiettivi does: existing ones
-  updated by id, new ones with a colour, those marked «da eliminare» in the answers deleted, the quotas of the touched
-  goals only rewritten in percent; an instrument's quotas beyond 100% are REDUCED within the margin the untouched
-  goals leave, and the plan says so, never silently). Then `POST /api/allocation-advice/applied` records what was
-  written and the document moves to `applied`; every key of the readers is invalidated (settings, assets, overview,
-  goals, allocationAdvice).
+- **«Applica», its plans, the plan of accumulation it creates and the operating plan's row** moved to doc/guide/consulente-piano.md
+  (2026-11-19), with the page «Il piano operativo».
 - **The review date** (`reviewByIso`) lives in the document, not in the settings: the Allocazione page prints it in
   its header (`describeReviewBy` → `describeAllocazioneHeader.reviewBy`) only when the plan has been applied — no
   sixth place in the FIVE places.
@@ -397,11 +423,9 @@ on a phone, and from the row under the Assistente's conversation).
 - **The strategy reads this year's rows twice** (2026-11): the YTD bundle and the cashflow block query them apart —
   accepted, the bundle stays the Assistente's, and the block is read once per strategy and once per interview round (`buildConsulenteContext`), never by the instruments or
   the review.
-- **A bond ETF's duration in the context is Yahoo's, up to 30 days old, and may differ from the factsheet**
-  (2026-11-08): the block says «secondo Yahoo, non verificate» and the instruments contract has the second agent
-  confirm it before a candidate carries `duration`; a fund Yahoo does not describe («non pubblicata») is still in the
-  block with its value, so the strategy can ask the search for it. The context never rereads Yahoo: the Esposizione's
-  TTL rules it.
+- **The strategy names no duration in figures, only a horizon** (2026-11-20): the OBBLIGAZIONI block carries none
+  (Yahoo's proved wrong), so a bond sub-target's text says «orizzonte 1-3 anni» and the figure appears only on the
+  candidates of «Gli strumenti», verified by the search. A strategy written before 2026-11-20 may still carry Yahoo's.
 - **A path abandoned before its report is not in the archive** (2026-11-08): the previous paths are those with a
   report; «Riprova» after a failed strategy creates a new document with the same answers, and archiving the failed
   one would have listed the same words twice. The one exception the model sees: the live document without a report
@@ -439,7 +463,7 @@ on a phone, and from the row under the Assistente's conversation).
   (`answers.exchange` is '' until typed, and step 3 does not pass), and a draft that comes back with an unlisted
   exchange reopens it (`isListedExchange`). The free text goes to the instrument agent as written.
 
-- **The run costs money and takes minutes** (three calls, two on Opus 5.5, one with web search): «Puoi lasciare la
+- **The run costs money and takes minutes** (four calls, three on Opus 5.5, one with web search): «Puoi lasciare la
   pagina» is true — every stage is saved — but the closed SSE connection does not stop the server; whoever reopens
   sees the saved stage and the page rereads the document while it is `running`. A run cut by the platform stays
   `running` until the 20-minute stale mark.
@@ -451,7 +475,7 @@ on a phone, and from the row under the Assistente's conversation).
 - **The rules are inert until they are deployed** (`npx firebase deploy --only firestore:rules`; done by the owner on 2026-10-20, the Consulente tried in production; the `history` rule of 2026-11-08 deployed by the retirement session on the owner's call — a merge deploys nothing): before the deploy
   the page does not read the document (permission-denied → the read fails and the page says so).
 - **The run's E2E specs fake the route**: one `page.route` handler per spec — `e2e/consulenteInterview.ts` scripts the
-  interview's rounds and records the strategy and revise bodies (a strategy answers with an error so the chain stops, a revise completes), `allocation.consulente.spec.ts` scripts its three stages and the retry
+  interview's rounds and records the strategy and revise bodies (a strategy answers with an error so the chain stops, a revise completes), `allocation.consulente.spec.ts` scripts its four stages, the retry and the plan the fake writes
   (`doc/guide/e2e-playwright.md` § Browser-Driven E2E); no test spends, and the real run is made once per change on
   the mirror (2026-10-20 with the owner's key; the outcomes in that session's SESSION_NOTES and in the commit).
 - **The interview writes nothing**: its rounds live in the draft until the strategy, and a cleared storage loses them.
@@ -465,7 +489,7 @@ on a phone, and from the row under the Assistente's conversation).
 - **A new report opens on its cover** whatever `?pagina=` says.
 - **The count-up plays on the proposal page's first mount in the session**, not on the cover.
 - **Copy and the browser's find see the open page only**; the print sheet holds every page.
-- **Twelve requests an hour**: a run with three rounds is four, a revision with its round two.
+- **Twelve requests an hour**: a run with three rounds is five, a revision with its round three (the plan stage counts one, 2026-11-19).
 - **«Rifai il percorso» drops an interview the document on screen already used** (`reopenStoredDraft`): only rounds
   asked after that document's `updatedAt` survive.
 - **The arrows and a swipe never turn the card** (2026-11-11): a textarea and radios live on the pages; the arrows move

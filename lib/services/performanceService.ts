@@ -30,6 +30,7 @@ import { buildCashFlowMap, externalFlowOf, mergePensionFlows, mergePortfolioFlow
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { endOfMonthBound } from '@/lib/utils/dateHelpers';
 import { buildTwrIndex, computeDrawdownSeries, findMaxDrawdown } from '@/lib/utils/drawdownSeries';
+import { isTradeFeeRow } from '@/lib/utils/tradeFeeExpense';
 import { resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
 import type { PerformanceYieldPeriod } from '@/lib/utils/dividendYield';
 import type { FlowSource, PensionBoundaryFlow, PortfolioBoundaryFlow } from '@/types/performance';
@@ -721,7 +722,8 @@ async function getCashFlowsForPeriod(
   expenses.forEach(expense => {
     // Transfers are net-zero for portfolio metrics — skip before touching the map
     // so a transfer-only month never creates a spurious empty cashflow entry.
-    if (expense.type === 'transfer') return;
+    // A trade's fee row is a cost of the portfolio, not money leaving it: the return stays net (owner, 2026-11-12).
+    if (expense.type === 'transfer' || isTradeFeeRow(expense)) return;
 
     const date = expense.date;
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -791,7 +793,8 @@ export function getCashFlowsFromExpenses(
   filtered.forEach(expense => {
     // Transfers are net-zero for portfolio metrics — skip before touching the map
     // so a transfer-only month never creates a spurious empty cashflow entry.
-    if (expense.type === 'transfer') return;
+    // A trade's fee row is a cost of the portfolio, not money leaving it: the return stays net (owner, 2026-11-12).
+    if (expense.type === 'transfer' || isTradeFeeRow(expense)) return;
 
     const date = expense.date;
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;

@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { ASSISTANT_PROMPT_MAX_LENGTH } from '@/lib/utils/assistantPeriodOptions';
+import { ASSISTANT_MODES, assistantRouteOverrideSchema } from '@/lib/utils/assistantRoute';
 
 /**
  * Server-side input validation schemas (SEC-3).
@@ -155,6 +156,12 @@ export const assetTransactionUpdateSchema = assetTransactionBaseSchema
   .superRefine(refineAssetTransaction);
 
 /**
+ * The version of a trade an edit or a delete was drawn from (`updatedAt`, ISO). Absent from an older
+ * client: the server's own read is then the version (2026-11-12).
+ */
+export const tradeVersionSchema = isoDateSchema.optional();
+
+/**
  * GET /api/ai/assistant/threads?after= — the cursor of the next page is a thread id: never empty
  * (`.doc('')` throws) and never a path (a slash would address a subcollection).
  */
@@ -167,12 +174,18 @@ export const assistantThreadCursorSchema = z
 /**
  * POST /api/ai/assistant/stream — EVERY field of `AssistantStreamRequest` (types/assistant.ts) is
  * declared: zod strips an undeclared key, so a field left out here would silently stop reaching
- * the route. The mode is the app's six and nothing else — an unknown one used to fall through to
- * the chat builder — and the prompt is capped in every mode (2026-11).
+ * the route. The mode is the app's six, or `'auto'` (the server reads it,
+ * `lib/server/assistant/router.ts`) — an unknown one used to fall through to the chat builder —
+ * and the prompt is capped in every mode (2026-11).
+ *
+ * A `route` (the reading the client chose, or carried from the previous turn with `routeCarried`)
+ * belongs to `'auto'` alone, and `'auto'` never carries a period of its own: the reading is its
+ * period. Whether the route is consistent with TODAY (an analysis on its period, no month after
+ * the current one) is the route's check, after the account's: it needs the Italian date.
  */
 export const assistantStreamRequestSchema = z.object({
   userId: z.string().min(1),
-  mode: z.enum(['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis', 'chat', 'register']),
+  mode: z.enum([...ASSISTANT_MODES, 'auto']),
   prompt: z.string().trim().min(1).max(ASSISTANT_PROMPT_MAX_LENGTH),
   threadId: assistantThreadCursorSchema.optional(),
   month: z.object({ year: z.number().int(), month: z.number().int().min(1).max(12) }).optional(),
@@ -187,6 +200,18 @@ export const assistantStreamRequestSchema = z.object({
     })
     .partial()
     .optional(),
+  route: assistantRouteOverrideSchema.optional(),
+  routeCarried: z.boolean().optional(),
+}).superRefine((body, ctx) => {
+  if (body.route && body.mode !== 'auto') {
+    ctx.addIssue({ code: 'custom', path: ['route'], message: 'Una lettura scelta vale solo con mode auto.' });
+  }
+  if (body.routeCarried !== undefined && !body.route) {
+    ctx.addIssue({ code: 'custom', path: ['routeCarried'], message: 'Una lettura ereditata richiede la lettura.' });
+  }
+  if (body.mode === 'auto' && (body.month || body.year !== undefined || body.chatContext)) {
+    ctx.addIssue({ code: 'custom', path: ['mode'], message: 'Con mode auto il periodo lo legge il server.' });
+  }
 });
 
 /**

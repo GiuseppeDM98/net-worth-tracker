@@ -12,12 +12,25 @@ import {
   ALLOCATION_ADVICE_STAGES,
   type AllocationAdviceDocument,
   type AllocationAdviceInterview,
+  type AllocationAdviceOperatingPlan,
   type AllocationAdvicePriorPlan,
   type AllocationAdviceRunStage,
   type AllocationAdviceStage,
 } from '@/types/allocationAdvice';
 
 type Data = Record<string, unknown>;
+
+/** The operating plan as stored (2026-11-19): its three dates through `toDate`, the plan as written; null when absent. */
+function operatingPlanOrNull(value: unknown): AllocationAdviceOperatingPlan | null {
+  if (!value || typeof value !== 'object') return null;
+  const stored = value as Data;
+  return {
+    ...(stored as unknown as AllocationAdviceOperatingPlan),
+    startedAt: toDate(stored.startedAt as Date),
+    finishedAt: dateOrNull(stored.finishedAt),
+    reportFinishedAt: toDate(stored.reportFinishedAt as Date),
+  };
+}
 
 function dateOrNull(value: unknown): Date | null {
   return value ? toDate(value as Date) : null;
@@ -72,7 +85,7 @@ export function stageOfRunStage(stage: AllocationAdviceRunStage): AllocationAdvi
 }
 
 /**
- * Each of the four stages with its state: `running` lights `stage` and marks the ones before it
+ * Each of the five stages with its state: `running` lights `stage` and marks the ones before it
  * done (`null`: all pending, the run is opening); `failed` marks `stage` failed; `done` marks all
  * done. ONE reading for the run's screen, the rail and the report's «in corso» view.
  */
@@ -117,5 +130,6 @@ export function mapAllocationAdviceData(userId: string, data: Data): AllocationA
       : [],
     interview: interviewOrNull(data.interview),
     revisionInterview: interviewOrNull(data.revisionInterview),
+    operatingPlan: operatingPlanOrNull(data.operatingPlan),
   };
 }

@@ -137,8 +137,8 @@ export const WithOwnerFilter: Story = {
     ownerOptions: [
       { value: 'all', label: 'Tutti' },
       { value: 'common', label: 'In comune' },
-      { value: 'member-1', label: 'Giuseppe' },
-      { value: 'member-2', label: 'Marcella' },
+      { value: 'member-1', label: 'Paolo' },
+      { value: 'member-2', label: 'Elena' },
     ],
     selectedOwnerId: 'member-1',
     activeFilterCount: 1,

@@ -23,6 +23,7 @@ import { MONTH_NAMES } from '@/lib/constants/months';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { periodSavings } from '@/lib/utils/hallOfFameRecords';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
+import { meaningfulSavingsRate } from '@/lib/utils/savingsRate';
 import type {
   HallOfFameData,
   HallOfFameNote,
@@ -240,7 +241,8 @@ function valueOf(
       return { value: record.totalExpenses, percentage: null, income: null, base: null };
     case 'savings': {
       const saved = periodSavings(record);
-      return { value: saved, percentage: shareOf(saved, record.totalIncome), income: record.totalIncome, base: null };
+      // A savings rate, or null below the floor and without income (`meaningfulSavingsRate`, 2026-11-12).
+      return { value: saved, percentage: meaningfulSavingsRate(record.totalIncome, record.totalExpenses), income: record.totalIncome, base: null };
     }
   }
 }

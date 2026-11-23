@@ -155,6 +155,19 @@ describe('POST /api/allocation-advice/run', () => {
     expect(rateLimitMock).toHaveBeenCalledTimes(1);
   });
 
+  // The operating plan (2026-11-19): a model call of its own, so it counts. Mutation: `plan` left out of the limit.
+  it('plan reaches the stage runner without answers, counts against the limit, and is refused at 429 once the hour is spent', async () => {
+    runMock.mockResolvedValue({ userId: 'user-1', status: 'ready' });
+    const response = await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'plan' }));
+    expect(response.status).toBe(200);
+    await readSse(response);
+    expect(runMock.mock.calls[0][0]).toMatchObject({ userId: 'user-1', stage: 'plan', answers: undefined });
+    expect(rateLimitMock).toHaveBeenCalledWith('user-1:allocation-advice', 12, 3_600_000);
+    rateLimitMock.mockReturnValueOnce({ allowed: false, retryAfterSeconds: 60 } as never);
+    expect((await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', stage: 'plan' }))).status).toBe(429);
+    expect(runMock).toHaveBeenCalledTimes(1);
+  });
+
   it('streams a stage failure as an error event in the product\'s words', async () => {
     runMock.mockRejectedValue(new AllocationAdviceStageError('instruments', 'Il servizio AI non ha risposto.', true));
     const events = await readSse(await runRoute(post('http://localhost/api/allocation-advice/run', { userId: 'user-1', answers: ANSWERS })));
@@ -274,5 +287,16 @@ describe('POST /api/allocation-advice/applied', () => {
     const response = await appliedRoute(post('http://localhost/api/allocation-advice/applied', { userId: 'user-1', applied }));
     expect(response.status).toBe(200);
     expect(patchAdviceMock).toHaveBeenCalledWith('user-1', { status: 'applied', applied: expect.objectContaining({ ...applied, at: expect.any(Date) }) });
+  });
+
+  // «applicato il …» stays the day the settings were applied (2026-11-20): a second POST records the plan the click
+  // created and keeps the first `at`. Mutation that turns it red: stamp `new Date()` on every POST.
+  it('a second POST with the plan keeps the first applied.at', async () => {
+    const first = new Date('2026-11-10T09:00:00.000Z');
+    getAdviceMock.mockResolvedValue({ userId: 'user-1', status: 'applied', report: { markdown: 'x', proposal: null }, applied: { at: first, ...applied } });
+    const response = await appliedRoute(post('http://localhost/api/allocation-advice/applied', { userId: 'user-1', applied: { ...applied, planId: 'plan-1', planAction: 'create' } }));
+    expect(response.status).toBe(200);
+    expect(patchAdviceMock).toHaveBeenCalledWith('user-1', { status: 'applied', applied: { at: first, ...applied, planId: 'plan-1', planAction: 'create' } });
+    expect((await appliedRoute(post('http://localhost/api/allocation-advice/applied', { userId: 'user-1', applied: { ...applied, planAction: 'other' } }))).status).toBe(400);
   });
 });

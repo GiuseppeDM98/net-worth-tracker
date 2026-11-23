@@ -13,11 +13,12 @@
  * pure module that feeds a screen — see AGENTS.md → Italian Localization.
  */
 
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatEuroMinus } from '@/lib/utils/formatters';
+import { readSavings, type SavingsReading } from '@/lib/utils/savingsRate';
 import { projectMonthEndWithScheduled } from '@/lib/utils/spendingProjection';
 import { formatPercentage } from '@/lib/services/chartService';
 import { MONTH_NAMES } from '@/lib/constants/months';
-import { atThePercent } from '@/lib/utils/patrimonioNarrative';
+import { articleForPercent, atThePercent } from '@/lib/utils/patrimonioNarrative';
 import { PENSION_BAND_KEY } from '@/lib/utils/historyComposition';
 import { isPrintedZero } from '@/lib/utils/verdictStrip';
 import { resolveDeclineCause, resolveTaxedGrowth, type PeriodSalesSummary } from '@/lib/utils/periodSales';
@@ -27,6 +28,7 @@ import {
   describePurchases,
   describeSales,
   taxedGrowthHeadline,
+  saleCarriesMonthSplit,
 } from '@/lib/utils/salesNarrative';
 
 import type { Narrative, NarrativeSegment, VerdictTone } from '@/lib/utils/narrative';
@@ -47,9 +49,9 @@ export interface OverviewVerdictInput {
   yearlyVariation: { value: number; percentage: number } | null;
   isNewATH: boolean;
   /**
-   * Current-month savings rate in percent; null when there is no income to measure against. The
-   * Panoramica passes the rate of what has ALREADY happened (`resolveLivedCashflow`), the base of
-   * «risparmiati» and of Tracciamento's verdict.
+   * Current-month savings rate in percent; null when it is not a rate (`readSavings`: no income,
+   * or a deficit larger than the income). The Panoramica passes the rate of what has ALREADY
+   * happened (`resolveLivedCashflow`), the base of «risparmiati» and of Tracciamento's verdict.
    */
   savingsRate: number | null;
   /**
@@ -75,17 +77,21 @@ export interface OverviewVerdictInput {
 export interface LivedCashflow {
   /** Income − expenses dated up to today. */
   savings: number;
-  /** `savings` over the income received so far, in percent; null with no income yet. */
+  /** `savings` over the income received so far, in percent; null when `reading` is not a rate. */
   savingsRate: number | null;
   scheduledExpenses: number;
   scheduledIncome: number;
+  /** What can be said about the lived part (`readSavings` of the income and spending up to today). */
+  reading: SavingsReading;
+  /** The same reading of the WHOLE month, calendar included: how the month closes. */
+  monthReading: SavingsReading;
 }
 
 /**
  * The payload's month totals minus their scheduled slice — the same subtraction Tracciamento's
- * `settleTotals` makes, so the Panoramica's «Hai messo da parte il 45% delle entrate finora» and
- * Tracciamento's verdict judge the same days (the old rate included rows dated after today: 17%
- * on the real account's 19 settembre 2026 against 45% already saved). Null when the payload
+ * `settleTotals` makes, so the Panoramica's «Hai messo da parte il 40% delle entrate finora» and
+ * Tracciamento's verdict judge the same days (the old rate included rows dated after today: a
+ * fraction of the rate already saved, mid-month on a lived account). Null when the payload
  * predates `incomeScheduled` (source version 19): a rate on half a subtraction would be wrong.
  */
 export function resolveLivedCashflow(stats: DashboardOverviewExpenseStats | null | undefined): LivedCashflow | null {
@@ -94,12 +100,15 @@ export function resolveLivedCashflow(stats: DashboardOverviewExpenseStats | null
   const scheduledExpenses = current.expensesScheduled ?? 0;
   const scheduledIncome = current.incomeScheduled;
   const income = current.income - scheduledIncome;
-  const savings = income - (current.expenses - scheduledExpenses);
+  const spending = current.expenses - scheduledExpenses;
+  const reading = readSavings(income, spending);
   return {
-    savings,
-    savingsRate: income > 0 ? (savings / income) * 100 : null,
+    savings: income - spending,
+    savingsRate: reading.kind === 'rate' ? reading.rate : null,
     scheduledExpenses,
     scheduledIncome,
+    reading,
+    monthReading: readSavings(current.income, current.expenses),
   };
 }
 
@@ -166,7 +175,7 @@ function previousMonthIndex(month: number): number {
 /**
  * «ad agosto» / «a luglio» for the month BEFORE `month` — the Cashflow tile's row label and its
  * flat-delta line read it from here so no component types the preposition (a tile printed
- * «A agosto» on the real account until 2026-09-13). `capitalised` for the start of a label.
+ * «A agosto» until 2026-09-13). `capitalised` for the start of a label.
  */
 export function atPreviousMonth(month: number, capitalised = false): string {
   const phrase = withPrepositionA(monthInSentence(previousMonthIndex(month)));
@@ -245,7 +254,7 @@ function resolveHeadline(input: OverviewVerdictInput): ResolvedHeadline {
     if (taxedGrowth) {
       return { headline: taxedGrowthHeadline(month, taxedGrowth, input.sales), tone: 'warning', taxIsTheStory: true };
     }
-    if (input.savingsRate !== null && input.savingsRate < 0) {
+    if (spendingExceedsIncome(input)) {
       return { headline: `${month} cresce, ma le spese superano le entrate.`, tone: 'warning', taxIsTheStory: false };
     }
     return { headline: `${month} sta andando bene.`, tone: 'positive', taxIsTheStory: false };
@@ -268,6 +277,91 @@ function resolveHeadline(input: OverviewVerdictInput): ResolvedHeadline {
   };
 }
 
+/** A reading the headline warns about: spending above the income, in euros or as a negative rate. */
+function isDeficit(reading: SavingsReading): boolean {
+  return reading.kind === 'deficit' || reading.kind === 'no-income' || (reading.kind === 'rate' && reading.rate < 0);
+}
+
+/**
+ * Whether «le spese superano le entrate» heads a growing month. A lived part that is not a rate
+ * (no income yet, or a deficit beyond the floor) hands the judgement to the WHOLE month, calendar
+ * included — the salary still to come must not turn a month that closes positive into a warning
+ * (2026-11-12). A lived `none` (nothing happened yet) keeps the old reading: the sentence has
+ * no clause to support a warning.
+ */
+function spendingExceedsIncome(input: OverviewVerdictInput): boolean {
+  const lived = input.cashflow?.reading;
+  if (lived && (lived.kind === 'no-income' || lived.kind === 'deficit')) return isDeficit(input.cashflow!.monthReading);
+  return (input.savingsRate ?? 0) < 0;
+}
+
+/** «45%», «−30%»: a whole percentage with the typographic minus (The Comma Rule). */
+function wholePercent(rate: number): string {
+  const rounded = Math.round(rate);
+  return `${rounded < 0 ? '−' : ''}${Math.abs(rounded)}%`;
+}
+
+/**
+ * The savings clause. A lived part below the savings floor, or without income, is said in euros
+ * (owner, 2026-11-12): «Nessuna entrata finora, 500 € di spese», or «Finora hai messo da parte
+ * −497 €: le spese superano le entrate» — the signed figure of the strip's cell «Messo da parte
+ * finora» —, then how the calendar closes the month. A rate keeps «Hai messo da parte il 45% delle
+ * entrate finora», rounded once here (the strip's cell carries the same rounded value). Empty
+ * with nothing to say.
+ */
+/**
+ * The article before a whole-percent savings rate, from the figure as printed (The Comma Rule):
+ * «il 45%», «l'81%», «lo 0%»; «il» before a negative one («il −12%», read «il meno dodici»).
+ */
+function savedArticle(rate: number): string {
+  return rate < 0 && Math.round(rate) !== 0 ? 'il ' : articleForPercent(Math.round(rate), 0);
+}
+
+function describeSavedSoFar(rate: number | null, cashflow: LivedCashflow | null | undefined): Narrative {
+  const reading = cashflow?.reading;
+  if (cashflow && (reading?.kind === 'no-income' || reading?.kind === 'deficit')) {
+    const lead: Narrative =
+      reading.kind === 'no-income'
+        ? [prose(' Nessuna entrata finora, '), figure(cachedFormatCurrencyEUR(reading.spending, true)), prose(' di spese')]
+        : [prose(' Finora hai messo da parte '), figure(formatEuroMinus(-reading.deficit)), prose(': le spese superano le entrate')];
+    return [...lead, ...describeCalendarClosing(cashflow)];
+  }
+  if (rate === null) return [];
+  return [
+    prose(` Hai messo da parte ${savedArticle(rate)}`),
+    figure(wholePercent(rate)),
+    prose(cashflow ? ' delle entrate finora' : ' delle entrate'),
+    ...describeCalendarAside(cashflow),
+  ];
+}
+
+/**
+ * «; con il calendario (2600 € di entrate, 1500 € di spese) il mese chiude al 23%» — said only
+ * when the lived part cannot be judged as a rate; the whole month's closing is a rate, or euros
+ * below the floor. Empty with nothing scheduled.
+ */
+function describeCalendarClosing(cashflow: LivedCashflow): Narrative {
+  const expenses = cashflow.scheduledExpenses >= 1 ? cashflow.scheduledExpenses : 0;
+  const income = cashflow.scheduledIncome >= 1 ? cashflow.scheduledIncome : 0;
+  if (!expenses && !income) return [];
+  const euro = (value: number) => figure(cachedFormatCurrencyEUR(value, true));
+  const parts: Narrative =
+    income && expenses
+      ? [euro(income), prose(' di entrate, '), euro(expenses), prose(' di spese')]
+      : income
+        ? [euro(income), prose(' di entrate')]
+        : [euro(expenses), prose(' di spese')];
+  const month = cashflow.monthReading;
+  const closing: Narrative =
+    month.kind === 'rate'
+      ? // The article follows the figure as printed (The Comma Rule): «al 23%», «all'81%».
+        [prose(` il mese chiude ${atThePercent(Math.round(month.rate), 0)}`), figure(wholePercent(month.rate))]
+      : month.kind === 'deficit' || month.kind === 'no-income'
+        ? [prose(' il mese chiude a '), figure(formatEuroMinus(-(month.kind === 'deficit' ? month.deficit : month.spending)))]
+        : [];
+  return closing.length ? [prose('; con il calendario ('), ...parts, prose(')'), ...closing] : [];
+}
+
 /**
  * « (altri 1297 € di spese in calendario)» after a savings rate that counts only what has
  * happened — the calendar is named, never folded into the rate. Empty when nothing is scheduled.
@@ -286,9 +380,9 @@ function describeCalendarAside(cashflow: LivedCashflow | null | undefined): Narr
 }
 
 /**
- * «sul mercato hanno spinto soprattutto le criptovalute (+726 €)». The top mover explains the
+ * «sul mercato hanno spinto soprattutto le criptovalute (+700 €)». The top mover explains the
  * MARKET half, not the month: «hanno fatto il grosso del lavoro» read as the month's cause, and on
- * the real account's settembre 2026 the +726 € it credited was six times the month's +124 €.
+ * a lived account the mover's figure was several times the month's own change.
  * Null when the class has no subject in the map — the clause is dropped, never guessed.
  */
 function buildDriverClause(topMover: { assetClass: string; delta: number }, leading: boolean): Narrative | null {
@@ -353,7 +447,7 @@ export function buildOverviewVerdict(input: OverviewVerdictInput): OverviewVerdi
           flows: input.monthFlows ?? null,
         }
       : undefined;
-  const saleCarriesSplit = split !== undefined && (input.sales?.estimatedTax ?? 0) > 0;
+  const saleCarriesSplit = saleCarriesMonthSplit(input.sales, split);
   const saleClause: Narrative = [];
   if (input.sales) {
     saleClause.push(prose(' '), ...describeSales(input.sales, split));
@@ -367,19 +461,11 @@ export function buildOverviewVerdict(input: OverviewVerdictInput): OverviewVerdi
   // restate the strip's euro and percentage).
   const leadLength = taxIsTheStory ? sentence.length : 0;
 
-  const hasSavingsClause = input.savingsRate !== null;
-  if (input.savingsRate !== null) {
-    // Rounded once, here; the strip's cell carries the same rounded value (doc/guide/panoramica.md
-    // § Composizione mobile). A negative rate takes the typographic minus, as every figure does
-    // (The Comma Rule; since 2026-10-11).
-    const rate = Math.round(input.savingsRate);
-    sentence.push(
-      prose(' Hai messo da parte il '),
-      figure(`${rate < 0 ? '−' : ''}${Math.abs(rate)}%`),
-      prose(input.cashflow ? ' delle entrate finora' : ' delle entrate'),
-      ...describeCalendarAside(input.cashflow),
-    );
-  }
+  // The strip's cell «Messo da parte finora» carries the same figure, rounded the same way
+  // (doc/guide/panoramica.md § Composizione mobile).
+  const savedSoFar = describeSavedSoFar(input.savingsRate, input.cashflow);
+  const hasSavingsClause = savedSoFar.length > 0;
+  sentence.push(...savedSoFar);
 
   // The driver is only stated when a market effect was actually measured this month, and only
   // for a class the map can name as a subject.
@@ -504,19 +590,21 @@ export function describeLiquidity(
 }
 
 /**
- * "Messo da parte il 40%; spese in calo del 6,4% su luglio." The expense delta is the
- * percentage change against the previous month (negative = spent less, which is the good
- * direction, hence coloured positive).
+ * "Messo da parte il 40%; spese in calo del 6,4% su luglio." — the WHOLE month's `SavingsReading`
+ * (`readSavings` of its income and expenses). A deficit, as a negative rate or beyond the floor,
+ * reads «Speso più di quanto è entrato.»; no income → null. The expense delta is the percentage
+ * change against the previous month (negative = spent less, which is the good direction, hence
+ * coloured positive).
  */
 export function describeCashflow(
-  savingsRate: number | null,
+  reading: SavingsReading,
   expensesDeltaPercent: number,
   currentMonth: number,
 ): Narrative | null {
-  if (savingsRate === null) return null;
-  if (savingsRate < 0) return [prose('Speso più di quanto è entrato.')];
+  if (reading.kind === 'none' || reading.kind === 'no-income') return null;
+  if (reading.kind === 'deficit' || reading.rate < 0) return [prose('Speso più di quanto è entrato.')];
 
-  const narrative: Narrative = [prose('Messo da parte il '), figure(`${Math.round(savingsRate)}%`)];
+  const narrative: Narrative = [prose(`Messo da parte ${savedArticle(reading.rate)}`), figure(`${Math.round(reading.rate)}%`)];
   if (expensesDeltaPercent !== 0) {
     const direction = expensesDeltaPercent < 0 ? 'calo' : 'aumento';
     narrative.push(

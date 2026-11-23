@@ -136,6 +136,7 @@ import {
   summarizeScheduled,
   summarizeSavingsHistory,
 } from '@/lib/utils/tracciamentoSummary';
+import { incomeRingSegments } from '@/lib/utils/categoryRing';
 import {
   TRACKING_CLOSED_ASIDES,
   buildCashflowVerdict,
@@ -909,6 +910,7 @@ export function ExpenseTrackingTab({
 
   const expenseRanking = useMemo(() => rankCategories(expenses, 'expenses'), [expenses]);
   const incomeRanking = useMemo(() => rankCategories(expenses, 'income'), [expenses]);
+  const incomeRing = useMemo(() => incomeRingSegments(incomeRanking), [incomeRanking]);
   // What the closed rows answer in the landscape index, from the figures the tiles already hold.
   const rowAnswers = useMemo(
     () => describeTrackingClosedAnswers({ expenseRanking, incomeRanking, savingsHistory }),
@@ -1355,6 +1357,8 @@ export function ExpenseTrackingTab({
             color="var(--chart-2)"
             emptyCopy="Nessuna entrata registrata nel periodo."
             labelClassName="min-w-[72px]"
+            ring={incomeRing}
+            ringCenterLabel="entrate"
             footer={analisiLink}
             collapse={sections.collapse(TRACKING_SECTION_IDS.entrate)}
             asideWhenClosed={TRACKING_CLOSED_ASIDES.entrate}

@@ -6,17 +6,20 @@
  * - Rendimenti: the Dettaglio's plots are not in the page but are fetched while it is idle
  *   (`lazyComponent` + `usePreloadWhenIdle`), so opening the Dettaglio draws them in that render —
  *   no Suspense fallback held ~300 ms, the defect of `next/dynamic` measured the same day.
- * - Analisi: from 640px the Flusso draws the Sankey, so its chunk (`@nivo/sankey`, d3-sankey) DOES
- *   arrive — the positive anchor of `bundle.lazy.mobile.spec.ts`, where it must not — and the chart
- *   replaces its placeholder without moving anything: the placeholder is the plot's own height.
+ * - Analisi: the Flusso is content of «Dettaglio» (2026-11-12): its tile is not in the page's first
+ *   JavaScript but arrives while the page is idle, so opening «Dettaglio» draws it with no placeholder.
+ *   From 640px the Flusso draws the Sankey, so its chunk (`@nivo/sankey`, d3-sankey) DOES arrive — the
+ *   positive anchor of `bundle.lazy.mobile.spec.ts`, where it must not — and the chart replaces its
+ *   placeholder without moving anything: the placeholder is the plot's own height.
  *
- * Chunks are recognised by content (`chunkProbe.ts`), and the suite runs on `next dev`: these
- * tests prove the laziness of an IMPORT; the sizes are `npm run perf:budget`'s, on the build.
+ * Chunks are recognised by a string their module carries (`chunkProbe.ts`), on `next dev` (an area
+ * run) and on the production build (the whole run, since 2026-11-16) alike: these tests prove the
+ * laziness of an IMPORT; the sizes are `npm run perf:budget`'s, on the build.
  * Seen red on 2026-09-30 by putting each static import back (doc/guide/storico.md,
  * rendimenti.md and cashflow-analisi.md say how).
  */
 import { test, expect } from '@playwright/test';
-import { PDF_ENGINE_SIGNATURE, SANKEY_SIGNATURE, UNDERWATER_CHART_SIGNATURE, holdChunks, layoutShiftSince, probeChunks, recordLayoutShifts } from './chunkProbe';
+import { FLUSSO_TILE_SIGNATURE, PDF_ENGINE_SIGNATURE, SANKEY_SIGNATURE, UNDERWATER_CHART_SIGNATURE, holdChunks, layoutShiftSince, probeChunks, recordLayoutShifts } from './chunkProbe';
 
 test('Storico downloads the PDF engine when «Esporta PDF» is pressed, not with the page', async ({ page }) => {
   test.setTimeout(150_000); // the engine's first compile in `next dev` is the long wait below
@@ -60,6 +63,37 @@ test('Rendimenti preloads the Dettaglio\'s plots while idle, so opening it draws
   expect(await page.evaluate(() => (window as unknown as { __sawPlaceholder: boolean }).__sawPlaceholder)).toBe(false);
 });
 
+test('Analisi keeps the Flusso out of its first JavaScript, preloads it while idle and opens «Dettaglio» with no placeholder', async ({ page }) => {
+  test.setTimeout(120_000);
+  const flussoTile = probeChunks(page, FLUSSO_TILE_SIGNATURE);
+  // The scripts the document carried when it was parsed: the page's first JavaScript.
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      (window as unknown as { __initialScripts: string[] }).__initialScripts = [...document.scripts].map((script) => script.src).filter(Boolean);
+    });
+  });
+  await page.goto('/dashboard/analisi', { waitUntil: 'load' });
+  await expect(page.getByRole('region', { name: 'Verdetto del periodo' })).toBeVisible({ timeout: 60_000 });
+
+  // Nothing opened yet, and the tile's chunk arrives anyway: the idle preload (`usePreloadWhenIdle`).
+  await expect.poll(async () => (await flussoTile.matching()).length, { timeout: 60_000 }).toBeGreaterThan(0);
+  const initial = await page.evaluate(() => (window as unknown as { __initialScripts: string[] }).__initialScripts ?? []);
+  expect((await flussoTile.matching()).filter((url) => initial.includes(url))).toEqual([]);
+  await page.waitForTimeout(500); // the chunk evaluated, not only received
+
+  // Watch from before the press whether the Flusso's fallback EVER appears in «Dettaglio».
+  await page.evaluate(() => {
+    const w = window as unknown as { __sawPlaceholder: boolean };
+    w.__sawPlaceholder = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-dettaglio-flusso] > [data-slot="skeleton"]')) w.__sawPlaceholder = true;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await page.getByRole('button', { name: 'Dettaglio', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Flusso', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __sawPlaceholder: boolean }).__sawPlaceholder)).toBe(false);
+});
+
 test('Analisi at 1440 downloads the Sankey and draws it in the box its placeholder held', async ({ page }) => {
   // `next dev` compiles the route and the chart on first request: the default 30 s is too tight in a
   // full run on a loaded machine (seen 2026-09-30).
@@ -71,6 +105,9 @@ test('Analisi at 1440 downloads the Sankey and draws it in the box its placehold
   const sankeyChunk = await holdChunks(page, SANKEY_SIGNATURE);
   // Not `load`: the held chunk is requested before the load event, which would then never fire.
   await page.goto('/dashboard/analisi', { waitUntil: 'domcontentloaded' });
+  // The Flusso is in «Dettaglio» (2026-11-12): opened first, once the page is up.
+  await expect(page.getByRole('region', { name: 'Verdetto del periodo' })).toBeVisible({ timeout: 60_000 });
+  await page.getByRole('button', { name: 'Dettaglio', exact: true }).click();
 
   const flusso = page.getByRole('region', { name: 'Flusso', exact: true });
   const placeholder = flusso.locator('[data-slot="skeleton"]');

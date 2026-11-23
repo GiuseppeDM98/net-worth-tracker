@@ -17,9 +17,9 @@ import { SPLIT_UNASSIGNED_LABEL } from '@/lib/utils/expenseSplitSummary';
 import type { Expense } from '@/types/expenses';
 import type { FamilyMember } from '@/types/assets';
 
-const GIUSEPPE: FamilyMember = { id: 'm-giuseppe', name: 'Giuseppe' };
-const MARCELLA: FamilyMember = { id: 'm-marcella', name: 'Marcella' };
-const MEMBERS = [GIUSEPPE, MARCELLA];
+const PAOLO: FamilyMember = { id: 'm-paolo', name: 'Paolo' };
+const ELENA: FamilyMember = { id: 'm-elena', name: 'Elena' };
+const MEMBERS = [PAOLO, ELENA];
 const KNOWN = new Set(MEMBERS.map((member) => member.id));
 const NAMES = new Map(MEMBERS.map((member) => [member.id, member.name]));
 
@@ -43,8 +43,8 @@ function row(personalMemberId?: string): Expense {
 
 const COMMON = row();
 const BLANK = row('');
-const MINE = row(GIUSEPPE.id);
-const HERS = row(MARCELLA.id);
+const MINE = row(PAOLO.id);
+const HERS = row(ELENA.id);
 const ORPHAN = row('m-deleted');
 
 describe('listOwnerFilterOptions', () => {
@@ -52,8 +52,8 @@ describe('listOwnerFilterOptions', () => {
     expect(listOwnerFilterOptions([COMMON, MINE, HERS], MEMBERS)).toEqual([
       { value: OWNER_FILTER_ALL, label: 'Tutti' },
       { value: OWNER_FILTER_COMMON, label: 'In comune' },
-      { value: GIUSEPPE.id, label: 'Giuseppe' },
-      { value: MARCELLA.id, label: 'Marcella' },
+      { value: PAOLO.id, label: 'Paolo' },
+      { value: ELENA.id, label: 'Elena' },
     ]);
   });
 
@@ -77,8 +77,8 @@ describe('matchesOwnerFilter', () => {
   });
 
   it('should pass only that person on a member id', () => {
-    expect(passing(GIUSEPPE.id)).toEqual([MINE.id]);
-    expect(passing(MARCELLA.id)).toEqual([HERS.id]);
+    expect(passing(PAOLO.id)).toEqual([MINE.id]);
+    expect(passing(ELENA.id)).toEqual([HERS.id]);
   });
 
   it('should pass only the orphaned rows on «Senza intestatario» — never fold them into the pool', () => {
@@ -90,7 +90,7 @@ describe('resolveOwnerLabel', () => {
   it('should print nothing for a shared row, the name for an attributed one, the orphan label for a lost owner', () => {
     expect(resolveOwnerLabel(COMMON, NAMES)).toBeNull();
     expect(resolveOwnerLabel(BLANK, NAMES)).toBeNull();
-    expect(resolveOwnerLabel(MINE, NAMES)).toBe('Giuseppe');
+    expect(resolveOwnerLabel(MINE, NAMES)).toBe('Paolo');
     expect(resolveOwnerLabel(ORPHAN, NAMES)).toBe(SPLIT_UNASSIGNED_LABEL);
   });
 });

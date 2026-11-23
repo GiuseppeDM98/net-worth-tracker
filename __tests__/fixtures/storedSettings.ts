@@ -7,7 +7,18 @@
  * page's sub-targets).
  */
 
-import type { AssetAllocationSettings } from '@/types/assets';
+import type { AssetAllocationSettings, IdealAllocationSettings } from '@/types/assets';
+
+/** The model portfolio's criteria — every field diverges from DEFAULT_IDEAL_ALLOCATION so a field
+ *  lost on either write chain or the read mapping shows. */
+export const STORED_IDEAL_ALLOCATION: IdealAllocationSettings = {
+  enabled: true,
+  classPriority: 'high',
+  leveragePriority: 'medium',
+  factorObjectives: [{ assetClass: 'equity', priority: 'low' }],
+  instrumentLimits: [{ assetId: 'asset-1', minPct: 5, maxPct: 40 }],
+  groupLimits: [{ id: 'group-1', label: 'Leva', assetIds: ['asset-1', 'asset-2'], maxPct: 20, priority: 'high' }],
+};
 
 /** Ogni valore è scelto per essere DIVERSO dal default, così un campo perso si vede. */
 export const STORED_SETTINGS = {
@@ -22,10 +33,12 @@ export const STORED_SETTINGS = {
   pensionInpsRetirementAge: 68,
   pensionRitaLongUnemployment: true,
   cashflowHistoryStartYear: 2019,
-  familyMembers: [{ id: 'm1', name: 'Giuseppe' }],
+  familyMembers: [{ id: 'm1', name: 'Paolo' }],
   expenseSplitEnabled: true,
   spendingRolesEnabled: true,
+  idealAllocation: STORED_IDEAL_ALLOCATION,
   dividendCashAssetId: 'cash-1',
+  investmentCashAssetId: 'cash-invest',
   transferFeeCategoryId: 'cat-fee',
   transferFeeSubCategoryId: 'sub-fee',
   realEstateCostCategories: [
@@ -88,6 +101,7 @@ export const FULL_PAGE_SETTINGS: AssetAllocationSettings = {
   dividendCashAssetId: 'cash-div',
   defaultDebitCashAssetId: 'cash-debit',
   defaultCreditCashAssetId: 'cash-credit',
+  investmentCashAssetId: 'cash-invest',
   transferFeeCategoryId: 'cat-fee',
   transferFeeSubCategoryId: 'sub-fee',
   // In `REAL_ESTATE_COST_KINDS` order, as the slice keeps it (orderRealEstateDefaults).
@@ -116,7 +130,7 @@ export const FULL_PAGE_SETTINGS: AssetAllocationSettings = {
   weeklyBudgetEmailEnabled: true,
   monthlyEmailRecipients: ['a@example.com', 'b@example.com'],
   familyMembers: [
-    { id: 'm1', name: 'Giuseppe', grossAnnualIncome: 42000, isFirstEmploymentPost2007: true, firstEmploymentYear: 2015 },
-    { id: 'm2', name: 'Marcella', grossAnnualIncome: 38000.5, isFirstEmploymentPost2007: false },
+    { id: 'm1', name: 'Paolo', grossAnnualIncome: 42000, isFirstEmploymentPost2007: true, firstEmploymentYear: 2015 },
+    { id: 'm2', name: 'Elena', grossAnnualIncome: 38000.5, isFirstEmploymentPost2007: false },
   ],
 };

@@ -69,7 +69,7 @@ function Kpi({ label, value, valueClass, caption, className }: { label: string; 
  * months against today's ceiling (the element that stretches when the tile spans two rows),
  * and the month's income targets as the footer. Every figure is the `CeilingSummary`'s; the
  * tile computes nothing. The hero used to print `spent` (scheduled rows included) over the
- * word «speso» — 1953 € for 656 € spent, on the owner's account (2026-09-14).
+ * word «speso» — say 1500 € for 500 € actually spent (seen live, 2026-09-14).
  */
 export function TettoTile({ id, summary, aside, reading, history, historyCaption, income, incomeReading, liftedFigures = [], className }: TettoTileProps) {
   const lifted = (block: TettoLiftedBlock) => (liftedFigures.includes(block) ? LIFTED_FIGURE_CLASS : undefined);

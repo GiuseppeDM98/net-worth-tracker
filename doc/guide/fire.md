@@ -114,9 +114,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   **the fan's targets are those rows** (`resolveFanFireTargets(todayRequirement, projection)` →
   `AccumulationSimulationParams.fireTargets`; `buildBridgeFireTargets` lived for three hours and is gone). Until
   then the row printed expenses ÷ SWR while the test ran on the bridge figure, and the fan aimed at the number
-  WITHOUT the lock under a verdict that named the bridge one: on the owner's mirror (lock on, unlock 2060) the
-  Distribuzione read «Meno di metà dei percorsi è FIRE entro il 2066» under «FIRE nel 2049» and the lever asked
-  for 67.000 € a year. Zero-volatility coherence: without pensions and tax `honest` passed or not is byte-identical
+  WITHOUT the lock under a verdict that named the bridge one: with the lock on (an invented case: unlock 2050) the
+  Distribuzione read «Meno di metà dei percorsi è FIRE entro il 2055» under «FIRE nel 2040» and the lever asked
+  for 50.000 € a year. Zero-volatility coherence: without pensions and tax `honest` passed or not is byte-identical
   (pinned); with the bridge the fan lands on the walk's year BEFORE the unlock (pinned); after it the two diverge by
   the compartment's growth (the walk merges the grown fund, the fan injects today's value — the documented model).
 - **The state pensions are the Coast tab's, dated by the saved age** (`settings.coastFirePensions`,
@@ -223,7 +223,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the «Dettaglio» alone: `historyExpenses` is the two lists joined (disjoint and contiguous, no row twice), the grid
   no longer waits for the snapshots, and `FireDettaglio` takes `loading` and shows its own skeleton until the history
   is in — a wait is not the «no history» readings. A failed read of either window is the tab's notice. Until then the
-  page read the whole collection (1547 rows on the owner's account against 1299 + 48). Pinned by
+  page read the whole collection, several times the rows the two windows hold. Pinned by
   `__tests__/expenseWindows.test.ts` (the number and the history on the windows against the whole list, a last
   snapshot ahead of the device's clock included).
 - **The lock switch saves on change** (optimistic `setRespectPensionLockIn`, reverted on error, disabled while

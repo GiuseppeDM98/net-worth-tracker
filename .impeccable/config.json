@@ -16,7 +16,7 @@
           "components/expenses/CategoryManagementDialog.tsx"
         ],
         "createdAt": "2026-08-13T00:00:00.000Z",
-        "reason": "User-picked category palette (CATEGORY_COLORS + the #3b82f6 form default): data colours stored per-category in Firestore, not theme tokens. Confirmed intentional by Giuseppe 2026-08-13"
+        "reason": "User-picked category palette (CATEGORY_COLORS + the #3b82f6 form default): data colours stored per-category in Firestore, not theme tokens. Confirmed intentional by Paolo 2026-08-13"
       },
       {
         "rule": "design-system-color",
@@ -25,7 +25,7 @@
           "lib/services/dashboardOverviewService.ts"
         ],
         "createdAt": "2026-08-13T00:00:00.000Z",
-        "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per doc/guide/grafici.md § Recharts ('Server-cached chart data'). Confirmed by Giuseppe 2026-08-13"
+        "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per doc/guide/grafici.md § Recharts ('Server-cached chart data'). Confirmed by Paolo 2026-08-13"
       },
       {
         "rule": "design-system-color",
@@ -34,7 +34,7 @@
           "lib/services/dashboardOverviewService.ts"
         ],
         "createdAt": "2026-08-13T00:00:00.000Z",
-        "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per doc/guide/grafici.md § Recharts ('Server-cached chart data'). Confirmed by Giuseppe 2026-08-13"
+        "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per doc/guide/grafici.md § Recharts ('Server-cached chart data'). Confirmed by Paolo 2026-08-13"
       },
       {
         "rule": "design-system-color",
@@ -43,7 +43,7 @@
           "components/**/*.stories.tsx"
         ],
         "createdAt": "2026-09-13T17:42:22.433Z",
-        "reason": "Storybook stories are fixtures, not UI: a story's category colour (user-picked palette stored per category) is sample data, like the CategoryManagementDialog waiver. Confirmed by Giuseppe 2026-09-13"
+        "reason": "Storybook stories are fixtures, not UI: a story's category colour (user-picked palette stored per category) is sample data, like the CategoryManagementDialog waiver. Confirmed by Paolo 2026-09-13"
       }
     ]
   }

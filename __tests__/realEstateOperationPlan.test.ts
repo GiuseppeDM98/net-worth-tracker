@@ -14,12 +14,14 @@ import {
   futureSeriesAfter,
   isProposedToStop,
   isValidIso,
+  mortgageFromPercent,
+  percentOfPrice,
   suggestCategory,
   type PlanStep,
 } from '@/lib/utils/realEstateOperationPlan';
 import { initialAnswers } from '@/lib/utils/realEstateOperationDraft';
 import type { RealEstateOperationAnswers } from '@/types/realEstateOperation';
-import { CATEGORIES, EXPENSES, makeContext } from './fixtures/realEstateOperation';
+import { ACCOUNT, asset, CATEGORIES, EXPENSES, makeContext } from './fixtures/realEstateOperation';
 
 const context = makeContext();
 const answersWith = (patch: Partial<RealEstateOperationAnswers>): RealEstateOperationAnswers => ({ ...initialAnswers(context), ...patch });
@@ -244,5 +246,76 @@ describe('a sale', () => {
     const answers = answersWith({ kind: 'sale', event: 'preliminare', propertyId: 'house', depositAmount: 1000, costs: { agency: { amount: 500, category: { categoryId: 'gone' } } }, costCenter: { mode: 'none', name: '', existingId: '' } });
 
     expect(kinds(buildRealEstatePlan(answers, context).steps)).toEqual(['row:deposit']);
+  });
+});
+
+describe('a mortgage beyond what is left to pay', () => {
+  // A house worth 20.000 already (the deposit), a price of 200.000 and no costs: the plan's kinds are exactly the listed ones.
+  const depositHouse = asset({ id: 'deposit-house', name: 'Casa Airone', type: 'realestate', assetClass: 'realestate', quantity: 20000 });
+  const depositContext = makeContext({ assets: [ACCOUNT, depositHouse] });
+  const rogito = (principal: number) =>
+    answersWith({
+      event: 'rogito',
+      propertyId: 'deposit-house',
+      price: 200000,
+      hasMortgage: true,
+      mortgage: { principal, ratePct: 3, years: 25, firstInstalmentIso: '2026-07-27', instalmentOverride: null },
+      costCenter: { mode: 'none', name: '', existingId: '' },
+    });
+
+  it('should count the mortgage beyond the residual as an excess, not a negative balance', () => {
+    expect(figuresOf(rogito(190000), depositContext)).toMatchObject({ purchaseBalance: 0, mortgageExcess: 10000 });
+    expect(figuresOf(rogito(150000), depositContext)).toMatchObject({ purchaseBalance: 30000, mortgageExcess: 0 });
+  });
+
+  it('should disburse an exceeding mortgage onto the house and the account in one step', () => {
+    const plan = buildRealEstatePlan(rogito(190000), depositContext);
+
+    expect(kinds(plan.steps)).toEqual(['createLoan', 'disburseMortgage', 'row:mortgageInstalments']);
+    expect(plan.steps[0]).toMatchObject({ kind: 'createLoan', ref: 'mortgage', principal: 190000 });
+    expect(plan.steps[1]).toEqual({ kind: 'disburseMortgage', toProperty: 180000, toAccount: 10000, accountId: 'acc' });
+  });
+
+  it('should split a principal with cents without losing one', () => {
+    const answers = { ...rogito(190000.1), price: 200000 };
+    const step = buildRealEstatePlan(answers, depositContext).steps[1] as Extract<PlanStep, { kind: 'disburseMortgage' }>;
+
+    expect(step).toMatchObject({ toProperty: 180000, toAccount: 10000.1 });
+    expect(Math.round((step.toProperty + step.toAccount) * 100) / 100).toBe(190000.1);
+  });
+
+  it('should keep today\'s steps when the mortgage equals the residual', () => {
+    const plan = buildRealEstatePlan(rogito(180000), depositContext);
+
+    expect(figuresOf(rogito(180000), depositContext)).toMatchObject({ purchaseBalance: 0, mortgageExcess: 0 });
+    expect(kinds(plan.steps)).toEqual(['createLoan', 'adjustProperty', 'row:mortgageInstalments']);
+    expect(plan.steps[1]).toEqual({ kind: 'adjustProperty', delta: 180000, reason: 'mortgage' });
+  });
+
+  it('should have no excess without a mortgage, whatever the price', () => {
+    expect(figuresOf({ ...rogito(190000), hasMortgage: false }, depositContext).mortgageExcess).toBe(0);
+  });
+});
+
+describe('the mortgage as a percentage of the price', () => {
+  it('should turn a percentage of the price into an amount in cents', () => {
+    expect(mortgageFromPercent(300000, 95)).toBe(285000);
+    expect(mortgageFromPercent(200000, 33.333)).toBe(66666);
+    expect(mortgageFromPercent(100000, 33.33333)).toBe(33333.33);
+    expect(mortgageFromPercent(100000, 0)).toBe(0);
+  });
+
+  it('should give nothing without a price or a percentage', () => {
+    expect(mortgageFromPercent(null, 95)).toBeNull();
+    expect(mortgageFromPercent(0, 95)).toBeNull();
+    expect(mortgageFromPercent(300000, null)).toBeNull();
+  });
+
+  it('should read the percentage back from the amount, to two decimals', () => {
+    expect(percentOfPrice(285000, 300000)).toBe(95);
+    expect(percentOfPrice(100000, 300000)).toBe(33.33);
+    expect(percentOfPrice(null, 300000)).toBeNull();
+    expect(percentOfPrice(285000, null)).toBeNull();
+    expect(percentOfPrice(285000, 0)).toBeNull();
   });
 });

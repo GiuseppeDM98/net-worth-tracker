@@ -277,8 +277,8 @@ describe('dashboardOverviewService', () => {
           id: 'etf-1',
           data: () => ({
             userId: 'user-1',
-            ticker: 'VWCE',
-            name: 'VWCE',
+            ticker: 'ORNI',
+            name: 'Ornitorinco',
             type: 'etf',
             assetClass: 'equity',
             currency: 'EUR',
@@ -463,11 +463,12 @@ describe('dashboardOverviewService', () => {
     expect(result.expenseStats?.currentMonth.incomeScheduled).toBe(0);
     expect(result.variations.monthly?.value).toBe(1000);
     expect(result.variations.monthly?.percentage).toBeCloseTo(5.2631578947, 6);
-    // 10 × 200 − 5 fees = 1.995 € of proceeds against a 150 € PMC: 495 € realized, 26% of it estimated.
-    expect(result.monthSales).toMatchObject({ proceeds: 1995, realizedGain: 495, brokenLedgers: 0 });
-    expect(result.monthSales?.estimatedTax).toBeCloseTo(130, 6); // 26% of 495 + the 5 € of sale fees
+    // 10 × 200 − 5 fees = 1.995 € of proceeds against a 150 € PMC: 500 € realized (fee-free,
+    // 2026-11-12); the tax is 26% of the taxable 495 (the sale fee deducted).
+    expect(result.monthSales).toMatchObject({ proceeds: 1995, realizedGain: 500, brokenLedgers: 0 });
+    expect(result.monthSales?.estimatedTax).toBeCloseTo(128.7, 6);
     expect(result.monthSales?.instruments).toEqual([
-      { id: 'etf-1', name: 'VWCE', proceeds: 1995, realizedGain: 495, estimatedTax: expect.closeTo(130, 6), taxIsWithheld: false },
+      { id: 'etf-1', name: 'ORNI', proceeds: 1995, realizedGain: 500, estimatedTax: expect.closeTo(128.7, 6), taxIsWithheld: false },
     ]);
     // The summary is written AFTER the response, and only if nothing touched it since the read.
     expect(overviewSummaryDocUpdateMock).not.toHaveBeenCalled();
@@ -535,10 +536,10 @@ describe('dashboardOverviewService — G/P in EUR on both sides (costBasisEur.ts
     }),
   });
 
-  it('measures a USD position against its EUR PMC with fees, and prints nothing for one without it', async () => {
+  it('measures a USD position against its fee-free EUR PMC, and prints nothing for one without it', async () => {
     assetsGetMock.mockResolvedValue({
       docs: [
-        // 10 units, EUR PMC 91 (fees included), worth 1.300 €: +390 €, +42,86 %, taxed at 26 %.
+        // 10 units, EUR PMC 91 (no fee; no fiscal cost stored, so the tax stands on it too), worth 1.300 €: +390 €, +42,86 %, taxed at 26 %.
         usdAsset('vusa', { averageCostEur: 91, taxRate: 26 }),
         // Pre-backfill: only the native PMC — a G/P here would be dollars against euros.
         usdAsset('legacy', {}),

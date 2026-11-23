@@ -38,7 +38,7 @@ import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOver
 import type { AssetAllocationSettings, AssetAllocationTarget } from '@/types/assets';
 // The fixture is shared with settingsDraft.test.ts since 2026-10-08: the page's draft
 // is held to the same document the service's whitelists are.
-import { STORED_SETTINGS } from './fixtures/storedSettings';
+import { STORED_IDEAL_ALLOCATION, STORED_SETTINGS } from './fixtures/storedSettings';
 
 const TARGETS = { equity: { targetPercentage: 100 } } as unknown as AssetAllocationTarget;
 
@@ -70,6 +70,18 @@ describe('getSettings — lettura', () => {
     expect(settings?.pensionReturnStartMonth).toBe('2026-07');
   });
 
+  it('returns the account for the investments instead of dropping it', async () => {
+    const settings = await getSettings('user-1');
+
+    expect(settings?.investmentCashAssetId).toBe('cash-invest');
+  });
+
+  it('returns idealAllocation instead of dropping it', async () => {
+    const settings = await getSettings('user-1');
+
+    expect(settings?.idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
+  });
+
   it('keeps returning the pre-existing fields alongside them', async () => {
     const settings = await getSettings('user-1');
 
@@ -77,7 +89,7 @@ describe('getSettings — lettura', () => {
     expect(settings?.includePrimaryResidenceInFIRE).toBe(true);
     expect(settings?.respectPensionLockInFire).toBe(true);
     expect(settings?.cashflowHistoryStartYear).toBe(2019);
-    expect(settings?.familyMembers).toEqual([{ id: 'm1', name: 'Giuseppe' }]);
+    expect(settings?.familyMembers).toEqual([{ id: 'm1', name: 'Paolo' }]);
     expect(settings?.expenseSplitEnabled).toBe(true);
     expect(settings?.spendingRolesEnabled).toBe(true);
   });
@@ -183,6 +195,7 @@ describe('setSettings — scrittura, ramo con targets (setDoc senza merge)', () 
     ['dividendCashAssetId', 'cash-1'],
     ['transferFeeCategoryId', 'cat-fee'],
     ['transferFeeSubCategoryId', 'sub-fee'],
+    ['investmentCashAssetId', 'cash-invest'],
   ])('drops %s from the payload when it is cleared', async (field, stored) => {
     vi.mocked(getDoc).mockResolvedValue({
       exists: () => true,
@@ -205,6 +218,7 @@ describe('setSettings — scrittura, ramo con targets (setDoc senza merge)', () 
     ['dividendCashAssetId', 'cash-1'],
     ['transferFeeCategoryId', 'cat-fee'],
     ['transferFeeSubCategoryId', 'sub-fee'],
+    ['investmentCashAssetId', 'cash-invest'],
   ])('leaves an untouched %s alone when the key is absent from the update', async (field, stored) => {
     vi.mocked(getDoc).mockResolvedValue({
       exists: () => true,
@@ -301,7 +315,7 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
 
   // Lo stesso per gli altri quattro campi svuotabili: qui si scrive con merge, quindi omettere
   // la chiave lascerebbe il valore vecchio — serve un deleteField() esplicito (2026-08-29).
-  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId', 'dividendCashAssetId', 'transferFeeCategoryId', 'transferFeeSubCategoryId'])(
+  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId', 'dividendCashAssetId', 'transferFeeCategoryId', 'transferFeeSubCategoryId', 'investmentCashAssetId'])(
     'uses deleteField to clear %s, since omitting the key would keep it',
     async (field) => {
       await setSettings('user-1', { [field]: undefined } as unknown as AssetAllocationSettings);
@@ -310,7 +324,7 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
     }
   );
 
-  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId', 'dividendCashAssetId', 'transferFeeCategoryId', 'transferFeeSubCategoryId'])(
+  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId', 'dividendCashAssetId', 'transferFeeCategoryId', 'transferFeeSubCategoryId', 'investmentCashAssetId'])(
     'does not touch %s when the key is absent from the update',
     async (field) => {
       await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);
@@ -318,6 +332,47 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
       expect(writtenPayload()).not.toHaveProperty(field);
     }
   );
+});
+
+describe('setSettings — i criteri del modello', () => {
+  it('writes idealAllocation through both chains', async () => {
+    await setSettings('user-1', { idealAllocation: STORED_IDEAL_ALLOCATION } as AssetAllocationSettings);
+    expect(writtenPayload().idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
+
+    await setSettings('user-1', { targets: TARGETS, idealAllocation: STORED_IDEAL_ALLOCATION } as AssetAllocationSettings);
+    expect(writtenPayload().idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
+  });
+
+  // «Salva i criteri» (Allocazione › Accumulo) sends ONLY idealAllocation.
+  it('writes the criteria alone: no other setting is in the payload', async () => {
+    await setSettings('user-1', { idealAllocation: STORED_IDEAL_ALLOCATION } as AssetAllocationSettings);
+
+    const payload = writtenPayload();
+    expect(payload.idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
+    expect(Object.keys(payload).filter((key) => key !== 'idealAllocation' && key !== 'userId' && key !== 'updatedAt')).toEqual([]);
+  });
+
+  // An «Applica» of the Consulente writes the targets alone, and the targets branch replaces the document:
+  // the stored criteria ride on the existing data (2026-11-12). Seen red without the existingData spread.
+  it('keeps the stored criteria when only the targets are written', async () => {
+    vi.mocked(getDoc).mockResolvedValue({ exists: () => true, data: () => ({ targets: TARGETS, idealAllocation: STORED_IDEAL_ALLOCATION }) } as never);
+    await setSettings('user-1', { targets: TARGETS } as AssetAllocationSettings);
+    expect(writtenPayload().idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
+  });
+
+  it('leaves the criteria alone when the key is absent from the update', async () => {
+    await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);
+    expect(writtenPayload()).not.toHaveProperty('idealAllocation');
+  });
+
+  it('drops an optional bound that is undefined: Firestore refuses undefined inside an array', async () => {
+    await setSettings('user-1', {
+      idealAllocation: { ...STORED_IDEAL_ALLOCATION, instrumentLimits: [{ assetId: 'asset-1', minPct: undefined, maxPct: 40 }] },
+    } as AssetAllocationSettings);
+
+    expect(writtenPayload().idealAllocation).toMatchObject({ instrumentLimits: [{ assetId: 'asset-1', maxPct: 40 }] });
+    expect((writtenPayload().idealAllocation as { instrumentLimits: object[] }).instrumentLimits[0]).not.toHaveProperty('minPct');
+  });
 });
 
 describe('setSettings — il riepilogo della Panoramica', () => {

@@ -11,7 +11,7 @@
  * the 50/30/20 roles off) and SpendingRolesMobileFlow (the roles view). This component knows nothing
  * of either: segments, groups and every sentence come in ready to draw, the sentences as Narrative
  * from analisiNarrative.ts, the shares from the pure layer. It computes nothing a reader sees except
- * a group's own row shares and «Altre N», as Analisi's CategorieTile does.
+ * a group's own row shares and «Altre N», as Analisi's ClassificaTile does.
  *
  * The bar is the shared CompositionBar (ticks, the income edge and whole-percent legend are its
  * additive props); the shares are printed in its legend, never inside the segments — white figures

@@ -33,6 +33,7 @@ import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdvicePropo
 import type { GoalPlan, planRoleChanges } from '@/lib/utils/allocationAdviceApply';
 import { bookIndexOf, bookPageUrl, buildBookPages, turnDirection, type BookPage, type BookPageId } from '@/lib/utils/allocationAdviceBook';
 import { BOOK_COPY, describeInterviewAside, REVISION_COPY, type ProposalClassRow } from '@/lib/utils/allocationAdviceNarrative';
+import { operatingPlanOf } from '@/lib/utils/operatingPlan';
 import { cardItem, sceneVariants, sceneVariantsReduced, staggerContainer } from '@/lib/utils/motionVariants';
 import type { PageVerdictModel } from '@/lib/utils/narrative';
 import { useCompactLayout } from '@/lib/hooks/useCompactLayout';
@@ -41,11 +42,12 @@ import { PathRail } from '@/components/ui/path-rail';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS, TILE_SURFACE_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SCENE_CARD_CLASS, SCENE_GRID_CLASS } from './ConsulenteRun';
-import { HEADLINE_CLASS } from './ConsulenteWizard';
+import { PATH_BUTTON_CLASS, PATH_HEADLINE_CLASS } from '@/components/ui/path-card';
 import { InterviewBody } from './ConsulenteInterviewTile';
 import { describeRevisionAside, RevisionBody, useRevisionDraft, type RevisionDraft } from './ConsulenteRevisionTile';
 import {
@@ -55,6 +57,7 @@ import {
   instrumentsPieces,
   MARKDOWN_COMPONENTS,
   modelAside,
+  planPieces,
   proposalPieces,
   risksPieces,
   rolesPieces,
@@ -64,7 +67,6 @@ import {
 import { useSceneTurn } from './useSceneTurn';
 import type { useConsulenteRevision } from './useConsulenteRevision';
 
-const BUTTON_CLASS = 'h-11 desktop:h-9';
 const REMARK_PLUGINS = [remarkGfm];
 const VERDICT_LABEL = 'Verdetto del Consulente';
 
@@ -106,6 +108,10 @@ function piecesOf(page: BookPage, pages: readonly BookPage[], props: ConsulenteB
       return proposal && proposal.goals.length > 0 ? goalsPieces(proposal) : NO_PIECES;
     case 'ruoli':
       return proposal ? rolesPieces(props.roles) : NO_PIECES;
+    case 'piano': {
+      const plan = operatingPlanOf(document);
+      return plan ? planPieces(plan) : NO_PIECES;
+    }
     case 'rischi':
       return proposal ? risksPieces(proposal) : NO_PIECES;
     case 'colloquio':
@@ -183,6 +189,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
     hasRoles: proposal !== null && roles.changes.length + roles.unmatched.length > 0,
     hasInterview: (document.interview?.rounds.length ?? 0) > 0,
     hasReport: document.report !== null,
+    hasPlan: operatingPlanOf(document) !== null,
   });
   const index = bookIndexOf(pages, pageId);
   const page = pages[index];
@@ -219,6 +226,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
         <section
           ref={cardRef}
           aria-label={eyebrow}
+          data-tile=""
           data-generated={page.generated ? '' : undefined}
           className={cn(TILE_SURFACE_CLASS, SCENE_CARD_CLASS, 'scroll-mt-4 desktop:scroll-mt-5', page.generated && AI_GENERATED_SURFACE_CLASS)}
         >
@@ -226,7 +234,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
             <BookPageSlide key={page.id} pageId={page.id} direction={direction} reduced={reduced} turned={turned} cascade={plays.cascade} onSettled={() => focusTarget(sceneTurn)}>
               <motion.div variants={cardItem} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
                 {/* One h2 per page: the eyebrow, or on the cover the verdict's own. */}
-                {page.id === 'copertina' ? <p className={eyebrowClass}>{eyebrow}</p> : <h2 className={eyebrowClass}>{eyebrow}</h2>}
+                {page.id === 'copertina' ? <p className={eyebrowClass}><HeadingText text={eyebrow} /></p> : <h2 className={eyebrowClass}><HeadingText text={eyebrow} /></h2>}
                 {pieces.aside && <div className="min-w-0 max-w-full shrink-0 text-[10px] text-muted-foreground">{pieces.aside}</div>}
               </motion.div>
               <motion.div variants={cardItem}>
@@ -235,8 +243,8 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
                     <PageVerdict verdict={verdict} ariaLabel={VERDICT_LABEL} />
                   </div>
                 ) : (
-                  <p ref={targetRef as RefObject<HTMLParagraphElement | null>} tabIndex={-1} className={cn(HEADLINE_CLASS, 'mt-3 outline-none')}>
-                    {page.title}
+                  <p ref={targetRef as RefObject<HTMLParagraphElement | null>} tabIndex={-1} className={cn(PATH_HEADLINE_CLASS, 'mt-3 outline-none')}>
+                    <HeadingText text={page.title} />
                   </p>
                 )}
               </motion.div>
@@ -257,11 +265,11 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
                 <div className="flex flex-col gap-2 tablet:order-2 tablet:flex-row">
                   {page.id === 'modifica' && (
                     <>
-                      <Button type="button" className={cn(BUTTON_CLASS, 'border border-transparent tablet:order-2', AI_CONTROL_ACCENT_CLASS)} onClick={draft.primary.onClick} disabled={draft.primary.disabled}>
+                      <Button type="button" className={cn(PATH_BUTTON_CLASS, 'border border-transparent tablet:order-2', AI_CONTROL_ACCENT_CLASS)} onClick={draft.primary.onClick} disabled={draft.primary.disabled}>
                         {draft.primary.label}
                       </Button>
                       {draft.showSkip && (
-                        <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'tablet:order-1')} onClick={draft.skipQuestions} disabled={draft.revising}>
+                        <Button type="button" variant="outline" className={cn(PATH_BUTTON_CLASS, 'tablet:order-1')} onClick={draft.skipQuestions} disabled={draft.revising}>
                           Salta le domande
                         </Button>
                       )}
@@ -270,26 +278,26 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
                   {page.id === 'applica' && (
                     <>
                       {document.status === 'ready' && (
-                        <Button type="button" className={cn(BUTTON_CLASS, 'tablet:order-2')} disabled={!props.canApply || writing || done} onClick={props.onApply}>
+                        <Button type="button" className={cn(PATH_BUTTON_CLASS, 'tablet:order-2')} disabled={!props.canApply || writing || done} onClick={props.onApply}>
                           Applica alle impostazioni
                         </Button>
                       )}
-                      <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'tablet:order-1')} onClick={onRedo}>
+                      <Button type="button" variant="outline" className={cn(PATH_BUTTON_CLASS, 'tablet:order-1')} onClick={onRedo}>
                         Rifai il percorso
                       </Button>
                     </>
                   )}
                   {!isLast && (
-                    <Button type="button" variant={page.id === 'modifica' ? 'outline' : 'default'} className={cn(BUTTON_CLASS, 'tablet:order-3')} onClick={() => turnTo(index + 1)}>
+                    <Button type="button" variant={page.id === 'modifica' ? 'outline' : 'default'} className={cn(PATH_BUTTON_CLASS, 'tablet:order-3')} onClick={() => turnTo(index + 1)}>
                       {BOOK_COPY.next}
                     </Button>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 tablet:order-1 tablet:flex">
-                  <Button type="button" variant="outline" className={BUTTON_CLASS} disabled={index === 0} onClick={() => turnTo(index - 1)}>
+                  <Button type="button" variant="outline" className={PATH_BUTTON_CLASS} disabled={index === 0} onClick={() => turnTo(index - 1)}>
                     {BOOK_COPY.back}
                   </Button>
-                  <Button type="button" variant="outline" className={cn(BUTTON_CLASS, 'desktop:hidden')} onClick={() => setIndexOpen(true)}>
+                  <Button type="button" variant="outline" className={cn(PATH_BUTTON_CLASS, 'desktop:hidden')} onClick={() => setIndexOpen(true)}>
                     {BOOK_COPY.index}
                   </Button>
                 </div>

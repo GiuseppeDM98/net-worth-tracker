@@ -6,6 +6,7 @@ import { sectionPanelId } from '@/lib/utils/mobileSections';
 import { NarrativeSegments, NarrativeText } from '@/components/ui/narrative-text';
 import { VerdictSkeletonHeadline, VerdictSkeletonLines } from '@/components/ui/tile-grid-skeleton';
 import type { TileCollapse } from '@/components/ui/tile';
+import { HeadingText } from '@/components/ui/heading-text';
 
 /**
  * A verdict not here yet: the wait (the skeleton's silhouette) or the read that failed (the
@@ -102,8 +103,9 @@ export function PageVerdict({ verdict, ariaLabel, axis, strip, scope, restCollap
     // `page-verdict` is the region a page scene morphs into the next page's verdict (globals.css →
     // Page scene); the loading skeleton reserves the same name so the morph has a target on landing.
     <section aria-label={ariaLabel} className="flex max-w-[920px] flex-col gap-2" style={{ viewTransitionName: 'page-verdict' }}>
-      <h2 className="text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]">
-        {headline}
+      {/* `costume-heading`: a costume theme's heading face (globals.css → Theme costume); its figures stay mono. */}
+      <h2 className="costume-heading text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]">
+        <HeadingText text={headline} />
         <span className={TONE_DOT_CLASS[verdict.tone]} aria-hidden="true">
           .
         </span>

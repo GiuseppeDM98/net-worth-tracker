@@ -5,7 +5,7 @@ import { PDFText } from '../primitives/PDFText';
 import { PDFPage, PDFSection, PDFMetrics, PDFRankedRows, PDFNote, type PDFMetric, type PDFRankedRow } from '../primitives/PDFTile';
 import type { CashflowData } from '@/types/pdf';
 import { cachedFormatCurrencyEUR, formatPercentageIt } from '@/lib/utils/formatters';
-import { describeCashflowSection, cashflowScopeLine, PDF_SECTION_TITLES } from '@/lib/utils/pdfNarrative';
+import { describeCashflowSection, describeNetSavingsNote, cashflowScopeLine, PDF_SECTION_TITLES } from '@/lib/utils/pdfNarrative';
 
 interface CashflowSectionProps {
   data: CashflowData;
@@ -46,8 +46,6 @@ export function CashflowSection({ data, reportScope }: CashflowSectionProps) {
     );
   }
 
-  const savingsRate = data.totalIncome > 0 ? (data.netCashflow / data.totalIncome) * 100 : null;
-
   const metrics: PDFMetric[] = [
     {
       label: 'Entrate',
@@ -64,8 +62,8 @@ export function CashflowSection({ data, reportScope }: CashflowSectionProps) {
     {
       label: 'Risparmio netto',
       value: euro(data.netCashflow),
-      // The savings rate is a share of INCOME, and without income there is nothing to share.
-      note: savingsRate === null ? undefined : `${formatPercentageIt(savingsRate, 1)} di quanto è entrato`,
+      // The savings rate is a share of INCOME: none without income or below the floor.
+      note: describeNetSavingsNote(data.totalIncome, data.totalExpenses) ?? undefined,
       sign: data.netCashflow >= 0 ? 'positive' : 'negative',
     },
   ];

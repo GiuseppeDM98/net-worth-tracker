@@ -141,6 +141,10 @@ export interface Expense {
   // series carries its own.
   transferFeeExpenseId?: string; // On any row: the fee row it created
   feeOfTransferId?: string; // On a fee row: the row it was charged for
+  // On the fee row of an asset trade (lib/utils/tradeFeeExpense.ts): the trade it was charged for.
+  // The trade names the row back (`AssetTransaction.feeExpenseId`). It moves no account — the
+  // trade's own settlement already debits the fee — and the trade use case owns its lifecycle.
+  feeOfTradeId?: string;
   // A `debt` row may repay a loan (lib/utils/mortgageRepayment.ts; a property's own debt until
   // 2026-10-10): on the row's date — `balancePending` until then, like its account — the loan's
   // principal falls by the instalment's PRINCIPAL (instalment − debt × TAN / 12), which is then
@@ -222,10 +226,18 @@ export interface ExpenseCategoryBreakdown {
   subCategories: ExpenseSubCategoryBreakdown[];
 }
 
+export interface IncomeSubCategoryBreakdown {
+  subCategoryName: string; // NO_SUBCATEGORY_LABEL for the category's rows that name none
+  total: number; // positive
+  transactionCount: number;
+}
+
 export interface IncomeCategoryBreakdown {
   categoryName: string;
   total: number; // positive
   transactionCount: number;
+  /** By total desc; present only when a row of the category names a subcategory (2026-11-16). */
+  subCategories?: IncomeSubCategoryBreakdown[];
 }
 
 export interface IndividualExpenseRow {

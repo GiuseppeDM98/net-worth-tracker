@@ -18,6 +18,9 @@
  * without TER or stamp duty → the null test red; the projection without the calendar's rows → the
  * answers and the projection tests red; Costi answering with the strip's «+3000,00 €» → the
  * Lifted-Figure test red.
+ *
+ * Falsified on 2026-11-22, one at a time, on `selectResourceBar` (the resource bar's four figures): `decimals: 0` on
+ * «Patrimonio» → the identity with the hero's text red; the `totalValue <= 0` gate dropped → the negative-total case red.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -52,8 +55,10 @@ import {
   OVERVIEW_PATRIMONIO_ID,
   OVERVIEW_SECTION_IDS,
   selectOverviewStrip,
+  selectResourceBar,
   verdictNamesMarket,
 } from '@/lib/utils/overviewSummary';
+import { cachedFormatCurrencyEUR, formatEuroMinus, formatSignedPercentIt, withTypographicMinus } from '@/lib/utils/formatters';
 import { VERDICT_REST_SECTION } from '@/lib/utils/mobileSections';
 import { formatStripFigure, liftedBlocks, validateStrip, type StripFigure } from '@/lib/utils/verdictStrip';
 import type { DashboardOverviewExpenseStats, DashboardOverviewPayload } from '@/types/dashboardOverview';
@@ -165,6 +170,42 @@ describe('selectOverviewStrip', () => {
     expect(cellText(strip[0])).toBe('0,00 €');
     expect(cellText(strip[1])).toBe('0,00%');
     for (const figure of strip) expect(sentence).toContain(cellText(figure));
+  });
+
+  // The savings floor (owner, 2026-11-12): ① nothing in, 500 € out; ② 3 € in, 500 € out; ③ 2000 €
+  // in, 2600 € out (−30%), with 1500 € of spending and 2600 € of income still in the calendar.
+  describe('«Messo da parte finora» below the savings floor', () => {
+    const withLived = (income: number, spending: number) =>
+      makeOverview({
+        expenseStats: {
+          ...STATS,
+          currentMonth: { income: income + 2600, expenses: spending + 1500, net: income + 2600 - spending - 1500, expensesScheduled: 1500, incomeScheduled: 2600 },
+        },
+      });
+
+    it('has no value without income so far (S1)', () => {
+      expect(selectOverviewStrip(withLived(0, 500))[2]).toMatchObject({ value: null, reason: 'nessuna entrata finora' });
+    });
+
+    it('prints a deficit beyond the floor in signed euros, the text of the sentence (S2)', () => {
+      const overview = withLived(3, 500);
+      const cell = selectOverviewStrip(overview)[2];
+      expect(cellText(cell)).toBe('−497 €');
+      expect(plain(narrativeToText(buildOverviewVerdict(verdictInput(overview)).sentence))).toContain(cellText(cell));
+    });
+
+    it('keeps a true −30% as a rate (S3)', () => {
+      const overview = withLived(2000, 2600);
+      const cell = selectOverviewStrip(overview)[2];
+      expect(cellText(cell)).toBe('−30%');
+      expect(plain(narrativeToText(buildOverviewVerdict(verdictInput(overview)).sentence))).toContain(cellText(cell));
+    });
+
+    it('says the deficit in words on a payload without the calendar, whose sentence has no clause', () => {
+      const olderPayload = makeOverview({ expenseStats: { ...STATS, currentMonth: { income: 3, expenses: 500, net: -497, expensesScheduled: 0 } } });
+      expect(selectOverviewStrip(olderPayload)[2]).toMatchObject({ value: null, reason: 'spese oltre le entrate' });
+      expect(plain(narrativeToText(buildOverviewVerdict(verdictInput(olderPayload)).sentence))).not.toContain('delle entrate');
+    });
   });
 
   it('says why a figure is missing, never a zero', () => {
@@ -411,5 +452,59 @@ describe('describeOverviewClosedAnswers (the landscape index)', () => {
     expect(projectCashflowMonthEnd(STATS.currentMonth, 0, 30)).toBeNull();
     expect(annualPortfolioCostTotal({ annualPortfolioCost: 300, annualStampDuty: 380 })).toBe(680);
     expect(liquidityShare(20000, 130000, 0)).toBeNull();
+  });
+});
+
+/** The resource bar of a costume theme (2026-11-22): each cell is the text a tile prints for the same quantity. */
+describe('selectResourceBar', () => {
+  const bar = (overrides: Partial<DashboardOverviewPayload> = {}, metrics: Partial<DashboardOverviewPayload['metrics']> = {}) =>
+    selectResourceBar(makeOverview({ metrics: { ...makeOverview().metrics, totalValue: 250000, cashNetWorth: 25000, ...metrics }, ...overrides }));
+  const savings = (net: number): DashboardOverviewExpenseStats => ({ ...STATS, currentMonth: { ...STATS.currentMonth, net } });
+  const yearly = (percentage: number) => ({ monthly: { value: 3000, percentage: 1.6 }, yearly: { value: 15000, percentage } });
+  const cells = (figures: ReturnType<typeof selectResourceBar>) => figures.map((figure) => cellText(figure as StripFigure));
+  // What each tile's own formatter prints: the hero's and Sintesi's form, the Cashflow tile's, the year's chip.
+  const heroText = (value: number) => plain(withTypographicMinus(value, cachedFormatCurrencyEUR(Math.abs(value))));
+
+  it('prints the four figures in the order of the bar, with the invented figures of the spec', () => {
+    const figures = bar({ expenseStats: savings(900), variations: yearly(6.4) });
+    expect(figures.map((figure) => figure.label)).toEqual(['Patrimonio', 'Liquidità', 'Risparmio', 'Da inizio anno']);
+    expect(cells(figures)).toEqual(['250.000,00 €', '25.000,00 €', '900 €', '+6,40%']);
+  });
+
+  it("repeats each tile's text: the hero, the Sintesi row, the Cashflow figure and the year's chip", () => {
+    const figures = bar({ expenseStats: savings(900), variations: yearly(6.4) });
+    expect(cells(figures)).toEqual([heroText(250000), heroText(25000), plain(formatEuroMinus(900)), plain(formatSignedPercentIt(6.4, 2))]);
+  });
+
+  it('prints a negative liquidity with the typographic minus, as the Sintesi row does', () => {
+    const figures = bar({}, { cashNetWorth: -1200 });
+    expect(cells(figures)[1]).toBe('−1200,00 €');
+    expect(cells(figures)[1]).toBe(heroText(-1200));
+  });
+
+  it('prints a year at zero as «0,00%», in the cell and in the chip', () => {
+    const figures = bar({ variations: yearly(0) });
+    expect(cells(figures)[3]).toBe('0,00%');
+    expect(cells(figures)[3]).toBe(plain(formatSignedPercentIt(0, 2)));
+  });
+
+  it('prints a negative saving as «−1200 €» (Intl groups from five digits), uncoloured', () => {
+    const figures = bar({ expenseStats: savings(-1200) });
+    expect(cells(figures)[2]).toBe('−1200 €');
+    expect(cells(figures)[2]).toBe(plain(formatEuroMinus(-1200)));
+    expect(formatStripFigure(figures[2] as StripFigure)).not.toHaveProperty('sign');
+  });
+
+  it('names the reason of a figure it cannot measure, never a zero', () => {
+    const figures = bar({ expenseStats: null, variations: { monthly: null, yearly: null } });
+    expect(figures[2]).toMatchObject({ value: null, reason: 'nessun movimento nel mese' });
+    expect(figures[3]).toMatchObject({ value: null, reason: "nessuno snapshot da cui contare l'anno" });
+    expect(figures[3].reason).toBe(selectOverviewStrip(makeOverview({ variations: { monthly: null, yearly: null } }))[1].reason);
+  });
+
+  it('is absent with no asset, and with a total at or below zero (Sintesi prints no rows there)', () => {
+    expect(selectResourceBar(makeOverview({ flags: { ...makeOverview().flags, assetCount: 0 } }))).toEqual([]);
+    expect(bar({}, { totalValue: -5000 })).toEqual([]);
+    expect(bar({}, { totalValue: 0 })).toEqual([]);
   });
 });

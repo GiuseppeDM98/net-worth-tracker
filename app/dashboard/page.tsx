@@ -38,6 +38,7 @@ import {
   OVERVIEW_PATRIMONIO_ID,
   OVERVIEW_SECTION_IDS,
   selectOverviewStrip,
+  selectResourceBar,
   verdictNamesMarket,
 } from '@/lib/utils/overviewSummary';
 import { useMobileSections, type SectionSpec } from '@/lib/hooks/useMobileSections';
@@ -59,12 +60,14 @@ import {
   resolveHeroValueClass,
   type PatrimonioLiftedBlock,
 } from '@/components/dashboard/overview/PatrimonioTile';
+import { ResourceBar } from '@/components/dashboard/overview/ResourceBar';
 import { SintesiTile } from '@/components/dashboard/overview/SintesiTile';
 import { CashflowTile } from '@/components/dashboard/overview/CashflowTile';
 import { ComposizioneTile } from '@/components/dashboard/overview/ComposizioneTile';
 import { CostiTile } from '@/components/dashboard/overview/CostiTile';
 import { ObiettivoTile } from '@/components/dashboard/overview/ObiettivoTile';
 import { CategoryTile } from '@/components/dashboard/overview/CategoryTile';
+import { incomeRingSegments } from '@/lib/utils/categoryRing';
 import { AssetPrincipaliTile } from '@/components/dashboard/overview/AssetPrincipaliTile';
 import { IntestatariTile } from '@/components/dashboard/overview/IntestatariTile';
 import { OverviewTile, TILE_CELL_CLASS } from '@/components/dashboard/overview/OverviewTile';
@@ -394,7 +397,7 @@ export default function DashboardPage() {
   const entranceInitial = playsEntrance ? 'hidden' : false;
 
   const pageChrome = (
-    <PageHeader label="Panoramica" title={header.title} description={header.date} freshness={freshness} />
+    <PageHeader label="Panoramica" title={header.title} description={header.date} freshness={freshness} emblem="panoramica" />
   );
 
   if (overviewState === 'loading') {
@@ -433,9 +436,11 @@ export default function DashboardPage() {
   const expenseReading = expenseStats
     ? describeCategoryShare(rankingFromOverview(expenseStats.topExpenseCategories, expenseStats.currentMonth.expenses), 'expenses')
     : null;
-  const incomeReading = expenseStats
-    ? describeCategoryShare(rankingFromOverview(expenseStats.topIncomeCategories, expenseStats.currentMonth.income), 'income')
-    : null;
+  const incomeRanking = expenseStats ? rankingFromOverview(expenseStats.topIncomeCategories, expenseStats.currentMonth.income) : null;
+  const incomeReading = incomeRanking ? describeCategoryShare(incomeRanking, 'income') : null;
+  // The income is the ring Tracciamento draws (The Ring Rule, 2026-11-15: the owner's tour aligned the two pages);
+  // the spending stays ranked rows, a ranking on both.
+  const incomeRing = incomeRanking ? incomeRingSegments(incomeRanking) : null;
   // The two totals hold the rows still in the calendar: declared under the readings
   // (The Scheduled-Is-Not-Spent Rule, at every width — DESIGN.md → The Binding-Clause Rule).
   const expensesScheduledCaption = expenseStats ? describeScheduledCaption(expenseStats.currentMonth.expensesScheduled ?? 0, today.daysInMonth) : null;
@@ -509,11 +514,15 @@ export default function DashboardPage() {
       <div className="space-y-4">
         <PageHeader
           label="Panoramica"
+          emblem="panoramica"
           title={header.title}
           description={header.date}
           actions={snapshotAction}
           freshness={freshness}
         />
+
+        {/* A costume theme's four-figure bar, at ≥ 1440 only: nothing in any other theme (DESIGN.md → The Costume Rule). */}
+        <ResourceBar figures={selectResourceBar(overview)} />
 
         {/* The stage: the verdict over the grid; on a tablet in landscape the answer on the left
             (verdict and THE tile) and the index on the right (lib/utils/tabletComposition.ts). */}
@@ -678,6 +687,8 @@ export default function DashboardPage() {
                   reading={incomeReading}
                   scheduledCaption={incomeScheduledCaption}
                   color="var(--chart-2)"
+                  ring={incomeRing}
+                  ringCenterLabel="entrate"
                   emptyCopy="Nessuna entrata registrata questo mese."
                   onSelectCategory={openCategoryInAnalisi}
                   footer={analisiFooter}

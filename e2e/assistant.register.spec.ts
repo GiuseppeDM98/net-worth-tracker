@@ -1,13 +1,13 @@
 /**
- * Assistente › Registra at 1440px, on the base account (2026-11, doc/guide/assistente.md).
+ * Assistente › Registra at 1440px, on the base account (2026-11, doc/guide/assistente-registra.md).
  *
  * WHY IT EXISTS: the protocol, the resolution and the card are held by Vitest; what only a browser
- * on the emulators knows is that «Registra» swaps the period axis for its strip and shows what the
- * assistant knows before any message, that a sentence becomes a card, that «Conferma» writes ONE
- * row through the expense services (the account moves, a future row waits), that the outcome is
- * saved on the message so a reload shows «Registrata» and never the buttons, that «Modifica» opens
- * the form on the proposal, that «apri in Cashflow» lands on the row's month and on the row, and that «Torna
- * all'analisi» leaves the register thread.
+ * on the emulators knows is that a sentence written in the chat (no axis, no «Registra» button
+ * since 2026-11-12) is read as a registration and becomes a card with the companion showing what the
+ * assistant knows, that «Conferma» writes ONE row through the expense services (the account moves,
+ * a future row waits), that the outcome is saved on the message so a reload on `?thread=` shows
+ * «Registrata» and never the buttons, that «Modifica» opens the form on the proposal, that «apri in
+ * Cashflow» lands on the row's month and on the row, and that «Nuova conversazione» leaves the thread.
  *
  * The stream is ALWAYS faked (`e2e/assistantRegister.ts`): no request reaches a model. Amounts are
  * invented and round; the regexes take both no-break spaces before «€».
@@ -16,7 +16,7 @@
 import { test, expect } from '@playwright/test';
 import {
   ACCOUNT_ID, ACCOUNT_START, FOOD_ID, FOOD_SUB_ID, HEALTH_ID, HEALTH_SUB_ID, THREAD_ID,
-  admin, card, composer, enterRegister, expectDecoyUntouched, installFakeStream, italyDateIso, italyDayOffsetIso,
+  admin, card, expectDecoyUntouched, installFakeStream, italyDateIso, italyDayOffsetIso,
   openAssistant, outcomeSaved, plantExchange, plantFillers, plantFixture, previousMonthFifteenthIso, proposalBlock, quantityOf,
   removeFixture, resetFixture, send, storedProposals, writtenRows,
 } from './assistantRegister';
@@ -34,40 +34,36 @@ test.afterAll(async () => {
   await removeFixture();
 });
 
-test('«Registra» shows the strip and what the assistant knows; the owner’s sentence becomes a card and «Conferma» writes one row, once', async ({ page }) => {
+test('a sentence written in the chat is read as a registration: a card, what the assistant knows, and «Conferma» writes one row, once', async ({ page }) => {
   test.setTimeout(120_000);
   const recorder = await installFakeStream(page, () => `Ti propongo questa riga.\n\n${proposalBlock({ amount: 103 })}`);
   await openAssistant(page);
-  await expect(page.getByRole('tablist', { name: 'Periodo di analisi' })).toBeVisible();
-
-  await enterRegister(page);
-  // The strip stands where the axis was; the composer has the focus.
+  // Only a chat: no period axis, no «Registra» button — the composer takes the sentence.
   await expect(page.getByRole('tablist', { name: 'Periodo di analisi' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: "Torna all'analisi" })).toBeVisible();
-  await expect(composer(page)).toBeFocused();
-  await expect(composer(page)).toHaveAttribute('placeholder', 'Scrivi cosa hai speso, incassato o spostato…');
-
-  // Before any message: the verdict is computed (never the skeleton) and the panel lists the account.
-  const verdict = page.getByRole('region', { name: 'Verdetto sul contesto' });
-  await expect(verdict).toContainText('Registra un movimento.');
-  await expect(verdict).toContainText(/Conosco \d+ categorie e \d+ conti/);
-  const companion = page.locator('[data-scene="register"]');
-  await expect(companion).toContainText("Cosa conosce l'Assistente");
-  await expect(companion.getByRole('list', { name: 'Conti' })).toContainText('Conto principale');
-  await expect(companion.getByRole('list', { name: 'Conti' })).toContainText('addebito predefinito');
-  await expect(companion).not.toContainText('righe lette');
+  await expect(page.getByRole('button', { name: 'Registra un movimento' })).toHaveCount(0);
 
   await send(page, 'Ciao, ho fatto spesa per 103 euro, per favore segnalo');
   const proposed = card(page, 'expense:0');
   await expect(proposed).toBeVisible();
   await expect(proposed).toContainText("L'Assistente propone");
   await expect(proposed).toContainText(/Spesa · 103,00\s€ · Cibo › Spesa · oggi · Conto principale/);
-  // The request was the mode's, with no period; the panel now shows what the server read.
+  await expect(page.getByText('Ho letto: un movimento da registrare')).toBeVisible();
+  // The request was `auto`, with no period; the router's reading turned the page to the registration.
   expect(recorder.requests).toHaveLength(1);
-  expect(recorder.requests[0]).toMatchObject({ mode: 'register', prompt: 'Ciao, ho fatto spesa per 103 euro, per favore segnalo' });
+  expect(recorder.requests[0]).toMatchObject({ mode: 'auto', prompt: 'Ciao, ho fatto spesa per 103 euro, per favore segnalo' });
   expect(recorder.requests[0].month).toBeUndefined();
+  expect(recorder.requests[0].route).toBeUndefined();
+
+  // After the answer: the verdict is the registration's and the panel lists the account and what the server read.
+  const verdict = page.getByRole('region', { name: 'Verdetto sul contesto' });
+  await expect(verdict).toContainText('Registra un movimento.');
+  // What the server read: the categories, the account and the last rows (the stream's `register` summary).
+  await expect(verdict).toContainText(/Conosco \d+ categorie, \d+ cont[oi] e le ultime 4 righe/);
+  const companion = page.locator('[data-scene="register"]');
+  await expect(companion).toContainText("Cosa conosce l'Assistente");
+  await expect(companion.getByRole('list', { name: 'Conti' })).toContainText('Conto principale');
+  await expect(companion.getByRole('list', { name: 'Conti' })).toContainText('addebito predefinito');
   await expect(companion).toContainText('ultime 4 righe lette');
-  await expect(verdict).toContainText(/le ultime 4 righe/);
 
   // The accent is on what the model wrote — the assistant message and its card — and nowhere else.
   await expect(page.locator('main [data-generated]')).toHaveCount(2);
@@ -95,7 +91,7 @@ test('«Registra» shows the strip and what the assistant knows; the owner’s s
   expect(await storedProposals(recorder.messageIds[0])).toMatchObject({ 'expense:0': { status: 'written', writtenIds: [rows[0].id] } });
 });
 
-test('two rows in one sentence are two cards with two outcomes, and a reload on ?mode=registra shows them — never the buttons', async ({ page }) => {
+test('two rows in one sentence are two cards with two outcomes, and a reload on ?thread= shows them — never the buttons', async ({ page }) => {
   test.setTimeout(120_000);
   const recorder = await installFakeStream(
     page,
@@ -110,7 +106,6 @@ test('two rows in one sentence are two cards with two outcomes, and a reload on 
       ].join('\n\n'),
   );
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'Ciao, ho speso 100 euro alla Coop per la spesa e 20 euro in farmacia');
 
   const first = card(page, 'expense:0');
@@ -153,9 +148,9 @@ test('two rows in one sentence are two cards with two outcomes, and a reload on 
   expect(stored['expense:1'].status).toBe('ignored');
   expect(await quantityOf(db, ACCOUNT_ID)).toBeCloseTo(ACCOUNT_START - 100, 2);
 
-  // A reload: the param opens the day's thread, read back from the documents.
-  await openAssistant(page, '?mode=registra');
-  await expect(page.getByRole('button', { name: "Torna all'analisi" })).toBeVisible({ timeout: 60_000 });
+  // A reload: the URL kept the thread (`?thread=`), read back from the documents.
+  await expect(page).toHaveURL(new RegExp(`thread=${THREAD_ID}`));
+  await openAssistant(page, `?thread=${THREAD_ID}`);
   await expect(card(page, 'expense:0').getByText('Registrata')).toBeVisible({ timeout: 60_000 });
   await expect(card(page, 'expense:1').getByText('Ignorata')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Conferma' })).toHaveCount(0);
@@ -167,7 +162,6 @@ test('«Modifica» opens the form on the proposal, and the row the form saves is
   test.setTimeout(120_000);
   const recorder = await installFakeStream(page, () => `Ecco la riga.\n\n${proposalBlock({ amount: 103, note: 'Supermercato' })}`);
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'ho fatto spesa per 103 euro');
 
   const proposed = card(page, 'expense:0');
@@ -201,7 +195,6 @@ test('a row dated tomorrow says when it moves the account, and waits: the row is
   const tomorrow = italyDayOffsetIso(1);
   await installFakeStream(page, () => `Ecco la riga di domani.\n\n${proposalBlock({ amount: 40, dateIso: tomorrow })}`);
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'domani spendo 40 euro di spesa');
 
   const proposed = card(page, 'expense:0');
@@ -225,7 +218,6 @@ test('«apri in Cashflow» opens Tracciamento on the row’s month and ON the ro
   await plantFillers(previousMonthFifteenthIso(20), 25);
   await installFakeStream(page, () => `Ecco la riga del mese scorso.\n\n${proposalBlock({ amount: 55, dateIso })}`);
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'il 15 del mese scorso ho speso 55 euro di spesa');
 
   const proposed = card(page, 'expense:0');
@@ -263,35 +255,33 @@ test('«apri in Cashflow» opens Tracciamento on the row’s month and ON the ro
   await page.evaluate(() => window.localStorage.removeItem('cashflow.movimenti.vista'));
 });
 
-test('«Torna all’analisi» leaves the register thread: the axis is back and the conversation is empty', async ({ page }) => {
+test('«Nuova conversazione» empties the conversation and drops `?thread`', async ({ page }) => {
   test.setTimeout(120_000);
-  // The thread of today, planted: the param opens it.
+  // A planted thread: the param opens it.
   await plantExchange('ieri ho speso 12 euro di spesa', 'Riga di ieri annotata: fenicottero.');
   const recorder = await installFakeStream(page, () => 'Non serve.');
-  await openAssistant(page, '?mode=registra');
+  await openAssistant(page, `?thread=${THREAD_ID}`);
   const conversation = page.getByRole('region', { name: 'Conversazione' });
   await expect(conversation).toContainText('Riga di ieri annotata: fenicottero.', { timeout: 60_000 });
-  await expect(page.getByRole('tablist', { name: 'Periodo di analisi' })).toHaveCount(0);
+  await expect(page.locator('[data-scene="register"]')).toBeVisible();
 
-  await page.getByRole('button', { name: "Torna all'analisi" }).click();
-  const axis = page.getByRole('tablist', { name: 'Periodo di analisi' });
-  await expect(axis).toBeVisible();
-  await expect(axis.getByRole('tab', { name: 'Mese' })).toHaveAttribute('aria-selected', 'true');
-  // The register thread is no longer open: its message is gone and the next question would not go into it.
+  await page.getByRole('button', { name: 'Nuova conversazione' }).filter({ visible: true }).first().click();
+  // The thread is no longer open: its message is gone and the next question would not go into it.
   await expect(conversation).not.toContainText('fenicottero');
-  await expect(page.locator('[data-scene="month_analysis"]')).toBeVisible();
-  await expect(page).not.toHaveURL(/mode=registra/);
+  await expect(conversation.getByRole('list', { name: 'Domande suggerite' })).toBeVisible();
+  await expect(page.locator('[data-scene="chat"]')).toBeVisible();
+  await expect(page).not.toHaveURL(/thread=/);
   expect(recorder.requests).toHaveLength(0);
   const db = await admin();
   expect((await db.collection('assistantThreads').doc(THREAD_ID).get()).exists).toBe(true);
 });
 
-test('back from Cashflow, the next sentence goes into the day’s thread — never into a second one', async ({ page }) => {
+test('back from Cashflow on `?thread=`, the next sentence goes into that thread — never into a second one', async ({ page }) => {
   test.setTimeout(180_000);
   const recorder = await installFakeStream(page, (prompt) => (prompt.includes('budget') ? 'Sei in linea: fenicottero.' : `Ecco la riga.\n\n${proposalBlock({ amount: 30 })}`));
-  // The way the owner got there on 2026-11-11: a reload on the param, the card's link, the browser's Back.
+  // The way the owner got there on 2026-11-11: the thread on screen, the card's link, the browser's Back.
   await plantExchange('ho speso 30 euro di spesa', `Ecco la riga.\n\n${proposalBlock({ amount: 30 })}`);
-  await openAssistant(page, '?mode=registra');
+  await openAssistant(page, `?thread=${THREAD_ID}`);
   const proposed = card(page, 'expense:0');
   const saved = outcomeSaved(page);
   await proposed.getByRole('button', { name: 'Conferma' }).click();
@@ -302,7 +292,7 @@ test('back from Cashflow, the next sentence goes into the day’s thread — nev
   await expect(page.locator('[data-linked-row="true"]').filter({ visible: true })).toHaveCount(1, { timeout: 60_000 });
 
   await page.goBack();
-  await expect(page.getByRole('button', { name: "Torna all'analisi" })).toBeVisible({ timeout: 60_000 });
+  await expect(page).toHaveURL(new RegExp(`thread=${THREAD_ID}`));
   await expect(card(page, 'expense:0').getByText('Registrata')).toBeVisible({ timeout: 60_000 });
   await send(page, 'come sono messo col budget');
   await expect(page.getByRole('region', { name: 'Conversazione' })).toContainText('fenicottero', { timeout: 30_000 });

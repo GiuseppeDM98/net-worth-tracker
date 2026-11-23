@@ -26,6 +26,7 @@ import {
   describeWithheldTaxField,
   describeSnapshotOverwrite,
   describeExpenseFeeField,
+  describeTradeFeeField,
   describeDebtRepaymentField,
   describePropertyTransferRefusal,
   describeTradeIntent,
@@ -36,6 +37,7 @@ import {
   EXPENSE_TYPE_PICKER_READING,
   PENSION_CONTRIBUTION_COPY,
   PENSION_CONTRIBUTION_RECORDED,
+  TRADE_FEE_ROW_NOTE,
   type ModalStatusCopy,
 } from '@/lib/utils/dialogNarrative';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
@@ -601,6 +603,36 @@ describe('describeExpenseFeeField — the line under «Commissione»', () => {
   });
 });
 
+describe('describeTradeFeeField — the line under a trade\'s «Commissioni (€)»', () => {
+  const facts = { reading: false, categoryLabel: 'Commissioni', hasRow: false, legacyFee: false };
+
+  it('says a fee with its row moves with the trade, even before the category is read', () => {
+    expect(describeTradeFeeField({ ...facts, hasRow: true, legacyFee: true, reading: true })).toBe(
+      'Non entra nel prezzo medio: è la sua spesa in Cashflow, e cambia con l’operazione.'
+    );
+  });
+
+  it('says a fee saved before fees became rows stays on the trade', () => {
+    expect(describeTradeFeeField({ ...facts, legacyFee: true, reading: true, categoryLabel: null })).toBe(
+      'Registrata prima che le commissioni diventassero spese: resta su questa operazione, fuori dal Cashflow.'
+    );
+  });
+
+  it('says it is reading while the category loads', () => {
+    expect(describeTradeFeeField({ ...facts, reading: true, categoryLabel: null })).toBe('Sto leggendo dove va la commissione…');
+  });
+
+  it('is null without a fee category (the link to Impostazioni shows)', () => {
+    expect(describeTradeFeeField({ ...facts, categoryLabel: null })).toBeNull();
+  });
+
+  it('names the category a new fee lands in', () => {
+    expect(describeTradeFeeField(facts)).toBe(
+      'Non entra nel prezzo medio: diventa una spesa in Commissioni, alla data dell’operazione.'
+    );
+  });
+});
+
 describe('describeSeriesDeleteReading — «solo questa o tutta la serie?»', () => {
   it('names the instalment, its plan and what the account gets back', () => {
     const text = plain(describeSeriesDeleteReading({ mode: 'installment', label: 'Figlie', amount: -373.81, installmentNumber: 3, installmentTotal: 12 }));
@@ -632,6 +664,11 @@ describe('describeMovementDetailReading — the reading of the detail is where i
     const armed = describeMovementDetailReading({ date, scheduled: false, phase: 'armed', deletion });
     expect(plain(armed.narrative)).toBe('Eliminando, il conto viene riaccreditato di 373,81 €.');
     expect(armed.tone).toBe('negative');
+  });
+
+  it('adds, on a trade\'s fee row, that its trade keeps amount and date', () => {
+    const idle = describeMovementDetailReading({ date, scheduled: false, phase: 'idle', deletion, tradeFee: true });
+    expect(plain(idle.narrative)).toBe(`Movimento del 14 settembre 2026. ${TRADE_FEE_ROW_NOTE}`);
   });
 
   it('says the delete was let go instead of silently returning to the date', () => {

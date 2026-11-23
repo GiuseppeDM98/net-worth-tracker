@@ -2,8 +2,8 @@
 
 /**
  * A choice as 44px rows — a radio or a checkbox, the label, a hint — never a dropdown for two or
- * three options (DESIGN.md → The Question-Card Rule). ONE module for the Consulente's path, the
- * Compravendita's screens and the interview to come (2026-11-07: the two `ChoiceRows`
+ * three options (DESIGN.md → The Question-Card Rule). ONE module for every guided path — the Consulente's,
+ * Compravendita's, the plan of accumulation's (2026-11-20) — and the interview (2026-11-07: the two `ChoiceRows`
  * copies merged here; the interview's question cards and the Assistente's cards read this contract).
  *
  * Single mode is the Radix `RadioGroup` (its own roving focus); multiple mode is a `role="group"`
@@ -17,8 +17,10 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PATH_FIELD_HEIGHT_CLASS } from '@/components/ui/path-fields';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRovingFocus } from '@/lib/hooks/useRovingFocus';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface ChoiceListOption<T extends string> {
   value: T;
@@ -31,12 +33,18 @@ export interface ChoiceListOption<T extends string> {
 
 export const CHOICE_ROW_CLASS = 'flex items-start gap-3 px-4 py-3';
 
-const GROUP_CLASS = 'divide-y divide-border rounded-xl border border-border';
+const GROUP_CLASS = `divide-y divide-border ${COSTUME_FRAME_RADIUS_CLASS} border border-border`;
 const LABEL_CLASS = 'flex min-h-11 flex-1 cursor-pointer flex-col items-start justify-center gap-0.5 text-left desktop:min-h-0';
 const TITLE_CLASS = 'text-[14px] font-medium text-foreground';
 const HINT_CLASS = 'text-[13px] font-normal leading-[1.45] text-muted-foreground';
-/** The «Altro…» field's height: the value of the Compravendita's FIELD_HEIGHT_CLASS, written here (a primitive imports nothing from components/assets/). */
-const OTHER_FIELD_CLASS = 'mt-2 h-11 desktop:h-9';
+/**
+ * The control beside its label (2026-11-20): below `desktop:` a row is 44 px and a label of ONE line sits centred in it,
+ * so the 16 px radio or box takes (44 − 16) / 2 = 14 px from the top; with a hint the label fills the row and the
+ * control stays on the title's line. At `desktop:` the row has no minimum and `mt-1` aligns it everywhere.
+ */
+const controlClass = (option: { hint?: string }) => (option.hint ? 'mt-1' : 'mt-1 max-desktop:mt-[14px]');
+/** The «Altro…» field: the guided paths' field height. */
+const OTHER_FIELD_CLASS = `mt-2 ${PATH_FIELD_HEIGHT_CLASS}`;
 
 export type ChoiceListProps<T extends string> = {
   name: string;
@@ -84,7 +92,7 @@ export function ChoiceList<T extends string>(props: ChoiceListProps<T>) {
           const id = `${name}-${option.value}`;
           return (
             <div key={option.value} className={CHOICE_ROW_CLASS}>
-              <RadioGroupItem value={option.value} id={id} className="mt-1" />
+              <RadioGroupItem value={option.value} id={id} className={controlClass(option)} />
               <div className="flex min-w-0 flex-1 flex-col">
                 {rowLabel(option, id)}
                 {otherField(option)}
@@ -105,7 +113,7 @@ export function ChoiceList<T extends string>(props: ChoiceListProps<T>) {
           <div key={option.value} className={CHOICE_ROW_CLASS}>
             <Checkbox
               id={id}
-              className="mt-1"
+              className={controlClass(option)}
               checked={value.includes(option.value)}
               onCheckedChange={(checked) => onChange(nextMultipleValue(options, value, option.value, checked === true))}
               {...roving.itemProps(index)}

@@ -125,7 +125,10 @@ export function stageParts(scope: Locator) {
  * In landscape: the verdict and THE tile on the left, 16px apart; the index on the right, 360px wide,
  * its top on the verdict's and its bottom on THE tile's (the two cards end on one line); «Il resto»
  * and then EVERY row, in DOM order, one under the other with a hairline between, a closed one as
- * tall as its trigger. When the left stack fits the screen it is sticky and ends above the fold.
+ * tall as its trigger. When the left stack fits the screen it is sticky and, once stuck, ends above the fold —
+ * measured stuck, not at the top of the page: the rule (`leftStackSticks`) is the stack against the whole
+ * `main`, so a stack that fits only without the page header above it sticks too (Accumulo's empty tile with
+ * Geist, 2026-11-21: 856px at the top, 739px stuck, under a fold of 768).
  */
 export async function expectLandscapeStage(page: Page, scope: Locator, ids: readonly string[]): Promise<void> {
   const { verdict, lead, rest, index, stage } = stageParts(scope);
@@ -139,8 +142,18 @@ export async function expectLandscapeStage(page: Page, scope: Locator, ids: read
   const anyOpen = (await Promise.all(ids.map((id) => page.locator(`#${id}-trigger`).getAttribute('aria-expanded')))).includes('true');
   if (anyOpen) expect(i.bottom, 'the index reaches at least THE tile line').toBeGreaterThanOrEqual(l.bottom - 1);
   else expect(Math.abs(i.bottom - l.bottom), 'the index ends on THE tile line').toBeLessThanOrEqual(1);
-  if (sticks === 'true') expect(l.bottom, 'THE tile ends above the fold').toBeLessThanOrEqual(fold);
-  else expect(l.y, 'THE tile starts above the fold').toBeLessThan(fold);
+  if (sticks === 'true') {
+    const main = page.locator('#page-main');
+    // Scrolled until the verdict sits at its sticky top (16px), then back: the rest of the check reads the page at its top.
+    await main.evaluate((el, verdictTop) => {
+      el.scrollTop += verdictTop - el.getBoundingClientRect().top - 16;
+    }, v.y);
+    const stuck = await rectOf(lead);
+    await main.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    expect(stuck.bottom, 'THE tile, stuck, ends above the fold').toBeLessThanOrEqual(fold);
+  } else expect(l.y, 'THE tile starts above the fold').toBeLessThan(fold);
 
   let previous = await rectOf(rest);
   expect(previous.y, '«Il resto» heads the index').toBeLessThanOrEqual(i.y + 1);

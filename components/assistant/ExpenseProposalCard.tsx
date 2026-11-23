@@ -63,6 +63,7 @@ import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { cn } from '@/lib/utils';
 import type { AssistantProposalState } from '@/types/assistant';
 import type { ExpenseFormData } from '@/types/expenses';
+import { COSTUME_FRAME_RADIUS_CLASS, COSTUME_GENERATED_FILL_CLASS } from '@/lib/constants/themeCostume';
 
 // The form is heavy and «Modifica» is the rare path: its chunk loads on hover or focus of the
 // button, never with the page (the route's first-load budget, doc/guide/velocita.md).
@@ -258,7 +259,7 @@ export function ExpenseProposalCard({ proposal, index }: ExpenseProposalCardProp
       animate="center"
       data-generated
       data-proposal={key}
-      className={cn('not-prose my-3 rounded-xl border bg-muted/40 p-4', AI_GENERATED_SURFACE_CLASS)}
+      className={cn('not-prose my-3 border p-4', COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)}
     >
       <p className={cn(TILE_EYEBROW_CLASS, AI_GENERATED_EYEBROW_CLASS)}>L&apos;Assistente propone</p>
 

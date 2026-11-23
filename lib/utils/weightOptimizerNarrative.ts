@@ -1,0 +1,487 @@
+/**
+ * weightOptimizerNarrative — every word the weight optimizer's PAC panel and report speak
+ *. Pure: no Firebase, no DOM. A signed figure always carries
+ * the typographic minus «−», never the ASCII hyphen (same rule as `accumulationNarrative.ts`).
+ *
+ * `describeObjectiveLabel` moved here from `weightOptimizer.ts` (O1 kept a local `labelForRow`
+ * only so that module compiled and reported on its own before this one existed — see its header
+ * comment) and fixes the factor label to match this file's own convention: "Momentum nell'azionario",
+ * not "Momentum (Azioni)".
+ */
+import { isLoanAsset, type Asset, type AssetClass } from '@/types/assets';
+import type { ConflictReport, ObjectiveReport, OptimizerMode, OptimizerResult, OptimizerSaleReport, OptimizerWarning, SecondLevelGap } from './weightOptimizer';
+import type { ModalReading } from './dialogNarrative';
+import type { Narrative } from './narrative';
+import { ASSET_CLASS_LABELS, resolveAllocationRoleWithin } from './allocationUtils';
+import { cachedFormatCurrencyEUR, formatCurrency, formatNumberIt, formatPercentageIt } from './formatters';
+import { formatSignedCurrency } from './accumulationNarrative';
+
+const SECOND_LEVEL_GAP_NAME_LIMIT = 5;
+
+// ---------------------------------------------------------------------------
+// Objective labels
+// ---------------------------------------------------------------------------
+
+/** "Momentum nell'azionario", "X nell'obbligazionario" — never "Momentum (Azioni)". */
+const CLASS_SCOPE_PHRASE: Partial<Record<AssetClass, string>> = {
+  equity: "nell'azionario",
+  bonds: "nell'obbligazionario",
+};
+
+function classScopePhrase(assetClass: AssetClass | undefined): string {
+  if (!assetClass) return '';
+  return CLASS_SCOPE_PHRASE[assetClass] ?? `nella classe ${ASSET_CLASS_LABELS[assetClass] ?? assetClass}`;
+}
+
+export function describeObjectiveLabel(
+  kind: ObjectiveReport['kind'],
+  assetClass?: AssetClass,
+  subCategory?: string,
+  groupLabel?: string
+): string {
+  switch (kind) {
+    case 'class':
+      return `Classe ${ASSET_CLASS_LABELS[assetClass as string] ?? assetClass}`;
+    case 'leverage':
+      return 'Leva';
+    case 'factor':
+      return `${subCategory} ${classScopePhrase(assetClass)}`;
+    case 'group':
+      return `Gruppo ${groupLabel}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Gap / target / achieved formatting — pp with one decimal, leverage with two and "×"
+// ---------------------------------------------------------------------------
+
+function isLeverageObjective(objective: Pick<ObjectiveReport, 'kind'>): boolean {
+  return objective.kind === 'leverage';
+}
+
+export function formatObjectiveTarget(objective: ObjectiveReport): string {
+  return isLeverageObjective(objective) ? `${formatNumberIt(objective.targetValue, 2)}×` : formatPercentageIt(objective.targetValue, 1);
+}
+
+export function formatObjectiveAchieved(objective: ObjectiveReport): string {
+  return isLeverageObjective(objective) ? `${formatNumberIt(objective.achievedValue, 2)}×` : formatPercentageIt(objective.achievedValue, 1);
+}
+
+/** «+0,4 pp» / «−0,4 pp» / «+0,04×» / «−0,04×» — typographic minus, never the ASCII hyphen. */
+export function formatObjectiveGap(objective: ObjectiveReport): string {
+  const leverage = isLeverageObjective(objective);
+  const value = leverage ? objective.gapPp / 100 : objective.gapPp;
+  const amount = formatNumberIt(Math.abs(value), leverage ? 2 : 1);
+  const suffix = leverage ? '×' : ' pp';
+  if (value < -1e-9) return `−${amount}${suffix}`;
+  if (value > 1e-9) return `+${amount}${suffix}`;
+  return `${amount}${suffix}`;
+}
+
+// ---------------------------------------------------------------------------
+// Conflicts
+// ---------------------------------------------------------------------------
+
+/** «Senza il criterio «Leva»: Stati Uniti nell'azionario da 66,1% a 62,0%.» — `fromGapPp`/`toGapPp`
+ *  are gaps, not raw values, so the sentence rebuilds the achieved figure from each objective's
+ *  own `targetValue` (looked up by id in the same `objectives` list the report carries). */
+export function describeConflict(conflict: ConflictReport, objectives: ObjectiveReport[]): string {
+  const removed = objectives.find((o) => o.id === conflict.removedObjectiveId);
+  const removedLabel = removed?.label ?? conflict.removedObjectiveId;
+
+  const parts = conflict.improvements
+    .map((improvement) => {
+      const objective = objectives.find((o) => o.id === improvement.objectiveId);
+      if (!objective) return null;
+      const leverage = isLeverageObjective(objective);
+      const fromValue = objective.targetValue + improvement.fromGapPp;
+      const toValue = objective.targetValue + improvement.toGapPp;
+      const fromText = leverage ? `${formatNumberIt(fromValue, 2)}×` : formatPercentageIt(fromValue, 1);
+      const toText = leverage ? `${formatNumberIt(toValue, 2)}×` : formatPercentageIt(toValue, 1);
+      return `${objective.label} da ${fromText} a ${toText}`;
+    })
+    .filter((text): text is string => text !== null);
+
+  return `Senza il criterio «${removedLabel}»: ${parts.join('; ')}.`;
+}
+
+/** The tile's reading of a conflict, as in the render: «Leva e Stati Uniti nell'azionario tirano in
+ *  direzioni opposte: senza «Leva», Stati Uniti nell'azionario passerebbe da 66,1% a 62,0%.» */
+export function describeConflictReading(conflict: ConflictReport, objectives: ObjectiveReport[]): string {
+  const removed = objectives.find((o) => o.id === conflict.removedObjectiveId);
+  const removedLabel = removed?.label ?? conflict.removedObjectiveId;
+  const labels = conflict.improvements
+    .map((improvement) => objectives.find((o) => o.id === improvement.objectiveId)?.label)
+    .filter((label): label is string => !!label);
+  const detail = describeConflict(conflict, objectives).replace(/^Senza il criterio «[^»]*»: /, '').replace(/ da /g, ' passerebbe da ');
+  const pull = labels.length === 0 ? removedLabel : `${removedLabel} e ${labels.join(', ')}`;
+  return `${pull} tirano in direzioni opposte: senza «${removedLabel}», ${detail}`;
+}
+
+// ---------------------------------------------------------------------------
+// Warnings — one text per OptimizerWarning.code
+// ---------------------------------------------------------------------------
+
+/** `labelOf` resolves a candidate/position key to its display label — the report only carries the
+ *  key, the panel is the one that knows the positions. */
+export function describeOptimizerWarning(warning: OptimizerWarning, labelOf: (key: string) => string): string {
+  switch (warning.code) {
+    case 'factor_unmapped':
+      return `«${warning.subCategory}» (${ASSET_CLASS_LABELS[warning.assetClass] ?? warning.assetClass}) non ha un peso tra i sotto-criteri: pesa zero nel calcolo.`;
+    case 'proxy_mismatch':
+      return `«${labelOf(warning.key)}»: i membri del gruppo hanno un'esposizione diversa dallo strumento che compra; il calcolo usa solo quella dello strumento che compra.`;
+    case 'bound_conflict':
+      return `«${labelOf(warning.key)}»: i limiti impostati si escludono a vicenda, il massimo è stato allineato al minimo.`;
+    case 'not_converged':
+      return "Il calcolo non ha raggiunto la convergenza entro le iterazioni disponibili: il risultato resta un'approssimazione.";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Second-level gaps — preventive warning, IdealAllocationTile and the model's dialog
+// ---------------------------------------------------------------------------
+
+/** «ETF-A, ETF-B, ETF-C e altri 2» — unique names in order of first appearance, capped at 5. */
+function joinTruncatedNames(names: string[]): string {
+  const unique = Array.from(new Set(names));
+  if (unique.length <= SECOND_LEVEL_GAP_NAME_LIMIT) return unique.join(', ');
+  const shown = unique.slice(0, SECOND_LEVEL_GAP_NAME_LIMIT);
+  const rest = unique.length - SECOND_LEVEL_GAP_NAME_LIMIT;
+  return `${shown.join(', ')} e altri ${rest}`;
+}
+
+/** One sentence per (class, reason) group — «3 strumenti nella classe Azioni senza sottocategoria:
+ *  ETF-A, ETF-B, ETF-C.» / «…con una sottocategoria non configurata: …» — never blocks the calculation. */
+export function describeSecondLevelGaps(gaps: SecondLevelGap[]): string[] {
+  const groups = new Map<string, { assetClass: AssetClass; reason: 'missing' | 'unknown'; names: string[] }>();
+  for (const gap of gaps) {
+    const key = `${gap.assetClass}:${gap.reason}`;
+    const group = groups.get(key) ?? { assetClass: gap.assetClass, reason: gap.reason, names: [] };
+    group.names.push(gap.assetName);
+    groups.set(key, group);
+  }
+
+  return Array.from(groups.values()).map((group) => {
+    const uniqueCount = new Set(group.names).size;
+    const classLabel = ASSET_CLASS_LABELS[group.assetClass] ?? group.assetClass;
+    const subject = uniqueCount === 1 ? '1 strumento' : `${uniqueCount} strumenti`;
+    const clause = group.reason === 'missing' ? 'senza sottocategoria' : 'con una sottocategoria non configurata';
+    return `${subject} nella classe ${classLabel} ${clause}: ${joinTruncatedNames(group.names)}.`;
+  });
+}
+
+/** Shown wherever a class carries an enabled `specificAssets` target: instrument-level
+ *  targets are never a soft objective, they are what the optimizer computes. */
+export const OPTIMIZER_SPECIFIC_ASSETS_NOTE =
+  `I target sui singoli strumenti non entrano nel calcolo: sono ciò che l'ottimizzatore propone.`;
+
+// ---------------------------------------------------------------------------
+// Modes
+// ---------------------------------------------------------------------------
+
+export const OPTIMIZER_MODE_LABELS: Record<OptimizerMode, string> = {
+  reachable: 'Raggiungibile col PAC',
+  ideal: 'Ideale',
+  targeted: 'Con vendite mirate',
+};
+
+/** The one-line difference shown under the mode toggle. */
+export function describeOptimizerMode(mode: OptimizerMode): string {
+  switch (mode) {
+    case 'reachable':
+      return 'Raggiungibile non scende sotto ciò che possiedi, perché le rate del PAC comprano soltanto.';
+    case 'targeted':
+      return 'Con vendite mirate vende solo ciò che conviene di più, finché le tasse restano sotto il tetto; gli strumenti spuntati non si vendono.';
+    case 'ideal':
+      return 'Ideale ignora quanto possiedi oggi: propone i pesi più vicini ai criteri del modello, anche sotto il posseduto.';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The optimizer's copy — no component carries an Italian literal of its own (accumulationNarrative.ts's rule)
+// ---------------------------------------------------------------------------
+
+/** The objectives live in Allocazione › Accumulo; the query opens their modal. */
+export { OPTIMIZER_OBJECTIVES_HREF } from '@/lib/constants/idealAllocation';
+export const OPTIMIZER_ACTION_MODIFY_IN_SETTINGS = 'Modifica i criteri';
+export const OPTIMIZER_ACTION_CALCULATE = 'Calcola';
+export const OPTIMIZER_OBJECTIVES_TITLE = 'Criteri attivi';
+export const OPTIMIZER_REPORT_TITLE = 'Rapporto';
+export const OPTIMIZER_CONFLICTS_TITLE = 'Conflitti';
+export const OPTIMIZER_WARNINGS_TITLE = 'Avvisi';
+export const OPTIMIZER_STATUS_NO_CANDIDATES = 'Nessuno strumento nel piano su cui proporre pesi.';
+export const OPTIMIZER_STATUS_INFEASIBLE_BOUNDS = 'I limiti impostati non lasciano arrivare al 100%: nessun peso proponibile.';
+export const OPTIMIZER_MODE_ARIA_LABEL = 'Modalità di calcolo dei pesi';
+
+// ---------------------------------------------------------------------------
+// The standalone tool, Allocazione's `ComposizioneIdealeTile` + `IdealCompositionDialog`
+// ---------------------------------------------------------------------------
+
+export const IDEAL_COMPOSITION_TITLE = 'Ricalcola il portafoglio modello';
+export const IDEAL_COMPOSITION_AMOUNT_LABEL = 'Importo da investire (€)';
+export const IDEAL_COMPOSITION_REACHABLE_DISABLED_REASON =
+  'Inserisci un importo da investire per vedere cosa è raggiungibile senza vendere.';
+export const IDEAL_COMPOSITION_COL_INSTRUMENT = 'Strumento';
+export const IDEAL_COMPOSITION_COL_CURRENT = 'Peso attuale';
+export const IDEAL_COMPOSITION_COL_IDEAL = 'Peso ideale';
+export const IDEAL_COMPOSITION_COL_DIFF = 'Differenza';
+/** A fixed share's difference: only the rounding to hundredths of a point, never euro to move (owner, 2026-11-17). */
+export const IDEAL_COMPOSITION_FIXED_DIFF = '—';
+export const IDEAL_COMPOSITION_ACTION_CREATE_PAC = 'Crea un PAC con questi pesi';
+export const IDEAL_COMPOSITION_PLAN_ALREADY_OPEN =
+  'Hai già un piano aperto: modificalo dal tile Accumulo.';
+
+// ---------------------------------------------------------------------------
+// «Con vendite mirate» — only in the standalone tool
+// ---------------------------------------------------------------------------
+
+export const IDEAL_COMPOSITION_TAX_CAP_LABEL = 'Tasse massime (€)';
+export const IDEAL_COMPOSITION_COL_LOCK = 'Non vendere';
+export const IDEAL_COMPOSITION_COL_TAX = 'Tasse';
+// Why a row's «Non vendere» box is ticked and cannot be unticked, printed under its name (a tooltip is invisible on touch).
+export const IDEAL_COMPOSITION_LOCK_UNKNOWN_BASIS = 'Costo fiscale sconosciuto';
+export const IDEAL_COMPOSITION_LOCK_UNKNOWN_RATE = 'Aliquota non impostata';
+export const IDEAL_COMPOSITION_LOCK_FROZEN = 'Bloccato in Impostazioni';
+export const IDEAL_COMPOSITION_LOCK_PROPERTY = 'Immobile: resta com’è';
+export const IDEAL_COMPOSITION_LOCK_NOT_TRADED = 'Non si vende sul mercato';
+
+/** The body's first line under the table whenever the targeted mode has a result (losses not offset, 2026-11-12). */
+export const IDEAL_COMPOSITION_LOSSES_NOTE =
+  'Le stime non compensano le minusvalenze: una vendita in perdita conta zero tasse, non un credito.';
+
+/** Below half a euro a «sale» is float noise, not an order anyone places. */
+const SALE_NOISE_EUR = 0.5;
+
+/** The «Tasse» cell: the estimated tax on a row in sale — «0,00 €» on a sale at a loss — and «—»
+ *  on a row that sells nothing. */
+export function formatSaleTaxCell(soldEur: number, taxEur: number): string {
+  return soldEur < SALE_NOISE_EUR ? '—' : formatCurrency(taxEur);
+}
+
+function wholeEuro(value: number): string {
+  return formatCurrency(Math.round(value), 'EUR', 0);
+}
+
+/**
+ * The targeted mode's total line, which is the dialog's reading: «Vendi 8000 €, paghi circa 400 € di
+ * tasse (tetto 500 €).» when the cap binds, «…: è l'Ideale, il tetto di 10.000 € non serve.» when it
+ * does not, «Nessuna vendita…» when nothing is sold — and, first, the tax the Impostazioni limits force
+ * when it exceeds the cap (2026-11-12). Spending the liquidity is not a sale: it is said apart, «, usi
+ * 3000 € di liquidità» (2026-11-12).
+ */
+export function describeTargetedSaleTotal(sale: OptimizerSaleReport): string {
+  const spent = sale.liquiditySpentEur >= SALE_NOISE_EUR ? `usi ${wholeEuro(sale.liquiditySpentEur)} di liquidità` : '';
+  if (sale.soldEur < SALE_NOISE_EUR) {
+    return spent ? `Nessuna vendita: ${spent}.` : 'Nessuna vendita: i pesi sono quelli raggiungibili col PAC.';
+  }
+  const sold = `Vendi ${wholeEuro(sale.soldEur)}, paghi circa ${wholeEuro(sale.taxEur)} di tasse${spent ? `, ${spent}` : ''}`;
+  if (sale.minTaxEur > sale.taxCapEur + SALE_NOISE_EUR) {
+    return `I limiti in Impostazioni obbligano a pagare almeno ${wholeEuro(sale.minTaxEur)} di tasse, oltre il tetto di ${wholeEuro(sale.taxCapEur)}: ${sold.charAt(0).toLowerCase()}${sold.slice(1)}.`;
+  }
+  if (!sale.capBinding) return `${sold}: è l'Ideale, il tetto di ${wholeEuro(sale.taxCapEur)} non serve.`;
+  return `${sold} (tetto ${wholeEuro(sale.taxCapEur)}).`;
+}
+
+/** «+1.240,00 €» — the weight's € distance at B, mono (The Comma Rule: never `toFixed`). */
+export function formatOptimizerWeightDiffEur(currentPct: number, proposedPct: number, baseEur: number): string {
+  return formatSignedCurrency(((proposedPct - currentPct) / 100) * baseEur);
+}
+
+// ---------------------------------------------------------------------------
+// Criteri del modello (the allocation's objectives), in Allocazione › Accumulo
+// ---------------------------------------------------------------------------
+
+export const OBJECTIVES_TILE_EYEBROW = 'Criteri del modello';
+export const OBJECTIVES_TILE_ASIDE = 'target · raggiunto dal modello';
+export const OBJECTIVES_TILE_PLAN_ASIDE = 'target · raggiunto dal piano';
+export const OBJECTIVES_TILE_PLAN_NOTE = 'A fine piano, ai prezzi di oggi: le barre sono quanto raggiunge il PAC aperto.';
+export const OBJECTIVES_DIALOG_TITLE = 'Criteri del modello';
+export const OBJECTIVES_ACTION_EDIT = 'Modifica i criteri';
+export const OBJECTIVES_ACTION_TRY = 'Prova';
+export const OBJECTIVES_ACTION_SAVE = 'Salva i criteri';
+export const OBJECTIVES_ACTION_CANCEL = 'Annulla';
+export const OBJECTIVES_DIALOG_READING = 'Cambia i criteri e premi «Prova»: il calcolo gira sulla bozza e non salva nulla. «Salva i criteri» li rende quelli dell’account.';
+export const OBJECTIVES_OFF_READING = 'I criteri sono spenti: il portafoglio modello resta manuale finché non li accendi.';
+/** Under the criteria's «Attiva» switch (Impostazioni and the model's «Modifica i criteri»). */
+export const IDEAL_ALLOCATION_ENABLE_HINT = 'Propone i pesi degli strumenti del portafoglio modello, da cui può partire il piano di accumulo.';
+export const OBJECTIVES_SAVED_TOAST = 'Criteri salvati';
+export const OBJECTIVES_CLASS_TARGETS_EYEBROW = 'Target di classe';
+export const OBJECTIVES_CLASS_TARGETS_READING = 'Il criterio «Classi» porta i pesi verso questi target. Si scrivono in un posto solo: Impostazioni › Allocazione.';
+export const OBJECTIVES_CLASS_TARGETS_EMPTY = 'Nessun target di classe: il criterio «Classi» non ha nulla da inseguire finché non ne scrivi uno.';
+export const OBJECTIVES_CLASS_TARGETS_LINK = 'Modifica in Impostazioni';
+export const OBJECTIVES_CLASS_TARGETS_HREF = '/dashboard/settings?tab=allocazione';
+export { OBJECTIVES_LINK_FROM_SETTINGS, OBJECTIVES_SETTINGS_EYEBROW } from '@/lib/constants/idealAllocation';
+
+// ---------------------------------------------------------------------------
+// The model portfolio — `PortafoglioModelloTile` and its dialogs
+// ---------------------------------------------------------------------------
+
+export const MODEL_TILE_EYEBROW = 'Portafoglio modello';
+export const MODEL_TILE_EMPTY_READING =
+  'Nessun portafoglio modello: calcola i pesi con l’ottimizzatore o scrivili a mano, e un piano parte da lì.';
+export const MODEL_TILE_READ_FAILURE_READING =
+  'Non riesco a leggere il portafoglio modello. Se è la prima volta, la regola Firestore della nuova collezione potrebbe non essere ancora pubblicata.';
+export const MODEL_ACTION_RECALCULATE = 'Ricalcola';
+export const MODEL_ACTION_EDIT = 'Modifica a mano';
+export const MODEL_ACTION_ADD_CANDIDATE = 'Aggiungi strumento da valutare';
+export const MODEL_ADD_CANDIDATE_NEEDS_MODEL = 'Salva prima un portafoglio modello: lo strumento da valutare ci entra a peso 0.';
+export const MODEL_RECALCULATE_NEEDS_OBJECTIVES = 'Accendi i criteri per far calcolare i pesi all’ottimizzatore.';
+export const MODEL_COL_INSTRUMENT = 'Strumento';
+export const MODEL_COL_TODAY = 'Oggi';
+export const MODEL_COL_MODEL = 'Modello';
+export const MODEL_COL_DIFF = 'Differenza';
+export const MODEL_CANDIDATE_TAG = 'da valutare';
+export const MODEL_OUTSIDE_LABEL = 'Fuori dal modello';
+/** A group's other members, under the buyer in the tile and in «Modifica a mano». */
+export const MODEL_GROUP_NO_BUY = 'non riceve acquisti';
+export function describeModelGroupMembers(otherLabels: string[]): string {
+  return `Gruppo con ${otherLabels.join(', ')}: compra solo il primo.`;
+}
+export const MODEL_TARGETED_HINT =
+  'Per avvicinarti al modello vendendo poco, «Ricalcola» ha la modalità «Con vendite mirate», con un tetto di tasse.';
+
+function formatModelDay(updatedAt: Date): string {
+  return `${String(updatedAt.getDate()).padStart(2, '0')}/${String(updatedAt.getMonth() + 1).padStart(2, '0')}/${updatedAt.getFullYear()}`;
+}
+
+/**
+ * «Calcolato dall'ottimizzatore il 07/10/2026» / «Scritto a mano il 07/10/2026». With the snapshot of
+ * the calculation the model started from, the mode is named too (render, view 1): «Proposto
+ * dall'ottimizzatore il 02/10/2026 (Raggiungibile)», then «, poi cambiato a mano» when the origin is manual.
+ */
+export function describeModelOrigin(origin: 'manual' | 'optimizer', updatedAt: Date, snapshot?: { computedAt: Date; mode: OptimizerMode }): string {
+  if (!snapshot) {
+    const day = formatModelDay(updatedAt);
+    return origin === 'optimizer' ? `Calcolato dall'ottimizzatore il ${day}.` : `Scritto a mano il ${day}.`;
+  }
+  const proposed = `Proposto dall'ottimizzatore il ${formatModelDay(snapshot.computedAt)} (${OPTIMIZER_MODE_LABELS[snapshot.mode]})`;
+  return origin === 'optimizer' ? `${proposed}.` : `${proposed}, poi cambiato a mano.`;
+}
+
+/** The two bases differ only when a debt sits inside the allocation. */
+export const MODEL_DEBT_BASE_NOTE = 'I pesi di oggi non contano i debiti: Bilanciamento li sottrae alla classe che finanziano.';
+
+/**
+ * The line under the model's table, only when it is true: a loan with a debt that Bilanciamento nets (a personal loan, or a
+ * mortgage on a property INSIDE the allocation). A mortgage on an excluded home changes no figure on either side, so it says nothing.
+ */
+export function describeModelDebtNote(assets: readonly Asset[], valueOf: (asset: Asset) => number): string | null {
+  const nets = assets.some((asset) => isLoanAsset(asset) && valueOf(asset) < 0 && resolveAllocationRoleWithin(asset, assets) !== 'excluded');
+  return nets ? MODEL_DEBT_BASE_NOTE : null;
+}
+
+/** The tile's aside: «pesi di mercato · base 182.000 €». */
+export function describeModelTileAside(baseEur: number): string {
+  return `pesi di mercato · base ${cachedFormatCurrencyEUR(baseEur, true)}`;
+}
+
+/**
+ * The tile's foot (render, view 1): who stays above the model without selling, then where the sale
+ * is — a calculation the reader asks for in «Ricalcola», never run here.
+ */
+export function describeModelSalesHint(overweightLabels: string[]): string {
+  if (overweightLabels.length === 0) return MODEL_TARGETED_HINT;
+  const names = overweightLabels.length === 1 ? overweightLabels[0] : `${overweightLabels.slice(0, -1).join(', ')} e ${overweightLabels[overweightLabels.length - 1]}`;
+  const verb = overweightLabels.length === 1 ? 'resta sopra' : 'restano sopra';
+  return `Senza vendere, ${names} ${verb} il modello. ${MODEL_TARGETED_HINT}`;
+}
+
+export const MODEL_SAVE_ACTION = 'Salva come portafoglio modello';
+export const MODEL_SAVED_TOAST = 'Portafoglio modello salvato';
+/** With an active plan and no model, the tile offers the plan's weights as the model. */
+export const MODEL_ACTION_USE_PLAN = 'Usa i pesi del piano';
+export const MODEL_SAVE_REPLACES_NOTE = 'Sostituisce il portafoglio modello attuale.';
+
+export const MODEL_EDIT_TITLE = 'Modifica il portafoglio modello';
+export const MODEL_EDIT_READING =
+  'Scrivi i pesi di mercato di ogni strumento: devono sommare 100%. Uno strumento da valutare entra a peso 0 e lo togli da qui.';
+export const MODEL_EDIT_ACTION_NORMALIZE = 'Riporta a 100%';
+export const MODEL_EDIT_ACTION_SAVE = 'Salva';
+export const MODEL_EDIT_ACTION_CANCEL = 'Annulla';
+export const MODEL_EDIT_ACTION_REMOVE = 'Togli';
+export const MODEL_EDIT_SUM_LABEL = 'Somma';
+
+/** The conflict sentence the Criteri del modello tile shows under the bars (first conflict of the saved snapshot). */
+export const OBJECTIVES_TILE_CALCULATED_ON = 'Calcolati sull’ultimo portafoglio modello salvato.';
+
+// ---------------------------------------------------------------------------
+// The base the model is computed on, and the model that went stale (2026-11-12)
+// ---------------------------------------------------------------------------
+
+/** Under the amount: the money to invest is on the accounts already, so the base does not grow. */
+export const IDEAL_COMPOSITION_AMOUNT_HELP = 'Presi dai tuoi conti: il totale non cambia.';
+
+export function describeAmountAboveLiquidity(liquidityEur: number): string {
+  return `Sui conti hai ${cachedFormatCurrencyEUR(liquidityEur, true)}: l'importo non può superarla.`;
+}
+
+export function describeNegativeFixed(labels: string[]): string {
+  const names = labels.length <= 1 ? (labels[0] ?? '') : `${labels.slice(0, -1).join(', ')} e ${labels[labels.length - 1]}`;
+  return labels.length > 1
+    ? `${names} valgono meno dei loro debiti: il modello non si calcola su una base con una quota negativa.`
+    : `${names} vale meno dei suoi debiti: il modello non si calcola su una base con una quota negativa.`;
+}
+
+export const NEGATIVE_LIQUIDITY_NOTE =
+  'La liquidità è sotto zero (i prestiti personali superano i conti): il modello la riporta almeno a zero.';
+
+const IDEAL_COMPOSITION_IDLE = 'Scegli la modalità e premi «Calcola»: niente si salva finché non lo chiedi.';
+
+/**
+ * The dialog's reading, which IS its status (The Modal-Is-A-Tile Rule): a negative fixed share first, then
+ * the run's outcome. `instrumentCount` counts the instrument positions, never «Liquidità» nor a property.
+ */
+export function describeIdealCompositionStatus(
+  run: Pick<OptimizerResult, 'status' | 'sale'> | null,
+  negativeFixedLabels: string[],
+  liquidityEur: number,
+  context: { instrumentCount: number; baseEur: number }
+): ModalReading {
+  if (negativeFixedLabels.length > 0) return { narrative: [{ text: describeNegativeFixed(negativeFixedLabels) }], tone: 'negative' };
+  if (run?.status === 'infeasible_bounds') return { narrative: [{ text: OPTIMIZER_STATUS_INFEASIBLE_BOUNDS }], tone: 'negative' };
+  if (run?.status === 'no_candidates') return { narrative: [{ text: OPTIMIZER_STATUS_NO_CANDIDATES }], tone: 'negative' };
+  const note: Narrative = liquidityEur < 0 ? [{ text: ` ${NEGATIVE_LIQUIDITY_NOTE}` }] : [];
+  if (!run) return { narrative: [{ text: IDEAL_COMPOSITION_IDLE }, ...note], tone: 'neutral' };
+  // «Con vendite mirate»: the total line IS the reading.
+  if (run.status === 'ok' && run.sale) return { narrative: [{ text: describeTargetedSaleTotal(run.sale) }, ...note], tone: 'neutral' };
+  const n = context.instrumentCount;
+  return {
+    narrative: [
+      { text: `Pesi proposti per ${n} ${n === 1 ? 'strumento' : 'strumenti'} su una base di ` },
+      { text: cachedFormatCurrencyEUR(context.baseEur, true), mono: true },
+      { text: '.' },
+      ...note,
+    ],
+    tone: 'neutral',
+  };
+}
+
+export const MODEL_STALE_ASIDE = 'superato';
+export const MODEL_STALE_READING = 'I target, i criteri o i ruoli sono cambiati dopo il salvataggio: ricalcola il modello.';
+
+/** The model tile's reading. `instrumentCount` null = no model saved. */
+export function describeModelTileReading(input: {
+  readFailed: boolean;
+  instrumentCount: number | null;
+  origin: 'manual' | 'optimizer';
+  updatedAt: Date;
+  snapshot?: { computedAt: Date; mode: OptimizerMode };
+  toBuyEur: number;
+  stale: boolean;
+}): Narrative {
+  if (input.readFailed) return [{ text: MODEL_TILE_READ_FAILURE_READING }];
+  if (input.instrumentCount === null) return [{ text: MODEL_TILE_EMPTY_READING }];
+  const n = input.instrumentCount;
+  const head: Narrative = [
+    ...(input.stale ? [{ text: `${MODEL_STALE_READING} ` }] : []),
+    { text: `${n} strument${n === 1 ? 'o' : 'i'}. ${describeModelOrigin(input.origin, input.updatedAt, input.snapshot)} ` },
+  ];
+  return input.toBuyEur >= 1
+    ? [
+        ...head,
+        { text: 'Per portare il portafoglio sul modello servono ' },
+        { text: cachedFormatCurrencyEUR(input.toBuyEur, true), mono: true },
+        { text: ' di acquisti.' },
+      ]
+    : [...head, { text: 'Il portafoglio è già sul modello.' }];
+}

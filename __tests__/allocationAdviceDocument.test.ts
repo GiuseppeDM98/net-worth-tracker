@@ -4,6 +4,8 @@
  * always an array.
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isRunStale, mapAllocationAdviceData, pageShowsReport, priorPlanOf, RUN_STALE_AFTER_MS, runStageStates, stageOfRunStage } from '@/lib/utils/allocationAdviceDocument';
 
@@ -95,11 +97,13 @@ describe('the run’s stage rows (2026-11-07)', () => {
       { stage: 'strategy', state: 'pending' },
       { stage: 'instruments', state: 'pending' },
       { stage: 'review', state: 'pending' },
+      { stage: 'plan', state: 'pending' },
     ]);
-    expect(states(runStageStates({ status: 'running', stage: 'instruments' }))).toEqual(['done', 'done', 'active', 'pending']);
-    expect(states(runStageStates({ status: 'failed', stage: 'strategy' }))).toEqual(['done', 'failed', 'pending', 'pending']);
-    expect(states(runStageStates({ status: 'failed', stage: 'review' }))).toEqual(['done', 'done', 'done', 'failed']);
-    expect(states(runStageStates({ status: 'done', stage: null }))).toEqual(['done', 'done', 'done', 'done']);
+    expect(states(runStageStates({ status: 'running', stage: 'instruments' }))).toEqual(['done', 'done', 'active', 'pending', 'pending']);
+    expect(states(runStageStates({ status: 'failed', stage: 'strategy' }))).toEqual(['done', 'failed', 'pending', 'pending', 'pending']);
+    expect(states(runStageStates({ status: 'failed', stage: 'review' }))).toEqual(['done', 'done', 'done', 'failed', 'pending']);
+    expect(states(runStageStates({ status: 'running', stage: 'plan' }))).toEqual(['done', 'done', 'done', 'done', 'active']);
+    expect(states(runStageStates({ status: 'done', stage: null }))).toEqual(['done', 'done', 'done', 'done', 'done']);
   });
 });
 
@@ -127,5 +131,52 @@ describe('the interview on the document (2026-11-08: null when absent)', () => {
     const document = mapAllocationAdviceData('u1', { status: 'ready', answers: {}, stage: 'review', createdAt: AT, updatedAt: AT });
     expect(document.interview).toBeNull();
     expect(document.revisionInterview).toBeNull();
+  });
+});
+
+// ── «Applica» creates the plan of accumulation (2026-11-20) ─────────────────────────────────
+describe('the hand-off is gone, and the Consulente route stays light', () => {
+  // The exports of the editor's hand-off are removed (2026-11-20).
+  it('allocationAdviceDocument no longer exports the hand-off', async () => {
+    const exported: Record<string, unknown> = await import('@/lib/utils/allocationAdviceDocument');
+    for (const name of ['applyHandoffOf', 'handoffProposalOf', 'CONSULENTE_HANDOFF_HREF']) expect(exported[name], name).toBeUndefined();
+    // @ts-expect-error — the type went with the link.
+    type Gone = import('@/lib/utils/allocationAdviceDocument').ApplyHandoff;
+    expect(true as unknown as Gone).toBe(true);
+  });
+
+  // Mutation that turns it red: a static import of '@/lib/utils/advicePlan' — or of the tick's sentences,
+  // '@/lib/utils/advicePlanNarrative' (2026-11-20) — in ConsulenteReport.tsx.
+  it('only ConsulentePlanTick imports the plan\'s builder and utils; the executor only through import(); the tick only through lazyComponent()', () => {
+    const dir = join(process.cwd(), 'components/allocation/consulente');
+    const sources = readdirSync(dir).filter((name) => name.endsWith('.tsx'));
+    expect(sources).toContain('ConsulentePlanTick.tsx');
+    const heavy = /@\/lib\/utils\/(advicePlan|advicePlanNarrative|accumulationPlanUtils|accumulationNarrative|operatingPlanFacts|operatingPlanSchema|allocationAdviceHandoff|weightOptimizer)['"]/;
+    const staticExecutor = /from\s+['"]@\/lib\/services\/advicePlanService['"]/;
+    const tickImport = /(?:import|from)\s*\(?\s*['"]\.\/ConsulentePlanTick['"]/g;
+    for (const name of sources) {
+      const text = readFileSync(join(dir, name), 'utf8');
+      expect(text, name).not.toMatch(staticExecutor);
+      if (name === 'ConsulentePlanTick.tsx') continue;
+      expect(text, name).not.toMatch(heavy);
+      // A type import is erased; any other import of the tick is the lazy one.
+      for (const match of text.matchAll(tickImport)) {
+        const line = text.slice(text.lastIndexOf('\n', match.index) + 1, text.indexOf('\n', match.index));
+        expect(/^import type /.test(line) || /lazyComponent\(\(\) => import\('\.\/ConsulentePlanTick'\)/.test(line), `${name}: ${line}`).toBe(true);
+      }
+    }
+  });
+});
+
+describe('the operating plan on the document (2026-11-19: null when absent)', () => {
+  const AT2 = new Date('2026-11-19T10:00:00.000Z');
+  // Mutation: a date left as the stored Timestamp.
+  it('maps operatingPlan with its three dates through toDate, and null when the field is absent', () => {
+    const stored = { status: 'ready', plan: null, error: null, model: 'opus', startedAt: { toDate: () => AT2 }, finishedAt: { toDate: () => AT2 }, reportFinishedAt: { toDate: () => AT } };
+    const document = mapAllocationAdviceData('u1', { status: 'ready', answers: {}, stage: 'review', createdAt: AT, updatedAt: AT, operatingPlan: stored });
+    expect(document.operatingPlan).toEqual({ status: 'ready', plan: null, error: null, model: 'opus', startedAt: AT2, finishedAt: AT2, reportFinishedAt: AT });
+    const running = mapAllocationAdviceData('u1', { status: 'ready', answers: {}, createdAt: AT, updatedAt: AT, operatingPlan: { ...stored, status: 'running', finishedAt: null } });
+    expect(running.operatingPlan?.finishedAt).toBeNull();
+    expect(mapAllocationAdviceData('u1', { status: 'ready', answers: {}, createdAt: AT, updatedAt: AT }).operatingPlan).toBeNull();
   });
 });

@@ -12,6 +12,9 @@ import { NarrativeText } from '@/components/ui/narrative-text';
 import { BudgetTrack } from '@/components/cashflow/budget/BudgetTrack';
 import { progressFillColor, progressTextClass } from '@/components/cashflow/budget/budgetProgressStyle';
 import { CenterStackBars } from './CenterStackBars';
+import { RankedRows } from '@/components/ui/ranked-rows';
+import { RING_LAYOUT_CLASS, RING_ROWS_CLASS, RingChart } from '@/components/ui/ring-chart';
+import type { RingSegment } from '@/lib/utils/ringChart';
 
 interface CostoTileProps {
   /** THE tile's anchor (`cdc-centro-costo`): open at every width, never a row (The First-Screen Rule). */
@@ -24,6 +27,8 @@ interface CostoTileProps {
   reading: Narrative;
   footer: Narrative;
   kpis: { month: KpiReading; year: KpiReading; average: KpiReading };
+  /** Fixed and one-off as ring parts (`costCenterRingSegments`); null keeps the footer sentence. */
+  ring: RingSegment[] | null;
   palette: string[];
   now: Date;
   className?: string;
@@ -52,9 +57,9 @@ function Kpi({ label, reading }: { label: string; reading: KpiReading }) {
  * Track, when a ceiling is set), three KPIs that name their window (month end, year end,
  * the monthly average), the trailing months in the center's colour (the element that
  * stretches when the tile spans two rows), and the fixed/one-off split as the footer.
- * Every figure is the `CenterSummary`'s; the tile computes nothing.
+ * Every figure is the `CenterSummary`'s; the tile only turns the ring's two parts into shares for their rows.
  */
-export function CostoTile({ id, summary, stack, stackCaption, aside, reading, footer, kpis, palette, now, className }: CostoTileProps) {
+export function CostoTile({ id, summary, stack, stackCaption, aside, reading, footer, kpis, ring, palette, now, className }: CostoTileProps) {
   const budget = summary.budget;
   const ratio = budget ? budget.spent / budget.amount : 0;
 
@@ -96,7 +101,37 @@ export function CostoTile({ id, summary, stack, stackCaption, aside, reading, fo
       <CenterStackBars stack={stack} palette={palette} legend={false} className="mt-2.5 flex-1" />
 
       <div className="mt-auto border-t border-border pt-3.5">
-        <NarrativeText segments={footer} className="text-[11px] text-muted-foreground" figureClassName="font-medium" />
+        {ring ? (
+          // The two rows say what the sentence says, with figures and shares (The Ring Rule, 2026-11-12).
+          <div className="@container">
+            <div className={RING_LAYOUT_CLASS}>
+              <RingChart
+                segments={ring}
+                centerValue={summary.total}
+                centerLabel="in tutto"
+                ariaLabel={`Costo di ${summary.center.name}, fisso e una tantum`}
+                size={96}
+              />
+              <div className={RING_ROWS_CLASS}>
+                <RankedRows
+                  bars={false}
+                  color={ring[0].color}
+                  ariaLabel="Fisso e una tantum"
+                  rows={ring.map((part) => ({
+                    key: part.key,
+                    label: part.label,
+                    caption: part.key === 'recurring' ? 'ricorrenti e rate' : undefined,
+                    amount: part.value,
+                    percentage: (part.value / summary.total) * 100,
+                    swatch: part.color,
+                  }))}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <NarrativeText segments={footer} className="text-[11px] text-muted-foreground" figureClassName="font-medium" />
+        )}
       </div>
     </Tile>
   );

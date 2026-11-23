@@ -81,3 +81,14 @@ export function resolveBondPrice(
 export function toBorsaItalianaQuote(eurPerUnit: number, basis: BondQuoteBasis): number {
   return (eurPerUnit * 100) / effectiveBondNominal(basis.nominalValue) / effectiveIndexationCoefficient(basis.indexationCoefficient);
 }
+
+/**
+ * A new bond priced at the Consulente's click (owner, 2026-11-20): euro per unit of 1 € of nominal — the quote ÷ 100,
+ * × the coefficient for a BTP€i (`indexed`); null without the quote, or a BTP€i without its coefficient.
+ */
+export function bondUnitPriceEur(quote: { pricePct: number | null; indexed: boolean; coefficient?: number }): number | null {
+  if (quote.pricePct === null || quote.pricePct <= 0) return null;
+  if (quote.indexed && !(quote.coefficient && quote.coefficient > 0)) return null;
+  const price = resolveBondPrice(quote.pricePct, { indexationCoefficient: quote.indexed ? quote.coefficient : undefined }, true);
+  return Math.round(price * 1e6) / 1e6;
+}

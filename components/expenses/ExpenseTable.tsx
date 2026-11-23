@@ -54,10 +54,12 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
 import { resolveOwnerLabel } from '@/lib/utils/movementsOwnerFilter';
-import { describeExpenseDeleteConsequence, EXPENSE_BUDGET_EXCLUSION_CHIP } from '@/lib/utils/dialogNarrative';
+import { describeExpenseDeleteConsequence, EXPENSE_BUDGET_EXCLUSION_CHIP, TRADE_FEE_ROW_DELETE_BLOCKED } from '@/lib/utils/dialogNarrative';
+import { isTradeFeeRow } from '@/lib/utils/tradeFeeExpense';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { EXPENSE_TYPE_BADGE_CLASS } from '@/lib/constants/expenseTypeColors';
 import { SeriesDeleteDialog, resolveSeriesDeleteMode, type SeriesDeleteRequest } from '@/components/expenses/SeriesDeleteDialog';
@@ -165,7 +167,7 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
         {singleType ? (
           <span className="text-xs text-muted-foreground">{EXPENSE_TYPE_LABELS[expense.type]}</span>
         ) : (
-          <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold', EXPENSE_TYPE_BADGE_CLASS[expense.type])}>
+          <span className={cn('inline-flex items-center border px-2.5 py-0.5 text-xs font-semibold', COSTUME_PILL_RADIUS_CLASS, EXPENSE_TYPE_BADGE_CLASS[expense.type])}>
             {EXPENSE_TYPE_LABELS[expense.type]}
           </span>
         )}
@@ -174,7 +176,7 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
         <div className="flex items-center gap-2">
           {CatIcon ? (
             <div
-              className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded"
+              className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-[var(--costume-control-chip-radius,0.25rem)]"
               style={{ backgroundColor: categoryMeta?.color ? `${categoryMeta.color}20` : 'var(--muted)' }}
             >
               <Suspense fallback={null}>
@@ -260,18 +262,21 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
             size="sm"
             onClick={isSeries ? () => onDelete(expense) : onArmedClick}
             onBlur={isSeries ? undefined : onBlur}
-            disabled={disabled}
+            // A trade's fee row leaves with its trade, in Patrimonio (2026-11-12).
+            disabled={disabled || isTradeFeeRow(expense)}
             aria-pressed={isSeries ? undefined : armed}
             aria-label={
               isDemo
                 ? 'Elimina — non disponibile in modalità demo'
-                : isSeries
-                  ? `Elimina ${rowName} o la sua serie`
-                  : armed
-                    ? `Premi di nuovo per eliminare ${rowName}`
-                    : `Elimina ${rowName}`
+                : isTradeFeeRow(expense)
+                  ? `Elimina ${rowName} — ${TRADE_FEE_ROW_DELETE_BLOCKED}`
+                  : isSeries
+                    ? `Elimina ${rowName} o la sua serie`
+                    : armed
+                      ? `Premi di nuovo per eliminare ${rowName}`
+                      : `Elimina ${rowName}`
             }
-            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+            title={isDemo ? 'Non disponibile in modalità demo' : isTradeFeeRow(expense) ? TRADE_FEE_ROW_DELETE_BLOCKED : undefined}
           >
             {armed ? <span className="px-1 text-xs">Conferma</span> : <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />}
           </Button>

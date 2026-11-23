@@ -98,6 +98,18 @@ describe('planRoleChanges', () => {
     expect(findAssetByName(list, '  ')).toBeNull();
   });
 
+  // An instrument created empty for a plan may share a name or a ticker with one held: the held one wins
+  // (2026-11-12). Seen red searching `assets` instead of the held-first pool.
+  it('prefers the held instrument when a name or a ticker names two', () => {
+    const empty = asset({ id: 'a-empty', name: 'Alfa', ticker: 'ALFA.MI', type: 'etf', assetClass: 'equity', quantity: 0, currentPrice: 10 });
+    const held = asset({ id: 'a-held', name: 'Alfa', ticker: 'ALFA.DE', type: 'etf', assetClass: 'equity', quantity: 10, currentPrice: 10 });
+    expect(findAssetByName([empty, held], 'Alfa')?.id).toBe('a-held');
+    expect(findAssetByName([empty, held], 'Alfa (ALFA)')?.id).toBe('a-held');
+    expect(findAssetByName([{ ...empty, name: 'Alfa Vuoto' }, { ...held, name: 'Alfa Pieno' }], 'ALFA')?.id).toBe('a-held');
+    // Two held, one ticker: still nobody.
+    expect(findAssetByName([{ ...held, name: 'Gamma' }, { ...held, id: 'a-held-2', name: 'Beta' }], 'ALFA')).toBeNull();
+  });
+
   it('matches the display alias the prompt prints in place of the ticker (2026-10-23)', () => {
     const etc = asset({ id: 'a-etc', name: 'ETC Metallo', ticker: 'XS0000000000.SG', displayTicker: 'METL', type: 'etf', assetClass: 'commodity', quantity: 10, currentPrice: 10 });
     const list = [...ASSETS, etc];

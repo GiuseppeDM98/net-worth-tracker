@@ -93,7 +93,7 @@ export function PageTabBar({ tabs, value, onValueChange, layoutId, ariaLabel, re
               // `min-h-11 min-w-11`: a thumb's target (the pill measured 38×32 until 2026-10-10,
               // DESIGN.md → Navigation); the icon-only tabs centre in the square.
               className={cn(
-                'relative flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[6px] px-3 py-1.5 text-sm font-medium whitespace-nowrap z-10',
+                'relative flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[var(--costume-control-chip-radius,6px)] px-3 py-1.5 text-sm font-medium whitespace-nowrap z-10',
                 isActive ? 'text-foreground' : 'text-muted-foreground',
               )}
             >
@@ -103,7 +103,7 @@ export function PageTabBar({ tabs, value, onValueChange, layoutId, ariaLabel, re
               {isActive && (
                 <motion.div
                   layoutId={`${layoutId}-pill`}
-                  className="absolute inset-0 -z-10 rounded-[6px] bg-background shadow-sm"
+                  className="absolute inset-0 -z-10 rounded-[var(--costume-control-chip-radius,6px)] bg-background shadow-sm"
                   transition={SPRING}
                 />
               )}

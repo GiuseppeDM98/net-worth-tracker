@@ -4,7 +4,7 @@
 
 ## Files
 
-- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`, `seedSplitE2E`, `seedHallOfFameE2E`, `seedInstrumentProfilesE2E` + `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp, `seedCensusE2E` — the first-screen census's account `census@example.com`, not a Playwright fixture: `npm run mobile:census` re-seeds it on the `perf:serve` build at :3200 — the port it shares with `perf:*`, never with :3100 — and writes `.mobile-census/` (gitignored), doc/guide/prima-schermata.md), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
+- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`, `seedSplitE2E`, `seedHallOfFameE2E`, `seedInstrumentProfilesE2E` + `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp, `seedCensusE2E` — the first-screen census's account `census@example.com`, not a Playwright fixture: `npm run mobile:census` re-seeds it on the `perf:serve` build at :3200 — the port it shares with `perf:*`, never with :3100 — and writes `.mobile-census/` (gitignored), doc/guide/prima-schermata.md), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked), the tour's windows `scripts/collaudo-finestre.mts` (visible, signed in, self-closing; WORKFLOW.md § 3 Obligation 5); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
 
 ## Proving a refactor changed no number
 - **Measure the noise floor BEFORE interpreting a diff**: anything downstream of `new Date()` drifts (cents at two
@@ -114,7 +114,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   answered 200 and moved the mtime, then a plain kill); on Windows, where only the wrapper
   can be killed, POST `http://127.0.0.1:4400/_admin/export` with `{"path": "<abs>/.emulator-data"}` (forward slashes —
   a backslashed path 400s; `/emulators/export` 404s), then terminate. **Verify the directory's mtime moved**: a 200 with
-  an unchanged mtime is the failure that looks like success — and a path that lost its slashes (`C:UsersGiuseppe…`,
+  an unchanged mtime is the failure that looks like success — and a path that lost its slashes (`C:UsersPaolo…`,
   2026-09-13) still answers 200 and writes a full export into a directory of THAT name in the repo root, which `git
   status` then shows as untracked: delete it. **Stopping a background task (`TaskStop`) kills only the npm wrapper**
   (2026-09-19): `next dev`, the `firebase` CLI and the Firestore `java` stay LISTENING on 3000/4000/4400/8080/9099 —
@@ -131,7 +131,8 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   **A port 3100 held by another app is REUSED by Playwright** (`reuseExistingServer` is on locally, the port fixed in
   `playwright.config.ts`; 2026-10-08 and 2026-10-12, the owner's other project on `next start --port 3100`): the suite
   would run against the wrong app. Before a suite, read the command line of :3100's PID; if it is not this repo's
-  `dev:e2e`, the owner stops it — the agent never does.
+  `dev:e2e`, the owner stops it — the agent never does. Since 2026-11-16 this holds for an AREA run only: the whole
+  run (`npm run test:e2e`, on the production build) never reuses a server and stops with «already used».
 - **After a long session the Firestore emulator can refuse every gRPC WRITE while REST still answers** (2026-09-29,
   Windows machine: two full suites, six partial runs, four benchmarks and a mirror seed in one evening, the JVM at
   2,5 GB): `global-setup` died on the Centri seed's `WriteBatch.commit` with `4 DEADLINE_EXCEEDED … after 60.0s`, the

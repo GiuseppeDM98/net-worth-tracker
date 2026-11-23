@@ -34,6 +34,7 @@ import { AsideToggle } from '@/components/ui/aside-toggle';
 import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { resolveHeroValueClass } from '@/components/dashboard/overview/PatrimonioTile';
 import { SettledCurrencyValue, SettledPercentageValue } from '@/components/fire-simulations/SettledValue';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 const VIEW_OPTIONS = [
   { value: 'scenari' as const, label: 'Scenari' },
@@ -83,14 +84,14 @@ export function TraguardoTile({ reading, target, caption, view, onViewChange, fa
             their own gap instead of a space that would never paint. */}
         {/* «verso FI» is a direction; past the target it is «del numero FIRE» — a reader at 252%
             has nothing left to go towards (2026-09-22). */}
-        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-[9px] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground">
           <SettledPercentageValue value={target.progressPct} />
           <span>{target.reached ? 'del numero FIRE' : 'verso FI'}</span>
         </span>
         <NarrativeText segments={caption} className="min-w-0 text-[11px] leading-[1.4] text-muted-foreground" figureClassName="font-medium" />
       </div>
       <div
-        className="mt-2.5 h-[3px] overflow-hidden rounded-full bg-muted"
+        className={cn('mt-2.5 h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}
         role="progressbar"
         aria-label="Progresso verso il numero FIRE"
         aria-valuemin={0}
@@ -99,7 +100,7 @@ export function TraguardoTile({ reading, target, caption, view, onViewChange, fa
         // The bar caps at 100; the text says the true share, so 252% is not announced as 100.
         aria-valuetext={`${formatPercentage(target.progressPct, 1)} del numero FIRE`}
       >
-        <div className={cn('h-full rounded-full', target.reached ? 'bg-positive' : 'bg-[var(--chart-1)]')} style={{ width: `${fill}%` }} />
+        <div className={cn('h-full', COSTUME_PILL_RADIUS_CLASS, target.reached ? 'bg-positive' : 'bg-[var(--chart-1)]')} style={{ width: `${fill}%` }} />
       </div>
 
       {/* The Recharts views stretch with the tile's free height: the SVG's 100% height resolves

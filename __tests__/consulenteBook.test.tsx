@@ -103,12 +103,11 @@ function makeDocument(overrides: Partial<AllocationAdviceDocument> = {}): Alloca
 
 const ROLES = { changes: [{ assetId: 'a1', assetName: 'Fondo fenicottero', from: 'tradable' as const, to: 'excluded' as const, reason: 'Un fondo pensione.' }], unmatched: [] };
 
-function Host({ document, initialPage = null, onPage }: { document: AllocationAdviceDocument; initialPage?: string | null; onPage?: (id: BookPageId) => void }) {
+function Host({ document, initialPage = null, onPage, applyState = { phase: 'idle' } }: { document: AllocationAdviceDocument; initialPage?: string | null; onPage?: (id: BookPageId) => void; applyState?: ApplyState }) {
   const [pageId, setPageId] = useState<string | null>(initialPage);
   const revision = useConsulenteRevision('u1');
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
   const rows = proposal ? buildProposalRows(proposal, { equity: 60, bonds: 40 }) : [];
-  const applyState: ApplyState = { phase: 'idle' };
   return (
     <ConsulenteBook
       ownerId="u1"
@@ -119,7 +118,7 @@ function Host({ document, initialPage = null, onPage }: { document: AllocationAd
       roles={ROLES}
       goalPlan={null}
       revision={revision}
-      apply={{ document, proposal, rows, roles: ROLES, goalPlan: null, goalsCount: 0, applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {}, applyGoals: true, setApplyGoals: () => {}, applyState }}
+      apply={{ document, proposal, rows, roles: ROLES, goalPlan: null, goalsCount: 0, applySummary: 'Scrive i target.', applyTargets: true, setApplyTargets: () => {}, applyRoles: true, setApplyRoles: () => {}, applyGoals: true, setApplyGoals: () => {}, applyState, planRow: null, planTick: null, planDone: null, planFailure: null, onCreatePlan: null, creatingPlan: false }}
       canApply
       onApply={() => {}}
       pageId={pageId}
@@ -273,6 +272,18 @@ describe('the pager and «Indice»', () => {
     expect(button('Rivedi il report').className).toContain('var(--ai-glow)');
   });
 
+  // A double click sends one run (2026-11-20): the button that started a write stays disabled while it runs.
+  // Mutation that turns it red: drop `writing` from the button's `disabled` in ConsulenteBook.tsx.
+  it('«Applica alle impostazioni» is disabled while the write runs', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <Host document={makeDocument()} initialPage="applica" applyState={{ phase: 'writing' }} />
+      </QueryClientProvider>
+    );
+    expect((button('Applica alle impostazioni') as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('a failed document: no «Applica alle impostazioni» on the last page, only «Rifai il percorso»', () => {
     renderBook(makeDocument({ status: 'failed', error: 'Il servizio AI non ha risposto.' }), 'applica');
     expect(within(card()).queryByRole('button', { name: 'Applica alle impostazioni' })).toBeNull();
@@ -296,6 +307,22 @@ describe('the pages keep their figures and their author', () => {
       const { unmount, container } = renderBook(makeDocument(), id);
       expect(card().hasAttribute('data-generated')).toBe(generated);
       expect(container.querySelectorAll('[data-generated]').length).toBe(generated ? 1 : 0);
+      unmount();
+    }
+  });
+
+  // 2026-11-23: the card is a tile to the costume (its cap or marks); a generated page keeps `data-generated`, so
+  // the AI border and glow stay its own. Seen red with `data-tile` dropped from the card.
+  it('the card is a tile on every page, a generated one both; the headline is a costume heading, the eyebrow’s figures wrapped', () => {
+    for (const id of ['allocazione', 'colloquio']) {
+      const { unmount } = renderBook(makeDocument(), id);
+      expect(card().hasAttribute('data-tile')).toBe(true);
+      expect(card().matches('[data-tile][data-generated]')).toBe(id === 'allocazione');
+      const eyebrow = card().querySelector('h2');
+      expect([...(eyebrow?.querySelectorAll('.costume-figure') ?? [])].map((span) => span.textContent)).toEqual(
+        eyebrow?.textContent?.match(/\d+/g) ?? ['no figure'],
+      );
+      expect(card().querySelector('p.costume-heading')?.getAttribute('tabindex')).toBe('-1');
       unmount();
     }
   });

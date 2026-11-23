@@ -206,7 +206,7 @@ export function AndamentoStoricoSection({
         aside={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span>
-              {typeView === 'percent' ? 'composizione' : 'andamento storico'} {granularityLabel} · fisse / variabili / debiti
+              {typeView === 'percent' ? 'composizione' : 'andamento storico'} {granularityLabel} · necessarie / non necessarie / debiti
             </span>
             <AsideToggle
               options={[

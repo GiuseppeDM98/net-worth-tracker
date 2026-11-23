@@ -7,7 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Centri di Costo**: Centri di Costo `components/cashflow/{CostCentersTab,CostCenterDetail,CostCenterDialog}.tsx` + `cost-centers/*`, pure `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils,costCenterColors,costCenterLinking}.ts` (`firstFreeColorKey`/`mapColorSlotUsage` = who wears which slot; `buildLinkCandidates`/`buildLinkPlan` = bulk link with its undo, UI `cost-centers/{LinkExpensesDialog,UnlinkSeriesDialog}.tsx`), `costCenterStyles.ts` (`CHART_TICK_STYLE`), specs `e2e/cashflow.centri{,.mobile}.spec.ts` on `npm run e2e:seed:centri`
-- **Suites to run after a change here — Centri di costo** (moved from `AGENTS.md` § Commands on 2026-09-30): `costCenterSummary`, `costCenterNarrative` (with `describeCostCenters{,Detail}ClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles, `budgetNarrative` for `dayRef`), `costCenterUtils`, `costCenterColors` · **Browser** `e2e/cashflow.centri{,.mobile}.spec.ts` (own account, `npm run e2e:seed:centri`)
+- **Suites to run after a change here — Centri di costo** (moved from `AGENTS.md` § Commands on 2026-09-30): `costCenterSummary`, `costCenterNarrative` (with `describeCostCenters{,Detail}ClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles, `budgetNarrative` for `dayRef`), `costCenterUtils`, `costCenterColors`, `costoTile`, `sottocategorieTile` · **Browser** `e2e/cashflow.centri{,.mobile}.spec.ts`, `e2e/ring-chart.centri{,.mobile}.spec.ts` (own account, `npm run e2e:seed:centri`)
 
 ## Centri di Costo (`CostCentersTab`, `CostCenterDetail`, `components/cashflow/cost-centers/*`, `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils,costCenterColors}.ts`)
 - **NO period axis, by decision (2026-08-23).** A project's cost is its whole cost: every figure is lifetime («in
@@ -24,10 +24,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   cost. A backdated row moves the total AND the crossing day retroactively.
 - **A CENTER HAS NO PACE (2026-09-18, the owner's call).** A window's end is what is booked plus what is already
   in the calendar — `ytd` + `yearScheduled`, `monthSpentToDate` + `monthScheduled` — and nothing else: no
-  `projectWindowEndWithScheduled`, no «al ritmo attuale», no «~» (it is a sum). Two reasons, both measured on
-  the owner's account: a recurring series is N REAL future rows, so its future already sits in `scheduled` and
-  pacing its booked part counted it twice (50 €/month of insurance read 779 € at year end instead of 600); and
-  a project spends in blocks — a 1650 € repair on the 17th read «~2942 € a fine mese». Budget KEEPS its pace (a
+  `projectWindowEndWithScheduled`, no «al ritmo attuale», no «~» (it is a sum). Two reasons, both
+  seen on real data (the figures here are illustrative): a recurring series is N REAL future rows, so its future already sits in `scheduled` and
+  pacing its booked part counted it twice (100 €/month of insurance read ~1300 € at year end instead of 1200); and
+  a project spends in blocks — a 1500 € repair on the 15th read «~3000 € a fine mese». Budget KEEPS its pace (a
   category of groceries is smooth; a project is not): do not «unify» the two. The cells are «Questo mese» /
   «Quest'anno» — the figure is what is BOOKED in the window, the caption adds the calendar («con il calendario
   chiude a 1100 €, 100 € oltre») or says «speso finora»; the verdict of a center without a ceiling adds «con
@@ -80,7 +80,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
     already paid would leave «con il calendario chiude a …» blind to the rest of the plan.
   - **An expense has ONE center, so linking a row of another center MOVES it**: those rows are hidden until
     «Mostra anche quelle di altri centri», carry «di {centro}», and the reading — which is the status line —
-    says «3 passano da Vacanze a Dacia Jogger» BEFORE the confirm. The summary runs over ALL the candidates, not
+    says «3 passano da Vacanze a Auto Tapiro» BEFORE the confirm. The summary runs over ALL the candidates, not
     the filtered ones: a tick survives a change of filter, and the confirm must never write more than it announced.
   - **Every write is a two-sided plan** (`buildLinkPlan` / `buildUnlinkPlan` → `writes` + `undo`, each row exactly
     as it was, its previous center included), so the outcome toast's «Annulla» is a second write, not a guess.
@@ -141,11 +141,29 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   a center sits in Centri AND in Dormienti when idle, so a spec scopes the locator to the tile
   (`getByRole('region', { name: 'Centri', exact: true })`) or `.first()` trips strict mode.
 
+- **«Costo»'s footer is a ring of fixed and one-off** (2026-11-15; The Ring Rule, 2026-11-12): `costCenterRingSegments(summary)`
+  in `costCenterSummary.ts` — «Fisso» `--chart-7` (caption «ricorrenti e rate») and «Una tantum» `--chart-3`
+  (`COST_SPLIT_RING_COLORS`), the two parts of the booked total, `null` when either is zero. With it the footer is the ring
+  (size 96, centre `summary.total` «in tutto», the hero's figure again — the owner's «total in the centre» wins) and two
+  legend rows, which replace the sentence (they say it with figures and shares; the tile only divides each part by
+  `summary.total` for its row); without it, today's sentence («Tutto una tantum: …»). A centre wearing slot 3 or 7 shares a
+  hue with the split on its own detail (declared). Tests `costCenterSummary.test.ts` (K1), `__tests__/costoTile.test.tsx`;
+  browser `e2e/ring-chart.centri{,.mobile}.spec.ts` («Ornitorinco» «270 €»; «Fenicottero» the sentence, skipped on 31
+  December, when its instalment is booked).
+- **«Per sottocategoria» is a ring of the subcategories still counted** (2026-11-15, added by the owner on the mirror tour;
+  The Ring Rule): `subCategoryRingSegments(slices, excludedKeys)` in `costCenterSummary.ts` — the counted rows in the tile's
+  order, `RING_CATEGORY_COLORS` by their rank among them, an excluded row NOT a part (the ring is the net total the lens
+  measures), `null` with fewer than two counted. With it the ring stands beside the toggle rows, `netTotal` in its hole —
+  «in tutto» while nothing is excluded, «al netto» after — and each counted row is led by its arc's swatch (`ringSwatchAt`)
+  in place of its bar; an excluded row keeps an empty swatch box, so the names keep one left edge. The toggle, «Reimposta»,
+  the reading and the footer are unchanged. Tests `costCenterSummary.test.ts` (K3), `__tests__/sottocategorieTile.test.tsx`
+  (K4); browser `e2e/ring-chart.centri.spec.ts` («Airone», planted and removed by the test, «300 €»).
+
 ## Composizione mobile
 
 Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log -- doc/mobile/`; the primitives in doc/guide/hall-of-fame.md § Composizione mobile): the list and the detail are each one sequence, the desktop DOM (the `order-*` of both went that day — DESIGN.md → The First-Screen Rule). The rules are DESIGN.md's (§ 5 → Small-Screen Composition: The First-Screen, Lifted-Figure, Closed-Row and Binding-Clause Rules); here is what this page does with them. Not reached, and declared: the spec's «≤ 1,5 screens» at 390 — the fixture measures 1,55 (doc/guide/prima-schermata-misure.md § Il fixture).
 
-- **THE tile**: Totale (`cdc-totale`) on the list, Costo (`cdc-centro-costo`) on the detail — open at every width (DESIGN.md → The First-Screen Rule), their charts as they are.
+- **THE tile**: Totale (`cdc-totale`) on the list, Costo (`cdc-centro-costo`) on the detail — open at every width (DESIGN.md → The First-Screen Rule), their charts as they are. Costo's footer is a 96px ring when both fixed and one-off were spent (2026-11-15, § Centri di Costo): at the bottom of THE tile, so the first screen of a detail at 390 changes only below the KPIs and the bars.
 - **The strip**: none (the owner's choice, 2026-10-10): Totale's three figures each name their own window and none is the verdict's; the verdict is whole, no cut, no axis.
 - **Lifted blocks**: none — with no strip no cell repeats a figure, so neither Totale nor Costo takes `liftedFigures`.
 - **The rows and their aside, in DOM order** (`COST_CENTERS_SECTIONS`, `DETAIL_SECTIONS` / `DETAIL_SECTIONS_WITHOUT_CATEGORIES`, module-level; ids `COST_CENTER_SECTION_IDS`, the words in `lib/utils/costCenterNarrative.ts`): the list's `cdc-centri` («in ordine di costo») and `cdc-dormienti` («senza spese da tempo»); the detail's `cdc-centro-categorie` («in totale», not rendered when one category is the hero said again), `cdc-centro-ciclo` (its own aside, «attivo» / «fermo» / «archiviato» from `describeCicloAside`, open or closed), `cdc-centro-sottocategorie` («in totale», or `describeSottocategorieClosedAside`: «2 escluse» while a lens is set), `cdc-centro-movimenti` (`describeMovimentiAside`, the count). «Apri Fenicottero» lives inside the Centri row: a spec opens the row first.
@@ -167,4 +185,6 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 ## Per-page blind spots
 
 - **The detail's rows are remembered for every centre at once** (2026-10-12): a Movimenti collegati opened on one centre is open on the next, because the memory is the page's (`cost-centers-center`), not the centre's — the list keeps its own.
-- **Centri di Costo**: **habitual spending typed by hand (fuel) is not foreseen** — a window's end is booked + calendar, by decision; two centers saved with the same colour before 2026-09-18 stay the same colour until one is edited (no backfill); «Per categoria» is not rendered for a center with one category (it would repeat the hero) and Ciclo di vita takes its columns; the expense form lists an archived center only on the expense already linked to it; «Collega spese…» is disabled on an archived center and offers no refund (a positive amount — see above) and no income; its list is the account's WHOLE expense history read once per open (`useExpenses`, ~1500 rows on the real account, 50 shown at a time); «Annulla» lives as long as its toast; the list's «Media 12 mesi» and the detail's «Al mese» are two magnitudes on purpose (trailing year / 12 vs whole cost / months since the first expense); an annual ceiling has no crossing day (`crossedOn` is monthly only); «Al mese» divides by the calendar months since the first expense (an idle project reads as a lower monthly cost, by design); «in totale» counts rows dated up to today (a future row is «in calendario»); the subcategory lens and the movements window (25 + «Mostra altre») are per-center, session-only state.
+- **Centri di Costo**: **habitual spending typed by hand (fuel) is not foreseen** — a window's end is booked + calendar, by decision; two centers saved with the same colour before 2026-09-18 stay the same colour until one is edited (no backfill); «Per categoria» is not rendered for a center with one category (it would repeat the hero) and Ciclo di vita takes its columns; the expense form lists an archived center only on the expense already linked to it; «Collega spese…» is disabled on an archived center and offers no refund (a positive amount — see above) and no income; its list is the account's WHOLE expense history read once per open (`useExpenses`, the whole history, 50 shown at a time); «Annulla» lives as long as its toast; the list's «Media 12 mesi» and the detail's «Al mese» are two magnitudes on purpose (trailing year / 12 vs whole cost / months since the first expense); an annual ceiling has no crossing day (`crossedOn` is monthly only); «Al mese» divides by the calendar months since the first expense (an idle project reads as a lower monthly cost, by design); «in totale» counts rows dated up to today (a future row is «in calendario»); the subcategory lens and the movements window (25 + «Mostra altre») are per-center, session-only state.
+- **«Costo»'s footer names no largest part** (2026-11-15, declared, no heir): the ring shows whether the fixed or the
+  one-off spending weighs more; the readings stay as they were.

@@ -14,10 +14,10 @@
  * pass-through cases green.
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { THEME_MODES, themeBlockBody } from './themeBlocks';
 import { CHART_COLORS } from '@/lib/constants/colors';
+import { SANKEY_COSTUME_TOKEN } from '@/lib/constants/sankeyCostumeColors';
 import { SPENDING_ROLE_TOKEN } from '@/lib/constants/spendingRoleColors';
 import { clampActionLightness } from '@/lib/utils/actionColor';
 import { cssColorToOklch, oklchToHex, parseToOklch, type Triple } from '@/lib/utils/colorParse';
@@ -93,6 +93,16 @@ describe('readThemePalette — the chart slots as the browser serves them', () =
     expect(cssColorToOklch(unmodelled)).toBeNull();
     expect(resolveChartPalette(servedStyle({ ...SERVED_LIGHT, '--chart-2': unmodelled }), false)[1]).toBe(unmodelled);
   });
+
+  it('reads an oklab() colour, the form a colour mixed with alpha is served in, as the same OKLCH', () => {
+    // oklch(0.6 0.1 135) written as its a/b pair, alpha and a negative axis included (2026-11-22, the
+    // e2e/themeNeutral.ts colour comparison: a sidebar label at 60 % is served as oklab()).
+    const [l, c, h] = cssColorToOklch('oklab(0.6 -0.0707107 0.0707107 / 0.6)')!;
+    expect(l).toBeCloseTo(0.6, 6);
+    expect(c).toBeCloseTo(0.1, 6);
+    expect(h).toBeCloseTo(135, 4);
+    expect(cssColorToOklch('oklab(60% 0 0)')![0]).toBeCloseTo(0.6, 6);
+  });
 });
 
 describe('readThemePalette — the action colours and the Sankey hexes from the same read', () => {
@@ -117,7 +127,11 @@ describe('readThemePalette — the action colours and the Sankey hexes from the 
       '--role-deficit': 'lab(52% 68 52)',
     };
     const { tokenHex } = readThemePalette(servedStyle(served), false);
-    expect(THEME_HEX_TOKENS).toEqual(Object.values(SPENDING_ROLE_TOKEN));
+    // The role aliases, then the ten tokens a costumed Sankey paints with (2026-11-23).
+    expect(THEME_HEX_TOKENS).toEqual([...Object.values(SPENDING_ROLE_TOKEN), ...Object.values(SANKEY_COSTUME_TOKEN)]);
+    expect(Object.values(SANKEY_COSTUME_TOKEN)).toEqual([
+      '--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5', '--chart-6', '--chart-7', '--chart-8', '--chart-9', '--positive',
+    ]);
     for (const [token, value] of Object.entries(served)) expect(tokenHex[token]).toBe(colorToHex(value));
   });
 
@@ -127,18 +141,14 @@ describe('readThemePalette — the action colours and the Sankey hexes from the 
   });
 });
 
-// ─── The twelve theme blocks: the live filter changes no palette shipped today ─────────────────
+// ─── Every theme block: the live filter changes no palette shipped today ─────────────────
 
-const GLOBALS = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
-const THEMES = [null, 'retro-arcade', 'cyberpunk', 'solar-dusk', 'elegant-luxury', 'midnight-bloom'] as const;
-
-/** The `--chart-1..9` of one block as authored. */
+/** The `--chart-1..9` of one block as authored (the headers come from the registry: `./themeBlocks`). */
 function authoredSlots(selector: string): Triple[] {
-  const start = GLOBALS.indexOf(`\n${selector} {`);
-  expect(start, `block "${selector}"`).toBeGreaterThan(-1);
-  const block = GLOBALS.slice(start, GLOBALS.indexOf('\n}', start));
+  const block = themeBlockBody(selector);
+  expect(block, `block "${selector}"`).not.toBeNull();
   return Array.from({ length: 9 }, (_, i) => {
-    const match = block.match(new RegExp(`--chart-${i + 1}:\\s*(oklch\\([^)]*\\))`));
+    const match = block!.match(new RegExp(`--chart-${i + 1}:\\s*(oklch\\([^)]*\\))`));
     expect(match, `--chart-${i + 1} in "${selector}"`).not.toBeNull();
     return parseToOklch(match![1])!;
   });
@@ -157,10 +167,7 @@ function servedForm(oklch: Triple): string {
 }
 
 describe.each(
-  THEMES.flatMap((theme) => [
-    { label: `${theme ?? 'default'} · light`, selector: theme ? `[data-theme="${theme}"]` : ':root', isDark: false },
-    { label: `${theme ?? 'default'} · dark`, selector: theme ? `.dark[data-theme="${theme}"]` : '.dark', isDark: true },
-  ]),
+  THEME_MODES.map(({ label, header, mode }) => ({ label, selector: header, isDark: mode === 'dark' })),
 )('the live luminance filter on $label', ({ selector, isDark }) => {
   it('keeps every served slot: no colour of the shipped palettes falls back to the static one', () => {
     const served = Object.fromEntries(authoredSlots(selector).map((oklch, i) => [`--chart-${i + 1}`, servedForm(oklch)]));

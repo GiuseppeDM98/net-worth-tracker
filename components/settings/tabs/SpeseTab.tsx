@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * Impostazioni › Spese — in the left column the two settings the expense FORM reads (default
- * accounts, the transfer fee's category) and the «Ruoli 50/30/20» switch, then the CSV import
- * and the category inventory.
+ * Impostazioni › Spese — in the left column the settings the expense FORM reads (default accounts,
+ * the transfer fee's category), the account a plan of accumulation draws from by default («Conto per
+ * gli investimenti», beside the two defaults) and the «Ruoli 50/30/20» switch, then the CSV import and
+ * the category inventory.
  *
  * A controlled view of the `spese` slice: `slice` in, `onChange(patch)` out. The categories are
  * NOT the slice's: a category is written where it is edited (the dialogs, the move and the delete
@@ -211,7 +212,7 @@ export function SpeseTab({
   onExpenseImported,
 }: SpeseTabProps) {
   const queryClient = useQueryClient();
-  const { defaultDebitCashAssetId, defaultCreditCashAssetId, transferFeeCategoryId, transferFeeSubCategoryId, spendingRolesEnabled } = slice;
+  const { defaultDebitCashAssetId, defaultCreditCashAssetId, investmentCashAssetId, transferFeeCategoryId, transferFeeSubCategoryId, spendingRolesEnabled } = slice;
 
   // Dialog state — ephemeral, the view's own.
   const [categoryAnnouncement, setCategoryAnnouncement] = useState('');
@@ -230,6 +231,7 @@ export function SpeseTab({
   const getCategoriesByType = (type: ExpenseType): ExpenseCategory[] => expenseCategories.filter((cat) => cat.type === type);
   const debitAccount = cashAssets.find((a) => a.id === defaultDebitCashAssetId);
   const creditAccount = cashAssets.find((a) => a.id === defaultCreditCashAssetId);
+  const investmentAccount = cashAssets.find((a) => a.id === investmentCashAssetId);
   const categoryCounts = summarizeExpenseCategories(expenseCategories);
   const categoryClassification = summarizeCategoryClassification(expenseCategories);
   const transferFeeCategory = expenseCategories.find((cat) => cat.id === transferFeeCategoryId);
@@ -432,7 +434,7 @@ export function SpeseTab({
           desktop the wrapper dissolves (`contents`) and each tile is a grid cell; from desktop
           they stack at their natural height beside the taller import tile. */}
       <div className="contents desktop:col-span-5 desktop:flex desktop:flex-col desktop:gap-3">
-      {/* Conti di default (moved here from Preferenze: they act in the expense dialog) */}
+      {/* Conti di default (moved here from Preferenze): debit and credit act in the expense dialog, the investment account (2026-11-19) in a new plan of accumulation */}
       <div className={TILE_CELL_CLASS}>
         {accountsState === 'failed' ? (
           <ErrorNotice
@@ -447,7 +449,7 @@ export function SpeseTab({
         ) : (
         <Tile
           eyebrow="Conti di default"
-          reading={describeDefaultAccounts({ debitName: debitAccount?.name, creditName: creditAccount?.name })}
+          reading={describeDefaultAccounts({ debitName: debitAccount?.name, creditName: creditAccount?.name, investmentName: investmentAccount?.name })}
         >
           {accountsState === 'loading' ? (
             <p className="mt-3 text-[13px] text-muted-foreground">Caricamento dei conti…</p>
@@ -494,11 +496,30 @@ export function SpeseTab({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium">Conto per gli investimenti</p>
+                  <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">Da qui partono le rate del piano di accumulo</p>
+                </div>
+                <Select value={investmentCashAssetId} onValueChange={(value) => onChange({ investmentCashAssetId: value })}>
+                  <SelectTrigger className={cn('w-56', INTERACTIVE_CONTROL_CLASS)} aria-label="Conto per gli investimenti">
+                    <SelectValue placeholder="Nessun default" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_SELECTION}>Nessun default</SelectItem>
+                    {cashAssets.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} ({a.currency})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
             </div>
           )}
           <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
-            Proposti nel modulo di spese ed entrate; solo conti veri, non asset di classe liquidità.
+            Prelievo e accredito sono proposti nel modulo di spese ed entrate; il conto per gli investimenti nel piano di accumulo. Solo conti veri, non asset di classe liquidità.
           </div>
         </Tile>
         )}

@@ -89,7 +89,7 @@ function ThreadRow({ thread, isActive, isDeleting, isStreaming, onSelect, onDele
 
   return (
     // The `li` stays square: `divide-y` draws its hairline on it, and a radius there bends the
-    // ends of the rule (seen on the owner's six threads, 2026-09-18). The wash is the inner box's.
+    // ends of the rule (seen on a lived thread list, 2026-09-18). The wash is the inner box's.
     <li className="py-1">
       <div
         className={cn(

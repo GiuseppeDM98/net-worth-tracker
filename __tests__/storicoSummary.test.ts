@@ -292,10 +292,10 @@ describe('projectNextDoubling', () => {
 
 describe('driver helpers', () => {
   const rows = [
-    { year: '2023', netSavings: 9000, market: 3000, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 12000, growthPct: 12, latest: { year: 2023, month: 12 } },
-    { year: '2024', netSavings: 12000, market: -1000, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 11000, growthPct: 9.8, latest: { year: 2024, month: 12 } },
-    { year: '2025', netSavings: 22800, market: 6900, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 29700, growthPct: 24.1, latest: { year: 2025, month: 12 } },
-    { year: '2026', netSavings: 14100, market: 7300, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 21400, growthPct: 14, latest: { year: 2026, month: 8 } },
+    { year: '2023', netSavings: 9000, market: 3000, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, isMarketMeasured: true, netWorthGrowth: 12000, growthPct: 12, latest: { year: 2023, month: 12 } },
+    { year: '2024', netSavings: 12000, market: -1000, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, isMarketMeasured: true, netWorthGrowth: 11000, growthPct: 9.8, latest: { year: 2024, month: 12 } },
+    { year: '2025', netSavings: 22800, market: 6900, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, isMarketMeasured: true, netWorthGrowth: 29700, growthPct: 24.1, latest: { year: 2025, month: 12 } },
+    { year: '2026', netSavings: 14100, market: 7300, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, otherPension: 0, otherHoldings: 0, otherAccounts: 0, isMarketMeasured: true, netWorthGrowth: 21400, growthPct: 14, latest: { year: 2026, month: 8 } },
   ];
 
   it('should split a year between its drivers as shares that sum to 100, or refuse a mixed-sign split', () => {
@@ -456,6 +456,9 @@ describe('selectStoricoStrip', () => {
     debtRepaid: 1200,
     pensionContributions: 2500,
     other: 936,
+    otherPension: 0,
+    otherHoldings: 0,
+    otherAccounts: 936,
     isMarketMeasured: true,
     growthPct: 12.4,
     baseline: { year: 2025, month: 12 },
@@ -497,7 +500,7 @@ describe('selectStoricoStrip', () => {
   });
 
   it('should print a Driver year with no savings as the ledger does, «0 €»', () => {
-    const zero = { ...ROW, netSavings: 0.3, other: ROW.other - 0.3 };
+    const zero = { ...ROW, netSavings: 0.3, other: ROW.other - 0.3, otherAccounts: ROW.otherAccounts - 0.3 };
     const [, savings] = strip({ featured: { row: zero, isRunning: false }, ledger: buildDriverLedger(zero), window: null });
     expect(savings.label).toBe('Risparmio 2026');
     expect(cellText(savings)).toBe('0 €');

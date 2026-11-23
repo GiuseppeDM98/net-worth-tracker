@@ -53,9 +53,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   hex WinAnsi (`<53746f72>` = «Stor») inside kerned `TJ` arrays that split words, and the metric labels are printed
   uppercase: compare space-free and case-insensitively. **And render with the REAL data path too** (2026-09-07): a
   section rendered from hand-typed metrics passed every word while the owner's own export still ran
-  `preparePerformanceData` without the ledger (26,05% against the page's 27,08%) — call `fetchPDFData` through the
+  `preparePerformanceData` without the ledger (a return about a point off the page's) — call `fetchPDFData` through the
   client SDK on the emulators (a `globalThis.fetch` shim prefixes the tour server's origin to the relative yield
   routes) and compare its metrics with `getAllPerformanceData`'s.
+- **The note under «Risparmio netto»** is `describeNetSavingsNote(income, spending)` (`pdfNarrative.ts`, 2026-11-12):
+  «28,2% di quanto è entrato», «−30,0% …» with the typographic minus, no note without income or below the savings
+  floor (`meaningfulSavingsRate`) — the euro figure above it says it. Pinned by `__tests__/pdfNarrative.test.ts`.
 
 ## Periodic Emails (`lib/server/monthlyEmailService.ts`, `weeklyBudgetEmailService.ts`)
 
@@ -125,9 +128,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The email's «mercato» nets out the tax on the period's sales** (2026-09-11): `marketEffectOf` = `Δ − risparmio
   netto + tasse stimate` (`MonthlyEmailData.periodSales`, read from the ledger by `summarizePeriodSales` over the
   email's own window, `null` without a sale, never blocking). Why: the broker's withholding leaves the account with no
-  cashflow row, so inside the residual a 4.089 € tax read as a market loss on the real account (settembre 2026). The
+  cashflow row, so inside the residual a 4.000 € tax read as a market loss. The
   verdict then follows the Panoramica's `resolveDeclineCause` («il mercato ha pesato, le tasse sulle vendite di più»),
-  the split has THREE parts that still sum to Δ («… viene dal mercato, +988 € da quanto hai risparmiato e −4089 €
+  the split has THREE parts that still sum to Δ («… viene dal mercato, +1000 € da quanto hai risparmiato e −4000 €
   dalle tasse sulle vendite»), the sale is told by `describeSales` and the Patrimonio tile's footer names the tax
   «circa». The AI prompt's market block is unchanged (it still prints `Δ − risparmio`): a known asymmetry, and a
   tax the owner ALSO records as a cashflow expense would be counted twice in the split (doc/guide/panoramica.md § Per-page blind spots).
@@ -142,9 +145,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   still `Δ − risparmio` (the asymmetry above). Pinned by `__tests__/{emailNarrative,monthlyEmailService}.test.ts`.
 - **Every email cap is stated in the prompt**: `MAX_CATEGORY_DELTAS` (12) is named in the section header together with
   how many categories were left out. The selection is by SPEND, not by size of variation — describe it as it is.
+- **The periodic comment's contract names the spending types as the app prints them** (2026-11-12):
+  «Spese Necessarie/Spese Non Necessarie/Debiti» (`buildEmailPeriodicFormatContract`, `lib/server/assistant/prompts.ts`), never
+  the labels retired on 2026-10-20.
 - **`max_tokens` scales with the period** (6000/8000/8000/10000), and the format contract names the period in its
   length line instead of a word count. Web search is offered only when `includeMacroContext` allows it, like the
   assistant's structured analyses.
+- **A deficit without a baseline reads as the Cashflow tile reads it** (2026-11-12): the period verdict's fallback
+  (no snapshot before the period) says «Sono usciti 600 € più di quanto è entrato.», never «Hai messo da parte −600 €, il
+  −30,0%»; a surplus keeps its share, from `meaningfulSavingsRate`, as `describeCashflowTile` does. Pinned by
+  `__tests__/emailNarrative.test.ts`. Both «Hai messo da parte» sentences take the article from the figure as printed
+  («l'81,0%», The Comma Rule, 2026-11-14), and so does the income tile's ranked category («Stipendio copre l'86,1%»,
+  the share passed to the lead-in as a number).
 
 ## Verifying a surface with no DOM
 

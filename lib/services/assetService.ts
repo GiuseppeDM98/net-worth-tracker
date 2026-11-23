@@ -17,7 +17,7 @@ import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firest
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { roundToCents } from '@/lib/utils/cents';
 import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
-import { costBasisPerUnitEur, unitPriceEur } from '@/lib/utils/costBasisEur';
+import { costBasisPerUnitEur, fiscalCostPerUnitEur, unitPriceEur } from '@/lib/utils/costBasisEur';
 import { CHECKING_ACCOUNT_STAMP_DUTY_EUR, CHECKING_ACCOUNT_STAMP_DUTY_THRESHOLD_EUR } from '@/lib/constants/stampDuty';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { AllocationRole, Asset, AssetFormData, BondDetails, isLoanAsset } from '@/types/assets';
@@ -763,8 +763,8 @@ export function calculateIlliquidFIRENetWorth(assets: Asset[], includePrimaryRes
 }
 
 /**
- * One position's unrealized gain in EUR: the value (EUR) minus quantity × the EUR PMC, purchase
- * fees included (`costBasisPerUnitEur`) — the same subtraction `computeUnrealizedGain`
+ * One position's unrealized gain in EUR: the value (EUR) minus quantity × the fee-free EUR PMC
+ * (`costBasisPerUnitEur`) — the same subtraction `computeUnrealizedGain`
  * (patrimonioSummary) makes for the table, so the overview's total, the estimated taxes and the
  * PDF print the figure the Patrimonio page shows (pinned by __tests__/assetService.test.ts).
  *
@@ -782,11 +782,24 @@ export function calculateUnrealizedGains(asset: Asset): number {
 }
 
 /**
- * Calculate estimated taxes on unrealized gains for a single asset
+ * The gain a tax is estimated on: the value minus quantity × the FISCAL cost, purchase fees
+ * included (`fiscalCostPerUnitEur`, owner 2026-11-12), with the guards of
+ * `calculateUnrealizedGains` — which stays on the PMC, the figure the table prints.
+ */
+function fiscalUnrealizedGain(asset: Asset): number {
+  if (asset.quantity <= 0 || asset.type === 'pensionFund') return 0;
+  if (asset.type === 'cash' && asset.assetClass === 'cash') return 0;
+  const basisPerUnit = fiscalCostPerUnitEur(asset);
+  if (basisPerUnit === undefined) return 0;
+  return calculateAssetValue(asset) - asset.quantity * basisPerUnit;
+}
+
+/**
+ * Calculate estimated taxes on unrealized gains for a single asset, on the fiscal cost.
  * Returns 0 if taxRate is not set or gains are negative/zero
  */
 function calculateEstimatedTaxes(asset: Asset): number {
-  const gains = calculateUnrealizedGains(asset);
+  const gains = fiscalUnrealizedGain(asset);
 
   if (gains <= 0 || !asset.taxRate || asset.taxRate <= 0) {
     return 0;

@@ -18,7 +18,7 @@ Moved here from `AGENTS.md` § Caching on 2026-09-30.
 
 ### What is persisted, and what is out by design
 
-- ONLY the keys of `PERSISTED_QUERY_PREFIXES` — the twelve owner collections read through the hooks of
+- ONLY the keys of `PERSISTED_QUERY_PREFIXES` — the thirteen owner collections read through the hooks of
   AGENTS.md § React Query and Derived State, plus the ledger's meta document Patrimonio gates its trades on — only
   successful reads, and NEVER the demo uid (`isDemoUid`, `lib/utils/demoAccount.ts`, the ONE rule `useDemoMode` reads
   too); out by design: the assistant, benchmarks/FX/ECB, the Esposizione's profiles, the budget history. Since
@@ -41,7 +41,8 @@ Moved here from `AGENTS.md` § Caching on 2026-09-30.
 - **Bump `PERSIST_CACHE_VERSION` (the `buster`) on any change that RENAMES, REMOVES or retypes a field of a persisted
   payload** — everything under `PERSISTED_QUERY_PREFIXES`: an asset (the mortgage instalments under its key too), an
   expense, a snapshot, a category, the settings document, a contribution, a trade, the ledger's meta document, a cost
-  centre, the Hall of Fame rankings, a goal, a receipt, the overview, Rendimenti's `PerformanceData` and its yields —
+  centre, the Hall of Fame rankings, a goal, a receipt, an accumulation plan (`accumulation-plans`, persisted since 2026-11-17 so the Piano's note is on a
+  warm load's first paint), the overview, Rendimenti's `PerformanceData` and its yields —
   or a client restores the old shape and reads it
   as truth until the refetch lands; a new optional field whose absence means the default does not need it.
 
@@ -84,8 +85,8 @@ Three traps, each paid for on 2026-09-29:
 ## Per-page blind spots
 
 - **Every window of the expenses is a payload of its own in the ONE record** (2026-09-30): after a tour of
-  Tracciamento, Budget, Divisione, FIRE and Storico on the owner's mirror the record held six `expenses.*` keys, 4407
-  rows and 2,2 MB (the whole collection once, 1547 rows and 0,8 MB, before the windows), and the auth wait that
+  Tracciamento, Budget, Divisione, FIRE and Storico on the owner's mirror the record held six `expenses.*` keys and
+  close to three times the rows and the megabytes of the whole collection held once before the windows, and the auth wait that
   contains the restore rose on every page — measured on the Panoramica. The rows are the same rows several times:
   a window is a slice of the collection, not new data. Counting the keys of that record after a tour is part of
   giving a page a window (`doc/guide/cashflow.md § Expenses by window`); merging the slices into one list is not

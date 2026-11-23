@@ -10,6 +10,10 @@
  * expense form offers the field on a debt row and not on a transfer, and the sale's series screen
  * pre-ticks the house's series ONLY — the base seed's own series (a debt, a policy or not) start unticked.
  *
+ * A mortgage above what is left to pay (owner, 2026-11-12): a second house, a 20.000 deposit, then a rogito
+ * at 200.000 with a 190.000 mortgage — the bank pays the seller 180.000 and credits the 10.000 to the account,
+ * in one transaction and with no row (the property worth the price, the loan the principal, no income).
+ *
  * The arithmetic is Vitest's (`realEstateOperationPlan.test.ts`); what only a browser proves here is
  * that the screens walk, that «Conferma» writes what the summary said, and that the expense form's two
  * pickers offer a property on one end only.
@@ -27,6 +31,8 @@ process.env.GCLOUD_PROJECT = 'demo-net-worth';
 const UID = 'test-user-1';
 const ACCOUNT_ID = 'seed-cash';
 const HOUSE_NAME = 'Casa Fenicottero';
+/** The second house: a mortgage above what is left to pay (its rows' notes contain `HOUSE_NAME`, so `ownRows` collects them). */
+const HOUSE_2_NAME = 'Casa Fenicottero 2';
 const HOME_CATEGORY_ID = 'e2e-re-home';
 const MORTGAGE_CATEGORY_ID = 'e2e-re-mortgage';
 const DRAFT_KEY = `real-estate-operation-draft:${UID}`;
@@ -110,7 +116,7 @@ test.afterAll(async () => {
   const db = await admin();
   const batch = db.batch();
   for (const doc of await ownRows(db)) batch.delete(doc.ref);
-  for (const name of [HOUSE_NAME, `Mutuo ${HOUSE_NAME}`]) {
+  for (const name of [HOUSE_NAME, `Mutuo ${HOUSE_NAME}`, HOUSE_2_NAME, `Mutuo ${HOUSE_2_NAME}`]) {
     const asset = await assetNamed(db, name);
     if (asset) batch.delete(asset.ref);
   }
@@ -279,4 +285,70 @@ test('the sale revalues the house to the price, transfers the rest, pays off the
   expect(own.find((row) => row.data().type === 'transfer' && row.data().notes === `Saldo al rogito · ${HOUSE_NAME}` && row.data().linkedCashAssetId === house!.id)?.data()?.amount).toBe(59000);
   // −23.000 −30.000 −2.000 (purchase) +1000 (deposit) +59.000 (the net balance).
   expect(await quantityOf(db, ACCOUNT_ID)).toBeCloseTo(accountStart + 5000, 2);
+});
+
+test('a second house takes a deposit at the preliminare', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openPath(page);
+  await next(page, 'Immobile');
+  await page.locator('#re-name').fill(HOUSE_2_NAME);
+  await page.locator('#re-price').fill('200000');
+  await next(page, 'Caparra');
+  await pick(page, 're-account', /^Conto Corrente/);
+  await page.locator('#re-deposit').fill('20000');
+  await next(page, 'Costi');
+  await skipCentre(page);
+  await page.getByRole('button', { name: 'Conferma', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: `Preliminare d’acquisto registrato: ${HOUSE_2_NAME}` })).toBeVisible({ timeout: 30_000 });
+
+  const db = await admin();
+  expect((await assetNamed(db, HOUSE_2_NAME))?.data()?.quantity).toBe(20000);
+});
+
+test('a mortgage above what is left to pay credits the excess to the account, with no row', async ({ page }) => {
+  test.setTimeout(120_000);
+  const db = await admin();
+  const accountBefore = await quantityOf(db, ACCOUNT_ID);
+  await openPath(page);
+  await page.getByText('Rogito', { exact: true }).click();
+  await next(page, 'Immobile');
+  await pick(page, 're-property', new RegExp(`^${HOUSE_2_NAME}`));
+  await page.locator('#re-price').fill('200000');
+  await next(page, 'Mutuo');
+  await page.locator('#re-principal').fill('190000');
+  await page.locator('#re-rate').fill('3');
+  await page.locator('#re-years').fill('1');
+  await pick(page, 're-mortgage-category', 'Mutuo Fenicottero');
+  // Above the price the screen refuses; at 190.000 (beyond the 180.000 left to pay) it lets the run go on.
+  await page.locator('#re-principal').fill('210000');
+  await expect(screen(page, 'Mutuo')).toContainText('Il mutuo supera il prezzo della casa');
+  await expect(page.getByRole('button', { name: 'Avanti', exact: true })).toBeDisabled();
+  // The amount can be asked as a share of the price: 95% of 200.000, and the field reads it back.
+  await page.locator('#re-principal-percent').fill('95');
+  await expect(page.locator('#re-principal')).toHaveValue('190000');
+  await next(page, 'Rogito');
+  // The question asks where the excess LANDS, never where the rest of the price is paid from.
+  await expect(screen(page, 'Rogito')).toContainText('Su quale conto la banca accredita quanto avanza del mutuo?');
+  await pick(page, 're-account', /^Conto Corrente/);
+  await expect(screen(page, 'Rogito')).toContainText('Dal conto non esce nulla');
+  await next(page, 'Polizze');
+  await next(page, 'Costi');
+  await skipCentre(page);
+  const summary = page.getByRole('list', { name: 'Le scritture, in ordine' });
+  await expect(summary).toContainText('Il mutuo paga al venditore 180.000,00');
+  await expect(summary).toContainText('Nessuna entrata: è debito, non reddito.');
+  await expect(summary).not.toContainText('saldo al rogito');
+  await page.getByRole('button', { name: 'Conferma', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: `Rogito d’acquisto registrato: ${HOUSE_2_NAME}` })).toBeVisible({ timeout: 30_000 });
+
+  const house = await assetNamed(db, HOUSE_2_NAME);
+  const loan = await assetNamed(db, `Mutuo ${HOUSE_2_NAME}`);
+  // +200.000 house, −190.000 loan, +10.000 account (−20.000 already moved at the preliminare): the net worth stands.
+  expect(house?.data()?.quantity).toBe(200000);
+  expect(loan?.data()).toMatchObject({ type: 'loan', quantity: 190000, financedAssetId: house!.id });
+  expect(await quantityOf(db, ACCOUNT_ID)).toBeCloseTo(accountBefore + 10000, 2);
+  // The excess is neither income nor a transfer: no row carries it (the instalments' series is the only row).
+  const rows = (await ownRows(db)).filter((row) => String(row.data().notes ?? '').includes(HOUSE_2_NAME));
+  expect(rows.some((row) => Math.abs(row.data().amount) === 10000)).toBe(false);
+  expect(rows.filter((row) => row.data().type !== 'debt')).toHaveLength(1); // the preliminare's deposit
 });

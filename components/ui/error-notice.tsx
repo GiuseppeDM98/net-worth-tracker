@@ -87,7 +87,7 @@ export function ErrorNotice({ notice, onRetry, footNote, compact = false, collap
   }
 
   return (
-    <section role={live ? 'alert' : undefined} aria-label={live ? undefined : notice.eyebrow} className={cn(TILE_SURFACE_CLASS, 'p-5', className)}>
+    <section role={live ? 'alert' : undefined} aria-label={live ? undefined : notice.eyebrow} data-tile="" className={cn(TILE_SURFACE_CLASS, 'p-5', className)}>
       <div className="flex gap-2.5">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
         <div className="min-w-0 space-y-1.5">

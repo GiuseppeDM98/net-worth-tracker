@@ -36,7 +36,8 @@ import {
   type LeveragePlanInputs,
 } from '@/lib/utils/leverageAwareAllocationUtils';
 import { assetClassLegs } from '@/lib/utils/assetDisplayClass';
-import { estimateSaleTax } from '@/lib/utils/saleTax';
+import { saleTaxPerEuro } from '@/lib/utils/saleTax';
+import type { PlanPosition } from '@/types/accumulationPlan';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
 import type { SectionSpec } from '@/lib/hooks/useMobileSections';
 
@@ -416,7 +417,7 @@ const visible = (nodes: PlanNode[]): PlanNode[] => nodes.filter((node) => node.a
  *
  * A plan is class → sub-category → instrument, and a sub-category that receives the whole of its
  * class's move and holds exactly ONE instrument prints the same euro figure twice under two
- * different names: «ETF Obbligazionari a Breve Termine +3000 €» over «iShares … (CSBGE3) +3000 €»,
+ * different names: «ETF Obbligazionari a Breve Termine +3000 €» over «iShares … (ABCD) +3000 €»,
  * «DBMFE +5000 €» over «iMGP DBi Managed Futures (DBMFE) +5000 €», «Bitcoin −2000 €» over
  * «WisdomTree Physical Bitcoin (WBIT) −2000 €». A third of the leg rows were that on a real
  * account, and they made the Piano tile ~1060px tall beside a ~380px neighbour.
@@ -777,7 +778,8 @@ function planLeaves(nodes: PlanNode[]): PlanNode[] {
  * gross figure and the reader receives less — on a product whose defensible claim is Italian
  * fiscal fidelity, quoting only the gross is the one number it declines to finish. The estimate
  * reuses `estimateSaleTax`, the app's ONE tax rule, on the same basis the sale ledger taxes: the
- * price difference of the slice being sold, fees excluded.
+ * gain of the slice being sold over the fiscal cost (`AllocatableHolding.costBasisEur`, purchase
+ * fees included, 2026-11-12).
  *
  * Selling a fraction f of a position realizes the fraction f of its unrealized gain, so the
  * taxable gain of a leg is `amount × (value − costBasisEur) / value`, floored at zero — a position
@@ -804,18 +806,12 @@ export function estimatePlanSaleTax(nodes: PlanNode[], holdings: AllocatableHold
       unknownReason ??= 'cost-basis';
       continue;
     }
-    if (!holding.taxableOnSale || holding.value <= 0) continue;
-    if (holding.costBasisEur === undefined) {
-      unknownReason ??= 'cost-basis';
+    const perEuro = saleTaxPerEuro(holding);
+    if (perEuro.kind === 'unknown') {
+      unknownReason ??= perEuro.reason;
       continue;
     }
-    if (holding.taxRate === undefined) {
-      unknownReason ??= 'rate';
-      continue;
-    }
-    const gainFraction = (holding.value - holding.costBasisEur) / holding.value;
-    const taxableGain = leaf.amount * Math.max(0, gainFraction);
-    tax += estimateSaleTax(taxableGain, holding.taxRate) ?? 0;
+    if (perEuro.kind === 'taxed') tax += leaf.amount * perEuro.perEuro;
   }
 
   if (unknownReason) return { gross, tax: null, net: null, unknownReason };
@@ -1055,4 +1051,58 @@ export function buildPensionLookThrough(
     hasExcluded: assets.some((asset) => resolveAllocationRole(asset) === 'excluded' && valueOf(asset) > 0),
     allFrozen: funds.every((fund) => resolveAllocationRole(fund) === 'frozen'),
   };
+}
+
+
+// ─── Con un PAC attivo ──────────────────────────────────────────
+
+/** Whether a node (or any descendant) is an instrument; collects the instrument ids it buys. */
+function collectInstrumentKeys(nodes: PlanNode[], out: Set<string>): void {
+  for (const node of nodes) {
+    if (node.isInstrument) out.add(node.key);
+    collectInstrumentKeys(node.children, out);
+  }
+}
+
+/**
+ * The assets the Piano BUYS in the mode on screen, by asset id: Ribilancia's COMPRA legs, Versa's
+ * nodes (under leverage, the engine's trades with a positive amount). Preleva buys nothing. A
+ * sleeve of a composite instrument maps back to its asset. The plan engines are not touched: this
+ * only reads what they already returned.
+ */
+export function listPlanBuyAssetIds(view: PlanView, holdings: AllocatableHolding[]): string[] {
+  const assetIdOfHolding = new Map(holdings.map((holding) => [holding.id, holding.assetId ?? holding.id]));
+  const ids = new Set<string>();
+  if (view.mode === 'withdraw') return [];
+  if (view.trades) {
+    for (const trade of view.trades) if (trade.amount > 0) ids.add(trade.assetId);
+    return Array.from(ids);
+  }
+  const keys = new Set<string>();
+  if (view.mode === 'rebalance') {
+    for (const move of view.moves) if (move.action === 'COMPRA') collectInstrumentKeys(move.children, keys);
+  } else {
+    collectInstrumentKeys(view.nodes, keys);
+  }
+  for (const key of keys) ids.add(assetIdOfHolding.get(key) ?? key);
+  return Array.from(ids);
+}
+
+export interface PacSubstitution {
+  /** The group member the Piano buys although the plan does not: the plan buys `buyAssetId` instead. */
+  replacedAssetId: string;
+  buyAssetId: string;
+}
+
+/** The instruments the Piano buys that the open plan replaced with another member of their group. */
+export function findPacSubstitutions(positions: PlanPosition[], boughtAssetIds: Iterable<string>): PacSubstitution[] {
+  const bought = new Set(boughtAssetIds);
+  const out: PacSubstitution[] = [];
+  for (const position of positions) {
+    if (position.memberAssetIds.length < 2) continue;
+    for (const memberId of position.memberAssetIds) {
+      if (memberId !== position.buyAssetId && bought.has(memberId)) out.push({ replacedAssetId: memberId, buyAssetId: position.buyAssetId });
+    }
+  }
+  return out;
 }

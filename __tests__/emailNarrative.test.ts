@@ -165,6 +165,15 @@ describe('buildPeriodEmailVerdict', () => {
     );
   });
 
+  // The fallback without a baseline: a deficit is said as the email's tile says it, never as a
+  // negative «messo da parte» (owner, 2026-11-12) (E1).
+  it('says a deficit without a baseline in euros, never as a negative share', () => {
+    const verdict = buildPeriodEmailVerdict({ ...GROWING, previousNetWorth: 0, rank: null, totalIncome: 2000, totalExpenses: 2600 });
+    expect(plain(verdict.sentence)).toBe('Il patrimonio vale 312.480 €. Sono usciti 600 € più di quanto è entrato.');
+    const tiny = buildPeriodEmailVerdict({ ...GROWING, previousNetWorth: 0, rank: null, totalIncome: 3, totalExpenses: 500 });
+    expect(plain(tiny.sentence)).toBe('Il patrimonio vale 312.480 €. Sono usciti 497 € più di quanto è entrato.');
+  });
+
   /**
    * The pension contributions and the debts repaid are the user's money, taken out of the
    * residual by the caller (`marketEffectOf`) and named here (owner, 2026-10-14): left in, the
@@ -191,56 +200,56 @@ describe('buildPeriodEmailVerdict', () => {
   });
 
   it('takes the tax on a sale out of the market and names it, in the headline and in the split', () => {
-    // September 2026 on the real account, as the email would see it: Δ −4.938 €, +988 € saved,
-    // 4.089 € of estimated tax on the Vanguard sale — the service hands a residual already net
-    // of that tax (−4.938 − 988 + 4.089 = −1.837), and the tax is its own third part.
+    // A falling month with a taxed sale, as the email sees it: Δ −5000 €, +1000 € saved, 4160 € of
+    // estimated tax — the service hands a residual already net of that tax
+    // (−5000 − 1000 + 4160 = −1840), and the tax is its own third part.
     const verdict = buildPeriodEmailVerdict({
       ...GROWING,
       period: { kind: 'monthly', year: 2026, month: 9 },
-      netWorthDelta: -4937.74,
+      netWorthDelta: -5000,
       netWorthDeltaPct: -1.66,
-      totalIncome: 2758,
-      totalExpenses: 1770,
-      marketEffect: -1837,
+      totalIncome: 2800,
+      totalExpenses: 1800,
+      marketEffect: -1840,
       sales: {
-        proceeds: 39052.45,
-        realizedGain: 15726.38,
-        estimatedTax: 4088.86,
-        instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+        proceeds: 40000,
+        realizedGain: 16000,
+        estimatedTax: 4160,
+        instruments: [{ id: 'orni', name: 'Ornitorinco World', proceeds: 40000, realizedGain: 16000, estimatedTax: 4160 }],
         brokenLedgers: 0,
       },
       rank: null,
     });
     expect(verdict.headline).toBe('Settembre è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
     expect(plain(verdict.sentence)).toBe(
-      'Il patrimonio vale 312.480 €: −4938 € (−1,66%) su agosto. ' +
-        'Di quel movimento, −1837 € viene dal mercato, +988 € da quanto hai risparmiato e −4089 € dalle tasse sulle vendite. ' +
-        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.',
+      'Il patrimonio vale 312.480 €: −5000 € (−1,66%) su agosto. ' +
+        'Di quel movimento, −1840 € viene dal mercato, +1000 € da quanto hai risparmiato e −4160 € dalle tasse sulle vendite. ' +
+        'Hai venduto Ornitorinco World per 40.000 € con una plusvalenza di 16.000 € e pagato circa 4160 € di tasse.',
     );
   });
 
   it('names the tax in the headline when it took the growth, and tells what was bought beside the sale', () => {
-    // Settembre 2026 on the real account as a monthly email would see it: +124 € (+0,04%) with
-    // 4.089 € withheld on VWCE and six instruments bought in the month.
+    // A flat month as a monthly email sees it: +120 € (+0,04%) with 4160 € withheld on ORNI and
+    // six instruments bought in the month.
     const sales = {
-      proceeds: 39052.45,
-      realizedGain: 15726.38,
-      estimatedTax: 4088.86,
-      instruments: [{ id: 'vwce', name: 'VWCE', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+      proceeds: 40000,
+      realizedGain: 16000,
+      estimatedTax: 4160,
+      instruments: [{ id: 'orni', name: 'ORNI', proceeds: 40000, realizedGain: 16000, estimatedTax: 4160 }],
       brokenLedgers: 0,
-      purchases: { amount: 34305.1, instrumentCount: 6 },
+      purchases: { amount: 34000, instrumentCount: 6 },
     };
     const flat = buildPeriodEmailVerdict({
       ...GROWING,
       period: { kind: 'monthly', year: 2026, month: 9 },
-      netWorthDelta: 124.32,
+      netWorthDelta: 120,
       netWorthDeltaPct: 0.04,
       sales,
       rank: null,
     });
-    expect(flat.headline).toBe('Settembre è in pari: le tasse sulla vendita di VWCE si sono prese la crescita.');
+    expect(flat.headline).toBe('Settembre è in pari: le tasse sulla vendita di ORNI si sono prese la crescita.');
     expect(flat.tone).toBe('warning');
-    expect(plain(flat.sentence)).toContain('pagato circa 4089 € di tasse. Nello stesso mese hai comprato 6 strumenti per 34.305 €.');
+    expect(plain(flat.sentence)).toContain('pagato circa 4160 € di tasse. Nello stesso mese hai comprato 6 strumenti per 34.000 €.');
 
     const quarter = buildPeriodEmailVerdict({
       ...GROWING,
@@ -251,7 +260,7 @@ describe('buildPeriodEmailVerdict', () => {
       rank: null,
     });
     expect(quarter.headline).toBe(
-      'Il terzo trimestre è cresciuto, ma le tasse sulla vendita di VWCE si sono prese più di metà della crescita.',
+      'Il terzo trimestre è cresciuto, ma le tasse sulla vendita di ORNI si sono prese più di metà della crescita.',
     );
     expect(plain(quarter.sentence)).toContain('Nello stesso trimestre hai comprato 6 strumenti');
   });
@@ -338,8 +347,8 @@ describe('describeMarketSplit', () => {
   });
 
   it('names the tax on the sales as its own part, as an estimate', () => {
-    expect(plain(describeMarketSplit(-1837, 988, 4088.86))).toBe(
-      'Mercato −1837 €, risparmio +988 €, tasse sulle vendite circa −4089 €. È un residuo strutturale: assorbe anche i movimenti non tracciati.',
+    expect(plain(describeMarketSplit(-1840, 1000, 4160))).toBe(
+      'Mercato −1840 €, risparmio +1000 €, tasse sulle vendite circa −4160 €. È un residuo strutturale: assorbe anche i movimenti non tracciati.',
     );
     expect(plain(describeMarketSplit(3130, 1180, 0))).not.toContain('tasse');
   });
@@ -423,6 +432,13 @@ describe('describeClassMovesTile', () => {
 });
 
 describe('describeCashflowTile', () => {
+  // The article follows the figure as printed (The Comma Rule; «il 81,0%» until 2026-11-14).
+  it('says «l’81,0%» in the tile and in the verdict without a baseline', () => {
+    expect(plain(describeCashflowTile({ totalIncome: 1000, totalExpenses: 190 }))).toBe("Hai messo da parte 810 €, l'81,0% di quanto è entrato.");
+    const verdict = buildPeriodEmailVerdict({ ...GROWING, previousNetWorth: 0, rank: null, totalIncome: 1000, totalExpenses: 190 });
+    expect(plain(verdict.sentence)).toContain("Hai messo da parte +810 €, l'81,0% di quanto è entrato.");
+  });
+
   it('reads the savings rate', () => {
     expect(plain(describeCashflowTile({ totalIncome: 4180, totalExpenses: 3000 }))).toBe(
       'Hai messo da parte 1180 €, il 28,2% di quanto è entrato.',
@@ -482,7 +498,13 @@ describe('ranked category readings', () => {
           3,
         ),
       ),
-    ).toBe('Stipendio copre il 86,1% di quanto è entrato.');
+    ).toBe('Stipendio copre l\'86,1% di quanto è entrato.');
+  });
+
+  it('takes the article from the share as printed (The Comma Rule)', () => {
+    expect(plain(describeIncomeCategoriesTile([{ name: 'Stipendio', amount: 3000 }, { name: 'Altro', amount: 7000 }], 5))).toBe(
+      'Altro copre il 70,0% di quanto è entrato.',
+    );
   });
 
   it('is absent when there is nothing to rank', () => {
@@ -496,22 +518,22 @@ describe('describeExpenseTypes', () => {
     expect(
       plain(
         describeExpenseTypes([
-          { label: 'Fisse', amount: 1640 },
-          { label: 'Variabili', amount: 1180 },
+          { label: 'Spese Necessarie', amount: 1640 },
+          { label: 'Spese Non Necessarie', amount: 1180 },
           { label: 'Debiti', amount: 180 },
         ]),
       ),
-    ).toBe('Fisse 1640 € (54,7%) · Variabili 1180 € (39,3%) · Debiti 180 € (6,0%).');
+    ).toBe('Spese Necessarie 1640 € (54,7%) · Spese Non Necessarie 1180 € (39,3%) · Debiti 180 € (6,0%).');
   });
 
   it('omits a type with nothing in it, rather than printing a zero row', () => {
     const reading = plain(
       describeExpenseTypes([
-        { label: 'Fisse', amount: 1640 },
+        { label: 'Spese Necessarie', amount: 1640 },
         { label: 'Debiti', amount: 0 },
       ]),
     );
-    expect(reading).toBe('Fisse 1640 € (100,0%).');
+    expect(reading).toBe('Spese Necessarie 1640 € (100,0%).');
     expect(reading).not.toContain('Debiti');
   });
 });
@@ -733,5 +755,22 @@ describe('budgetWindowLabel', () => {
   it('never says "settimana", because no figure in that email is weekly', () => {
     expect(budgetWindowLabel('monthly', 'agosto')).toBe('dal 1° agosto a oggi');
     expect(budgetWindowLabel('annual', 'agosto')).toBe('da inizio anno a oggi');
+  });
+});
+
+describe('buildPeriodEmailVerdict — the tax weighed on the change', () => {
+  const SALE = (tax: number) => ({
+    proceeds: 9000,
+    realizedGain: 3500,
+    estimatedTax: tax,
+    instruments: [{ id: 'orni', name: 'ORNI', proceeds: 9000, realizedGain: 3500, estimatedTax: tax }],
+    brokenLedgers: 0,
+  });
+  const FALLING = { ...GROWING, netWorthDelta: -10000, netWorthDeltaPct: -3, marketEffect: -20000, rank: null };
+
+  it('should name a tax material on the period change, and drop one that is not', () => {
+    // 900 € is past max(100 €, 5% of −10.000 €); against the market's −20.000 € it would not be.
+    expect(buildPeriodEmailVerdict({ ...FALLING, sales: SALE(900) }).headline).toBe('Agosto è in calo: il mercato ha pesato, e con lui le tasse sulle vendite.');
+    expect(buildPeriodEmailVerdict({ ...FALLING, sales: SALE(2) }).headline).toBe('Agosto è in calo: il mercato ha pesato.');
   });
 });

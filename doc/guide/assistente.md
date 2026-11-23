@@ -2,21 +2,23 @@
 
 > **When to open this guide** — whoever touches `app/dashboard/assistant/*`, `components/assistant/*`,
 > `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`,
-> `lib/utils/{assistantNarrative,assistantPeriodOptions,assistantQuestionBlocks,assistantRegisterContext,assistantStreamBuffer,cashflowBlock,expenseBreakdown,expenseProposal,goalProposal}.ts`,
+> `lib/utils/{assistantChatNarrative,assistantNarrative,assistantNetWorthDrivers,assistantPeriodOptions,assistantQuestionBlocks,assistantRegisterContext,assistantRoute,assistantStreamBuffer,cashflowBlock,expenseBreakdown,expenseProposal,goalProposal}.ts`,
 > `lib/hooks/useAssistantStreaming.ts`, `app/api/ai/assistant/*`, `app/api/goals/route.ts`. In
 > `AGENTS.md` the stub with the essentials stays; here is the full rule. Modules and files: § *Files* below.
-> E2E: `e2e/assistant.register.spec.ts`, `e2e/assistant.register.mobile.spec.ts`, `e2e/assistant.register.{kinds,question}.spec.ts`
-> and `e2e/assistant.register.question.mobile.spec.ts` (Registra, the stream always
-> faked with `page.route`, helper `e2e/assistantRegister.ts`); the analysis modes have no Playwright spec.
+> E2E: `e2e/assistant.chat.spec.ts` and `e2e/assistant.chat.mobile.spec.ts` (the page as a chat, 2026-11-16),
+> `e2e/assistant.register.spec.ts`, `e2e/assistant.register.mobile.spec.ts`, `e2e/assistant.register.{kinds,question}.spec.ts`
+> and `e2e/assistant.register.question.mobile.spec.ts` (Registra) — the stream always faked with `page.route`, helper
+> `e2e/assistantRegister.ts`; no spec asserts an analysis's answer.
+> **Registra** (the `register` mode: card, questions, write, outcome) has its own guide since 2026-11-16:
+> doc/guide/assistente-registra.md.
 
 ## Files
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `store.ts` → `mergeMemoryItem`), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`) and `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, its rules in doc/guide/consulente.md § The run); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
+- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `router.ts` — the router of `mode: 'auto'` —, `store.ts` → `mergeMemoryItem`), pure `lib/utils/assistantRoute.ts` (the reading's contract), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria · Preferenze, the fields in `AssistantPreferencesFields.tsx`), the chat (2026-11-16): `components/assistant/AssistantRouteChooser.tsx` («cambia»), `AssistantWaiting.tsx` (the wait), pure `lib/utils/assistantChatNarrative.ts` (the reading line, the suggestions, the wait's phrases), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`) and `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, its rules in doc/guide/consulente.md § The run); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
 - **The portfolio block** (2026-10-20): pure `lib/utils/assistantPortfolioContext.ts` (`buildAssistantPortfolioContext`, `emptyAssistantPortfolioContext` for the fixtures), printed by `formatPortfolioForPrompt` in `prompts.ts`; the Italian month bounds `getItalyMonthBoundsUtc`/`getItalyMonthRangeBoundsUtc` in `lib/utils/dateHelpers.ts`. The Consulente of Allocazione is its own guide: doc/guide/consulente.md.
-- **Registra** (2026-11): pure `lib/utils/{expenseProposal,assistantRegisterContext,assistantStreamBuffer,assistantQuestionBlocks}.ts` (the question helpers in `lib/utils/questionSet.ts`), `components/assistant/{ExpenseProposalCard,MessageIdContext,RegisterRefsContext,AssistantQuestionBlock,MessageQuestionsContext}.tsx`, `components/assistant/tiles/RegistraContestoTile.tsx`, `app/api/ai/assistant/threads/[threadId]/messages/[messageId]/route.ts` (the PATCH of a card's outcome), `fetchRegisterInputs` in `assistantMonthContextService.ts`, `ExpenseDialog`'s `initialValues` (doc/guide/dialog.md), `parseCashflowMonthParam` in `lib/utils/period.ts`. Suites: `expenseProposal`, `assistantRegisterContext`, `assistantStreamBuffer`, `assistantQuestionBlocks`, `questionSet`, `assistantQuestionBlock` (`.test.tsx`), `assistantFollowUps`, `assistantMessageRoute`, `expenseProposalCard`, `goalProposalCard`, `assistantStreamingResponse`, `assistantComposer`, `useAssistantStreaming`, `expenseDialogInitialValues`, `assistantCompanionScene`, `assistantHeader` (the last eight `.test.tsx`), and the five E2E specs with the emulators up.
-- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `dateHelpers`, `cashflowBlock`, `anthropicStream` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
+- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantRouter`, `assistantRoute`, `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `dateHelpers`, `cashflowBlock`, `anthropicStream`, `assistantNetWorthDrivers` · **The page as a chat** `assistantChatNarrative`, `assistantPeriodOptions`, `assistantRouteChooser`, `assistantHeader`, `assistantCompanionScene`, `assistantStreamingResponse`, `assistantQuestionBlock`, `useAssistantStreaming` (the `.tsx` ones on the `dom` project; `AssistantWaiting` has no suite of its own) · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
 
 ## Assistant
 
@@ -70,12 +72,30 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **`bundle.portfolio` is REQUIRED and built by ONE pure function**, `buildAssistantPortfolioContext`
   (`lib/utils/assistantPortfolioContext.ts`), from the documents every builder fetches beside the assets
   (`fetchPortfolioDocuments`: `assetTransactions`, `dividends`, `pensionContributions`) and the period's expenses:
-  every held instrument with class, sub-category, ROLE, quantity, value, fiscal PMC and G/P in euro, owner
-  (`describeAssetOwnerLabel`), liquidity; the allocation on the Allocazione page's base; the ledger; the dividend
+  every held instrument with class, sub-category, ROLE, quantity, value, fee-free PMC and G/P in euro, owner
+  (`describeAssetOwnerLabel`), liquidity; the allocation on the Allocazione page's base; the ledger (a fee with its
+  spending row prints «commissioni X (già fra le spese)», `feeIsSpendingRow`, 2026-11-12, so the AI never counts it
+  twice beside the cashflow block); the dividend
   registry in its two halves and the coupon of every bond held; the pension funds with their contributions by tax
-  year and nature; the loans; the household (`familyMembers`, `userAge`). `formatPortfolioForPrompt` prints every
+  year and nature and, in a bundle with a period, `paidInPeriod`: the contributions that moved the fund's value in
+  the period, by the month they were RECORDED (`valueEffectMonth`, the rule of Previdenza and of the Panoramica's
+  «versati nel fondo pensione»), each with its competence date and the day it was recorded, and one prompt rule —
+  take the paid-in out before blaming the market for a fund's change or its class's (owner, 2026-11-16: September's
+  contributions recorded in October read as an unexplained October jump of the bond class). Each builder passes its
+  months through `portfolioPeriod` (`assistantMonthContextService.ts`); the portfolio of today carries none;
+  and every analysis bundle carries `netWorthDrivers` (2026-11-16, owner: «Il sistema non scompone la variazione»):
+  the period's change split as Storico's Driver splits it (`buildAssistantNetWorthDrivers`,
+  `lib/utils/assistantNetWorthDrivers.ts`, over `buildMonthlyGrowthDrivers` + `sumGrowthDrivers`), from the snapshot
+  before the period to the one it closes on, printed after PATRIMONIO as «DA DOVE VIENE LA VARIAZIONE» with the rule
+  «non stimarlo per differenza»; null without both snapshots or across a month with none (the parts would no
+  longer add up); each class of «VARIAZIONI ALLOCAZIONE» carries `pension` (2026-11-16): the funds' change in it from
+  both snapshots' `pension.byAssetClass` and the contributions recorded in the period split by each fund's
+  `composition` (`pensionPaidInByClass`), printed as «› di cui fondi pensione: Δ …, di cui versati …; il resto della
+  classe: Δ …» — null when a snapshot does not record the funds' part (old and hand-entered ones); the income
+  categories carry their subcategories (`IncomeCategoryBreakdown.subCategories`, only when a row names one) and the
+  prompt prints them like the expenses'; the loans; the household (`familyMembers`, `userAge`). `formatPortfolioForPrompt` prints every
   list whole or declares the cut (`PORTFOLIO_LEDGER_ROW_CAP` 300, `PORTFOLIO_DIVIDEND_ROW_CAP` 150, the oldest rows
-  dropped, the omission written) — the silent-cap rule above. The owner's account measured ~3700 tokens.
+  dropped, the omission written) — the silent-cap rule above. A full portfolio fits in a few thousand tokens.
 - **A free question with NO context still gets the portfolio of today** (owner's run, 2026-10-20: with «Nessuno» the
   assistant answered «non c'è il blocco STRUMENTI» to «quali strumenti ho liberi da obiettivi?», because the route built
   a bundle only for a chosen period). `buildAssistantTodayContext(userId)` returns `AssistantTodayContext` — the
@@ -102,15 +122,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   («Non assegnato a nessun obiettivo: X € su Y €») — FIRE › Obiettivi' own arithmetic, a property NET of the loan that
   finances it (`lib/utils/goalAssetValue.ts`), a loan never a holding a goal can take; with the feature off nothing of
   it is printed (a feature not in use, never a zero). The free figure is printed EVEN when no goal touches the
-  instrument («libero da obiettivi (60.000 €)»): without it the model summed the gross values, found the total short
+  instrument («libero da obiettivi (50.000 €)»): without it the model summed the gross values, found the total short
   of the mortgage and called the data inconsistent (the owner's run, 2026-10-20); the coverage line says the property
   is net and tells it to sum the rows' free figures, not the values.
 - **The email gets the block too** (owner's decision): `buildEmailAiPrompt` reuses `formatBundleForPrompt`, so the
   periodic comment reads the instruments and the ledger; `__tests__/monthlyEmailService.test.ts` pins it.
 - **Every expense window is an ITALIAN calendar window** (`getItalyMonthBoundsUtc`, `getItalyMonthRangeBoundsUtc`,
   `lib/utils/dateHelpers.ts`): the rows are dated at Italian midnight and Vercel runs in UTC, so
-  `new Date(year, month - 1, 1)` filed the 1st of a month under the month before — on the owner's account 30 rows
-  of 1793 sat in the wrong month for the assistant while Tracciamento had them right. Pinned by
+  `new Date(year, month - 1, 1)` filed the 1st of a month under the month before — every row dated on
+  a 1st sat in the wrong month for the assistant while Tracciamento had them right. Pinned by
   `__tests__/assistantMonthContextService.test.ts` on ISO instants (green under `TZ=UTC` too).
 - **«Entrate» is Tracciamento's figure** (owner's decision): the prompt prints
   `Entrate: X (di cui dividendi e cedole Y; è lo stesso totale della pagina Cashflow)` and the Cashflow tile prints
@@ -119,11 +139,30 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `cashflow.totalIncome` itself keeps excluding dividends (Σ incomeByCategory === totalIncome).
 
 ### Streaming, threads, memory
-- **The waiting chip rotates a phrase, it never apologises** (owner, 2026-10-20: «Sta impiegando più del previsto»
-  read as a complaint): after `SLOW_RESPONSE_MS` with no text, `StreamStatusChip` shows `SLOW_PHRASES` one at a time
-  («Ci sto ragionando…», «Sto facendo i conti…», …), the next every 8 s, from a tick counter the hook resets when the
-  stream ends (`useSlowPhrase`, called before the early return — a hook after it is a conditional hook); a web search
-  keeps its own «Sto cercando sul web…».
+- **The wait speaks in the answer's place, from the first instant** (owner, 2026-11-16: «come fai tu su Claude
+  Code»; it replaced the chip's `SLOW_PHRASES` after 15 s of 2026-10-20 and the hook's `isSlowResponse`): while the
+  streaming message has no text, `AssistantWaiting` (`components/assistant/AssistantWaiting.tsx`) shows a pulsing ✦ in
+  the AI accent and one phrase at a time, the next every `WAITING_PHRASE_MS` (3 s), with a light passing over it
+  (`.assistant-waiting-phrase` in `app/globals.css`, only under `prefers-reduced-motion: no-preference`; under reduce the
+  mark and the shimmer stand still and the phrases still turn). The phrases are `buildWaitingPhrases(reading, status)`
+  (`lib/utils/assistantChatNarrative.ts`): «Sto leggendo la domanda…» until the `route` event, «Sto cercando sul web…»
+  on the `searching` status, then by the reading — «Apro ottobre 2026…» and the analysis's two steps, «Cerco la
+  categoria giusta…» for a registration, «Ci sto ragionando…» for a free question. Never an operation the server is
+  not doing. A new list remounts by its key and starts from its first phrase. The phrases are `aria-hidden`: the
+  message list is a live region, and a screen reader hears one sr-only «L'assistente sta preparando la risposta.»
+  instead of a phrase every 3 s; a search, which can last a minute, alternates «Sto cercando sul web…» and «Leggo i
+  risultati…». `StreamStatusChip` in the tile's aside now shows the web search only. An answer
+  already begun that stops for a search shows the wait again UNDER its text while the status is `searching`.
+- **The companion column is clipped** (2026-11-16, `overflow-clip [overflow-clip-margin:4px]` in `AssistantPageClient`):
+  every routed answer can change the scene, and its sideways slide pushed a phone's `main` 8px wide until it
+  ended (`assistant.chat.mobile.spec.ts` red 3 runs in 4); the margin keeps the tiles' shadow.
+- **The status says what the server is doing now** (2026-11-16, `anthropicStream.ts`): `'writing'` at the start
+  even with the web allowed, `'searching'` only from a `server_tool_use` block, `'writing'` again at the first
+  text after it; the text that resumes after a search starts a new paragraph («materie prime.**In sintesi**» on
+  the owner's run). Each `web_search_tool_result` is logged — `[assistant] web search failed: <error_code>` or the
+  number of results — so an answer that says the web was unavailable can be checked in the server log. On the
+  owner's run two searches returned 9 results each while the answer said «la ricerca web non era disponibile»: the
+  prompt's web section now says to write that the search found no dated events, never that it was unavailable.
 - **The thread list is read 50 at a time** (2026-10-05; it was read whole and grew forever):
   `listAssistantThreads(userId, { limit = ASSISTANT_THREADS_PAGE_SIZE, after })` asks for ONE more than the page,
   so `nextCursor` (the page's last id) is `null` on a list of exactly 50, and the next page starts with
@@ -134,8 +173,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `useInfiniteQuery` whose `select` flattens the pages, on the same key every writer invalidates (an invalidation
   re-reads every loaded page from the fresh cursors). **Nothing hides in silence** (owner's wording, 2026-10-05):
   while a page is unread the list closes on «Mostra altre», the header says «Più di 50 conversazioni»
-  (`describeAssistantHeader` `moreThreads`), its icon «Conversazioni (più di 50)» with a «50+» dot (`CountDot`'s
-  `isFloor`; past two digits it reads «99+», where it printed a bare «99» until 2026-10-05) and the modal «Le 50
+  (`describeAssistantHeader` `moreThreads`), the «⋯» menu's item «Conversazioni (più di 50)» (`threadsLabel` in
+  `AssistantHeader.tsx`; an icon with a «50+» dot until 2026-11-16, when the header became «⋯») and the modal «Le 50
   conversazioni più recenti: premine una per riprenderla; «Mostra altre» legge le precedenti.»
   (`describeThreadsReading` `hasMore`). Seen in the browser on 60 planted threads (2026-10-05, a throwaway spec):
   50 rows, the three sentences, «Mostra altre» → 60 rows, none twice, the button gone.
@@ -177,7 +216,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   bundle lives in React state and is never persisted. `MARKDOWN_COMPONENTS` must be module-level or ReactMarkdown
   re-mounts on every chunk.
 - **Do not use `DropdownMenu` for panels containing `Select` or `Switch`** — it closes on any click inside; use
-  `Popover`. The Conversazioni modal is controlled and must be closed explicitly in `onSelect`.
+  `Popover` or a modal: Preferenze is a modal since 2026-11-12, opened from the header's «⋯» menu. The Conversazioni modal
+  is controlled and must be closed explicitly in `onSelect`.
 - **Merging a partial patch onto existing state: build the merge object with ONLY the fields present in the input**
   (conditional spread), never assign every field unconditionally from a `Partial<T>` — an absent field becomes an
   explicit `undefined` that wins `{...existing, ...patch}` and silently wipes it. `store.ts`'s `mergeMemoryItem`/
@@ -190,6 +230,26 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **A field only the GET path can compute (`hasDummySnapshots`) must be optional on the base
   `AssistantMemoryDocument`**, required only on `AssistantMemoryResponse` — never a hardcoded `false` from a write
   helper that cannot know the real value.
+
+### The router (2026-11)
+- **`mode: 'auto'` is read by ONE forced-tool Haiku 5.5 call before any builder** (`routeAssistantMessage`, `router.ts`):
+  intent (one of the six modes), period, web search, confidence; `routeToSelection` (`lib/utils/assistantRoute.ts`) turns
+  the reading into today's request fields, so the pipeline after it is an explicit mode's. An explicit mode never calls it.
+  The `route` event goes right after `meta`; the assistant message stores it as `routeReading` (no `elapsedMs`).
+- **A route in the request** (`route`, only with `'auto'`, which never carries `month`/`year`/`chatContext`) skips the
+  router, stamped `confidence: 1`: `source: 'override'` when the owner chose it, `'carried'` with `routeCarried: true`
+  (a reading the turn inherits — an answer to a question card, «Rigenera»); one `checkRouteConsistency` refuses (an
+  analysis on another period, a month or year after today, Registra with the web) is a 400 after `assertCanAccessAccount`.
+- **It never throws**: an SDK error, a timeout (4 s, no retry), no tool block, an invalid input or a confidence below 0.6
+  give the fallback — a free question with no period — with its `reason` (`error`, `timeout`, `invalid`,
+  `low-confidence`). A Registra reading drops its period.
+- **The web**: Registra never; an `'override'` its own flag, as it is; the router AND a `'carried'` reading only ADD to
+  today's policy (owner, 2026-11-16: «Contesto macro» on keeps searching on a carried turn); an analysis read with a
+  reading gets `includeMacroContext` = the effective decision, so its macro sentence and the tool agree.
+- **Cost** ≤ $0.00047 a message, ≤ 4 s, none for a route in the request; logged `routeSource`, `routeReason`, `routerMs`.
+  `system` is a constant; the previous turn is the thread's LAST assistant message and the user message right before it
+  — a last answer without a reading (an explicit mode) gives none, and the router is never told of an older one. Faked
+  by a `RouterClient` with a `vi.fn()` `create` and `vi.mock` of the module; the thread's detail is its last 100 messages.
 
 ### Structured goals (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts` extraction)
 - **Structure is NEVER parsed from text.** It arrives from a forced-tool-use Haiku call validated with zod. A malformed
@@ -233,11 +293,16 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   block carries `goalId` (the id the OBIETTIVI block prints): the card reads «Modifica di un obiettivo», every row
   before → after, and the route rewrites that goal in place (`updateInvestmentGoal`, transactional, colour and creation
   date kept, the optional fields REPLACED — a proposal that drops the deadline removes it; 404 when the goal is gone).
+  The STRUMENTI block leaves out every asset at quantity 0 but a loan and an instrument created empty for a plan and
+  never traded (`Asset.createdEmpty`, no ledger row), printed «0 quote, mai comprato» (`neverBought`,
+  `lib/utils/assistantPortfolioContext.ts`; what that row means is one constant sentence of the system prompt; a
+  position sold to 0 has no flag and stays out; 2026-11-12).
   `assignments` names instruments by their EXACT name from the STRUMENTI block with a percent of each; the CARD resolves
-  the names to asset ids (`findAssetByName`, lib/utils/allocationAdviceApply.ts: the exact name, the printed «name
+  the names to asset ids (`findAssetByName`, lib/utils/allocationAdviceApply.ts — the held instruments first, so one at
+  quantity 0 with the same name or ticker never wins, 2026-11-12: the exact name, the printed «name
   (TICKER)» form, or the ticker alone with or without its exchange — the owner's run of 2026-10-20 had the model write
-  «… (SWDA)» for «SWDA.MI»; the `displayTicker` alias counts as a ticker, because the block prints it in its place —
-  on 2026-10-23 two ETCs ticked «ISIN.SG» reached the model by their alias and their quotas were lost) and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,
+  «… (ABCD)» for «ABCD.MI»; the `displayTicker` alias counts as a ticker, because the block prints it in its place —
+  on 2026-10-23 ETCs ticked «ISIN.SG» reached the model by their alias and their quotas were lost) and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,
   refusing a sum past 100% on one asset. On an update present quotas replace the goal's, absent ones leave them, and
   **one unmatched name keeps EVERY quota of today** (`keepQuotas`: the card sends no `assignments` and its eyebrow
   says so) — the first version wrote the resolved list, which was empty, and wiped a goal's quota of an ETF on the
@@ -254,7 +319,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 ## Assistente — a verdict over tiles (`components/assistant/AssistantPageClient.tsx`, `components/assistant/tiles/*`, `lib/utils/assistantNarrative.ts`)
 - **The verdict is the context, and the page computes nothing**: `buildAssistantPeriodVerdict(bundle, today)` reads the period
   bundle the prompt receives (`selector`, `netWorth`, `cashflow`, `dataQuality`) and `buildNoContextVerdict(toNoContextVerdictInput(overview,
-  month))` reads the Panoramica payload for a Libera question with no context — `buildOverviewVerdict` verbatim, never a second
+  month))` reads the Panoramica payload for a free question with no period — `buildOverviewVerdict` verbatim, never a second
   phrasing. `today` is a PARAMETER (`getItalyMonthYear` once per mount).
 - **Tense follows the period, and the bundle has no market attribution**: a closed month «è andato bene / in calo», a closed year
   «è stato un anno in crescita», the running year and YTD «finora va bene», the history «è cresciuto»; growth with spending over
@@ -262,32 +327,61 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   verdict NEVER says «il mercato ha pesato» here, and the old context card's sign-coloured class rows are gone. `netWorth.end ===
   null` (a month without its snapshot; the running month is `isPartialMonth`) → «Di luglio conosco solo il cashflow.» /
   «Agosto è ancora in corso.» with the cashflow figures; no snapshot AND no cashflow → «Nessun dato per …».
-- **The savings rate is `netCashFlow / (totalIncome + totalDividends)`** (`resolveSavingsRate`), null without inflows; the
-  Cashflow tile's reading is the Panoramica's `describeCashflow` on it (no month-over-month delta: the bundle carries one period).
+- **The savings rate is `netCashFlow / (totalIncome + totalDividends)`** (`resolveSavingsRate` = `meaningfulSavingsRate`),
+  null without inflows and below the savings floor (2026-11-12); the Cashflow tile's reading is the Panoramica's
+  `describeCashflow` on the period's `readSavings` (no month-over-month delta: the bundle carries one period). **The
+  words read the reading, not the number**: `savingsClause`, `cashflowOnlyClause`, `resolveTone` and
+  `describeAssistantCashflow` take `periodSavings(cashflow)` and treat a `deficit` as a negative rate — had they kept
+  branching on `null` (the spec's assumption that the swap «changes nothing printed»), 3 € in and 500 € out would have
+  read «Nessuna entrata registrata» with a positive tone. Pinned by `__tests__/assistantNarrative.test.ts` («is null
+  below the savings floor, while the words still say…»). Both savings sentences take the article from the figure as
+  printed («l'81%», The Comma Rule, 2026-11-14).
 - **Every count on the page is a sentence from the pure layer**: the header's description (`describeAssistantHeader`), the
-  Conversazione reading (`describeConversation` — the period question while empty, then «2 messaggi; la risposta usa i numeri di
+  Conversazione reading (`describeConversation` — `EMPTY_CHAT_QUESTION` while empty, then «2 messaggi; la risposta usa i numeri di
   luglio 2026 e una ricerca web» with `formatPeriodInSentence`), «Cosa sa di te» (`describeMemory`), the sheet's Obiettivi and
   Fatti (`describeGoalsTile`, `describeFactsTile`), a goal's state (`describeGoalProgress`: «Raggiunto» · «14.300 € / 20.000 €» ·
   «Non tracciato», the percent kind with the comma — the memory rows' `toFixed` retired with it).
-- **Rows, not chips, inside a tile**: `AssistantPromptRows` renders the starter questions (the one whose `chip.mode === mode`
-  first and bold) and the follow-ups; a row is `min-h-11` below `desktop:`. A starter still PREFILLS the composer (the period must
-  be confirmed); a follow-up acts by its `action`: absent, the mode's behaviour (it submits, in Registra it prefills the
-  composer); `send` submits; `focus-composer` empties and focuses the composer («Registra un'altra», first after a
-  written card, 2026-11).
-- **Layout**: `PageContainer` (1920, its only width); verdict + `AssistantPeriodSelector` (in Registra the strip with «Torna all'analisi» in its place, `RegistraContestoTile` in the companion) in `flex desktop:flex-row desktop:justify-between`;
+- **Rows, not chips, inside a tile**: `AssistantPromptRows` renders the four suggestions of an empty chat
+  (`buildEmptyChatSuggestions`, `lib/utils/assistantChatNarrative.ts`: from what the account holds — no payload yet,
+  nothing, assets only, a cashflow —, the first bold; `?mode=registra` puts the three register rows first; four
+  `Skeleton` rows while the Panoramica payload loads) and the follow-ups; a row is `min-h-11` below `desktop:`. A
+  suggestion only WRITES the composer (a register row is a sentence to finish), the caret at the end, and sends
+  nothing; a follow-up acts by its `action`: absent, the last answer's mode decides (it submits, after a registration
+  it prefills the composer); `send` submits, with no route (the router reads it again); `focus-composer` empties and
+  focuses the composer («Registra un'altra», first after a written card, 2026-11).
+- **The page as a chat (2026-11-12)**: no period axis, no mode to enter. Every send is `mode: 'auto'`
+  (`useAssistantStreaming`); the stream's `route` event sets the turn's `mode` and the answer's `routeReading`, and
+  the page is shown in the LAST answer's mode (`displayMode`: verdict, companion scene, register reads). The
+  placeholders are born with the last answer's mode, so a turn never slides to a free question while the router
+  reads. Under a complete answer with a reading the line «Ho letto: … · cambia» (`describeReadingLine`; «Hai scelto»
+  for an override, «Non ne sono sicuro: l'ho letta come …» for a fallback, « · con ricerca web» from `webSearchUsed`);
+  «cambia» on the last answer only, at rest, outside the demo, opens `AssistantRouteChooser` (the focus on the chosen reading; Esc and «Annulla» bring it back to «cambia» through the
+  page's `changeOpenerRef`, Safari's click included) and «Rileggi» re-sends the
+  last prompt as a new turn with the chosen route (no `routeCarried`), the focus on «Interrompi risposta». A question
+  card's answer and «Rigenera» carry the reading (`routeCarried: true`). The open thread is `?thread=<id>`, written
+  with `history.replaceState` at a new thread's `meta` and removed by «Nuova conversazione». Testing the page
+  (`__tests__/assistantCompanionScene.test.tsx`): `AnimatePresence mode="wait"` keeps the exiting scene in the DOM, so
+  a scene is proven by the verdict's text after the exit (400 ms), never by the companion alone; a question card's
+  answer also PATCHes its message, so the stream calls are counted by URL.
+- **Layout**: `PageContainer` (1920, its only width); the verdict alone above the grid (`RegistraContestoTile` in the companion after a registration);
   the grid is `desktop:grid-cols-[2fr_1fr] desktop:items-start`, the companion `desktop:sticky desktop:top-5 desktop:self-start`
   (sticky needs self-start, AGENTS.md § Tailwind Breakpoints) and it renders AFTER the composer on a phone; the composer stays
   `sticky bottom-0 max-desktop:portrait:bottom-20` inside the left column. The pill's strip bleeds `max-desktop:-mx-4
   max-desktop:px-4` (the page padding) and its tabs are 44px there. `TileGridSkeleton` with `cells={[]}` is the verdict's
   placeholder while a bundle loads.
+- **A generated sub-tile's fill is the costume's** (2026-11-23): the question block and the two proposal cards paint
+  `COSTUME_GENERATED_FILL_CLASS` — `bg-muted/40` in every theme but Egeo, where the fill is the card so the AI accent
+  stays over 4,5:1 — and their boxes, the preferences' rows and the route chooser's are frames (doc/guide/temi.md § Il costume).
 - **Messages are flat** (`AssistantStreamingResponse`): the user's in a `bg-muted/40` sub-tile, the assistant's full-width prose;
   the proposal cards (`GoalProposalCard`, `ExpenseProposalCard`) are `not-prose` blocks with the AI accent (DESIGN.md → The
   AI-Accent Rule), never a card in the tile; `MARKDOWN_COMPONENTS` stays module-level. The
   streaming badge lives in the tile's aside (`role="status"`); the interruption notice is a muted row with «Rigenera».
-- **Conversazioni and Memoria are `ResponsiveModal`s** (`AssistantModals.tsx`, 2026-09-18 — two right-side `Sheet`s
-  until then): `md` and `lg`, eyebrow «Assistente · …», the title the act («Riprendi una conversazione») or the
-  companion tile's own name («Cosa sa di te», opening on the SAME `describeMemory` sentence the tile shows), no
-  footer. The thread rows are flat and divided, the active one `aria-current` on `bg-muted`; their delete is
+- **Conversazioni, Memoria and Preferenze are `ResponsiveModal`s** (`AssistantModals.tsx`, 2026-09-18 — two right-side
+  `Sheet`s until then; Preferenze since 2026-11-12, a header popover before): `md`, `lg` and `sm`, eyebrow «Assistente
+  · …», the title the act («Riprendi una conversazione», «Come risponde l'Assistente») or the companion tile's own name
+  («Cosa sa di te», opening on the SAME `describeMemory` sentence the tile shows), no footer. Each takes
+  `returnFocusTo`: the «⋯» copy that opened its menu (a menu item is gone when the modal opens), null from «Apri
+  memoria» (the modal's own restore). The thread rows are flat and divided, the active one `aria-current` on `bg-muted`; their delete is
   `useArmedDelete` with `THREAD_DELETE_CONSEQUENCE` printed in the row in place of the preview and ONE live region
   for the list. They stay overlays for the reason the sheets were: the companion column must never become a second
   nested-scroll box.
@@ -295,149 +389,30 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   reached» suggestion shows on its goal's row (the durable «Ignora» is `ignoreSuggestion`, the same mutation the tile above the
   conversation uses — two surfaces of ONE suggestion); the item delete is `useArmedDelete` (two clicks, no timer).
   `AssistantMemoryPanel` lost its collapsible variant (only the sheet renders it).
-- **The guide is `AssistantComeFunziona`**, a Collapsible below the grid with three tiles; the header has four icon actions (Registra, 2026-11) and
-  ONE primary; Conversazioni and Memoria wear their count as a dot AND the description says it in words (the dots were
-  dropped once and asked back the same day). Playwright locates: the verdict by `region` «Verdetto sul
-  contesto», the tiles by their eyebrow («Conversazione» with `exact: true` — «Conversazione con l'assistente» is the live
-  region), the rows by `list` «Domande suggerite», the axis by `tablist` «Periodo di analisi», the disclosure by `button` «Come
-  funziona».
+- **The guide is `AssistantComeFunziona`**, a Collapsible below the grid with three tiles («Come ti leggo», the web, the
+  memory); the header has two buttons (2026-11-12): «⋯» (`DropdownMenu` of Conversazioni with its count, Memoria with
+  its count, Preferenze; a bottom sheet below 769px) and ONE primary, «Nuova conversazione»; the description says the
+  counts in words. Playwright locates: the verdict by `region` «Verdetto sul contesto», the tiles by their eyebrow
+  («Conversazione» with `exact: true` — «Conversazione con l'assistente» is the live region), the rows by `list`
+  «Domande suggerite», «⋯» by `button` «Altre azioni dell'assistente», the line by its text («Ho letto: …») and «cambia»
+  by `button` «Cambia come ho letto la domanda», the disclosure by `button` «Come funziona»; there is no `tablist`.
 
 ## The visual direction
 
 The whole page follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen by the owner on 2026-11-06 among three
 drawn concepts, archived in `git log -- doc/ai/reference/`): **The AI-Accent Rule** (the accent on the «Assistente» sub-eyebrow of a model's message, on
-proposal and question cards, and on the hover of «Invia messaggio», «Registra», «Rigenera», «Rispondi» and the suggestion rows;
-never on the verdict, the companion column, the thread list or the user's messages), **The Question-Card Rule** (the
+proposal and question cards, and on the hover of «Invia messaggio», «Rileggi», «Rigenera», «Rispondi» and the suggestion rows;
+never on the verdict, the companion column, the thread list, the «Ho letto» line or the user's messages), **The Question-Card Rule** (the
 cards inside a message, ONE «Rispondi» under the last) and the paragraph «The Assistente page» (the conversation stays
-still, the companion column's content slides with the mode). The code follows it from the Registra mode on (2026-11): the companion slides with `sceneVariants`, the cards enter with `cardEnterVariants`.
+still, the companion column's content slides when the reading changes). The code follows it since 2026-11: the companion slides with `sceneVariants`, the cards enter with `cardEnterVariants`.
 
 ## Registra (2026-11)
 
-«Ho fatto spesa per 103 euro» becomes a card; «Conferma» writes the row through the expense form's services (a series
-or a fee: the form's batch of documents); a reload never writes it twice. Since 2026-11-11 also transfers (onto a house too), instalments, series, fees and new categories,
-and the Assistente asks what it needs with options before proposing.
-
-- **The mode** is `register`, handled EXPLICITLY at every site of the WARNING comment that opens `types/assistant.ts`
-  (the true list; none falls through to chat). It has no period: the stream body carries no month, the context route
-  answers 400, `useAssistantPeriodContext` is never enabled, it is not a tab of `AssistantPeriodSelector`, web search is
-  off whatever the prompt says. The stream body is validated by `assistantStreamRequestSchema` (zod, every field; the
-  prompt stops at 4000 characters in EVERY mode, the composer counts from 3800 by `aria-describedby`).
-- **The register block** (`buildAssistantRegisterContext` → `formatRegisterContextForPrompt`, pure, `userContent`):
-  today's Italian date, the categories and sub-categories, the cash accounts with balance and default roles, the
-  centres and the members — all BY ID, uncapped — and the rows of the window from the first Italian day of the month
-  eleven months back to the end of today, newest first, a recurring series as ONE row with its count, cut at 300 with
-  the cut printed. **IL MESE** has two sources: the totals are the Panoramica's server summary (`getDashboardOverview`),
-  the spending by type and the budget lines (20 at most, printed; a budget on a type under the type's label, «Spese
-  Necessarie») come from the window's rows through the Budget's pure
-  level. The two reads of the month are settled apart: a failed one prints its sentence, the core reads failing is a 500
-  before any event. The CASHFLOW 12 MESI block follows, as in every mode.
-- **The protocol** lives ONLY in `buildRegisterPrompt` (`REGISTER_CONTRACT`; `ASSISTANT_SYSTEM_CORE` is untouched and the
-  mode's `system` is byte-identical between users — held by `not.toContain` and `toBe`): up to five
-  ```expense-proposal blocks a message (`EXPENSE_PROPOSALS_MAX_PER_MESSAGE`; a sixth renders as code), `expenseProposal.ts`
-  the ONE schema. A block's key is `expense:N`, N its rank among the message's blocks of that language, DERIVED from the
-  markdown (`listFencedBlocks`, matched by the `pre` node's offset) — never counted in render.
-- **The four kinds** (2026-11-11, `expenseProposalSchema` and its `superRefine`): `kind` expense · income · transfer ·
-  debt, `type` the row type of its kind. A **transfer** names `fromAccount`/`toAccount` (an id first, then the name:
-  exact → starts with → contains, the first stage with hits decides; «ambiguo: …» / «conto sconosciuto: …»), searched among
-  the cash accounts AND the houses (`isTransferableProperty`); a house sits on one side only, the card says «verso
-  l'immobile X: il valore della casa sale di …» or «… scende di …», refused above `propertyValueAvailable`; no category
-  needed (the named transfer one, else the first, else «Trasferimenti (nuova)», created on «Conferma»). An **instalment**
-  names `loanName` among the repayable debts (`isRepayableDebt`), matched as an account is («prestito ambiguo: …» /
-  «prestito sconosciuto: …»; two loans a name does not tell apart are asked first, «Quale prestito?», a `loan:`
-  question), and shows the principal / interest split (`splitInstalment`); no `loanName` is «Rata non collegata a un prestito»; `payoff` is all principal, one row. A
-  **series** (`recurring`: monthly or yearly, count up to `MAX_RECURRENCE_OCCURRENCES`, `canTypeRecur`: expenses and
-  instalments only) reads «12 occorrenze mensili, dal … al …» and writes the dialog's documents of one parent. A **fee**
-  (`fee.amount`) goes in the category of Impostazioni › Spese (`resolveExpenseFeeCategory`), never the model's; with none
-  set the card links Impostazioni. A field that does not belong to the row is dropped and said («ignorato: intestatario»,
-  «… fuori budget», «… commissione»).
-- **New categories are written BEFORE the row** (2026-11-11): `newSubCategory` under an existing category (reused by
-  its trimmed name, else appended to a FRESH read of the category, `newSubCategoryId` the one id rule with the dialog and
-  the import), `newCategory` alone (reused when its `categoryMatchKey` exists — the key lives in
-  `lib/utils/expenseCategoryMatching.ts`, NOT `expenseImport.ts`, whose papaparse cost the page 8 KB). A retry after a
-  failed row reuses what it created (`createdRef`).
-- **Questions** (2026-11-11, DESIGN.md → The Question-Card Rule): a ```assistant-question block holds ONE question
-  object, read by `parseQuestionsLenient([obj])` (the one parser) plus `entityQuestionProblems`; at most
-  `ASSISTANT_QUESTION_MAX_PER_MESSAGE` (2) a message, never beside a proposal of the same message (a card in a message
-  with a question reads «Rispondi prima alla domanda», «Conferma» closed). An entity question (`account:`, `center:`,
-  `member:`, `loan:`, `category:` before the first «:») takes `allowOther: true`, three options at most (a category
-  more), no «Preferisco non dire»; its «Altro…» is a `Select` of the page's own items (the houses as «X (immobile)» on
-  `account:from`/`account:to`). ONE «Rispondi» under the message's last card, on the thread's LAST assistant message, saved,
-  nothing streaming (`isAnswerableQuestionMessage`); it saves every answer on the message (`question:N`, `answered`,
-  the label), then sends ONE user message, one line per question — «{domanda} → {scelta} [id]» for an entity. An older
-  question reads «Non risposta qui». **A submit from an older render starts from the buffer** (`useAssistantStreaming`,
-  2026-11-11): «Rispondi» records, then calls the `submit` of the render it was clicked in, whose `renderedMessages`
-  predates the answers — the buffer (or the cached thread, when it is empty) is the base; the E2E spec showed the
-  answered cards as «Non risposta qui».
-- **When to ask, and the block's three lines** (the contract's «QUANDO CHIEDERE»): the account only if the user named
-  none AND (no default for the type OR the category's most used account covers under 80% of its rows); the member only
-  with the Divisione on and at least half the category's rows personal; the cost centre only with the centres on and at
-  least one of the category's rows in a centre over the last 12 months; «fuori budget»
-  applied, never asked, when the user says it or half the category's rows are; an amount with no object asks «Di cosa si
-  tratta?». The register block feeds it: **PATTERN** per category over the window (the most used account and its share,
-  rows in a centre, the personal and out-of-budget shares, each clause only with its feature on; fee rows and transfers
-  out), **PRESTITI** (debt, TAN, the median instalment of the recent rows, a series counted once) and **IMMOBILI**
-  (`[id] nome · valore`), after CONTI. **The proposal's rules defer to these thresholds** (2026-11-11, the retirement of
-  the Registra details): the first contract's «the default account, unless the user names another», «a centre or a
-  member only when the user names it» and «fuori budget only when the user says it» contradicted them; the account is
-  now the one named or picked in an answer, else the default when QUANDO CHIEDERE does not ask, the centre and the
-  member the named or picked one, «fuori budget» what QUANDO CHIEDERE applies, and the opening names transfers and
-  instalments — every sentence held whole in `assistantPromptBundle`, each seen red. The way in reads «Registra un
-  movimento» and the composer «Scrivi cosa hai speso, incassato o spostato…» since the same day.
-- **The card** (`ExpenseProposalCard`): `resolveExpenseProposal` checks every id against the browser's own reads
-  (`RegisterRefsContext`: categories, assets, settings, centres) and names what it cannot find — a problem closes
-  «Conferma», never «Modifica»; a failed read closes all writing. States (`describeExpenseProposalState`): idle ·
-  saving (the first click closes the button: a double click writes one row) · «Registrata · apri in Cashflow»
-  (`/dashboard/cashflow?tab=tracking&month=YYYY-MM&row=<id>`: the ROW's month and the row itself, on which Tracciamento
-  lands — doc/guide/cashflow-tracciamento.md § Files; the month is the one the row was SAVED in, kept on the outcome
-  as `month` when «Modifica» moved the date out of the proposal's, 2026-11-11) · «Ignorata» · «Risposta interrotta: chiedi di
-  riproporla» on a message whose id is still `local-` (no buttons). The focus moves to the outcome line; no new live region
-  but the write error's (`role="alert"`). The three 44px buttons wrap (`flex-wrap`, held by `expenseProposalCard`'s
-  «offers three 44px buttons that wrap»).
-- **The write** is the expense form's create path, in the browser: `createExpenseSettledOnDate` → `applyDebtRepayments` →
-  `applyBalanceEffects` (a future date is a pending row, the balance moves on its day — the card says
-  when only if the row has an account), then four invalidations
-  (`expenses.all`, `assets.all`, `dashboard.overview`, `costCenters.all`). No server route writes a row. «Modifica»
-  opens `ExpenseDialog` on the proposal (`initialValues`, lazy — `lazyComponent`, preloaded on hover and focus) and the
-  row the form saves is the card's outcome.
-- **The outcome is saved on the message**: `proposals["expense:0"] = { status, writtenIds, at }` (a series or a fee
-  writes several ids: «12 righe registrate», «+ 1 commissione») through
-  `PATCH /api/ai/assistant/threads/[threadId]/messages/[messageId]` (`update` with a `FieldPath`, never a merge), after
-  it was written into the stream buffer and the cached thread (`recordProposal`: the buffer wins until a thread switch).
-  The stream's `done` carries the assistant message's id, adopted by the buffer (`adoptStreamMessageId`). The goal card
-  uses the same path (`goal:N`) and, since 2026-11-11, the same two rules: no button on a `local-` message, and a
-  toast when the save fails after the write (`GOAL_STATE_NOT_SAVED`, beside `PROPOSAL_STATE_NOT_SAVED`). An outcome
-  never scrolls the conversation (`conversationScrollSignal`, held in the browser by the two-card spec).
-- **The way in and out**: the pencil in the header («Registra un movimento», off in demo and while streaming)
-  or `?mode=registra`, once the thread list has resolved; the strip «Registra · l'Assistente conosce categorie, conti e
-  le ultime righe» stands where the period axis was (and the header's title reads «Una frase, una riga» instead of «Un periodo, una risposta», 2026-11-11), with «Torna all'analisi» — which leaves the thread FIRST (the mode
-  alone would send the next question into it) and drops the param. The thread is one per Italian day, «Registrazioni ·
-  1 nov 2026» (`buildThreadTitleFromPrompt`, `findRegisterThread`); entering reopens today's — the day is read at
-  the ENTRY (`enterRegister`), never once at mount: a page open since yesterday reopened yesterday's thread (2026-11-11). **With no thread picked, the
-  day's thread IS the open one, derived in render** (`selectedThreadId = pickedThreadId ?? the day's`, 2026-11-11): on the
-  owner's tour a sentence sent after the browser's Back from Cashflow opened a SECOND «Registrazioni» of the same day —
-  the mode had been entered while the list did not hold the thread, and a lookup made once at the entry never looked
-  again. So «Nuova conversazione» is OFF in Registra (2026-11-11, the owner's tour: it reopened the day's thread and
-  seemed to do nothing), named «Nuova conversazione — Registra tiene un thread al giorno» (`newThreadLabel`,
-  `__tests__/assistantHeader.test.tsx`); «Torna all'analisi» is the way out, and a clean register thread is had only by
-  deleting the day's.
-- **The answer is short, whatever the style preference** (the owner's tour, 2026-11-11): the first real answers carried
-  «Ipotesi che ho fatto», «Cosa dicono i dati del mese» and «Limiti dei dati» under the cards (the «deep» style line of
-  `userContent` asks for hypotheses and limits) and said «vedo solo le 300 righe più recenti su N». `REGISTER_CONTRACT`
-  now says: one sentence, the blocks, then only what the user needs to decide (a row not proposed and why, one sentence on
-  the category's budget; since 2026-11-11 a real doubt — on the category, the account, the PROPERTY, the member or the
-  loan — is a question block in a message WITHOUT proposals, never a prose question under the cards; «immobile» joined
-  the list after the owner's tour, where a deposit «sulla casa» became a spending row in Compravendita with «dimmelo e
-  la imposto come trasferimento» under it), no titled sections, nothing the card already shows, and
-  never the rows' cut unless the user asks for a row it cannot find. The 300 cap stays (the owner's choice).
-- **A card's outcome never moves the page** (2026-11-11): the conversation follows `conversationScrollSignal` (thread,
-  count, the last message's length — `assistantStreamBuffer.ts`), not the message list's identity, which a recorded
-  outcome renews; «Conferma» or «Ignora» on a card in the middle of an answer used to send the page to its bottom.
-- **The verdict and the panel**: `buildRegisterVerdict(summary)` — computed from the browser's reads before any
-  message, from the stream's `register` event after («le ultime N righe» is the server's alone); `RegistraContestoTile`
-  («Cosa conosce l'Assistente») lists the accounts, their default roles and what was read. Neither wears the accent.
-- **E2E**: the spec fakes the stream and does what the route does around the model (thread and messages written with
-  the Admin SDK, `done` with the planted id), so the PATCH and the reload run on the real routes. The page needs the key
-  in `.env.local` to render the composer; no request reaches a model (doc/guide/e2e-playwright.md).
+«Ho fatto spesa per 103 euro» becomes a card; «Conferma» writes the row in the browser through the expense form's
+services, once. The mode is `register`, handled explicitly at every site of the WARNING in `types/assistant.ts`; its
+protocol lives only in `buildRegisterPrompt`, never in `ASSISTANT_SYSTEM_CORE` (the emails read it); it never searches
+the web. The rest — the four kinds, the questions, the card, the write, the outcome, its blind spots — in
+doc/guide/assistente-registra.md.
 
 ## Composizione mobile
 
@@ -445,13 +420,12 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
 
 ## Per-page blind spots
 
-- **Assistente**: the analysis modes have no Playwright spec; the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`; «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; starter rows prefill the composer, follow-up rows act by their `action` (in Registra they prefill, «Registra un'altra» empties); the thread rows and the memory rows both use `useArmedDelete` (the threads' 3 s auto-disarm went on 2026-09-18, with the sheet); a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
+- **Assistente**: the analysis modes have no Playwright spec; the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`, through `meaningfulSavingsRate` (none below −100% or without income: the words then say the deficit, 2026-11-12); «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; a suggestion writes the composer and sends nothing, follow-up rows act by their `action` (after a registration they prefill, «Registra un'altra» empties); a «Continua con» row is read afresh: «e questo mese?» under an analysis of October may be read as a question on today's data — «cambia» corrects it; the thread rows and the memory rows both use `useArmedDelete` (the threads' 3 s auto-disarm went on 2026-09-18, with the sheet); a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
 - **The Assistant's cashflow figures changed on 2026-07-29 and again on 2026-10-20** (the Italian month bounds, «Entrate» with the coupons inside); saved threads are prose and are not regenerated (moved here from CLAUDE.md → Known Issues on 2026-09-18: it is this page's blind spot, not a cross-cutting one).
 - **The portfolio block is TODAY's, whatever the period** (2026-10-20): the instruments, the allocation on the base, the ledger and the registers describe the portfolio at the time of the question; only the snapshot blocks and the cashflow are the period's. A question about a past month reads today's holdings beside that month's figures — the system core says so.
-- **A period's own thread older than the pages read is not found** (owner's call, 2026-10-05): switching period
-  re-opens the existing thread for it by scanning the LOADED threads (`findThreadForPeriod`), so with more than 50
-  conversations one older than the 50 most recent is not resumed and the next question opens a new one — until
-  «Mostra altre» has read its page. No query of its own, by decision.
+- **An answer saved before 2026-11-12 has no reading**: no «Ho letto» line and no «cambia» (a «cambia» needs the
+  reading it changes); it keeps «Ricerca web usata», the tile's aside reads its mode's label, and its cards still follow
+  its own `mode`.
 - **The context preview reads the page's copy of the test-snapshot preference** (2026-10-05), not the stored one:
   the two differ only when the preference was changed from another device inside the memory query's five minutes. It
   is the toggle of test accounts, shown only where dummy snapshots exist.
@@ -466,15 +440,5 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
   one Admin query per message, off the browser; the block is never cached across messages, so a row confirmed a
   minute ago is in the next answer.
 - **A card's outcome is saved on its message** (2026-11): a reload shows «Obiettivo creato» / «Registrata». The one window left: a PATCH that fails after a successful write (the toast of either card says so); a reload then shows the card idle. A thread refetch landing between the local record and the PATCH can also drop the outcome from the cache — the stream buffer still shows it for the session.
-- **A Registra day past 100 messages shows its oldest 100** (`getAssistantThreadDetail` reads `orderBy createdAt asc, limit 100`), and the history is cut from those.
-- **A row written from Registra carries no mark**: in Tracciamento it is a row like any other — and never «Legata all'immobile»: «Modifica» sets it.
-- **A question is answered by a message** (2026-11-11): the thread shows the answer lines as the user's message, and the read-only cards above it.
-- **What Registra does not do** (owner, 2026-11-01): it never edits or deletes an existing row (the writer is the
-  card's «Conferma», once, through today's services — never a new server route); no receipt attachments and no voice;
-  no per-user «always ask the account» setting (the asking policy is the contract's thresholds); it is a mode of the
-  Assistente, never a page under Cashflow; what belongs to ONE mode never enters `formatBundleForPrompt` or
-  `ASSISTANT_SYSTEM_CORE`, which the emails read too.
+- **A thread past 100 messages shows its LAST 100** (since 2026-11-16, `getAssistantThreadDetail` reads `orderBy createdAt desc, limit 100` and reverses the page; its oldest 100 until then): the page, the history replayed to the model and the router's previous turn all read the thread's end, and nothing before it.
 - **Memory is the account's**: the owner and a co-owner share the categorisation rules; two wordings of one subject («palestra», «la palestra») stay two rules.
-- **The Cashflow bridge reads the key at build, as this page does**: `app/dashboard/cashflow/page.tsx` passes `Boolean(process.env.ANTHROPIC_API_KEY)`; a key added on Vercel shows «Chiedi all'Assistente» after the next deploy.
-- **IL MESE's totals are as fresh as the Panoramica's summary** (2026-11): the first line is the server summary, the lines under it are computed from the rows read for the message; a row written outside the app's services (an Admin write, a restore) leaves the two apart until the summary is rebuilt — seen on the emulator after a spec's Admin deletes.
-- **Registra adds about 25 KB gz to the page's first load** (2026-11-10, the ceiling raised with the owner's OK: doc/guide/velocita.md § Registro): the card's services, the protocol and the four reads ship with the page; only `ExpenseDialog` is lazy. Loading the three write services on «Conferma» was measured at −0,9 KB and dropped. The questions and the four kinds added 13,3 more on 2026-11-11 (738,1 → 751,4, ceiling 753).

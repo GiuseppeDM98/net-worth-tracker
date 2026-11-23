@@ -28,7 +28,7 @@ import {
   type AssetClass,
 } from '@/types/assets';
 import { getAssetDisplayTicker } from './assetDisplay';
-import { costBasisPerUnitEur } from './costBasisEur';
+import { fiscalCostPerUnitEur } from './costBasisEur';
 
 export type AllocationAction = 'COMPRA' | 'VENDI' | 'OK';
 
@@ -190,7 +190,7 @@ export const ACTION_CHART_NUMBER: Record<AllocationAction, 1 | 2 | 3 | 4 | 5> = 
  * old clamp only fired above L 0.72, above every value the palette holds.
  *
  * Here rather than in `useActionColors` so `__tests__/actionColorContrast.test.ts` can hold all
- * twelve theme blocks to the same numbers without importing the hook, which reaches the Firebase
+ * theme blocks to the same numbers without importing the hook, which reaches the Firebase
  * SDK through the theme context.
  */
 export const ACTION_LIGHT_MAX_L = 0.46;
@@ -681,7 +681,7 @@ export interface AllocatableHolding {
    */
   tradable: boolean;
   /**
-   * The holding's EUR cost basis, purchase fees included (`costBasisPerUnitEur × quantity`, the
+   * The holding's FISCAL EUR cost basis, purchase fees included (`fiscalCostPerUnitEur × quantity`, the
    * component's share of it for a sleeve of a composite asset). `undefined` when the asset has no
    * comparable EUR basis — a foreign position the ledger has not projected yet — and the tax of a
    * proposed sale is then not estimable rather than zero.
@@ -732,7 +732,8 @@ export function buildHoldings(
     // duplicate it (e.g. "Conto Corrente (Conto Corrente)" for a tickerless asset).
     const resolvedTicker = getAssetDisplayTicker(asset);
     const ticker = resolvedTicker && resolvedTicker !== asset.name ? resolvedTicker : undefined;
-    const basisPerUnit = costBasisPerUnitEur(asset);
+    // Read only to tax a proposed sale: the fiscal cost, purchase fees included (owner, 2026-11-12).
+    const basisPerUnit = fiscalCostPerUnitEur(asset);
     const costBasisEur = basisPerUnit !== undefined ? basisPerUnit * asset.quantity : undefined;
     const taxableOnSale = isTaxableOnSale(asset);
 

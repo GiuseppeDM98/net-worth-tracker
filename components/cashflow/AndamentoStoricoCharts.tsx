@@ -19,7 +19,7 @@ const TOOLTIP_CONTENT_STYLE = {
   border: '1px solid var(--border)',
   color: 'var(--card-foreground)',
   fontSize: 12,
-  borderRadius: 8,
+  borderRadius: 'var(--costume-control-frame-radius, 8px)',
 } as const;
 
 const TOOLTIP_LABEL_STYLE = { fontWeight: 600, color: 'var(--card-foreground)' } as const;
@@ -152,7 +152,7 @@ export function CategoryLinesChart({
 }
 
 // ── TypeCompositionChart ──────────────────────────────────────────────────────
-// 100%-stacked area: the spending mix (Fisse/Variabili/Debiti) as a share of total
+// 100%-stacked area: the spending mix (Necessarie/Non necessarie/Debiti) as a share of total
 // per bucket, so diversification reads independently of the absolute spend level.
 // Module-level (React Compiler).
 

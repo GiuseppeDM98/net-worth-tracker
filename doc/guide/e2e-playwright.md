@@ -1,8 +1,27 @@
 # E2E — Playwright
 
-> **When to open this guide** — anyone writing or changing a Playwright spec in `e2e/`, `playwright.config.ts`, `e2e/global-setup.ts`, an `e2e/auth*.setup.ts` or a helper no project collects (`e2e/*Fixture.ts`, `e2e/shellBoot.ts`, `e2e/chunkProbe.ts`, `e2e/assistantRegister.ts`), or reading a red of the full run. `AGENTS.md` keeps the stub with the essentials (`AGENTS.md § Browser-Driven E2E (Playwright)`); here is the full rule, moved whole from `doc/guide/e2e-emulatori.md` on 2026-11-11 (its history before that day: `git log -- doc/guide/e2e-emulatori.md`). The files, the seeds, the emulators' start and stop, the mirror, the throwaway exercises and «proving a refactor changed no number» stay in `doc/guide/e2e-emulatori.md` (§ Files, § Emulator Exercise Scripts); the environment in `SETUP.md` → Steps 6-7.
+> **When to open this guide** — anyone writing or changing a Playwright spec in `e2e/`, `playwright.config.ts`, `e2e/global-setup.ts`, an `e2e/auth*.setup.ts` or a helper no project collects (`e2e/*Fixture.ts`, `e2e/shellBoot.ts`, `e2e/chunkProbe.ts`, `e2e/assistantRegister.ts`), or reading a red of one; a red of the full run, the known flakes and the suite's speed are `doc/guide/e2e-suite.md` (since 2026-11-17). `AGENTS.md` keeps the stub with the essentials (`AGENTS.md § Browser-Driven E2E (Playwright)`); here is the full rule, moved whole from `doc/guide/e2e-emulatori.md` on 2026-11-11 (its history before that day: `git log -- doc/guide/e2e-emulatori.md`). The files, the seeds, the emulators' start and stop, the mirror, the throwaway exercises and «proving a refactor changed no number» stay in `doc/guide/e2e-emulatori.md` (§ Files, § Emulator Exercise Scripts); the environment in `SETUP.md` → Steps 6-7.
 
 ## Browser-Driven E2E (Playwright)
+- **The Egeo specs** (2026-11-22): `e2e/theme.egeo{,.mobile}.spec.ts` on the helper `e2e/themeEgeo.ts` — `setAccountColorTheme` reads `userPreferences/test-user-1.colorTheme` once through the emulator REST, writes `egeo` (or `default`) and `restoreColorTheme` puts it back in `afterAll` (the account's preference overrides `localStorage` after sign-in, `e2e/motion.layout.spec.ts`); `workers: 1` is what makes the write safe. Traps: signed out, `/login` has NO `h1` and `/` draws the header's `h1` twice (the phone's hidden at 1440) — wait for the first VISIBLE `h1, h2, h3`; a serial `describe` stops at the first red, so a mutation shows one failure, not all. Signed out on `/login` the check is «every `document.fonts` face of Marcellus is `unloaded`» and the headings are Geist Sans (2026-11-22): «not `loaded`» passed a face in `error`, seen red with the `.woff2` aborted and the font loaded by hand.
+- **A costume spec on another fixture account** (2026-11-23): the FILENAME picks the account, so the Analisi flow under
+  a costume is `e2e/theme.costume.analisi.spec.ts` and the Hall of Fame bar `e2e/theme.costume.hof.spec.ts` (the base
+  account has no records and Analisi's has no snapshots: the drawdown and the Consulente's book stay in
+  `theme.costume.spec.ts`, the book on a PLANTED report). `setAccountColorTheme(theme, uid)` writes that account's
+  preference and `restoreColorThemeOf(uid)` puts it back — wrapped in an arrow in `afterAll`, because a hook hands the
+  fixtures to its first argument. Traps: no control opens «Nuova Spesa» at 1024×768 (the rail has no «+»): the tablet
+  spec dispatches `cashflow:add-expense`, the event the page's own controls dispatch; a Nivo node's `fill` and a slot's
+  served form differ, so both go through `colorToHex` before the comparison; a mutation written as `@media not all`
+  around a CSS block SURVIVED on `next dev` — make the block's selector unmatchable instead; a page of a context the
+  spec opens itself has NO action timeout, so a click on a control that is not there waits out the whole test.
+- **The ring specs** (2026-11-15; doc/guide/grafici.md § The ring): `e2e/ring-chart{,.mobile,.tablet}.spec.ts` (the
+  homes of 2026-11-12, one body `ringChartSuite.ts`) and the minor tiles' seven files —
+  `e2e/ring-chart.split{,.mobile}.spec.ts` (projects `split`, `split-mobile`), `e2e/ring-chart.centri{,.mobile}.spec.ts`
+  (`centri`, `centri-mobile`; «Per sottocategoria» on a centre the test plants and removes), `e2e/ring-chart.owners{,.mobile}.spec.ts` (base account, «Valore» and «Carico»), `e2e/ring-chart.dividendi.spec.ts`
+  (`desktop`, two dividends created through the form and deleted by the app) — plus one assertion in
+  `e2e/cashflow.mortgage.spec.ts`; all through `expectRingFiguresInside` (`e2e/ringFit.ts`). **Deleting several rows of a
+  list that re-reads after each delete waits for the row count to drop** before the next press (2026-11-15, the Dividendi
+  spec): the refetch re-renders the next armed row mid-click, the button detaches and the click waits out the test.
 - **The tablet composition has two projects, one spec runs in both** (since 2026-10-16): `tablet` (768×1024, the pill) and
   `tablet-landscape` (1024×768: the landscape stage and the 56px icon rail `TabletRail`, no pill and no bar), copied from
   `mobile` (`isMobile`, `hasTouch`, the base account, the same `testIgnore`); a `*.tablet.spec.ts` branches on
@@ -13,7 +32,9 @@
   `[data-stage="lead"]` and the index by its «Il resto della pagina» heading: THE tile 16px under the verdict, the index
   360px wide and 16px to its right, starting on the verdict's line and ending on THE tile's, every row in DOM order inside it
   right under the one before with a hairline, a closed one 52px — its trigger's height; THE tile ends above the fold when the
-  stage has `data-stick="true"`, starts above it otherwise); **`expectStickyStage`** (every row open, `main` scrolled to its
+  stage has `data-stick="true"` — measured STUCK, `main` scrolled until the verdict sits 16px from its top, since the rule
+  is the stack against the whole `main` and a stack that fits only without the header above it sticks too (2026-11-21) —,
+  starts above it otherwise); **`expectStickyStage`** (every row open, `main` scrolled to its
   end in steps: THE tile stays 16px under the verdict, never slides over it); an opened row that did not move nor scroll
   (`openRow` + `expectOpenedRow`: its box and `main.scrollTop` read before the tap; in landscape it stays in the index), no
   half grid row at 768 (`expectNoHalfCells`), `expectNoOverflow`; at 1440 **`expectGridAcrossMain`** (the grid as wide as `main`'s content box). Counting the grid's tracks does NOT prove the 1440 grid (2026-10-16): with `max-desktop:` taken off the stage's columns the grid kept its twelve tracks inside the 360px column and the check stayed green — the width is what went red. The specs: `e2e/overview.tablet.spec.ts` (the overview
@@ -37,7 +58,7 @@
   «still in the calendar» is planted on the 28th of December at noon UTC (`ornitorinco` in its note) and removed after,
   the test skipped from that day on. Storico's ledger is summed on its VISIBLE rows inside `#storico-driver-panel`, the
   featured year being the panel's `button[aria-expanded="true"]`.
-- **Allocazione, Previdenza and the five FIRE tabs are composed at 390 since 2026-10-15: a spec opens the row before it reads inside it** — `#alloc-esposizione-trigger` before the coverage line (`allocation.mobile.spec.ts`), `#prev-versamenti-trigger` before the ledger's delete targets (`pension.mobile.spec.ts`), «Apri tutte» before `fire.mobile.spec.ts` and `coast.mobile.spec.ts` measure `main`. **A request that must NOT happen is counted with a positive anchor first** (`allocation.mobile.spec.ts`: `page.on('request')` on `/api/portfolio/instrument-profiles`, the Esposizione's trigger seen closed, then `[]` after 1,5 s; the opening makes the count grow): the Esposizione reads its profiles only once its row has been opened, and the route's abort (`page.route(…, route.abort())`, the pattern of `settings.spec.ts`) makes the FIRST read fail into an `ErrorNotice` row with ONE live node. **The FIRE page's memory is per tab** (`mobile-sections:fire-simulations:fire`, `:coast`, …): `fire.mobile.spec.ts` opens a row, switches tab, opens one there and comes back — the inactive `TabsContent` is unmounted, so what survives the switch is `localStorage` alone. A What If spec reads the Evento FIRST in `section.rounded-2xl` of the tabpanel at both widths (Evento is THE tile, first in the DOM at 1440 too — DESIGN.md → The Input Tile Rule). On the base account the FIRE verdict may read «Sei già FIRE.» (small expenses): `fire.spec.ts` asserts «anni. Da allora» only on a headline that starts with «FIRE nel».
+- **Allocazione, Previdenza and the five FIRE tabs are composed at 390 since 2026-10-15: a spec opens the row before it reads inside it** — `#alloc-esposizione-trigger` before the coverage line (`allocation.mobile.spec.ts`), `#prev-versamenti-trigger` before the ledger's delete targets (`pension.mobile.spec.ts`), «Apri tutte» before `fire.mobile.spec.ts` and `coast.mobile.spec.ts` measure `main`. **A request that must NOT happen is counted with a positive anchor first** (`allocation.mobile.spec.ts`: `page.on('request')` on `/api/portfolio/instrument-profiles`, the Esposizione's trigger seen closed, then `[]` after 1,5 s; the opening makes the count grow): the Esposizione reads its profiles only once its row has been opened, and the route's abort (`page.route(…, route.abort())`, the pattern of `settings.spec.ts`) makes the FIRST read fail into an `ErrorNotice` row with ONE live node. **The FIRE page's memory is per tab** (`mobile-sections:fire-simulations:fire`, `:coast`, …): `fire.mobile.spec.ts` opens a row, switches tab, opens one there and comes back — the inactive `TabsContent` is unmounted, so what survives the switch is `localStorage` alone. A What If spec reads the Evento FIRST in `section.rounded-2xl` of the tabpanel at both widths (Evento is THE tile, first in the DOM at 1440 too — DESIGN.md → The Input Tile Rule). On the base account the FIRE verdict may read «Sei già FIRE.» (small expenses): `fire.spec.ts` asserts «anni. Da allora» only on a headline that starts with «FIRE nel». At 1440, `allocation.spec.ts` compares the Piano's edges with Bilanciamento's and Per classe's in the three modes and with the amount cleared (2026-11-12).
 - **Rendimenti's composition spec runs on the degraded account at 390, with the model series answered by the browser**
   (2026-10-14, `e2e/mobile-composition.performance.degraded.mobile.spec.ts`, project `degraded-mobile`:
   `testMatch: /\.degraded\.mobile\.spec\.ts/`, `DEGRADED_STORAGE_STATE`; `mobile` ignores `degraded.`, or it would
@@ -107,25 +128,22 @@
   window` branch planted in the layout — read `page.on('pageerror')` too. And a mismatch makes React regenerate the
   tree on the client, which then prints «Encountered a script tag while rendering React component» for the `<head>`
   theme script: that line is a symptom of the failed hydration, not of the script.
-- **A full run where every spec that calls a route is red is the suite's dev server, not the routes** (2026-09-29,
-  Windows machine: 18 red of 154 in 13,5 min — the Esposizione, the Dividendi form, «Crea snapshot», an Impostazioni
-  read, all eleven Hall of Fame — while the 136 that never call `/api/*` stayed green). The tell is in the `[WebServer]`
-  lines of the log: «Failed to fetch YOC: Not Found», «Unexpected token '<', "<!DOCTYPE"» from a `response.json()`, a
-  spec reading 404 where it expects 200 — the `next dev` Playwright started answered 404 HTML on EVERY `/api/*` route
-  (`Invoke-WebRequest http://localhost:3100/api/dashboard/overview` from the shell, while it was still up), and its
-  `.next-e2e/dev/types/validator.ts` typed 3 API routes of 37. Not reproduced on demand: `.next-e2e` deleted and
-  `npm run dev:e2e` restarted, the same route answered 401 JSON and the nine red files reran green (30/31, the one
-  left `modal.origin`, CLAUDE.md § Known Issues). Before reading a red spec, probe one route on :3100; if it 404s, restart the server and
-  rerun the red files against it (`reuseExistingServer` is on locally).
-- **All six setups red at 30 s on `/login` is a COLD dev server** (2026-09-30, after an `npm ci`, CPU loaded): start
-  `npm run dev:e2e` detached, request the 13 routes once, run `--project=setup`, then the suite — it reuses the server.
 - **What a page DOWNLOADS is asserted by chunk CONTENT** (`e2e/chunkProbe.ts`, 2026-09-30): chunk names change every
-  build, so `probeChunks` reads each body for a library's module path (`node_modules/d3-sankey/`) or a function only one
-  module defines — never OUR module's path, which the importer's chunk also names in its `import()` loader, and never a
-  word a comment could hold (dev chunks keep comments). To measure a placeholder against what replaces it, HOLD the
-  chunk until the test releases it (`holdChunks`) — a fixed delay loses the race to a preload — and navigate to
-  `domcontentloaded`: a held chunk requested before `load` means `load` never fires. The suite runs `next dev`, so these
-  prove an import is lazy; sizes are `perf:budget`'s. Worked example: `e2e/bundle.lazy{,.mobile}.spec.ts`.
+  build, so `probeChunks` reads each body for a STRING LITERAL of the module (`CHUNK_SIGNATURES` in `chunkProbe.ts`, since
+  2026-11-16): a minifier renames functions and drops module paths and comments, never a string, so one signature
+  holds on `next dev` and on the production build of the whole run. A literal of ONE source file of `app/`,
+  `components/`, `lib/` — a comment counts, dev chunks keep them (`circular link` is quoted by `cashflowSankey.ts`, so
+  the Sankey's signature is d3-sankey's `Error("circular link")`) —, pinned by `__tests__/chunkSignatures.test.ts`;
+  never OUR module's path, which the importer's chunk also names in its `import()` loader. To measure a placeholder
+  against what replaces it, HOLD the chunk until the test releases it (`holdChunks`) — a fixed delay loses the race to a
+  preload — and navigate to `domcontentloaded`: a held chunk requested before `load` means `load` never fires. A held
+  check that stays true with NOTHING held asserts `held() > 0` (Dividendi's landing: the tab's loading state is the
+  page's placeholder). These prove an import is lazy; sizes are `perf:budget`'s. Worked example:
+  `e2e/bundle.lazy{,.mobile}.spec.ts`. **A signature is proven by breaking it**: with every one set to a string no chunk
+  holds, the presence and hold checks go red (8 of the 11 tests on 2026-11-16, both servers; Dividendi's the ninth, once
+  it asserted `held()`); the four absence checks — two of them in tests a broken signature leaves green — by
+  putting a static import back (the PDF engine in `PDFExportDialog`, the Sankey in `FlussoTile`, the Flusso in
+  `DettaglioDisclosure`, the sparkline's preload at 1440 in `StrumentiTile`), each red at its own line on both servers.
 - **Only four lazy surfaces are held against a placeholder that moves**: Analisi's Sankey (`layout-shift` 0
   and equal heights) and Rendimenti's Dettaglio (no placeholder ever shown), both in `e2e/bundle.lazy.spec.ts`
   (2026-09-30); Cashflow's Dividendi at 390 and Divisione at 390 and 1440 (2026-10-06, `e2e/lazyTabLanding.ts`, run
@@ -206,8 +224,9 @@
 - **`workers: 1`, non-negotiable** (the specs share emulator accounts). **Give the suite its OWN fixture**, tuned so the
   thing under test is on screen at all (Analisi dates every expense to January so its figures are exact in any month;
   Coast picks the RITA long-unemployment variant because the ordinary unlock falls past the projection) and say so in
-  the file. `e2e/global-setup.ts` runs every seed, in order Previdenza → Coast → degraded → Analisi, on EVERY
-  invocation: a new fixture is an `npm run e2e:seed:*` script plus one `spawnSync` there, and a test that patches
+  the file. `e2e/global-setup.ts` runs every seed on EVERY invocation, side by side since 2026-11-16 (each writes its
+  own account; Previdenza → Coast stay a chain, Coast's inflow needs the fund): a new fixture is an `npm run e2e:seed:*`
+  script plus one `runSeed` in that `Promise.all` — after another one only if it reads what that one writes —, and a test that patches
   Firestore does it inside the test. **Re-seeding an account mid-suite logs it out** (`auth.updateUser(uid, { password })`
   revokes the refresh tokens and the parked `storageState`): creation once from `global-setup`, data-only per test.
 - **`storageState` does NOT capture IndexedDB unless asked** (`{ path, indexedDB: true }`) — the Firebase session lives
@@ -233,44 +252,8 @@
   filter (both header copies, `toHaveText(['', ''])`). The sign-out test reads the record back through IndexedDB
   itself (`indexedDB.open` + `get`), the way «assert on data» means here.
 - **Prove the test can fail before trusting it** (the 1440px assertions were re-run at 1200px, where they must fail).
-- **The full run and its known flakes** (the record of each run is in its commit message since 2026-10-19; before
-  that, in `git log -- doc/guide/e2e-emulatori.md`). A full run is ~290 tests incl. 6 setups in ~12 min on the reference
-  machine (2026-10-16). Each flake below was red once or twice in a full run and green alone right after
-  (`--repeat-each=3`); a second red of the same test is a pattern, not noise:
-  - `cashflow.tablet.spec.ts` «the tabs are 44×44…» [tablet] (2026-10-16): 0 visible tabs 1,3 s after the verdict — the tab
-    bar not yet painted when `open()` returned on the verdict and THE tile. Returned on 2026-10-20 (landscape, one full run); since then `open()` waits for the tablist and a visible tab too.
-  - `overview.mobile.spec.ts` «a cell with a six-figure variation…» (2026-10-16, twice): the strip's second row 1,3–1,6 px
-    apart where the cells share a line. Fixed: the test polls until the two cells share their line before reading the boxes.
-  - The «remembered across a reload» tests of `mobile-composition.patrimonio.mobile.spec.ts` and `overview.mobile.spec.ts`
-    (2026-10-15/16): `apiResponse.json: Response has been disposed` — the response a probe holds across `page.reload()`,
-    the shape of the `holdChunks` entry below. Closed on 2026-10-16: `patchOverview` reads the body in a `try` and lets a
-    disposed response go with `route.continue()` (green ×5 on both).
-  - `mobile-composition.performance.degraded.mobile.spec.ts` «Analizza con AI … a thumb's target» (2026-10-16): 43,999996 px
-    against `>= 44`, the sub-pixel shape of the pill's «Dividendi» below; the assertion takes half a pixel of tolerance.
-  - The pill's selector (2026-10-16): the landscape `TabletRail` is the same landmark «Navigazione principale» and comes
-    first in the DOM, so every tool that means THE PILL reads `nav[data-nav="pill"]` (the census included).
-  - `mobile-composition.analisi.mobile.spec.ts` «a category row opens the Scheda…» (2026-10-15): `#analisi-scheda-trigger`
-    counted 1 where 0 was expected — the row's trigger survived the Escape. Red again on 2026-11-11 (twice in the full runs of two Registra branches, none touching Analisi, and once in three runs alone), then **traced and fixed the same day — NOT a flake of the page but a race of the test**: on the second opening the Scheda row is remembered open, so `aria-expanded` is true at the first render, before `landOnScheda`'s 50 ms timer lands the focus on the trigger (one landing, logged with `focusin`); the test's focus into the panel came first and was taken back, and Escape on the trigger does nothing by design (2 runs in 20, the focus on the trigger after the Escape). The test now waits for the trigger's focus before moving it; seen red 3/3 with the timer at 300 ms and a 400 ms pause, green 10/10 as it is.
-  - `mobile-composition.cashflow.mobile.spec.ts` «the «+» saves a row of today…» (2026-11-11): red once in a full run, then in 3 runs of 8
-    alone — NOT a flake but a race of the page (the focus stopped `reveal`'s glide, the row left past the window). Fixed in
-    `TransactionFeed` (doc/guide/cashflow-tracciamento.md § Files); the test polls the row's place.
-  - `mobile-composition.patrimonio.mobile.spec.ts` «the DOM order is the vertical order…» (2026-10-18): the test ended while
-    `patchOverview`'s route callback still had the overview refetch in flight (`route.fetch: Test ended` at
-    `overviewFixture.ts:73`) — a harness race of a 2,6 s test, not a page fact. If it returns, end that test with
-    `page.unrouteAll({ behavior: 'ignoreErrors' })`.
-- **A full run on the month's first three days reads a different Budget** (2026-11-03): `mobile-composition.cashflow.mobile.spec.ts` «the two cells open the right row» counted two lifted KPIs, one on those days (no pace, `liftedBlocks` skips «Fine mese»); it now reads the Italian day. Not a flake: a test written on a later day stays green until a run lands there. **A seed that ran before the Auth emulator was up** gave 12 red in one full run the same day (`seed exit=1`, the fixtures missing): wait on BOTH :8080 and :9099 before `emulators:seed`.
-- **`e2e/cashflow.transfer-fee.spec.ts` was red ONCE in a full run** (2026-10-07, Windows machine, the second full run
-  of PR #434, which did not touch transfers): green alone and in the suite's order, cause not traced. A second red
-  there is a pattern, not noise — note the run before re-running it. **`e2e/cashflow.mobile.spec.ts` › «every tab of the
-  pill is at least 44×44» was red ONCE the same way** (2026-10-11, the full run of PR #452, the Panoramica's composition, which did not touch the pill):
-  «Dividendi» read 43,99999237 px against `>= 44`, a sub-pixel reading of the 44px tab; green ×2 alone right after
-  (`--repeat-each=2`). If it returns, compare with `Math.round` or a half-pixel tolerance rather than widening a timeout. **`e2e/bundle.lazy.spec.ts` › Analisi was red ONCE
-  the same way** (2026-10-08, the first full run on Next 16.4, PR #436): `apiResponse.text: Response has been disposed`
-  inside `holdChunks`' route handler (`chunkProbe.ts:61`) — a chunk fetched by the handler was disposed before its body
-  was read, i.e. the page had moved on; green ×2 alone right after (`--repeat-each=2`). If it returns, read the body
-  inside a `try` and `route.continue()` on the disposed one rather than widening a timeout. **`e2e/cashflow.dividendi.spec.ts` › «the form
-  refuses in the reading line…» was red ONCE the same way** (2026-11-08, a full run that did not touch the Dividendi): the
-  picker's BTP option was not clicked within 30 s; green alone right after (4/4). A second red there is a pattern, not noise.
+- **The whole run — its server, its known flakes, its speed — is `doc/guide/e2e-suite.md`** (split out on 2026-11-17):
+  a red only a full run produces, the flake list read before any re-run, the production build that serves it.
 - **A green suite on the emulators says nothing about a server dependency's MODULE LOADING on Vercel** (2026-10-08):
   `verifyIdToken` skips the signature against the Auth emulator, so the `jwks-rsa → jose` chain of firebase-admin never
   ran under Playwright, and 173 green tests preceded a deploy where every Admin route answered 500 (`ERR_REQUIRE_ESM`;
@@ -304,6 +287,10 @@
 - **`npx playwright test … | grep … | head -N` hides the verdict** (2026-09-18): `global-setup` prints ~14 «✓ …» seed
   lines that fill `head` first — filter on `"\[(desktop|mobile)\]|[0-9]+ (passed|failed)"`. **A falsification must fail
   on the assertion it is about**: break ONE behaviour at a time, or an earlier assertion goes red and proves nothing.
+  When the only mutation that breaks a LATER step also breaks an earlier one (2026-11-15, the opening fee's Tracciamento
+  row in `e2e/assets.trade-fee.spec.ts`: `fees` dropped from `firstBuy` fails first on the Firestore read), run a
+  throwaway copy of the spec with the earlier reads set aside (matching `testMatch`, deleted after) and watch the new
+  step fail there.
   **Shoot the SETTLED frame**: right after `dialog.waitFor()` a vaul drawer is half-way up (~500 ms) and a button is
   mid colour-transition — ~800 ms before a capture, never before an assertion.
 - **A spec that needs a server-computed FLAG forces it on the RESPONSE** (2026-09-18, `e2e/panoramica.snapshot.spec.ts`:
@@ -319,16 +306,24 @@
   in the DOM**: `toContainText` on the verdict's region reads it, so «title only» is asserted with
   `getByText(/Il patrimonio vale/)` → `toBeHidden()`, never with `not.toContainText` (seen that day).
 - **A control that calls a model is pressed only on a FAKED route** (owner, 2026-11-07):
-  `npm run dev:e2e` is `next dev`, which loads `.env.local`, so the owner's real `ANTHROPIC_API_KEY` reaches the server
+  `npm run dev:e2e` is `next dev`, which loads `.env.local` — and so does the whole run's production server since
+  2026-11-16 (`perfServe.mjs --env-local`) —, so the owner's real `ANTHROPIC_API_KEY` reaches the server
   on :3100 and enables the control (the Consulente's `configured`) — the key makes it pressable, never what answers
   it. The spec installs `page.route('**/api/allocation-advice/run', …)` BEFORE the click and answers each request by
   its `stage` with an SSE body (`data: {json}\n\n`: the `stage` events, then `done` or `error`; an interview round is ONE `interview` event, `e2e/consulenteInterview.ts`); a request it must
   hold to read a state is answered after the assertion. No dummy key in `package.json`, no real request from a spec.
-  Worked example: `e2e/allocation.consulente.spec.ts` › «runs the three stages on a faked route, a failed stage
-  retried from itself». **A fake that stands for a route which WRITES does the write itself** (2026-11-10,
+  Worked example: `e2e/allocation.consulente.spec.ts` › «runs the stages on a faked route, a failed stage
+  retried from itself, then the operating plan». **A fake that stands for a route which WRITES does the write itself** (2026-11-10,
   `e2e/assistantRegister.ts`): the Assistente's stream route stores the thread and the two messages before it answers,
   and the card's PATCH and the reload read them — so the fake writes them with the Admin SDK and answers `done` with
-  the id it wrote; the real PATCH and thread routes then run against real documents. The Assistente page needs the key
+  the id it wrote; the real PATCH and thread routes then run against real documents. Since 2026-11-12 the
+  fake also emits the router's `route` event (`reply(prompt, body)` returns the text or `{ text, reading }`; a body
+  `route` comes back as the reading, `'carried'` or `'override'`), `plantExchange(user, assistant, reading)` writes
+  the reading (`null`: a message saved before the router), and `enterRegister`/`registerAction` are gone — a
+  sentence is read as a registration with no mode to enter. Two things the fake does NOT do: it emits no `context`
+  event, so after a faked analysis the verdict stays a skeleton (the real route sends the bundle, `stream/route.ts`);
+  and its `done` says `webSearchUsed: false`, which the line reads over the reading's `webSearch` — no « · con
+  ricerca web» on a faked answer. The Assistente page needs the key
   in `.env.local` to render its composer at all (`openAssistant` says so in its failure message). A spec with
   independent tests is NOT `serial`: the first red would skip the rest, and one mutation run could not show three reds.
 - **Locators — the controls are not buttons** (2026-08-28: read the failure's page snapshot before guessing a second
@@ -387,3 +382,47 @@
   ISIN already has dividends. And a date planted at LOCAL midnight is 23:00 UTC of the day before — the form stores
   `new Date('YYYY-MM-DD')`, UTC midnight, so every coupon derived from a local-midnight fixture reads the 14th.
   (Moved here whole from `AGENTS.md` → *Audit habits* on 2026-09-20; the rule stays there in one line.)
+- **A throwaway probe on the dev server** (2026-11-13): the Next dev overlay (`nextjs-portal`) covers the bottom-left button of the 1024×768 rail and swallows its click — the probe hides it with `nextjs-portal{display:none!important}`; the dashboard never reaches `networkidle` (Firestore listeners stay open), so a window opened for the owner waits on `domcontentloaded` and a failed `goto` is caught, or the script exits and takes the window with it.
+- **A `tsx` probe's `page.evaluate` with a named inner function dies on `__name is not defined`** (2026-11-23):
+  esbuild wraps a `const read = () => …` declared inside the evaluated function with its `__name` helper, which the
+  page does not have — `context.addInitScript('window.__name = (fn) => fn')` before the first page, or no named
+  function inside the callback. A spec run by Playwright's own transform is not touched.
+- **`browser.newContext()` inside a test inherits the project's `use`, `storageState` included** (2026-11-15): an
+  «anonymous» context opened that way is logged in, and `/` redirects to the Panoramica. A context for the landing
+  passes `storageState: { cookies: [], origins: [] }`. A `tile.screenshot()` taken as soon as the tile is visible can
+  come out blank (the entrance is still running): assert on the DOM, photograph after a pause.
+
+## In brief
+
+The core's summary of this guide, moved here whole from AGENTS.md (§ 5 → Browser-Driven E2E (Playwright)) on 2026-11-17; AGENTS.md keeps a stub.
+
+- **What belongs in a browser test**: only what needs a real layout (the `desktop:` switch at 1440px, a collapsible, a
+  state flash, computed sizes, bounding boxes, overflow); the arithmetic stays with Vitest. A query race and an error
+  branch reached by cutting the network are NOT reproducible locally.
+- **`workers: 1`, non-negotiable**, and **each suite its OWN fixture** (an `npm run e2e:seed:*` script plus one
+  `runSeed` in `e2e/global-setup.ts`, the seeds side by side since 2026-11-16). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
+- **The whole run is a production build, an area run `next dev`** (2026-11-16): `npm run test:e2e` builds `.next-e2e-build`
+  when the code changed, refuses a stale one or a server on :3100; a chunk is known by a STRING its module carries
+  (`CHUNK_SIGNATURES`, unique per `__tests__/chunkSignatures.test.ts`), never a name or path a minifier drops.
+- **The FILENAME chooses the account**: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` → `mobile`, `*.degraded.spec.ts` →
+  degraded, `*.degraded.mobile.spec.ts` → `degraded-mobile` (2026-10-14), `*.tablet.spec.ts` → `tablet` (768×1024, two
+  columns and the pill) AND `tablet-landscape` (1024×768, the stage and the icon rail — `expectLandscapeStage`,
+  `expectLandscapeShell`, `expectStickyStage` in `e2e/tabletLayout.ts`) on the base account, branching on
+  `page.viewportSize().width` (2026-10-16; `desktop` ignores `tablet.`), only `analisi.spec.ts` / `centri.spec.ts` / `split.spec.ts` / `hof.spec.ts` reach those fixtures — and each
+  is ALSO excluded from `desktop`/`mobile` by `testIgnore`. A throwaway spec gets its own `playwright.<name>.config.ts`
+  and is deleted before the full suite (2026-08-28).
+- **`localhost`, never `127.0.0.1`** (the page never hydrates and the login submits natively), and `storageState`
+  captures the Firebase session only with `{ path, indexedDB: true }`.
+- **Prove the test can fail before trusting it**, breaking ONE behaviour at a time (2026-09-18). **Assert on Firestore,
+  not on pixels**: plant a decoy word absent from the seed, and remove the fixture BY THE APP, not by `curl -X DELETE`
+  (2026-08-31). On the BASE account FIRE figures depend on the run month: assert STRUCTURE and FORMAT, never amounts.
+- **Proving a refactor changed no number** (doc/guide/e2e-emulatori.md, its own section): measure the noise floor first (two dumps of unchanged code), compare
+  old-vs-new MINUTES apart, and compare the SET of rendered values, not the page text.
+- **In the cloud container** (2026-09-25) the pinned Chromium is missing (a throwaway `playwright.local.config.ts` sets
+  `executablePath`), its own Chromium groups «1.100 €» (four base specs read red there only), and no spec can import
+  `lib/` (no `@/` alias): doc/guide/e2e-playwright.md.
+- Il resto — the page-reading traps (`addInitScript`, `innerText`, `boundingBox`, hidden mobile duplicates, hydration
+  wiping a `fill()`), the vaul drawer after Escape, locators that are not buttons and substring matching (`exact: true`),
+  the euro regex and U+202F, forcing a server flag on the response, the settings reload rule, the armed two-click
+  confirm, the three tour-spec traps, the frozen clock and the empty closed row of a phone spec, Java ≥ 21 and foreign
+  emulators on 8080/9099 — in `doc/guide/e2e-playwright.md`.

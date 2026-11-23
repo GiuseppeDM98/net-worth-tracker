@@ -10,9 +10,9 @@
 
 | | |
 | --- | --- |
-| **Last audit** | 2026-11-11 (`npm audit --json`, on the lock of 2026-11-11 — `fast-xml-parser` moved on the lock of 2026-11-07 (PR #507), § Registro › Moves) |
-| **Result** | **30 advisories**: 9 high · 21 moderate, no critical, no low (32 on 2026-11-07: 9 high · 23 moderate — two moderate rows left the registry's advisories; 31 on the morning of 2026-11-11 with a new low on `fast-xml-parser`, cured the same day; 41 on 2026-11-03; 54 before the upgrade of that day) |
-| **Frameworks** | Next.js `^16.4.2` · React 19 (compiler on) · firebase `^12.5.0` (12.19.0) · firebase-admin `^14.5.0` · zod `^4.6.7` · `@anthropic-ai/sdk` `^0.115.0` · storybook `^10.6.5` · firebase-tools `^15.24.0` (15.33.0) · vitest `^4.1.12` |
+| **Last audit** | 2026-11-23 (`npm audit`, on the lock of 2026-11-16 — `next` moved that day, § Registro › Moves) |
+| **Result** | **30 advisories** on 2026-11-23, unchanged since 2026-11-20 (9 high · 21 moderate, no new package, the same lock); on 2026-11-20, unchanged (9 high · 21 moderate, the same packages and lock as the evening of 2026-11-18); in the evening of 2026-11-18 (9 high · 21 moderate, no critical, no low, no new package; the same lock): the `picomatch` advisory is no longer reported by the registry, its 18 rows gone; 48 in the morning of 2026-11-18 (29 high · 19 moderate, the 18 more ONE new advisory, `picomatch`, § Registro's last row, accepted); 30 on 2026-11-16 (31 in the evening of 2026-11-16 with a new moderate on `next`, cured the same day; 31 on the morning of 2026-11-13 with a new moderate on `hono`, cured the same day; 30 on 2026-11-11, 32 on 2026-11-07, 41 on 2026-11-03; 54 before the upgrade of that day) |
+| **Frameworks** | Next.js `^16.4.6` · React 19 (compiler on) · firebase `^12.5.0` (12.19.0) · firebase-admin `^14.5.0` · zod `^4.6.7` · `@anthropic-ai/sdk` `^0.115.0` · storybook `^10.6.5` · firebase-tools `^15.24.0` (15.33.0) · vitest `^4.1.12` |
 | **Node** | 24.x (`engines.node`, held by `__tests__/vercelConfig.test.ts`) |
 | **Next step** | none open: the next audit opens the next session (WORKFLOW.md rule 8) |
 
@@ -38,7 +38,8 @@ The open rows of the audit of 2026-11-03. Compared at every session start; a row
 nine high rows are all open and 21 of the moderate ones: @google-cloud/pubsub, @opentelemetry/core, gaxios, glob,
 minimatch, rimraf, uuid · @typescript-eslint/{parser,typescript-estree,utils}, typescript-eslint ·
 @storybook/react-vite, @joshwooding/vite-plugin-react-docgen-typescript · archiver, archiver-utils, zip-stream,
-exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslint/type-utils, google-gax.
+exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslint/type-utils, google-gax. On 2026-11-18
+picomatch's ReDoS (below) adds 18 rows and raises to high the rows it reaches through `tinyglobby` and `fast-glob`.
 
 | Severity | Packages | Rows | npm's «fix» | Decision |
 | --- | --- | --- | --- | --- |
@@ -48,6 +49,7 @@ exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslin
 | moderate | eslint · eslint-config-next · @eslint-community/eslint-utils · @eslint/config-array · @eslint/eslintrc · @typescript-eslint/{parser,typescript-estree,utils} · typescript-eslint · eslint-plugin-jsx-a11y | 10 | `eslint@4` / `eslint-config-next@0.2.4` / `eslint-plugin-storybook@0.1.1` (major) | accepted (1) |
 | moderate | @storybook/react-vite · @joshwooding/vite-plugin-react-docgen-typescript · eslint-plugin-storybook | 3 | major downgrade | accepted (1) |
 | moderate | archiver · archiver-utils · zip-stream · readdir-glob · exegesis · googleapis-common · eslint-plugin-react · @typescript-eslint/eslint-plugin · @typescript-eslint/type-utils · google-gax · eslint-plugin-import | 11 | `true` or a major, it flips; no fixed version in range | accepted (1) |
+| high | picomatch (GHSA-fc5q-39xc-vjpf, ReDoS through single-branch repeated extglobs, range `<=4.0.7`) · anymatch · chokidar · readdirp · micromatch · fast-glob · fdir · tinyglobby · unplugin · @rollup/pluginutils · @storybook/addon-docs · @next/eslint-plugin-next · eslint-config-next · eslint-import-resolver-typescript · node-gyp · re2 · vite · vitest | 18 | majors of `firebase-tools`, `eslint-config-next`, `vitest`, `@storybook/addon-docs`, or `true`; no fixed version exists — 4.0.7 (2026-08-24) is the newest and inside the range | accepted (1), owner 2026-11-18: every copy is `dev` (`npm explain picomatch`; `re2` optional under `firebase-tools` → `superstatic`); reopened when a picomatch above 4.0.7 is published; no longer reported on the evening of 2026-11-18 (same lock) — the row stays as the decision, in case it returns |
 
 ### Moves
 
@@ -64,7 +66,9 @@ exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslin
 | 2026-11-03 | qs · fast-uri · ip-address | 6.16.0 → 6.16.2 · 3.1.8 → 3.1.9 · 10.7.3 → 10.7.5 | DoS in stringify; URI spoofing; quadratic zone match | #497 |
 | 2026-11-03 | @hono/node-server | 1.19.17 → 2.1.6 (published 2026-11-02, the newest in `@modelcontextprotocol/sdk`'s `^1.19.9 \|\| ^2.0.5`; a major inside the parent's range) | `serveStatic` decoding the path twice | #497 |
 | 2026-11-07 | jsdom · @testing-library/react · @testing-library/dom · @testing-library/user-event | new devDependencies at exact versions: 30.1.3 · 16.3.3 · 10.4.2 · 14.6.8 (the newest stable at least seven days old; `dom` and `user-event` were already hoisted under storybook, now declared) | none — the component-test harness of the `dom` project in `vitest.config.ts` (owner, 2026-11-07); the gate below run once, 0 new advisories (32, unchanged) | #507 |
-| 2026-11-11 | fast-xml-parser (with is-unsafe 2.0.2 → 2.0.3 and strnum 2.4.2 → 2.5.1; under `firebase-admin` → `@google-cloud/storage`, optional) | 5.11.2 → 5.12.0 (published 2026-11-03) | quadratic CPU on unterminated stop-node tags (low, GHSA-474x-hrwr-fgx4, new that morning) | the retirement of the Registra spec (branch `docs/ritiro-ai-05`) — in that session by the owner's waiver of WORKFLOW.md rule 8 for this row (2026-11-11); `npm update fast-xml-parser`, the gate run once |
+| 2026-11-11 | fast-xml-parser (with is-unsafe 2.0.2 → 2.0.3 and strnum 2.4.2 → 2.5.1; under `firebase-admin` → `@google-cloud/storage`, optional) | 5.11.2 → 5.12.0 (published 2026-11-03) | quadratic CPU on unterminated stop-node tags (low, GHSA-474x-hrwr-fgx4, new that morning) | the retirement of the Registra spec (#513) — in that session by the owner's waiver of WORKFLOW.md rule 8 for this row (2026-11-11); `npm update fast-xml-parser`, the gate run once |
+| 2026-11-13 | hono (under `firebase-tools` → `@modelcontextprotocol/sdk` and `@hono/node-server`, dev CLI only) | 4.13.13 → 4.13.18 (published 2026-11-11) | `mount()` forwarding a path that bypasses scoped middleware; RegExpRouter skipping wildcard middleware (two moderate, fixed in 4.13.16) | the Allocazione Piano-height session of 2026-11-13 (#524) — in that session by the owner's waiver of WORKFLOW.md rule 8 for this row (2026-11-13); `npm update hono`, the gate run once |
+| 2026-11-16 | next (with `@next/env` and the nine `@next/swc-*`) | 16.4.2 → 16.4.6 (published 2026-11-09) | information disclosure across root params when a `'use cache'` function is called through `unstable_cache()` (moderate, GHSA-mfr8-8qww-v76h, new that evening; the repo uses neither). `next build` itself refused to finish while it was open — `SecurityFatalError` from its upgrade check when run by an agent, after the whole build — so the gate stopped there | the Playwright speed session of 2026-11-16 (branch `perf/e2e-suite-speed`) — in that session by the owner's waiver of WORKFLOW.md rule 8 for this row (2026-11-16); `npm install -S next@16.4.6`, the lock moved on the `next` family alone, the gate run once |
 
 ## How an upgrade is done
 
@@ -86,7 +90,7 @@ exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslin
   `npm run build && npm run perf:budget`; `npm run build-storybook -- --quiet -o <scratchpad>/storybook-static`; the
   emulators restarted and seeded, :3100 free, `npx playwright test --project=desktop`. After the last group, the whole
   `npm run test:e2e`, and on the PR's Vercel preview an Admin route with no token answers 401, never 500. A red
-  test among the known flakes of `doc/guide/e2e-playwright.md` (§ Browser-Driven E2E) is re-run alone with
+  test among the known flakes of `doc/guide/e2e-suite.md` (§ The server and the full run) is re-run alone with
   `--repeat-each=3` and must be green there; a second red of the same test stops the session.
 - **The acceptance filter**: walk `npm audit --json`'s `.vulnerabilities`; a row passes only when its `fixAvailable` is
   a major of `firebase`, `firebase-tools`, `eslint`, `eslint-config-next`, `@storybook/react-vite`,
@@ -96,6 +100,11 @@ exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslin
 
 ## Per-page blind spots
 
+- **`next build` can fail on an advisory published an hour ago** (2026-11-16): Next 16.4 asks the registry at the end of
+  every build and, when the build runs from an agent (no TTY), turns an open advisory on its own version into
+  `SecurityFatalError` and exit 1 — after compiling everything (`node_modules/next/dist/lib/upgrade/nudge.js`). A
+  second build within 5 minutes passes, a door meant for the owner's decision, not the agent's: the gate is red, the
+  advisory goes to the owner through rule 8, and the cure is the upgrade.
 - **The count rises while the lock does not change**: `npm audit` asks the registry, not the lock. An audit higher than
   the recorded one means advisories published in the meantime, not an undocumented `npm update`.
 - **`fixAvailable: true` is not a fix inside the range**: read the versions. Rows also flip between `true` and a major
@@ -107,6 +116,10 @@ exegesis, googleapis-common, @typescript-eslint/eslint-plugin, @typescript-eslin
   `firebase-tools` 15.33.0 → 15.34.2 (dry run of 2026-11-03: 85 package changes). Its output is not pure JSON: text lines
   come first.
 - **`npm audit fix --dry-run` crashes on npm 10.9.2** («Cannot read properties of null (reading 'edgesOut')»); npm 11 runs it.
+- **`node_modules` can lag the lock without a word** (2026-11-17): `npm audit` reads the lock, so the morning audit of
+  the model portfolio's implementation session read «invariate» while this machine still ran Next 16.4.2 under a lock at 16.4.6 (the move of 2026-11-16 was
+  made on another branch, and nothing reinstalled): every build stopped on `SecurityFatalError`. Since that day a
+  session opens with `npm ci`, servers stopped, before the audit (WORKFLOW.md rule 8).
 - **npm 11 prints `allow-scripts` warnings on `npm ci`** (2026-11-03): the install scripts of `esbuild`, `re2`,
   `protobufjs`, `@firebase/util`, `unrs-resolver` stay pending and are not run; every gate was green that way. Not
   approved: nothing asked for it.

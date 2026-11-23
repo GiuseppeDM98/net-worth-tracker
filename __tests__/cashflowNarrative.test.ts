@@ -46,7 +46,9 @@ import {
   describeTrackingClosedAnswers,
   type CashflowVerdictInput,
 } from '@/lib/utils/cashflowNarrative';
-import { TRACKING_SECTION_IDS } from '@/lib/utils/tracciamentoSummary';
+import { TRACKING_SECTION_IDS, summarizePeriodCashflow, summarizeSavingsHistory } from '@/lib/utils/tracciamentoSummary';
+import { readSavings } from '@/lib/utils/savingsRate';
+import type { Expense } from '@/types/expenses';
 
 // Intl 'it-IT' puts a no-break space before "€" and leaves four-digit amounts ungrouped
 // (CLDR minimumGroupingDigits = 2): expectations are written the way the screen prints
@@ -157,6 +159,16 @@ describe('describeComparisonPhrase', () => {
 });
 
 describe('buildCashflowVerdict', () => {
+  it('should say a deficit beyond the savings floor in euros, never as «senza entrate» (V7)', () => {
+    // 3 € in and 500 € out: the rate is not a rate (owner, 2026-11-12), but there was income.
+    const totals = summarizePeriodCashflow([{ type: 'income', amount: 3 }, { type: 'variable', amount: -500 }] as Expense[]);
+    const verdict = buildCashflowVerdict({ ...INPUT, totals, delta: null });
+    expect(verdict.headline).toBe('Ad agosto hai speso più di quanto è entrato.');
+    expect(verdict.tone).toBe('negative');
+    expect(plain(verdict.sentence)).toContain('le spese superano le entrate di 497 €: entrate 3 €, spese 500 €');
+    expect(plain(verdict.sentence)).not.toContain('%');
+  });
+
   it('should praise a month saving 20% or more and state every figure in the sentence', () => {
     const verdict = buildCashflowVerdict(INPUT);
 
@@ -467,17 +479,23 @@ describe('describeCategoryShare', () => {
 });
 
 describe('describeSavingsHistory', () => {
-  const flow = (year: number, month: number, savingsRate: number | null): MonthFlow => ({
-    key: `${year}-${String(month).padStart(2, '0')}`,
-    year,
-    month,
-    label: 'x',
-    income: savingsRate === null ? 0 : 100,
-    expenses: 0,
-    net: 0,
-    savingsRate,
-    scheduled: false,
-  });
+  /** 100 € of income saving `savingsRate`%, or a month without movements for `null`. */
+  const flow = (year: number, month: number, savingsRate: number | null): MonthFlow => {
+    const income = savingsRate === null ? 0 : 100;
+    const expenses = savingsRate === null ? 0 : 100 - savingsRate;
+    return {
+      key: `${year}-${String(month).padStart(2, '0')}`,
+      year,
+      month,
+      label: 'x',
+      income,
+      expenses,
+      net: income - expenses,
+      savingsRate,
+      reading: readSavings(income, expenses),
+      scheduled: false,
+    };
+  };
   const history = (overrides: Partial<SavingsHistory>): SavingsHistory => ({
     months: Array.from({ length: 12 }, (_, i) => flow(2026, i + 1, 30)),
     ongoing: null,
@@ -487,6 +505,8 @@ describe('describeSavingsHistory', () => {
     worst: flow(2025, 12, 12.4),
     deficitMonths: [],
     measuredCount: 12,
+    rankedCount: 12,
+    futureMonths: [],
     ...overrides,
   });
 
@@ -500,9 +520,21 @@ describe('describeSavingsHistory', () => {
     expect(plain(describeSavingsHistory(history({ worst: flow(2025, 12, -8.2) })))).toContain('il peggiore dicembre (−8%)');
   });
 
-  it('should say over how many closed months the average runs when the running month was left out', () => {
-    expect(plain(describeSavingsHistory(history({ ongoing: flow(2026, 8, 57), closedCount: 11, measuredCount: 11 })))).toBe(
-      'In media il 31% su 11 mesi chiusi; il mese migliore è stato aprile (44%), il peggiore dicembre (12%).',
+  it('should say over how many measurable months the average runs when the running month was left out', () => {
+    expect(plain(describeSavingsHistory(history({ ongoing: flow(2026, 8, 57), closedCount: 11, measuredCount: 11, rankedCount: 11 })))).toBe(
+      'In media il 31% su 11 mesi misurabili; il mese migliore è stato aprile (44%), il peggiore dicembre (12%).',
+    );
+  });
+
+  // A month below the savings floor has income and is no rate: the count after «su» is the months
+  // the average runs on, «misurabili» (owner, 2026-11-14 — «con entrate» named 10 of 11 months
+  // with income); the footer names the deficit month.
+  it('should count the measurable months when a month below the floor was left out', () => {
+    expect(plain(describeSavingsHistory(history({ ongoing: flow(2026, 11, 80), closedCount: 11, measuredCount: 11, rankedCount: 10, average: 33.3, best: flow(2026, 9, 33.3), worst: flow(2026, 8, 33.3) })))).toBe(
+      'In media il 33% su 10 mesi misurabili, uguale in tutti.',
+    );
+    expect(plain(describeSavingsHistory(history({ measuredCount: 12, rankedCount: 11 })))).toBe(
+      'In media il 31% su 11 mesi misurabili; il mese migliore è stato aprile (44%), il peggiore dicembre (12%).',
     );
   });
 
@@ -510,16 +542,38 @@ describe('describeSavingsHistory', () => {
     expect(plain(describeSavingsHistory(history({ average: -8.2, worst: flow(2025, 12, -20), best: flow(2026, 4, 2) })))).toBe(
       'In media −8%; il mese migliore è stato aprile (2%), il peggiore dicembre (−20%).',
     );
-    expect(plain(describeSavingsHistory(history({ average: 30, best: flow(2026, 7, 30), worst: flow(2026, 6, 30), measuredCount: 8 })))).toBe(
-      'In media il 30%, uguale in tutti gli 8 mesi con entrate.',
+    expect(plain(describeSavingsHistory(history({ average: 30, best: flow(2026, 7, 30), worst: flow(2026, 6, 30), measuredCount: 8, rankedCount: 8 })))).toBe(
+      'In media il 30%, uguale in tutti gli 8 mesi misurabili.',
     );
   });
 
   it('should not rank a single measured month, and say so', () => {
-    expect(plain(describeSavingsHistory(history({ average: 40, best: flow(2026, 8, 40), worst: flow(2026, 8, 40), measuredCount: 1 })))).toBe(
-      'Un solo mese con entrate: agosto (40%).',
+    expect(plain(describeSavingsHistory(history({ average: 40, best: flow(2026, 8, 40), worst: flow(2026, 8, 40), measuredCount: 1, rankedCount: 1 })))).toBe(
+      'Un solo mese misurabile: agosto (40%).',
     );
-    expect(describeSavingsHistory(history({ average: null, best: null, worst: null, measuredCount: 0 }))).toBeNull();
+    expect(describeSavingsHistory(history({ average: null, best: null, worst: null, measuredCount: 0, rankedCount: 0 }))).toBeNull();
+  });
+
+  it('should rank only the months that are rates, the average weighted by income (H4)', () => {
+    // March 2026 had 3 € of income and 500 € of spending: the worst month is not −16.567%.
+    const months = [
+      { ...flow(2026, 1, 50), income: 1000, expenses: 500, net: 500, reading: readSavings(1000, 500) },
+      { ...flow(2026, 2, 25), income: 4000, expenses: 3000, net: 1000, reading: readSavings(4000, 3000) },
+      { ...flow(2026, 3, null), income: 3, expenses: 500, net: -497, reading: readSavings(3, 500) },
+    ];
+    const summary = summarizeSavingsHistory(months, NOW);
+    expect(plain(describeSavingsHistory(summary))).toBe('In media il 30% su 2 mesi misurabili; il mese migliore è stato gennaio (50%), il peggiore febbraio (25%).');
+    expect(plain(describeDeficitMonths(summary, NOW))).toBe('1 mese in deficit: marzo.');
+  });
+
+  it('should keep the footer, and no reading, when no closed month is a rate', () => {
+    const months = [
+      { ...flow(2026, 1, null), income: 3, expenses: 500, net: -497, reading: readSavings(3, 500) },
+      { ...flow(2026, 2, null), income: 0, expenses: 300, net: -300, reading: readSavings(0, 300) },
+    ];
+    const summary = summarizeSavingsHistory(months, NOW);
+    expect(describeSavingsHistory(summary)).toBeNull();
+    expect(plain(describeDeficitMonths(summary, NOW))).toBe('2 mesi in deficit: gennaio e febbraio.');
   });
 
   it('should count the deficit months in the footer, naming up to three', () => {
@@ -544,7 +598,7 @@ describe('describeSavingsHistory', () => {
     expect(plain(describeDeficitMonths(history({ measuredCount: 8 }), NOW))).toBe('Nessun mese in deficit negli 8 con entrate.');
     expect(plain(describeDeficitMonths(history({ measuredCount: 11 }), NOW))).toBe('Nessun mese in deficit negli 11 con entrate.');
     expect(plain(describeDeficitMonths(history({ measuredCount: 1 }), NOW))).toBe("Nessun deficit nell'unico mese con entrate.");
-    expect(describeDeficitMonths(history({ average: null, best: null, worst: null, measuredCount: 0 }), NOW)).toBeNull();
+    expect(describeDeficitMonths(history({ average: null, best: null, worst: null, measuredCount: 0, rankedCount: 0 }), NOW)).toBeNull();
   });
 
   it('should name a window as "ultimi" only when it ends today, and the hero window likewise', () => {
@@ -657,7 +711,7 @@ describe('describeMovements', () => {
  * The closed rows' answers of Tracciamento (2026-10-16): what each row says in the landscape index
  * beside its eyebrow. The index sets a gap between the segments, so the expectations join them with
  * a space. Falsified on 2026-10-16, one at a time: «one measured month is no mean» went red with the
- * `measuredCount < 2` guard set to `< 1`; «a printed 100% never claims it all» went red with the
+ * `measuredCount < 2` guard set to `< 1` (the guard reads `rankedCount` since 2026-11-12); «a printed 100% never claims it all» went red with the
  * `share >= 100` branch removed; «Movimenti keeps its count» went red with the row answering the
  * first category.
  */
@@ -665,26 +719,33 @@ describe('describeTrackingClosedAnswers', () => {
   const answer = (narrative: Narrative | null | undefined) => (narrative ? narrative.map((s) => s.text).join(' ').replace(/ /g, ' ') : null);
   const row = (category: string, amount: number, percentage: number) => ({ category, categoryKey: category, amount, percentage });
   const ranking = (rows: ReturnType<typeof row>[]) => ({ rows, total: rows.reduce((sum, r) => sum + r.amount, 0), remainder: null });
-  const flow = (month: number, savingsRate: number | null): MonthFlow => ({
-    key: `2026-${String(month).padStart(2, '0')}`,
-    year: 2026,
-    month,
-    label: 'x',
-    income: savingsRate === null ? 0 : 100,
-    expenses: 0,
-    net: 0,
-    savingsRate,
-    scheduled: false,
-  });
+  const flow = (month: number, savingsRate: number | null): MonthFlow => {
+    const income = savingsRate === null ? 0 : 100;
+    const expenses = savingsRate === null ? 0 : 100 - savingsRate;
+    return {
+      key: `2026-${String(month).padStart(2, '0')}`,
+      year: 2026,
+      month,
+      label: 'x',
+      income,
+      expenses,
+      net: income - expenses,
+      savingsRate,
+      reading: readSavings(income, expenses),
+      scheduled: false,
+    };
+  };
   const history = (overrides: Partial<SavingsHistory>): SavingsHistory => ({
     months: [flow(6, 20), flow(7, 40)],
     ongoing: null,
+    futureMonths: [],
     closedCount: 2,
     average: 30,
     best: flow(7, 40),
     worst: flow(6, 20),
     deficitMonths: [],
     measuredCount: 2,
+    rankedCount: 2,
     ...overrides,
   });
   const EXPENSES = ranking([row('Casa', 1200, 40), row('Alimentari', 600, 20), row('Trasporti', 300, 10)]);
@@ -735,8 +796,10 @@ describe('describeTrackingClosedAnswers', () => {
   });
 
   it('should keep the scope without a mean: no measured month, or only one', () => {
-    expect(input({ savingsHistory: history({ average: null, best: null, worst: null, measuredCount: 0 }) })[TRACKING_SECTION_IDS.risparmio]).toBeNull();
-    expect(input({ savingsHistory: history({ average: 44, measuredCount: 1 }) })[TRACKING_SECTION_IDS.risparmio]).toBeNull();
+    expect(input({ savingsHistory: history({ average: null, best: null, worst: null, measuredCount: 0, rankedCount: 0 }) })[TRACKING_SECTION_IDS.risparmio]).toBeNull();
+    expect(input({ savingsHistory: history({ average: 44, measuredCount: 1, rankedCount: 1 }) })[TRACKING_SECTION_IDS.risparmio]).toBeNull();
+    // Two months with income, one of them below the floor: one ranked month is no mean either.
+    expect(input({ savingsHistory: history({ average: 44, measuredCount: 2, rankedCount: 1 }) })[TRACKING_SECTION_IDS.risparmio]).toBeNull();
   });
 
   it('should leave Movimenti its count (null): an inventory answers with how many rows it lists', () => {

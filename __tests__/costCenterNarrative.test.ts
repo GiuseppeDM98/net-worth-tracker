@@ -281,8 +281,8 @@ describe('list readings', () => {
     expect(plain(describeLastYearCaption(NOW, day('2023-03-14')))).toBe('2025, intero');
     expect(plain(describeLastYearCaption(NOW, day('2025-01-20')))).toBe('2025, intero');
     expect(plain(describeLastYearCaption(NOW, null))).toBe('2025, intero');
-    // The owner's account: a first expense in September 2025 read «2025, intero» beside «Quest'anno».
-    expect(plain(describeLastYearCaption(NOW, day('2025-09-03')))).toBe('2025, da settembre');
+    // A first expense in the middle of last year read «2025, intero» beside «Quest'anno».
+    expect(plain(describeLastYearCaption(NOW, day('2025-05-03')))).toBe('2025, da maggio');
   });
 
   it('gives Centri a scope of its own and an empty page the way in', () => {
@@ -522,13 +522,13 @@ describe('the create/edit form', () => {
 
   it('names a swatch by its position and by who already wears it', () => {
     expect(describeColorSwatch(0, 8, [], false)).toBe('Colore 1 di 8');
-    expect(describeColorSwatch(0, 8, ['Dacia Jogger'], true)).toBe('Colore 1 di 8, in uso da Dacia Jogger (selezionato)');
+    expect(describeColorSwatch(0, 8, ['Auto Tapiro'], true)).toBe('Colore 1 di 8, in uso da Auto Tapiro (selezionato)');
     expect(describeColorSwatch(2, 8, ['A', 'B'], false)).toBe('Colore 3 di 8, in uso da A e B');
   });
 
   it('says what a shared colour costs, and nothing when it is free', () => {
     expect(describeColorClash([])).toBeNull();
-    expect(describeColorClash(['Dacia Jogger'])).toBe('È già il colore di Dacia Jogger: nei grafici i due centri non si distinguono.');
+    expect(describeColorClash(['Auto Tapiro'])).toBe('È già il colore di Auto Tapiro: nei grafici i due centri non si distinguono.');
     expect(describeColorClash(['A', 'B'])).toBe('È già il colore di A e B: nei grafici questi centri non si distinguono.');
   });
 
@@ -543,16 +543,16 @@ describe('the create/edit form', () => {
 
 describe('«Collega spese…»', () => {
   it('counts what the confirm writes and names what it MOVES, before the button is pressed', () => {
-    expect(plain(describeLinkSelection({ rowCount: 0, total: 0, moves: [] }, 'Dacia Jogger'))).toBe(
-      'Nessuna spesa selezionata: spunta quelle che appartengono a Dacia Jogger.',
+    expect(plain(describeLinkSelection({ rowCount: 0, total: 0, moves: [] }, 'Auto Tapiro'))).toBe(
+      'Nessuna spesa selezionata: spunta quelle che appartengono a Auto Tapiro.',
     );
-    expect(plain(describeLinkSelection({ rowCount: 1, total: 70, moves: [] }, 'Dacia Jogger'))).toBe('1 spesa, 70 €.');
-    expect(plain(describeLinkSelection({ rowCount: 12, total: 1840, moves: [{ centerId: 'v', centerName: 'Vacanze', count: 3 }] }, 'Dacia Jogger'))).toBe(
-      '12 spese, 1840 € · 3 passano da Vacanze a Dacia Jogger.',
+    expect(plain(describeLinkSelection({ rowCount: 1, total: 70, moves: [] }, 'Auto Tapiro'))).toBe('1 spesa, 70 €.');
+    expect(plain(describeLinkSelection({ rowCount: 12, total: 1840, moves: [{ centerId: 'v', centerName: 'Vacanze', count: 3 }] }, 'Auto Tapiro'))).toBe(
+      '12 spese, 1840 € · 3 passano da Vacanze a Auto Tapiro.',
     );
     const two = { rowCount: 5, total: 200, moves: [{ centerId: 'v', centerName: 'Vacanze', count: 1 }, { centerId: 'c', centerName: 'Casa', count: 1 }] };
-    expect(plain(describeLinkSelection(two, 'Dacia Jogger'))).toBe('5 spese, 200 € · 2 passano da Vacanze e Casa a Dacia Jogger.');
-    expect(plain(describeLinkSelection({ rowCount: 2, total: 50, moves: [{ centerId: 'v', centerName: 'Vacanze', count: 1 }] }, 'Dacia Jogger'))).toContain('1 passa da Vacanze');
+    expect(plain(describeLinkSelection(two, 'Auto Tapiro'))).toBe('5 spese, 200 € · 2 passano da Vacanze e Casa a Auto Tapiro.');
+    expect(plain(describeLinkSelection({ rowCount: 2, total: 50, moves: [{ centerId: 'v', centerName: 'Vacanze', count: 1 }] }, 'Auto Tapiro'))).toContain('1 passa da Vacanze');
   });
 
   it('captions a series as one row that links every occurrence', () => {
@@ -569,13 +569,13 @@ describe('«Collega spese…»', () => {
   });
 
   it('words the outcomes, the undo and the unlink', () => {
-    expect(describeLinkOutcome(12, 'Dacia Jogger')).toBe('12 spese collegate a Dacia Jogger');
-    expect(describeLinkOutcome(1, 'Dacia Jogger')).toBe('1 spesa collegata a Dacia Jogger');
+    expect(describeLinkOutcome(12, 'Auto Tapiro')).toBe('12 spese collegate a Auto Tapiro');
+    expect(describeLinkOutcome(1, 'Auto Tapiro')).toBe('1 spesa collegata a Auto Tapiro');
     expect(describeUnlinkOutcome(3, 'Ornitorinco')).toBe('3 spese scollegate da Ornitorinco');
     expect(plain(describeLinkUndone(1))).toBe('Annullato: la spesa è tornata com’era.');
     expect(plain(describeLinkUndone(6))).toBe('Annullato: 6 spese sono tornate com’erano.');
     expect(UNLINK_CONSEQUENCE).toBe('Scollegando, la spesa resta in Cashflow ed esce dal centro.');
-    expect(describeUnlinkSeriesReading('installment', 12, 'Dacia Jogger')).toContain('un piano di 12 rate collegate a Dacia Jogger');
+    expect(describeUnlinkSeriesReading('installment', 12, 'Auto Tapiro')).toContain('un piano di 12 rate collegate a Auto Tapiro');
     expect(describeUnlinkSeriesReading('recurring', 3, 'Ornitorinco')).toContain('una serie di 3 occorrenze');
   });
 });

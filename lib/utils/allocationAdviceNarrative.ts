@@ -7,6 +7,9 @@
 import type { Narrative, PageVerdictModel } from '@/lib/utils/narrative';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { ADVICE_SOURCE_GONE } from '@/lib/utils/accumuloCopy';
+import type { AdvicePlanBuild } from '@/lib/utils/advicePlan';
+import type { AdvicePlanStep } from '@/lib/services/advicePlanService';
 import type { AllocationAdviceDocument, AllocationAdviceInterview, AllocationAdviceStage, AllocationAdviceStep } from '@/types/allocationAdvice';
 import type { AllocationAdviceProposal } from '@/lib/utils/allocationAdviceProposal';
 
@@ -167,6 +170,7 @@ export const STAGE_COPY: Record<AllocationAdviceStage, { label: string; detail: 
   strategy: { label: 'Propongo la strategia', detail: 'Opus 5.5 ragiona su orizzonte, tolleranza, obiettivi e vincoli.' },
   instruments: { label: 'Cerco gli strumenti', detail: 'Sonnet 5.5 verifica sul web quotazione, ISIN e costi sulla tua borsa.' },
   review: { label: 'Rivedo il tutto', detail: 'Opus 5.5 unisce strategia e strumenti nel report finale.' },
+  plan: { label: 'Scrivo il piano operativo', detail: 'Opus 5.5 traduce il report in versamento, mesi, quote e vendite.' },
 };
 
 export function describeRunHeadline(stage: AllocationAdviceStage | null): string {
@@ -174,8 +178,8 @@ export function describeRunHeadline(stage: AllocationAdviceStage | null): string
   return `${STAGE_COPY[stage].label}.`;
 }
 
-/** What a stage usually takes, in minutes (about five in all at effort `medium`, 2026-10-23; the owner's figures of 2026-11-01). */
-export const STAGE_TYPICAL_MINUTES: Record<AllocationAdviceStage, number> = { context: 0, strategy: 2, instruments: 2, review: 1 };
+/** What a stage usually takes, in minutes (about five in all at effort `medium`, 2026-10-23; the owner's figures of 2026-11-01; the plan's minute, 2026-11-19). */
+export const STAGE_TYPICAL_MINUTES: Record<AllocationAdviceStage, number> = { context: 0, strategy: 2, instruments: 2, review: 1, plan: 1 };
 
 /** «di solito ~N min»; null when N is 0 (the context: the row prints no duration). */
 export function describeStageTypical(stage: AllocationAdviceStage): string | null {
@@ -272,13 +276,39 @@ export function describeProposalReading(rows: ProposalClassRow[]): Narrative {
   return out;
 }
 
-export function describeApplySummary(input: { targets: boolean; roles: number; goals: number }): string {
+/** What «Applica» writes; with a plan, what the same click does to it (2026-11-20). */
+export function describeApplySummary(input: { targets: boolean; roles: number; goals: number; plan?: AdvicePlanBuild['action'] | null }): string {
   const parts: string[] = [];
   if (input.targets) parts.push('i target in Impostazioni → Allocazione');
   if (input.roles > 0) parts.push(`${input.roles} ${input.roles === 1 ? 'ruolo' : 'ruoli'} degli asset`);
   if (input.goals > 0) parts.push(`${input.goals} ${input.goals === 1 ? 'obiettivo' : 'obiettivi'}`);
   if (parts.length === 0) return 'Niente selezionato: scegli almeno una voce.';
+  if (input.plan) return `Scrive ${parts.join(', ')} ${PLAN_CLAUSE[input.plan]}.`;
   return `Scrive ${parts.join(', ')}. Puoi sempre cambiarli a mano dopo.`;
+}
+
+const PLAN_CLAUSE = { create: 'e crea il piano di accumulo', replace: 'e sostituisce la bozza del piano', revise: 'e rivede il piano di accumulo' } as const;
+
+export { ADVICE_SOURCE_GONE };
+
+/** With its preposition: «ad attivare», the euphonic d before a vowel. */
+const FAILED_STEP: Record<AdvicePlanStep, string> = {
+  setting: 'a salvare il conto per gli investimenti',
+  instruments: 'a creare gli strumenti',
+  plan: 'a scrivere il piano',
+  activate: 'ad attivare il piano',
+};
+
+/** After a failed click: what it wrote, the step, the reason, and the button that starts again from there. */
+export function describeAdvicePlanFailure(
+  error: { step: AdvicePlanStep; done: readonly AdvicePlanStep[]; message: string },
+  wroteSettings: boolean
+): string {
+  const before = `${wroteSettings ? 'Ho scritto target, ruoli e obiettivi. ' : ''}${error.done.includes('instruments') ? 'Ho creato gli strumenti. ' : ''}`;
+  // The account gone: its sentence already names the button.
+  if (error.message === ADVICE_SOURCE_GONE) return `${before}${error.message}`;
+  const reason = error.message.trim().replace(/\.$/, '');
+  return `${before}Non sono riuscito ${FAILED_STEP[error.step]}: ${reason.charAt(0).toLowerCase()}${reason.slice(1)}. Premi «Crea il piano di accumulo»: riparte da lì.`;
 }
 
 /** The Allocazione header's line when a plan has a review date («Piano applicato il 20/10/2026 · rivedi entro il 20/10/2028»). */
@@ -304,6 +334,29 @@ export function reviewDueState(document: AllocationAdviceDocument | null | undef
 
 export const REVIEW_INVITE_LABEL = 'Rivedi con il Consulente';
 
+/** The plan of accumulation on «Applica» (2026-11-20): its tick, its states, the outcome of the click. */
+export const ADVICE_PLAN_TICK_COPY = {
+  // A new BTP€i (owner, 2026-11-20): Borsa Italiana's quote is a real price, the coefficient makes it euro.
+  coefficientLabel: (name: string) => `Coefficiente di indicizzazione di ${name}`,
+  coefficientPlaceholder: 'es. 1,2345',
+  coefficientHint: 'Il coefficiente di oggi, dal sito del MEF o dal tuo broker.',
+  labelCreate: 'Il piano di accumulo',
+  labelReplace: 'Il piano di accumulo, al posto della bozza che hai in Accumulo',
+  labelRevise: 'Rivede il piano di accumulo attivo',
+  loading: 'Preparo il piano…',
+  plansFailed: 'Non ho letto i piani di accumulo: ricarica la pagina per creare il piano da qui.',
+  noAccount: 'Per creare il piano serve un conto da cui comprare: aggiungine uno in Patrimonio.',
+  targetsUnticked: 'Il piano va verso i nuovi target: applicali insieme.',
+  sourceQuestion: 'Da quale conto?',
+  sourcePlaceholder: 'Scegli il conto',
+  sourceRemembered: 'Lo ricordo come Conto per gli investimenti.',
+  instrumentsLabel: 'Strumenti da creare',
+  notesEyebrow: "Corretto dall'app",
+  createAction: 'Crea il piano di accumulo',
+  creating: 'Creo il piano…',
+  done: { create: 'Piano creato.', replace: 'Bozza sostituita e piano attivato.', revise: 'Piano rivisto.' },
+} as const;
+
 /** The invite's sentence when the review is near or due; null otherwise. */
 export function describeReviewInvite(due: ReviewDue): string | null {
   if (due.state !== 'soon' && due.state !== 'due') return null;
@@ -318,4 +371,38 @@ export function describeReviewBy(document: AllocationAdviceDocument | null | und
   const proposal = document.report?.proposal ?? document.strategy?.proposal ?? null;
   if (!proposal) return `Piano del Consulente applicato il ${formatDate(document.applied.at)}`;
   return `Piano del Consulente applicato il ${formatDate(document.applied.at)} · rivedi entro il ${formatDate(new Date(proposal.reviewByIso))}`;
+}
+
+// ─── The operating plan (2026-11-19, doc/guide/consulente-piano.md) ───────────
+
+export const OPERATING_PLAN_PAGE_COPY = {
+  buy: 'Compra',
+  hold: 'Smetti di comprare',
+  sell: 'Vendi',
+  departures: 'Dove si discosta dal report',
+  corrections: "Corretto dall'app",
+  footnote: "Le rate esatte le calcola l'app quando crei il piano: dipendono dai prezzi di quel giorno.",
+  allShares: 'tutte le quote',
+  // The swap (owner, 2026-11-20): the sale's proceeds buy one instrument in its month.
+  swapBuys: (name: string) => `con il ricavato compra ${name}`,
+  bySwap: 'con lo scambio',
+  taxUnknown: { rate: "tasse non stimabili: manca l'aliquota", 'cost-basis': 'tasse non stimabili: manca il costo fiscale' },
+  rowAbsent: "Il piano operativo non c'è ancora.",
+  rowRunning: 'Scrivo il piano operativo…',
+  action: 'Scrivi il piano operativo',
+} as const;
+
+/** «12 mesi · 500,00 € al mese»: the aside of the page «Il piano operativo». */
+export function describePlanAside(plan: { months: number; monthlyInflowEur: number }): string {
+  return `${plan.months} ${plan.months === 1 ? 'mese' : 'mesi'} · ${formatCurrency(plan.monthlyInflowEur)} al mese`;
+}
+
+/** «Tasse stimate delle vendite: €X», plus «, senza N vendite non stimabili»; null when no sale is estimable. */
+export function describePlanTaxTotal(sales: ReadonlyArray<{ estimatedTaxEur?: number | null }>): string | null {
+  const estimable = sales.filter((sale) => typeof sale.estimatedTaxEur === 'number');
+  if (estimable.length === 0) return null;
+  const total = estimable.reduce((sum, sale) => sum + (sale.estimatedTaxEur as number), 0);
+  const unknown = sales.length - estimable.length;
+  const without = unknown === 0 ? '' : unknown === 1 ? ', senza 1 vendita non stimabile' : `, senza ${unknown} vendite non stimabili`;
+  return `Tasse stimate delle vendite: ${formatCurrency(Math.round(total * 100) / 100)}${without}`;
 }

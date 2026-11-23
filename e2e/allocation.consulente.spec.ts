@@ -13,11 +13,17 @@
  * `.env.local` key enables the button, no request reaches the server (doc/guide/e2e-playwright.md
  * § Browser-Driven E2E). A real run is covered by `allocationAdviceRun` (the SDK simulated) and,
  * on 2026-10-20, by a real run on the mirror. The interview that precedes the run (2026-11-08) has
- * its own specs, `allocation.consulente.interview*.spec.ts`.
+ * its own specs, `allocation.consulente.interview*.spec.ts`. The fifth stage, the operating plan
+ * (2026-11-19), is faked too: the fake writes the plan on the emulator, and `afterAll` puts back
+ * what the account held.
  */
 
 import { test, expect } from '@playwright/test';
 import { clearDraft, next, openConsulente, walkGoals, walkToSummary } from './consulentePath';
+import { rememberHeld, restoreHeld, storedOperatingPlanStatus, writeOperatingPlan } from './consulenteReport';
+
+test.beforeAll(rememberHeld);
+test.afterAll(restoreHeld);
 
 test.beforeEach(async ({ page }) => {
   await clearDraft(page);
@@ -130,7 +136,7 @@ test('the draft survives a reload on this browser', async ({ page }) => {
   await expect(page.locator('#consulente-horizon')).toHaveValue('15');
 });
 
-test('runs the three stages on a faked route, a failed stage retried from itself', async ({ page }) => {
+test('runs the stages on a faked route, a failed stage retried from itself, then the operating plan', async ({ page }) => {
   const order: string[] = [];
   const carriesAnswers: Record<string, boolean> = {};
   let instrumentsRequests = 0;
@@ -156,6 +162,10 @@ test('runs the three stages on a faked route, a failed stage retried from itself
         await retryHeld;
         await route.fulfill(stream([{ type: 'stage', stage: 'instruments' }, { type: 'done' }]));
       }
+    } else if (body.stage === 'plan') {
+      // The fifth stage (2026-11-19): the fake writes the plan on the emulator, then answers.
+      await writeOperatingPlan('ready', 'Piano finto della corsa.');
+      await route.fulfill(stream([{ type: 'stage', stage: 'plan' }, { type: 'done' }]));
     } else {
       await route.fulfill(stream([{ type: 'stage', stage: 'review' }, { type: 'done' }]));
     }
@@ -173,11 +183,12 @@ test('runs the three stages on a faked route, a failed stage retried from itself
   await expect(card.getByRole('status')).toHaveText('Il percorso non si è concluso.');
   await expect(card).toContainText('Ricerca finta interrotta: ornitorinco.');
   const rows = card.locator('ol[aria-label="Le fasi"] > li');
-  await expect(rows).toHaveCount(4);
+  await expect(rows).toHaveCount(5);
   await expect(rows.nth(0)).toHaveAttribute('data-state', 'done');
   await expect(rows.nth(1)).toHaveAttribute('data-state', 'done');
   await expect(rows.nth(2)).toHaveAttribute('data-state', 'failed');
   await expect(rows.nth(3)).toHaveAttribute('data-state', 'pending');
+  await expect(rows.nth(4)).toHaveAttribute('data-state', 'pending');
   await expect(card.getByRole('button', { name: 'Riprova' })).toBeVisible();
 
   // «Riprova» restarts from the instruments, whose request is held: the row is active with its
@@ -193,8 +204,12 @@ test('runs the three stages on a faked route, a failed stage retried from itself
 
   await expect(card.getByRole('status')).toHaveText('La proposta è pronta.');
   await expect(rows.nth(3)).toHaveAttribute('data-state', 'done');
-  expect(order).toEqual(['strategy', 'instruments', 'instruments', 'review']);
-  expect(carriesAnswers).toEqual({ 'strategy#1': true, 'instruments#2': false, 'instruments#3': false, 'review#4': false });
+  await expect(rows.nth(4)).toHaveAttribute('data-state', 'done');
+  await expect(rows.nth(4)).toContainText('Scrivo il piano operativo');
+  expect(order).toEqual(['strategy', 'instruments', 'instruments', 'review', 'plan']);
+  expect(carriesAnswers).toEqual({ 'strategy#1': true, 'instruments#2': false, 'instruments#3': false, 'review#4': false, 'plan#5': false });
+  // The document read after the run carries the plan the fake wrote.
+  expect(await storedOperatingPlanStatus()).toBe('ready');
 });
 
 test('the assistant links to the Consulente', async ({ page }) => {

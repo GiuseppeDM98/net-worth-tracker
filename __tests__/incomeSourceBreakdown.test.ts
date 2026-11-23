@@ -27,7 +27,7 @@ describe('buildIncomeSourceBreakdown', () => {
   it('should group income into a category → subcategory tree', () => {
     // Arrange
     const expenses: Expense[] = [
-      makeExpense({ subCategoryId: 's1', subCategoryName: 'Giuseppe', amount: 2000 }),
+      makeExpense({ subCategoryId: 's1', subCategoryName: 'Paolo', amount: 2000 }),
       makeExpense({ subCategoryId: 's2', subCategoryName: 'Partner', amount: 1500 }),
       makeExpense({
         categoryId: 'rent',
@@ -70,7 +70,7 @@ describe('buildIncomeSourceBreakdown', () => {
   it('should scale amounts by the annualization factor so they sum to the annualised total', () => {
     // Arrange: 6 months of data → factor 2 to project a full year.
     const expenses: Expense[] = [
-      makeExpense({ subCategoryId: 's1', subCategoryName: 'Giuseppe', amount: 6000 }),
+      makeExpense({ subCategoryId: 's1', subCategoryName: 'Paolo', amount: 6000 }),
     ]
 
     // Act

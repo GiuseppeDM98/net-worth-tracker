@@ -18,7 +18,7 @@ const TOOLTIP_CONTENT_STYLE = {
   border: '1px solid var(--border)',
   color: 'var(--card-foreground)',
   fontSize: 12,
-  borderRadius: 8,
+  borderRadius: 'var(--costume-control-frame-radius, 8px)',
 } as const;
 
 const TOOLTIP_LABEL_STYLE = {
@@ -46,15 +46,17 @@ export function EntityTrendChart({ data, seriesName, color, height }: EntityTren
     <ResponsiveContainer width="100%" height={height}>
       <ComposedChart
         data={data}
-        margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
+        margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
         role="img"
         accessibilityLayer={false}
         aria-label={`${seriesName} per mese, ultimi 24 mesi. ${data.map((point) => `${point.label}: ${formatCurrency(point.value)}${point.prevYearValue !== null ? `, anno precedente ${formatCurrency(point.prevYearValue)}` : ''}`).join('; ')}`}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis dataKey="label" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-        {/* «150 €», the page's own format — not «€150» with the symbol in front. */}
-        <YAxis tickFormatter={(value: number) => formatCurrency(value)} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width={56} />
+        {/* «150 €», the page's own format — not «€150» with the symbol in front. The axis is as wide as
+            its longest tick (`width="auto"`): a fixed 56px under a −16px margin cut «1200 €» to «200 €»
+            (owner, 2026-11-15, the mirror tour of Analisi «Classifica»; held by e2e/classifica.tablet.spec.ts). */}
+        <YAxis tickFormatter={(value: number) => formatCurrency(value)} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width="auto" />
         <Tooltip
           // A null baseline (pre-floor month) is a gap, not a zero — the tooltip must
           // not resurrect the fabricated 0 the series refused.

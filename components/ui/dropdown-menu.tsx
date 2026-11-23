@@ -14,6 +14,7 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { usePopperSheet } from "@/components/ui/popper-sheet"
+import { useCostumeScopeProps } from "@/contexts/ColorThemeContext"
 
 // === Root Components ===
 
@@ -49,10 +50,12 @@ function DropdownMenuContent({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   const sheet = usePopperSheet()
+  const scopeProps = useCostumeScopeProps()
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
+        {...scopeProps}
         data-popper-sheet={sheet ? "" : undefined}
         sideOffset={sideOffset}
         className={cn(

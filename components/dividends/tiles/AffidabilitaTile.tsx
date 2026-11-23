@@ -91,7 +91,7 @@ export function AffidabilitaTile({ reliability, reading, months, footer, emptyCo
             {months.map((month) => (
               <span
                 key={month.key}
-                className="h-[22px] rounded-[3px]"
+                className="h-[22px] rounded-[var(--costume-control-chip-radius,3px)]"
                 style={{ background: month.paid ? 'var(--chart-2)' : 'var(--muted)' }}
               />
             ))}

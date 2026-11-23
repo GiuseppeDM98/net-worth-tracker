@@ -32,9 +32,11 @@ import {
   type AllocazioneSlice,
   type AssetClassDraft,
 } from '@/lib/utils/settingsDraft';
-import type { AssetClass } from '@/types/assets';
+import type { AssetClass, IdealAllocationSettings } from '@/types/assets';
 import { AllocationClassEditor } from '@/components/settings/allocation/AllocationClassEditor';
+import { IdealAllocationSummary } from '@/components/settings/IdealAllocationSummary';
 import { DeclarationRow, INTERACTIVE_CONTROL_CLASS, pctLabel, SettingsTabPanel } from './shared';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface AllocazioneTabProps {
   slice: AllocazioneSlice;
@@ -43,9 +45,11 @@ export interface AllocazioneTabProps {
   /** The field «Salva» wants focused (its group already open in `slice`), or `null`. */
   pendingFocus: string | null;
   onFocusConsumed: () => void;
+  /** The model portfolio's criteria — read-only here, edited in Allocazione › Accumulo. */
+  idealAllocation: IdealAllocationSettings;
 }
 
-export function AllocazioneTab({ slice, onChange, onClassChange, pendingFocus, onFocusConsumed }: AllocazioneTabProps) {
+export function AllocazioneTab({ slice, onChange, onClassChange, pendingFocus, onFocusConsumed, idealAllocation }: AllocazioneTabProps) {
   const { userAge, riskFreeRate, autoCalculate, cashUseFixedAmount, cashFixedAmount, classes } = slice;
 
   // The pending focus, consumed after the commit that opened the group and showed the tab (an
@@ -108,7 +112,7 @@ export function AllocazioneTab({ slice, onChange, onClassChange, pendingFocus, o
               {pctLabel(total)}
             </p>
             {hasTargetLeverage && (
-              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 font-mono text-[12px] font-medium tabular-nums">
+              <span className={cn('border border-border bg-muted px-2.5 py-0.5 font-mono text-[12px] font-medium tabular-nums', COSTUME_PILL_RADIUS_CLASS)}>
                 Leva {formatNumber(derivedTargetLeverage, 2)}×
               </span>
             )}
@@ -289,6 +293,11 @@ export function AllocazioneTab({ slice, onChange, onClassChange, pendingFocus, o
             <span>I target arrivano in Allocazione con «Salva», non prima.</span>
           </TileMethodNote>
         </Tile>
+      </div>
+
+      {/* Criteri del modello — read-only here; they are edited in Allocazione › Accumulo */}
+      <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-12')}>
+        <IdealAllocationSummary value={idealAllocation} targetLeverageRatio={derivedTargetLeverage} />
       </div>
     </SettingsTabPanel>
   );

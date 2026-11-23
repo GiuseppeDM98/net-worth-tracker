@@ -1,5 +1,5 @@
 import type { PeriodCashflowTotals } from '@/lib/utils/tracciamentoSummary';
-import { cachedFormatCurrencyEUR, formatEuroMinus } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR, formatEuroMinus, withTypographicMinus } from '@/lib/utils/formatters';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { printedDelta } from '@/lib/utils/cashflowNarrative';
 import { cn } from '@/lib/utils';
@@ -16,10 +16,10 @@ export function deltaClass(delta: number, positiveGood: boolean): string {
   return (delta > 0) === positiveGood ? 'text-positive' : 'text-destructive';
 }
 
-function DeltaLine({ delta, positiveGood, previousLabel, lifted = false }: { delta: number | null; positiveGood: boolean; previousLabel: string | null; lifted?: boolean }) {
+function DeltaLine({ delta, positiveGood, previousLabel }: { delta: number | null; positiveGood: boolean; previousLabel: string | null }) {
   // No previous period, or a zero base: the line is absent rather than a placeholder.
   if (delta === null) return null;
-  const lineClass = cn('text-[11px] text-muted-foreground', lifted && LIFTED_FIGURE_CLASS);
+  const lineClass = 'text-[11px] text-muted-foreground';
   // Decided on the printed figure: a 0,04% change prints as 0,0% and reads as no change.
   const printed = printedDelta(delta);
   if (printed === 0) return <p className={lineClass}>{previousLabel ? `come ${previousLabel}` : 'invariate'}</p>;
@@ -49,12 +49,6 @@ interface CashflowKpiTrioProps {
    * the savings rate and the coverage stay — only the figure the strip repeats goes.
    */
   lifted?: boolean;
-  /**
-   * The spending delta a page's verdict already prints (Analisi: «−1,5% su 2025» in its first
-   * sentence, owner's call 2026-10-14), hidden below `desktop:` like a lifted value.
-   * Default false: Tracciamento's verdict names no delta.
-   */
-  expensesDeltaLifted?: boolean;
   className?: string;
 }
 
@@ -63,7 +57,7 @@ interface CashflowKpiTrioProps {
  * and on Analisi's Periodo tile, one component so the two cannot drift. The savings rate and
  * the coverage ratio sit together on purpose: same relationship, two units.
  */
-export function CashflowKpiTrio({ totals, incomeDelta, expensesDelta, previousLabel, lifted = false, expensesDeltaLifted = false, className }: CashflowKpiTrioProps) {
+export function CashflowKpiTrio({ totals, incomeDelta, expensesDelta, previousLabel, lifted = false, className }: CashflowKpiTrioProps) {
   const { income, expenses, net, savingsRate, coverageRatio } = totals;
   const valueClass = cn(KPI_VALUE_CLASS, lifted && LIFTED_FIGURE_CLASS);
   return (
@@ -80,7 +74,7 @@ export function CashflowKpiTrio({ totals, incomeDelta, expensesDelta, previousLa
         <p className={cn(valueClass, expenses > 0 ? 'text-destructive' : 'text-muted-foreground')}>
           {cachedFormatCurrencyEUR(expenses, true)}
         </p>
-        <DeltaLine delta={expensesDelta} positiveGood={false} previousLabel={previousLabel} lifted={expensesDeltaLifted} />
+        <DeltaLine delta={expensesDelta} positiveGood={false} previousLabel={previousLabel} />
       </div>
       <div className="flex min-w-0 flex-col gap-1.5">
         <p className={TILE_SUB_EYEBROW_CLASS}>Risparmio</p>
@@ -89,7 +83,7 @@ export function CashflowKpiTrio({ totals, incomeDelta, expensesDelta, previousLa
         <p className={cn(valueClass, 'text-foreground')}>{formatEuroMinus(net)}</p>
         <p className="text-[11px] text-muted-foreground">
           {savingsRate !== null ? (
-            <span className="font-mono tabular-nums text-foreground">{formatPercentage(savingsRate, 1)}</span>
+            <span className="font-mono tabular-nums text-foreground">{withTypographicMinus(savingsRate, formatPercentage(Math.abs(savingsRate), 1))}</span>
           ) : (
             <span>—</span>
           )}

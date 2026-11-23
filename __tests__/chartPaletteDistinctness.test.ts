@@ -2,13 +2,15 @@
  * The nine chart slots of EVERY theme must be tellable apart in both modes — a rule DESIGN.md
  * stated in prose since 2026-08-30 (when the static teal at index 6 measured ΔE00 0.87 from
  * `--chart-2`) and nothing enforced: the default light palette shipped with Liquidità 10.1 ΔE00
- * from Immobili until the Panoramica critique of 2026-09-13 measured it on the real account.
+ * from Immobili until the Panoramica critique of 2026-09-13 measured it.
  *
  * Until 2026-09-20 the suite held the default theme only, and the named themes were a declared
  * blind spot. The owner's tour on solar-dusk showed what that costs: Obbligazioni and Immobili
  * were the SAME grey (ΔE00 0.0), Azioni and Criptovalute two browns at 9.5; elegant-luxury had
  * six pairs under the floor (three reds), retro-arcade and midnight-bloom Immobili ~ Liquidità at
- * 10. Four palettes were re-pitched that day, and the twelve blocks are measured here.
+ * 10. Four palettes were re-pitched that day, and every theme block is measured here — since
+ * 2026-11-21 the list comes from the registry (`./themeBlocks`), so a theme added to `COLOR_THEMES`
+ * is measured too, and one without its CSS is red.
  *
  * The suite reads `app/globals.css` itself, so a token edited in the stylesheet is what gets
  * measured — never a transcription that can drift. Three floors per theme:
@@ -19,14 +21,17 @@
  *     the slot silently falls back to the static palette (doc/guide/temi.md) — cyberpunk's
  *     light slots 3-5 sat at L 0.84–0.92 until the same day.
  *   - a slot keeps its hue across the two modes (≤ 30°), so a class does not change identity when
- *     the mode flips. A NEUTRAL slot (chroma < 0.03: solar-dusk's Immobili is a warm grey on
- *     purpose) has no hue to hold and is exempt.
+ *     the mode flips. A NEUTRAL slot (chroma < 0.03) has no hue to hold and is exempt; none is left
+ *     since 2026-11-15, when solar-dusk's grey Immobili became a pine green (below).
+ *   - every slot ΔE00 ≥ 14 from the block's `--muted-foreground`, the colour of a ring's fold
+ *     («Altre N classi», DESIGN.md → The Ring Rule): solar-dusk's grey Immobili measured ΔE00 ~1
+ *     from it, two arcs of one ring in the same grey (the tour of 2026-11-15).
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { COLOR_THEMES } from '@/lib/constants/colorTheme';
 import { CHART_DARK_MIN_L, CHART_LIGHT_MAX_L } from '@/lib/utils/themePalette';
+import { THEME_MODES, themeBlockBody, themeBlockHeader } from './themeBlocks';
 
 // ─── OKLCH → CIE Lab (D65), then CIEDE2000 ────────────────────────────────────
 
@@ -109,16 +114,12 @@ const labOf = (oklch: Oklch) => linearSrgbToLab(oklchToLinearSrgb(oklch));
 
 // ─── Reading the stylesheet ───────────────────────────────────────────────────
 
-const GLOBALS = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
-
-/** The `--chart-1..9` declarations of one selector block (`:root` or `.dark`), as OKLCH triples. */
+/** The `--chart-1..9` declarations of one theme block, as OKLCH triples (the headers: `./themeBlocks`). */
 function chartSlotsOf(selector: string): Oklch[] {
-  const start = GLOBALS.indexOf(`\n${selector} {`);
-  expect(start, `block "${selector}" in app/globals.css`).toBeGreaterThan(-1);
-  const end = GLOBALS.indexOf('\n}', start);
-  const block = GLOBALS.slice(start, end);
+  const block = themeBlockBody(selector);
+  expect(block, `block "${selector}" in app/globals.css`).not.toBeNull();
   return Array.from({ length: SLOT_NAMES.length }, (_, i) => {
-    const match = block.match(new RegExp(`--chart-${i + 1}:\\s*oklch\\(([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+    const match = block!.match(new RegExp(`--chart-${i + 1}:\\s*oklch\\(([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
     expect(match, `--chart-${i + 1} in "${selector}"`).not.toBeNull();
     return [Number(match![1]), Number(match![2]), Number(match![3])] as const;
   });
@@ -139,20 +140,15 @@ function closestPair(slots: Oklch[]): { a: string; b: string; deltaE: number } {
   return closest;
 }
 
-/** `null` = the default theme (`:root` / `.dark`); the named ones are `[data-theme]` blocks. */
-const THEMES = [null, 'retro-arcade', 'cyberpunk', 'solar-dusk', 'elegant-luxury', 'midnight-bloom'] as const;
-type ThemeName = (typeof THEMES)[number];
-
-const lightSelector = (theme: ThemeName) => (theme ? `[data-theme="${theme}"]` : ':root');
-const darkSelector = (theme: ThemeName) => (theme ? `.dark[data-theme="${theme}"]` : '.dark');
-
 /** Below this chroma a slot is a neutral: it has no hue to keep across the modes. */
 const NEUTRAL_CHROMA = 0.03;
 
-const BLOCKS = THEMES.flatMap((theme) => [
-  { label: `${theme ?? 'default'} · light`, selector: lightSelector(theme), guard: { maxL: CHART_LIGHT_MAX_L, minL: 0 } },
-  { label: `${theme ?? 'default'} · dark`, selector: darkSelector(theme), guard: { maxL: 1, minL: CHART_DARK_MIN_L } },
-]);
+/** Every theme of the registry in both modes (`COLOR_THEMES`, lib/constants/colorTheme.ts). */
+const BLOCKS = THEME_MODES.map(({ label, header, mode }) => ({
+  label,
+  selector: header,
+  guard: mode === 'light' ? { maxL: CHART_LIGHT_MAX_L, minL: 0 } : { maxL: 1, minL: CHART_DARK_MIN_L },
+}));
 
 describe.each(BLOCKS)('the chart slots of $label', ({ selector, guard }) => {
   const slots = chartSlotsOf(selector);
@@ -170,12 +166,26 @@ describe.each(BLOCKS)('the chart slots of $label', ({ selector, guard }) => {
   });
 });
 
-describe.each(THEMES.map((theme) => ({ theme, label: theme ?? 'default' })))('the two modes of $label agree on what a slot looks like', ({ theme }) => {
+describe.each(BLOCKS)('the ring fold of $label', ({ selector }) => {
+  it(`keeps every slot at least ΔE00 ${MIN_DELTA_E} from --muted-foreground, the fold's colour`, () => {
+    const block = themeBlockBody(selector);
+    expect(block, `block "${selector}" in app/globals.css`).not.toBeNull();
+    const match = block!.match(/--muted-foreground:\s*oklch\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)/);
+    expect(match, `--muted-foreground in "${selector}"`).not.toBeNull();
+    const fold = labOf([Number(match![1]), Number(match![2]), Number(match![3])]);
+    chartSlotsOf(selector).forEach((slot, i) => {
+      const deltaE = deltaE00(labOf(slot), fold);
+      expect(deltaE, `${SLOT_NAMES[i]} ↔ the fold measure ΔE00 ${deltaE.toFixed(1)}`).toBeGreaterThanOrEqual(MIN_DELTA_E);
+    });
+  });
+});
+
+describe.each(COLOR_THEMES.map((theme) => ({ theme, label: theme })))('the two modes of $label agree on what a slot looks like', ({ theme }) => {
   it('holds each slot inside the same hue band in light and dark (≤ 30° apart)', () => {
     // The identity of a slot is its hue: a class that is blue in dark and orange in light is
     // two identities, which is what the default light palette was until 2026-09-13.
-    const light = chartSlotsOf(lightSelector(theme));
-    const dark = chartSlotsOf(darkSelector(theme));
+    const light = chartSlotsOf(themeBlockHeader(theme, 'light'));
+    const dark = chartSlotsOf(themeBlockHeader(theme, 'dark'));
     light.forEach(([, chromaLight, hueLight], i) => {
       const [, chromaDark, hueDark] = dark[i];
       if (chromaLight < NEUTRAL_CHROMA && chromaDark < NEUTRAL_CHROMA) return;

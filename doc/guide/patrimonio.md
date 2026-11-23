@@ -7,12 +7,12 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Composite class chip** (2026-09-26): `InstrumentClassChip` in `components/assets/AssetRow.tsx` (desktop `Classe` column and phone row; the group header keeps `AssetClassChip`), pure `describeAssetClassChip` + `rankedClassLegs` + `SHORT_CLASS_LABELS` in `lib/utils/assetDisplayClass.ts`; tests `__tests__/assetDisplayClass.test.ts`, `e2e/assets.composite-chip.spec.ts` (1440: the 112px floor, «Andamento» without sideways scroll, the grouped header's plain chip; 390: the chip ends before the amount after a 12-character ticker, `main` does not scroll)
-- **Mutuo tile** (2026-09-25; per LOAN since 2026-10-10): `components/assets/tiles/MutuoTile.tsx`, pure `lib/utils/mortgageSummary.ts` (`summarizeMortgage`, `projectPayoff`, `interestPaidOf`), words `describeMortgage*` + `loanNoun` in `patrimonioNarrative.ts`, reader `getMortgageInstalments` + `lib/hooks/useMortgageInstalments.ts`; tests `__tests__/mortgageSummary.test.ts`, `e2e/cashflow.mortgage.spec.ts`
+- **Mutuo tile** (2026-09-25; per LOAN since 2026-10-10): `components/assets/tiles/MutuoTile.tsx`, pure `lib/utils/mortgageSummary.ts` (`summarizeMortgage`, `projectPayoff`, `interestPaidOf`), words `describeMortgage*` + `loanNoun` in `patrimonioNarrative.ts`, reader `getMortgageInstalments` + `lib/hooks/useMortgageInstalments.ts`; tests `__tests__/mortgageSummary.test.ts`, `e2e/cashflow.mortgage.spec.ts`, `__tests__/mutuoTile.test.tsx`; the ring `mortgageRingSegments`, `mortgageYearPaid`, `MORTGAGE_RING_COLORS` (2026-11-15)
 - **Loans — a debt as an asset** (2026-10-10): `types/assets.ts` (`LOAN_ASSET_TYPE`, `isLoanAsset`, `Asset.financedAssetId`), the sign in `calculateAssetValue` (`lib/services/assetService.ts`, with `isFireExcluded`), `lib/utils/mortgageRepayment.ts` (`debtBalanceOf`, `debtBalanceField`, `isRepayableDebt`), the one-shot migration `lib/utils/loanMigration.ts` (pure plan) + `lib/services/loanMigration.ts` (fired by `app/dashboard/assets/page.tsx`), the Liquidità rows `isLiquidityRow` (`patrimonioSummary.ts`), the row's words `describeLoanRow`, the badge `resolveMortgageOf` (`AssetRow.tsx`), the form's «Prestito» card and `loanClassOf` (`AssetDialog.tsx`); tests `__tests__/loanAssets.test.ts`, `__tests__/updateAssetDebtFields.test.ts`, `e2e/cashflow.mortgage.spec.ts` (the migration case too)
-- **Intestatari** (2026-10-17; per QUOTA since the same day): the ONE slice primitive `lib/utils/assetSlice.ts` (`AssetSlice`, `sliceFraction`, `summarizeSlices`, `sliceUnit`), the pure `lib/utils/assetOwnership.ts` (`resolveAssetOwnership`, `summarizeOwnership`, `isOwnedHolding`, the Strumenti filter `listAssetOwnerFilterOptions`/`matchesAssetOwnerFilter`, the sub-line `describeAssetOwnerLabel`, `formatOwnerUnits`/`formatOwnerPercent`/`formatOwnerSlice`, `ownerShareSlice`), the words `describeOwnership*` + `describeOwnershipFooter` in `patrimonioNarrative.ts`, the tile `components/dashboard/overview/IntestatariTile.tsx` (Panoramica and Patrimonio), `Asset.ownerShares` (units or percent) + `Asset.ownerMemberId` (`types/assets.ts`), the form's «Intestatari» rows `OwnerSharesRows` in `AssetDialog.tsx` (the % | quote switch `ownerSharesMode`, `defaultOwnerSharesMode`, the schema's `ownerShares` refusal), the clear-guards in `assetService.ts` (`updateAsset`, `updateAssetMetadata`), the owner filter and the sub-line in `StrumentiTile.tsx`/`AssetRow.tsx`; tests `__tests__/assetSlice.test.ts`, `__tests__/assetOwnership.test.ts`, the answers in `patrimonioSummary.test.ts` and `overviewSummary.test.ts`; **the «Valore | Carico» switch** (2026-10-18): `costBasisOf` in `patrimonioSummary.ts` (the ONE «quantity × PMC in euro», the G/P's own), `OwnershipBasis`/`hasCostFigures` in `assetOwnership.ts`, `ownershipRowOn` in the leaf `ownershipBasis.ts` (every narrative imports `patrimonioNarrative`: never give that file a value import of `assetOwnership`), `describeOwnership(summary, basis)` + `describeOwnershipFooter(summary, basis)`, the `AsideToggle` and the memory `patrimonio.intestatari.base` in `IntestatariTile.tsx`; the carry cases in `__tests__/assetOwnership.test.ts`, the switch and its memory in `e2e/mobile-composition.patrimonio.spec.ts`
-- **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; spec `e2e/assets.bond.spec.ts`
+- **Intestatari** (2026-10-17; per QUOTA since the same day): the ONE slice primitive `lib/utils/assetSlice.ts` (`AssetSlice`, `sliceFraction`, `summarizeSlices`, `sliceUnit`), the pure `lib/utils/assetOwnership.ts` (`resolveAssetOwnership`, `summarizeOwnership`, `isOwnedHolding`, the Strumenti filter `listAssetOwnerFilterOptions`/`matchesAssetOwnerFilter`, the sub-line `describeAssetOwnerLabel`, `formatOwnerUnits`/`formatOwnerPercent`/`formatOwnerSlice`, `ownerShareSlice`), the ring builder `lib/utils/ownershipRing.ts` (`ownershipRingSegments`, 2026-11-15), the words `describeOwnership*` + `describeOwnershipFooter` in `patrimonioNarrative.ts`, the tile `components/dashboard/overview/IntestatariTile.tsx` (Panoramica and Patrimonio), `Asset.ownerShares` (units or percent) + `Asset.ownerMemberId` (`types/assets.ts`), the form's «Intestatari» rows `OwnerSharesRows` in `AssetDialog.tsx` (the % | quote switch `ownerSharesMode`, `defaultOwnerSharesMode`, the schema's `ownerShares` refusal), the clear-guards in `assetService.ts` (`updateAsset`, `updateAssetMetadata`), the owner filter and the sub-line in `StrumentiTile.tsx`/`AssetRow.tsx`; tests `__tests__/assetSlice.test.ts`, `__tests__/assetOwnership.test.ts`, the answers in `patrimonioSummary.test.ts` and `overviewSummary.test.ts`; **the «Valore | Carico» switch** (2026-10-18): `costBasisOf` in `patrimonioSummary.ts` (the ONE «quantity × PMC in euro», the G/P's own), `OwnershipBasis`/`hasCostFigures` in `assetOwnership.ts`, `ownershipRowOn` in the leaf `ownershipBasis.ts` (every narrative imports `patrimonioNarrative`: never give that file a value import of `assetOwnership`), `describeOwnership(summary, basis)` + `describeOwnershipFooter(summary, basis)`, the `AsideToggle` and the memory `patrimonio.intestatari.base` in `IntestatariTile.tsx`; the carry cases in `__tests__/assetOwnership.test.ts`, the switch and its memory in `e2e/mobile-composition.patrimonio.spec.ts`
+- **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur` = the fee-free PMC, `fiscalCostPerUnitEur` = the fiscal cost, `unitPriceEur` = EUR against EUR), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; specs `e2e/assets.bond.spec.ts`, `e2e/assets.ledger-meta.spec.ts` (a new ledger instrument under a cached `null` ledger meta, doc/guide/registro-operazioni.md § Per-page blind spots)
 - **Light rows and dialogs** (2026-10-07): `StrumentiTile` (`!useCompactLayout()` since 2026-10-14, one list), `AssetRow` (`ASSET_ROW_LAZY_CHARTS`, the sparkline a `lazyComponent`), `AssetSparkline` (colours as a prop), the `{ open, mounted }` state and the openers in `app/dashboard/assets/page.tsx`, `onExitComplete` in `components/ui/responsive-modal.tsx`, the six watching leaves at the top of `AssetDialog.tsx`; specs `e2e/assets.rows.spec.ts` (1440) and `e2e/assets.rows.mobile.spec.ts` (390), the census scenario `asset` (`scripts/perfRenderCensus.mjs`)
-- **Suites to run after a change here — Asset / bond** (moved from `AGENTS.md` § Commands on 2026-09-30): `assetDialogHelpers`, `couponUtils` · **Composizione mobile** `patrimonioSummary` (with `describePatrimonioClosedAnswers`, the landscape index), `tabletComposition` · **Browser (tablet)** `e2e/patrimonio.tablet.spec.ts`
+- **Suites to run after a change here — Asset / bond** (moved from `AGENTS.md` § Commands on 2026-09-30): `assetDialogHelpers`, `couponUtils`, `priceUpdater` (no empty ticker to Yahoo, 2026-11-20), `yahooFinanceService` (the quote's `quotedAt`) · **Composizione mobile** `patrimonioSummary` (with `describePatrimonioClosedAnswers`, the landscape index), `tabletComposition` · **Browser (tablet)** `e2e/patrimonio.tablet.spec.ts` · **Mutuo · Intestatari** (2026-11-15) `mortgageSummary`, `mutuoTile`, `ownershipRing`, `intestatariTile` · **Browser** `e2e/cashflow.mortgage.spec.ts`, `e2e/ring-chart.owners{,.mobile}.spec.ts`
 
 ## Asset Pricing, FX and Assets
 
@@ -25,13 +25,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - `buildAssetFormDataFromValues` clamps `autoUpdatePrice` to `false` when `hasMarketPrice()` is false. **That clamp is
   the only defense — never remove it.**
 - **GBp (pence) ≠ GBP**: normalize `price / 100` before any FX call or values inflate 100×. **Never call Frankfurter from
-  the browser** — all FX is server-side via `/api/prices/quote`. `quantity = 0` marks a sold asset, cash balance lives
+  the browser** — all FX is server-side via `/api/prices/quote` (since 2026-11-20 its answer carries `quotedAt`, the ISO time of the last trade, when Yahoo gives it: the Consulente's click reads a price at most 5 days old). `quantity = 0` marks a sold asset, cash balance lives
   in `quantity`.
 - **A Borsa Italiana bond quote is `% of par`, ALWAYS, and ONE rule turns it into euro per unit** —
   `lib/utils/bondPricing.ts` (2026-09-11, issue #340): `eurPerUnit = quote / 100 × nominalValue × indexationCoefficient`,
   with the nominal defaulting to **1 €** (`effectiveBondNominal`) — the quantity is then the nominal in euro, as on a
   broker statement (5.000 € of BTP → quantity 5000, quote 99,5 → 4.975 €) — and 1000 meaning the quantity counts
-  1.000 € lots (the owner's BTP Valore: quantity 10, 967,48 € per lot). Before the fix the conversion was skipped unless
+  1.000 € lots (e.g. a BTP Valore: quantity 10, 980 € per lot). Before the fix the conversion was skipped unless
   the nominal was set and > 1, so a bond saved with the field empty kept the raw quote as euro (93 % → 93 € per unit,
   93.000 € on quantity 1000) — and NO quantity made that right, because coupons, the final premium and the cron
   already assumed a 1 € unit. `isBondQuotedInPercent` (bond + bonds + ISIN) decides WHETHER a price is a quote;
@@ -48,12 +48,17 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   never read by the replay). A BTP€i without any coefficient is valued at par of the real price: understated by the
   accrued inflation, and declared in the form. The coupon side is in doc/guide/cashflow-dividendi.md.
 - **Inputs that receive a back-converted quote carry `step="any"`** (`manualPrice`, both `averageCost` fields, the
-  trade's price): a stored 967,4843 € per lot comes back as 96,74843 — five decimals — and a fixed `step="0.0001"` made
-  the browser's native validation refuse the form's OWN value on every edit of the owner's BTP Valore (found in the
+  trade's price): a stored 980,1234 € per lot comes back as 98,01234 — five decimals — and a fixed `step="0.0001"` made
+  the browser's native validation refuse the form's OWN value on every edit of a lot-quoted BTP Valore (found in the
   browser, 2026-09-11).
-- **Every G/P stands EUR against EUR, fees included — ONE rule in `lib/utils/costBasisEur.ts`** (2026-09-07, PR #326
-  merged with changes). `costBasisPerUnitEur` is the ledger's `averageCostEur` (the position's cost at trade-date
-  rates, purchase fees INCLUDED — the fiscal cost a capital gain is taxed on) when the ledger has projected it, the
+- **Two numbers, one module: the PMC for every G/P, the fiscal cost for every tax** (owner, 2026-11-12; EUR against EUR
+  since 2026-09-07, PR #326 merged with changes; `lib/utils/costBasisEur.ts`). A trade's fee is a spending row of its
+  own (doc/guide/registro-operazioni.md § The fee as a spending row), so the PMC carries none.
+  `fiscalCostPerUnitEur` is the ledger's `fiscalAverageCostEur` (the PMC plus the purchase fees — what a capital gain
+  is taxed on), falling back to the PMC; it is read by `assetService.calculateEstimatedTaxes`, the withdrawal tax
+  (`withdrawalTax.ts`), the Allocazione holdings (`allocationUtils.buildHoldings`) and `TaxCalculatorModal` (which
+  prints «Costo fiscale» beside «PMC» when they differ). `costBasisPerUnitEur` is the ledger's `averageCostEur` (the
+  position's cost at trade-date rates, no fee) when the ledger has projected it, the
   native `averageCost` only for a EUR-native asset until the backfill reaches it, and `undefined` for a foreign asset
   without a EUR PMC — the consumers then print nothing rather than a dollar PMC against a euro value, which is what
   every G/P did before. `unitPriceEur` is the per-unit twin of `calculateAssetValue`'s rule (`currentPriceEur`, else
@@ -64,15 +69,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `pdfDataService` (the Patrimonio section's rows), `TaxCalculatorModal` (the simulation runs in EUR on both sides
   and shows the native price and PMC as extra rows on a foreign asset), `yieldOnCost` (YOC and current yield over the
   EUR PMC and the EUR price; a foreign asset without a EUR PMC is left out). **The PMC cell prints the EUR PMC**, and
-  on a foreign row the native one under it (alone until the backfill). The owner's call: a PMC with fees is the
-  broker's fiscal figure; a EUR position's G/P therefore drops by its total purchase fees.
-- **`averageCostEur` is projected by every ledger mutation and, once, by `backfillAverageCostEur`** (`POST
+  on a foreign row the native one under it (alone until the backfill). Never one against the other (DESIGN → The
+  Same-Basis Rule): a G/P on the fiscal cost, or a tax on the PMC, would mix the two.
+- **The two PMCs are projected by every ledger mutation and, once, by `backfillAverageCostEur`** (`POST
   /api/asset-transactions/backfill-average-cost-eur`, fired by the Patrimonio page after the ledger migration, gated on
   the demo like every write): a pure re-projection of the trades' own `priceEur` — no FX call — that writes ONLY
-  `averageCostEur`, skips a closed position, logs and counts a ledger the replay rejects instead of failing, and stamps
-  `averageCostEurBackfilledAt` on the meta doc so it never runs twice. Until an account opens Patrimonio once, its
-  foreign positions have no G/P on the Panoramica and in the PDF, and its EUR positions measure against the
-  fee-excluded native PMC: honest, and one visit away from the fiscal figure.
+  `averageCostEur` and `fiscalAverageCostEur`, skips a closed position, logs and counts a ledger the replay rejects
+  instead of failing, and stamps `averageCostEurFeeFreeAt` on the meta doc so it never runs twice (re-run once on
+  2026-11-12: the PMC lost the fees; `averageCostEurBackfilledAt` is superseded). Until an account opens Patrimonio
+  once, its stored PMC still carries the fees and stands in for the fiscal cost; its foreign positions without a EUR
+  PMC have no G/P on the Panoramica and in the PDF.
+- **Deleting an asset unlinks its trades' fee rows** (2026-11-12, `app/api/assets/[assetId]/route.ts`): in the same
+  batch each row a trade names loses `feeOfTradeId`, so it stays as plain spending, deletable in Cashflow.
 - **Patrimonio Δ columns are UNIT-PRICE variations over time windows, not profit/loss and not value changes**
   (`lib/utils/assetPerformanceDeltas.ts`): the canonical EUR unit `totalValue / quantity` of the snapshot row against
   today's, the property (by TYPE `realestate` — a REIT ETF in that class is a quoted fund) gross of debt, pension
@@ -103,7 +111,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `computeTopWeightShare`, `resolveLastPriceUpdate`, `computeUnrealizedGain`) or `assetPerformanceDeltas.ts`; the words in
   `patrimonioNarrative.ts`. `isCashAccount` = the cash-picker rule (`type === 'cash' && assetClass === 'cash'`);
   **`isHeld` (`quantity > 0`) gates every count, share and sum** — a sold position stays in the table as «Azzerato»
-  but is not owned, and the Panoramica's `assetCount` already counts held only; `hasCostBasis` excludes cash
+  but is not owned (an instrument created empty for an accumulation plan and never traded wears «Mai comprato»
+  instead: `describeZeroQuantityChip`, the page's `tradedAssetIds` from the trades it already reads; «Azzerato» while
+  the ledger is not read yet — owner, 2026-11-12), and the Panoramica's `assetCount` already counts held only; `hasCostBasis` excludes cash
   accounts, pension funds (a leftover `averageCost` from a type conversion is not a PMC) and sold positions, and
   `rankInstrumentReturns` applies the same exclusions to the payload's `topAssets` (whose `returnPercent` is computed
   on ANY `averageCost`) so the Rendimento KPI, its ranking and its footer share one rule.
@@ -126,7 +136,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (`allocationRole: 'excluded'`, the form's hint says so), or the cash class would count a debt the per-instrument
   list does not show. On the Liquidità tile the row shares are of the money HELD (the positive balances) and an account
   in the red reads «debito» (`summarizeCashAccounts`, `shareOfCash: null`): shares of a total that nets the card out
-  read «138%» and «−57%» on the real account. The KPI «Sui conti» stays net of it.
+  read figures like «140%» and «−40%». The KPI «Sui conti» stays net of it.
 - **Peso is measured over the GROSS total** (cash accounts included), like the Classi and Liquidità shares —
   before the redesign the table measured it over the instruments only.
 - **Below `desktop:` the rows are `AssetRow`, flat and expandable** (CSS `grid-rows-[0fr] → [1fr]` with `inert`
@@ -140,7 +150,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `lazyComponent` — the only path from Patrimonio to recharts, so the page's initial JS lost recharts (764,7 → 655,8 KB
   gz) — preloaded when idle on a phone only, and its colours come from the page's ONE `useChartColors()` as a prop. It
   no longer animates its draw: the line used to animate inside the closed row at page load, so a reader opening a row
-  always found it already still. Before: 15 recharts charts, 30 rAF and 16 `getComputedStyle` on the owner's phone at
+  always found it already still. Before: one recharts chart per row, its rAF loop and its `getComputedStyle` on a phone at
   each visit, all closed. Pinned by `e2e/assets.rows{,.mobile}.spec.ts`. Class chips take
   their label from `ASSET_CLASS_LABELS` (Italian); `lib/utils/assetUtils.ts` with its English map is gone.
 - **A composite instrument is ONE row with a split chip** (2026-09-26): a 60/40 fund stays one row, grouped and sorted
@@ -179,7 +189,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   subCategory)`: a property, a pension fund, a private-equity stake, value in `quantity` at price 1 — prints «—» in
   Quantità/Prezzo/PMC and «valore a mano dal 12/08» under its name (`describeManualValuation`, off
   `lastPriceUpdate`), and **`hasCostBasis` is false for it**: its PMC equals its price by construction, so the G/P
-  was a structural «+0,00 €» (Academia Private Equity on the real account), a zero nothing measured. A quoted
+  was a structural «+0,00 €» (on a private-equity stake, for one), a zero nothing measured. A quoted
   instrument the owner prices by hand (`autoUpdatePrice: false`) keeps its real quantity, price and PMC. A bond
   prints «scade il 10/03/2032 · prossima cedola 10/12» (`resolveBondRowFacts` in `patrimonioSummary.ts` reads the
   dates the coupon scheduler already knows, `describeBondRow` in `patrimonioNarrative.ts` says them; the coupon
@@ -288,8 +298,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   carta, immobile —, quote on a quoted instrument; switching converts the typed figures, «50%» of 100 quote ↔ «50 quote»;
   a saved asset opens in the form of its rows), one input per member in that form with the other figure derived beside
   it, the LAST row the rest, computed and never typed — «In comune» by default, or the last member with the «Nessuna
-  quota in comune» switch (then that member's row moves last and reads what the others leave: «scrivo 40 a Giuseppe,
-  Marcella legge 60 da sola»; a legacy whole-to-one asset opens with its member last and whole) —, the sum under the rows
+  quota in comune» switch (then that member's row moves last and reads what the others leave: «scrivo 40 a Paolo,
+  Elena legge 60 da sola»; a legacy whole-to-one asset opens with its member last and whole) —, the sum under the rows
   («50% + 50% = 100%», «40 + 60 = 100 quote»), and a sum past the whole (100%, or the quantity) red there and a refusal in
   the reading line at submit (the schema's superRefine on `ownerShares`, `FIELD_LABELS` «Intestatari», `describeFormRefusal`), never a
   save. **Strumenti**: an «Intestatario» `Select` in the aside (every width; «Tutti · In comune · members · Senza
@@ -379,6 +389,26 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   composed since 2026-10-14: below `desktop:` the chips and the curve's last label are lifted, the digest when the
   sentence names the market (§ Composizione mobile).
 
+- **«Mutuo» draws the year's instalments as a ring** (2026-11-15; The Ring Rule, 2026-11-12): `mortgageRingSegments(summary)`
+  — «Interessi {Y}» `--chart-8` and «Capitale {Y}» `--chart-7` (`MORTGAGE_RING_COLORS`: on this page every slot is also a
+  class's, and 7 and 8 are the two rarest, Trend following and Carry), `null` with no settled instalment in the year or with
+  one of the two at zero. The 96px ring stands before the KPI grid, its centre `mortgageYearPaid(summary)` «pagati» — the
+  year's SETTLED rows, principal and interest only (a fee on its own row is not in it) —, the two KPIs' labels led by their
+  swatch; the grid is a container of its own, so beside the ring the four KPIs go across from 680px of the GRID's width
+  (560px without it, as before): at 768 the grid beside the ring is ~584px and four six-figure KPIs of ~152px touched (the tour
+  of 2026-11-15; 4 × 152 + 3 × 24 = 680), so there they stand two by two.
+  The «Per anno» table is unchanged. Tests `mortgageSummary.test.ts` (M1), `__tests__/mutuoTile.test.tsx`; the figure inside
+  its hole in `e2e/cashflow.mortgage.spec.ts`.
+- **«Intestatari»: a ring on «Valore» and on «Carico»** (2026-11-15; the spec kept «Carico» on its bars, the owner added it on the
+  mirror tour: the bars beside the ring read as a different tile): `ownershipRingSegments(summary, basis)`, the parts
+  `ownershipRowOn(row, basis).value`
+  in `lib/utils/ownershipRing.ts` — a module of its own: `ownershipBasis.ts` is value-imported by `patrimonioNarrative`, and a
+  builder there would carry `ringChart.ts` into every route's first load. The rows in order, members and «In comune» coloured
+  by rank (`RING_CATEGORY_COLORS`), «Senza intestatario» in `RING_REST_COLOR`, `null` when a group prints below zero; the
+  centre `total` «patrimonio» on «Valore», `costTotal` «carico» on «Carico», the rows its legend (`bars={false}`, `ringSwatchAt`), capped at 560px from `desktop:` (twelve
+  columns without the bars would put a label a thousand pixels from its figure). The bars come back only when a group prints below zero;
+  the switch, its memory and the footer are unchanged. The same tile on the Panoramica. Tests
+  `__tests__/ownershipRing.test.ts`, `__tests__/intestatariTile.test.tsx`; browser `e2e/ring-chart.owners{,.mobile}.spec.ts`.
 ## Two-Step Create Dialogs — `AssetDialog`
 
 Moved here on 2026-09-30 from `AGENTS.md` § 2, now doc/guide/dialog.md § Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`); the rule for any
@@ -432,6 +462,7 @@ Composed for a small screen on 2026-10-14, with Analisi and Storico, after Hall 
 ## Per-page blind spots
 
 - **Patrimonio**: Δ columns are empty for pension funds and cash accounts by design; the Rendimento tile ranks only within the overview's `topAssets` (15 largest); «Movimenti del mese» reads the whole ledger and filters in memory; **«Andamento» hides Quantità/Prezzo/PMC/TER while it is on** (a view, not a bug — the footer says so); a hand-valued row shows «—» for quantity, price and PMC and has no G/P (its PMC is its price); `text-muted-foreground` on the tile surface measures 4,48:1 in light on the owner's named theme (0,02 under AA; the default theme passes — a theme issue, doc/guide/temi.md, not touched); **a foreign-currency position has no G/P, no YOC and no PMC in euro until its ledger has projected `averageCostEur`** (the backfill runs on the first visit to Patrimonio; before it, the Panoramica's «Asset principali» and the PDF print no return for it — never the old dollar-against-euro figure); a EUR position measured against the native PMC before the backfill reads a G/P higher by its purchase fees. **Two accepted side effects of the optional Sottocategoria** (2026-08-30; neither is new — without the asterisk they are only less signalled): a cash account without the «conti correnti» subcategory loses the 5.000 € stamp-duty threshold AND the flat fee — it pays the securities' rate on its balance (`calculateStampDuty`, a rule Impostazioni already states), and changing Tipo or Classe does not clear `subCategory`, so an out-of-class value can survive invisibly — Radix shows the placeholder because the value is not among the items. **The checking-account duty is a flat 34,20 € above 5.000 €** (`lib/constants/stampDuty.ts`, fixed 2026-09-24: until then the account paid `balance × 0,2%` while the comment beside it said the flat rule and the test pinned the wrong figure — 12 € on 6.000 €, 2.000 € on a million); the threshold reads TODAY's balance, while the law reads the year's average balance, which the app does not keep — an account that dips under 5.000 € on the day the Costi tile is read shows no duty.
+- **An instrument created by the Consulente's click** (2026-11-20, doc/guide/consulente-piano.md): 0 quotes, «mai comprato», and possibly no price — its ticker may be its ISIN or a slug of its name, completed from its form. It is never auto-updated until it has a symbol (`autoUpdatePrice: false`), but a government bond with its ISIN is (Borsa Italiana): priced at the click when it has a quote, else from the first daily update; an empty ticker never reaches Yahoo (`priceUpdater`'s guard).
 - **Light rows and dialogs** (2026-10-07): typing an ISIN still re-renders the whole asset form at each key — it turns
   every bond label to «% del nominale», so it stays a root watch (rare, one field); a row's sparkline, once opened,
   stays mounted until the page unmounts; the account detail and the asset form cross-fade when «Modifica» hands one
@@ -442,6 +473,13 @@ Composed for a small screen on 2026-10-14, with Analisi and Storico, after Hall 
   the stored `composition`, never re-read from the market, so a fund whose mix drifted shows its last saved split.
 - **Mutuo**: the interest counts from the first instalment the app settled, never before the link; the projected end assumes monthly instalments of the latest linked amount at today's TAN (a variable rate moves it); the tile appears only for a loan with a linked instalment, so a loan tracked without the link has no tile; the «Per anno» table appears from the second measured year.
 - **Intestatari** (2026-10-17): the tile's rows share the NET total, so a member whose debts outweigh their assets has a negative amount and no bar (a bar has no negative width) and the reading names them «in negativo»; an owner set on a pension fund's `ownerMemberId` by hand is never read (the Previdenza member wins), and a mortgage's own rows are never read while its property exists (the property's fractions win); the Strumenti filter is a session lens, not remembered like the two toggles; **the rows' «N asset» no longer add up to the aside** since the quotas (a divided asset counts in every row that holds a quota of it, the owner's choice: «3 asset» and «2 asset» under «su 4 asset» is right); **an asset with quotas past its quantity is split by their proportions** (declared «quote da riassegnare», the tile still adds up) — the stored units are untouched until the owner reassigns them, and a buy that restores the quantity makes the declaration vanish on its own; the sum line of the form reads the typed rows only (an empty field is 0), and «Nessuna quota in comune» with a single member saves the legacy shape (`ownerMemberId` alone); **a document with a percent row AND a units row** (never written by the form, which saves one form) reads as a percent block — the units row's fraction is still its own (`resolveAssetOwnership.mode` says only how the rest is figured); a percent block is never «da riassegnare» (100% follows the asset); the base E2E fixture names an owner through its pension fund's member alone (the Previdenza seed), so the row EXISTS in every composed spec of Patrimonio and the Panoramica (their row lists carry it) while the filter, the sub-line, the form's rows and the tile's words have no browser proof — Vitest holds the slices, the summary, the words and the answers, the owner's look on the preview after the merge (phase F skipped on 2026-10-17, the owner's call). **The «Carico» view** (2026-10-18): a quoted instrument without a EUR PMC — a foreign position before its ledger backfill, a position with no PMC typed — counts at its value and is named in the footer, so on an account that holds many of them the two splits coincide for a reason the footer states; a pension fund counts at its value, never at its contributions (the owner's call: a fund's carry is Previdenza's measure, not this tile's); the closed row's answer in the landscape index («Marco 54%») is on the value whatever the remembered basis, since the switch is not visible on a closed row; the memory is per browser, not per account — a second account on the same browser opens on the last choice; the switch has a 1440 proof on the base account (`e2e/mobile-composition.patrimonio.spec.ts`), the phone row's switch has none beyond Vitest (phase F skipped on 2026-10-18 too, the owner's call).
+- **Intestatari's ring** (2026-11-15, accepted): a row worth exactly 0 € beside six positive ones greys the sixth row's swatch while its arc keeps its colour (`ringSwatchAt` counts every row, the fold only the positive ones); and the owners, coloured by rank, share hues with the classes' ring on the same page, where every chart slot is also a class's.
+- **«Mutuo»'s reading names no largest part** (2026-11-15, declared, no heir): the ring shows whether the year's
+  interest or principal weighs more; the reading and its sentences stay as they were.
+- **A class below zero keeps the bar** (2026-11-12): Classi (and the Panoramica's Composizione) draw a ring only when
+  every class is ≥ 0 (`compositionRing`, DESIGN.md → The Ring Rule) — a whole with a negative member is a signed
+  quantity; with one, today's `CompositionBar` and every row. **A class at 0 € has no row beside the ring**, as it has
+  no segment in the bar: a legend row without an arc is a key to nothing.
 - **Loans** (2026-10-10): a personal loan larger than the accounts turns the Liquidità class NEGATIVE on the Composizione tiles and in Storico's composition (the credit-card case of 2026-09-19, now reachable on purpose — declared, not clamped); a loan's row in Storico's «Valore per strumento» is a negative line that rises to zero; the Panoramica's «Asset principali» never ranks it (price effect 0 by construction); a loan deleted by hand after its payoff is read by the Driver as repaid in that month (its negative `totalValue` leaves the snapshots); the demo account keeps the legacy property debt (no write on the demo), so there a mortgage is still a field of the house and the «Mutuo» tile reads the property; the migration runs on the owner's next visit to Patrimonio and nowhere else — an account that never opens the page keeps the old model, which still works.
 - **FX** depends on Frankfurter with a 24h in-memory cache (no fallback on a cold instance). Pre-migration non-EUR assets without `currentPriceEur` show the native price as EUR until the first update; one with `autoUpdatePrice: false` never self-heals until re-saved. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
 - **Bonds saved before 2026-09-11 with the nominal empty or 1 keep a wrong PMC and opening trade** (the raw quote as

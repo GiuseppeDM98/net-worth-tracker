@@ -48,11 +48,12 @@ import {
 } from '@/lib/utils/settingsDraft';
 import type { ExpenseCategory } from '@/types/expenses';
 import { DeclarationRow, INTERACTIVE_CONTROL_CLASS, pctLabel, runGuarded, SettingsTabPanel } from './shared';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // The assistant is a route gated by this flag; its state tile follows the same gate.
 const SHOW_ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false';
 
-// The words the Assistant's own popover uses for the response styles.
+// The words the Assistant's own Preferenze modal uses for the response styles.
 const ASSISTANT_STYLE_LABELS: Record<'balanced' | 'concise' | 'deep', string> = {
   balanced: 'Bilanciato',
   concise: 'Conciso',
@@ -437,7 +438,7 @@ export function GeneraleTab({
                         })
                       }
                       className={cn(
-                        'inline-flex h-11 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors desktop:h-8',
+                        'inline-flex h-11 items-center gap-1.5 border px-3 text-xs transition-colors desktop:h-8', COSTUME_PILL_RADIUS_CLASS,
                         checked
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-border bg-background text-foreground hover:bg-muted'
@@ -767,7 +768,7 @@ export function GeneraleTab({
         </Tile>
       </div>
 
-      {/* Assistente — read-only mirror; the popover beside the conversation is the write surface */}
+      {/* Assistente — read-only mirror; the Preferenze modal of the Assistente's «⋯» menu is the write surface */}
       {SHOW_ASSISTANT ? (
         <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-6')}>
           <Tile eyebrow="Assistente" aside="sola lettura" reading={describeAssistantPreferences(assistantPrefs)}>
@@ -799,7 +800,7 @@ export function GeneraleTab({
               <Link href="/dashboard/assistant" className={TILE_FOOTER_ACTION_CLASS}>
                 dall&apos;Assistente
               </Link>
-              , accanto alla conversazione.
+              , nel menu «⋯» → Preferenze.
             </div>
           </Tile>
         </div>

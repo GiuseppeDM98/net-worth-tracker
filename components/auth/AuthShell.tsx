@@ -51,7 +51,7 @@ export function AuthShell({ verdict, verdictAriaLabel, footer, children }: AuthS
           animate="visible"
         >
           <motion.div variants={cardItem} className="flex flex-col gap-3">
-            <p className={TILE_EYEBROW_CLASS}>Portfolio Tracker</p>
+            <p className={TILE_EYEBROW_CLASS}>Net Worth Tracker</p>
             <PageVerdict verdict={verdict} ariaLabel={verdictAriaLabel} />
           </motion.div>
 

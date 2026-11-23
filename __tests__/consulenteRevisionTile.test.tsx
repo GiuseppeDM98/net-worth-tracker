@@ -17,6 +17,11 @@ import { Button } from '@/components/ui/button';
 import { describeRevisionAside, RevisionBody, useRevisionDraft } from '@/components/allocation/consulente/ConsulenteRevisionTile';
 import { useConsulenteRevision } from '@/components/allocation/consulente/useConsulenteRevision';
 
+// A portalled primitive reads the costume scope from ColorThemeContext, whose module imports AuthContext → Firebase.
+vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('@/lib/services/userPreferencesService', () => ({ getUserPreferences: vi.fn(async () => ({})), setUserPreferences: vi.fn() }));
+
 const { authenticatedFetch } = vi.hoisted(() => ({ authenticatedFetch: vi.fn() }));
 vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch }));
 
@@ -100,6 +105,8 @@ describe('«Chiedi una modifica»', () => {
     const user = userEvent.setup();
     authenticatedFetch.mockResolvedValueOnce(sse({ type: 'interview', round: round([QUESTION]) }));
     authenticatedFetch.mockResolvedValueOnce(sse({ type: 'done' }));
+    // The operating plan the revision asks after it (2026-11-19).
+    authenticatedFetch.mockResolvedValueOnce(sse({ type: 'done' }));
     renderSubject();
     await user.type(screen.getByLabelText('Cosa vuoi cambiare'), 'più fenicotteri');
     await user.click(reviseButton());
@@ -109,8 +116,9 @@ describe('«Chiedi una modifica»', () => {
     expect((screen.getByLabelText('Cosa vuoi cambiare') as HTMLTextAreaElement).readOnly).toBe(true);
 
     await user.click(screen.getByRole('button', { name: 'Salta le domande' }));
-    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(3));
     expect(bodies()[1]).toMatchObject({ stage: 'revise', request: 'più fenicotteri', interview: { skipped: true } });
+    expect(bodies()[2]).toEqual({ userId: 'u1', stage: 'plan' });
     await waitFor(() => expect((screen.getByLabelText('Cosa vuoi cambiare') as HTMLTextAreaElement).value).toBe(''));
   });
 
@@ -118,11 +126,14 @@ describe('«Chiedi una modifica»', () => {
     const user = userEvent.setup();
     authenticatedFetch.mockResolvedValueOnce(sse({ type: 'interview', round: round([]) }));
     authenticatedFetch.mockResolvedValueOnce(sse({ type: 'done' }));
+    // The operating plan the revision asks after it (2026-11-19).
+    authenticatedFetch.mockResolvedValueOnce(sse({ type: 'done' }));
     renderSubject();
     await user.type(screen.getByLabelText('Cosa vuoi cambiare'), 'più fenicotteri');
     await user.click(reviseButton());
-    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(3));
     expect(bodies()[1]).toMatchObject({ stage: 'revise', request: 'più fenicotteri', interview: { skipped: false } });
+    expect(bodies()[2]).toEqual({ userId: 'u1', stage: 'plan' });
     expect(bodies()[1].interview.rounds).toHaveLength(1);
     expect(screen.queryByText('Quanti titoli singoli?')).toBeNull();
   });

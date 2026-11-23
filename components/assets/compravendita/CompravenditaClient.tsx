@@ -66,6 +66,7 @@ export function CompravenditaClient() {
 
   const header = (
     <PageHeader
+      emblem="patrimonio"
       label="Patrimonio"
       title="Compravendita"
       description={COMPRAVENDITA_DESCRIPTION}

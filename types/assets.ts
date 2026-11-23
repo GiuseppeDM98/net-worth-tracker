@@ -179,6 +179,17 @@ export type AssetOwnerShare =
   | { memberId: string; units: number } // > 0
   | { memberId: string; percent: number }; // 0-100
 
+// An instrument the Consulente proposes and the owner does not hold yet (`planConsulenteHandoff`, 2026-11-12):
+// the operating plan's legend carries it, and «Applica» creates the asset from it (`newInstrumentFormData`, 2026-11-20).
+export interface AssetPrefill {
+  name: string;
+  ticker: string;
+  isin?: string;
+  type: AssetType;
+  assetClass: AssetClass;
+  subCategory: string;
+}
+
 // Core asset model representing a single financial holding.
 // Supports stocks, ETFs, bonds, crypto, real estate, cash, commodities.
 // Includes automatic price updates via Yahoo Finance (unless autoUpdatePrice=false).
@@ -201,13 +212,18 @@ export interface Asset {
   // trade Admin API after every ledger mutation. Do NOT write them directly for ledger types; the
   // ledger is the source of truth. cash/realestate keep direct editing and have no ledger.
   quantity: number;
+  /** Created at quantity 0 for a plan (2026-11-12): with no ledger row it reads «mai comprato»; absent on every other asset. Written only by AssetDialog's empty create. */
+  createdEmpty?: true;
   averageCost?: number; // Native-currency PMC (weighted avg of trade prices, fees excluded). Derived for ledger types — see note on `quantity`.
-  // EUR-equivalent PMC (costBasisEur / quantity — fees and the trade-date FX rate included), same
+  // EUR-equivalent PMC (costBasisEur / quantity at the trade-date FX rate), no fee (2026-11-12), same
   // derivation and lifecycle as `averageCost`. G/P math MUST compare this against the EUR value
   // (calculateAssetValue), never `averageCost` against it — that mixes a native-currency PMC with a
   // EUR value. Absent for cash/realestate (no ledger) and, until their next ledger mutation, for
   // assets that predate this field.
   averageCostEur?: number;
+  // Purchase fees included; the tax estimates' basis (lib/utils/costBasisEur.ts → fiscalCostPerUnitEur).
+  // Same derivation as `averageCostEur`; absent until the asset's next ledger write or the one-shot re-projection.
+  fiscalAverageCostEur?: number;
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
   stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation (e.g. pension funds, real estate)
@@ -288,6 +304,8 @@ export interface AssetFormData {
   subCategory?: string;
   currency: string;
   quantity: number;
+  /** Only AssetDialog's empty create (Accumulo → «+ Nuovo asset») sets it — see `Asset.createdEmpty`. */
+  createdEmpty?: true;
   averageCost?: number;
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
@@ -390,7 +408,32 @@ export interface FamilyMember {
   firstEmploymentYear?: number; // First calendar year of participation — anchors the plafond 5/20-year windows
 }
 
+// Weight optimizer (lib/utils/weightOptimizer.ts) — four fixed priority levels an objective can
+// carry, from "never trade it away" to "nice to have". Also used by `IdealAllocationSettings`'s
+// per-objective priorities (class, leverage, factor, group cap).
+export type ObjectivePriority = 'essential' | 'high' | 'medium' | 'low';
+
+// The owner's model-portfolio criteria (Allocazione › Accumulo › "Criteri del modello"), read by the
+// weight optimizer to propose market weights. Classes and sub-category targets are NOT duplicated
+// here — they are read from the existing `targets` (AssetAllocationTarget); this settings block only
+// carries priorities and the per-instrument/per-group caps.
+export interface IdealAllocationSettings {
+  enabled: boolean;
+  classPriority: ObjectivePriority;
+  leveragePriority: ObjectivePriority | 'off';
+  factorObjectives: Array<{ assetClass: AssetClass; priority: ObjectivePriority }>;
+  instrumentLimits: Array<{ assetId: string; minPct?: number; maxPct?: number }>;
+  groupLimits: Array<{
+    id: string;
+    label: string;
+    assetIds: string[];
+    maxPct: number;
+    priority: ObjectivePriority;
+  }>;
+}
+
 export interface AssetAllocationSettings {
+  idealAllocation?: IdealAllocationSettings; // the model portfolio's criteria (weight optimizer)
   userAge?: number;
   riskFreeRate?: number;
   withdrawalRate?: number; // Safe withdrawal rate for FIRE calculations (e.g., 4.0 for 4%)
@@ -421,6 +464,7 @@ export interface AssetAllocationSettings {
   autoCalculateEquityBonds?: boolean; // When true, equity and bond targets are auto-computed via the "125 − age − (rate × 5)" formula; stored explicitly so disabling persists across reloads
   defaultDebitCashAssetId?: string; // Default cash asset pre-selected for expenses/debts in expense dialog
   defaultCreditCashAssetId?: string; // Default cash asset pre-selected for income entries in expense dialog
+  investmentCashAssetId?: string; // The account a plan of accumulation draws from by default
   stampDutyEnabled?: boolean; // Toggle to include stamp duty (imposta di bollo) in annual portfolio cost
   stampDutyRate?: number; // Annual stamp duty rate as a percentage (e.g. 0.2 for 0.20%)
   checkingAccountSubCategory?: string; // Cash subcategory name representing checking accounts (conti correnti); stamp duty applies only if value > 5000€

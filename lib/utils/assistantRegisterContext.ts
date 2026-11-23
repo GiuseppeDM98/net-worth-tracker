@@ -30,7 +30,7 @@ import { isFeeRow } from '@/lib/utils/expenseFee';
 import { debtBalanceOf, isRepayableDebt } from '@/lib/utils/mortgageRepayment';
 import { isTransferableProperty } from '@/lib/utils/propertyTransfer';
 import { budgetItemLabel, getMonthlyTotalExpenses, getPeriodActual } from '@/lib/utils/budgetUtils';
-import { buildCashAccountLines } from '@/lib/utils/cashflowBlock';
+import { buildCashAccountLines } from '@/lib/utils/cashAccountLines';
 import { ITALY_TIMEZONE, getItalyDateIso, toDate } from '@/lib/utils/dateHelpers';
 import { formatNumberIt } from '@/lib/utils/formatters';
 import { resolveRecurrenceFrequency } from '@/lib/utils/recurrenceDates';

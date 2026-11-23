@@ -33,7 +33,8 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { getItalyDate } from '@/lib/utils/dateHelpers';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { describeRecurrence } from '@/lib/utils/recurrenceDates';
-import { describeMovementDetailReading, EXPENSE_BUDGET_EXCLUSION_LABEL } from '@/lib/utils/dialogNarrative';
+import { describeMovementDetailReading, EXPENSE_BUDGET_EXCLUSION_LABEL, TRADE_FEE_ROW_DELETE_BLOCKED } from '@/lib/utils/dialogNarrative';
+import { isTradeFeeRow } from '@/lib/utils/tradeFeeExpense';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { resolveSeriesDeleteMode } from '@/components/expenses/SeriesDeleteDialog';
 import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
@@ -258,6 +259,7 @@ function TransactionDetailModal({
         phase: armed ? 'armed' : wasArmed ? 'disarmed' : 'idle',
         // A row still waiting for its date has moved nothing, so its delete gives nothing back.
         deletion: { type: expense.type, amount: expense.amount, hasAccount: appliedBalanceEffectsOf(expense).length > 0, hasFee: !!expense.transferFeeExpenseId },
+        tradeFee: isTradeFeeRow(expense),
       })}
       footer={
         <>
@@ -268,17 +270,21 @@ function TransactionDetailModal({
             className={cn(!armed && 'text-destructive hover:text-destructive')}
             onClick={isSeries ? () => onDelete(expense) : onArmedClick}
             onBlur={isSeries ? undefined : onBlur}
-            disabled={isDemo}
+            // A trade's fee row leaves with its trade, in Patrimonio (2026-11-12).
+            disabled={isDemo || isTradeFeeRow(expense)}
             aria-pressed={isSeries ? undefined : armed}
             aria-label={
               isDemo
                 ? 'Elimina — non disponibile in modalità demo'
-                : isSeries
-                  ? `Elimina ${rowName} o la sua serie`
-                  : armed
-                    ? `Premi di nuovo per eliminare ${rowName}`
-                    : `Elimina ${rowName}`
+                : isTradeFeeRow(expense)
+                  ? `Elimina ${rowName} — ${TRADE_FEE_ROW_DELETE_BLOCKED}`
+                  : isSeries
+                    ? `Elimina ${rowName} o la sua serie`
+                    : armed
+                      ? `Premi di nuovo per eliminare ${rowName}`
+                      : `Elimina ${rowName}`
             }
+            title={isTradeFeeRow(expense) ? TRADE_FEE_ROW_DELETE_BLOCKED : undefined}
           >
             {!armed && <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />}
             {/* The ellipsis is the convention for «this opens a question»: a series row never arms. */}

@@ -13,7 +13,6 @@ import {
   buildTimeBuckets,
   buildCategoryTimeSeries,
   buildTypeTimeSeries,
-  computeTrailingSavingsRateAverage,
 } from '@/lib/utils/cashflowTimeSeries';
 import type { Expense } from '@/types/expenses';
 
@@ -94,8 +93,8 @@ describe('buildTimeBuckets', () => {
   });
 
   it('closes the axis on the ceiling, so a materialised plan does not draw the years ahead', () => {
-    // A 2027 instalment is a calendar row, not a history bucket (seventeen empty years on the
-    // real account, 2026-09-14). The running year keeps its own bucket, calendar included.
+    // A 2027 instalment is a calendar row, not a history bucket (years of empty buckets on a
+    // lived account, 2026-09-14). The running year keeps its own bucket, calendar included.
     const expenses: Expense[] = [
       makeExpense({ type: 'income', amount: 1000, date: d(2025, 3) }),
       makeExpense({ type: 'fixed', amount: -100, date: d(2026, 10) }),
@@ -192,7 +191,7 @@ describe('buildCategoryTimeSeries', () => {
 });
 
 describe('buildTypeTimeSeries', () => {
-  it('groups expenses by type in canonical order (Fisse → Variabili → Debiti)', () => {
+  it('groups expenses by type in canonical order (Necessarie → Non necessarie → Debiti)', () => {
     const expenses: Expense[] = [
       makeExpense({ type: 'debt', amount: -100, date: d(2025, 1) }),
       makeExpense({ type: 'fixed', amount: -400, date: d(2025, 1) }),
@@ -251,40 +250,3 @@ describe('buildTypeTimeSeries', () => {
   });
 });
 
-describe('computeTrailingSavingsRateAverage', () => {
-  it('averages the savings rate over months that have income, skipping months without it', () => {
-    const expenses: Expense[] = [
-      makeExpense({ type: 'income', amount: 2000, date: d(2025, 1) }),
-      makeExpense({ type: 'variable', amount: -1000, date: d(2025, 1) }), // 50%
-      // February: no income → excluded from the average, not treated as 0%
-      makeExpense({ type: 'variable', amount: -200, date: d(2025, 2) }),
-      makeExpense({ type: 'income', amount: 1000, date: d(2025, 3) }),
-      makeExpense({ type: 'variable', amount: -700, date: d(2025, 3) }), // 30%
-    ];
-
-    const result = computeTrailingSavingsRateAverage(expenses, 2025, 3, 3);
-
-    expect(result).toBeCloseTo(40, 5); // (50 + 30) / 2
-  });
-
-  it('returns null when no month in the window has income', () => {
-    const expenses: Expense[] = [
-      makeExpense({ type: 'variable', amount: -100, date: d(2025, 1) }),
-    ];
-
-    expect(computeTrailingSavingsRateAverage(expenses, 2025, 1, 3)).toBeNull();
-  });
-
-  it('walks backward across a year boundary', () => {
-    const expenses: Expense[] = [
-      makeExpense({ type: 'income', amount: 1000, date: d(2024, 12) }),
-      makeExpense({ type: 'variable', amount: -600, date: d(2024, 12) }), // 40%
-      makeExpense({ type: 'income', amount: 1000, date: d(2025, 1) }),
-      makeExpense({ type: 'variable', amount: -800, date: d(2025, 1) }), // 20%
-    ];
-
-    const result = computeTrailingSavingsRateAverage(expenses, 2025, 1, 2);
-
-    expect(result).toBeCloseTo(30, 5); // (20 + 40) / 2
-  });
-});

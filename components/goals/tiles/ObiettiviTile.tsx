@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Tile } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { VERDICT_META } from '@/components/goals/goalVerdictMeta';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface ObiettiviRow {
   line: GoalLine;
@@ -70,14 +71,14 @@ function GoalRow({ row, featured, selected, onSelect }: { row: ObiettiviRow; fea
         </span>
         {progress !== null && (
           <span
-            className="block h-[3px] w-full overflow-hidden rounded-full bg-muted"
+            className={cn('block h-[3px] w-full overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(progress)}
             aria-label={`Avanzamento ${line.name}`}
           >
-            <span className="block h-full rounded-full" style={{ width: `${progress}%`, background: line.color }} />
+            <span className={cn('block h-full', COSTUME_PILL_RADIUS_CLASS)} style={{ width: `${progress}%`, background: line.color }} />
           </span>
         )}
         <NarrativeText segments={row.caption} className="text-[11px] leading-[1.4] text-muted-foreground" figureClassName="font-medium" />

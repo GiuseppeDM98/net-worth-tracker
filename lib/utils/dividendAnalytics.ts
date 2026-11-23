@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Dividend, DividendStats, DividendStatsPayload, DividendType } from '@/types/dividend';
 import { toDate, getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
+import { RING_CATEGORY_COLORS, RING_REST_COLOR, RING_REST_KEY, isRingWhole, type RingSegment } from '@/lib/utils/ringChart';
 
 // The period axis driving every figure on the tab. Mirrors the Cost Centers axis;
 // "year" is the current calendar year (Jan 1 → now), which for a calendar-based tracker
@@ -377,7 +378,7 @@ export interface DividendReliability {
  *
  * The tile's question is in the present tense — «posso contare su questo reddito?» — so with
  * `heldAssetIds` the signals are measured on the instruments STILL IN THE PORTFOLIO: a payer
- * sold since is history, and «Concentrazione alta: SPM.MI vale il 47%» on a sold stock was a
+ * sold since is history, and «Concentrazione alta: ABC.MI vale il 50%» on a sold stock was a
  * risk warning about money nobody can lose (2026-09-14, the owner's call). The window's
  * length is still the period's, never the subset's. Without the set every payer counts,
  * which is what the registry-only surfaces (the verdict's «da 3 strumenti») still read.
@@ -463,6 +464,22 @@ export interface PayerRanking {
   soldNet: number;
   /** The largest payer STILL HELD; null when every payer of the period has been sold. */
   top: PayerRow | null;
+}
+
+/** The payers as ring parts: the rows by rank, then the remainder in the neutral ink; null unless a whole. */
+export function payerRingSegments(ranking: PayerRanking): RingSegment[] | null {
+  const segments: RingSegment[] = ranking.rows.map((row, index) => ({
+    key: row.key,
+    label: row.label,
+    value: row.amount,
+    color: RING_CATEGORY_COLORS[index % RING_CATEGORY_COLORS.length],
+  }));
+  // `!== 0`: a remainder below zero enters so that `isRingWhole` refuses the whole (the centre
+  // prints `total`, which counts it); one at zero is left out, as `RankedRows` leaves it out.
+  if (ranking.remainder && ranking.remainder.amount !== 0) {
+    segments.push({ key: RING_REST_KEY, label: ranking.remainder.label, value: ranking.remainder.amount, color: RING_REST_COLOR });
+  }
+  return isRingWhole(segments) ? segments : null;
 }
 
 /**

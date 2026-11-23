@@ -8,12 +8,14 @@
  * page; reduced motion plays nothing.
  *
  * Each test plants its own document (`e2e/consulenteReport.ts`); `afterAll` puts back what the
- * account held. The run route is ALWAYS faked (`installFakeRun`): no model is called.
+ * account held. The run route is ALWAYS faked (`installFakeRun`): no model is called. The operating
+ * plan (2026-11-19): the row on «Applica» asks it, a failure says its sentence and leaves the report,
+ * a success adds the page «Il piano operativo»; a revision rewrites it.
  */
 
 import { test, expect, type Page } from '@playwright/test';
 import { REVISION_ROUND, installFakeRun, type FakeRunRecorder } from './consulenteInterview';
-import { PRINTABLE_TITLES, bookCard, expectPage, openReport, plant, rememberHeld, restoreHeld } from './consulenteReport';
+import { FAKE_PLAN_ERROR, PRINTABLE_TITLES, bookCard, expectPage, openReport, plant, rememberHeld, restoreHeld } from './consulenteReport';
 
 declare global {
   interface Window {
@@ -144,7 +146,9 @@ test('the rail is the index: its label turns the page, one Tab stop between the 
 // The defect phase E found on 2026-11-11: the grid stretched a short page's card to the ten-row
 // rail, its footer left mid-card. `desktop:items-start` on the book's grid fixed it; this pins it
 // (pinned 2026-11-12). «Cosa fare adesso» is the fixture's shortest page at 1440 (223px against the
-// 338px rail); «Gli obiettivi» is as tall as the rail and proves nothing.
+// 338px rail); «Gli obiettivi» is as tall as the rail and proves nothing. The fixture holds no
+// operating plan, so the book keeps its ten pages and «Cosa fare adesso» stays the shortest
+// (2026-11-19: the page «Il piano operativo» exists only with a plan).
 test('a short page hugs its text: the card ends at its footer, shorter than the rail', async ({ page }) => {
   await plant('ready');
   await openReport(page, '?pagina=passi');
@@ -210,6 +214,56 @@ test('the accent follows the author: «Il colloquio», «Chiedi una modifica» a
   await expectPage(page, 'Pagina 10 di 10 · Applica', 'applica');
   await expect(page.locator('[data-generated]')).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Avanti' })).toHaveCount(0);
+});
+
+test('«Applica» asks the operating plan: a failure keeps the report, a success adds the page', async ({ page }) => {
+  await plant('ready');
+  await openReport(page, '?pagina=applica');
+  await expectPage(page, 'Pagina 10 di 10 · Applica', 'applica');
+  const card = bookCard(page);
+  const row = card.locator('[data-plan-row]');
+  await expect(row).toHaveAttribute('data-plan-row', 'absent');
+  await expect(row).toContainText("Il piano operativo non c'è ancora.");
+  const write = row.getByRole('button', { name: 'Scrivi il piano operativo' });
+  await expect(write).toHaveClass(/var\(--ai-glow\)/);
+
+  recorder.planOutcome = 'failed';
+  await write.click();
+  await expect(row).toHaveAttribute('data-plan-row', 'failed', { timeout: 15_000 });
+  await expect(row).toContainText(FAKE_PLAN_ERROR);
+  await expectPage(page, 'Pagina 10 di 10 · Applica', 'applica');
+  await expect(card.getByRole('button', { name: 'Applica alle impostazioni' })).toBeVisible();
+
+  recorder.planOutcome = 'ready';
+  await row.getByRole('button', { name: 'Scrivi il piano operativo' }).click();
+  await expect(rail(page).getByRole('button', { name: 'Il piano operativo' })).toBeVisible({ timeout: 15_000 });
+  await expect(card.locator('[data-plan-row]')).toHaveCount(0);
+  expect(recorder.plan).toHaveLength(2);
+  await rail(page).getByRole('button', { name: 'Il piano operativo' }).click();
+  await expectPage(page, 'Pagina 7 di 11 · Il piano operativo', 'piano');
+  await expect(card).toContainText('Piano finto n. 2.');
+  await expect(card.getByRole('list', { name: 'Compra' })).toContainText('ETF fenicottero breve');
+});
+
+test('a revision rewrites the operating plan', async ({ page }) => {
+  await plant('ready', 'headings', { operatingPlan: 'ready' });
+  await openReport(page, '?pagina=piano');
+  await expectPage(page, 'Pagina 7 di 11 · Il piano operativo', 'piano');
+  const card = bookCard(page);
+  await expect(card).toContainText('Il piano piantato.');
+
+  await rail(page).getByRole('button', { name: 'Chiedi una modifica' }).click();
+  await expectPage(page, /Chiedi una modifica$/, 'modifica');
+  await page.locator('#consulente-revision').fill('niente ornitorinchi');
+  await card.getByRole('button', { name: 'Rivedi il report' }).click();
+  await card.getByRole('button', { name: 'Salta le domande' }).click();
+  await expect(page.locator('#consulente-revision')).toHaveValue('', { timeout: 15_000 });
+  await expect.poll(() => recorder.plan.length, { timeout: 15_000 }).toBe(1);
+
+  await rail(page).getByRole('button', { name: 'Il piano operativo' }).click();
+  await expectPage(page, /Il piano operativo$/, 'piano');
+  await expect(card).toContainText('Piano finto n. 1.');
+  await expect(card).not.toContainText('Il piano piantato.');
 });
 
 test('a text without headings is one page «Il report» after a plain cover', async ({ page }) => {

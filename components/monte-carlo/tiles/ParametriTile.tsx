@@ -30,6 +30,7 @@ import { Label } from '@/components/ui/label';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { SCENARIO_SLOT } from '@/components/monte-carlo/ScenarioOverlayChart';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface MonteCarloForm {
   initialPortfolio: string;
@@ -224,7 +225,7 @@ export function ParametriTile({
             {SCENARIO_META.map(({ key, label, icon: Icon }) => {
               const scenario = scenarios[key];
               return (
-                <div key={key} className="flex flex-col gap-3 rounded-xl border border-border bg-muted p-3.5">
+                <div key={key} className={cn('flex flex-col gap-3 border border-border bg-muted p-3.5', COSTUME_FRAME_RADIUS_CLASS)}>
                   {/* A chart slot is not a text colour: the slot is the swatch, the label stays muted. */}
                   <p className="flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: chartColors[SCENARIO_SLOT[key]] }} aria-hidden="true" />

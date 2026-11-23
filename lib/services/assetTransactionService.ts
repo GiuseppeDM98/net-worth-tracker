@@ -37,6 +37,8 @@ export interface AssetTransactionMutationResult {
   transactionId: string;
   derived: { quantity: number; averageCost?: number; averageCostEur?: number };
   realizedPnlEur?: number;
+  /** What became of the trade's fee in the cashflow (2026-11-12); `'refused'` = no fee category document. */
+  feeRow?: 'written' | 'none' | 'refused';
 }
 
 export type AssetLedgerMigrationResult =
@@ -59,6 +61,7 @@ function docToAssetTransaction(id: string, data: Record<string, unknown>): Asset
     pricePerUnit: data.pricePerUnit as number,
     priceEur: data.priceEur as number,
     fees: data.fees as number | undefined,
+    feeExpenseId: data.feeExpenseId as string | undefined,
     linkedCashAssetId: data.linkedCashAssetId as string | undefined,
     withheldTaxEur: data.withheldTaxEur as number | undefined,
     isBaseline: data.isBaseline as boolean | undefined,
@@ -100,6 +103,8 @@ export async function getAssetLedgerMeta(ownerId: string): Promise<AssetTransact
     migratedAssetCount: data.migratedAssetCount as number,
     averageCostEurBackfilledAt:
       data.averageCostEurBackfilledAt !== undefined ? toDate(data.averageCostEurBackfilledAt as never) : undefined,
+    averageCostEurFeeFreeAt:
+      data.averageCostEurFeeFreeAt !== undefined ? toDate(data.averageCostEurFeeFreeAt as never) : undefined,
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),
   };
@@ -145,25 +150,33 @@ export async function createAssetTransaction(
   return parseWriteResponse(response, "Errore durante la registrazione dell'operazione.");
 }
 
+/**
+ * `expectedUpdatedAt` is the `updatedAt` of the trade the form was drawn from: the server refuses
+ * (409) a trade changed since, so a form left open on an older version cannot overwrite a newer one.
+ */
 export async function updateAssetTransaction(
   ownerId: string,
   transactionId: string,
-  updates: Partial<AssetTransactionFormData>
+  updates: Partial<AssetTransactionFormData>,
+  expectedUpdatedAt: Date
 ): Promise<AssetTransactionMutationResult> {
   const response = await authenticatedFetch(`/api/asset-transactions/${transactionId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: ownerId, updates }),
+    body: JSON.stringify({ userId: ownerId, updates, expectedUpdatedAt: expectedUpdatedAt.toISOString() }),
   });
   return parseWriteResponse(response, "Errore durante la modifica dell'operazione.");
 }
 
+/** `expectedUpdatedAt`: the version the row's delete button was drawn from (see the edit). */
 export async function deleteAssetTransaction(
   ownerId: string,
-  transactionId: string
+  transactionId: string,
+  expectedUpdatedAt: Date
 ): Promise<AssetTransactionMutationResult> {
   const response = await authenticatedFetch(
-    `/api/asset-transactions/${transactionId}?userId=${encodeURIComponent(ownerId)}`,
+    `/api/asset-transactions/${transactionId}?userId=${encodeURIComponent(ownerId)}` +
+      `&expectedUpdatedAt=${encodeURIComponent(expectedUpdatedAt.toISOString())}`,
     { method: 'DELETE' }
   );
   return parseWriteResponse(response, "Errore durante l'eliminazione dell'operazione.");

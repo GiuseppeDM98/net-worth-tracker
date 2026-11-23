@@ -6,7 +6,7 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Impostazioni**: `app/dashboard/settings/page.tsx` (the orchestrator, under 500 lines since 2026-10-08: the draft's `useReducer`, the observed read, the one «Salva», the bar, the tab), the six views `components/settings/tabs/{Generale,Allocazione,Spese,Dividendi,Condivisione,Aspetto}Tab.tsx` (+ `shared.tsx`: `SettingsTabPanel`, `DeclarationRow`, `runGuarded`, `INTERACTIVE_CONTROL_CLASS`; `CategoryRow` lives in `SpeseTab`, `SyncDividendsButton` in `DividendiTab`, the theme swatches in `AspettoTab`), `components/settings/allocation/{AllocationClassEditor,SubTargetEditor}.tsx`, `components/settings/{ExpenseImportSection,AccountSharingSection}.tsx`, pure `lib/utils/settingsDraft.ts` (the reducer, `sliceSettings`, `composeSettingsDocument`, `isSliceDirty`, `revealTargetProblem`, `targetFieldId`, `SETTINGS_CLASS_ORDER`) and `lib/utils/{settingsNarrative,spendingRoles,equityBondsAutoTargets,allocationTargetValidation}.ts`, `lib/services/assetAllocationService.ts` (`getSettings`/`setSettings`, the FIVE places); browser `e2e/settings{,.mobile,.roles,.draft}.spec.ts`
+- **Impostazioni**: `app/dashboard/settings/page.tsx` (the orchestrator, under 500 lines since 2026-10-08: the draft's `useReducer`, the observed read, the one «Salva», the bar, the tab), the six views `components/settings/tabs/{Generale,Allocazione,Spese,Dividendi,Condivisione,Aspetto}Tab.tsx` (+ `shared.tsx`: `SettingsTabPanel`, `DeclarationRow`, `runGuarded` re-exported from `lib/utils/runGuarded.ts`, `INTERACTIVE_CONTROL_CLASS`; `CategoryRow` lives in `SpeseTab`, `SyncDividendsButton` in `DividendiTab`, the theme swatches in `AspettoTab`), `components/settings/allocation/{AllocationClassEditor,SubTargetEditor}.tsx`, `components/settings/{ExpenseImportSection,AccountSharingSection}.tsx`, pure `lib/utils/settingsDraft.ts` (the reducer, `sliceSettings`, `composeSettingsDocument`, `isSliceDirty`, `revealTargetProblem`, `targetFieldId`, `SETTINGS_CLASS_ORDER`) and `lib/utils/{settingsNarrative,spendingRoles,equityBondsAutoTargets,allocationTargetValidation}.ts`, `lib/services/assetAllocationService.ts` (`getSettings`/`setSettings`, the FIVE places); browser `e2e/settings{,.mobile,.roles,.draft}.spec.ts`
 - **Suites to run after a change here — Impostazioni** (moved from `AGENTS.md` § Commands on 2026-09-30): **Bozza** `settingsDraft` (the identity `compose ∘ slice`, on the fixtures of `__tests__/fixtures/storedSettings.ts`) · **Letture** `settingsNarrative` · **Round-trip** `settingsRoundTrip` · **Formula** `equityBondsAutoTargets` · **Sblocco** `pensionUnlock` · and the compiler map `reactCompilerCoverage`
 
 ## Impostazioni — tessere senza verdetto (`app/dashboard/settings/page.tsx`, `lib/utils/settingsNarrative.ts`)
@@ -23,9 +23,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   piano» and «Assistente» are read-only tiles: label · mono value rows (`DeclarationRow`) and a footer that LINKS the
   write surface. Two reasons, both structural: the FIRE parameters save from FIRE › Calcolatore/Coast FIRE, and a
   second surface would be a second write path (see the Dividendi Save in § Settings — the FIVE places); the assistant's preferences live in its
-  memory document and the settings doc is a MIRROR THAT LOSES ON READ (`lib/server/assistant/store.ts` prefers the
+  memory document (read and changed from the Assistente, its «⋯» menu → Preferenze, a modal since 2026-11-12) and the settings doc is a MIRROR THAT LOSES ON READ (`lib/server/assistant/store.ts` prefers the
   stored value), so an edit made here would be silently overwritten. A never-synced mirror prints no default — the
-  reading says where the truth lives instead.
+  reading says where the truth lives instead. «Criteri del modello» (`idealAllocation`, 2026-11-17) is the third: a
+  read-only summary on the Allocazione tab (`IdealAllocationSummary`) linking Allocazione › Accumulo, where the
+  criteria are edited; the field is carried through `composeSettingsDocument` untouched, its default from
+  `lib/constants/idealAllocation.ts` (doc/guide/ottimizzatore.md).
 - **The applicative default is named as a default**: «pensione INPS a 67 anni (predefinita)» — printing 67 like a saved
   choice tells the reader they decided something they did not. The RITA age is never derived here: it comes from
   `resolveRitaUnlockAge`, the app's one unlock rule.
@@ -91,6 +94,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   dialog IS the confirmation, without them the row arms), dividend sync (`SyncDividendsButton`, armed in the primary
   tint: it writes, it does not destroy) and the revoke of an access (`MemberRow`, the row says what is taken away).
   One live region per list.
+- **The Categorie tile counts the spending categories by type in the type's own words** (`describeExpenseCategories`): «3 necessarie, 1 non necessaria» — the old «fisse / variabili» renamed on 2026-11-15 (owner, 2026-11-12: the old type words go wherever the owner reads them; the ids `fixed`/`variable` unchanged; test `__tests__/settingsNarrative.test.ts`).
 - **«Ruoli 50/30/20» is its own tile in Spese**, under the two the expense form reads — not a row of Categorie,
   because that tile gives way to an `ErrorNotice` when the categories fail, and the switch and its reading must not.
   The reading (`describeSpendingRolesSetting`) counts the classified spending categories
@@ -150,7 +154,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   default (it used to carry only the email fields). `familyMembers` was missing from BOTH server mappers until
   2026-08-31 and there is no type error for it — an absent field is simply `undefined` server-side. **And an EIGHTH
   for the Assistente**: `fetchSettings` in `lib/services/assistantMonthContextService.ts`, narrow too (each new reader
-  adds its fields; Registra added its own in 2026-11).
+  adds its fields; Registra added its own in 2026-11), read since 2026-11-19 by the Consulente's plan stage too, which
+  added `investmentCashAssetId` and `idealAllocation` (doc/guide/consulente-piano.md).
   `pensionReturnStartMonth` joined it on 2026-10-14 (the email names the month's pension contributions only from
   there, doc/guide/email-pdf.md).
 - **Store a boolean explicitly, never derive it** from other fields. All feature toggles live in
@@ -181,10 +186,17 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **«Commissioni bancarie»** (Spese, 2026-09-25 as «Commissioni sui trasferimenti»; the fee of ANY row since 2026-10-10, doc/guide/cashflow.md — the keys keep their name): `transferFeeCategoryId` / `transferFeeSubCategoryId`, both
   user-clearable (`'x' in settings` in both `setSettings` branches), in the `spese` snapshot, read by the expense
   form and, since 2026-11, mapped by the Assistente's `fetchSettings` (the eighth place above) for Registra. The Select lists the spending categories grouped by type — the fee row takes the category's
-  type. `e2e/cashflow.transfer-fee.spec.ts` is the one spec that WRITES this page's settings: it picks the category,
+  type. `e2e/cashflow.transfer-fee.spec.ts` WRITES the fee fields (the other writers: § Per-page blind spots): it picks the category,
   presses «Salva», reloads, and restores the WHOLE settings document in `afterAll`: «Salva» rewrites every field the page
   holds, and on the base seed it drops the allocation sub-targets (the seed's shape is not the page's), so restoring the
   two fee fields alone left `e2e/allocation.spec.ts` with no class row to open (seen red in the full run, 2026-09-25).
+- **«Conto per gli investimenti»** (Spese, 2026-11-19, the third row of the default accounts): `investmentCashAssetId`,
+  the account a plan of accumulation draws from by default. User-clearable (`'x' in settings`: `delete` on the no-merge
+  branch, `deleteField()` on the merge one), in `SpeseSlice` (`|| NO_SELECTION`), named in the tile's narrative
+  («Il piano di accumulo attinge da X.», `describeDefaultAccounts`). Its only reader is Accumulo's new plan
+  (`resolveInvestmentAccountId`, doc/guide/accumulo.md), which ticks it while it is still a plan source account; Registra,
+  the trade dialog and the server do not read it. Pinned by `settingsRoundTrip` (written, read back, cleared),
+  `settingsDraft` (both fixtures carry `'cash-invest'`) and `e2e/settings.draft.spec.ts`.
 
 ## Composizione mobile
 

@@ -2,8 +2,11 @@ import type { ReactNode } from 'react';
 import type { DashboardOverviewCategoryAmount } from '@/types/dashboardOverview';
 import type { Narrative } from '@/lib/utils/narrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { RING_REST_COLOR, type RingSegment } from '@/lib/utils/ringChart';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import type { TileCollapse } from '@/components/ui/tile';
+import type { RankedRow } from '@/components/ui/ranked-rows';
+import { RING_LAYOUT_CLASS, RING_ROWS_CLASS, RingChart } from '@/components/ui/ring-chart';
 import { OverviewTile } from './OverviewTile';
 import { RankedRows } from './RankedRows';
 
@@ -36,6 +39,10 @@ interface CategoryTileProps {
    * button: it is not a category.
    */
   onSelectCategory?: (category: DashboardOverviewCategoryAmount) => void;
+  /** The rows as ring parts (the income, on Tracciamento and the Panoramica: `incomeRingSegments`); absent or null, the rows keep their bar. */
+  ring?: RingSegment[] | null;
+  /** The word under the ring's figure («entrate»). */
+  ringCenterLabel?: string;
   className?: string;
 }
 
@@ -43,7 +50,8 @@ interface CategoryTileProps {
  * "Dove vanno / da dove arrivano i soldi?" — the period's top categories as ranked rows, on
  * the Panoramica (the overview payload's top 5) and on Tracciamento (`rankCategories`). Only
  * the top 5 are carried, so the list closes with the residual ("Altre categorie") — a list
- * titled "per categoria" that does not add up to the total reads as missing data.
+ * titled "per categoria" that does not add up to the total reads as missing data; with `ring`
+ * (the income, on Tracciamento and the Panoramica) the rows are its legend.
  */
 export function CategoryTile({
   eyebrow,
@@ -58,6 +66,8 @@ export function CategoryTile({
   labelClassName,
   footer,
   onSelectCategory,
+  ring,
+  ringCenterLabel,
   className,
 }: CategoryTileProps) {
   const shown = categories.reduce((sum, c) => sum + c.amount, 0);
@@ -69,6 +79,17 @@ export function CategoryTile({
         if (category) onSelectCategory(category);
       }
     : undefined;
+  const rankedRows: RankedRow[] = categories.map((c) => ({
+    key: rowKey(c),
+    label: c.category,
+    amount: c.amount,
+    percentage: c.percentage,
+  }));
+  const remainders =
+    remainderAmount >= 1
+      ? [{ label: 'Altre categorie', amount: remainderAmount, percentage: total > 0 ? (remainderAmount / total) * 100 : 0 }]
+      : null;
+  const ringColor = new Map((ring ?? []).map((segment) => [segment.key, segment.color]));
 
   return (
     <OverviewTile
@@ -85,30 +106,32 @@ export function CategoryTile({
       )}
       {categories.length === 0 ? (
         <p className="mt-3 text-[13px] text-muted-foreground">{emptyCopy}</p>
+      ) : ring ? (
+        <div className="@container mt-3.5">
+          <div className={RING_LAYOUT_CLASS}>
+            <RingChart segments={ring} centerValue={total} centerLabel={ringCenterLabel ?? ''} ariaLabel={eyebrow} />
+            <div className={RING_ROWS_CLASS}>
+              <RankedRows
+                rows={rankedRows.map((row) => ({ ...row, swatch: ringColor.get(row.key) }))}
+                color={color}
+                bars={false}
+                labelClassName={labelClassName}
+                onRowClick={handleRowClick}
+                ariaLabel={eyebrow}
+                remainders={remainders && remainders.map((remainder) => ({ ...remainder, swatch: RING_REST_COLOR }))}
+              />
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="mt-2">
           <RankedRows
-            rows={categories.map((c) => ({
-              key: rowKey(c),
-              label: c.category,
-              amount: c.amount,
-              percentage: c.percentage,
-            }))}
+            rows={rankedRows}
             color={color}
             labelClassName={labelClassName}
             onRowClick={handleRowClick}
             ariaLabel={eyebrow}
-            remainders={
-              remainderAmount >= 1
-                ? [
-                    {
-                      label: 'Altre categorie',
-                      amount: remainderAmount,
-                      percentage: total > 0 ? (remainderAmount / total) * 100 : 0,
-                    },
-                  ]
-                : null
-            }
+            remainders={remainders}
           />
         </div>
       )}

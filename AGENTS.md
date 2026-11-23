@@ -23,10 +23,11 @@ Companion documents — do not duplicate their content into this file:
 UI patterns, testing, workflow. **A rule about one area's behaviour lives in `doc/guide/<tema>.md`**, one file per
 page, tab, integration or subsystem, read only by whoever touches that area: the pages (`panoramica`, `patrimonio`,
 `cashflow*`, `rendimenti`, …), the cross-cutting subsystems since 2026-09-06 (`stati`, `dialog`, `temi`,
-`account-condiviso-demo`, Settings inside `impostazioni`), the test harness since 2026-09-20 (`e2e-emulatori`; its Playwright half since 2026-11-11, `e2e-playwright`), the
+`account-condiviso-demo`, Settings inside `impostazioni`), the test harness since 2026-09-20 (`e2e-emulatori`; its Playwright half since 2026-11-11, `e2e-playwright`, and the whole run since 2026-11-17, `e2e-suite`; the guided tour's why and history since 2026-11-18, `collaudo`), the
 shell and the persisted cache since 2026-09-30 (`shell`, `cache-persistita`), the first-screen census since 2026-10-10
 (`prima-schermata`; its record — baselines, fixture table, widened entries — since 2026-10-17, `prima-schermata-misure`), and since 2026-10-10 the charts (`grafici`) and the server layer (`server`), which left this file
-whole, the two-step dialogs and the form reset joining `dialog` the same day, and since 2026-11-06 the motion (`motion`:
+whole, the two-step dialogs and the form reset joining `dialog` the same day, the Assistente's Registra mode out of
+`assistente` since 2026-11-16 (`assistente-registra`), and since 2026-11-06 the motion (`motion`:
 Framer, scenes, count-up, collapsibles — the React Compiler and `react-hooks` rules stayed here, § React Compiler and
 the hooks rules, because they hold for every component). **How to use them**: section 3 is the index — for each guide the 3–4 things to know BEFORE opening it, then the
 pointer; the three subsystem guides born from sections 2 and 4 keep their stub under the heading the code cites
@@ -43,7 +44,7 @@ holds it): how it was learned is `git log`'s.
 
 ### Italian Localization
 - UI text Italian, code comments English. `formatCurrency()`, `formatDate()` (`DD/MM/YYYY`), `Sottocategoria` (no
-  hyphen), `Buongiorno Giuseppe` (no comma). English on purpose: `Hall of Fame`, `FIRE e Simulazioni`, `Cashflow`,
+  hyphen), `Buongiorno Paolo` (no comma). English on purpose: `Hall of Fame`, `FIRE e Simulazioni`, `Cashflow`,
   `Assistente AI` and the standard metric names; `Current Yield` → `Rendimento Corrente`.
 - **`formatPercentage` exists TWICE and the two disagree**: `lib/utils/formatters`' is `toFixed` (`40.71%`), the it-IT
   one is `Intl('it-IT')` (`40,71%`) — `formatPercentageIt`/`formatNumberIt` in `lib/utils/formatters.ts`, to which
@@ -74,6 +75,9 @@ holds it): how it was learned is `git log`'s.
   from the other reader).
 - Inclusive month upper bound: `endOfMonthBound(year, month)` — the 1st at midnight drops the whole closing month.
   `<input type="date">` defaults take `getItalyDateIso()`: `toISOString()` proposes yesterday from 22:00.
+- **A date saved from `<input type="date">` is the UTC midnight of its day: «today or later» compares Italian DAYS,
+  never instants** (2026-11-15: the provisional-coupon banner dropped a coupon on its own payment day;
+  `isPendingProvisionalCoupon`, `__tests__/couponUtils.test.ts`).
 
 ### Tailwind Breakpoints and Responsive Layout
 - `desktop:` = 1440px, never `lg:`. Dialog-internal layouts use `sm:`; portrait wrappers `max-desktop:portrait:pb-20`.
@@ -123,9 +127,15 @@ holds it): how it was learned is `git log`'s.
   `DialogDescription` hands `text-sm text-muted-foreground` down, a child running `cn(own…, className)` lets
   `tailwind-merge` keep the wrapper's, and a font-size utility also drops a `leading-*` — put the incoming `className`
   BEFORE the classes that must win, and read the result with `getComputedStyle`.
+- **A guided path renders `PathCard`** (`components/ui/path-card.tsx`, 2026-11-20: Compravendita and the plan of
+  accumulation): the 720px card, «Passo n di N · tema», one primary button, «Ricomincia» armed; its fields are
+  `components/ui/path-fields.tsx`, its browser draft `lib/utils/pathDraftStorage.ts`. The Consulente keeps its own card
+  (the rail, the slide) and imports only the class constants.
 
 ### Layout and Color Tokens
 - Never hardcode structural colors in shell components — `bg-background`, `text-foreground`, `border-border`.
+- **`NarrativeText` renders its own `<p>`**: its host is a `<div>`, never a `<p>` (a `<p>` in a `<p>` is a hydration
+  error; 2026-11-18, «Questo mese»; held by `__tests__/narrativeTextNesting.test.ts`, a scan of `components/`).
 - **Sign colors are tokens: `text-positive`/`text-destructive`**, chips `bg-positive/10`, resolved via
   `getMetricValueColor()` — drop `dark:` variants (the token swaps itself); the function returns neutral for the
   `currency` format by design, signed currency uses `signChipClass`/`signTextClass`. No legacy `text-emerald-*` is left
@@ -150,7 +160,7 @@ holds it): how it was learned is `git log`'s.
   1..8; but on 2026-09-18 `--chart-3` light measured 2,74:1 and `--chart-1` dark 2,62:1 ON A CARD — re-measure before
   leaning on that floor, doc/guide/temi.md § Per-page blind spots). The semantic amber is `--warning-foreground`; only
   `ExpenseTable`'s chips are exempt. **A chart slot used as TEXT is held to 4,5:1**: `__tests__/actionColorContrast.test.ts`
-  measures COMPRA/VENDI/OK across all twelve theme blocks, on `--card` and on the chip's own `color-mix` fill (the
+  measures COMPRA/VENDI/OK across all sixteen theme blocks, on `--card` and on the chip's own `color-mix` fill (the
   HARDER surface).
 - **A computed custom property comes back as `lab()`, never as the `oklch()` you authored**: anything that READS a
   colour token parses `lab()` (and `#hex`) too and never asserts `/^oklch\(/` — through `lib/utils/colorParse.ts`, the
@@ -237,7 +247,8 @@ holds it): how it was learned is `git log`'s.
   in updates` guard, or a price refresh wipes it.
 - **`runTransaction`: ALL `tx.get()` before ANY write** — a `get→update` loop breaks on the second doc and is invisible
   when the function is mocked; aggregate deltas per docId first (template
-  `__tests__/updateCashAssetBalancesAtomic.test.ts`), success toasts AFTER the reconcile returns. Firestore rejects
+  `__tests__/updateCashAssetBalancesAtomic.test.ts`), success toasts AFTER the reconcile returns. **A decision read
+  outside a transaction is re-checked inside it** (2026-11-12; `assetTransactionsRoutes.test.ts` M1, D1, E1). Firestore rejects
   `undefined` inside an array element: `assetAllocationService.ts` builds `docData` by hand, so its array fields need a
   whitelisting serializer with conditional spreads.
 - **A bare `.set()` on a server-owned doc DELETES every field its object omits, and the daily cron re-runs them all.**
@@ -317,10 +328,22 @@ holds it): how it was learned is `git log`'s.
 - **CSS custom property liveness — the 5-check sweep.** A token is live if ANY holds: `var(--name` in `.ts/.tsx/.css`;
   if mapped via `@theme`, the **generated utility name** appears (grep `bg-X`, not the variable); `getPropertyValue`; an
   internal chain; the vendored-surface contract. A confirmed-dead token leaves **every** theme block in one commit.
+- **A page never reads `searchParams` for a UI-only parameter** (2026-11-21): it turns a prerendered route
+  dynamic (○ → ƒ) and perf:budget reads none of its chunks. Read it in the client with `useSyncExternalStore` on
+  `window.location.search`, on EVERY render — never once at mount: a client navigation mounts the page before the URL
+  changes (`components/allocation/piano/PianoClient.tsx`, `__tests__/pianoClient.test.tsx`, «Rivedi dal modello» in `e2e/accumulo.piano.spec.ts`).
 
 ### Shared Constants and Fixed Hooks
 - **Rule of Three**: a map used in 3+ files lives in `lib/constants/<domain>.ts`. The canonical symptom of a duplicated
   `Record<Type, string>` is one copy missing its `dark:` variants — illegible in dark mode with a clean `tsc`.
+- **A savings rate goes through `readSavings` (`lib/utils/savingsRate.ts`)**: below −100% (`SAVINGS_RATE_FLOOR`) or
+  without income the app speaks in euros («Finora hai messo da parte −497 €: le spese superano le entrate»), never «il
+  −16567%»; `meaningfulSavingsRate` is the number-or-null door, `weightedSavingsRate` the average of a window (Σ
+  saved / Σ income, never a mean of rates). A negative rate keeps the typographic minus (`withTypographicMinus`).
+  2026-11-12; pinned by `__tests__/savingsRate.test.ts` and by the grep
+  `grep -rnE "/ ?\(?[A-Za-z_.]*([Ii]ncome|[Ii]nflows?)\)? ?\* ?100" lib components app`, which prints only
+  `savingsRate.ts`, `savingsRateBadge.ts` (last month ≥ 30%, positive by construction), `landingSampleData.ts`, the
+  income variation of `dashboardOverviewService.ts` and `whatIfSummary.ts` (a share of income lost, not a rate).
 - **Declare N fixed hook instances with `enabled: false` for the inactive ones — never loop over hooks.**
 - **Yahoo module asymmetry** — funds `topHoldings` → `sectorWeightings`, stocks `assetProfile` → `sector`, the two
   maps in `lib/constants/exposureSectors.ts`, two MODULES of one per-ticker document since 2026-09-28:
@@ -345,15 +368,15 @@ file used to carry.
 ### Patrimonio · Asset Pricing, FX and Assets → `doc/guide/patrimonio.md`
 - "Does this asset have a market price?" is ONE rule in `assetPricing.ts` (`hasMarketPrice`/`requiresManualPricing`); a new hand-valued type goes in `MANUALLY_VALUED_TYPES` and nowhere else.
 - **A debt is a `loan` ASSET worth minus its principal** (2026-10-10, `types/assets.ts` → `LOAN_ASSET_TYPE`, the sign in `calculateAssetValue`): the property stays GROSS, the loan sits in the class of what it finances (`realestate` when `financedAssetId`, else `cash` = negative liquidity), out of every Rendimenti base, out of FIRE with the primary residence it finances. **In the Allocazione a loan FOLLOWS what it finances** (2026-10-17, `resolveAllocationRoleWithin`): a mortgage takes its property's role (excluded home → nets the excluded figure; a property in the allocation → nets Immobili in the base), a personal loan nets Liquidità in the base; never a plan's leg, its stored `allocationRole` inert. **Its «Intestatari» follow the property's quotas too** (`resolveAssetOwnership`, lib/utils/assetOwnership.ts; an asset is divisible by QUOTA since 2026-10-17 — `Asset.ownerShares` in units or percent + `ownerMemberId` as the rest, the ONE slice primitive `lib/utils/assetSlice.ts` shared with the goals' quotas, units past the quantity declared «quote da riassegnare», never rescaled; since 2026-10-18 every group measured on the VALUE and on the PRICE OF CARRY — `costOf` = `costBasisOf` of `patrimonioSummary.ts` injected beside `valueOf`, the tile's «Valore | Carico» `AsideToggle` —, an asset with no PMC at its value, a quoted one declared, never left out). Where the debt lives on the document is `debtBalanceField`'s alone (a loan's `quantity`, a legacy property's `outstandingDebt`, read-only since the one-shot migration `loanMigration.ts`).
-- GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset.
+- GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset — or one created empty for a plan (`Asset.createdEmpty`).
 - A Borsa Italiana bond quote is `% of par`, always, and `lib/utils/bondPricing.ts` is the ONE conversion (`quote / 100 × nominal × coefficient`, nominal **1 €** by default). Never re-implement it; never guard it on `nominal > 1` again (issue #340).
-- Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts` (`costBasisPerUnitEur`, fees included); `undefined` without a EUR PMC — print nothing, never dollars against euros.
+- Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts`: `costBasisPerUnitEur` (the fee-free PMC) for every G/P, YOC and PMC cell, `fiscalCostPerUnitEur` (purchase fees included) for every tax estimate (2026-11-12); `undefined` without a EUR PMC — print nothing, never dollars against euros.
 - Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; numbers not in the payload are born in `patrimonioSummary.ts`; the page owns every dialog.
 - Il resto — the mobile composition (§ Composizione mobile), the «Mutuo» tile, one per LOAN (interest measured only from the settled instalments, `mortgageSummary.ts`), the loan migration and its blind spots, the split class chip of a composite instrument (`describeAssetClassChip`), BTP€i, the «Andamento» view, `hasCostBasis`, `MIN_ANNUALIZABLE_DAYS`, the instrument driver, `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch, the `averageCostEur` backfill — in `doc/guide/patrimonio.md`.
 
 ### Patrimonio › Compravendita → `doc/guide/compravendita.md`
 - A guided path (the Consulente's card) that records ONE event of a house's purchase or sale — preliminare, then rogito — the day it happens (a future date is refused); `buildRealEstatePlan` (`lib/utils/realEstateOperationPlan.ts`, pure) turns the answers into steps of the app's own pieces, `executeRealEstatePlan` runs them through the services that own each write, NOT atomically: the first failure stops and the page names what landed.
-- Costs are SPENDING, never the property's value; a purchase creates the property at zero and the transfers raise it, the mortgage's principal lands on the value when the loan opens (`adjustProperty`); a sale first brings the value to what the buyer still pays (the «Rivaluta» line, up or down), closes each loan WITH THE PRICE (`payOffWithSale`: debt and value fall together, no row — a `debt` payoff row would count as spending everywhere while the price is a transfer), transfers the net out and stops the series of the house after the rogito. A premium paid by a loan is no spending row: its instalments are.
+- Costs are SPENDING, never the property's value; a purchase creates the property at zero and the transfers raise it, the mortgage's principal lands on the value when the loan opens (`adjustProperty`; beyond the residual, `disburseMortgage` credits the excess to the account, no row); a sale first brings the value to what the buyer still pays (the «Rivaluta» line, up or down), closes each loan WITH THE PRICE (`payOffWithSale`: debt and value fall together, no row — a `debt` payoff row would count as spending everywhere while the price is a transfer), transfers the net out and stops the series of the house after the rogito. A premium paid by a loan is no spending row: its instalments are.
 - «Legata all'immobile» (`Expense.propertyAssetId`, 2026-10-21): the house a row belongs to — the form, «Collega la serie a un immobile…», the purchase path; a row repaying a loan that finances a house belongs to THAT house first (`houseOfRow`, `lib/utils/propertyLink.ts`). A sale proposes only the house's series (`isProposedToStop`), never by word or type.
 - Every cost row's category: the default of Impostazioni › Spese (`realEstateCostCategories`, a LIST so `merge: true` replaces it whole) else `suggestCategory` (specific words first, broad words on the shortest category name), of an allowed type (`REAL_ESTATE_COST_TYPES`).
 - Il resto — the screens and the prefill, the policies, the executor's refs, the plain transfer out of a property, the blind spots — in `doc/guide/compravendita.md`.
@@ -364,6 +387,7 @@ file used to carry.
 - The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`; a replay returning `holdingStartDate: undefined` means leave the doc untouched (never `deleteField()`).
 - A trade date has ONE floor — the asset's OWN baseline (`BASELINE_NOT_FIRST`) — and the future as its only ceiling (2026-09-13); `assetTransactionsMeta.baselineDate` is NOT a floor.
 - Per-transaction derived data comes from `replayTransactionsWithEffects` (one pass), never a replay per prefix.
+- The PMC is fee-free and every tax reads `fiscalCostPerUnitEur`; a trade's fee row is planned and written in the trade's transaction (2026-11-12; `assetTransactionWriteTx.test.ts` W1, X1) — `lib/utils/tradeFeeExpense.ts`, its id drawn in prepare, a fee saved before then never gets one.
 - Il resto — settlement timing, `buildDerivedAssetFields` and the `averageCostEur` backfill, `resolveBondPrice` reuse, the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
 
 ### Cashflow — expense mechanics → `doc/guide/cashflow.md`
@@ -388,7 +412,7 @@ file used to carry.
 - A running year is NOT clipped (`periodExpenses` takes the whole calendar year); the pacing compares year vs year−1 on the period's own span (`resolveComparisonScope`), the running MONTH on the same days of its baseline (`throughDay`, rows through `dayOf`), plus the shared `scheduledSentence`. The history CLOSES on the current year (`availableYears`, the Storico slice, the two charts' `BucketCeiling`): a plan's rows in 2043 are a calendar, not years.
 - The Scheda is a tile of the grid; every entry point lands through `handleEntitySelect`; URL focus is three FLAT params (`?focusType&focusCat&focusSub`); closing it returns the focus to its opener. Its pace divides the LIVED total by the months lived (`computeEntityRunRate`: `livedTotal`/`livedMonths`), the projection takes the calendar as a FLOOR under the pace, and its period carries the page's `throughMonth` cut.
 - Every number has one source (`analisiSummary.ts`, `comparisonDeltas.ts`); every sentence from `analisiNarrative.ts`/`cashflowNarrative.ts`, never a component.
-- Il resto — the mobile composition (§ Composizione mobile), «Fuori scala», the Periodo pacing, `EntityDossier`, the Sankey rules, the optional Flusso by 50/30/20 role (`spendingRoles.ts`), the Flusso's drawing below 640px (a share bar and rows, a legibility threshold of the chart), Playwright — in `doc/guide/cashflow-analisi.md`.
+- Il resto — the mobile composition (§ Composizione mobile; THE tile «Dove vanno i soldi», 2026-11-12), «Cosa è cambiato» and the anomalies as its sentence, the Periodo pacing, the Flusso inside «Dettaglio», lazy (2026-11-12), `EntityDossier`, the Sankey rules, the optional Flusso by 50/30/20 role (`spendingRoles.ts`), the Flusso's drawing below 640px (a share bar and rows, a legibility threshold of the chart), Playwright — in `doc/guide/cashflow-analisi.md`.
 
 ### Cashflow › Budget → `doc/guide/cashflow-budget.md`
 - Opt-in (`reconcileBudgetItems` never auto-creates); NO period axis (always the current Italian month; annual budgets are year-to-date on their own Off-Axis tile).
@@ -449,13 +473,31 @@ file used to carry.
 - Esposizione (2026-09-28): the engine runs in the BROWSER on the page's assets; the route answers only Yahoo's profiles from ONE cache per ticker, owner-scoped (`assertCanAccessAccount`), and nothing of the user's goes in a profile. Every euro of the Allocazione base has ONE of four destinies and the list adds up to 100 on screen.
 - Il resto — the mobile composition (§ Composizione mobile), THE ASYMMETRY of the two plans and the band-independent score, the dormant class (`isDormantClass`, `activeClassGaps` and never the raw `summarizeClassGaps`), `collapseRepeatedLevels` and the node's own `isInstrument`, the leverage engine and its tree, what Titoli, Settori and Emittenti weigh (`hasMarketPrice` + a ticker), the per-ticker cache and Yahoo's two modules, the Bull's formula, the six label maps, the action colours' measured lightness band and the `lab()` trap that made the old clamp dead code, the verdict-over-tiles rules — in `doc/guide/allocazione.md`.
 
+### Allocazione › Accumulo → `doc/guide/accumulo.md`
+- A plan splits a monthly inflow over instruments by target weight and PROPOSES purchases, never writing a transaction on its own («Registra» prefills `TransactionDialog` and links it). ONE draft-or-active plan per account (the lock `accumulationPlanLocks/{ownerUid}`, written in the plan's transaction) in `accumulationPlans/{id}`; both Firestore rules are published by hand. The reserve is the allocation's cash quota kept on the real accounts (`isPlanSourceAccount`), refilled by the sales and the inflows before anything is bought (`computeUsableLiquidity.refillMonths`). The tab is a `lazyComponent`; the Piano's note reads the slim path (`useAccumulationPlans`, `usePacMonth`), both importing their modules on demand, never the editor.
+- A sale counts from its month (`PlanDisposal.monthIndex`, absent = 1): `computeUsableLiquidity` takes the first index and returns `dueProceedsEur` and `monthShares`, which `scheduleInstallments` spreads from the sale's month; a later sale refills the reserve first, so `L` does not depend on the months.
+- Sentences and figures live in `accumulationNarrative.ts` / `accumuloSummary.ts`; every write invalidates `queryKeys.accumulationPlans.all`, which the Piano's note reads too.
+- The Consulente's plan (2026-11-20) arrives ACTIVE from «Applica»: `createAndActivatePlan` validates on the given assets, writes (or replaces the open draft whole — `updateDraftPlan` clears what the draft lacks), activates, then writes the model; no editor on this path, its corrections in `advisorNotes` («Questo mese» › «Dal Consulente»).
+- A swap (2026-11-20): a sale with `reinvestAssetId` buys that instrument with its WHOLE proceeds in its own month, outside the reserve, `L` and the rates (`computeUsableLiquidity.swaps`, lines `swap: true`); every reading of «a month that buys» goes through `isRegularLine` (`accumuloMonth.ts`), never `lines.length`.
+- A plan is created by the guided path at `/dashboard/allocation/piano` (2026-11-20: eight screens, ONE «Conferma» that activates, the answers on the browser; a draft in Accumulo is continued there) and revised by the same path (2026-11-21: the closed instalments kept, `revisePlan` with `expectedFirstIndex`); no editor.
+- Il resto — the mobile composition (§ Composizione mobile), «Rivedi il piano», «Riattiva», the ledger matching — in `doc/guide/accumulo.md`.
+
+### Allocazione › Portafoglio modello e ottimizzatore → `doc/guide/ottimizzatore.md`
+- The criteria («Criteri del modello», `idealAllocation` in the settings doc) drive a pure optimizer (`weightOptimizer.ts`, exact active-set QP, run on the click only) that proposes the weights of a saved portfolio model (`modelPortfolios/{ownerUid}`, rule published by hand); the PAC never sells, so «Raggiungibile» never goes below what is held. The base is Bilanciamento's (the accounts ONE candidate «Liquidità», a property net of its loans; the amount to invest comes FROM the accounts, never on top); the model carries a fingerprint of the stored targets, the criteria and the non-tradable roles, and reads «superato» when they move (a price never stales it).
+- Sentences live in `weightOptimizerNarrative.ts` / `settingsNarrative.ts`; saving the model invalidates `queryKeys.modelPortfolio.byOwner`.
+
 ### Allocazione › Consulente → `doc/guide/consulente.md`
-- A guided path (one question per screen, the draft on the browser), then an interview of up to three rounds of questions that writes nothing until the strategy (2026-11; `questionSet.ts` is the one question schema, shared with the Assistente); the strategy and the interview read the YTD bundle AND the cashflow block (`lib/utils/cashflowBlock.ts`), the OBBLIGAZIONI block (`lib/utils/allocationAdviceBonds.ts`: the single bonds' maturities, the bond ETFs' duration from the Esposizione's profile cache) and the previous paths (`allocationAdvice/{uid}/history`, the replaced document archived when it has a report, Admin only, the last six; 2026-11-08); the answers and the whole portfolio go to THREE model calls in series — the strategy on Opus 5.5, the instruments on Sonnet 5.5 with web search, the review on Opus 5.5 — persisted after every stage in `allocationAdvice/{uid}` (Admin writes only, `rules: write false`); ONE request per stage (`runAllocationAdviceStage`, `maxDuration = 300`: Vercel Hobby's ceiling, a whole run is about five minutes at effort `medium` (2026-10-23)), chained by the client, a failed stage retried from itself; the report is read as a book of up to ten pages, the model's text split by section onto the page of its tile, the rail its index from `desktop:` (2026-11).
+- A guided path (one question per screen, the draft on the browser), then an interview of up to three rounds of questions that writes nothing until the strategy (2026-11; `questionSet.ts` is the one question schema, shared with the Assistente); the strategy and the interview read the YTD bundle AND the cashflow block (`lib/utils/cashflowBlock.ts`), the OBBLIGAZIONI block (`lib/utils/allocationAdviceBonds.ts`: the single bonds' maturities, the bond ETFs by value, never a duration: the search verifies it, 2026-11-20), the PIANO DI ACCUMULO block (the strategy, the interview, the review and the revision, 2026-11-12: `lib/server/allocationAdvice/accumulationPlan.ts`, a failed read never fails the run) and the previous paths (`allocationAdvice/{uid}/history`, the replaced document archived when it has a report, Admin only, the last six; 2026-11-08); the answers and the whole portfolio go to the model calls in series — the strategy on Opus 5.5, the instruments on Sonnet 5.5 with web search, the review on Opus 5.5, the operating plan on Opus 5.5 since 2026-11-19 — persisted after every stage in `allocationAdvice/{uid}` (Admin writes only, `rules: write false`); ONE request per stage (`runAllocationAdviceStage`, `maxDuration = 300`: Vercel Hobby's ceiling, a whole run is about five minutes at effort `medium` (2026-10-23)), chained by the client, a failed stage retried from itself; the report is read as a book of up to eleven pages, the model's text split by section onto the page of its tile, the rail its index from `desktop:` (2026-11); a fifth stage writes the operating plan (2026-11-19, below).
 - STRUCTURE IS NEVER PARSED FROM PROSE (the book's split of the markdown by its headings decides only where the text is shown, 2026-11): the strategy and the review answer as a structured output, `{ markdown, proposal }` (`allocationAdviceAnswerSchema`, 2026-10-23 — the API guarantees the shape, not the sums: classes without a fixed amount sum to 100, sleeves sum to 100 or are empty, names copied EXACTLY from the STRUMENTI block, all checked by `parseAllocationAnswer`; a goal's mix travels as `{ assetClass, percentage }` pairs, because the API writes an object's keys in schema order and a mix written out of order fell short of 100); a strategy that breaks them fails the run, a review that does keeps the strategy's proposal. The instrument search keeps ONE fenced ```instrument-candidates block: web search answers with citations, which structured outputs refuse (400).
 - «Applica» shows its plans before writing, one checkbox each (`allocationAdviceApply.ts`): the targets through `setSettings`, a role through `updateAssetAllocationRole` (the ONE field; the other asset writers delete absent fields), the goals as a whole document through `saveGoalData` with over-100% quotas reduced and SAID; the «applied» route records it; the review date lives in the document and reaches the Allocazione header through `describeReviewBy`.
 - «Chiedi una modifica» on the report is a `revise` request (`runRevise`, `buildRevisionPrompt`): the review again with the previous report and every request so far, `document.revisions` appended, the status back to `ready`; never a new strategy or search.
-- A probe never runs the Consulente's model (2026-11-01): the E2E specs fake `/api/allocation-advice/run` with `page.route` (one handler per spec: `e2e/consulenteInterview.ts` scripts the interview's rounds and records the strategy and revise bodies — a strategy answers with an error, a revise completes —, the run spec scripts its three stages and the retry; the book's specs plant their documents through `e2e/consulenteReport.ts` and keep `installFakeRun` armed) — the `.env.local` key only enables the controls on :3100 (doc/guide/e2e-playwright.md § Browser-Driven E2E); the real run is made once, on the mirror.
+- A probe never runs the Consulente's model (2026-11-01): the E2E specs fake `/api/allocation-advice/run` with `page.route` (one handler per spec: `e2e/consulenteInterview.ts` scripts the interview's rounds and records the strategy and revise bodies — a strategy answers with an error, a revise completes —, the run spec scripts its four stages and the retry; the book's specs plant their documents through `e2e/consulenteReport.ts` and keep `installFakeRun` armed) — the `.env.local` key only enables the controls on :3100 (doc/guide/e2e-playwright.md § Browser-Driven E2E); the real run is made once, on the mirror.
 - Il resto — the reducer and its sub-screens, the stale run, the demo gate, the prompts' contract — in `doc/guide/consulente.md`.
+
+### Allocazione › Consulente, il piano operativo → `doc/guide/consulente-piano.md`
+- Five stages (2026-11-19): after the review, «Piano» (Opus 5.5) writes ONE structured object on `document.operatingPlan` — inflow, months, one row per instrument addressed by a KEY the app printed (S held, N new, M money-market fund), sales with month, a review month — checked by ONE pure `reconcileOperatingPlan` whose every correction is a sentence. The plan stage reads its own facts block (DATI PER IL PIANO OPERATIVO) and never changes the document's `status`, `stage`, `error` or `updatedAt` (`keepUpdatedAt`); it never fails the run, and «Scrivi il piano operativo» on «Applica» reruns it alone.
+- ONE «Applica» creates the plan of accumulation (2026-11-20): a fourth tick built by the pure `buildAdvicePlan` on today's portfolio as the click leaves it (roles applied, the targets `resolveEffectiveTargets` gives), `executeAdvicePlan` after targets, roles and goals — re-read, account, instruments matched before created, plan, model. Only `ConsulentePlanTick.tsx` (a `lazyComponent`) may import the plan's builder and utils on the route, the executor only through `import()` (a test reads the sources).
+- Il resto — «Applica»'s writes and the click's states, the page «Il piano operativo», the blind spots — in `doc/guide/consulente-piano.md`.
 
 ### Previdenza · Fondo Pensione → `doc/guide/previdenza.md`
 - `pensionFund` is an `AssetType`, never an `AssetClass`, never a ledger type; its value is statement-driven, held in `quantity` at price 1 (`assertFundValueLivesInQuantity`).
@@ -472,14 +514,16 @@ file used to carry.
 - Goal math the server needs lives in `goalMath.ts` (imports `calculateAssetValue` directly); `serializeGoalForFirestore` IS the persistence allowlist (`serializeAssignmentForFirestore` the quotas'); the goal document is rewritten WHOLE, never patched. **A quota is a percent OR units of its asset** (2026-10-17, `GoalAssetAssignment` union): every formula reads it through `assignmentFraction` (lib/utils/assetSlice.ts), never `.percentage` directly. **A property is worth to a goal its value NET of the loans that finance it, a loan nothing** (2026-10-20, `lib/utils/goalAssetValue.ts` → `goalMath.goalAssetValueOf`): every goal reader takes that value, never `calculateAssetValue` alone.
 - Il resto — the mobile composition (§ Composizione mobile), what the requirement takes off and grosses up (the Coast pensions by the saved age, the tax of `lib/utils/withdrawalTax.ts` and its `null` without any PMC, the fund at its unlock), the fan's second ledger (`retirements`, which never touches `paths`), the Distribuzione's nearest-rank percentiles (`fireYears`, `fireDistribution.ts`, never the fan's `floor`), the category-agnostic pure layer, each tab computing nothing (numbers from `*Summary`, words from `*Narrative`), config-first collapse, the five verdict-over-tiles sections, Playwright locators — in `doc/guide/fire.md` (pagina e Calcolatore), `fire-coast.md`, `fire-what-if.md`, `fire-monte-carlo.md`, `fire-obiettivi.md`.
 
-### Assistant · Assistente → `doc/guide/assistente.md`
+### Assistant · Assistente → `doc/guide/assistente.md` (Registra → `doc/guide/assistente-registra.md`)
 - The context service runs server-side (`adminDb` directly); every mode maps to its own builder in `stream/route.ts` (a missing branch silently falls through to monthly); `buildAssistantPeriodRangeContext` is the FIFTH builder.
 - ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 5 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's interview and strategy and of the emails' AI comments, always under the same note (owner, 2026-11-07). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
 - A silent cap in a context builder becomes a hallucinated "N/D": a cap either does not exist or is stated in the text the model reads. `ASSISTANT_SYSTEM_CORE` is shared with `buildEmailAiPrompt`.
 - A free question with NO context still gets the portfolio of today (`buildAssistantTodayContext` → `AssistantTodayContext`, the sixth argument of `buildChatPrompt`, 2026-10-20): the period bundle is a chosen period's, never a substitute for the portfolio.
 - THE PROPOSAL PROTOCOL: the AI never writes — it emits fenced blocks that a card turns into a write on the user's Conferma: ONE ```goal-proposal (`POST`/`PATCH /api/goals`, `goalProposal.ts` the ONE schema, quotas by instrument NAME) and, in Registra (2026-11), up to five ```expense-proposal (`expenseProposal.ts`; the browser writes through `createExpenseSettledOnDate`, never a server route); a card's outcome is saved on its message (`proposals["kind:N"]`, N the block's rank among its language's blocks, derived from the markdown, never counted in render) through `PATCH …/messages/[messageId]`, so a reload never writes twice; questions travel as ```assistant-question blocks, one per block, at most two, answered by ONE user message (2026-11).
+- **The cards follow the MESSAGE's `mode`, never the page's** (2026-11-12; pinned by `assistantStreamingResponse.test.tsx`): the page sends only `mode: 'auto'`, the stream's `route` event sets each turn's mode, and an old thread's messages keep theirs.
+- **`mode: 'auto'` is read by ONE forced-tool Haiku 5.5 call (`lib/server/assistant/router.ts`) before any builder**; it never throws, below 0.6 it is a free question with no period, its `system` is a constant (2026-11-12; pinned by `assistantRouter.test.ts`). An explicit mode never calls it; after the selection the route reads `selection.*`, never `body.mode`/`month`/`year`/`chatContext` (doc/guide/assistente.md § The router).
 - **The portfolio block is REQUIRED and the allocation it reads is the Allocazione PAGE's base** (2026-10-20, `lib/utils/assistantPortfolioContext.ts`): every instrument with its role, the ledger, the registers, the household — printed whole or with the cut declared; never the snapshot's whole patrimony against the targets. **Every expense window is an Italian calendar window** (`getItalyMonthBoundsUtc`): the rows sit at Italian midnight and Vercel runs in UTC.
-- Il resto — memory merge rules, `deleteAssistantThread` batching, the verdict-is-the-context rules, streaming traps, the 64 000-token chat budget — in `doc/guide/assistente.md`.
+- Il resto — memory merge rules, `deleteAssistantThread` batching, the verdict-is-the-context rules, streaming traps, the 64 000-token chat budget — in `doc/guide/assistente.md`; Registra's kinds, questions, card, write and outcome in `doc/guide/assistente-registra.md`.
 
 ### Periodic Emails · PDF Export → `doc/guide/email-pdf.md`
 - Both render OUTSIDE the DOM: every hex comes from `lib/constants/printTokens.ts` and nothing else; every email layout is a nested table (Outlook = Word). Verify by RENDERING — no check is in the suite.
@@ -544,7 +588,7 @@ file used to carry.
 - A new setting lands in all five or it silently disappears: the type (`types/assets.ts`), `getSettings`, BOTH write
   chains in `setSettings`, the wiring where its own Save lives — and `settingsRoundTrip`'s `STORED_SETTINGS` fixture.
 - SIXTH place for anything the SERVER reads (`lib/services/dashboardOverviewService.ts`), SEVENTH for the periodic
-  emails (`getSettingsAdmin`), EIGHTH for the Assistente (`fetchSettings`); none is covered by the round-trip.
+  emails (`getSettingsAdmin`), EIGHTH for the Assistente and the Consulente's plan stage (`fetchSettings`); none is covered by the round-trip.
 - A user-clearable field is guarded by `'x' in settings`, never `x !== undefined`. Only a hard refresh proves a
   setting was saved; one Save per page; booleans stored, never derived.
 - Il resto — il ramo `targets` senza merge, `deleteField()`, lo snapshot dirty che segue il tab che MODIFICA, i quattro
@@ -576,7 +620,11 @@ file used to carry.
 - **A user-chosen identity colour is a SLOT, not a hex** (`'chart-1'..'chart-8'`, `resolveCostCenterColor`); indices
   0-8 theme-aware (`--chart-9` is Storico's «Previdenza» band), 9 static.
 - **Every theme block is held to the distinctness floor** (`__tests__/chartPaletteDistinctness.test.ts`, all twelve
-  since 2026-09-20): nine slots, ΔE00 ≥ 14 between any two. A new theme or a moved slot runs it first.
+  since 2026-09-20, fourteen with Egeo, sixteen with Orbita): nine slots, ΔE00 ≥ 14 between any two. A new theme or a moved slot runs it first.
+- **A mechanism beyond palette and radius goes through the costume contract** (2026-11-21): `data-costume` on
+  `<html>`, `data-costume-scope` on the dashboard shell and a modal's content, the scope properties
+  (`COSTUME_SCOPE_PROPERTIES`), every rule gated by `[data-costume] [data-costume-scope]` — doc/guide/temi.md § Il costume.
+  A theme's name, description and costume live in `COLOR_THEME_META`; the gate tests and the swatches derive from it.
 - Il resto — il filtro di luminanza (vivo dal 2026-10-08), gli slot senza backfill, la tinta tenuta tra i due modi, `useActionColors`,
   i sign token per tema, `--chart-6/7/8`, `getAssetClassCssVar`, «Adding a theme» — in `doc/guide/temi.md`.
 
@@ -634,6 +682,7 @@ file used to carry.
 - **`useChartColors()` for every series, once per page or tile, never once per row** (2026-10-07): a list of small charts takes the palette as a prop (`AssetSparkline`'s `colors`); the slots come from `ChartColorsProvider`, read once per theme in the dashboard layout since 2026-10-08 (`__tests__/chartColorsContext.test.ts`). Never pass it to a Nivo/react-spring component: the Sankey takes HEX.
 - **The legend is `SeriesLegend`, never Recharts' `<Legend>`** (`components/ui/series-legend.tsx`, 2026-09-20): one entry per series, one word one colour per page, a reference series that is not a part of the total in neutral ink, dashed.
 - **Accessibility and style go on the chart itself**: `role="img"` + `aria-label` + `accessibilityLayer={false}`; `contentStyle`, `labelStyle` AND `itemStyle` as module-level `as const` objects on the card tokens (without `itemStyle` the rows vanish on dark); `tick={CHART_TICK_STYLE}` on every axis (the Mono Mandate).
+- **Parts of one whole are `RingChart`** (2026-11-12, The Ring Rule): hand-written SVG, never a Recharts `<Pie>`; its figure stays inside the hole (`formatRingCenter` + `ringCenterMaxChars`, held by `__tests__/ringChart.test.ts` and `e2e/ringFit.ts`) — doc/guide/grafici.md § The ring.
 - Il resto — a series driving the page (the retired scrub, `useMorphingSeries`), `<Legend content=>` and `formatter`, negative bands and the 100% stack, `stackId`, `fontSize`/`interval`/margins, rolling charts that always render, server-cached colours remapped at render time, the sticky `<thead>` — in doc/guide/grafici.md
 
 ### Navigation → `doc/guide/shell.md`
@@ -675,9 +724,10 @@ file used to carry.
   moving eight method footers behind «Come si calcola» made the voids BIGGER, Benchmark ~170 → ~215px, Plusvalenze ~280
   → ~380px). Tiles share a row only with tiles of their own height; below that row two columns at natural height —
   wrappers `contents` below `desktop:`, `desktop:flex desktop:flex-col` from it — and the ONE element that can be any
-  height (a chart, `desktop:flex-1`) takes the slack. **The declared exception is Allocazione's Per classe** (owner,
-  2026-10-17): it fills the grid's `1fr` row to the Piano's bottom edge, its footer on the Piano's last line, because
-  the owner preferred the aligned edges to the void under it (doc/guide/allocazione.md). **Keep ONE sequence: the DOM order is the reading order on every
+  height (a chart, `desktop:flex-1`) takes the slack. **The declared exceptions are all on Allocazione**: Per classe (owner,
+  2026-10-17) fills the grid's `1fr` row to the Piano's bottom edge, its footer on the Piano's last line, because
+  the owner preferred the aligned edges to the void under it; the Piano (owner, 2026-11-12) stretches to Per
+  classe's bottom edge when it is the shorter, its cell without `desktop:self-start` (doc/guide/allocazione.md); on Accumulo (owner, 2026-11-18) Portafoglio modello or Criteri del modello stretches to the other column's bottom edge (doc/guide/accumulo.md). **Keep ONE sequence: the DOM order is the reading order on every
   device**; the desktop places cells with `desktop:col-start-*`/`row-start-*`, never with an `order` swap (2026-09-27,
   DESIGN.md → The First-Screen Rule; Hall of Fame lost its `order-1…5` on 2026-10-10,
   `e2e/mobile-composition.hof.mobile.spec.ts` holds the DOM-equals-vertical order at 390 and 1440 and the `order-*`
@@ -705,7 +755,8 @@ file used to carry.
 - **A row's caption WRAPS, it is never truncated, and the label column never grows to make room for it** (2026-09-14,
   `RankedRows`): a cut fact is no fact («30 set · Asilo nido · in calendario»); at 4 grid columns 46% is the most the
   label can take beside the bar's 40px floor, the amount and the share (58% painted the share outside the tile,
-  measured) — the caption takes a second line (`line-clamp-2`).
+  measured) — the caption takes a second line (`line-clamp-2`). Spese maggiori lays its rows `layout="stacked"` (owner,
+  2026-11-15): the label beside the figures, the caption (category · subcategory · day) beside the bar on a line of its own.
 
 ### Accessibility
 - **`title` is not an accessible name** (VoiceOver on iOS ignores it, touch never fires it): `aria-label` on icon-only
@@ -780,6 +831,8 @@ file used to carry.
   again to undo it (2026-11-07: a chat mutation stayed applied until restored by hand). **`next dev`
   rewrites `tsconfig.json`** (an extra dist dir in `include`, the formatting): a stray `tsconfig.json` in a diff is
   checked out again, never committed (2026-10-10).
+- **Never `prettier --write` a whole file** (2026-11-17): `.prettierrc` exists but the repo is not formatted by it — one run rewrapped 143 lines of `IdealAllocationTile.tsx` and turned it LF; the file was rebuilt from the index. Edit by hand; a file that loses its CRLF shows in `git diff --stat` as a rewrite.
+- **Tailwind scans every non-ignored file, `doc/` and `SESSION_NOTES.md` included** (2026-11-13): an arbitrary `rounded` class that holds a `var(--costume-control-*,…)`, quoted in a spec, made the CSS fail to compile and every page answer 500 in dev — a test's comment too (2026-11-22, a placeholder radius in `themeCostume.test.ts`'s header). Quote such a class broken up, or describe it in words; once removed, restart `next dev` (its cache keeps the broken rule). Pinned by nothing: a dev server that 500s on every page is the symptom.
 - **Components and hooks are tested under jsdom** (2026-11-07): `__tests__/<name>.test.tsx` runs in the `dom`
   project of `vitest.config.ts` (Testing Library, `@testing-library/user-event`, `__tests__/domSetup.ts` for cleanup,
   `ResizeObserver` and `matchMedia`), `.test.ts` in the `node` one; plain assertions, no jest-dom. An `aria-hidden`
@@ -800,6 +853,9 @@ file used to carry.
   `…/app/api/<route>/route.js` in the `validator.ts` of every `.next-*` (2026-09-28), or in a production build's
   `.next/types/` (2026-10-07, after PERF-09 removed `current-yield`), cites a route that no longer exists;
   `.next-e2e/dev/types/` goes whole (2026-09-20) — it is the suite server's alone.
+- **A Node script's `execSync` on Windows runs through cmd.exe, where `^` is the escape**: `git show <sha>^:<file>`
+  loses its caret (2026-11-15: a cites-mapping script read nothing, the error swallowed by its `try`) — write the
+  parent as `<sha>~1`, which both systems read alike.
 - **Git Bash on Windows, two traps**: MSYS rewrites an argument starting with `//` or `/` (2026-10-04: `/api/cron/…`
   became a Windows path) — prefix `MSYS_NO_PATHCONV=1`; **its `sed -i` is not a falsification tool** (2026-09-28: a
   pattern with `€` matched nothing and exited 0, and a CRLF file came back LF) — swap text with a node script that
@@ -810,20 +866,8 @@ file used to carry.
 - **A surface with no DOM is verified by RENDERING it** (the PDF through `renderToFile` under Vitest, the emails in
   Chromium at 390 / 600 / 1440), and a render with hand-built data proves the WORDS, not the data path (2026-09-07: run
   `fetchPDFData` itself on the emulators) — doc/guide/email-pdf.md § Verifying a surface with no DOM.
-- **A trial merge of an open PR runs in a worktree, never in the main checkout** (2026-09-07): fetch `refs/pr/<N>`,
-  `git merge --no-commit --no-ff`, `tsc` + area suites + eslint, `git merge --abort`. `node_modules` is a directory
-  junction on Windows (`New-Item -ItemType Junction`; `cmd //c mklink` is refused), a `cp -cR` clone on macOS
-  (Turbopack refuses a symlink out of the root, 2026-10-04); two at a time at most; a conflict is judged on `git
-  merge-tree --write-tree`, never guessed. **Never `git worktree remove --force` a worktree that held a junction or a
-  build** (2026-09-30: it emptied the main `node_modules`): drop the junction, check the path is gone, delete the
-  build, remove the worktree, count `ls node_modules | wc -l`.
-- **An accepted PR merged "with changes" is its diff applied, not its commits** (2026-09-07): `git apply --reject` of
-  `base...head`, the session's fixes on top, one commit with the author as `Co-authored-by`, never the PR's own
-  `CLAUDE.md` and draft hunks. **While a spec series is open** (2026-09-27; `doc/perf/` closed on 2026-10-08,
-  `doc/mobile/` on 2026-10-17) it is crossed with the open specs (a cited line that moves, a count, a baseline, a rule the new code should follow), the
-  specs amended in the same commit; it lands BEFORE a spec that rewrites the same files. Look first for the five defects
-  of that day's three PRs: a sentence or number born in a component, an overflow asserted on `document`, an absence
-  with no positive anchor, a hook running with its feature off, a write that does not invalidate its reader's key.
+- **A contributor's PR is tried in a worktree and merged as its diff applied, never its commits** (2026-09-07; never
+  `git worktree remove --force` a worktree that held a junction, 2026-09-30) — doc/guide/contributi.md.
 - **Run the suite under `TZ=Europe/Rome` too**: every date fixture sits at noon, twelve hours clear of the DST edge,
   while production dates are local midnight and the pure layer runs in the user's browser. Day-of-year from calendar
   fields in UTC (`Date.UTC(y,m,d) - Date.UTC(y,0,0)`), and one fixture built the way the dialog builds one. **A fixture
@@ -846,6 +890,10 @@ file used to carry.
 - `npx knip` uses the root `knip.json` (`components/ui/**` and `public/sw.js` ignored, `firebase-tools` an ignored
   dependency, `ignoreExportsUsedInFile: true`): remaining EXPORT_ONLY findings are deliberate prop surface.
 - Emulators, Playwright, production-build verification and their environment traps: **SETUP.md → Steps 6-7**.
+
+### Guided verification (*collaudo*) → `doc/guide/collaudo.md`
+- WORKFLOW.md § 3 holds the commands, the gates and each tour rule in one line; the why, the history and the measures
+  of each rule (the windows, the mirror, the evidence without Chrome, the spec retirements, the critiques) are the guide (2026-11-18).
 
 ### Emulator Exercise Scripts → `doc/guide/e2e-emulatori.md`
 - A collection whose value is in the *wiring* gets an exercise: the unit suites mock Firestore away, so only an exercise
@@ -870,58 +918,25 @@ file used to carry.
   another app — in `doc/guide/e2e-emulatori.md`.
 
 ### Browser-Driven E2E (Playwright) → `doc/guide/e2e-playwright.md`
-- **What belongs in a browser test**: only what needs a real layout (the `desktop:` switch at 1440px, a collapsible, a
-  state flash, computed sizes, bounding boxes, overflow); the arithmetic stays with Vitest. A query race and an error
-  branch reached by cutting the network are NOT reproducible locally.
-- **`workers: 1`, non-negotiable**, and **each suite its OWN fixture** (an `npm run e2e:seed:*` script plus one
-  `spawnSync` in `e2e/global-setup.ts`). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
-- **The FILENAME chooses the account**: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` → `mobile`, `*.degraded.spec.ts` →
-  degraded, `*.degraded.mobile.spec.ts` → `degraded-mobile` (2026-10-14), `*.tablet.spec.ts` → `tablet` (768×1024, two
-  columns and the pill) AND `tablet-landscape` (1024×768, the stage and the icon rail — `expectLandscapeStage`,
-  `expectLandscapeShell`, `expectStickyStage` in `e2e/tabletLayout.ts`) on the base account, branching on
-  `page.viewportSize().width` (2026-10-16; `desktop` ignores `tablet.`), only `analisi.spec.ts` / `centri.spec.ts` / `split.spec.ts` / `hof.spec.ts` reach those fixtures — and each
-  is ALSO excluded from `desktop`/`mobile` by `testIgnore`. A throwaway spec gets its own `playwright.<name>.config.ts`
-  and is deleted before the full suite (2026-08-28).
-- **`localhost`, never `127.0.0.1`** (the page never hydrates and the login submits natively), and `storageState`
-  captures the Firebase session only with `{ path, indexedDB: true }`.
-- **Prove the test can fail before trusting it**, breaking ONE behaviour at a time (2026-09-18). **Assert on Firestore,
-  not on pixels**: plant a decoy word absent from the seed, and remove the fixture BY THE APP, not by `curl -X DELETE`
-  (2026-08-31). On the BASE account FIRE figures depend on the run month: assert STRUCTURE and FORMAT, never amounts.
-- **Proving a refactor changed no number** (doc/guide/e2e-emulatori.md, its own section): measure the noise floor first (two dumps of unchanged code), compare
-  old-vs-new MINUTES apart, and compare the SET of rendered values, not the page text.
-- **In the cloud container** (2026-09-25) the pinned Chromium is missing (a throwaway `playwright.local.config.ts` sets
-  `executablePath`), its own Chromium groups «1.100 €» (four base specs read red there only), and no spec can import
-  `lib/` (no `@/` alias): doc/guide/e2e-playwright.md.
-- Il resto — the page-reading traps (`addInitScript`, `innerText`, `boundingBox`, hidden mobile duplicates, hydration
-  wiping a `fill()`), the vaul drawer after Escape, locators that are not buttons and substring matching (`exact: true`),
-  the euro regex and U+202F, forcing a server flag on the response, the settings reload rule, the armed two-click
-  confirm, the three tour-spec traps, the frozen clock and the empty closed row of a phone spec, Java ≥ 21 and foreign
-  emulators on 8080/9099 — in `doc/guide/e2e-playwright.md`.
+- **What belongs in a browser test**: only what needs a real layout; the arithmetic stays with Vitest. **`workers: 1`**,
+  each suite its OWN fixture (`npm run e2e:seed:*` + one `runSeed` in `e2e/global-setup.ts`).
+- **The whole run is a production build, an area run `next dev`** (2026-11-16); a chunk is known by a STRING its module
+  carries (`CHUNK_SIGNATURES`), never a name a minifier drops.
+- **The FILENAME chooses the project** (`*.mobile`, `*.tablet`, `*.degraded`, `*.degraded.mobile`); **`localhost`, never
+  `127.0.0.1`**; `storageState` with `{ path, indexedDB: true }`.
+- **Prove the test can fail before trusting it; assert on Firestore, not on pixels.**
+- Il resto — the rules in brief (§ In brief, moved here whole on 2026-11-17), the page-reading traps, the vaul drawer,
+  locators and `exact: true`, the euro regex, the cloud container, Java ≥ 21 — in `doc/guide/e2e-playwright.md`; the whole
+  run, its known flakes and its speed in `doc/guide/e2e-suite.md` (2026-11-17).
 
 ### Performance tooling → `doc/guide/velocita.md`
-- **Three tools, one port**: `npm run perf:budget` (JS per route against `perf/budget.json`, two seconds, no server),
-  `perf:bench` (cold / warm / revisit on the `.next-perf` build that `perf:serve` serves on :3200, mirror data) and
-  `perf:census` (React commits and components per keystroke, per tab change, per load, per navigation). Options ALWAYS
-  after `--`, and PowerShell 5.1 eats the `--`: use Git Bash.
-- **A ceiling only a measure may lower, and only a new feature may raise** — `raisedBy` on the route, the before/after
-  and a row in § Registro dei tetti alzati, in the same commit; `libraryCopies: { recharts: 1 }` is a rule, not a
-  measure. TIMES compare only on the same machine in the same session (±10%); COUNTS compare anywhere.
-- **`perf:census` has a scenario for the phone composition** (2026-10-10): `npm run perf:census -- --mobile
-  --scenario=hall-of-fame` taps a closed row four times; a tap re-renders that row, `PageRest` and the page, never
-  another tile nor the verdict — a new `collapse(id)` identity on every render is what it would catch.
-- **The first-screen census shares the port** (2026-10-10; its manual is `doc/guide/prima-schermata.md`, its record —
-  baselines, the fixture table, every widened entry — `doc/guide/prima-schermata-misure.md`): `npm
-  run mobile:census` measures the composition of 19 surfaces × 390/768/1024 on the same :3200 build, re-seeding its own
-  fixture `census@example.com`; `npm run mobile:budget` holds the run against `perf/mobile-budget.json` (zero tolerance,
-  it only tightens, a widening carries `raisedBy: "<date>: …"` and KEEPS every reason the entry carried before — concatenated,
-  never overwritten (2026-10-16: a `--tighten` had replaced twelve); `--tighten` refuses a partial run and a run in which
-  Yahoo answered a profile, 2026-10-10). The fixture refuses to be measured from the 1st to the 4th and on the month's
-  last day; an unknown `--surfaces` key or `--viewports` value exits 1 with the valid ones; a figure whose unit is a
-  `[data-figure-unit]` span counts once (2026-10-10). **A change that moves what a composed page shows on its first
-  screen closes on `mobile:census` + `mobile:budget` green on the fixture** (2026-10-17: the series that measured each page
-  is closed, the budget stays; DESIGN.md → The First-Screen Rule).
-- Il resto — every column, the baseline in force and the historical one of 2026-09-26, the before/after of every speed
-  session, the census scenarios, `--revisit` and what the tables do not say — in `doc/guide/velocita.md`.
+- **Three tools, one port** (:3200): `perf:budget`, `perf:bench`, `perf:census`; options ALWAYS after `--`, in Git Bash.
+- **A ceiling only a measure may lower, and only a new feature may raise** — `raisedBy`, the before/after and a row in
+  § Registro dei tetti alzati, in the same commit.
+- **A change that moves what a composed page shows on its first screen closes on `mobile:census` + `mobile:budget`
+  green on the fixture** (2026-10-17) — doc/guide/prima-schermata.md § In brief.
+- Il resto — the rules in brief (§ In brief, moved here whole on 2026-11-17), every column, the baselines, the census
+  scenarios, `--revisit` — in `doc/guide/velocita.md`.
 
 ---
 

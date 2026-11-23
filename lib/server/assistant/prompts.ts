@@ -44,6 +44,40 @@ function eur(value: number): string {
   }).format(value);
 }
 
+/** «+900 €», «−1000 €», «0 €»: a part of a change, always with its sign. */
+function signedEur(value: number): string {
+  const rounded = Math.round(value);
+  return `${rounded > 0 ? '+' : rounded < 0 ? '−' : ''}${eur(Math.abs(rounded))}`;
+}
+
+/**
+ * The period's change split as Storico's Driver splits it (2026-11-16): the parts add up to the
+ * change, so the model reads the market from them instead of estimating it by difference.
+ */
+function formatNetWorthDrivers(d: NonNullable<AssistantMonthContextBundle['netWorthDrivers']>): string[] {
+  const lines = ['--- DA DOVE VIENE LA VARIAZIONE (il calcolo del Driver di Storico: le parti sommano alla variazione) ---'];
+  lines.push(`Variazione: ${signedEur(d.total)}`);
+  lines.push(`Risparmio dal cashflow: ${signedEur(d.savings)}`);
+  lines.push(
+    `Mercato: ${signedEur(d.market)} (${d.isMarketMeasured ? 'misurato strumento per strumento' : 'stimato: non ogni mese del periodo è misurato strumento per strumento'})`
+  );
+  if (Math.round(d.taxes) !== 0) lines.push(`Tasse stimate sulle vendite: ${signedEur(-d.taxes)}`);
+  if (Math.round(d.debtRepaid) !== 0) lines.push(`Debito rimborsato: ${signedEur(d.debtRepaid)}`);
+  lines.push(`Versati nei fondi pensione: ${signedEur(d.pensionContributions)}`);
+  if (Math.round(d.other) !== 0) {
+    const causes = [
+      [d.otherPension, 'fondi pensione'],
+      [d.otherHoldings, 'strumenti'],
+      [d.otherAccounts, 'conti'],
+    ]
+      .filter(([value]) => Math.round(value as number) !== 0)
+      .map(([value, label]) => `${label} ${signedEur(value as number)}`);
+    lines.push(`Altre variazioni: ${signedEur(d.other)}${causes.length > 0 ? ` (${causes.join(', ')})` : ''}`);
+  }
+  lines.push('Usa queste parti per dire quanto viene dal mercato: non stimarlo per differenza.');
+  return lines;
+}
+
 function pct(value: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 }
@@ -263,6 +297,19 @@ function quantityUnit(type: string): string {
  * Each list is printed whole, or the text says how many rows were left out and which (the
  * oldest), never a silent cap (the rule of this module's header).
  */
+const CONTRIBUTION_SOURCE_LABELS = { tfr: 'TFR', voluntary: 'volontario', employer: 'datoriale' } as const;
+
+/** «  › con effetto sul valore in ottobre 2026: 850 € — TFR 700 € (competenza 2026-09-30, registrato il 2026-10-13), …» */
+function formatPensionPaidIn(paidIn: NonNullable<AssistantPortfolioContext['pension'][number]['paidInPeriod']>): string {
+  const head = `  › con effetto sul valore in ${paidIn.label}: `;
+  if (paidIn.rows.length === 0) return `${head}nessun versamento`;
+  const rows = paidIn.rows.map(
+    (row) =>
+      `${CONTRIBUTION_SOURCE_LABELS[row.source]} ${eur(row.amount)} (competenza ${row.dateIso}${row.recordedIso ? `, registrato il ${row.recordedIso}` : ''})`
+  );
+  return `${head}${eur(paidIn.total)} — ${rows.join(', ')}`;
+}
+
 export function formatPortfolioForPrompt(portfolio: AssistantPortfolioContext): string[] {
   const lines: string[] = [];
   const { holdings, allocation, ledger, dividends, pension, loans, family } = portfolio;
@@ -276,7 +323,8 @@ export function formatPortfolioForPrompt(portfolio: AssistantPortfolioContext): 
     const parts: string[] = [];
     parts.push(`${assetClassLabel(row.assetClass)}${row.subCategory ? ` › ${row.subCategory}` : ' (senza sottocategoria)'}`);
     parts.push(HOLDING_ROLE_LABELS[row.role]);
-    parts.push(`${quantity(row.quantity)} ${quantityUnit(row.type)}`);
+    // An instrument created empty for a plan and never bought (2026-11-12): named, never read as held.
+    parts.push(row.neverBought ? `0 ${quantityUnit(row.type)}, mai comprato` : `${quantity(row.quantity)} ${quantityUnit(row.type)}`);
     parts.push(`valore ${eur(row.valueEur)}`);
     if (row.costPerUnitEur !== undefined) parts.push(`PMC ${eurCents(row.costPerUnitEur)}`);
     if (row.gainEur !== undefined && row.gainPct !== undefined) parts.push(`G/P ${eur(row.gainEur)} (${pct(row.gainPct)})`);
@@ -344,7 +392,7 @@ export function formatPortfolioForPrompt(portfolio: AssistantPortfolioContext): 
   }
   for (const row of ledger.rows) {
     lines.push(
-      `${row.dateIso} · ${ledgerTypeLabel(row.type)}${row.isBaseline ? ' (posizione iniziale di migrazione)' : ''} · ${row.assetName}${row.ticker ? ` (${row.ticker})` : ''}: ${quantity(row.quantity)} quote a ${eurCents(row.priceEur)} = ${eur(row.amountEur)}${row.feesEur > 0 ? `, commissioni ${eurCents(row.feesEur)}` : ''}`
+      `${row.dateIso} · ${ledgerTypeLabel(row.type)}${row.isBaseline ? ' (posizione iniziale di migrazione)' : ''} · ${row.assetName}${row.ticker ? ` (${row.ticker})` : ''}: ${quantity(row.quantity)} quote a ${eurCents(row.priceEur)} = ${eur(row.amountEur)}${row.feesEur > 0 ? `, commissioni ${eurCents(row.feesEur)}${row.feeIsSpendingRow ? ' (già fra le spese)' : ''}` : ''}`
     );
   }
   lines.push('');
@@ -389,12 +437,18 @@ export function formatPortfolioForPrompt(portfolio: AssistantPortfolioContext): 
   // Pension funds and their contributions.
   lines.push(`--- PREVIDENZA (fondi pensione: ${pension.length}) ---`);
   if (pension.length === 0) lines.push('Nessun fondo pensione registrato.');
+  if (pension.some((fund) => fund.paidInPeriod !== null)) {
+    lines.push(
+      'Un versamento muove il valore del fondo nel mese in cui è registrato, non in quello di competenza: prima di attribuire al mercato la variazione di un fondo, o della classe in cui conta, togli il versato con effetto sul valore nel periodo.'
+    );
+  }
   for (const fund of pension) {
     lines.push(`${fund.name}: valore ${eur(fund.valueEur)}${fund.memberName ? ` | di ${fund.memberName}` : ''} | ${HOLDING_ROLE_LABELS[fund.role]}`);
     if (fund.byYear.length === 0) lines.push('  › nessun versamento registrato');
     for (const year of fund.byYear) {
       lines.push(`  › ${year.taxYear}: ${eur(year.total)} (TFR ${eur(year.tfr)}, volontari ${eur(year.voluntary)}, datoriali ${eur(year.employer)})`);
     }
+    if (fund.paidInPeriod) lines.push(formatPensionPaidIn(fund.paidInPeriod));
   }
   lines.push('');
 
@@ -457,7 +511,7 @@ export function formatTodayContextForPrompt(context: AssistantTodayContext): str
   const lines: string[] = [];
   lines.push('=== DATI FINANZIARI: PORTAFOGLIO DI OGGI (nessun periodo selezionato) ===');
   lines.push(
-    "Non c'è un periodo: niente entrate, uscite, snapshot o confronto tra date. Se la domanda riguarda un periodo, chiedi all'utente di selezionarlo nel contesto; non stimare quelle cifre."
+    "Non c'è un periodo: niente entrate, uscite, snapshot o confronto tra date. Se la domanda riguarda un periodo, di' all'utente di nominarlo nella domanda (per esempio «a ottobre») o di usare «cambia» sotto la risposta; non stimare quelle cifre."
   );
   lines.push('');
   lines.push(
@@ -493,6 +547,10 @@ export function formatBundleForPrompt(
     lines.push(`Variazione %: ${pct(netWorth.deltaPct)}`);
   }
   lines.push('');
+  if (bundle.netWorthDrivers) {
+    lines.push(...formatNetWorthDrivers(bundle.netWorthDrivers));
+    lines.push('');
+  }
 
   // Cashflow section. «Entrate» is the figure Cashflow › Tracciamento prints — every income
   // row, dividends and coupons included — with the dividends named inside it (owner's decision,
@@ -512,7 +570,7 @@ export function formatBundleForPrompt(
   const shareOfExpenses = (value: number): string =>
     totalExpenses !== 0 ? share((value / totalExpenses) * 100) : share(0);
 
-  // Coarse-grained view first, so the model has the Fisse/Variabili/Debiti mix in mind
+  // Coarse-grained view first, so the model has the Necessarie/Non necessarie/Debiti mix in mind
   // before it reads the long category list.
   if (bundle.expensesByType.length > 0) {
     lines.push('--- SPESE PER TIPO ---');
@@ -559,6 +617,9 @@ export function formatBundleForPrompt(
     lines.push('--- ENTRATE PER CATEGORIA (esclusi i dividendi, già contati in Entrate) ---');
     for (const entry of bundle.incomeByCategory) {
       lines.push(`${entry.categoryName}: ${eur(entry.total)} (${txn(entry.transactionCount)})`);
+      for (const sub of entry.subCategories ?? []) {
+        lines.push(`  › ${sub.subCategoryName}: ${eur(sub.total)} (${txn(sub.transactionCount)})`);
+      }
     }
     lines.push('');
   }
@@ -640,6 +701,11 @@ export function formatBundleForPrompt(
           ? ` (${pct(change.percentagePointsChange)} p.p.)`
           : '';
       lines.push(`${assetClassLabel(change.assetClass)}: ${prev} → ${curr} | Δ ${abs}${pp}`);
+      if (change.pension) {
+        lines.push(
+          `  › di cui fondi pensione: Δ ${signedEur(change.pension.change)}, di cui versati ${signedEur(change.pension.paidIn)} (ripartiti con la composizione del fondo); il resto della classe: Δ ${signedEur(change.absoluteChange - change.pension.change)}`
+        );
+      }
     }
     lines.push('');
   }
@@ -709,6 +775,7 @@ export const ASSISTANT_SYSTEM_CORE = [
   '',
   '# Ricerca web (quando disponibile come strumento)',
   "Quando hai accesso alla ricerca web, usala ESCLUSIVAMENTE per contestualizzare i movimenti di mercato del patrimonio (decisioni di banche centrali, eventi geopolitici, andamento borsistico) con eventi e date verificabili. Non usarla mai per spiegare variazioni di entrate o spese personali dell'utente: quelle dipendono solo dai suoi dati di cashflow. Cita l'evento e la data specifica, non affermazioni generiche come \"i mercati sono saliti\".",
+  "Se la ricerca non trova eventi datati del periodo, scrivi che la ricerca non li ha trovati: non scrivere mai che la ricerca web non era disponibile quando l'hai usata.",
   '',
   '# Stile e formattazione',
   '- Markdown semplice: grassetto per i numeri chiave, elenchi puntati per le liste. Evita tabelle complesse e intestazioni annidate oltre un livello',
@@ -729,7 +796,7 @@ export const ASSISTANT_SYSTEM_CORE = [
   "Non elencare le sottocategorie quando non ti vengono chieste: l'elenco completo serve a rispondere nel dettaglio, non a riempire la risposta.",
   '',
   '# Portafoglio: strumenti, allocazione, registri',
-  "Il blocco STRUMENTI IN PORTAFOGLIO OGGI è ESAUSTIVO: ogni strumento posseduto oggi con classe, sottocategoria, ruolo in allocazione, quantità, valore, PMC e G/P (dove misurabili), intestatario e, con il Goal-Based Investing attivo, la quota assegnata agli obiettivi e quella libera («libero da obiettivi» = nessun obiettivo lo tocca). Uno strumento che l'utente nomina e che non compare non è in portafoglio.",
+  "Il blocco STRUMENTI IN PORTAFOGLIO OGGI è ESAUSTIVO: ogni strumento posseduto oggi con classe, sottocategoria, ruolo in allocazione, quantità, valore, PMC e G/P (dove misurabili), intestatario e, con il Goal-Based Investing attivo, la quota assegnata agli obiettivi e quella libera («libero da obiettivi» = nessun obiettivo lo tocca). Uno strumento che l'utente nomina e che non compare non è in portafoglio. Una riga «0 quote, mai comprato» è uno strumento già creato e mai acquistato: non è posseduto, ma per proporlo usa quel nome.",
   "Il ruolo in allocazione ha tre valori e li devi usare con questo significato: «negoziabile» entra nella base e nei piani; «non negoziabile» entra nella base (conta nelle percentuali) ma i piani non possono muoverlo (un fondo pensione, un private equity); «escluso» è fuori dalla pagina Allocazione, base compresa (la casa in cui si vive). Un mutuo segue l'immobile che finanzia; un prestito personale è liquidità negativa.",
   "Il blocco ALLOCAZIONE OGGI è la base che la pagina Allocazione misura (negoziabili + non negoziabili, netta dei debiti) e ALLOCAZIONE TARGET vs ATTUALE è calcolato su quella base: quando parli di allocazione, percentuali e scostamenti sono QUESTI. Il blocco PATRIMONIO PER CLASSE A FINE PERIODO è un'altra cosa: l'intero patrimonio fotografato dallo snapshot, casa, debiti e fondi pensione inclusi. Non confrontare mai i target con quest'ultimo.",
   "Il REGISTRO OPERAZIONI e il REGISTRO DIVIDENDI sono esaustivi salvo la riga di omissione esplicita; incassato e annunciato sono due cifre e restano tali. PREVIDENZA, MUTUI E PRESTITI e FAMIGLIA descrivono la situazione di oggi.",
@@ -841,7 +908,7 @@ export function buildEmailPeriodicFormatContract(periodType: EmailPeriodicPeriod
     "2. **Patrimonio e investimenti** — come si è mosso il patrimonio: usa la riga EFFETTO MERCATO già calcolata per separare quanto viene dal risparmio e quanto dalla variazione di mercato, commenta l'allocazione corrente e il suo scostamento dai target quando sono configurati, e cita gli obiettivi di investimento solo se il blocco relativo ne contiene",
     '3. **Rispetto al periodo precedente** — cosa è cambiato rispetto al periodo precedente, citando i numeri del blocco di confronto fornito',
     "4. **Confronto con l'anno precedente** — confronto anno su anno citando i numeri forniti; se il periodo è annuale e questo confronto coincide con quello del punto 3 (i dati te lo segnalano esplicitamente), unisci le due sezioni e dillo",
-    "5. **Entrate e spese: di quanto e perché** — quantifica l'aumento o la diminuzione di entrate e spese e ipotizza le cause più probabili basandoti sui dati per categoria e sottocategoria; commenta il mix per tipo (Fisse/Variabili/Debiti) quando rilevante",
+    "5. **Entrate e spese: di quanto e perché** — quantifica l'aumento o la diminuzione di entrate e spese e ipotizza le cause più probabili basandoti sui dati per categoria e sottocategoria; commenta il mix per tipo (Spese Necessarie/Spese Non Necessarie/Debiti) quando rilevante",
     "6. **Azioni o attenzioni** — 1-2 osservazioni pratiche per l'investitore",
     '',
     "I blocchi delle spese per categoria e sottocategoria e delle entrate per categoria sono ESAUSTIVI: una voce che non c'è ha avuto importo zero nel periodo — dillo come \"nessuna spesa registrata\", non come dato mancante. L'unica eccezione sono le righe di omissione dichiarate esplicitamente nel testo dei dati.",

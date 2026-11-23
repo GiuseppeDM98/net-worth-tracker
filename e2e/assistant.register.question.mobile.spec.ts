@@ -1,5 +1,5 @@
 /**
- * Assistente › Registra at 390px: the question cards on a phone (2026-11, doc/guide/assistente.md
+ * Assistente › Registra at 390px: the question cards on a phone (2026-11, doc/guide/assistente-registra.md
  * § Registra; AGENTS.md § Tailwind Breakpoints).
  *
  * WHY IT EXISTS: what only a layout engine knows — every row of the cards and «Rispondi» are 44px
@@ -12,7 +12,7 @@
 
 import { test, expect } from '@playwright/test';
 import {
-  expectDecoyUntouched, installFakeStream, openAssistant, enterRegister, plantFixture, questionBlock, questionCard, removeFixture,
+  expectDecoyUntouched, installFakeStream, openAssistant, plantFixture, questionBlock, questionCard, removeFixture,
   resetFixture, send,
 } from './assistantRegister';
 
@@ -37,7 +37,6 @@ test('the cards’ rows and «Rispondi» are 44px targets, and nothing overflows
   test.setTimeout(120_000);
   await installFakeStream(page, () => QUESTIONS);
   await openAssistant(page);
-  await enterRegister(page);
   await send(page, 'Ho speso 30 euro');
 
   await expect(questionCard(page, 'abitudine')).toBeVisible();

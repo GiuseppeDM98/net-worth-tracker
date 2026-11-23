@@ -28,7 +28,7 @@ interface ProbabilitaTileProps {
   className?: string;
 }
 
-const CHIP_CLASS = 'inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-[9px] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground';
+const CHIP_CLASS = 'inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground';
 
 function Chip({ value, words, caption }: { value: string; words?: string; caption: string }) {
   return (

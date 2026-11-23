@@ -5,8 +5,8 @@
 >
 > **Why they live in the repo and not in agent memory**: agent memory is per-machine and per
 > install, so the same rules drift into different versions on each machine and in a cloud
-> session. A tracked file travels with the clone and can be reviewed in a diff. If you are an agent
-> with persistent memory, do **not** re-save these rules there — save one pointer to this file. If
+> session. A tracked file travels with the clone and is reviewed in a diff. If you are an agent
+> with persistent memory, save one pointer to this file, not the rules. If
 > the owner states a new rule, it is added *here*, in that session's commit: to section 3 if it holds
 > for this repo only; if it holds for every repo, ask the owner, because it enters the standard
 > first (`claude-config/prompts/WORKFLOW_STANDARD.md`) and reaches the repos from there.
@@ -21,11 +21,10 @@
 
 1. **Never commit without explicit approval.** Do not run `git commit` (nor `--amend`) until the
    owner gives the OK for that specific commit. Finish the work, summarise the diff, then ask.
-   Creating the branch and editing files needs no approval — only the commit does.
+   Branches and edits need no approval — only the commit does.
 
 2. **One branch per session.** Before starting implementation work, create a new branch from the
-   branch that is active at the start of the session. Always check which one that is; never assume
-   `master`/`main`.
+   branch that is active at the start of the session. Check which one that is; never assume `master`/`main`.
 
 3. **One commit per session.** Everything from a session is squashed into a single commit, never
    scattered across several.
@@ -34,26 +33,24 @@
    channel; code, identifiers and comments stay in English. **Every tracked document is written in
    the repo's documentation language** (2026-11-01): English in the open repos, Italian where the
    repo's documentation is Italian (its WORKFLOW.md says which). In an English-language repo, Italian
-   is reserved for the UI text a document quotes, for page and feature names (they are the labels the
-   product shows) and for the owner's own words, quoted as such — the launch prompt at the end of a
-   spec, the text the owner pastes, is the owner's words and stays in Italian. A guide still in the
-   other language is rewritten the first time a session rewrites it anyway, never in a session of its
-   own.
+   is reserved for the UI text a document quotes, page and feature names (the labels the product
+   shows) and the owner's own words, quoted as such (the launch prompt at the end of a spec, pasted
+   text). A guide still in the
+   other language is rewritten when a session rewrites it anyway, never in a session of its own.
 
 5. **Questions and proposals are asked interactively** (2026-09-11). When a decision is the owner's —
    which layers to build, on which surfaces, a wording — put it through the agent's interactive
    question tool, in groups of four, one topic at a time, multi-select where the options are not exclusive and the
-   recommended option first; never a numbered list of questions in prose. The owner refines the
-   wording through the free-text answer («hai pagato», not «pagherai», for a tax the broker
-   withholds at the sale).
+   recommended option first; never a numbered list of questions in prose. The owner refines the wording in the free-text answer.
 
 6. **Figures in tests are invented and round, never the owner's** (2026-10-12). A unit-test
    fixture, an E2E decoy or a seed carries amounts like 2500, 1120, 50: the owner's real data never
    enters the repo, not even as an expected value. If § 3 provides a copy of real data for the
    guided tour, it serves the tour only and phase G removes it.
-   **Nothing of the owner's real data in a tracked file** (2026-09-20, 2026-10-15): a draft, a
-   critique, a screenshot, a fixture or an example sentence takes invented figures and generic
-   names, never an amount, an account or a family detail copied from the real data. In a public
+   **Nothing of the owner's real data in a tracked file** (2026-09-20, 2026-10-15; code comments
+   too since 2026-11-15): a draft, comment, critique, screenshot, fixture or example sentence takes
+   invented figures and generic names, never an amount, holding, account, start date or family
+   detail from the real data — «seen live» and the lesson, not the figure. In a public
    repo this has no exception. A private repo may waive it, or narrow it, only by saying so in § 3
    with the owner's decision and its date; public data that is not the owner's (a listed company's
    published accounts) is not the owner's data.
@@ -63,27 +60,32 @@
    fixes to apply and in what order (through rule 5).
 
 8. **Dependencies: compare at session start, upgrade in a session of their own** (2026-10-26). If
-   the repo has a lockfile, the first thing a session does is run the package manager's audit
-   (`npm audit --json`, `pnpm audit --json`, …) and compare it with `doc/guide/dipendenze.md`,
+   the repo has a lockfile, the first thing a session does is install from it with every server
+   stopped (`npm ci`, `pnpm install --frozen-lockfile`; 2026-11-17: the audit reads the lock, not
+   what is installed), then run the package manager's audit (`npm audit --json`, `pnpm audit --json`, …) and compare it with `doc/guide/dipendenze.md`,
    which records the date of the last audit, the framework version and every open advisory with
    the owner's decision (accepted because dev-only, waiting for version X, to upgrade). The answer
    is one line: «dipendenze: invariate dal <data>» or «N avvisi nuovi: …». A new advisory is
    written into the guide with its decision, asked through rule 5; nothing is upgraded in that
    session. An upgrade is a session on its own branch with its own verification; never
-   `audit fix --force`, never the command an advisory or a page suggests: the version is chosen and
-   installed by hand, preferring a release that is at least a few days old. If the guide is
-   missing, the session that notices it creates it (`TEMPLATES.md` has the skeleton). A repo without
-   a lockfile skips this rule.
+   `audit fix --force` or the command an advisory suggests: the version is chosen and installed by
+   hand, preferring a release at least a few days old. If the guide is
+   missing, the session that notices it creates it (`TEMPLATES.md`). A repo without a lockfile skips this rule.
 
 9. **`SESSION_NOTES.md` is the session's temporary container** (2026-10-26). A working file in the
    repo root, created at the start of the session and never committed. Before the closing prompt it
    ends with one block per thing learned: *Cosa* (what was done), *Perché* (the decision behind
-   it), *Nota* (traps and measurements, each with its date), *Dove va a fine sessione* (`AGENTS.md`
+   it), *Nota* (traps and measurements, dated), *Dove va a fine sessione* (`AGENTS.md`
    if it holds for the whole repo · `doc/guide/<tema>.md` if a domain lesson · `WORKFLOW.md` if a
    session rule · `CLAUDE.md` if project state · a comment at the right line if it is the why of one
    line). The closing prompt writes every entry into its destination and deletes the file before
    the single commit; a note that names no destination is lost. A `SESSION_NOTES.md` still on the
    remote means a session was not closed.
+
+10. **The commit's «Model: … · effort …» line is read from the spec, never asked** (2026-11-18). A
+    session that implements a spec writes the model and the effort the spec names (its prompt, or its
+    row in the series index); the session that retires it writes the SAME pair as the implementation
+    (its commit's line, `git log`). The owner is asked only when no spec is behind the session or it ran at another model or effort.
 
 ---
 
@@ -96,7 +98,7 @@ disappear. The verification is done together, in chat, one phase at a time.
 
 1. **You prepare the test data.** A throwaway script (untracked by git, deleted when the
    verification ends) that plants **decoy words** — invented terms such as *fenicottero*,
-   *ornitorinco*, which appear nowhere else in the data. Not entered by hand by the owner.
+   *ornitorinco*, which appear nowhere else in the data. Never entered by hand.
 
 2. **One phase per message.** Give the phase, wait for the report, then the next one. Never deliver
    all the phases at once: it breaks their prerequisites.
@@ -105,51 +107,60 @@ disappear. The verification is done together, in chat, one phase at a time.
    fit whatever happened.
 
 4. **Do every check you can automate yourself, and leave the owner only what you cannot do.**
-   "Together, in chat" does not mean "one dictated click at a time". If the sessions are JWT-based
-   or otherwise scriptable, write a throwaway script that opens a **real browser** (e.g. Playwright)
+   "Together, in chat" does not mean "one dictated click at a time". If the sessions are scriptable (e.g. JWT), write a throwaway script that opens a **real browser** (e.g. Playwright)
    with an authenticated session — your own if the role allows it, otherwise a throwaway test
    identity created for the occasion — and verify every outcome **against the database or the HTTP
-   response, never against the look of the page alone**. Report the results phase by phase, with the
-   expected outcome stated first.
+   response, never against the look of the page alone**. Report phase by phase, expected outcome first.
    **Any automated end-to-end test that you are able to run, you run.** Never declare a feature
-   verified while an automated check that could have covered it was left unrun. What is left to the
+   verified with an automated check left unrun. What is left to the
    owner is only what is genuinely not automatable: visual and aesthetic judgement, physical
    hardware (a real barcode scanner), or an interactive login that cannot be driven by a script (a
    real OAuth flow with MFA).
+   **The whole suite is launched last, when no file of the repo is left to change** (2026-11-22). A
+   run builds and fingerprints the tree it starts from: a file edited while it runs (a document, a
+   note, `CLAUDE.md`) makes the server refuse the build as stale and the run dies at start-up, or
+   measures a tree that no longer exists. So finish every edit first — code, documents, release
+   notes, the deletion of `SESSION_NOTES.md` —, start the suite, touch nothing in that repo until it
+   reports, and if a file changes after it, run it again. A file in another repo, or in the
+   scratchpad, may change meanwhile.
 
 5. **Before dismantling, let the owner look.** When the session touched something visible, ask for
    the OK and then walk the owner onto the dev server **with the fixtures still alive**: exact URLs,
    under which identity, and at most **five** things to look at — for each one, what must happen and
-   what would be the bug. **The tour starts at the owner's go, not when the work is ready**
-   (2026-10-05): finish everything that needs no eyes, say it is ready, and wait. Where obligation 4
-   allows it, **open the page for the owner, already authenticated** — but one item per message and
-   one page at a time, waiting for the outcome before opening the next; two pages together only
-   when the item is a comparison (the same URL under two identities), saying which window is which.
-   The windows of a driven browser have no name: five at once turn the tour into working out which
-   belongs to which item. Only what a probe cannot say: layout, whether the screen says what it must
+   what would be the bug. **The tour starts at the owner's go** (2026-10-05): finish everything that needs no eyes, say it is ready, and wait. **A tour the spec
+   plans is always done, and before the commit** (2026-11-14): never offered as optional, never
+   traded for green tests, and never begun without the owner's go; the diff summary and the request
+   for the commit's OK (rule 1) follow the tour, never precede it (2026-11-21). The assistant opens
+   the windows itself (2026-11-21): a before/after comparison as its two windows side by side, an
+   action as the page already on it, so the owner only looks and acts. Where obligation 4
+   allows it, **open the page for the owner, already authenticated**: one item per message, one page
+   at a time, waiting for the outcome; two pages together only for a comparison (the same URL under
+   two identities), saying which window is which.
+   Five windows at once turn the tour into working out which belongs to which item. Only what a probe cannot say: layout, whether the screen says what it must
    say, the words, whether an action gives feedback that it happened. State also **what that tour
    does not cover**, and never ask the owner to redo by hand something already verified. Whatever
-   the tour finds becomes an assertion before the session ends, or it will come back: the tour
-   exists to discover what nobody thought to assert, not to replace the tests.
+   the tour finds becomes an assertion before the session ends, or it comes back: the tour
+   discovers what nobody thought to assert, it does not replace the tests.
 
 **A before/after comparison of screenshots is shown cropped, one item at a time** (2026-10-30, after
-«I don't understand the differences between before and after, which images am I supposed to compare?»
-in front of twenty near-identical PNGs): never a folder of files to open. The agent opens a browser
-window on an HTML page with BEFORE and AFTER **cropped to the area that changes** — one above the
-other, or side by side for phone screenshots — and **enlarged** when the difference is a few pixels (a
-darker grey), with a title saying where to look; before talking about it, it checks the crop with a
-headless screenshot of the same page. The message says «Comparison N of M», what changes and which
-side is which; the window rules of obligation 5 apply (one item per message, closed and counted before
-the next).
+twenty near-identical PNGs left the owner unable to tell what to compare): never a folder of files to
+open. The agent opens a browser window on an HTML page with BEFORE and AFTER **cropped to the area that
+changes** (one above the other; side by side for phone screenshots), **enlarged** when the difference
+is a few pixels, with a title saying where to look, and checks the crop with a headless screenshot
+first. The message says «Comparison N of M», what changes and which side is which; the window rules of
+obligation 5 apply.
 
-**A window ends by itself, and is closed by its tree** (2026-11-09, after sixteen collaudo scripts of two
-closed sessions were found alive hours later, about a hundred Chromium). The script that opens a visible
-browser for the owner exits when the owner closes the **page** — closing a driven window closes the page,
-not the browser, so `browser.on("disconnected")` alone never fires —, when the browser goes, or after a
-time limit; never an endless wait. The repo writes that wait **once**, in a helper the throwaway scripts
-import, never again in each script. And stopping the background task kills the shell, not the tree
-beneath it (`npx → tsx → node → Chromium`): a window is closed by its root with the whole tree, then the
-count says zero.
+**A window ends by itself, and is closed by its tree** (2026-11-09). The script that opens a visible
+browser exits when the owner closes the **page** (closing a driven window closes the page, not the
+browser, so `browser.on("disconnected")` alone never fires), when the browser goes, or after a time
+limit; never an endless wait. The repo writes that wait **once**, in a helper the throwaway scripts
+import. Stopping the background task kills the shell, not the tree beneath it
+(`npx → tsx → node → Chromium`): a window is closed by its root with the whole tree, then the count
+says zero.
+**Once the owner confirms an item, the agent closes its windows** (2026-11-13; the comparison page
+too, 2026-11-21: it opens in a driven window, never in the owner's default browser, where only the
+owner could close it): the owner never closes a window to move on. The agent stops the helper by its
+root (it closes its browser on SIGTERM), checks the count at zero and only then opens the next item.
 
 ### Standard phases, when they make sense
 
@@ -173,21 +184,22 @@ resource** (the test — must fail), with the same identical file or record.
 Restore any configuration that was changed, remove fixtures and test attachments, delete the script,
 and **record the outcome somewhere that survives the session** (`CLAUDE.md` or equivalent).
 
-**No collaudo script outlives its session** (2026-11-09). `node ~/.claude/processi-collaudo.mjs` counts the
-trees of `scripts/collaudo-*` alive in the repo and says whose they are: this session's (closed with
+**No collaudo script outlives its session** (2026-11-09; the services too, 2026-11-13). `node ~/.claude/processi-collaudo.mjs` counts the
+trees of `scripts/collaudo-*` alive in the repo and the services a session starts and forgets (the Firebase
+emulators with their JVM, the Next.js `dev`/`start` servers), and says whose they are: this session's (closed with
 `--chiudi`), another open session's (never touched), or nobody's known (named to the owner, closed with
-`--chiudi --anche-ignote` only on their yes). The count is the **first gate** of every repo's gate list:
-zero, or the gates do not start. The standard `settings.json` runs it with `--hook` at `SessionEnd`, so a
-session that ends closes its own windows; one that dies without ending is caught by the next gate.
+`--chiudi --anche-ignote` only on their yes). The count is the **first gate** of every repo's gate list: zero, or none starts. The standard `settings.json` runs it with `--hook` at `SessionEnd`
+(a service gets SIGTERM first: the emulators export on exit); a session that dies without ending is
+caught by the next gate and by the same count at the start of every session (`prompts/01_SESSION_START.md`).
 *A verification that was not recorded counts as not done.*
 
 **The outcome is one line, the signals are not** (2026-10-19). In `CLAUDE.md` the session's status
 entry says what was done, where it is documented, what is still open and what comes next; it
 replaces the previous one. The session's signals — type-check, test counts, E2E runs, flakes,
-skipped phases, the guided tour's walk and its findings (2026-10-23) — go in the commit message
-and, where they teach something, in the area's guide, never in `CLAUDE.md`: that file is injected
-into every turn, and a status entry that collects them grows back into a diary after every trim.
-Of the tour, the status entry keeps only its outcome: done and closed, or what it left open.
+skipped phases, the guided tour's walk and findings (2026-10-23) — go in the commit message and,
+where they teach something, in the area's guide, never in `CLAUDE.md`: it is injected into every
+turn, and an entry that collects them grows back into a diary. Of the tour it keeps only the
+outcome: done and closed, or what is left open.
 
 ---
 
@@ -200,11 +212,12 @@ changes from repo to repo and is the only part to rewrite when the tooling chang
 
 | Purpose | Command |
 | --- | --- |
+| Collaudo count (first gate) | `node ~/.claude/processi-collaudo.mjs` — zero collaudo trees and forgotten services (the Firebase emulators, the Next `dev`/`start` server), or the gates do not start (§ 2) |
 | Types | `npx tsc --noEmit` |
 | Unit tests | `TZ=Europe/Rome npx vitest run` (or `npm test -- <file>`) |
 | Lint | `npm run lint` (flat ESLint config, `eslint.config.mjs`) |
 | Build | `npm run build` |
-| Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) |
+| Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) — the whole suite once, before the commit is asked for, on a production build it makes first when the code changed (since 2026-11-16); while working, the touched area's specs on `next dev`: `npx playwright test e2e/<area>` (Obligation 4, below) |
 
 npm is the package manager (`package-lock.json`; there is no Makefile, no pnpm/yarn lockfile).
 **Phantom `tsc` errors** clustered in `e2e/` and `lib/utils/expenseImport.ts` after a branch switch
@@ -220,128 +233,87 @@ npm run emulators:seed   # once: creates test-user-1 and its data (scripts/seedE
 npm run dev:emulator     # the app on :3000 pointed at the emulators
 ```
 
-Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 (`npm run dev:e2e`, isolated
-`.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000. Port
+Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 is the Playwright server — `npm run dev:e2e`
+(isolated `.next-e2e` build dir) for an area run, the `.next-e2e-build` production build for the whole run (since
+2026-11-16, SETUP.md → Step 7); keep it separate from the tour server on :3000. Port
 3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's and the first-screen census's
 (`npm run mobile:census`, `doc/guide/prima-schermata.md`).
 
 ### Obligation 5 — how to hand the owner an app already authenticated
 
-The app **is** locally runnable; there is no fallback to declare.
+The app **is** locally runnable; there is no fallback to declare. Every rule below has its why, its history and its
+measures in `doc/guide/collaudo.md` (moved there whole on 2026-11-18).
 
-- **The tour server**: `npm run dev:emulator` → `http://localhost:3000`. It reads the emulators, so
-  nothing seen there can touch production data.
-- **The owner's go** (§ 2, obligation 5; owner, 2026-10-05): say «pronto» and wait — here the owner starts the tour
-  when they can give it at least 20 minutes, because a session left idle mid-tour is what the memory watchdog kills,
-  emulators and dev server with it.
-- **One `next dev` at a time.** Stop the :3100 server before the tour: it exists for the suite only.
-  On 2026-09-07 three background processes (the emulators and two `next dev`) plus Playwright and
-  Vitest exhausted the machine's memory and the system killed all three; an emulator killed that
-  way exports nothing, so the fixtures have to be re-seeded. The tour runs on the emulators plus
-  ONE server.
-- **Getting in**: the login is email/password on `/login` — no OAuth, no MFA, so it is a five-second
-  manual step and also fully scriptable. Fixture identities (all password `test1234`):
+- **The tour server**: `npm run dev:emulator` → `http://localhost:3000`, on the emulators: nothing seen there touches
+  production data.
+- **The owner's go** (2026-10-05): say «pronto» and wait; the owner starts the tour when they can give it 20 minutes.
+- **Phase F before the commit** (owner, 2026-11-21; § 2 obligation 5): the tour first, then the diff summary and the
+  OK; the assistant opens every window itself.
+- **One `next dev` at a time** (2026-09-07): stop the :3100 server before the tour; the tour runs on the emulators
+  plus ONE server.
+- **The windows: `scripts/collaudo-finestre.mts`** (2026-11-13): `npx tsx scripts/collaudo-finestre.mts
+  --email=<fixture> --url=<path> [--url=<path>] [--title=…]`, in the background as its own task; stopped with `pkill
+  -TERM -f scripts/collaudo-finestre.mts`; from Git Bash on Windows prefix `MSYS_NO_PATHCONV=1` (2026-11-15). A file
+  the page downloads goes through a throwaway Playwright script into the scratchpad (2026-11-14).
+- **Getting in**: email/password on `/login` (no OAuth, no MFA). Fixture identities, all password `test1234`:
 
   | Account | UID | What it is for |
   | --- | --- | --- |
   | `test@example.com` | `test-user-1` | The base seed: assets, expenses, snapshots — the account most tours use |
-  | `analisi@example.com` | `test-user-analisi` | Everything dated to January, so year-to-date windows contain it whatever month it is |
-  | `centri@example.com` | `test-user-centri` | Centri di Costo ON: «Fenicottero» (annual ceiling the calendar will cross) and «Ornitorinco» (dormant, 27 movements) — `npm run e2e:seed:centri` |
-  | `degraded@example.com` | `test-user-degraded` | The states in which a return is *not* a measure — empty/degraded readings |
-  | `split@example.com` | `test-user-split` | Cashflow › Divisione ON: Ghiandaia and Nibbio at 60/40, with one row dated 31 December that stays «in calendario» all year — `npm run e2e:seed:split` |
-  | `hof@example.com` | `hof-user` | Hall of Fame: 47 monthly snapshots from novembre 2022 with a story (best month marzo 2024, worst ottobre 2023, a two-month first year); NO rankings document — the specs press «Aggiorna i record» — `npm run e2e:seed:hof` |
-  | `census@example.com` | `census-user` | The first-screen budget's fixture (since 2026-10-10, doc/guide/prima-schermata.md): every surface with data, each option in its default state — Centri and Divisione on, a coupon, a Budget ceiling, a pension fund, 47 snapshots ending last month, one row «in calendario» on the month's last day; FIRE › Obiettivi ON with ONE invented goal since 2026-10-15, the day that tab was composed for a phone (every option in its default state) — dated relative to the run; `npm run mobile:census` re-seeds it and rebuilds its Hall of Fame (`npm run e2e:seed:census` alone does not) |
+  | `analisi@example.com` | `test-user-analisi` | Everything dated to January, so year-to-date windows contain it |
+  | `centri@example.com` | `test-user-centri` | Centri di Costo ON — `npm run e2e:seed:centri` |
+  | `degraded@example.com` | `test-user-degraded` | The states in which a return is *not* a measure |
+  | `split@example.com` | `test-user-split` | Cashflow › Divisione ON — `npm run e2e:seed:split` |
+  | `hof@example.com` | `hof-user` | Hall of Fame, 47 monthly snapshots, no rankings document — `npm run e2e:seed:hof` |
+  | `census@example.com` | `census-user` | The first-screen budget's fixture (2026-10-10) — `npm run mobile:census` re-seeds it and its Hall of Fame (`npm run e2e:seed:census` alone does not) |
 
-- **So the screen is not empty**: `npm run emulators:seed` for the base account, plus the fixture the
-  page needs — `npm run e2e:seed` (Previdenza), `npm run e2e:seed:analisi` (Analisi),
-  `npm run e2e:seed:coast` (Coast FIRE). Give the owner the **exact URL**, e.g.
-  `http://localhost:3000/dashboard/pension`, not "go to Previdenza".
-- **The routes** are `/dashboard` plus `assets · cashflow · analisi · performance · history ·
-  allocation · pension · fire-simulations · hall-of-fame · assistant · settings` — the list of
-  `perf/routes.json`, held equal to `lib/constants/navigation.ts` by a test. Dividendi is not a route:
-  it is `/dashboard/cashflow?tab=dividends`.
-- **The owner's REAL data, without touching production — the standard since 2026-09-07**: `npm run mirror:seed --
-  <production email>` reads the production account (service account from `.env.local`, `.get()` only, refuses to run
-  with `FIRESTORE_EMULATOR_HOST`) and seeds it into the emulators under `mirror@example.com` / `test1234` (uid
-  `prod-mirror`), re-keyed, in one command and with nothing written to disk (`scripts/mirrorProdAccount.mts`). The
-  ACCOUNT is the standard, the DATA is not: it is re-read on every seed because a month later it has changed, and
-  `npm run mirror:remove` takes it out at the end of the session (phase G). It is the right tour when the change moves
-  the owner's own figures (Rendimenti, Storico): a fixture proves the mechanism, the mirror shows what the owner will
-  see tomorrow. It is rule 6's copy of real data: it serves the tour only, and none of its figures enters a test, a
-  draft or any other tracked file (this repo is public, so rule 6 has no exception here).
-- **A reading the owner cannot open with their own account**: this app has a role split — *viewer*
-  (`user.uid`) vs *owner* (`ownerId`), grants in `account-access/{ownerUid}`. To show the delegated
-  view, seed a grant for the second identity and log in as *that* identity (SETUP.md → Step 5b);
-  do not ask the owner to reason about what a guest "would" see.
-- Two areas are deliberately out of reach of a tour: the **assistant** needs
-  `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` and a live Anthropic key, and **email/PDF** have no DOM — they
-  are verified by rendering them from a throwaway spec (doc/guide/email-pdf.md). **The PR's Vercel preview is no
-  tour for an AI surface** (owner, 2026-11-07, the Consulente's scene): the preview holds the demo account alone, and
-  the demo blocks every AI feature (`useDemoMode()`), so a phase F planned there is skipped — it runs on the MIRROR
-  (below) with the `.env.local` key, or, by the owner's choice, in production after the deploy.
+  What each fixture plants: `doc/guide/collaudo.md` § Obligation 5, «Getting in».
+- **So the screen is not empty**: `npm run emulators:seed`, plus `npm run e2e:seed` (Previdenza),
+  `npm run e2e:seed:analisi` (Analisi), `npm run e2e:seed:coast` (Coast FIRE). Give the **exact URL**.
+- **The routes**: `/dashboard` plus `assets · cashflow · analisi · performance · history · allocation · pension ·
+  fire-simulations · hall-of-fame · assistant · settings` (`perf/routes.json` = `lib/constants/navigation.ts`, held by a
+  test); Dividendi is `/dashboard/cashflow?tab=dividends`.
+- **The owner's REAL data** (the standard since 2026-09-07): `npm run mirror:seed -- <production email>` seeds
+  `mirror@example.com` / `test1234` (uid `prod-mirror`), `npm run mirror:remove` in phase G. It serves the tour only:
+  none of its figures enters a tracked file (this repo is public, rule 6 has no exception here).
+- **A delegated view**: seed a grant in `account-access/{ownerUid}` and log in as the second identity (SETUP.md →
+  Step 5b).
+- **Out of reach of a tour**: the assistant (`NEXT_PUBLIC_ASSISTANT_AI_ENABLED` + a live key) and email/PDF (no DOM:
+  a throwaway spec renders them). **The PR's Vercel preview is no tour for an AI surface** (owner, 2026-11-07): it holds
+  the demo account alone; that phase F runs on the mirror, or in production after the deploy.
 
 ### Obligation 4 — automate it here
 
-- **When the Claude-in-Chrome extension is not connected** («Browser extension is not connected» from
-  `tabs_context_mcp`, 2026-09-13 — for the session and its sub-agents alike), do not retry it: the live
-  evidence an Impeccable critique or audit needs (screenshots at 1440 and 390, `main` overflow, sub-44px
-  targets, console, the `detect.js` overlay) comes from a throwaway Playwright script on the emulator
-  dev server — copied into the repo root as `.tmp-*.mjs` so `import 'playwright'` resolves, deleted
-  after — that logs in for real and waits on the page's `h1`, never on `networkidle` (Firestore keeps
-  its sockets open). Say in the report that the evidence is Playwright's. And the tour still goes on
-  the MIRROR (below), not on the fixture: the fixture proves the mechanism, the mirror shows what the
-  owner will see — on 2026-09-13 the mirror surfaced a stale-value reading the fixture cannot produce. **Read the
-  in-page detector's count before quoting it** (2026-09-18, Centri di Costo: 71 and 110 findings, the CLI on the same
-  files 0): every Cashflow tab stays mounted and hidden (`forceMount`), so ~36 hits per scan were Tracciamento's; the
-  9–11px «undersized text» is the enumerated ramp; the shell, the sidebar and the overlay's own yellow (`dark-glow
-  #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe never opens a control that SPENDS** (2026-09-20): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. **The session's background tasks die with it**: a restart of the Claude Code session, or its memory watchdog (on both of the owner's machines, even with memory free and even mid-suite), kills the emulators and the dev
-  server alike, and an emulator killed that way exports nothing. The safe default for the owner's tour: the emulators and
-  the dev server run in the OWNER's terminals, which the watchdog does not touch; the agent re-seeds the mirror, checks
-  the ports and reports the URLs, and does not restart a killed process on its own. When the owner asks the agent to
-  start them, say they hang on the session and check the ports before every hand-over; on Windows start each one DETACHED —
-  `Start-Process cmd.exe "/c npm run <script> > <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden` — which is neither a
-  session task the watchdog reaps nor subject to the tools' 10-minute cap; run the full suite the same way and follow its
-  log with a monitor; keep only what the step needs up (no `perf:serve` beside the suite); at the end export the
-  emulators through the hub and stop every process by PID (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
-- **Throwaway fixtures** follow the existing seed pattern (`scripts/seedEmulator.ts`,
-  `scripts/seedAnalisiE2E.mts`, `scripts/seedPensionE2E.mts`, `scripts/seedCoastFireE2E.mts`) or
-  live as a throwaway `scripts/*.tmp.mts` inside the repo (untracked, deleted in phase G) — never in
-  the session scratchpad, where `firebase-admin` does not resolve. `.mts`, never `.ts`: a `.ts` script
-  is CJS under tsx and has no top-level await (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
-- **The authenticated browser already exists.** The Playwright projects park an authenticated
-  `storageState` per fixture account (`e2e/.auth/<account>.json`, minted by the six `auth*.setup.ts`
-  projects), so a script does not have to reproduce the login: `npx playwright test --project=<name>`,
-  one of the fourteen projects of `playwright.config.ts` (SETUP.md § What it covers; the full table in
-  doc/guide/e2e-playwright.md). A throwaway spec
-  must match that project's `testMatch` to be collected, and must be deleted at the end.
-- **Automated suites are yours to run, always**: `npx tsc --noEmit`, `TZ=Europe/Rome npx vitest run`
-  and `npx playwright test`.
-- **Assert on data, not on pixels.** Read back from the Firestore emulator —
-  `curl -H "Authorization: Bearer owner" "http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/<collection>"`;
-  without that header the call is silently filtered to an empty result, which looks exactly like
-  "there are no documents" — or from the API route's own response, or from the emulator UI on
-  `http://127.0.0.1:4000`. Arithmetic belongs to Vitest; the browser is for what only a browser
-  knows (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
-- **Prove the check can fail.** Break the thing under test on purpose once and watch the assertion
-  go red. A green check that has never been seen red is indistinguishable from one asserting
-  nothing. **When it stays green, the sentence that motivated the test was wrong, not the test**
-  (2026-09-07: «the picker overflows a 360 phone» — it did not): rewrite the claim everywhere it was
-  written, keep the test as a regression guard, and say in its header which of the two it is.
-- **Phase E here is the delegation boundary**: `assertCanAccessAccount`, `firestore.rules`,
-  `REGISTRATION_WHITELIST`. The positive/negative pair is the owner's document against another
-  account's document — same collection, same shape.
-- **Phase G**: prefer deleting the few documents you created (`curl -X DELETE` with the same
-  `Bearer owner` header) over wiping `.emulator-data/`, which throws away the shared seed. A
-  document with side effects — a transaction or trade, whose deletion re-runs the replay — is
-  deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright)).
-- **A mock page published as an Artifact inherits the host skeleton's `body{color:#000}`** (2026-11-06, the concept
-  pages of the AI surfaces' visual direction): the Artifact host prepends `:root{color-scheme:light} body{background:#fff;color:#000}` and nests the
-  page inside its body, so a text colour declared on `html` is overridden for every descendant and a dark page shows
-  black on black — Playwright on `file://` never shows it. A page meant for an Artifact sets `background` AND `color`
-  on `body` (the page contract asks for the background alone).
-- **`impeccable detect` runs its `design-system-*` checks only on a file inside the repo root** (2026-11-06, the
-  check of those concept pages): a copy in the scratchpad reports 0 for that family while `low-contrast` still fires, so a
-  probe page (a light copy, a themes sheet) goes in the repo root as `.tmp-*.html` and is deleted before the commit.
+The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
+
+- **No Claude-in-Chrome** (2026-09-13): the live evidence comes from a throwaway Playwright script on the emulator dev
+  server, copied into the repo root as `.tmp-*.mjs`, waiting on the page's `h1`, never on `networkidle`; say it is
+  Playwright's. The tour still goes on the MIRROR. Count only the detector's hits that belong to the surface
+  (2026-09-18).
+- **A probe never opens a control that SPENDS** (2026-09-20): read what a control does before scripting a click on it.
+- **The session's background tasks die with it**: the emulators and the dev server of a tour run in the OWNER's
+  terminals; when the agent starts them on Windows, each one DETACHED (`Start-Process cmd.exe "/c npm run <script> >
+  <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden`), the full suite too, followed with a monitor; at the end export
+  through the hub and stop by PID (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
+- **Throwaway fixtures** follow the seed pattern (`scripts/seedEmulator.ts`, `scripts/seed*E2E.mts`) or live as an
+  untracked `scripts/*.tmp.mts` inside the repo — never in the scratchpad; `.mts`, never `.ts`.
+- **The authenticated browser already exists**: `e2e/.auth/<account>.json`, minted by the six `auth*.setup.ts`;
+  `npx playwright test --project=<name>`, one of the fourteen projects (doc/guide/e2e-playwright.md); a throwaway spec
+  matches its project's `testMatch` and is deleted at the end.
+- **Automated suites are yours to run, always**, in two levels (2026-11-13): while working, the specs of the area
+  touched in every project that collects them (each guide's § *Files*); the WHOLE suite once, with the work finished,
+  before the commit is asked for — and again if code changes after it. A change with no area runs the whole suite.
+- **Assert on data, not on pixels**: `curl -H "Authorization: Bearer owner"
+  "http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/<collection>"` — without the header
+  the answer is silently empty —, the route's own response, or the emulator UI on `http://127.0.0.1:4000`.
+- **Prove the check can fail**: break the thing under test once and watch it go red; when it stays green, the sentence
+  was wrong (2026-09-07): rewrite it everywhere and say so in the test's header.
+- **Phase E here is the delegation boundary**: `assertCanAccessAccount`, `firestore.rules`, `REGISTRATION_WHITELIST`;
+  the pair is the owner's document against another account's, same collection, same shape.
+- **Phase G**: delete the few documents you created (`curl -X DELETE`, same header) rather than `.emulator-data/`; a
+  transaction or trade is deleted BY THE APP (its replay).
+- **A mock page for an Artifact sets `background` AND `color` on `body`** (2026-11-06).
+- **A probe page for `impeccable detect` goes in the repo root as `.tmp-*.html`**, deleted before the commit (2026-11-06).
 
 ### Where things are recorded
 
@@ -350,69 +322,25 @@ The app **is** locally runnable; there is no fallback to declare.
   session at a time, and reaches `main` together after its last spec is retired, by a PR the owner opens** (owner,
   2026-10-12, for the mobile-composition series, whose last spec was retired on 2026-10-17; the PERF series went to
   `main` on its own, PR #446). While a series is open, its index's status table says which spec is in `develop`.
-- **A spec is retired by a session of its own** (since 2026-09-28: the fourteen PERF specs, then the nine MOB ones —
-  their history in README.md § Documentation): the code is read against the
-  spec, every divergence gets a verdict, the lessons go home (AGENTS.md, the guide, a comment at the line, CLAUDE.md),
-  then the spec and every pointer to it go. **The LAST spec of a series retires its whole folder** (`doc/perf/` on
-  2026-10-08, `doc/mobile/` on 2026-10-17): before the delete, each operative piece of the index goes to ONE home — a rule
-  to AGENTS.md or the guide, a measure table to a guide, a live artefact (a budget file) moved with `git mv` and never
-  deleted —, every numbered decision cited in code, tests and guides is rewritten as its rule and date (a number outlives
-  the document that numbered it), and the series' history goes to README.md § Documentation. A text-only defect found there is fixed in the retirement with `tsc`, lint
-  and Vitest, no Playwright; a runtime one only on the owner's call, with the area suite and the full Playwright; a
-  deferral nobody wrote goes where its theme lives (a guide's blind spots, the speed manual); a tour done in the
-  implementation session is recorded by the dossier's index (outside a series: one line of CLAUDE.md «Latest»). **`Draft Release Temp.md` never says a spec was retired**
-  (owner, 2026-10-08): its § Documentation line names what the guides now say, surface by surface. **The draft carries
-  user-visible changes only** (owner, 2026-10-10): a developer tool — a census, a budget, a seed, a script — gets no
-  row, not even a «dev» one; its home is the guide (and one line of CLAUDE.md «Latest» when it is the session's work).
-- **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
-  before the commit); its outcome goes into `CLAUDE.md`'s "Latest" entry as one line (§ 2, Closing a verification: the
-  signals go in the commit message and the guide) and, when the user sees it, into `Draft Release Temp.md`,
-  before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what
-  was implemented), *Perché* (the decision behind it), *Nota* (gotchas and measures, each with its date),
-  *Dove va a fine sessione* (AGENTS.md if repo-wide · `doc/guide/<tema>.md` if a domain lesson ·
-  WORKFLOW.md if a session rule · CLAUDE.md if project state · a comment at the right line if it is the
-  why of one line) — the closing prompt reads that block, so a note that names no destination is lost. **The draft ACCUMULATES until a release is tagged**: a session PREPENDS its entries to the
-  existing sections and never rewrites the file from scratch — on 2026-09-11 a session replaced 534 lines with 5
-  and 308 commits of draft had to be recovered from git two days later. **The owner DELETES the file when cutting
-  the tag** (2026-09-26, `v10.0.0 — Kalendae`): its body has become the release; `git log -1 --format=%ad <last tag>`
-  says when. A file that is missing is therefore never a loss — the first session after a tag recreates it from
-  this template, and every later one prepends: a `# Draft release notes` title, a quote line («Accumulates until
-  the next tag (WORKFLOW.md § Where things are recorded). Grouped by area; one entry per surface, rewritten to its
-  final state.»), then the four sections `## ✨ New Features`, `## 🐛 Bug Fixes`, `## 🔧 Improvements`,
-  `## 📚 Documentation`, one blank line between the entries of different areas. **The draft carries no private
-  data** (owner, 2026-09-20): it becomes public release notes, so an example sentence takes round invented figures and
-  generic names («Conto corrente», «un ETF») — never an amount, an instrument, a bank or a family detail of the real
-  account, which the mirror makes easy to paste. That day 33 entries had to be rewritten.
-- **Impeccable critiques are committed** (since 2026-09-12): `.impeccable/critique/*.md` is tracked,
-  so the snapshot `polish` reads as its backlog is the same on every machine. A critique is
-  committed in the session that produces it; one that describes a surface since rebuilt is
-  deleted, not kept as history (the eleven pre-«Verdict over Tiles» ones were removed that day). **A critique is written
-  on the fixture, never on the mirror** (2026-10-15): the sixteen written «live sul mirror» printed the real account's
-  figures and accounts in a public repo and were redacted — amounts «x.xxx €», the account «Banca X», a family surname replaced by an invented name in the fixtures that
-  had copied it. The same rule as for the draft above: nothing of the real account in a tracked file — nor the owner's
-  machines by model or hostname: «the reference machine» and «the other» (2026-10-15); the operating system may be
-  named («Windows», «the Mac»), because the line-ending rules depend on it (owner, 2026-10-19).
-  `.impeccable/hook.cache.json` stays local (`.git/info/exclude`). **A snapshot closes only through
-  `polish`, never by fixing the code** (2026-09-13): `critique-storage latest` judges it current from the
-  fingerprint of the ONE target file (`page.tsx`, a 32-line wrapper), so corrections made in the
-  components leave it open — the polish pass verifies each Priority Issue against the code and runs
-  `critique-storage close`, which stamps `closed: true` in the tracked file. Once the target file has changed,
-  `critique-storage latest` exits 2 with NO output (a JSON parser on its pipe dies on an empty stdin, 2026-09-18): keep
-  the snapshot's FILE NAME from the `write` step and hand it to `close` directly — the bare name
-  (`2026-09-20T09-25-18Z__app-dashboard-history-page-tsx.md`): the absolute path `write` prints, and the
-  repo-relative one, both exit 2 with no output (2026-09-20). **`close` takes TWO arguments**, the resolved target AND
-  that file name (`close <target> <snapshot-file>`); with the file alone it prints its usage and exits 1 (2026-09-21).
-  **`close` itself can answer exit 2 and still stamp the file**
-  (2026-09-20, Rendimenti: the target had changed, so `latest` had already closed the backlog): read `closed: true` in the
-  snapshot, not the exit code. **A snapshot's `target_path` and
-  `target_fingerprint` are those of the machine that wrote it** (2026-09-14): `latest` accepts only the local
-  absolute path and the local bytes (a Windows checkout is CRLF under `* text=auto`, so its fingerprint never
-  matches a macOS checkout's), while `trend` and `signals` match by slug. On 2026-09-14 the four snapshots written on Windows
-  were rewritten to the macOS path and LF fingerprint. The owner works from two machines with different line endings, so
-  close a snapshot on the machine that wrote it. **Impeccable runs on the Windows machine since 2026-10-17** (owner): every
-  command that writes or closes a snapshot — `critique`, `polish`, `critique-storage` — runs there, so a snapshot's path and
-  CRLF fingerprint always match the checkout that reads them. Every snapshot was deleted that day (the owner, closing the mobile-composition series), so the history
-  starts on Windows; the Mac-stamped snapshots before it are in `git log`.
+- **A spec is retired by a session of its own** (since 2026-09-28): the code read against the spec, every divergence
+  given a verdict, the lessons home, then the spec and every pointer go; **the LAST spec of a series retires its whole
+  folder**. A text-only defect found there is fixed with `tsc`, lint and Vitest, no Playwright; a runtime one only on
+  the owner's call, with the area suite and the full Playwright. The full rule: `doc/guide/collaudo.md` § Where things are recorded.
+- **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked, deleted before the commit, its
+  last block *Cosa* · *Perché* · *Nota* · *Dove va a fine sessione*, owner 2026-09-27); its outcome one line of
+  `CLAUDE.md` «Latest», the signals in the commit message and the guide.
+- **`Draft Release Temp.md`** carries user-visible changes only (owner, 2026-10-10), never «spec retired» (owner,
+  2026-10-08) and no private data (owner, 2026-09-20). It **ACCUMULATES until a release is tagged**: a session PREPENDS
+  its entries to the existing sections and never rewrites the file from scratch (2026-09-11); **the owner DELETES the
+  file when cutting the tag** (2026-09-26). A missing file is recreated from this template: a `# Draft release notes`
+  title, a quote line («Accumulates until the next tag (WORKFLOW.md § Where things are recorded). Grouped by area; one
+  entry per surface, rewritten to its final state.»), then `## ✨ New Features`, `## 🐛 Bug Fixes`, `## 🔧 Improvements`,
+  `## 📚 Documentation`, one blank line between the entries of different areas.
+- **Impeccable critiques are committed** (since 2026-09-12): `.impeccable/critique/*.md` is tracked, written on the
+  fixture, never on the mirror (2026-10-15); nothing of the real account nor the owner's machines by model or hostname
+  in a tracked file, the operating system may be named (owner, 2026-10-19). A snapshot closes only through `polish`
+  (2026-09-13), with `critique-storage close <target> <snapshot-file>` on the Windows machine, where Impeccable runs
+  since 2026-10-17 (owner). The traps of `latest` and `close`: `doc/guide/collaudo.md` § Where things are recorded.
 - **Do not duplicate project conventions here.** Code and comment conventions live in
   `DEVELOPMENT_GUIDELINES.md` and `COMMENTS.md`, repo-wide patterns and traps in `AGENTS.md`, the
   per-area rules in `doc/guide/<tema>.md`, the aesthetic in `DESIGN.md`, environment and emulators

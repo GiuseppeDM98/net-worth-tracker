@@ -7,7 +7,7 @@
  */
 
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import type { DeclineCause, PeriodSalesSummary, TaxedGrowth } from '@/lib/utils/periodSales';
+import { isMaterialAmount, isMaterialSalesTax, type DeclineCause, type PeriodSalesSummary, type TaxedGrowth } from '@/lib/utils/periodSales';
 import type { DebtRepayment, MonthFlows } from '@/lib/utils/marketEffect';
 import type { Narrative, NarrativeSegment } from '@/lib/utils/narrative';
 import { isPrintedZero } from '@/lib/utils/verdictStrip';
@@ -38,7 +38,7 @@ function signedCompactEuro(value: number): NarrativeSegment {
  */
 const binding = (segments: Narrative): Narrative => segments.map((segment) => ({ ...segment, binding: true }));
 
-/** «sulla vendita di VWCE» when the period sold exactly one instrument, «sulle vendite» otherwise. */
+/** «sulla vendita di ORNI» when the period sold exactly one instrument, «sulle vendite» otherwise. */
 function taxObject(sales?: PeriodSalesSummary | null): string {
   const instruments = sales?.instruments ?? [];
   return instruments.length === 1 ? `sulla vendita di ${instruments[0].name}` : 'sulle vendite';
@@ -46,7 +46,7 @@ function taxObject(sales?: PeriodSalesSummary | null): string {
 
 /**
  * The tail of a falling headline, after «{subject} è in calo». Empty for `unknown`. The
- * `taxes-despite-market` tail names the instrument sold («per le tasse sulla vendita di VWCE, non
+ * `taxes-despite-market` tail names the instrument sold («per le tasse sulla vendita di ORNI, non
  * per il mercato») when the period's sales carry exactly one, «sulle vendite» otherwise — the
  * headline is the ONE place the cause is stated, so it must say which sale.
  */
@@ -71,7 +71,7 @@ export function declineHeadlineTail(cause: DeclineCause, sales?: PeriodSalesSumm
 
 /**
  * The headline of a period the tax kept from growing (`resolveTaxedGrowth`): «Settembre è in pari:
- * le tasse sulla vendita di VWCE si sono prese la crescita.» / «Il portafoglio cresce, ma le tasse
+ * le tasse sulla vendita di ORNI si sono prese la crescita.» / «Il portafoglio cresce, ma le tasse
  * sulle vendite si sono prese più di metà della crescita.» `grew` is the caller's verb for a
  * visible growth («cresce» on the pages, «è cresciuto» in the email, which speaks of a closed period).
  */
@@ -104,11 +104,6 @@ export interface MonthSplit {
   flows?: MonthFlows | null;
 }
 
-/** «Altre variazioni» is said only from this many euro… */
-const OTHER_CHANGES_MIN_EUR = 100;
-/** …and from this share of the change being split, whichever is larger. */
-const OTHER_CHANGES_MIN_SHARE = 0.05;
-
 /**
  * Whether «altre variazioni» is worth a clause in a sentence. The residual is the gap between the
  * balances typed by hand and the cashflow rows — mostly TIMING: a credit-card expense is in the
@@ -119,7 +114,7 @@ const OTHER_CHANGES_MIN_SHARE = 0.05;
  * in the rows and tooltips that list every part. Shared by the Panoramica, Patrimonio and Storico.
  */
 export function isMaterialOtherChange(other: number, total: number): boolean {
-  return Math.abs(other) >= Math.max(OTHER_CHANGES_MIN_EUR, Math.abs(total) * OTHER_CHANGES_MIN_SHARE);
+  return isMaterialAmount(other, total);
 }
 
 /**
@@ -215,22 +210,22 @@ export function describeMonthSplit(split: MonthSplit): Narrative {
   return [prose('Di quel movimento: '), ...monthSplitParts(split.delta, split), prose('.')];
 }
 
-/** «Vanguard FTSE All-World» for one instrument, «3 strumenti» for more. */
+/** «Ornitorinco World» for one instrument, «3 strumenti» for more. */
 function salesSubject(sales: PeriodSalesSummary): NarrativeSegment[] {
   if (sales.instruments.length === 1) return [prose(sales.instruments[0].name)];
   return [figure(String(sales.instruments.length)), prose(' strumenti')];
 }
 
 /**
- * «Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato
- * circa 4089 € di tasse.» The tax is the broker's withholding, already gone at the sale (regime
+ * «Hai venduto Ornitorinco World per 40.000 € con una plusvalenza di 16.000 € e pagato
+ * circa 4000 € di tasse.» The tax is the broker's withholding, already gone at the sale (regime
  * amministrato), so the verb is «pagato», not «pagherai»; «circa» because it is estimated from the
  * instrument's rate. A loss carries no tax; a missing rate says so instead of printing zero.
  *
  * With `split` and a tax, the sentence closes on the month WITHOUT it — «: senza, il mese avrebbe
- * fatto +4213 € (+2018 € dal mercato, +2095 € risparmiati, +400 € di altre variazioni).» — and
- * replaces `describeMonthSplit`, whose parts would mix the tax back in (−1356 € «dai tuoi
- * movimenti» on the real account's settembre 2026, a figure nobody could read). The parts sum to
+ * fatto +4200 € (+2000 € dal mercato, +1800 € risparmiati, +400 € di altre variazioni).» — and
+ * replaces `describeMonthSplit`, whose parts would mix the tax back in (−1300 € «dai tuoi
+ * movimenti» on a lived month, a figure nobody could read). The parts sum to
  * Δ + tax by construction, but for an immaterial «altre variazioni» (`isMaterialOtherChange`).
  */
 export function describeSales(sales: PeriodSalesSummary, split?: MonthSplit): Narrative {
@@ -265,7 +260,9 @@ export function describeSales(sales: PeriodSalesSummary, split?: MonthSplit): Na
       prose(' di tasse'),
     ]),
   );
-  if (!split || sales.estimatedTax <= 0) {
+  // An immaterial tax (`isMaterialSalesTax`) stays a fact: the month without it says nothing, and
+  // the caller prints the plain split instead (`saleCarriesMonthSplit`).
+  if (!split || !isMaterialSalesTax(sales.estimatedTax, split.delta)) {
     narrative.push(prose('.'));
     return narrative;
   }
@@ -280,6 +277,11 @@ export function describeSales(sales: PeriodSalesSummary, split?: MonthSplit): Na
     ]),
   );
   return narrative;
+}
+
+/** Whether `describeSales` carries the month without the tax, so the caller drops its own split. */
+export function saleCarriesMonthSplit(sales: PeriodSalesSummary | null | undefined, split: MonthSplit | undefined): boolean {
+  return split !== undefined && isMaterialSalesTax(sales?.estimatedTax ?? null, split.delta);
 }
 
 /**

@@ -24,14 +24,14 @@
           "count": 1
         },
         {
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "totalNet": 37.739999999999995,
           "count": 2
         },
         {
-          "assetTicker": "SPM.MI",
-          "assetName": "Saipem",
+          "assetTicker": "TAP.MI",
+          "assetName": "Tapiro",
           "totalNet": 29.6,
           "count": 1
         },
@@ -81,9 +81,9 @@
       "totalCostBasis": 6150,
       "yieldOnCostAssets": [
         {
-          "assetId": "a-eni",
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetId": "a-orni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "quantity": 100,
           "averageCost": 12,
           "currentPrice": 15,
@@ -122,9 +122,9 @@
           "totalReturnPercentage": 33.46933333333333
         },
         {
-          "assetId": "a-eni",
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetId": "a-orni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "quantity": 100,
           "averageCost": 12,
           "currentPrice": 15,
@@ -139,9 +139,9 @@
           "isClosed": false
         },
         {
-          "assetId": "a-spm",
-          "assetTicker": "SPM.MI",
-          "assetName": "Saipem",
+          "assetId": "a-tap",
+          "assetTicker": "TAP.MI",
+          "assetName": "Tapiro",
           "quantity": 0,
           "averageCost": 20,
           "currentPrice": 2,
@@ -187,9 +187,9 @@
             "yoyGrowth": {}
           },
           {
-            "assetId": "a-eni",
-            "assetTicker": "ENI.MI",
-            "assetName": "Eni",
+            "assetId": "a-orni",
+            "assetTicker": "ORNI.MI",
+            "assetName": "Ornitorinco",
             "currency": "EUR",
             "yearlyDps": [
               {
@@ -223,14 +223,14 @@
       "upcomingTotal": 73.9275,
       "byAsset": [
         {
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "totalNet": 37.739999999999995,
           "count": 2
         },
         {
-          "assetTicker": "SPM.MI",
-          "assetName": "Saipem",
+          "assetTicker": "TAP.MI",
+          "assetName": "Tapiro",
           "totalNet": 29.6,
           "count": 1
         }
@@ -260,9 +260,9 @@
       "totalCostBasis": 6150,
       "yieldOnCostAssets": [
         {
-          "assetId": "a-eni",
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetId": "a-orni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "quantity": 100,
           "averageCost": 12,
           "currentPrice": 15,
@@ -301,9 +301,9 @@
           "totalReturnPercentage": 33.46933333333333
         },
         {
-          "assetId": "a-eni",
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetId": "a-orni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "quantity": 100,
           "averageCost": 12,
           "currentPrice": 15,
@@ -318,9 +318,9 @@
           "isClosed": false
         },
         {
-          "assetId": "a-spm",
-          "assetTicker": "SPM.MI",
-          "assetName": "Saipem",
+          "assetId": "a-tap",
+          "assetTicker": "TAP.MI",
+          "assetName": "Tapiro",
           "quantity": 0,
           "averageCost": 20,
           "currentPrice": 2,
@@ -366,9 +366,9 @@
             "yoyGrowth": {}
           },
           {
-            "assetId": "a-eni",
-            "assetTicker": "ENI.MI",
-            "assetName": "Eni",
+            "assetId": "a-orni",
+            "assetTicker": "ORNI.MI",
+            "assetName": "Ornitorinco",
             "currency": "EUR",
             "yearlyDps": [
               {
@@ -442,9 +442,9 @@
       "totalCostBasis": 6150,
       "yieldOnCostAssets": [
         {
-          "assetId": "a-eni",
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetId": "a-orni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "quantity": 100,
           "averageCost": 12,
           "currentPrice": 15,
@@ -483,9 +483,9 @@
           "totalReturnPercentage": 33.46933333333333
         },
         {
-          "assetId": "a-eni",
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetId": "a-orni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "quantity": 100,
           "averageCost": 12,
           "currentPrice": 15,
@@ -500,9 +500,9 @@
           "isClosed": false
         },
         {
-          "assetId": "a-spm",
-          "assetTicker": "SPM.MI",
-          "assetName": "Saipem",
+          "assetId": "a-tap",
+          "assetTicker": "TAP.MI",
+          "assetName": "Tapiro",
           "quantity": 0,
           "averageCost": 20,
           "currentPrice": 2,
@@ -548,9 +548,9 @@
             "yoyGrowth": {}
           },
           {
-            "assetId": "a-eni",
-            "assetTicker": "ENI.MI",
-            "assetName": "Eni",
+            "assetId": "a-orni",
+            "assetTicker": "ORNI.MI",
+            "assetName": "Ornitorinco",
             "currency": "EUR",
             "yearlyDps": [
               {
@@ -587,8 +587,8 @@
       "upcomingTotal": 19.24,
       "byAsset": [
         {
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "totalNet": 37.739999999999995,
           "count": 2
         }
@@ -618,9 +618,9 @@
       "totalCostBasis": 6150,
       "yieldOnCostAssets": [
         {
-          "assetId": "a-eni",
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetId": "a-orni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "quantity": 100,
           "averageCost": 12,
           "currentPrice": 15,
@@ -659,9 +659,9 @@
           "totalReturnPercentage": 33.46933333333333
         },
         {
-          "assetId": "a-eni",
-          "assetTicker": "ENI.MI",
-          "assetName": "Eni",
+          "assetId": "a-orni",
+          "assetTicker": "ORNI.MI",
+          "assetName": "Ornitorinco",
           "quantity": 100,
           "averageCost": 12,
           "currentPrice": 15,
@@ -676,9 +676,9 @@
           "isClosed": false
         },
         {
-          "assetId": "a-spm",
-          "assetTicker": "SPM.MI",
-          "assetName": "Saipem",
+          "assetId": "a-tap",
+          "assetTicker": "TAP.MI",
+          "assetName": "Tapiro",
           "quantity": 0,
           "averageCost": 20,
           "currentPrice": 2,
@@ -711,9 +711,9 @@
       "dividendGrowthData": {
         "byAsset": [
           {
-            "assetId": "a-eni",
-            "assetTicker": "ENI.MI",
-            "assetName": "Eni",
+            "assetId": "a-orni",
+            "assetTicker": "ORNI.MI",
+            "assetName": "Ornitorinco",
             "currency": "EUR",
             "yearlyDps": [
               {

@@ -270,8 +270,9 @@ export async function GET(request: NextRequest) {
           const currentValueEur = state.quantity > 0 ? resolveLedgerAssetValueEur(asset) : 0;
           const totalReturn = computeAssetTotalReturn(state, currentValueEur, netDividends);
           // Capital gain = the price-driven component (realized + unrealized), symmetric with the
-          // static path below where capitalGainPercentage + dividendReturnPercentage = total.
-          const capitalGainAbsolute = totalReturn.realizedPnlEur + totalReturn.unrealizedPnlEur;
+          // static path below where capitalGainPercentage + dividendReturnPercentage = total. Net of
+          // every fee, like the XIRR: the realized and unrealized P&L are fee-free (2026-11-12).
+          const capitalGainAbsolute = totalReturn.realizedPnlEur + totalReturn.unrealizedPnlEur - totalReturn.feesEur;
           const capitalGainPercentage = (capitalGainAbsolute / totalReturn.investedEur) * 100;
           // Same per-payment method as the static path (see computeDividendReturnPercentage) — NOT
           // a flat netDividends/investedEur ratio, which would silently lose the anti-dilution

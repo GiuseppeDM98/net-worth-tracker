@@ -13,16 +13,16 @@
  */
 import { test, expect } from '@playwright/test';
 import { SANKEY_SIGNATURE, probeChunks } from './chunkProbe';
-import { expectDividendsTabLandsInPlace } from './lazyTabLanding';
+import { expectAccumuloTabLandsInPlace, expectDividendsTabLandsInPlace } from './lazyTabLanding';
 
 test('Analisi at 390 draws the Flusso as a bar and rows and never downloads the Sankey', async ({ page }) => {
   const sankey = probeChunks(page, SANKEY_SIGNATURE);
   await page.goto('/dashboard/analisi', { waitUntil: 'load' });
 
   // The phone's drawing of the Flusso is on screen: the page, and the tile's own chunks, are all in.
-  // A closed row since 2026-10-14: closed, the legend is not in the DOM and the absence of
-  // the chart below would pass empty — the row opens first.
-  await page.locator('#analisi-flusso-trigger').click({ timeout: 60_000 });
+  // Inside «Dettaglio» since 2026-11-12: closed, the legend is not in the DOM and the absence of
+  // the chart below would pass empty — «Dettaglio» opens first.
+  await page.getByRole('button', { name: 'Dettaglio', exact: true }).click({ timeout: 60_000 });
   const flusso = page.getByRole('region', { name: 'Flusso', exact: true });
   await expect(flusso.getByRole('list', { name: 'Quote del flusso' })).toBeVisible({ timeout: 60_000 });
   await expect(flusso.getByRole('img', { name: /^Flusso del periodo/ })).toHaveCount(0);
@@ -33,4 +33,8 @@ test('Analisi at 390 draws the Flusso as a bar and rows and never downloads the 
 test('Cashflow › Dividendi at 390 lands on the placeholder the page drew for its chunk, axis row included', async ({ page }) => {
   test.setTimeout(120_000);
   await expectDividendsTabLandsInPlace(page);
+});
+
+test('Allocazione › Accumulo at 390 lands where the page drew its placeholder, the tab bar on screen', async ({ page }) => {
+  await expectAccumuloTabLandsInPlace(page);
 });

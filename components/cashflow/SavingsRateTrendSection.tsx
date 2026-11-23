@@ -7,8 +7,9 @@
  * Always rendered — shows "Dati insufficienti" placeholder when fewer than
  * 3 months have income data (< 3 non-null data points).
  *
- * Savings rate formula: ((totalIncome - totalExpenses) / totalIncome) * 100
- * Months without income → null → rendered as a gap in the line (connectNulls=false).
+ * Each month's rate is `readSavings` of its income and spending (`buildSavingsRateTrendPoints`):
+ * a month that is not a rate — no income, or a deficit beyond the −100% floor — is null, rendered
+ * as a gap in the line (connectNulls=false).
  */
 'use client';
 
@@ -21,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { lazyComponent } from '@/components/ui/lazy-component';
 import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
+import { buildSavingsRateTrendPoints } from '@/lib/utils/analisiSummary';
 
 /** The plot's height: the chart draws at it and its placeholder holds it, so it lands in place. */
 const SAVINGS_CHART_HEIGHT = 200;
@@ -103,7 +105,7 @@ export function SavingsRateTrendSection({
       ? 24
       : (currentYear - historyStartYear) * 12 + currentMonth;
 
-    const result: Array<{ label: string; rate: number | null; month: number; year: number }> = [];
+    const months: Array<{ label: string; month: number; year: number; income: number; expenses: number }> = [];
 
     let m = refMonth;
     let y = refYear;
@@ -127,14 +129,12 @@ export function SavingsRateTrendSection({
           .filter(e => e.type !== 'income' && e.type !== 'transfer')
           .reduce((s, e) => s + Math.abs(e.amount), 0);
 
-        // No income in this month → null (gap in chart, not zero)
-        const rate = income > 0 ? ((income - expenses) / income) * 100 : null;
-
-        result.unshift({
+        months.unshift({
           label: `${MONTH_NAMES[month - 1].slice(0, 3)} ${year.toString().slice(2)}`,
-          rate,
           month,
           year,
+          income,
+          expenses,
         });
       }
 
@@ -146,7 +146,7 @@ export function SavingsRateTrendSection({
       }
     }
 
-    return result;
+    return buildSavingsRateTrendPoints(months);
   }, [allExpenses, historyStartYear, range, isScoped, scopeYear]);
 
   // Need at least 3 months with actual income data to show a meaningful trend

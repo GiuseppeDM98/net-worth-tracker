@@ -3,9 +3,10 @@
 /**
  * React Query hooks for the asset trade ledger (Registro operazioni asset).
  *
- * Mutations invalidate a TRIPLE: assetTransactions.all + assets.all + dashboard.overview. The dual
- * asset/overview rule becomes a triple here because a trade's optional cash settlement moves a cash
- * asset balance, so both the hero total and the asset table change. Demo mode is gated at the UI (button
+ * Mutations invalidate four keys: assetTransactions.all + assets.all + dashboard.overview +
+ * expenses.all. The dual asset/overview rule grows here because a trade's optional cash settlement
+ * moves a cash asset balance, so both the hero total and the asset table change, and a trade's fee is
+ * a row the server writes with it (2026-11-12). Demo mode is gated at the UI (button
  * disable), like every other mutation — not here.
  */
 
@@ -56,11 +57,13 @@ export function useAssetLedgerMeta(ownerId: string | undefined) {
   });
 }
 
-/** Invalidate the trade list, the asset table, and the overview hero after a trade mutation. */
+/** Invalidate the trade list, the asset table, the expenses and the overview hero after a trade mutation. */
 function invalidateTradeCaches(queryClient: QueryClient, ownerId: string): void {
   // assetTransactions.all is a prefix of byAsset → this also refreshes any open movements list.
   queryClient.invalidateQueries({ queryKey: queryKeys.assetTransactions.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+  // A trade's fee is a cashflow row the server writes with it.
+  queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
 }
 
@@ -72,24 +75,43 @@ export function useCreateAssetTransaction(ownerId: string) {
   });
 }
 
+/**
+ * Edit and delete carry the `updatedAt` of the row the form or the button was drawn from: the server
+ * refuses a trade changed (409) or deleted (404) since. A refusal also invalidates, so the list —
+ * and a form reopened from it — shows the stored row (2026-11-12).
+ */
 export function useUpdateAssetTransaction(ownerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       transactionId,
       updates,
+      expectedUpdatedAt,
     }: {
       transactionId: string;
       updates: Partial<AssetTransactionFormData>;
-    }) => updateAssetTransaction(ownerId, transactionId, updates),
+      expectedUpdatedAt: Date;
+    }) => updateAssetTransaction(ownerId, transactionId, updates, expectedUpdatedAt),
     onSuccess: () => invalidateTradeCaches(queryClient, ownerId),
+    onError: () => invalidateTradeCaches(queryClient, ownerId),
   });
 }
 
 export function useDeleteAssetTransaction(ownerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (transactionId: string) => deleteAssetTransaction(ownerId, transactionId),
+    mutationFn: ({ transactionId, expectedUpdatedAt }: { transactionId: string; expectedUpdatedAt: Date }) =>
+      deleteAssetTransaction(ownerId, transactionId, expectedUpdatedAt),
     onSuccess: () => invalidateTradeCaches(queryClient, ownerId),
+    onError: () => invalidateTradeCaches(queryClient, ownerId),
+  });
+}
+
+/** The ledger meta as the SERVER holds it now — for a decision a restored `null` must not take. */
+export function fetchFreshLedgerMeta(queryClient: QueryClient, ownerId: string) {
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.assetTransactions.meta(ownerId),
+    queryFn: () => getAssetLedgerMeta(ownerId),
+    staleTime: 0,
   });
 }

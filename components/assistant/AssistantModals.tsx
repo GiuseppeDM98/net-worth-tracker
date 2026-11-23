@@ -1,10 +1,11 @@
 'use client';
 
 import { AssistantMemoryPanel } from '@/components/assistant/AssistantMemoryPanel';
+import { AssistantPreferencesFields } from '@/components/assistant/AssistantPreferencesFields';
 import { AssistantThreadList } from '@/components/assistant/AssistantThreadList';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { describeMemory, describeThreadsReading } from '@/lib/utils/assistantNarrative';
-import { AssistantMemoryDocument, AssistantThread } from '@/types/assistant';
+import { AssistantMemoryDocument, AssistantPreferences, AssistantThread } from '@/types/assistant';
 
 interface AssistantModalsProps {
   ownerId: string | undefined;
@@ -24,17 +25,29 @@ interface AssistantModalsProps {
   onDeleteThread: (threadId: string) => void;
   memory: AssistantMemoryDocument | undefined;
   loadingMemory: boolean;
+  isPreferencesOpen: boolean;
+  onPreferencesOpenChange: (open: boolean) => void;
+  onPreferencesChange: (patch: Partial<AssistantPreferences>) => void;
+  isPreferencesPending: boolean;
+  isDemo: boolean;
+  /**
+   * Where each modal returns the focus: the «⋯» copy that opened its menu (a menu item is unmounted
+   * when its modal opens, so the modal's own restore would land on `body`); null for a modal opened
+   * by a button that stays mounted («Apri memoria»), whose own restore then holds.
+   */
+  returnFocusTo: React.RefObject<HTMLElement | null>;
 }
 
 /**
- * The two overlay surfaces of the assistant — Conversazioni and Memoria — in the app's one
+ * The three overlay surfaces of the assistant — Conversazioni, Memoria and Preferenze (2026-11-12,
+ * a header popover until then; each opened from the header's «⋯») — in the app's one
  * modal vocabulary (doc/guide/dialog.md): a bottom sheet on a phone, a centred dialog above.
  * They were right-side `Sheet`s until 2026-09-18, the last two surfaces with a 14px title.
  *
  * What made them overlays still holds: the companion column must never become a second
  * nested-scroll box, so neither list is ever rendered inline.
- * Open state lives in the page because several surfaces open them. Neither has a footer: a
- * list to pick from and a panel to tend ask for no decision of their own.
+ * Open state lives in the page because several surfaces open them. None has a footer: a list to
+ * pick from, a panel to tend and preferences that save on change ask for no decision of their own.
  */
 export function AssistantModals({
   ownerId,
@@ -54,6 +67,12 @@ export function AssistantModals({
   onDeleteThread,
   memory,
   loadingMemory,
+  isPreferencesOpen,
+  onPreferencesOpenChange,
+  onPreferencesChange,
+  isPreferencesPending,
+  isDemo,
+  returnFocusTo,
 }: AssistantModalsProps) {
   // The same three counts the companion's «Cosa sa di te» tile reads, so the modal opens on
   // the sentence the reader pressed.
@@ -67,6 +86,7 @@ export function AssistantModals({
         open={isThreadsOpen}
         onClose={() => onThreadsOpenChange(false)}
         width="md"
+        returnFocusTo={returnFocusTo}
         eyebrow="Assistente · Conversazioni"
         title="Riprendi una conversazione"
         reading={{
@@ -96,6 +116,7 @@ export function AssistantModals({
           open={isMemoryOpen}
           onClose={() => onMemoryOpenChange(false)}
           width="lg"
+          returnFocusTo={returnFocusTo}
           eyebrow="Assistente · Memoria"
           title="Cosa sa di te"
           reading={
@@ -114,6 +135,24 @@ export function AssistantModals({
           <AssistantMemoryPanel userId={ownerId} memory={memory} isLoading={loadingMemory} />
         </ResponsiveModal>
       )}
+
+      <ResponsiveModal
+        open={isPreferencesOpen}
+        onClose={() => onPreferencesOpenChange(false)}
+        width="sm"
+        returnFocusTo={returnFocusTo}
+        eyebrow="Assistente · Preferenze"
+        title="Come risponde l'Assistente"
+        reading="Le scelte valgono per ogni conversazione e si salvano da sole."
+      >
+        <AssistantPreferencesFields
+          memory={memory}
+          onChange={onPreferencesChange}
+          isLoading={loadingMemory}
+          isPending={isPreferencesPending}
+          disabled={isDemo}
+        />
+      </ResponsiveModal>
     </>
   );
 }

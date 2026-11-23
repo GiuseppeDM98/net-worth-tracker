@@ -71,7 +71,9 @@
   --ease-spring: linear(0, 0.093 8.3%, 0.280 16.7%, 0.476 25%, 0.643 33.3%, 0.771 41.7%, 0.861 50%, 0.922 58.3%, 0.960 66.7%, 0.982 75%, 0.994 83.3%, 1);
 }
 
-:root {
+/* `[data-theme="default"]`: the swatch of Impostazioni › Aspetto applies this block to a `div`
+   (<html> never carries the default's name). */
+:root, [data-theme="default"] {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -508,7 +510,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --chart-1: oklch(0.5553 0.1455 48.9975);
   --chart-2: oklch(0.5830 0.1260 237.1000);
   --chart-3: oklch(0.6340 0.1180 85.6000);
-  --chart-4: oklch(0.5130 0.0120 58.0000);
+  --chart-4: oklch(0.4200 0.0800 170.0000);
   --chart-5: oklch(0.6200 0.1460 150.1000);
   --chart-6: oklch(0.4950 0.1020 100.0000);
   --chart-7: oklch(0.6300 0.1070 198.0000);
@@ -551,7 +553,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --chart-1: oklch(0.7049 0.1867 47.6044);
   --chart-2: oklch(0.6120 0.1310 237.2000);
   --chart-3: oklch(0.6760 0.1290 86.6000);
-  --chart-4: oklch(0.7830 0.0120 58.0000);
+  --chart-4: oklch(0.5300 0.1050 170.0000);
   --chart-5: oklch(0.8330 0.1700 150.0000);
   --chart-6: oklch(0.8600 0.1410 100.0000);
   --chart-7: oklch(0.8600 0.1370 198.0000);
@@ -738,6 +740,361 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --sidebar-ring: oklch(0.5676 0.2021 283.0838);
 }
 
+/* Egeo — marble, sea and gold (costume theme: DESIGN.md → The Costume Rule) */
+[data-theme="egeo"] {
+  --radius: 0.3125rem;
+  --background: oklch(0.925 0.035 85);
+  --foreground: oklch(0.27 0.045 250);
+  --card: oklch(0.975 0.012 90);
+  --card-foreground: oklch(0.27 0.045 250);
+  --popover: oklch(0.975 0.012 90);
+  --popover-foreground: oklch(0.27 0.045 250);
+  --primary: oklch(0.45 0.10 240);
+  --primary-foreground: oklch(0.98 0.012 90);
+  --secondary: oklch(0.92 0.025 88);
+  --secondary-foreground: oklch(0.27 0.045 250);
+  --muted: oklch(0.92 0.025 88);
+  --muted-foreground: oklch(0.36 0.035 250);
+  --accent: oklch(0.895 0.04 85);
+  --accent-foreground: oklch(0.27 0.045 250);
+  --destructive: oklch(0.47 0.17 28);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
+  --positive: oklch(0.43 0.11 145);
+  --border: oklch(0.78 0.05 80);
+  --input: oklch(0.78 0.05 80);
+  --ring: oklch(0.45 0.10 240);
+  --chart-1: oklch(0.47 0.107 240);
+  --chart-2: oklch(0.55 0.11 140);
+  --chart-3: oklch(0.52 0.10 60);
+  --chart-4: oklch(0.64 0.13 80);
+  --chart-5: oklch(0.42 0.14 330);
+  --chart-6: oklch(0.54 0.11 105);
+  --chart-7: oklch(0.60 0.09 200);
+  --chart-8: oklch(0.54 0.16 0);
+  --chart-9: oklch(0.50 0.13 285);
+  --sidebar: oklch(0.945 0.025 87);
+  --sidebar-foreground: oklch(0.27 0.045 250);
+  --sidebar-primary: oklch(0.45 0.10 240);
+  --sidebar-primary-foreground: oklch(0.98 0.012 90);
+  --sidebar-accent: oklch(0.885 0.04 85);
+  --sidebar-accent-foreground: oklch(0.27 0.045 250);
+  --sidebar-border: oklch(0.78 0.05 80);
+  --sidebar-ring: oklch(0.45 0.10 240);
+}
+
+.dark[data-theme="egeo"] {
+  --background: oklch(0.19 0.035 250);
+  --foreground: oklch(0.95 0.015 85);
+  --card: oklch(0.24 0.04 250);
+  --card-foreground: oklch(0.95 0.015 85);
+  --popover: oklch(0.24 0.04 250);
+  --popover-foreground: oklch(0.95 0.015 85);
+  --primary: oklch(0.80 0.11 85);
+  --primary-foreground: oklch(0.22 0.04 250);
+  --secondary: oklch(0.29 0.04 250);
+  --secondary-foreground: oklch(0.95 0.015 85);
+  --muted: oklch(0.29 0.04 250);
+  --muted-foreground: oklch(0.76 0.03 240);
+  --accent: oklch(0.32 0.045 250);
+  --accent-foreground: oklch(0.95 0.015 85);
+  --destructive: oklch(0.72 0.16 30);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
+  --positive: oklch(0.740 0.156 148.655);
+  --border: oklch(0.45 0.06 80);
+  --input: oklch(0.45 0.06 80);
+  --ring: oklch(0.80 0.11 85);
+  --chart-1: oklch(0.68 0.13 240);
+  --chart-2: oklch(0.74 0.12 140);
+  --chart-3: oklch(0.66 0.13 60);
+  --chart-4: oklch(0.80 0.13 80);
+  --chart-5: oklch(0.66 0.16 330);
+  --chart-6: oklch(0.66 0.10 105);
+  --chart-7: oklch(0.76 0.09 200);
+  --chart-8: oklch(0.78 0.14 0);
+  --chart-9: oklch(0.58 0.13 285);
+  --sidebar: oklch(0.19 0.035 250);
+  --sidebar-foreground: oklch(0.95 0.015 85);
+  --sidebar-primary: oklch(0.80 0.11 85);
+  --sidebar-primary-foreground: oklch(0.22 0.04 250);
+  --sidebar-accent: oklch(0.32 0.045 250);
+  --sidebar-accent-foreground: oklch(0.95 0.015 85);
+  --sidebar-border: oklch(0.45 0.06 80);
+  --sidebar-ring: oklch(0.80 0.11 85);
+}
+
+/* The Egeo costume, worn only inside the dashboard and its dialogs. */
+[data-theme="egeo"] [data-costume-scope] {
+  --radius: 0.3125rem;
+  --radius-2xl: 0.25rem;
+  --costume-ground: repeating-linear-gradient(92deg, oklch(0.925 0.035 85) 0 3px, oklch(0.915 0.038 82) 3px 4px,
+    oklch(0.93 0.033 88) 4px 9px);
+  --costume-ornament: oklch(0.62 0.11 80);
+  --costume-tile-image: linear-gradient(var(--costume-ornament), var(--costume-ornament));
+  --costume-tile-image-position: left top;
+  /* 4px: the tile's 1px border covers the top one, the cap shows 3px. */
+  --costume-tile-image-size: 100% 4px;
+  --costume-tile-shadow: none;
+  --costume-heading-font: var(--font-marcellus), var(--font-geist-sans), system-ui, sans-serif;
+  --costume-heading-weight: 400;
+  --costume-heading-tracking: 0.01em;
+  --costume-heading-case: none;
+  --costume-heading-size: 34px;
+  --costume-eyebrow-color: oklch(0.47 0.10 70);
+  --costume-eyebrow-weight: 400;
+  --costume-header-band: repeating-linear-gradient(90deg, var(--costume-ornament) 0 9px, transparent 9px 15px);
+  --costume-header-band-height: 7px;
+  --costume-primary-glow: none;
+  --costume-control-frame-radius: var(--radius-2xl);
+  --costume-control-pill-radius: initial;
+  --costume-control-chip-radius: initial;
+  --costume-control-switch-on: var(--primary);
+  /* The AI accent reads 4,48:1 on 40 % of this theme's muted over the card: the generated sub-tiles sit on the card. */
+  --costume-page-generated-fill: var(--card);
+}
+
+.dark[data-theme="egeo"] [data-costume-scope] {
+  --costume-ground: var(--background);
+  --costume-ornament: oklch(0.72 0.11 82);
+  --costume-eyebrow-color: oklch(0.80 0.09 82);
+}
+
+/* Orbita — deep space and amber (costume theme: DESIGN.md → The Costume Rule) */
+[data-theme="orbita"] {
+  --radius: 0.25rem;
+  --background: oklch(0.955 0.012 240);
+  --foreground: oklch(0.25 0.04 255);
+  --card: oklch(0.99 0.004 240);
+  --card-foreground: oklch(0.25 0.04 255);
+  --popover: oklch(0.99 0.004 240);
+  --popover-foreground: oklch(0.25 0.04 255);
+  --primary: oklch(0.48 0.10 235);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.925 0.015 240);
+  --secondary-foreground: oklch(0.25 0.04 255);
+  --muted: oklch(0.925 0.015 240);
+  --muted-foreground: oklch(0.45 0.035 250);
+  --accent: oklch(0.925 0.015 240);
+  --accent-foreground: oklch(0.25 0.04 255);
+  --destructive: oklch(0.52 0.19 28);
+  --warning: oklch(0.986 0.022 90);
+  --warning-foreground: oklch(0.468 0.098 75);
+  --warning-border: oklch(0.855 0.062 85);
+  --border: oklch(0.48 0.10 235 / 30%);
+  --input: oklch(0.48 0.10 235 / 30%);
+  --ring: oklch(0.48 0.10 235);
+  --chart-1: oklch(0.52 0.098 225);
+  --chart-2: oklch(0.60 0.12 165);
+  --chart-3: oklch(0.52 0.10 60);
+  --chart-4: oklch(0.66 0.13 75);
+  --chart-5: oklch(0.48 0.19 300);
+  --chart-6: oklch(0.56 0.11 105);
+  --chart-7: oklch(0.62 0.03 240);
+  --chart-8: oklch(0.60 0.17 345);
+  --chart-9: oklch(0.46 0.11 135);
+  --sidebar: oklch(0.955 0.012 240);
+  --sidebar-foreground: oklch(0.25 0.04 255);
+  --sidebar-primary: oklch(0.48 0.10 235);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.90 0.03 235);
+  --sidebar-accent-foreground: oklch(0.25 0.04 255);
+  --sidebar-border: oklch(0.48 0.10 235 / 30%);
+  --sidebar-ring: oklch(0.48 0.10 235);
+}
+
+.dark[data-theme="orbita"] {
+  --background: oklch(0.13 0.03 260);
+  --foreground: oklch(0.94 0.015 230);
+  --card: oklch(0.19 0.04 258);
+  --card-foreground: oklch(0.94 0.015 230);
+  --popover: oklch(0.19 0.04 258);
+  --popover-foreground: oklch(0.94 0.015 230);
+  --primary: oklch(0.78 0.12 215);
+  --primary-foreground: oklch(0.16 0.03 258);
+  --secondary: oklch(0.25 0.045 258);
+  --secondary-foreground: oklch(0.94 0.015 230);
+  --muted: oklch(0.25 0.045 258);
+  --muted-foreground: oklch(0.78 0.035 235);
+  --accent: oklch(0.27 0.05 258);
+  --accent-foreground: oklch(0.94 0.015 230);
+  --destructive: oklch(0.72 0.17 30);
+  --warning: oklch(0.260 0.038 78);
+  --warning-foreground: oklch(0.854 0.090 82);
+  --warning-border: oklch(0.460 0.085 75);
+  --border: oklch(0.78 0.12 215 / 26%);
+  --input: oklch(0.78 0.12 215 / 26%);
+  --ring: oklch(0.78 0.12 215);
+  --chart-1: oklch(0.70 0.13 225);
+  --chart-2: oklch(0.76 0.14 165);
+  --chart-3: oklch(0.64 0.13 60);
+  --chart-4: oklch(0.80 0.15 75);
+  --chart-5: oklch(0.66 0.19 300);
+  --chart-6: oklch(0.70 0.12 105);
+  --chart-7: oklch(0.52 0.08 240);
+  --chart-8: oklch(0.74 0.17 345);
+  --chart-9: oklch(0.60 0.12 135);
+  --sidebar: oklch(0.13 0.03 260);
+  --sidebar-foreground: oklch(0.94 0.015 230);
+  --sidebar-primary: oklch(0.78 0.12 215);
+  --sidebar-primary-foreground: oklch(0.16 0.03 258);
+  --sidebar-accent: oklch(0.27 0.05 258);
+  --sidebar-accent-foreground: oklch(0.94 0.015 230);
+  --sidebar-border: oklch(0.78 0.12 215 / 26%);
+  --sidebar-ring: oklch(0.78 0.12 215);
+}
+
+/* The Orbita costume, worn only inside the dashboard and its dialogs. */
+[data-theme="orbita"] [data-costume-scope] {
+  --radius: 0rem;
+  --radius-2xl: 0rem;
+  --costume-ground: var(--background);
+  --costume-ornament: oklch(0.48 0.10 235);
+  /* Console corner marks: two strokes top-left, two bottom-right. */
+  --costume-tile-image: linear-gradient(var(--costume-ornament), var(--costume-ornament)),
+    linear-gradient(var(--costume-ornament), var(--costume-ornament)),
+    linear-gradient(var(--costume-ornament), var(--costume-ornament)),
+    linear-gradient(var(--costume-ornament), var(--costume-ornament));
+  --costume-tile-image-position: left top, left top, right bottom, right bottom;
+  --costume-tile-image-size: 14px 2px, 2px 14px, 14px 2px, 2px 14px;
+  --costume-tile-shadow: none;
+  --costume-heading-font: var(--font-chakra-petch), var(--font-geist-sans), system-ui, sans-serif;
+  --costume-heading-weight: 600;
+  --costume-heading-tracking: 0.02em;
+  --costume-heading-case: uppercase;
+  --costume-heading-size: 28px;
+  --costume-eyebrow-color: oklch(0.50 0.115 60);
+  --costume-eyebrow-weight: 500;
+  --costume-header-band: none;
+  --costume-header-band-height: 0px;
+  --costume-primary-glow: none;
+  --costume-control-frame-radius: var(--radius-2xl);
+  --costume-control-pill-radius: 0px;
+  --costume-control-chip-radius: 0px;
+  --costume-control-switch-on: var(--primary);
+  --costume-page-generated-fill: initial;
+}
+
+.dark[data-theme="orbita"] [data-costume-scope] {
+  --costume-ground: radial-gradient(1px 1px at 12% 18%, oklch(0.95 0.02 230 / 70%) 50%, transparent 51%),
+    radial-gradient(1px 1px at 34% 62%, oklch(0.95 0.02 230 / 55%) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 58% 9%, oklch(0.9 0.06 215 / 70%) 50%, transparent 51%),
+    radial-gradient(1px 1px at 77% 41%, oklch(0.95 0.02 230 / 60%) 50%, transparent 51%),
+    radial-gradient(1px 1px at 91% 83%, oklch(0.95 0.02 230 / 55%) 50%, transparent 51%),
+    radial-gradient(900px 500px at 85% -10%, oklch(0.26 0.08 265 / 70%), transparent 70%),
+    oklch(0.13 0.03 260);
+  --costume-ornament: oklch(0.78 0.12 215);
+  --costume-eyebrow-color: oklch(0.80 0.14 75);
+  --costume-primary-glow: 0 6px 20px oklch(0.78 0.12 215 / 35%);
+}
+
+/* ─── Theme costume (DESIGN.md → The Costume Rule) ── */
+/* A costume theme's ground, frame, heading face, ornaments and glow (doc/guide/temi.md § Il costume).
+   Every selector starts with the gate: `data-costume` on <html> (the theme has a costume) AND a
+   `data-costume-scope` ancestor (the dashboard shell, a modal's content) — so the landing, the access
+   pages, the emails and the PDF wear the default costume, and a palette theme renders as before.
+   Unlayered on purpose: these beat a utility, so each excludes what a utility must keep. The tokens
+   are declared only in a theme's `[data-theme="<id>"] [data-costume-scope]` blocks. */
+[data-costume] [data-costume-scope] #page-main {
+  background: var(--costume-ground);
+}
+[data-costume] [data-costume-scope] [data-tile] {
+  background-image: var(--costume-tile-image);
+  background-position: var(--costume-tile-image-position);
+  background-size: var(--costume-tile-image-size);
+  background-repeat: no-repeat;
+  background-origin: border-box;
+}
+/* A generated tile keeps the AI accent's border and glow (DESIGN.md → The AI-Accent Rule). */
+[data-costume] [data-costume-scope] [data-tile]:not([data-generated]) {
+  box-shadow: var(--costume-tile-shadow);
+}
+[data-costume] [data-costume-scope] .costume-heading {
+  font-family: var(--costume-heading-font);
+  font-weight: var(--costume-heading-weight);
+  letter-spacing: var(--costume-heading-tracking);
+  text-transform: var(--costume-heading-case);
+  font-synthesis: none;
+}
+@media (width >= 1440px) {
+  [data-costume] [data-costume-scope] .costume-heading {
+    font-size: var(--costume-heading-size);
+  }
+}
+[data-costume] [data-costume-scope] .tile-eyebrow {
+  font-family: var(--costume-heading-font);
+  font-weight: var(--costume-eyebrow-weight);
+  font-synthesis: none;
+}
+/* The Mono Mandate wins over the heading font: a digit in a heading is a figure. */
+[data-costume] [data-costume-scope] .costume-figure {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+/* 16px above a band, nothing above a 0px one: a costume without a band adds no height. */
+[data-costume] [data-costume-scope] .costume-header-band {
+  height: var(--costume-header-band-height);
+  margin-top: min(16px, calc(var(--costume-header-band-height) * 1000));
+  background: var(--costume-header-band);
+}
+/* Below desktop the header is sticky: the band keeps an opaque strip, so no row shows through it. */
+@media (width < 1440px) {
+  [data-costume] [data-costume-scope] .costume-header-band {
+    box-sizing: content-box;
+    margin-top: 0;
+    background-color: var(--background);
+    border-top: min(16px, calc(var(--costume-header-band-height) * 1000)) solid var(--background);
+  }
+}
+/* Not on focus (the ring is a box-shadow too), never on a control that asks a model (The AI-Accent Rule). */
+[data-costume] [data-costume-scope] [data-slot="button"][data-variant="default"]:not(.ai-control):not(:focus-visible) {
+  box-shadow: var(--costume-primary-glow);
+}
+/* The shell's labels: the eyebrow's colour, not 60 % of the sidebar's ink (DESIGN.md → The Costume Rule). */
+[data-costume] [data-costume-scope] .costume-shell-eyebrow { color: var(--costume-eyebrow-color); }
+/* The shell's quiet text and icons — inactive pill labels, the account e-mail, the collapse toggle, the account
+   chevron — on the muted token; a hovered link or button keeps its ink. */
+[data-costume] [data-costume-scope] .costume-shell-quiet:not(a:hover):not(button:hover) { color: var(--muted-foreground); }
+/* The wordmark wears the heading face at its own size. */
+[data-costume] [data-costume-scope] .costume-wordmark {
+  font-family: var(--costume-heading-font); font-weight: var(--costume-heading-weight);
+  letter-spacing: var(--costume-heading-tracking); text-transform: var(--costume-heading-case); font-synthesis: none;
+}
+/* A modal is a tile lifted off the page: the tile's cap or marks, but its own Float shadow (DESIGN.md → The
+   Modal-Is-A-Tile Rule). Not `data-tile`, whose shadow rule would take the Float away. */
+[data-costume] [data-costume-scope][data-costume-frame] {
+  background-image: var(--costume-tile-image); background-position: var(--costume-tile-image-position);
+  background-size: var(--costume-tile-image-size); background-repeat: no-repeat; background-origin: border-box;
+}
+/* A modal's title: the heading face at the title's own size. */
+[data-costume] [data-costume-scope] .costume-title {
+  font-family: var(--costume-heading-font); font-weight: var(--costume-heading-weight);
+  letter-spacing: var(--costume-heading-tracking); text-transform: var(--costume-heading-case); font-synthesis: none;
+}
+/* Paper is the palette's: every scope property back to «off». */
+@media print {
+  [data-costume] [data-costume-scope] {
+    --radius: inherit !important; --radius-2xl: 1rem !important;
+    --costume-ground: var(--background) !important; --costume-ornament: var(--muted-foreground) !important;
+    --costume-tile-image: none !important; --costume-tile-image-position: 0 0 !important;
+    --costume-tile-image-size: auto !important;
+    --costume-tile-shadow: 0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a !important;
+    --costume-heading-font: var(--font-geist-sans), system-ui, sans-serif !important;
+    --costume-heading-weight: 600 !important; --costume-heading-tracking: -0.025em !important;
+    --costume-heading-case: none !important; --costume-heading-size: 30px !important;
+    --costume-eyebrow-color: var(--muted-foreground) !important; --costume-eyebrow-weight: 600 !important;
+    --costume-header-band: none !important; --costume-header-band-height: 0px !important;
+    --costume-primary-glow: none !important;
+    --costume-control-frame-radius: initial !important; --costume-control-pill-radius: initial !important;
+    --costume-control-chip-radius: initial !important; --costume-control-switch-on: initial !important;
+    --costume-page-generated-fill: initial !important;
+  }
+}
+/* ─── End of theme costume ── */
+
 /* Disable continuous rotation for users who prefer reduced motion.
  * Tailwind's animate-spin has no built-in reduced-motion guard, so we
  * neutralise it globally here rather than wrapping every spinner. */
@@ -782,7 +1139,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   width: 100%;
   max-width: none;
   max-height: 70dvh;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0;
   border-bottom-width: 0;
   background: var(--card);
   color: var(--card-foreground);
@@ -828,6 +1185,26 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   [data-popper-sheet][data-state='closed'] {
     animation: popper-sheet-out 200ms ease-in forwards;
   }
+}
+/* The Assistente's wait before the first word (components/assistant/AssistantWaiting.tsx,
+   2026-11-16): each phrase fades in, and a light passes over it; still under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .assistant-waiting-phrase {
+    background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--muted-foreground) 40%, var(--foreground) 50%, var(--muted-foreground) 60%, var(--muted-foreground) 100%);
+    background-size: 250% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    animation: assistant-waiting-in 240ms ease-out, assistant-waiting-shimmer 2.4s linear infinite;
+  }
+}
+@keyframes assistant-waiting-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes assistant-waiting-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
 }
 @keyframes popper-sheet-in {
   from { transform: translateY(100%); }

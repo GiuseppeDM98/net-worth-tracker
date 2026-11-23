@@ -5,6 +5,7 @@ import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { useCostumeScopeProps } from "@/contexts/ColorThemeContext"
 import { Button } from "@/components/ui/button"
 
 function Dialog({
@@ -55,11 +56,15 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const scopeProps = useCostumeScopeProps()
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        // The tile's cap or marks under a costume, never `data-tile`: the Float shadow stays the modal's.
+        data-costume-frame=""
+        {...scopeProps}
         className={cn(
           // The surface is `bg-card`, not `bg-background`: DESIGN.md §2 gives Charcoal Surface to
           // "card AND modal backgrounds", and a modal painted the same colour as the page it floats

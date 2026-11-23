@@ -38,6 +38,13 @@ le opzioni lette. **Una chiave di `--surfaces` o un valore di `--viewports` scon
 sovrascriveva `last-run.json`; `validateSelection`, `__tests__/mobileCensusOptions.test.ts`). L'uscita è `.mobile-census/` (gitignored): `last-run.json` con la durata in coda e due screenshot per
 superficie × viewport (`<viewport>/<superficie>-fold.png` e `-full.png`).
 
+**Il confronto con `develop` dello stesso giorno** (2026-11-14; proprietario, 2026-11-12 per una serie di spec, regola del repo dal 2026-11-23: un lavoro che tocca ciò che una pagina composta mostra per prima chiude su questo confronto — ogni voce che il lavoro NON nomina legge uguale sulle due corse, le voci che nomina si ri-registrano con `raisedBy` senza chiedere, e la sessione si ferma solo su una voce non nominata che si muove): si costruisce `develop` in un worktree (`git worktree add <cartella> develop`) con `cp -Rc node_modules <cartella>/node_modules` — un symlink fuori dalla root rompe Turbopack — più `.env.local`, si fa `perf:build` + `perf:serve` lì, si copia `.mobile-census/last-run.json`, poi lo stesso sul branch; le due corse si confrontano voce per voce (`results`), e il worktree si rimuove con `git worktree remove --force`. Non tocca il working tree della sessione.
+**Su Windows** (2026-11-16): `node_modules` si copia con `robocopy <repo>\node_modules <cartella>\node_modules /E /MT:16`;
+`git worktree remove --force` si ferma su «Filename too long» dentro `node_modules`, quindi la cartella si cancella con
+`Remove-Item -LiteralPath '\\?\<cartella>' -Recurse -Force` e poi `git worktree prune`. In uno script PowerShell della
+catena, nessuna funzione si chiama `Measure`: l'alias di `Measure-Object` la scavalca e la catena finisce in un minuto senza
+misurare niente.
+
 **Il fixture** `census@example.com` (`scripts/seedCensusE2E.mts`, `npm run e2e:seed:census`): con `--email` uguale al
 suo, il censimento lo risemina, ristampa i profili strumento (`e2e:seed:profiles`), ricostruisce i record di Hall of Fame
 chiamando `POST /api/hall-of-fame/recalculate` (solo il server li costruisce; proprietario, 2026-10-10) e **si rifiuta dal
@@ -94,7 +101,7 @@ non è di `census@example.com`, se una superficie è `missing` o `unsettled`, se
 (`yahooCalled` o un `source=yahoo` di riga) o se la corsa è parziale — ogni voce di `budget.json` deve essere stata
 misurata (2026-10-10: prima un `--tighten` su `--surfaces` scriveva il file e POI andava rosso su «non misurata»).
 Dopo una stretta il `raisedBy` resta sulla voce (può scusare una metrica che la misura non ha stretto; `perfBudget` lo
-toglie quando abbassa un tetto: scelta diversa, voluta). **Allargare** si fa a mano, con l'OK del proprietario:
+toglie quando abbassa un tetto: scelta diversa, voluta). **Allargare** si fa a mano, con l'OK del proprietario (senza chiederlo solo per le voci che il lavoro nomina, dopo «Il confronto con `develop` dello stesso giorno», qui sopra):
 `"raisedBy": "<data>: perché"` sulla voce (superficie × viewport), concatenato ai motivi che la voce già portava e mai
 sovrascritto, e una riga in `doc/guide/prima-schermata-misure.md` § Registro delle voci allargate, nello stesso commit;
 `mobile:budget` confronta con `git show HEAD:perf/mobile-budget.json` e un valore allargato senza un `raisedBy`
@@ -181,3 +188,19 @@ si legge prima di stringere o allargare.
 - **Il giro di riscaldamento attende l'assestamento, non le scritture**: le migrazioni della prima visita di Patrimonio
   (registro, prestiti, `backfillAverageCostEur`) partono in quel giro e non sono attese; due corse consecutive
   identiche (2026-10-10) dicono che atterrano prima della misura, non che non possano mai arrivare dopo.
+
+## In brief
+
+The core's summary of this guide, moved here whole from AGENTS.md (§ 5 → Performance tooling) on 2026-11-17; AGENTS.md keeps a stub.
+
+- **The first-screen census shares the port** (2026-10-10; its manual is `doc/guide/prima-schermata.md`, its record —
+  baselines, the fixture table, every widened entry — `doc/guide/prima-schermata-misure.md`): `npm
+  run mobile:census` measures the composition of 19 surfaces × 390/768/1024 on the same :3200 build, re-seeding its own
+  fixture `census@example.com`; `npm run mobile:budget` holds the run against `perf/mobile-budget.json` (zero tolerance,
+  it only tightens, a widening carries `raisedBy: "<date>: …"` and KEEPS every reason the entry carried before — concatenated,
+  never overwritten (2026-10-16: a `--tighten` had replaced twelve); `--tighten` refuses a partial run and a run in which
+  Yahoo answered a profile, 2026-10-10). The fixture refuses to be measured from the 1st to the 4th and on the month's
+  last day; an unknown `--surfaces` key or `--viewports` value exits 1 with the valid ones; a figure whose unit is a
+  `[data-figure-unit]` span counts once (2026-10-10). **A change that moves what a composed page shows on its first
+  screen closes on `mobile:census` + `mobile:budget` green on the fixture** (2026-10-17: the series that measured each page
+  is closed, the budget stays; DESIGN.md → The First-Screen Rule).

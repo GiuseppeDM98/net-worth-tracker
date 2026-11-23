@@ -41,6 +41,8 @@ describe('isPersistableQuery', () => {
       queryKeys.hallOfFame.all(OWNER),
       queryKeys.goals.all(OWNER),
       queryKeys.dividendReceipts.all(OWNER),
+      // The plans: the Piano note and the Accumulo tab on the first paint of a warm load.
+      queryKeys.accumulationPlans.all(OWNER),
       queryKeys.performance.data(OWNER, 'v8-cache-key'),
       queryKeys.performance.yields(OWNER, 'ytd:2026-01-01T00:00:00.000Z:2026-10-04:9'),
     ];
@@ -97,6 +99,7 @@ describe('every key builder under a persisted prefix', () => {
    * the owner out of position (`['assets', 'range', uid]`) fails the position.
    */
   const OWNER_KEYED_BUILDERS = [
+    'accumulationPlans.all',
     'assetTransactions.all',
     'assetTransactions.byAsset',
     'assetTransactions.meta',

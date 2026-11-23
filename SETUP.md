@@ -1,6 +1,6 @@
-# Setup Guide - Portfolio Tracker
+# Setup Guide - Net Worth Tracker
 
-This guide will walk you through setting up the Portfolio Tracker web app from scratch, using the `net-worth-tracker` repository as the codebase source, including Firebase configuration, Vercel deployment, and available alternatives.
+This guide will walk you through setting up the Net Worth Tracker web app from scratch, using the `net-worth-tracker` repository as the codebase source, including Firebase configuration, Vercel deployment, and available alternatives.
 
 ## Table of Contents
 
@@ -36,7 +36,7 @@ Firebase provides the backend infrastructure (database, authentication) for this
 
 1. Go to the [Firebase Console](https://console.firebase.google.com/)
 2. Click **"Add project"** or **"Create a project"**
-3. Enter a project name (e.g., `portfolio-tracker`)
+3. Enter a project name (e.g., `net-worth-tracker`)
 4. (Optional) Enable Google Analytics if desired
 5. Click **"Create project"**
 
@@ -105,7 +105,7 @@ Index creation can take a few minutes. You can monitor progress in Firebase Cons
 1. In the Firebase Console, click the **gear icon** → **Project settings**
 2. Scroll down to **"Your apps"** section
 3. Click the **Web icon** (`</>`) to add a web app
-4. Register your app with a nickname (e.g., `Portfolio Tracker Web`)
+4. Register your app with a nickname (e.g., `Net Worth Tracker Web`)
 5. Copy the Firebase configuration object - you'll need these values:
 
 ```javascript
@@ -316,12 +316,22 @@ Then install the browser (first time only) and run the suite:
 
 ```bash
 npx playwright install chromium
-npm run test:e2e         # or: npm run test:e2e:ui  (interactive runner)
+npm run test:e2e                      # the WHOLE suite, on a production build
+npx playwright test e2e/<area>        # some specs, on `next dev` (or: npm run test:e2e:ui)
 ```
 
 Playwright starts its own app server on **port 3100** and seeds its fixture automatically — no third
 terminal needed. If the emulators are not up it fails immediately with the two commands above
 rather than a connection stack trace.
+
+**Two servers, one port** (since 2026-11-16): `npm run test:e2e` first runs `npm run e2e:build` — a
+production build in `.next-e2e-build`, skipped when the code has not changed since the last one
+(`--force` rebuilds) — and serves it with `scripts/perfServe.mjs --port=3100`, which loads
+`.env.local` after the emulator variables. A plain `npx playwright test …` keeps `next dev`, which
+needs no build after a change. On the build, nothing already on :3100 is reused (stop a `dev:e2e`
+first) and a build older than the code is refused with the command that rebuilds it. A red of the
+whole run is re-run on its own with `npx playwright test <file> -g "<title>"`, on `next dev`; to
+re-run it on the build, prefix `E2E_SERVER=build` after `npm run e2e:build`.
 
 **Why port 3100 and a separate build directory:** Next refuses to start a second `next dev` for the
 same project directory whatever the port, because the lock lives inside the build dir. `npm run
@@ -458,7 +468,10 @@ and the two copies go next to THAT `server.js` (`<dir>/.next/static`, `<dir>/pub
 **:3200** with the Admin SDK routed to the emulators — :3000 stays the tour server and :3100 Playwright's. The benchmark
 and the size budget run on it (`doc/guide/velocita.md`). A build into a new dist dir makes `next build` add that dir's
 `types/**` to `tsconfig.json` and reformat the whole file: the `.next-perf` lines are committed, so a diff there after a
-build means another dist dir — keep its two lines, not the reformat.
+build means another dist dir — keep its two lines, not the reformat (the `.next-e2e-build` lines of the whole Playwright
+run are committed too, since 2026-11-16). The same script serves that build on :3100: `node scripts/perfServe.mjs
+[--port=3200] [--dist=.next-perf] [--env-local] [--fresh]` — `--env-local` reads `.env.local` as `next dev` does (a
+standalone `server.js` reads no env file), `--fresh` refuses a build older than the code (`scripts/buildFingerprint.mjs`).
 
 ### Font-loading changes cannot be verified in dev
 

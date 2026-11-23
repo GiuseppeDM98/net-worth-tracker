@@ -53,17 +53,23 @@ vi.mock('@/lib/firebase/admin', () => {
         ...query([]),
         doc: (id: string) => ({
           get: async () => ({ id, exists: threads.has(id), data: () => threads.get(id) }),
+          // The thread's own write beside a new message (the messageCount increment).
+          set: async () => undefined,
           collection: () => ({
-            doc: (messageId: string) => ({
+            doc: (messageId = 'new-msg') => ({
+              id: messageId,
               get: async () => ({ id: messageId, exists: messages.has(`${id}/${messageId}`), data: () => messages.get(`${id}/${messageId}`) }),
               update: messageUpdateMock,
               set: messageSetMock,
             }),
-            orderBy: () => ({
-              limit: () => ({
+            // Honours the direction and the limit: the thread's detail reads its LAST page (2026-11).
+            orderBy: (field: string, direction: 'asc' | 'desc' = 'asc') => ({
+              limit: (count: number) => ({
                 get: async () => ({
                   docs: [...messages.entries()]
                     .filter(([path]) => path.startsWith(`${id}/`))
+                    .sort(([, a], [, b]) => (millis(a[field]) - millis(b[field])) * (direction === 'asc' ? 1 : -1))
+                    .slice(0, count)
                     .map(([path, data]) => ({ id: path.slice(id.length + 1), data: () => data })),
                 }),
               }),
@@ -78,10 +84,12 @@ vi.mock('@/lib/firebase/admin', () => {
 import { FieldPath, Timestamp } from 'firebase-admin/firestore';
 import {
   ASSISTANT_THREADS_PAGE_SIZE,
+  appendAssistantMessage,
   getAssistantThreadDetail,
   listAssistantThreads,
   setAssistantMessageProposal,
 } from '@/lib/server/assistant/store';
+import type { AssistantRouteReading } from '@/types/assistant';
 
 const OWNER = 'owner-1';
 
@@ -186,5 +194,57 @@ describe('setAssistantMessageProposal — the outcome of a card on its message (
     });
     // A message with no card carries no `proposals` key at all.
     expect(detail.messages.find((message) => message.id === 'msg-0')).not.toHaveProperty('proposals');
+  });
+});
+
+// The reading of a message sent with mode 'auto' (2026-11), stored on the ASSISTANT message only.
+// Seen RED on purpose: `routeReading: message.routeReading` written unconditionally (R11b); the raw
+// field returned by `mapMessage` (R12); the detail read `'asc'` (R12b: messages 1-100 came back).
+describe('the route reading on a message, and the thread\'s last 100 messages (2026-11)', () => {
+  const READING: AssistantRouteReading = {
+    route: { intent: 'month_analysis', period: { kind: 'month', year: 2026, month: 10 }, webSearch: false, confidence: 0.9 },
+    source: 'router',
+  };
+
+  beforeEach(() => {
+    threads.clear();
+    messages.clear();
+    messageSetMock.mockReset().mockResolvedValue(undefined);
+    seedThreads(1);
+  });
+
+  it('R11b: writes the reading with no undefined `reason`, and no key at all without one', async () => {
+    const base = { userId: OWNER, role: 'assistant' as const, content: 'Ecco.', mode: 'month_analysis' as const };
+    await appendAssistantMessage('t000', { ...base, routeReading: { ...READING, reason: undefined } });
+    const written = messageSetMock.mock.calls[0][0];
+    expect(written.routeReading).toEqual(READING);
+    expect(written.routeReading).not.toHaveProperty('reason');
+
+    await appendAssistantMessage('t000', base);
+    expect(messageSetMock.mock.calls[1][0]).not.toHaveProperty('routeReading');
+  });
+
+  it('R12: reads a valid reading back, and drops a malformed one while keeping the message', async () => {
+    messages.set('t000/msg-1', { userId: OWNER, role: 'assistant', content: 'Ecco.', createdAt: new Date(Date.UTC(2026, 10, 1, 10)), mode: 'month_analysis', routeReading: READING });
+    messages.set('t000/msg-2', { userId: OWNER, role: 'assistant', content: 'Altro.', createdAt: new Date(Date.UTC(2026, 10, 1, 11)), mode: 'chat', routeReading: { route: 'x' } });
+    messages.set('t000/msg-3', { userId: OWNER, role: 'user', content: 'Ciao', createdAt: new Date(Date.UTC(2026, 10, 1, 12)), mode: 'chat' });
+
+    const detail = await getAssistantThreadDetail('t000', OWNER);
+    expect(detail.messages.find((m) => m.id === 'msg-1')?.routeReading).toEqual(READING);
+    const malformed = detail.messages.find((m) => m.id === 'msg-2');
+    expect(malformed?.content).toBe('Altro.');
+    expect(malformed).not.toHaveProperty('routeReading');
+    expect(detail.messages.find((m) => m.id === 'msg-3')).not.toHaveProperty('routeReading');
+  });
+
+  it('R12b: a thread of 101 messages reads its last 100, in ascending order', async () => {
+    for (let index = 1; index <= 101; index += 1) {
+      messages.set(`t000/m${String(index).padStart(3, '0')}`, {
+        userId: OWNER, role: index % 2 ? 'user' : 'assistant', content: `messaggio ${index}`,
+        createdAt: new Date(Date.UTC(2026, 10, 1, 0, index)), mode: 'chat',
+      });
+    }
+    const detail = await getAssistantThreadDetail('t000', OWNER);
+    expect(detail.messages.map((m) => m.content)).toEqual(Array.from({ length: 100 }, (_, i) => `messaggio ${i + 2}`));
   });
 });

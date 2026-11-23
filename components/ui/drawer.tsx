@@ -4,6 +4,7 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
+import { useCostumeScopeProps } from "@/contexts/ColorThemeContext"
 
 function Drawer({
   ...props
@@ -63,15 +64,19 @@ function DrawerContent({
 }: React.ComponentProps<typeof DrawerPrimitive.Content> & {
   minHeight?: keyof typeof minHeightMap
 }) {
+  const scopeProps = useCostumeScopeProps()
   return (
     <DrawerPortal>
       <DrawerOverlay />
       <DrawerPrimitive.Content
         data-slot="drawer-content"
+        data-costume-frame=""
+        {...scopeProps}
         className={cn(
           // `bg-card`, like the Dialog: the two are one surface at two widths, and a sheet the
           // colour of the page under it reads as part of that page (DESIGN.md §2).
-          "fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-[10px] border bg-card",
+          // The top corners follow a costume's frame radius, 10px in every palette theme (as the popper sheet's).
+          "fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-[var(--costume-control-frame-radius,10px)] border bg-card",
           // Max height: 92vh so the top is always visible
           "max-h-[92dvh]",
           minHeight && minHeightMap[minHeight],

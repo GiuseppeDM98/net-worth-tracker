@@ -149,6 +149,33 @@ service cloud.firestore {
       allow delete: if canAccess(resource.data.userId);
     }
 
+    // Collezione accumulationPlans - piani di accumulo (PAC) della scheda Accumulo
+    // Scritta dal client SDK: un documento per piano, nessun replay multi-doc.
+    // La lettura di un documento mancante è ammessa: il lock può nominare un piano cancellato fuori
+    // dall'app (console, rimozione di fixture interrotta), e la transazione che lo legge non deve fallire.
+    match /accumulationPlans/{planId} {
+      allow read: if resource == null || canAccess(resource.data.userId);
+      allow create: if canAccess(request.resource.data.userId);
+      allow update: if canAccess(resource.data.userId) &&
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
+      allow delete: if canAccess(resource.data.userId);
+    }
+
+    // Lock del piano di accumulo aperto (doc id = ownerUid): un solo piano in bozza o attivo per account
+    match /accumulationPlanLocks/{ownerUid} {
+      allow read: if canAccess(ownerUid);
+      allow create, update: if canAccess(ownerUid) && request.resource.data.userId == ownerUid;
+      allow delete: if canAccess(ownerUid);
+    }
+
+    // Portafoglio modello (doc id = ownerUid)
+    match /modelPortfolios/{ownerUid} {
+      allow read: if canAccess(ownerUid);
+      allow create, update: if canAccess(ownerUid) && request.resource.data.userId == ownerUid;
+      allow delete: if canAccess(ownerUid);
+    }
+
     // Collezione hall-of-fame - ranking dell'account (doc id = ownerUid)
     match /hall-of-fame/{userId} {
       // Lettura: proprietario o membro delegato

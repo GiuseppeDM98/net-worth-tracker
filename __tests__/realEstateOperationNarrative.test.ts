@@ -13,15 +13,28 @@ import {
   describePlanStep,
   describeSaleAdjustment,
   describeScreenBlock,
+  firstScreenRefusal,
   formatIsoDay,
+  screenCopy,
   type PlanNames,
 } from '@/lib/utils/realEstateOperationNarrative';
 import type { RealEstateOperationAnswers } from '@/types/realEstateOperation';
-import { makeContext } from './fixtures/realEstateOperation';
+import { ACCOUNT, asset, makeContext } from './fixtures/realEstateOperation';
 
 const context = makeContext();
 const answersWith = (patch: Partial<RealEstateOperationAnswers>): RealEstateOperationAnswers => ({ ...initialAnswers(context), ...patch });
 const flat = (text: string) => text.replace(/ /g, ' ');
+// A house worth 20.000 already, a price of 200.000 and a mortgage of 190.000: 10.000 beyond what is left to pay.
+const excessContext = makeContext({ assets: [ACCOUNT, asset({ id: 'deposit-house', name: 'Casa Airone', type: 'realestate', assetClass: 'realestate', quantity: 20000 })] });
+const excessRogito: Partial<RealEstateOperationAnswers> = {
+  event: 'rogito',
+  propertyId: 'deposit-house',
+  price: 200000,
+  hasMortgage: true,
+  accountId: 'acc',
+  mortgage: { principal: 190000, ratePct: 3, years: 25, firstInstalmentIso: '2026-07-27', instalmentOverride: null },
+  costCenter: { mode: 'none', name: '', existingId: '' },
+};
 const names: PlanNames = { assetName: (id) => ({ acc: 'Conto Fenicottero', house: 'Casa Gabbiano', loan: 'Mutuo Gabbiano' })[id] ?? id, propertyName: 'Casa Gabbiano', costCenterName: 'Vendita' };
 
 describe('describeScreenBlock', () => {
@@ -40,11 +53,13 @@ describe('describeScreenBlock', () => {
     expect(flat(describeScreenBlock('caparra', answersWith({ kind: 'sale', propertyId: 'house', depositAmount: 140000 }), context) ?? '')).toBe('La caparra supera il valore della casa (130.000,00 €).');
   });
 
-  it('should refuse a mortgage over what is left to pay, and a term over thirty years', () => {
+  it('should refuse a mortgage above the price, and a term over thirty years', () => {
     const rogito = { event: 'rogito' as const, propertyName: 'Casa Nuova', price: 100000, hasMortgage: true };
     expect(flat(describeScreenBlock('mutuo', answersWith({ ...rogito, mortgage: { principal: 120000, ratePct: 3, years: 20, firstInstalmentIso: '2026-07-15', instalmentOverride: null } }), context) ?? '')).toBe(
-      'Il mutuo supera quanto resta da pagare della casa (100.000,00 €).'
+      'Il mutuo supera il prezzo della casa (100.000,00 €).'
     );
+    // 190.000 on a price of 200.000 with 20.000 already in the house: beyond the residual, below the price.
+    expect(describeScreenBlock('mutuo', answersWith({ ...excessRogito }), excessContext)).toBeNull();
     expect(describeScreenBlock('mutuo', answersWith({ ...rogito, mortgage: { principal: 80000, ratePct: 3, years: 31, firstInstalmentIso: '2026-07-15', instalmentOverride: null } }), context)).toBe('Scrivi la durata in anni, al massimo 30.');
   });
 
@@ -69,12 +84,40 @@ describe('the sentences', () => {
   });
 
   it('should say the balance of a purchase and of a sale', () => {
-    expect(flat(describeBalance(answersWith({ event: 'rogito', propertyId: 'house', price: 280000, hasMortgage: true, mortgage: { principal: 100000, ratePct: 3, years: 25, firstInstalmentIso: '2026-07-27', instalmentOverride: null } }), context))).toBe(
+    expect(flat(describeBalance(answersWith({ event: 'rogito', propertyId: 'house', price: 280000, hasMortgage: true, mortgage: { principal: 100000, ratePct: 3, years: 25, firstInstalmentIso: '2026-07-27', instalmentOverride: null } }), context, 'Conto Fenicottero'))).toBe(
       'Dal conto escono 50.000,00 €: il prezzo meno 130.000,00 € già nella casa e 100.000,00 € di mutuo.'
     );
-    expect(flat(describeBalance(answersWith({ kind: 'sale', event: 'rogito', propertyId: 'house', price: 150000, depositsReceived: 15000 }), context))).toBe(
+    expect(flat(describeBalance(answersWith({ kind: 'sale', event: 'rogito', propertyId: 'house', price: 150000, depositsReceived: 15000 }), context, 'Conto Fenicottero'))).toBe(
       'Sul conto entrano 135.000,00 €: il prezzo meno le caparre già ricevute.'
     );
+  });
+
+  it('should say that nothing leaves the account and where the excess lands', () => {
+    expect(flat(describeBalance(answersWith(excessRogito), excessContext, 'Conto Fenicottero'))).toBe(
+      'Dal conto non esce nulla: il mutuo copre quanto resta del prezzo e avanzano 10.000,00 €, che la banca accredita su Conto Fenicottero.'
+    );
+  });
+
+  it('should ask where the excess lands, and keep today\'s questions otherwise', () => {
+    const purchase = answersWith(excessRogito);
+    expect(screenCopy('saldo', purchase, 10000).question).toBe('Su quale conto la banca accredita quanto avanza del mutuo?');
+    expect(screenCopy('saldo', purchase, 10000).help).toBe('Il mutuo supera quanto resta del prezzo: la banca versa al venditore il resto e accredita su questo conto quello che avanza.');
+    expect(screenCopy('saldo', purchase, 0).question).toBe('Da quale conto paghi il resto del prezzo?');
+    expect(screenCopy('saldo', purchase).question).toBe('Da quale conto paghi il resto del prezzo?');
+    expect(screenCopy('saldo', answersWith({ kind: 'sale', event: 'rogito' }), 10000).question).toBe('Su quale conto ricevi il resto del prezzo?');
+  });
+
+  it('should name the first refusal among the run\'s screens', () => {
+    const screens = ['saldo', 'mutuo', 'riepilogo'] as const;
+    const tooMuch = { ...excessRogito, mortgage: { ...excessRogito.mortgage!, principal: 210000 } };
+    expect(flat(firstScreenRefusal(screens, answersWith(tooMuch), excessContext) ?? '')).toBe('Il mutuo supera il prezzo della casa (200.000,00 €).');
+    expect(firstScreenRefusal(screens, answersWith(excessRogito), excessContext)).toBeNull();
+  });
+
+  it('should say the disbursement of a mortgage beyond the residual in the summary', () => {
+    const steps = buildRealEstatePlan(answersWith(excessRogito), excessContext).steps;
+    const line = flat(describePlanStep(steps.find((step) => step.kind === 'disburseMortgage')!, { ...names, propertyName: 'Casa Airone' }));
+    expect(line).toBe('Il mutuo paga al venditore 180.000,00 €, che diventano valore di Casa Airone; i 10.000,00 € che avanzano entrano su Conto Fenicottero. Nessuna entrata: è debito, non reddito.');
   });
 
   it('should say the revaluation up and down', () => {

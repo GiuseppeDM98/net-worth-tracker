@@ -59,6 +59,7 @@ import { Info, Pencil, Plus, Trash2, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Asset } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
+import { COSTUME_FRAME_RADIUS_CLASS, COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface AssetMovementsDialogProps {
   open: boolean;
@@ -135,9 +136,10 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
     [sortedAsc, vitals],
   );
 
-  const performDelete = async (transactionId: string) => {
+  // The row's version travels with the delete: a trade changed or deleted since is refused.
+  const performDelete = async (transaction: AssetTransaction) => {
     try {
-      await deleteMutation.mutateAsync(transactionId);
+      await deleteMutation.mutateAsync({ transactionId: transaction.id, expectedUpdatedAt: transaction.updatedAt });
       toast.success('Operazione eliminata');
     } catch (error) {
       toast.error(describeWriteError(error));
@@ -174,7 +176,7 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
         <div className="space-y-4">
           {/* Vitals — a sub-tile on the muted surface, never a card inside a card. */}
           {vitals && (
-            <div className="grid grid-cols-1 gap-3 rounded-xl bg-muted p-3.5 sm:grid-cols-3">
+            <div className={cn('grid grid-cols-1 gap-3 bg-muted p-3.5 sm:grid-cols-3', COSTUME_FRAME_RADIUS_CLASS)}>
               <Vital
                 label="P&L realizzato"
                 value={formatSignedEur(vitals.realizedPnlEur)}
@@ -228,7 +230,7 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
               ))}
             </div>
           ) : sortedDesc.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
+            <div className={cn('flex flex-col items-center justify-center gap-3 border border-dashed border-border py-10 text-center', COSTUME_FRAME_RADIUS_CLASS)}>
               <ScrollText className="h-8 w-8 text-muted-foreground opacity-40" aria-hidden="true" />
               <p className="max-w-[280px] text-sm text-muted-foreground">
                 Nessuna operazione registrata. Registra il primo acquisto per aprire la posizione.
@@ -262,13 +264,13 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
                       effect={effectsById[transaction.id]}
                       isDemo={isDemo}
                       onEdit={() => openEditTrade(transaction)}
-                      onDelete={() => void performDelete(transaction.id)}
+                      onDelete={() => void performDelete(transaction)}
                     />
                   ))}
                 </tbody>
               </table>
 
-              <div className="divide-y divide-border rounded-xl border border-border sm:hidden">
+              <div className={cn('divide-y divide-border border border-border sm:hidden', COSTUME_FRAME_RADIUS_CLASS)}>
                 {sortedDesc.map((transaction) => (
                   <MovementRow
                     key={transaction.id}
@@ -277,7 +279,7 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
                     effect={effectsById[transaction.id]}
                     isDemo={isDemo}
                     onEdit={() => openEditTrade(transaction)}
-                    onDelete={() => void performDelete(transaction.id)}
+                    onDelete={() => void performDelete(transaction)}
                   />
                 ))}
               </div>
@@ -488,7 +490,7 @@ function MovementRow({ transaction, currency, effect, isDemo, onEdit, onDelete }
 function TypeChip({ type, isBaseline }: { type: AssetTransaction['type']; isBaseline: boolean }) {
   if (isBaseline) {
     return (
-      <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+      <span className={cn('inline-flex items-center border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground', COSTUME_PILL_RADIUS_CLASS)}>
         Posizione iniziale
       </span>
     );
@@ -500,7 +502,7 @@ function TypeChip({ type, isBaseline }: { type: AssetTransaction['type']; isBase
   };
   const { label, className } = config[type];
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', className)}>
+    <span className={cn('inline-flex items-center px-2 py-0.5 text-[11px] font-medium', COSTUME_PILL_RADIUS_CLASS, className)}>
       {label}
     </span>
   );

@@ -22,6 +22,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { QuestionCard } from '@/components/ui/question-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
 import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, type AllocationAdviceInterview } from '@/types/allocationAdvice';
@@ -30,11 +31,11 @@ import { INTERVIEW_COPY } from '@/lib/utils/allocationAdviceNarrative';
 import { cardEnterVariants } from '@/lib/utils/motionVariants';
 import { answerOf, type QuestionAnswerValue } from '@/lib/utils/questionSet';
 import { cn } from '@/lib/utils';
+import { PATH_BUTTON_CLASS, PATH_HEADLINE_CLASS } from '@/components/ui/path-card';
 import type { ConsulenteInterviewState } from './useConsulenteInterview';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
-const HEADLINE_CLASS = 'text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]';
-const BUTTON_CLASS = 'h-11 desktop:h-9';
-const PRIMARY_CLASS = cn(BUTTON_CLASS, 'border border-transparent', AI_CONTROL_ACCENT_CLASS);
+const PRIMARY_CLASS = cn(PATH_BUTTON_CLASS, 'border border-transparent', AI_CONTROL_ACCENT_CLASS);
 
 /** The wait for a round: two question-shaped blocks, `aria-busy`, ONE status line (the skeletons are `aria-hidden`). */
 export function InterviewSkeleton({ className }: { className?: string }) {
@@ -44,7 +45,7 @@ export function InterviewSkeleton({ className }: { className?: string }) {
         {INTERVIEW_COPY.asking}
       </p>
       {[0, 1].map((index) => (
-        <div key={index} className="rounded-xl border border-border p-4 desktop:p-5">
+        <div key={index} className={cn('border border-border p-4 desktop:p-5', COSTUME_FRAME_RADIUS_CLASS)}>
           <Skeleton className="h-2.5 w-32" />
           <Skeleton className="mt-3 h-5 w-3/4" />
           <Skeleton className="mt-2 h-3.5 w-1/2" />
@@ -91,9 +92,11 @@ export function ConsulenteInterviewScene({ interview, round, configured, headlin
 
   return (
     <>
-      <h2 className={TILE_EYEBROW_CLASS}>{INTERVIEW_COPY.eyebrow(roundNumber, ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS)}</h2>
-      <p ref={headlineRef} tabIndex={-1} className={cn(HEADLINE_CLASS, 'mt-3 outline-none')}>
-        {headline}
+      <h2 className={TILE_EYEBROW_CLASS}>
+        <HeadingText text={INTERVIEW_COPY.eyebrow(roundNumber, ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS)} />
+      </h2>
+      <p ref={headlineRef} tabIndex={-1} className={cn(PATH_HEADLINE_CLASS, 'mt-3 outline-none')}>
+        <HeadingText text={headline} />
       </p>
       <div className="mt-5">
         {asking ? (
@@ -110,7 +113,7 @@ export function ConsulenteInterviewScene({ interview, round, configured, headlin
       </div>
 
       <div className="mt-6 flex flex-col-reverse gap-2 border-t border-border pt-4 tablet:flex-row tablet:items-center tablet:justify-between">
-        <Button type="button" variant="outline" className={BUTTON_CLASS} onClick={onBack} disabled={asking}>
+        <Button type="button" variant="outline" className={PATH_BUTTON_CLASS} onClick={onBack} disabled={asking}>
           {INTERVIEW_COPY.back}
         </Button>
         <div className="flex flex-col gap-2 tablet:items-end">
@@ -118,7 +121,7 @@ export function ConsulenteInterviewScene({ interview, round, configured, headlin
             {status ?? ''}
           </p>
           <div className="flex flex-col-reverse gap-2 tablet:flex-row tablet:items-center">
-            <Button type="button" variant="outline" className={BUTTON_CLASS} onClick={onSkip} disabled={!configured}>
+            <Button type="button" variant="outline" className={PATH_BUTTON_CLASS} onClick={onSkip} disabled={!configured}>
               {INTERVIEW_COPY.skip}
             </Button>
             <Button type="button" className={PRIMARY_CLASS} onClick={primary.onClick} disabled={primary.disabled}>

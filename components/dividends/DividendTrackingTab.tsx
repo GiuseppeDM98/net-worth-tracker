@@ -34,8 +34,8 @@
  * read the REGISTRY — every payment of the period, sold instruments included, because the
  * income was real. Affidabilità and Chi paga di più answer in the present tense («posso
  * contare su questo reddito?»), so they measure the instruments STILL HELD (`heldAssetIds`,
- * from the page's assets) and name what the sold ones paid in their own clause: on the
- * owner's mirror «Concentrazione alta: SPM.MI vale il 47%» was a risk on a stock already sold.
+ * from the page's assets) and name what the sold ones paid in their own clause: a
+ * «Concentrazione alta: ABC.MI vale il 50%» on a stock already sold was a risk nobody carries.
  *
  * WHY IN-MEMORY: the tab already receives the full dividend list as a prop, so every period
  * view is derived without a refetch and switching period is instant. The server block is one
@@ -94,6 +94,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { isPendingProvisionalCoupon } from '@/lib/utils/couponUtils';
 import { cn } from '@/lib/utils';
 import { dividendTypeLabels } from '@/lib/constants/dividendTypes';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
@@ -107,6 +108,7 @@ import {
   computeReliability,
   monthsInWindow,
   nextPayments,
+  payerRingSegments,
   rankPayerShares,
   resolveMonthlyWindow,
   resolvePeriodBounds,
@@ -266,6 +268,7 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
     () => rankPayerShares(dividends, period, now, RANKED_PAYERS, heldAssetIds),
     [dividends, period, now, heldAssetIds],
   );
+  const payerRing = useMemo(() => payerRingSegments(ranking), [ranking]);
   const yearly = useMemo(() => summarizeYearlyIncome(dividends, now), [dividends, now]);
   const monthly = useMemo(() => resolveMonthlyWindow(dividends, period, now, FLOW_MONTHS), [dividends, period, now]);
   const coverage = useMemo(() => buildCoverageMonths(dividends, period, now), [dividends, period, now]);
@@ -355,11 +358,11 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
 
   const inventory = useMemo(() => summarizePayments(listDividends, now), [listDividends, now]);
 
-  // Future inflation-linked coupons still at the provisional fixed floor.
+  // Inflation-linked coupons still at the provisional fixed floor, due today or later (Italian day).
   const provisionalCoupons = useMemo(
     () =>
       dividends
-        .filter((d) => d.isProvisional && toDate(d.paymentDate) > now)
+        .filter((d) => isPendingProvisionalCoupon(d, now))
         .sort((a, b) => toDate(a.paymentDate).getTime() - toDate(b.paymentDate).getTime()),
     [dividends, now],
   );
@@ -799,6 +802,7 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
             <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(DIVIDEND_SECTION_IDS.pagatori), 'desktop:col-span-4')}>
               <PagatoriTile
                 ranking={ranking}
+                ring={payerRing}
                 reading={describePayerRanking(ranking, subject.inPeriod)}
                 footer={describePayersFooter(upcomingNet)}
                 emptyCopy={`Nessun dividendo incassato ${subject.inPeriod}.`}

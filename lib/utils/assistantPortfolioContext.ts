@@ -42,6 +42,7 @@ import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { describeAssetOwnerLabel } from '@/lib/utils/assetOwnership';
 import { getItalyDateIso, toDate } from '@/lib/utils/dateHelpers';
+import { valueEffectMonth } from '@/lib/utils/pensionReturn';
 import { instrumentTicker, isQuotedInstrument } from '@/lib/utils/exposureRequests';
 import { sliceFraction } from '@/lib/utils/assetSlice';
 import { goalAssetValue, isGoalAsset } from '@/lib/utils/goalAssetValue';
@@ -75,17 +76,19 @@ export interface AssistantHoldingRow {
   currency: string;
   /** EUR, negative on a loan. */
   valueEur: number;
-  /** The fiscal PMC per unit in EUR, fees included; absent where there is no PMC to read. */
+  /** The PMC per unit in EUR, no fee (2026-11-12); absent where there is no PMC to read. */
   costPerUnitEur?: number;
   /** quantity × costPerUnitEur; absent with it. */
   costBasisEur?: number;
   gainEur?: number;
   gainPct?: number;
-  /** «di Marcella», «Giuseppe 273 quote, 692 in comune», null when the whole asset is in comune. */
+  /** «di Elena», «Paolo 273 quote, 692 in comune», null when the whole asset is in comune. */
   owner: string | null;
   isLiquid: boolean;
   /** A bond's redemption date (`bondDetails.maturityDate`) as an ISO day; only on a `bond` with its details (2026-11-08). */
   maturityIso?: string;
+  /** Created empty for a plan and never bought (`Asset.createdEmpty`, no ledger row, quantity 0): the prompt prints «0 quote, mai comprato» (2026-11-12). */
+  neverBought?: true;
   /** The property a loan finances, by name; only on a loan. */
   financedAssetName?: string;
   /**
@@ -152,6 +155,8 @@ export interface AssistantLedgerRow {
   quantity: number;
   priceEur: number;
   feesEur: number;
+  /** The fee has its spending row in Cashflow (2026-11-12): it is already among the expenses. */
+  feeIsSpendingRow: boolean;
   /** quantity × priceEur (fees aside). */
   amountEur: number;
   isBaseline: boolean;
@@ -181,6 +186,18 @@ export interface AssistantCouponFact {
   nextCouponPerUnitEur: number | null;
 }
 
+/**
+ * The contributions that moved a fund's value IN the period: by the month they were recorded
+ * (`valueEffectMonth`, the rule of Previdenza and of the Panoramica's «versati nel fondo pensione»),
+ * not their month of competence — September's contributions recorded on 13 October move October.
+ */
+export interface AssistantPensionPaidIn {
+  /** The period in words, as the prompt prints it («ottobre 2026», «il 2026»). */
+  label: string;
+  total: number;
+  rows: { source: PensionContribution['source']; amount: number; dateIso: string; recordedIso: string | null }[];
+}
+
 export interface AssistantPensionFund {
   assetId: string;
   name: string;
@@ -188,6 +205,15 @@ export interface AssistantPensionFund {
   memberName: string | null;
   role: AssistantHoldingRole;
   byYear: { taxYear: number; tfr: number; voluntary: number; employer: number; total: number }[];
+  /** Null when the context has no period (a free question on today's portfolio). */
+  paidInPeriod: AssistantPensionPaidIn | null;
+}
+
+/** The months a bundle covers, as `valueEffectMonth` keys: after `afterKey`, through `throughKey`. */
+export interface AssistantPortfolioPeriod {
+  afterKey: string;
+  throughKey: string;
+  label: string;
 }
 
 export interface AssistantLoanRow {
@@ -246,6 +272,8 @@ export interface BuildPortfolioContextInput {
   ownerAge: number | null;
   assetValueOf: (asset: Asset) => number;
   now: Date;
+  /** The bundle's period, for the pension contributions that moved a fund in it; absent or null without one. */
+  period?: AssistantPortfolioPeriod | null;
 }
 
 const TRANSACTION_TYPE_LABELS: Record<AssistantLedgerRow['type'], string> = {
@@ -293,21 +321,24 @@ function buildHoldingRows(
   assets: Asset[],
   valueOf: (asset: Asset) => number,
   memberNames: ReadonlyMap<string, string>,
-  goalAssignments: readonly GoalAssetAssignment[] | null
+  goalAssignments: readonly GoalAssetAssignment[] | null,
+  tradedAssetIds: ReadonlySet<string>
 ): AssistantHoldingRow[] {
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
   const rows: AssistantHoldingRow[] = [];
 
   for (const asset of assets) {
-    // A sold-out position is history, not a holding; a repaid loan likewise.
-    if (!(asset.quantity > 0) && !isLoanAsset(asset)) continue;
+    // A sold-out position is history, not a holding; a repaid loan likewise. An instrument created
+    // empty for a plan and never bought stays: the reader may name it, and a proposal may (2026-11-12).
+    const neverBought = asset.createdEmpty === true && !(asset.quantity > 0) && !tradedAssetIds.has(asset.id);
+    if (!(asset.quantity > 0) && !isLoanAsset(asset) && !neverBought) continue;
     if (isLoanAsset(asset) && !(asset.quantity > 0)) continue;
 
     const valueEur = valueOf(asset);
     // The G/P reads only where Patrimonio reads one: a quoted instrument with a EUR PMC. An
     // account, a hand-valued holding or a pension fund has no PMC to measure against.
     const measurable =
-      !isLoanAsset(asset) && asset.type !== 'pensionFund' && asset.type !== 'cash' && hasMarketPrice(asset.type, asset.subCategory);
+      !neverBought && !isLoanAsset(asset) && asset.type !== 'pensionFund' && asset.type !== 'cash' && hasMarketPrice(asset.type, asset.subCategory);
     const costPerUnitEur = measurable ? costBasisPerUnitEur(asset) : undefined;
     const costBasisEur = costPerUnitEur !== undefined ? asset.quantity * costPerUnitEur : undefined;
     const gainEur = costBasisEur !== undefined ? valueEur - costBasisEur : undefined;
@@ -338,6 +369,7 @@ function buildHoldingRows(
       owner: describeAssetOwnerLabel(asset, assets, memberNames),
       isLiquid: asset.isLiquid !== false,
       ...(financed ? { financedAssetName: financed.name.trim() } : {}),
+      ...(neverBought ? { neverBought: true as const } : {}),
       ...(assignedFraction !== null ? { goalAssignedPct: assignedFraction * 100, goalFreeEur: goalValueEur * (1 - assignedFraction), goalValueEur } : {}),
     });
   }
@@ -495,6 +527,7 @@ function buildLedger(transactions: AssetTransaction[], assets: Asset[]): Assista
       quantity: transaction.quantity,
       priceEur: transaction.priceEur,
       feesEur: transaction.fees ?? 0,
+      feeIsSpendingRow: !!transaction.feeExpenseId,
       amountEur: transaction.quantity * transaction.priceEur,
       isBaseline: transaction.isBaseline === true,
     };
@@ -560,11 +593,29 @@ function buildDividendContext(dividends: Dividend[], assets: Asset[], now: Date)
 
 // ─── Pension, loans, family ───────────────────────────────────────────────────
 
+function buildPaidInPeriod(contributions: PensionContribution[], assetId: string, period: AssistantPortfolioPeriod): AssistantPensionPaidIn {
+  const inPeriod = contributions
+    .filter((contribution) => {
+      if (contribution.assetId !== assetId) return false;
+      const key = valueEffectMonth(contribution);
+      return key > period.afterKey && key <= period.throughKey;
+    })
+    .map((contribution) => ({
+      source: contribution.source,
+      amount: contribution.amount,
+      dateIso: getItalyDateIso(toDate(contribution.date)),
+      recordedIso: contribution.createdAt ? getItalyDateIso(toDate(contribution.createdAt)) : null,
+    }))
+    .sort((a, b) => a.dateIso.localeCompare(b.dateIso) || (a.recordedIso ?? '').localeCompare(b.recordedIso ?? ''));
+  return { label: period.label, total: inPeriod.reduce((sum, row) => sum + row.amount, 0), rows: inPeriod };
+}
+
 function buildPensionContext(
   assets: Asset[],
   contributions: PensionContribution[],
   memberNames: ReadonlyMap<string, string>,
-  valueOf: (asset: Asset) => number
+  valueOf: (asset: Asset) => number,
+  period: AssistantPortfolioPeriod | null
 ): AssistantPensionFund[] {
   const funds: AssistantPensionFund[] = [];
   for (const asset of assets) {
@@ -586,6 +637,7 @@ function buildPensionContext(
       byYear: [...years.entries()]
         .map(([taxYear, split]) => ({ taxYear, ...split, total: split.tfr + split.voluntary + split.employer }))
         .sort((a, b) => a.taxYear - b.taxYear),
+      paidInPeriod: period ? buildPaidInPeriod(contributions, asset.id, period) : null,
     });
   }
   return funds.sort((a, b) => b.valueEur - a.valueEur);
@@ -645,7 +697,8 @@ function buildGoalCoverage(holdings: readonly AssistantHoldingRow[]): AssistantG
 export function buildAssistantPortfolioContext(input: BuildPortfolioContextInput): AssistantPortfolioContext {
   const { assets, transactions, dividends, pensionContributions, expenses, targets, goalAssignments, familyMembers, ownerAge, assetValueOf: valueOf, now } = input;
   const memberNames = new Map(familyMembers.map((member) => [member.id, member.name]));
-  const holdings = buildHoldingRows(assets, valueOf, memberNames, goalAssignments);
+  const tradedAssetIds = new Set(transactions.map((transaction) => transaction.assetId));
+  const holdings = buildHoldingRows(assets, valueOf, memberNames, goalAssignments, tradedAssetIds);
 
   return {
     holdings,
@@ -653,7 +706,7 @@ export function buildAssistantPortfolioContext(input: BuildPortfolioContextInput
     allocation: buildAllocationContext(assets, targets, valueOf),
     ledger: buildLedger(transactions, assets),
     dividends: buildDividendContext(dividends, assets, now),
-    pension: buildPensionContext(assets, pensionContributions, memberNames, valueOf),
+    pension: buildPensionContext(assets, pensionContributions, memberNames, valueOf, input.period ?? null),
     loans: buildLoanContext(assets, expenses),
     family: {
       ownerAge,

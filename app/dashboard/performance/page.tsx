@@ -154,6 +154,7 @@ import { PlusvalenzeTile } from '@/components/performance/tiles/PlusvalenzeTile'
 import { AttribuzioneTile } from '@/components/performance/tiles/AttribuzioneTile';
 import { CapitaleMercatoTile } from '@/components/performance/tiles/CapitaleMercatoTile';
 import { PerformanceDettaglio } from '@/components/performance/PerformanceDettaglio';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // Lazy-load AIAnalysisDialog to keep react-markdown and remark-gfm (~60KB gzipped)
 // out of the initial Performance page bundle — loaded only on first "Analizza con AI" click.
@@ -695,6 +696,7 @@ export default function PerformancePage() {
 
   const header = (
     <PageHeader
+      emblem="rendimenti"
       label="Analisi"
       title="Rendimenti"
       description={describeHeaderWindow(metrics)}
@@ -767,7 +769,7 @@ export default function PerformancePage() {
     return (
       <PageContainer>
         {header}
-        <TileGridSkeleton cells={SKELETON_CELLS} toolbar={<Skeleton className="h-9 w-72 rounded-full" />} />
+        <TileGridSkeleton cells={SKELETON_CELLS} toolbar={<Skeleton className={cn('h-9 w-72', COSTUME_PILL_RADIUS_CLASS)} />} />
       </PageContainer>
     );
   }

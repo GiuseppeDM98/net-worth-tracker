@@ -28,7 +28,7 @@ interface TileGridSkeletonProps {
 
 function SkeletonTile({ lines }: { lines: number }) {
   return (
-    <div className="flex-1 rounded-2xl border border-border bg-card p-5">
+    <div data-tile="" className="flex-1 rounded-2xl border border-border bg-card p-5">
       <Skeleton className="mb-3 h-2.5 w-24" />
       <Skeleton className="mb-4 h-[13px] w-4/5" />
       <div className="space-y-2">

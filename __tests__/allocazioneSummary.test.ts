@@ -18,6 +18,8 @@ import {
   buildPlanView,
   collapseRepeatedLevels,
   estimatePlanSaleTax,
+  findPacSubstitutions,
+  listPlanBuyAssetIds,
   isDormantClass,
   largestGapByValue,
   offTargetGaps,
@@ -94,7 +96,7 @@ describe('summarizeClassGaps', () => {
 });
 
 describe('isDormantClass / activeClassGaps', () => {
-  // The owner's real estate: the house is `excluded`, so the class holds nothing inside the
+  // A real-estate class whose only house is `excluded`: the class holds nothing inside the
   // allocated total, and its target entry is 0% — it cannot be off target, so «OK» would be a
   // verdict on a void and it must not inflate the «N classi su M» denominator.
   const dormant = data({ currentValue: 0, targetPercentage: 0 });
@@ -279,18 +281,18 @@ describe('collapseRepeatedLevels', () => {
   });
 
   it('ignores children below the visible floor when counting them', () => {
-    const rows = collapseRepeatedLevels([node('Breve Termine', 3975, [node('CSBGE3', 3975), node('briciola', 0.2)])]);
-    expect(rows.map((row) => row.key)).toEqual(['CSBGE3']);
+    const rows = collapseRepeatedLevels([node('Breve Termine', 4000, [node('ABCD', 4000), node('briciola', 0.2)])]);
+    expect(rows.map((row) => row.key)).toEqual(['ABCD']);
   });
 
   it('carries the lifted node`s own kind, so a collapsed instrument stays an instrument', () => {
     // A row's caption follows `isInstrument`, not its depth: an ETF lifted out of the sub-category
     // that repeated it would otherwise print «→ 100,0%» — «you keep everything» — instead of the
     // position it leaves behind.
-    const instrument = { ...node('CSBGE3', 3975), isInstrument: true };
-    const [row] = collapseRepeatedLevels([node('Breve Termine', 3975, [instrument])]);
+    const instrument = { ...node('ABCD', 4000), isInstrument: true };
+    const [row] = collapseRepeatedLevels([node('Breve Termine', 4000, [instrument])]);
     expect(row.isInstrument).toBe(true);
-    const [sleeve] = collapseRepeatedLevels([node('Breve Termine', 3975, [node('senza strumenti', 3975)])]);
+    const [sleeve] = collapseRepeatedLevels([node('Breve Termine', 4000, [node('senza strumenti', 4000)])]);
     expect(sleeve.isInstrument).toBeUndefined();
   });
 });
@@ -851,5 +853,59 @@ describe('resolveAllocazioneSections', () => {
     expect(resolveAllocazioneSections({ hasRows: true, hasPension: false, exposureFailed: true }).find((section) => section.id === ALLOCAZIONE_SECTION_IDS.esposizione)?.failed).toBe(true);
     expect(resolveAllocazioneSections({ hasRows: true, hasPension: false, exposureFailed: false }).find((section) => section.id === ALLOCAZIONE_SECTION_IDS.esposizione)?.failed).toBe(false);
     expect(resolveAllocazioneSections({ hasRows: false, hasPension: true, exposureFailed: true })).toEqual([]);
+  });
+});
+
+// The Piano buys an instrument the open plan replaced with another member of its group.
+describe('listPlanBuyAssetIds / findPacSubstitutions', () => {
+  const instrument = (key: string, amount = 100): PlanNode => ({
+    key,
+    label: key,
+    amount,
+    currentValue: 0,
+    newValue: amount,
+    newPercentage: 100,
+    targetPercentage: 0,
+    children: [],
+    isInstrument: true,
+  });
+  const klass = (key: string, children: PlanNode[]): PlanNode => ({ ...instrument(key), isInstrument: false, children });
+  const holdings = [holding({ id: 'etf-c', assetId: 'etf-c' }), holding({ id: 'etf-e-0', assetId: 'etf-e' })];
+  const positions = [
+    { id: 'p1', label: 'Managed futures', targetPercentage: 20, memberAssetIds: ['etf-c', 'etf-d'], buyAssetId: 'etf-d' },
+    { id: 'p2', label: 'Mondo', targetPercentage: 80, memberAssetIds: ['etf-a'], buyAssetId: 'etf-a' },
+  ];
+
+  it('reads the instruments Versa buys, through classes, and maps a sleeve back to its asset', () => {
+    const view = { mode: 'contribute', amount: 200, nodes: [klass('trendFollowing', [instrument('etf-c')]), klass('equity', [instrument('etf-e-0')])], trades: null, overTarget: [] } as never;
+    expect(listPlanBuyAssetIds(view, holdings).sort()).toEqual(['etf-c', 'etf-e']);
+  });
+
+  it('reads only the COMPRA legs of a rebalance, and nothing from a withdrawal', () => {
+    const rebalance = {
+      mode: 'rebalance',
+      moves: [
+        { assetClass: 'trendFollowing', action: 'COMPRA', children: [instrument('etf-c')] },
+        { assetClass: 'equity', action: 'VENDI', children: [instrument('etf-e-0')] },
+      ],
+      trades: null,
+      resultingLeverageRatio: null,
+    } as never;
+    expect(listPlanBuyAssetIds(rebalance, holdings)).toEqual(['etf-c']);
+    expect(listPlanBuyAssetIds({ mode: 'withdraw', nodes: [klass('equity', [instrument('etf-e-0')])], trades: null } as never, holdings)).toEqual([]);
+  });
+
+  it('uses the leverage engine\'s positive trades when it ran', () => {
+    const view = { mode: 'contribute', amount: 100, nodes: [], trades: [{ assetId: 'etf-c', ticker: 'ETF-C', name: 'x', amount: 50 }, { assetId: 'etf-a', ticker: 'ETF-A', name: 'y', amount: 0 }], overTarget: [] } as never;
+    expect(listPlanBuyAssetIds(view, holdings)).toEqual(['etf-c']);
+  });
+
+  it('flags a group member that the Piano buys although the plan buys another one', () => {
+    expect(findPacSubstitutions(positions, ['etf-c'])).toEqual([{ replacedAssetId: 'etf-c', buyAssetId: 'etf-d' }]);
+  });
+
+  it('says nothing when the Piano buys the plan\'s own buyer, a single instrument or nothing', () => {
+    expect(findPacSubstitutions(positions, ['etf-d', 'etf-a'])).toEqual([]);
+    expect(findPacSubstitutions(positions, [])).toEqual([]);
   });
 });

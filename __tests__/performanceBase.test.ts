@@ -333,7 +333,7 @@ function monthSnapshot(year: number, month: number, parts: { fund?: number; etf:
 }
 
 describe('resolvePerformanceExclusions — the pension toggle wins over the allocation role', () => {
-  // On the real account every fund carried allocationRole 'excluded' (two through the legacy flag),
+  // On a lived account every fund carried allocationRole 'excluded' (some through the legacy flag),
   // and the OR of the two exclusions made «Includi i fondi pensione» a no-op.
   const assets = [
     makeAsset({ id: 'fund-1', type: 'pensionFund', allocationRole: 'excluded' }),

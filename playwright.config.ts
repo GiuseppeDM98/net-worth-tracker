@@ -22,6 +22,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 const BASE_URL = 'http://localhost:3100';
 
+/** Set by `npm run test:e2e` (the whole run): serve the production build instead of `next dev`. */
+export const E2E_ON_BUILD = process.env.E2E_SERVER === 'build';
+
 /** Where auth.setup.ts parks the signed-in storage state so specs don't each log in. */
 export const STORAGE_STATE = 'e2e/.auth/user.json';
 
@@ -75,6 +78,9 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
+    // Kept (2026-11-16): switched off, two whole runs gained nothing past the run-to-run noise
+    // (doc/guide/e2e-suite.md § The suite's speed), and a red that only a whole run produces
+    // would leave no trace to read. `--trace=off` on the command line still turns it off for one run.
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -253,12 +259,27 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: 'npm run dev:e2e',
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-    stdout: 'ignore',
-    stderr: 'pipe',
-  },
+  // Two servers on the one port (2026-11-16, doc/guide/e2e-suite.md § The suite's speed):
+  // `npm run test:e2e`, the WHOLE run, builds first (`e2e:build`, skipped when the code has not
+  // changed) and serves that production build — about a third faster, and no route compiled on its
+  // first visit; `npx playwright test e2e/<area>` keeps `next dev`, which a code change needs no build for.
+  // The production server is never reused: one already on :3100 is either a `next dev` or a build of
+  // other code, and `--fresh` refuses a build older than the tree — a stale build runs green in silence.
+  webServer: E2E_ON_BUILD
+    ? {
+        command: `node scripts/perfServe.mjs --port=3100 --dist=.next-e2e-build --env-local --fresh`,
+        url: BASE_URL,
+        reuseExistingServer: false,
+        timeout: 60_000,
+        stdout: 'ignore',
+        stderr: 'pipe',
+      }
+    : {
+        command: 'npm run dev:e2e',
+        url: BASE_URL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 180_000,
+        stdout: 'ignore',
+        stderr: 'pipe',
+      },
 });

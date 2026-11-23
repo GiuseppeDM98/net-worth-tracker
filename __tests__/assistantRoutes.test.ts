@@ -53,6 +53,17 @@ const {
   fetchRegisterInputsMock: vi.fn(),
 }));
 
+// The router (2026-11) is never called for real: `mode: 'auto'` reads whatever the test hands it.
+const { routeAssistantMessageMock, createRouterClientMock } = vi.hoisted(() => ({
+  routeAssistantMessageMock: vi.fn(),
+  createRouterClientMock: vi.fn(() => ({ messages: {} })),
+}));
+
+vi.mock('@/lib/server/assistant/router', () => ({
+  routeAssistantMessage: routeAssistantMessageMock,
+  createRouterClient: createRouterClientMock,
+}));
+
 vi.mock('server-only', () => ({}));
 
 // Allow all requests — rate limiting is unit-tested separately in rateLimit.test.ts
@@ -130,6 +141,10 @@ import {
 import { POST as streamRoute } from '@/app/api/ai/assistant/stream/route';
 import { GET as getContextRoute } from '@/app/api/ai/assistant/context/route';
 import { emptyAssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
+import { checkRateLimit } from '@/lib/server/rateLimit';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { FALLBACK_ROUTE } from '@/lib/utils/assistantRoute';
+import type { AssistantRoute, AssistantRouteReading, AssistantStreamEvent } from '@/types/assistant';
 
 function createJsonRequest(
   url: string,
@@ -986,5 +1001,248 @@ describe('Assistant private API routes', () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'La modalità Registra non ha un contesto di periodo' });
     expect(buildAssistantMonthContextMock).not.toHaveBeenCalled();
+  });
+
+  // ── mode 'auto': the router in front of today's pipeline (2026-11) ───────────────────────
+  //
+  // Seen RED on purpose, one mutation at a time: `route` enqueued after the text (R7); the previous
+  // user message read with `findLast` on every user message (R7); `chatContext` dropped from
+  // `routeToSelection` (R7b); the month context built on a fallback (R7c); the router called for an
+  // explicit mode (R8); `source` always 'override' (R8b); `|| policy` removed and `preferences`
+  // passed untouched (R10); the router's outcome stored whole, `elapsedMs` included (R11); the
+  // router and the date check moved above `assertCanAccessAccount` (R13).
+
+  describe("POST /api/ai/assistant/stream — mode 'auto'", () => {
+    const now = getItalyMonthYear(new Date());
+    const lastMonth = now.month === 1 ? { year: now.year - 1, month: 12 } : { year: now.year, month: now.month - 1 };
+    const nextMonth = now.month === 12 ? { year: now.year + 1, month: 1 } : { year: now.year, month: now.month + 1 };
+    const LAST_MONTH_ROUTE: AssistantRoute = {
+      intent: 'month_analysis', period: { kind: 'month', ...lastMonth }, webSearch: false, confidence: 0.9,
+    };
+
+    function streamRequest(body: Record<string, unknown>) {
+      return streamRoute(
+        createJsonRequest('http://localhost/api/ai/assistant/stream', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid-token' },
+          body: { userId: 'user-1', prompt: 'Com’è andato il mese scorso? ornitorinco', ...body },
+        })
+      );
+    }
+
+    function readEvents(streamText: string): AssistantStreamEvent[] {
+      return streamText.split('\n\n').filter(Boolean).map((chunk) => JSON.parse(chunk.replace(/^data: /, '')));
+    }
+
+    function routerAnswers(route: AssistantRoute, extra: Partial<AssistantRouteReading> = {}) {
+      routeAssistantMessageMock.mockResolvedValue({ route, source: 'router', ...extra, elapsedMs: 12 });
+    }
+
+    function streamArgs() {
+      return streamAssistantResponseMock.mock.calls[0][0] as Parameters<typeof streamAssistantResponse>[0];
+    }
+
+    beforeEach(() => {
+      routerAnswers(LAST_MONTH_ROUTE);
+    });
+
+    it('R7: calls the router once, emits route right after meta, builds the reading\'s month and pins the thread on it', async () => {
+      const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+      const response = await streamRequest({ mode: 'auto' });
+      expect(response.status).toBe(200);
+      const events = readEvents(await response.text());
+
+      expect(routeAssistantMessageMock).toHaveBeenCalledTimes(1);
+      expect(createRouterClientMock).toHaveBeenCalledTimes(1);
+      // Before every status (the fake stream emits two), then the order of the other events: the
+      // filtered order alone does not name the status (seen red on 2026-11-16 with the route emitted
+      // from the first `onStatus`).
+      const types = events.map((event) => event.type);
+      expect(types.indexOf('route')).toBeLessThan(types.indexOf('status'));
+      expect(types.filter((type) => type !== 'status')).toEqual(['meta', 'route', 'context', 'text', 'done']);
+      expect(events[1]).toEqual({ type: 'route', reading: { route: LAST_MONTH_ROUTE, source: 'router' } });
+
+      expect(buildAssistantMonthContextMock).toHaveBeenCalledWith('user-1', lastMonth, false);
+      expect(createAssistantThreadMock).toHaveBeenCalledWith(expect.objectContaining({ mode: 'month_analysis', pinnedMonth: lastMonth }));
+      expect(appendAssistantMessageMock.mock.calls[0][1]).toMatchObject({ mode: 'month_analysis', monthContext: lastMonth });
+      expect(streamArgs()).toMatchObject({ mode: 'month_analysis', month: lastMonth });
+      expect(updateAssistantThreadMetadataMock).toHaveBeenCalledWith('thread-1', expect.objectContaining({ mode: 'month_analysis', pinnedMonth: lastMonth }));
+
+      const logged = info.mock.calls.find((call) => call[0] === '[assistant/stream] request');
+      expect(logged?.[1]).toMatchObject({ mode: 'month_analysis', routeSource: 'router', routeReason: null, routerMs: 12 });
+      expect(JSON.stringify(info.mock.calls)).not.toContain('ornitorinco');
+      info.mockRestore();
+    });
+
+    it('R7: hands the router today, and the previous turn — the last assistant message\'s reading with the user message before it', async () => {
+      const previous: AssistantRouteReading = { route: LAST_MONTH_ROUTE, source: 'router' };
+      getAssistantThreadDetailMock.mockResolvedValue({
+        thread: {},
+        messages: [
+          { id: 'm1', role: 'user', content: 'messaggio A' },
+          { id: 'm2', role: 'assistant', content: 'risposta', routeReading: previous },
+          // A failed stream leaves a user message with no answer after it.
+          { id: 'm3', role: 'user', content: 'messaggio B' },
+        ],
+      });
+      await (await streamRequest({ mode: 'auto', threadId: 'thread-1', prompt: '  e a settembre?  ' })).text();
+      const [input] = routeAssistantMessageMock.mock.calls[0];
+      expect(input).toEqual({
+        prompt: 'e a settembre?',
+        today: now,
+        todayIso: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        previous: { reading: previous, userMessage: 'messaggio A' },
+      });
+    });
+
+    it('R7: a history ending on an assistant message without a reading gives no previous turn', async () => {
+      getAssistantThreadDetailMock.mockResolvedValue({
+        thread: {},
+        messages: [
+          { id: 'm1', role: 'user', content: 'messaggio A' },
+          { id: 'm2', role: 'assistant', content: 'risposta', routeReading: { route: LAST_MONTH_ROUTE, source: 'router' } },
+          { id: 'm3', role: 'user', content: 'messaggio B' },
+          { id: 'm4', role: 'assistant', content: 'risposta di un modo esplicito' },
+        ],
+      });
+      await (await streamRequest({ mode: 'auto', threadId: 'thread-1' })).text();
+      expect(routeAssistantMessageMock.mock.calls[0][0].previous).toBeNull();
+    });
+
+    const BUILDERS = {
+      month: buildAssistantMonthContextMock,
+      year: buildAssistantYearContextMock,
+      ytd: buildAssistantYtdContextMock,
+      history: buildAssistantHistoryContextMock,
+      today: buildAssistantTodayContextMock,
+      register: fetchRegisterInputsMock,
+    };
+    const lastYear = now.year - 1;
+
+    it.each<[string, AssistantRoute['intent'], AssistantRoute['period'], keyof typeof BUILDERS, unknown[]]>([
+      ['month_analysis', 'month_analysis', { kind: 'month', ...lastMonth }, 'month', ['user-1', lastMonth, false]],
+      ['year_analysis', 'year_analysis', { kind: 'year', year: lastYear }, 'year', ['user-1', lastYear, false]],
+      ['ytd_analysis', 'ytd_analysis', { kind: 'ytd' }, 'ytd', ['user-1', false]],
+      ['history_analysis', 'history_analysis', { kind: 'history' }, 'history', ['user-1', 2025, false]],
+      ['register', 'register', { kind: 'none' }, 'register', ['user-1', expect.any(Date)]],
+      ['chat · none', 'chat', { kind: 'none' }, 'today', ['user-1']],
+      ['chat · month', 'chat', { kind: 'month', ...lastMonth }, 'month', ['user-1', lastMonth, false]],
+      ['chat · year', 'chat', { kind: 'year', year: lastYear }, 'year', ['user-1', lastYear, false]],
+      ['chat · ytd', 'chat', { kind: 'ytd' }, 'ytd', ['user-1', false]],
+      ['chat · history', 'chat', { kind: 'history' }, 'history', ['user-1', 2025, false]],
+    ])('R7b: a %s reading runs its builder and no other', async (_name, intent, period, builder, args) => {
+      routerAnswers({ intent, period, webSearch: false, confidence: 0.9 });
+      const response = await streamRequest({ mode: 'auto' });
+      expect(response.status).toBe(200);
+      await response.text();
+      for (const [name, mock] of Object.entries(BUILDERS)) {
+        if (name === builder) expect(mock, name).toHaveBeenCalledWith(...args);
+        else expect(mock, name).not.toHaveBeenCalled();
+      }
+    });
+
+    it('R7c: a fallback reading answers on today\'s portfolio, and the route event says why', async () => {
+      routeAssistantMessageMock.mockResolvedValue({ route: FALLBACK_ROUTE, source: 'fallback', reason: 'timeout', elapsedMs: 4000 });
+      const events = readEvents(await (await streamRequest({ mode: 'auto' })).text());
+      expect(buildAssistantTodayContextMock).toHaveBeenCalledWith('user-1');
+      expect(buildAssistantMonthContextMock).not.toHaveBeenCalled();
+      expect(events.find((event) => event.type === 'route')).toEqual({
+        type: 'route', reading: { route: FALLBACK_ROUTE, source: 'fallback', reason: 'timeout' },
+      });
+      expect(streamArgs()).toMatchObject({ mode: 'chat', contextBundle: null });
+    });
+
+    it('R8: an explicit mode never calls the router and emits no route event', async () => {
+      const streamText = await (await streamRequest({ mode: 'month_analysis', month: { year: 2026, month: 3 } })).text();
+      expect(routeAssistantMessageMock).not.toHaveBeenCalled();
+      expect(createRouterClientMock).not.toHaveBeenCalled();
+      expect(streamText).not.toContain('"type":"route"');
+      expect(appendAssistantMessageMock.mock.calls[1][1]).not.toHaveProperty('routeReading');
+    });
+
+    it.each([
+      [true, 'carried'],
+      [undefined, 'override'],
+    ])('R8b: an override with routeCarried=%s skips the router and reads source «%s», confidence 1', async (routeCarried, source) => {
+      const route = { intent: 'chat', period: { kind: 'none' }, webSearch: false };
+      const events = readEvents(await (await streamRequest({ mode: 'auto', route, ...(routeCarried ? { routeCarried } : {}) })).text());
+      expect(routeAssistantMessageMock).not.toHaveBeenCalled();
+      const expected = { route: { ...route, confidence: 1 }, source };
+      expect(events.find((event) => event.type === 'route')).toEqual({ type: 'route', reading: expected });
+      expect(appendAssistantMessageMock.mock.calls[1][1].routeReading).toEqual(expected);
+    });
+
+    it.each<[string, Record<string, unknown>, string | null]>([
+      ['routeCarried without route', { mode: 'auto', routeCarried: true }, null],
+      ['a route beside an explicit mode', { mode: 'chat', route: { intent: 'chat', period: { kind: 'none' }, webSearch: false } }, null],
+      ["'auto' with a month", { mode: 'auto', month: { year: 2026, month: 3 } }, null],
+      ['an analysis on a year', { mode: 'auto', route: { intent: 'month_analysis', period: { kind: 'year', year: 2025 }, webSearch: false } }, 'Lettura non valida.'],
+      ['a month after today', { mode: 'auto', route: { intent: 'chat', period: { kind: 'month', ...nextMonth }, webSearch: false } }, 'Lettura non valida.'],
+      ['Registra with the web', { mode: 'auto', route: { intent: 'register', period: { kind: 'none' }, webSearch: true } }, 'Lettura non valida.'],
+    ])('R9: %s is a 400, and nothing is read or called', async (_name, body, error) => {
+      const response = await streamRequest(body);
+      expect(response.status).toBe(400);
+      if (error) await expect(response.json()).resolves.toEqual({ error });
+      expect(routeAssistantMessageMock).not.toHaveBeenCalled();
+      expect(fetchCashflowBlockInputsMock).not.toHaveBeenCalled();
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
+    });
+
+    const MACRO_OFF = { includeMacroContext: false };
+    const MACRO_ON = { includeMacroContext: true };
+
+    it.each<[string, Record<string, unknown>, AssistantRoute | null, boolean, boolean | undefined]>([
+      ['a Registra override + «petrolio»', { mode: 'auto', prompt: 'benzina 60, il petrolio sale', route: { intent: 'register', period: { kind: 'none' }, webSearch: false } }, null, false, undefined],
+      ['a router chat without web + «inflazione»', { mode: 'auto', prompt: 'cosa fa l\'inflazione ai miei risparmi?' }, { intent: 'chat', period: { kind: 'none' }, webSearch: false, confidence: 0.9 }, true, undefined],
+      ['an override chat without web + «inflazione»', { mode: 'auto', prompt: 'cosa fa l\'inflazione ai miei risparmi?', route: { intent: 'chat', period: { kind: 'none' }, webSearch: false } }, null, false, undefined],
+      // A CARRIED reading is not an override: like the router's, it only adds to today's policy (owner,
+      // 2026-11-16; seen red with 'carried' taken as it is, like 'override').
+      ['a carried chat without web + «inflazione»', { mode: 'auto', prompt: 'cosa fa l\'inflazione ai miei risparmi?', route: { intent: 'chat', period: { kind: 'none' }, webSearch: false }, routeCarried: true }, null, true, undefined],
+      ['a carried analysis without web with «Contesto macro» on', { mode: 'auto', preferences: MACRO_ON, route: { intent: LAST_MONTH_ROUTE.intent, period: LAST_MONTH_ROUTE.period, webSearch: false }, routeCarried: true }, null, true, true],
+      ['a router analysis with «Contesto macro» on', { mode: 'auto', preferences: MACRO_ON }, LAST_MONTH_ROUTE, true, true],
+      ['a router analysis with the web and «Contesto macro» off', { mode: 'auto', preferences: MACRO_OFF }, { ...LAST_MONTH_ROUTE, webSearch: true }, true, true],
+      ['an explicit analysis with «Contesto macro» off', { mode: 'month_analysis', month: { year: 2026, month: 3 }, preferences: MACRO_OFF }, null, false, false],
+    ])('R10: %s', async (_name, body, routerRoute, web, macroSentence) => {
+      if (routerRoute) routerAnswers(routerRoute);
+      const events = readEvents(await (await streamRequest(body)).text());
+      expect(streamArgs().enableWebSearch).toBe(web);
+      if (macroSentence !== undefined) expect(streamArgs().preferences.includeMacroContext).toBe(macroSentence);
+      const routeEvent = events.find((event) => event.type === 'route');
+      // The route event's flag is the EFFECTIVE decision.
+      if (routeEvent && routeEvent.type === 'route') expect(routeEvent.reading.route.webSearch).toBe(web);
+    });
+
+    it('R11: the assistant message stores the route event\'s reading, without elapsedMs; the user message none', async () => {
+      const events = readEvents(await (await streamRequest({ mode: 'auto' })).text());
+      const routeEvent = events.find((event) => event.type === 'route');
+      expect(appendAssistantMessageMock.mock.calls[0][1]).not.toHaveProperty('routeReading');
+      const stored = appendAssistantMessageMock.mock.calls[1][1].routeReading;
+      expect(stored).toEqual(routeEvent && routeEvent.type === 'route' ? routeEvent.reading : undefined);
+      expect(stored).not.toHaveProperty('elapsedMs');
+    });
+
+    it('R13: a viewer without a grant is 403 before the router and before the date check', async () => {
+      const response = await streamRequest({ mode: 'auto', userId: 'user-2' });
+      expect(response.status).toBe(403);
+      const future = await streamRequest({
+        mode: 'auto', userId: 'user-2', route: { intent: 'chat', period: { kind: 'month', ...nextMonth }, webSearch: false },
+      });
+      expect(future.status).toBe(403);
+      expect(routeAssistantMessageMock).not.toHaveBeenCalled();
+    });
+
+    it('R13: past the hourly limit is 429, and the router is never called', async () => {
+      vi.mocked(checkRateLimit).mockReturnValueOnce({ allowed: false, retryAfterSeconds: 60 } as ReturnType<typeof checkRateLimit>);
+      const response = await streamRequest({ mode: 'auto' });
+      expect(response.status).toBe(429);
+      expect(routeAssistantMessageMock).not.toHaveBeenCalled();
+    });
+
+    it('R13: without a key the route answers 503 and never reads the message', async () => {
+      delete process.env.ANTHROPIC_API_KEY;
+      const response = await streamRequest({ mode: 'auto' });
+      expect(response.status).toBe(503);
+      expect(routeAssistantMessageMock).not.toHaveBeenCalled();
+    });
   });
 });

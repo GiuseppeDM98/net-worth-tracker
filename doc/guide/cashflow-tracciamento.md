@@ -128,8 +128,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   gap-free and bucketed by `getItalyYear`/`getItalyMonth`, while the period slice uses `periodToRange` (local time) —
   the same split `cashflowTimeSeries.ts` already lives with. **The running month is drawn but never ranked**
   (`summarizeSavingsHistory(months, now)` → `ongoing`/`closedCount`): its salary is in and its spending is not, so it
-  would be «il mese migliore» by construction; the reading says «su 11 mesi chiusi». A window is called «ultimi N
+  would be «il mese migliore» by construction; the reading says «su 11 mesi misurabili» — the months the average runs on, the running month and any month below the savings floor left out (owner, 2026-11-14: «mesi chiusi» and «con entrate» named months the average skipped). A window is called «ultimi N
   mesi» only when it ends today (`describeMonthWindow`/`describeFlowWindow`), else it is named by its bounds.
+- **«Risparmio nel tempo» and the savings floor** (2026-11-12, `readSavings`): every month carries its `reading`;
+  the average is `weightedSavingsRate` over the closed months (Σ saved / Σ income — a 3 €-income month no longer drags
+  it to −16.567%); best and worst rank only the months whose reading is a rate (`rankedCount`, the guard of the
+  reading and of «Mese per mese»); a month below the floor, or spending without income, is a deficit month and a bar
+  from 0 to −100% in full `--destructive` — the floor then sits on the plot's bottom edge, so one such month never
+  flattens the others; its title, label and tip say «Gen: spese oltre le entrate, −497 €» (`describeSavingsBar`).
+  A month after today's (`futureMonths`) draws no bar and is not judged. The period trio's caption prints «— ·
+  0,01×» below the floor and «−30,0%» with the typographic minus above it; `settleTotals` returns `savingsRate: null`
+  below the floor. Pinned by `__tests__/{tracciamentoSummary,cashflowNarrative,savingsRate}.test.ts` and
+  `__tests__/{risparmioTile,cashflowKpiTrio}.test.tsx`.
 - **Italian tense is data**: `describePeriodSubject` returns `ongoing` (the current month/year, a custom range whose
   `to` is today or later) and the headline conjugates on it («sta andando bene» / «è andato bene», «tiene» / «ha
   tenuto»); the article before the savings rate follows the figure AS PRINTED (`articleForPercent(rate, 0)`, now
@@ -169,6 +179,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   through `effectiveAccountId` (an account absent from the period is no filter) — both were `setState` in an
   effect. `filteredExpenses` is deliberately NOT wrapped in `useMemo`: the compiler could not preserve it and the
   skip un-memoized the whole component.
+- **«Entrate per categoria» is a ring of the period's income** (2026-11-12, DESIGN.md → The Ring Rule):
+  `incomeRingSegments(incomeRanking)` in `lib/utils/categoryRing.ts` — the rows coloured by rank
+  (`RING_CATEGORY_COLORS`), then what the cut left as «Altre categorie» in `RING_REST_COLOR` (the same ≥ 1 € floor as
+  the tile's residual row), «entrate» under the total; null with one category, and the rows keep their bar.
+  `CategoryTile` takes `ring` and `ringCenterLabel` (each swatch read from the ring BY KEY, never by rank); Tracciamento
+  and, since the owner's tour of 2026-11-15, the Panoramica's «Entrate per categoria» pass them (the same ring on both
+  pages); every «Spese per categoria» stays ranked rows, a ranking. A rank colour can move between periods: declared, not a defect.
 - **`CategoryTile` takes an optional `reading`** (the Panoramica passes none): the rows keep the overview payload's
   shape (`category`, `categoryKey`, `amount`, `percentage`) so `rankCategories` feeds the same component, and the
   residual row appears only when categories were cut.
@@ -188,11 +205,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   counts a non-current month as a filter. The landscape «Aggiungi» button lives beside the period
   (`max-desktop:portrait:hidden`): in portrait the bottom-nav FAB (`cashflow:add-expense`) is the only add
   affordance, in landscape the FAB is gone.
-- **«Chiedi all'Assistente», the bridge to Registra** (2026-11-11): an outline link (`MessageSquarePlus`,
-  `/dashboard/assistant?mode=registra`) beside «Nuova Spesa» in the page header (`hidden desktop:flex`, on Tracciamento)
+- **«Chiedi all'Assistente», the bridge to the Assistente** (2026-11-11; `?mode=registra`: the register suggestions
+  first, since 2026-11-12): an outline link (`MessageSquarePlus`, `/dashboard/assistant?mode=registra`) beside «Nuova Spesa» in the page header (`hidden desktop:flex`, on Tracciamento)
   and beside «Aggiungi» in the axis (`max-desktop:portrait:hidden h-11 shrink-0`, so 44px in landscape and absent in
   portrait, where the FAB is alone and the «Altro» sheet does not carry it). Both follow `isAssistantBridgeShown`: hidden
-  without `ANTHROPIC_API_KEY` (read by the server page at build: a key added on Vercel shows it after the next deploy, doc/guide/assistente.md § Per-page blind spots), in demo, and with `NEXT_PUBLIC_ASSISTANT_AI_ENABLED='false'`.
+  without `ANTHROPIC_API_KEY` (read by the server page at build: a key added on Vercel shows it after the next deploy, doc/guide/assistente-registra.md § Per-page blind spots), in demo, and with `NEXT_PUBLIC_ASSISTANT_AI_ENABLED='false'`.
   A link, not a modal: the chat needs its page.
 - **The Movimenti tile's reading totals each type of the rows it is handed** (a search on a note is its own total).
   (Moved here from the `AGENTS.md` stub on 2026-09-20.)
@@ -203,7 +220,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   «in comune», the same contract as `expenseSplitSummary`. A selection the options no longer offer (the feature
   switched off, a member removed) is no filter — `effectiveOwnerId`, derived like `effectiveAccountId`, never reset in
   an effect. It counts in `hasActiveFilters`, the drawer badge, the feed's `filterKey` and «Ripristina»; it narrows
-  ONLY the Movimenti list, and since the tile's reading totals the rows it is handed, «Spese di Giuseppe: 522 € su
+  ONLY the Movimenti list, and since the tile's reading totals the rows it is handed, «Spese di Paolo: 522 € su
   12 voci» comes for free. **With the feature on, an attributed row also prints its owner as a chip** (feed, table,
   detail drawer: `resolveOwnerLabel` — the name, or «Senza intestatario»); a shared row prints nothing, so the default
   case stays clean. `memberNames` is `null` when the feature is off, so no row is ever labelled by a feature the
@@ -251,6 +268,6 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 
 ## Per-page blind spots
 
-- **The trio's spending arrow repeats the first sentence's pacing on a phone** (seen 2026-10-15 on the census fixture, once the previous month's same days hold rows: «in aumento del 121,2%» in the sentence and «↑ 121,2%» under Spese, 7 figures outside the verdict at 390): Analisi lifts that arrow (`CashflowKpiTrio`'s `expensesDeltaLifted`, since 2026-10-14), Tracciamento does not — the owner's call that day was for Analisi alone. Whether to lift it here too is a decision not taken; `perf/mobile-budget.json` records the 7 with its `raisedBy`.
+- **The trio's spending arrow repeats the first sentence's pacing on a phone** (seen 2026-10-15 on the census fixture, once the previous month's same days hold rows: «in aumento del 121,2%» in the sentence and «↑ 121,2%» under Spese, 7 figures outside the verdict at 390): Analisi lifts that arrow (since 2026-10-14; since 2026-11-12 inside the Periodo's `trio` block, `PeriodoTile`, the trio's `expensesDeltaLifted` gone), Tracciamento does not — the owner's call that day was for Analisi alone. Whether to lift it here too is a decision not taken; `perf/mobile-budget.json` records the 7 with its `raisedBy`.
 - **The trio loses its three figures at 390** (2026-10-12): the strip prints them, THE tile keeps the labels, the deltas, the rate and the coverage, up to 1439 (on a tablet too since 2026-10-16); whole at 1440, where there is no strip. **The title stands alone** over the strip whenever the month has no calendar ahead («Il perché · le cifre del periodo»): the first sentence would reprint the three cells, so the «solo titolo» deroga (DESIGN.md → The Binding-Clause Rule) is declared here, not a cut gone missing. A row saved out of the period, or that the list's filters would hide, opens no row and moves no filter — the toast is the only sign. With nothing in and nothing out the verdict is whole, no «Il perché».
 - **Tracciamento**: a period never opened before shows the tiles' skeleton while its window is read (the pickers stay), and the pickers offer every year between the oldest and the newest row, one with no row included; the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip). The hero's KPIs print the PERIOD's totals (calendar included) beside a delta measured on the lived window («↓ 70,1% vs 1–14 ago» under a whole-month 1953 €) — the verdict's second sentence is what reconciles the two, by design. The Movimenti reading still sums scheduled spending and income into one figure («7 in calendario (3753 €)»). The `describePeriodCashflow` reading and `expenseEntityStats` keep their own windows (§ *Two conventions now coexist on purpose*, above in this guide — the citation pointed at an `AGENTS.md` section that left it with the 2026-09-06 carve-out).

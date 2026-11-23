@@ -21,6 +21,7 @@ import {
   IndexationCoefficientEntry,
 } from '@/types/assets';
 import { stripFloatNoise } from '@/lib/utils/floatNoise';
+import { getItalyDateIso, toDate } from '@/lib/utils/dateHelpers';
 
 /**
  * Returns the number of coupon payments per year for the given frequency. A single coupon at
@@ -265,6 +266,18 @@ export function resolveInflationIndexation(
 /**
  * Returns the Italian adjective for a coupon frequency (for human-readable notes).
  */
+/**
+ * A provisional coupon still waiting for its coefficient: due TODAY or later by the Italian calendar
+ * (2026-11-15). A coupon is stored at the UTC midnight of its date, so an instant comparison with
+ * `now` dropped it on its own payment day — the one day the banner must still ask.
+ */
+export function isPendingProvisionalCoupon(
+  coupon: { isProvisional?: boolean; paymentDate: Date },
+  now: Date
+): boolean {
+  return !!coupon.isProvisional && getItalyDateIso(toDate(coupon.paymentDate)) >= getItalyDateIso(now);
+}
+
 export function couponFrequencyLabel(frequency: CouponFrequency): string {
   switch (frequency) {
     case 'monthly':    return 'mensile';

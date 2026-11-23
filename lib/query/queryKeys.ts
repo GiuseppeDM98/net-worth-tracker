@@ -127,6 +127,20 @@ export const queryKeys = {
       ['pension-contributions', userId, assetId] as const,
   },
 
+  // Accumulation plans — one document per plan, filtered by userId only (no composite index); persisted.
+  accumulationPlans: {
+    all: (userId: string) => ['accumulation-plans', userId] as const,
+  },
+
+  // The quotes of the instruments the Consulente's «Applica» would create (2026-11-20): by the sorted
+  // symbols joined by `,`; never persisted (a price read from a restored cache is not today's).
+  adviceQuotes: (symbolsKey: string) => ['advice-quotes', symbolsKey] as const,
+
+  // Model portfolio (PAC / Accumulo) — one document per account, `modelPortfolios/{ownerId}`.
+  modelPortfolio: {
+    byOwner: (userId: string) => ['model-portfolio', userId] as const,
+  },
+
   // Cost centers: the centres ALONE (since 2026-09-29 — the key used to carry one query per
   // centre for its rows, and the detail had a `expenses(userId, centerId)` key of its own; the rows
   // are now grouped in memory from `useExpenses`, lib/utils/costCenterUtils.ts).

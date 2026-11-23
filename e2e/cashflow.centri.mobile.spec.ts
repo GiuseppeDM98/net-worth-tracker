@@ -3,8 +3,8 @@
  *
  * 1. The detail LANDS like a page. The row that opens it sits below the fold, and `main` —
  *    the dashboard's scroll container, not the document — kept its offset: the detail mounted
- *    530px down its own length, with the back link, the verdict and the actions out of sight
- *    (measured on the owner's data, 2026-09-18).
+ *    far down its own length, with the back link, the verdict and the actions out of sight
+ *    (measured on a lived account, 2026-09-18).
  * 2. Nothing the page prints leaves `main` sideways, and every control of the detail is a
  *    44px target — «Mostra altre» was 36.
  *

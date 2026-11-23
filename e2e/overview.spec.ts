@@ -13,7 +13,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { openOverview, patchOverview } from './overviewFixture';
+import { BASE_EXPENSE_STATS, openOverview, patchOverview } from './overviewFixture';
 
 test('is the page of every width at 1440: no rows, no strip, the chips and the digest, one paragraph with the calendar under the figures', async ({ page }) => {
   await patchOverview(page);
@@ -57,4 +57,23 @@ test('prints a zero variation without a sign, at 1440 too', async ({ page }) => 
   const paragraph = page.getByRole('region', { name: 'Verdetto del mese' }).locator('p');
   await expect(paragraph).toContainText(/: 0,00\s?€ \(0,00%\) su \p{Ll}+, 0,00% da inizio anno \(0,00\s?€\)\./u);
   await expect(paragraph).not.toContainText(/[+−-]0,00/);
+});
+
+// The savings floor (owner, 2026-11-12): 3 € in and 500 € out so far, a salary of 2600 € still in
+// the calendar — the lived part is said in signed euros, then how the calendar closes the month,
+// never «−16567% delle entrate finora». Seen red on 2026-11-14 with the no-income/deficit branch of
+// `describeSavedSoFar` removed.
+test('says a deficit beyond the savings floor in euros, with how the calendar closes the month', async ({ page }) => {
+  await patchOverview(page, {
+    expenseStats: {
+      ...BASE_EXPENSE_STATS,
+      currentMonth: { income: 2603, expenses: 500, net: 2103, expensesScheduled: 0, incomeScheduled: 2600 },
+    },
+  });
+  await openOverview(page);
+  const paragraph = page.getByRole('region', { name: 'Verdetto del mese' }).locator('p');
+  await expect(paragraph).toContainText(
+    /Finora hai messo da parte −497\s?€: le spese superano le entrate; con il calendario \(2600\s?€ di entrate\) il mese chiude all'81%/,
+  );
+  await expect(paragraph).not.toContainText('delle entrate finora');
 });

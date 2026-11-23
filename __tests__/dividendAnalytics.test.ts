@@ -25,7 +25,10 @@ import {
   summarizeDividendStats,
   selectUpcomingDividends,
   endOfServerDay,
+  payerRingSegments,
+  type PayerRanking,
 } from '@/lib/utils/dividendAnalytics';
+import { RING_REST_COLOR, RING_REST_KEY } from '@/lib/utils/ringChart';
 
 // --- Fixtures ---------------------------------------------------------------
 
@@ -226,12 +229,12 @@ describe('computeReliability', () => {
   });
 
   it('measures only the instruments still held when given the set, on the period’s own window', () => {
-    // Saipem (sold) paid the most in May; the BTP (held) paid in June. With the held set the
+    // Tapiro (sold) paid the most in May; the BTP (held) paid in June. With the held set the
     // top payer is the BTP at 100% of the HELD income, over one month — but the window stays
     // the year’s six months, so the coverage is 1/6, not 1/1.
     const dividends = [
-      makeDividend({ assetId: 'spm', assetTicker: 'SPM', paymentDate: new Date('2026-05-20T12:00:00'), netAmount: 142, grossAmount: 142, taxAmount: 0 }),
-      makeDividend({ assetId: 'btp', assetTicker: 'BTP', paymentDate: new Date('2026-06-10T12:00:00'), netAmount: 57, grossAmount: 57, taxAmount: 0 }),
+      makeDividend({ assetId: 'tap', assetTicker: 'TAP', paymentDate: new Date('2026-05-20T12:00:00'), netAmount: 140, grossAmount: 140, taxAmount: 0 }),
+      makeDividend({ assetId: 'btp', assetTicker: 'BTP', paymentDate: new Date('2026-06-10T12:00:00'), netAmount: 60, grossAmount: 60, taxAmount: 0 }),
     ];
     const held = computeReliability(dividends, 'year', NOW, new Set(['btp']));
     expect(held.topPayerTicker).toBe('BTP');
@@ -239,8 +242,8 @@ describe('computeReliability', () => {
     expect(held.payerCount).toBe(1);
     expect(held.monthsWithIncome).toBe(1);
     expect(held.monthsInWindow).toBe(6);
-    // Without the set the registry speaks: Saipem leads.
-    expect(computeReliability(dividends, 'year', NOW).topPayerTicker).toBe('SPM');
+    // Without the set the registry speaks: Tapiro leads.
+    expect(computeReliability(dividends, 'year', NOW).topPayerTicker).toBe('TAP');
     // An empty held set: nothing to count on, and the window is still the year’s.
     const none = computeReliability(dividends, 'year', NOW, new Set());
     expect(none.payerCount).toBe(0);
@@ -667,12 +670,12 @@ describe('summarizeDividendStats / selectUpcomingDividends', () => {
   const at = (iso: string) => new Date(iso);
   const routeNow = at('2026-06-15T10:00:00.000Z');
   const list: Dividend[] = [
-    makeDividend({ id: 'd3', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2026-09-23T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'final' }),
+    makeDividend({ id: 'd3', assetId: 'orni', assetTicker: 'ORNI.MI', paymentDate: at('2026-09-23T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'final' }),
     makeDividend({ id: 'd6', assetId: 'btp', assetTicker: 'BTP', paymentDate: at('2026-09-01T00:00:00Z'), grossAmount: 62.5, taxAmount: 7.8125, dividendType: 'coupon' }),
     makeDividend({ id: 'd4', assetId: 'aapl', assetTicker: 'AAPL', paymentDate: at('2026-06-15T00:00:00Z'), grossAmount: 2.6, taxAmount: 0.39, grossAmountEur: 2.4, netAmountEur: 2.04 }),
     makeDividend({ id: 'd5', assetId: 'btp', assetTicker: 'BTP', paymentDate: at('2026-03-01T00:00:00Z'), grossAmount: 62.5, taxAmount: 7.8125, dividendType: 'coupon' }),
-    makeDividend({ id: 'd2', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2025-11-19T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'interim' }),
-    makeDividend({ id: 'd1', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2025-05-21T00:00:00Z'), grossAmount: 25, taxAmount: 6.5 }),
+    makeDividend({ id: 'd2', assetId: 'orni', assetTicker: 'ORNI.MI', paymentDate: at('2025-11-19T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'interim' }),
+    makeDividend({ id: 'd1', assetId: 'orni', assetTicker: 'ORNI.MI', paymentDate: at('2025-05-21T00:00:00Z'), grossAmount: 25, taxAmount: 6.5 }),
   ];
 
   it('sums only what was RECEIVED: the two announced payments are never in the totals', () => {
@@ -717,5 +720,40 @@ describe('summarizeDividendStats / selectUpcomingDividends', () => {
     const end = endOfServerDay(routeNow);
     expect([end.getHours(), end.getMinutes(), end.getSeconds(), end.getMilliseconds()]).toEqual([23, 59, 59, 999]);
     expect(routeNow.getTime(), 'the input is not mutated').toBe(at('2026-06-15T10:00:00.000Z').getTime());
+  });
+});
+
+// «Chi paga di più» as a ring (The Ring Rule, 2026-11-12): the held payers by rank, then the remainder
+// in the neutral ink. Figures invented and round. Seen red on 2026-11-15 with the remainder dropped.
+describe('payerRingSegments', () => {
+  const rankingOf = (amounts: number[], remainder: number | null, label = 'Altri 2 strumenti'): PayerRanking => {
+    const total = amounts.reduce((sum, amount) => sum + amount, 0) + (remainder ?? 0);
+    return {
+      rows: amounts.map((amount, index) => ({ key: `asset-${index}`, label: `Strumento ${index + 1}`, amount, percentage: (amount / total) * 100 })),
+      remainder: remainder === null ? null : { label, amount: remainder, percentage: (remainder / total) * 100 },
+      total,
+      payerCount: amounts.length + 2,
+      heldPayerCount: amounts.length,
+      soldPayerCount: 0,
+      soldNet: 0,
+      top: null,
+    };
+  };
+
+  it('V1: five payers and «Altri 2 strumenti» are six parts, the remainder last and grey', () => {
+    const segments = payerRingSegments(rankingOf([500, 400, 300, 200, 100], 100));
+    expect(segments?.map((segment) => segment.color)).toEqual([
+      'var(--chart-2)', 'var(--chart-7)', 'var(--chart-6)', 'var(--chart-3)', 'var(--chart-8)', RING_REST_COLOR,
+    ]);
+    expect(segments?.at(-1)).toMatchObject({ key: RING_REST_KEY, label: 'Altri 2 strumenti', value: 100 });
+  });
+
+  it('V1: one payer and nothing else is no ring; one payer beside a sold one is a ring of two', () => {
+    expect(payerRingSegments(rankingOf([300], null))).toBeNull();
+    expect(payerRingSegments(rankingOf([300], 50, '1 strumento venduto'))).toHaveLength(2);
+  });
+
+  it('V1: a sold remainder of −50 € makes no ring', () => {
+    expect(payerRingSegments(rankingOf([300, 200], -50, '1 strumento venduto'))).toBeNull();
   });
 });

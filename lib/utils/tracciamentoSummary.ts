@@ -20,6 +20,7 @@ import { endOfMonthBound, getItalyDate, getItalyDateIso, getItalyMonth, getItaly
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { getCategoryKey, getCategoryName, resolveDisplayLabels } from '@/lib/utils/expenseGrouping';
 import type { StripFigure } from '@/lib/utils/verdictStrip';
+import { meaningfulSavingsRate, readSavings, weightedSavingsRate, type SavingsReading } from '@/lib/utils/savingsRate';
 
 // ─── The phone composition: the ids and the strip (since 2026-10-12) ──────────
 
@@ -100,7 +101,10 @@ export interface PeriodCashflowTotals {
   income: number;
   expenses: number;
   net: number;
-  /** (income − expenses) / income, in percent; null without income — a rate needs a denominator. */
+  /**
+   * (income − expenses) / income, in percent; null when it is not a rate (`meaningfulSavingsRate`:
+   * no income, or a deficit beyond the floor). Not a test for «no income»: read `income` for that.
+   */
   savingsRate: number | null;
   /** income / expenses; null without spending or without income. The second number of the pair, kept on purpose. */
   coverageRatio: number | null;
@@ -118,7 +122,7 @@ function buildTotals(income: number, spending: number, transferCount: number): P
     income,
     expenses: spending,
     net: income - spending,
-    savingsRate: income > 0 ? ((income - spending) / income) * 100 : null,
+    savingsRate: meaningfulSavingsRate(income, spending),
     // A ratio with a zero numerator says nothing the "nessuna entrata" verdict has not.
     coverageRatio: spending > 0 && income > 0 ? income / spending : null,
     transferCount,
@@ -424,8 +428,10 @@ export interface MonthFlow extends MonthRef {
   income: number;
   expenses: number;
   net: number;
-  /** Percent; null when the month had no income. */
+  /** Percent; null when `reading` is not a rate (no income, or a deficit beyond the floor). */
   savingsRate: number | null;
+  /** What can be said about the month (`readSavings` of its income and spending). */
+  reading: SavingsReading;
   /**
    * The month has not started yet: its bars hold only what is already in the calendar.
    * False for the month in progress — that one is partly real, and `highlightKey` marks it.
@@ -473,6 +479,7 @@ export function buildTrailingMonthFlows(expenses: Expense[], endYear: number, en
       expenses: 0,
       net: 0,
       savingsRate: null,
+      reading: { kind: 'none' },
       scheduled: startsAfterToday(ref),
     });
   }
@@ -488,7 +495,8 @@ export function buildTrailingMonthFlows(expenses: Expense[], endYear: number, en
 
   for (const bucket of byKey.values()) {
     bucket.net = bucket.income - bucket.expenses;
-    bucket.savingsRate = bucket.income > 0 ? (bucket.net / bucket.income) * 100 : null;
+    bucket.reading = readSavings(bucket.income, bucket.expenses);
+    bucket.savingsRate = bucket.reading.kind === 'rate' ? bucket.reading.rate : null;
   }
 
   return axis.map((ref) => byKey.get(monthKey(ref.year, ref.month))!);
@@ -500,45 +508,53 @@ export interface SavingsHistory {
   months: MonthFlow[];
   /** The month still running, if the window ends on it — drawn, never ranked. */
   ongoing: MonthFlow | null;
-  /** The months that can be judged: the window minus the running one. */
+  /** The months after today's: not lived, so never judged — no bar, no ranking, no footer. */
+  futureMonths: MonthFlow[];
+  /** The months that can be judged: the ones before today's. */
   closedCount: number;
-  /** Mean rate over the measured months (closed months with income); null when none. */
+  /** Σ savings / Σ income over the ranked months (`weightedSavingsRate`); null when none. */
   average: number | null;
   best: MonthFlow | null;
   worst: MonthFlow | null;
-  /** Measured months whose rate is negative, in chronological order. */
+  /**
+   * Closed months that spent more than they earned, in chronological order: a negative rate, a
+   * deficit beyond the floor, or spending without income.
+   */
   deficitMonths: MonthFlow[];
+  /** Closed months with income — what every «con entrate» sentence counts. */
   measuredCount: number;
+  /** Closed months whose reading is a rate — what the average, the best and the worst range over. */
+  rankedCount: number;
 }
 
 /**
- * Average, best, worst and deficits over the CLOSED months with income. A month still running
- * (the salary is in, most of the spending is not) would be the best by construction, so it is
- * excluded from every ranking — its rate is the hero tile's job — but stays in `months` for
- * the chart.
+ * Average, best, worst and deficits over the CLOSED months — the ones before today's Italian
+ * month. A month still running (the salary is in, most of the spending is not) would be the best
+ * by construction, so it is excluded from every ranking — its rate is the hero tile's job — but
+ * stays in `months` for the chart; a month after today's holds only the calendar (an anchor
+ * ahead makes its instalments look like deficits), so it is not judged at all (the «lived» rule
+ * of 2026-09-19). Below the savings floor a month is not a rate (`readSavings`, 2026-11-12): out
+ * of the average, the best and the worst, still a deficit month in the footer; the average is
+ * weighted by income, so one month with a tiny income cannot spoil twelve.
  */
 export function summarizeSavingsHistory(months: MonthFlow[], now: Date): SavingsHistory {
   const today = getItalyMonthYear(now);
+  const isBeforeToday = (m: MonthFlow) => m.year < today.year || (m.year === today.year && m.month < today.month);
+  const isAfterToday = (m: MonthFlow) => m.year > today.year || (m.year === today.year && m.month > today.month);
   const ongoing = months.find((m) => m.year === today.year && m.month === today.month) ?? null;
-  const closed = months.filter((m) => m !== ongoing);
-  const measured = closed.filter((m) => m.savingsRate !== null);
-  if (measured.length === 0) {
-    return { months, ongoing, closedCount: closed.length, average: null, best: null, worst: null, deficitMonths: [], measuredCount: 0 };
-  }
+  const futureMonths = months.filter(isAfterToday);
+  const closed = months.filter(isBeforeToday);
+  const measuredCount = closed.filter((m) => m.income > 0).length;
+  const ranked = closed.filter((m) => m.reading.kind === 'rate');
+  const deficitMonths = closed.filter(
+    (m) => m.reading.kind === 'deficit' || m.reading.kind === 'no-income' || (m.reading.kind === 'rate' && m.reading.rate < 0),
+  );
+  const empty = { months, ongoing, futureMonths, closedCount: closed.length, measuredCount, rankedCount: ranked.length, deficitMonths };
+  if (ranked.length === 0) return { ...empty, average: null, best: null, worst: null };
   const rate = (m: MonthFlow) => m.savingsRate as number;
-  const average = measured.reduce((sum, m) => sum + rate(m), 0) / measured.length;
-  const best = measured.reduce((top, m) => (rate(m) > rate(top) ? m : top), measured[0]);
-  const worst = measured.reduce((bottom, m) => (rate(m) < rate(bottom) ? m : bottom), measured[0]);
-  return {
-    months,
-    ongoing,
-    closedCount: closed.length,
-    average,
-    best,
-    worst,
-    deficitMonths: measured.filter((m) => rate(m) < 0),
-    measuredCount: measured.length,
-  };
+  const best = ranked.reduce((top, m) => (rate(m) > rate(top) ? m : top), ranked[0]);
+  const worst = ranked.reduce((bottom, m) => (rate(m) < rate(bottom) ? m : bottom), ranked[0]);
+  return { ...empty, average: weightedSavingsRate(closed.map((m) => ({ income: m.income, spending: m.expenses }))), best, worst };
 }
 
 // ─── Category ranking ─────────────────────────────────────────────────────────

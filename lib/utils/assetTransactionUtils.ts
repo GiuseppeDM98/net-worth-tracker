@@ -14,9 +14,12 @@
  *   - TIME IS INJECTED. Any function needing "now" takes it as an explicit Date parameter.
  *
  * Two invariants govern the PMC math and MUST be preserved:
- *   #2 The native PMC (`averageCost`) is the weighted average of native trade prices with fees
- *      EXCLUDED — exactly today's Asset.averageCost semantics. Fees and FX live only in the
- *      EUR-side fields (costBasisEur / investedEur / realized P&L).
+ *   #2 Neither PMC carries a fee (2026-11-12). The native PMC (`averageCost`) is the weighted
+ *      average of native trade prices, the EUR one (`costBasisEur / quantity`) the same at
+ *      trade-date FX; every capital GAIN stands on them. The fees live in three other places: the
+ *      fiscal basis (`fiscalCostBasisEur`, purchase fees included — every tax estimate's), the
+ *      money that moved (`investedEur` / `divestedEur`, the XIRR flows) and `feesEur`, so every
+ *      RETURN is net of them. A fee is a spending row of its own (lib/utils/tradeFeeExpense.ts).
  *   #4 The migration baseline NEVER produces a holdingStartDate (see §holdingStartDate below).
  */
 
@@ -120,9 +123,14 @@ export function sortTransactionsForReplay(transactions: AssetTransaction[]): Ass
 export interface LedgerPositionState {
   quantity: number;
   averageCost: number | undefined;      // native PMC; undefined only before any transaction
-  costBasisEur: number;                 // EUR cost of the OPEN position, buy fees included
-  averageCostEur: number | undefined;   // costBasisEur / quantity; undefined when quantity === 0
-  realizedPnlEur: number;               // cumulative since baseline
+  costBasisEur: number;                 // EUR cost of the OPEN position, no fee (2026-11-12)
+  averageCostEur: number | undefined;   // costBasisEur / quantity, no fee; undefined when quantity === 0
+  /** The open position's cost, purchase fees INCLUDED: every tax estimate's basis. */
+  fiscalCostBasisEur: number;
+  fiscalAverageCostEur: number | undefined; // fiscalCostBasisEur / quantity; undefined when quantity === 0
+  /** Σ every buy's and sell's fees: what a return is net of. */
+  feesEur: number;
+  realizedPnlEur: number;               // cumulative since baseline, no fee (2026-11-12)
   realizedByYear: Record<number, number>; // fiscal year (getItalyYear of sell date) → EUR
   investedEur: number;                  // Σ buy (quantity·priceEur + fees), baseline included
   divestedEur: number;                  // Σ sell (quantity·priceEur − fees)
@@ -147,19 +155,17 @@ function assertNonNegative(t: AssetTransaction): void {
  */
 export interface LedgerTransactionEffect {
   transactionId: string;
-  /** Solo sell, netto commissioni. */
+  /** Sell only: quantity × (sale price − the fee-free EUR PMC); the sale's fee is a row of its own. */
   realizedPnlEur?: number;
-  /** Solo sell: quantity × averageCostEur all'istante della vendita. Denominatore della %. */
+  /** Sell only: quantity × averageCostEur at the instant of the sale. The % denominator. */
   soldCostBasisEur?: number;
-  /** Solo sell: PMC EUR all'istante della vendita (costBasisEur / quantity pre-vendita). */
+  /** Sell only: the fee-free EUR PMC at the instant of the sale (costBasisEur / quantity before it). */
   averageCostEurAtTrade?: number;
   /**
-   * Sell only: the gain the BROKER taxes — quantity × (sale price − the EUR average price paid),
-   * with NO commission on either side. The realized P&L above is net of the sale's fees and
-   * stands on a cost basis that includes the purchase fees; the owner's Directa statements
-   * (2026-09-20) show the fiscal side ignores both: a purchase of 48 units at 123,48 € with 5 € of
-   * fees is carried at 123,48 €, not 123,58 €, and four sells with 14 € of fees were taxed on
-   * their gain plus those 14 €. It feeds the tax ESTIMATE only (lib/utils/saleTax.ts).
+   * Sell only: the FISCAL gain — the sale's gross minus its fee minus the fiscal cost of the units
+   * sold (purchase fees included). Both fees deducted (owner, 2026-11-12): it sits below what a
+   * broker that ignores commissions withholds by fees × rate, and the «Tasse trattenute» the owner
+   * types wins sale by sale. It feeds the tax ESTIMATE only (lib/utils/saleTax.ts).
    */
   taxableGainEur?: number;
 }
@@ -204,6 +210,9 @@ export function replayTransactionsWithEffects(
     averageCost: undefined,
     costBasisEur: 0,
     averageCostEur: undefined,
+    fiscalCostBasisEur: 0,
+    fiscalAverageCostEur: undefined,
+    feesEur: 0,
     realizedPnlEur: 0,
     realizedByYear: {},
     investedEur: 0,
@@ -211,9 +220,6 @@ export function replayTransactionsWithEffects(
     holdingStartDate: undefined,
   };
   const effects: LedgerTransactionEffect[] = [];
-  // The open position's EUR cost with NO purchase fees in it: the broker's fiscal carrying value,
-  // kept beside `costBasisEur` only to price `taxableGainEur`. Not part of the public state.
-  let feeFreeCostBasisEur = 0;
 
   for (const t of sorted) {
     assertNonNegative(t);
@@ -232,11 +238,14 @@ export function replayTransactionsWithEffects(
             : prevAverageCost;
         state.quantity = newQuantity;
 
-        // Fees and FX enter only the EUR side.
-        const addedCostEur = t.quantity * t.priceEur + (t.fees ?? 0);
+        // The PMC stands on price × quantity alone (owner, 2026-11-12): the fee is a spending row of its own
+        // (lib/utils/tradeFeeExpense.ts). The fiscal basis keeps it — every tax estimate reads that one.
+        const fees = t.fees ?? 0;
+        const addedCostEur = t.quantity * t.priceEur;
         state.costBasisEur += addedCostEur;
-        state.investedEur += addedCostEur;
-        feeFreeCostBasisEur += t.quantity * t.priceEur;
+        state.fiscalCostBasisEur += addedCostEur + fees;
+        state.investedEur += addedCostEur + fees;
+        state.feesEur += fees;
         break;
       }
 
@@ -248,33 +257,36 @@ export function replayTransactionsWithEffects(
             t.id,
           );
         }
-        // EUR average cost as of this instant (before reducing the position).
+        // Both EUR averages as of this instant (before reducing the position).
         const averageCostEur = state.quantity > 0 ? state.costBasisEur / state.quantity : 0;
-        const proceeds = t.quantity * t.priceEur - (t.fees ?? 0);
+        const fiscalAverageCostEur = state.quantity > 0 ? state.fiscalCostBasisEur / state.quantity : 0;
+        const fees = t.fees ?? 0;
+        const grossEur = t.quantity * t.priceEur;
         const soldCostBasis = t.quantity * averageCostEur;
-        const realized = proceeds - soldCostBasis;
-        const soldFeeFreeCost = state.quantity > 0 ? (t.quantity * feeFreeCostBasisEur) / state.quantity : 0;
+        const soldFiscalCost = t.quantity * fiscalAverageCostEur;
+        const realized = grossEur - soldCostBasis; // fee-free: the fee is a row (owner, 2026-11-12)
 
         state.realizedPnlEur += realized;
         const year = getItalyYear(t.date);
         state.realizedByYear[year] = (state.realizedByYear[year] ?? 0) + realized;
         state.costBasisEur -= soldCostBasis;
-        state.divestedEur += proceeds;
+        state.fiscalCostBasisEur -= soldFiscalCost;
+        state.divestedEur += grossEur - fees;
+        state.feesEur += fees;
         state.quantity -= t.quantity;
         // Native averageCost is UNCHANGED — selling never moves the PMC (regime amministrato).
 
         effect.realizedPnlEur = realized;
         effect.soldCostBasisEur = soldCostBasis;
         effect.averageCostEurAtTrade = averageCostEur;
-        effect.taxableGainEur = t.quantity * t.priceEur - soldFeeFreeCost;
-        feeFreeCostBasisEur -= soldFeeFreeCost;
+        effect.taxableGainEur = grossEur - fees - soldFiscalCost; // the fiscal gain: both fees deducted (owner, 2026-11-12)
 
         // Clamp float dust when the position closes; keep the last native PMC (harmless at qty 0,
         // and every consumer filters on quantity > 0).
         if (state.quantity <= EPSILON) {
           state.quantity = 0;
           state.costBasisEur = 0;
-          feeFreeCostBasisEur = 0;
+          state.fiscalCostBasisEur = 0;
         }
         break;
       }
@@ -285,7 +297,7 @@ export function replayTransactionsWithEffects(
         state.quantity = t.quantity;
         state.averageCost = t.pricePerUnit;
         state.costBasisEur = t.quantity * t.priceEur;
-        feeFreeCostBasisEur = t.quantity * t.priceEur;
+        state.fiscalCostBasisEur = state.costBasisEur;
         break;
       }
     }
@@ -299,6 +311,7 @@ export function replayTransactionsWithEffects(
   }
 
   state.averageCostEur = state.quantity > 0 ? state.costBasisEur / state.quantity : undefined;
+  state.fiscalAverageCostEur = state.quantity > 0 ? state.fiscalCostBasisEur / state.quantity : undefined;
   return { state, effects };
 }
 
@@ -314,21 +327,24 @@ export function replayTransactions(transactions: AssetTransaction[]): LedgerPosi
 /**
  * Project the replay result into the exact fields written back to assets/{assetId}. Single tested
  * source of truth for the write path. `averageCost`/`averageCostEur: undefined` can only occur for
- * an empty sequence (the route never writes in that case) or, for `averageCostEur` alone, when the
- * position just closed (quantity 0 — see the clamp in replayTransactionsWithEffects, harmless since
- * every G/P consumer filters on quantity > 0 first); `holdingStartDate: undefined` means "do not
- * write" (see §holdingStartDate).
+ * an empty sequence (the route never writes in that case) or, for the two EUR averages alone, when
+ * the position just closed (quantity 0 — see the clamp in replayTransactionsWithEffects, harmless
+ * since every G/P consumer filters on quantity > 0 first); `holdingStartDate: undefined` means "do
+ * not write" (see §holdingStartDate). `averageCostEur` is the fee-free PMC every G/P reads,
+ * `fiscalAverageCostEur` the cost with purchase fees every tax estimate reads (lib/utils/costBasisEur.ts).
  */
 export function buildDerivedAssetFields(state: LedgerPositionState): {
   quantity: number;
   averageCost: number | undefined;
   averageCostEur: number | undefined;
+  fiscalAverageCostEur: number | undefined;
   holdingStartDate: Date | undefined;
 } {
   return {
     quantity: state.quantity,
     averageCost: state.averageCost,
     averageCostEur: state.averageCostEur,
+    fiscalAverageCostEur: state.fiscalAverageCostEur,
     holdingStartDate: state.holdingStartDate,
   };
 }
@@ -537,9 +553,10 @@ export function computeAssetXirr(flows: XirrFlow[]): number | null {
 export interface AssetTotalReturn {
   investedEur: number;          // state.investedEur (denominator)
   realizedPnlEur: number;
-  unrealizedPnlEur: number;     // currentValueEur − state.costBasisEur (0 when closed)
+  unrealizedPnlEur: number;     // currentValueEur − state.costBasisEur (0 when closed), fee-free
   dividendsNetEur: number;      // same scoped set used for XIRR
-  totalReturnEur: number;       // realized + unrealized + dividends
+  feesEur: number;              // Σ every trade's fees (state.feesEur)
+  totalReturnEur: number;       // realized + unrealized + dividends − fees: net, like the XIRR
   totalReturnPct: number | null; // totalReturnEur / investedEur; null when investedEur === 0
   isClosed: boolean;            // quantity === 0 with a non-empty ledger
 }
@@ -555,7 +572,8 @@ export function computeAssetTotalReturn(
   dividendsNetEur: number,
 ): AssetTotalReturn {
   const unrealizedPnlEur = state.quantity > 0 ? currentValueEur - state.costBasisEur : 0;
-  const totalReturnEur = state.realizedPnlEur + unrealizedPnlEur + dividendsNetEur;
+  // A RETURN is net of every fee, like the XIRR's flows; the gains above it are fee-free (owner, 2026-11-12).
+  const totalReturnEur = state.realizedPnlEur + unrealizedPnlEur + dividendsNetEur - state.feesEur;
   const totalReturnPct = state.investedEur === 0 ? null : totalReturnEur / state.investedEur;
   const isClosed = state.quantity === 0 && (state.investedEur > 0 || state.divestedEur > 0);
 
@@ -564,6 +582,7 @@ export function computeAssetTotalReturn(
     realizedPnlEur: state.realizedPnlEur,
     unrealizedPnlEur,
     dividendsNetEur,
+    feesEur: state.feesEur,
     totalReturnEur,
     totalReturnPct,
     isClosed,

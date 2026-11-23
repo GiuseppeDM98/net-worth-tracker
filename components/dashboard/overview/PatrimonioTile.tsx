@@ -3,8 +3,7 @@
 import type { ReactNode } from 'react';
 import { TrendingDown, TrendingUp, Trophy } from 'lucide-react';
 import type { DashboardOverviewSparklinePoint } from '@/types/dashboardOverview';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { formatPercentage } from '@/lib/services/chartService';
+import { cachedFormatCurrencyEUR, formatSignedPercentIt } from '@/lib/utils/formatters';
 import { signChipClass, signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
@@ -113,15 +112,15 @@ export function VariationChip({
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <span
         className={cn(
-          'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[9px] px-[11px] py-[6px]',
+          'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] px-[11px] py-[6px]',
           'font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
           signChipClass(value),
         )}
       >
         <Icon className="h-[13px] w-[13px] shrink-0" aria-hidden="true" />
         {value >= 0 ? '+' : '−'}
-        {cachedFormatCurrencyEUR(Math.abs(value))} ({percentage >= 0 ? '+' : '−'}
-        {formatPercentage(Math.abs(percentage))})
+        {/* The percentage is the text of the resource bar's «Da inizio anno» cell: signed on the printed value, «0,00%» at zero. */}
+        {cachedFormatCurrencyEUR(Math.abs(value))} ({formatSignedPercentIt(percentage, 2)})
       </span>
       <span className="text-[11px] text-muted-foreground">{caption}</span>
     </div>
@@ -194,7 +193,7 @@ export function PatrimonioTile({
             />
           )}
           {isNewATH && (
-            <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-[9px] bg-positive/10 px-[11px] py-[6px] text-[12px] font-semibold leading-none text-positive">
+            <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] bg-positive/10 px-[11px] py-[6px] text-[12px] font-semibold leading-none text-positive">
               <Trophy className="h-[13px] w-[13px]" aria-hidden="true" />
               Massimo storico
             </span>

@@ -13,11 +13,13 @@ import type { CostCenter } from '@/types/costCenters';
 import { REAL_ESTATE_COST_LABELS, REAL_ESTATE_COST_TYPES, type LifePolicyMode, type RealEstateOperationAnswers, type RealEstateOperationScreen } from '@/types/realEstateOperation';
 import type { RealEstateOperationAction } from '@/lib/utils/realEstateOperationDraft';
 import { costKindsOf, propertyChoices } from '@/lib/utils/realEstateOperationDraft';
-import { futureSeriesAfter, loansFinancing, type RealEstatePlanContext } from '@/lib/utils/realEstateOperationPlan';
+import { figuresOf, futureSeriesAfter, loansFinancing, mortgageFromPercent, percentOfPrice, type RealEstatePlanContext } from '@/lib/utils/realEstateOperationPlan';
 import {
   LIFE_POLICY_INSURED_HINT,
   LIFE_POLICY_LINK_HINT,
   LIFE_POLICY_NO_MEMBERS_HINT,
+  MORTGAGE_PERCENT_HINT,
+  MORTGAGE_PERCENT_NO_PRICE_HINT,
   describeBalance,
   describeMortgageEnd,
   describeMortgageInstalment,
@@ -32,7 +34,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { ChoiceList } from '@/components/ui/choice-list';
-import { AccountField, CategoryField, DateField, FIELD_HEIGHT_CLASS, NumberField } from './fields';
+import { AccountField, NumberField, PATH_FIELD_HEIGHT_CLASS } from '@/components/ui/path-fields';
+import { CategoryField, DateField } from './fields';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface ScreenProps {
   screen: RealEstateOperationScreen;
@@ -78,7 +82,7 @@ export function ScreenBody(props: ScreenProps) {
     case 'saldo':
       return <SaldoScreen {...props} />;
     case 'rivaluta':
-      return <p className="rounded-xl border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground">{describeSaleAdjustment(props.answers, props.context, props.propertyName)}</p>;
+      return <p className={cn('border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground', COSTUME_FRAME_RADIUS_CLASS)}>{describeSaleAdjustment(props.answers, props.context, props.propertyName)}</p>;
     case 'polizze':
       return <PolizzeScreen {...props} />;
     case 'estinzione':
@@ -114,7 +118,7 @@ function ImmobileScreen({ answers, dispatch, context, familyMembers }: ScreenPro
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="re-property">{isPurchase ? 'La casa' : 'La casa che vendi'}</Label>
           <Select value={answers.propertyId ?? (isPurchase ? NEW_PROPERTY : undefined)} onValueChange={(value) => dispatch({ type: 'patch', patch: { propertyId: value === NEW_PROPERTY ? null : value } })}>
-            <SelectTrigger id="re-property" className={FIELD_HEIGHT_CLASS}>
+            <SelectTrigger id="re-property" className={PATH_FIELD_HEIGHT_CLASS}>
               <SelectValue placeholder="Scegli la casa" />
             </SelectTrigger>
             <SelectContent>
@@ -133,7 +137,7 @@ function ImmobileScreen({ answers, dispatch, context, familyMembers }: ScreenPro
         <>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="re-name">Nome della casa</Label>
-            <Input id="re-name" className={FIELD_HEIGHT_CLASS} value={answers.propertyName} placeholder="es. Casa in via Roma" onChange={(event) => dispatch({ type: 'patch', patch: { propertyName: event.target.value } })} />
+            <Input id="re-name" className={PATH_FIELD_HEIGHT_CLASS} value={answers.propertyName} placeholder="es. Casa in via Roma" onChange={(event) => dispatch({ type: 'patch', patch: { propertyName: event.target.value } })} />
           </div>
           <div className="flex items-start gap-3">
             <Checkbox id="re-home" checked={answers.isPrimaryResidence} onCheckedChange={(checked) => dispatch({ type: 'patch', patch: { isPrimaryResidence: checked === true } })} className="mt-0.5" />
@@ -174,7 +178,7 @@ function OwnershipField({ answers, dispatch, familyMembers }: Pick<ScreenProps, 
       <ChoiceList mode="single" name="re-owner" label="Intestatari" value={ownership.mode} options={options} onChange={setMode} />
       {ownership.mode === 'member' && (
         <Select value={ownership.memberId} onValueChange={(memberId) => dispatch({ type: 'patch', patch: { ownership: { mode: 'member', memberId } } })}>
-          <SelectTrigger aria-label="Intestatario" className={FIELD_HEIGHT_CLASS}>
+          <SelectTrigger aria-label="Intestatario" className={PATH_FIELD_HEIGHT_CLASS}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -219,6 +223,14 @@ function MutuoScreen({ answers, dispatch, context }: ScreenProps) {
         <>
           <div className="grid grid-cols-1 gap-4 tablet:grid-cols-2">
             <NumberField id="re-principal" label="Importo del mutuo, in euro" value={loan.principal} onChange={(principal) => patchLoan({ principal })} />
+            <NumberField
+              id="re-principal-percent"
+              label="Oppure in % del prezzo"
+              value={percentOfPrice(loan.principal, answers.price)}
+              step="0.01"
+              hint={answers.price ? MORTGAGE_PERCENT_HINT : MORTGAGE_PERCENT_NO_PRICE_HINT}
+              onChange={(percent) => patchLoan({ principal: mortgageFromPercent(answers.price, percent) })}
+            />
             <NumberField id="re-rate" label="TAN, in %" value={loan.ratePct} step="0.001" onChange={(ratePct) => patchLoan({ ratePct })} />
             <NumberField id="re-years" label="Durata, in anni" value={loan.years} step="1" onChange={(years) => patchLoan({ years })} />
             <DateField id="re-first" label="Prima rata" value={loan.firstInstalmentIso} onChange={(firstInstalmentIso) => patchLoan({ firstInstalmentIso })} />
@@ -239,9 +251,12 @@ function MutuoScreen({ answers, dispatch, context }: ScreenProps) {
 
 function SaldoScreen({ answers, dispatch, context, accounts }: ScreenProps) {
   const isPurchase = answers.kind === 'purchase';
+  // A mortgage beyond the residual credits the account instead of debiting it (owner, 2026-11-12).
+  const creditsAccount = !isPurchase || figuresOf(answers, context).mortgageExcess > 0;
+  const accountName = context.assets.find((asset) => asset.id === answers.accountId)?.name ?? 'il conto';
   return (
     <div className="flex flex-col gap-4">
-      <AccountField id="re-account" label={isPurchase ? 'Dal conto' : 'Sul conto'} accounts={accounts} value={answers.accountId} onChange={(accountId) => dispatch({ type: 'patch', patch: { accountId } })} />
+      <AccountField id="re-account" label={creditsAccount ? 'Sul conto' : 'Dal conto'} accounts={accounts} value={answers.accountId} onChange={(accountId) => dispatch({ type: 'patch', patch: { accountId } })} />
       {!isPurchase && (
         <NumberField
           id="re-deposits-received"
@@ -251,7 +266,7 @@ function SaldoScreen({ answers, dispatch, context, accounts }: ScreenProps) {
           onChange={(depositsReceived) => dispatch({ type: 'patch', patch: { depositsReceived } })}
         />
       )}
-      <p className="rounded-xl border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground">{describeBalance(answers, context)}</p>
+      <p className={cn('border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground', COSTUME_FRAME_RADIUS_CLASS)}>{describeBalance(answers, context, accountName)}</p>
     </div>
   );
 }
@@ -298,10 +313,10 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
         <p className={TILE_SUB_EYEBROW_CLASS}>Vita e CPI</p>
         {answers.lifePolicies.length === 0 && <p className="text-[13px] text-muted-foreground">Nessuna polizza vita.</p>}
         {answers.lifePolicies.map((policy, index) => (
-          <div key={index} className="flex flex-col gap-3 rounded-xl border border-border bg-muted px-4 py-4">
+          <div key={index} className={cn('flex flex-col gap-3 border border-border bg-muted px-4 py-4', COSTUME_FRAME_RADIUS_CLASS)}>
             <div className="flex items-center justify-between gap-3">
               <p className="text-[13px] font-medium text-foreground">Polizza vita {index + 1}</p>
-              <Button type="button" variant="ghost" className={cn(FIELD_HEIGHT_CLASS, 'gap-1.5 text-destructive')} onClick={() => dispatch({ type: 'removeLifePolicy', index })}>
+              <Button type="button" variant="ghost" className={cn(PATH_FIELD_HEIGHT_CLASS, 'gap-1.5 text-destructive')} onClick={() => dispatch({ type: 'removeLifePolicy', index })}>
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
                 Rimuovi
               </Button>
@@ -310,7 +325,7 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor={`re-life-${index}-insured`}>Assicurato</Label>
                 <Select value={policy.insuredMemberId || undefined} onValueChange={(insuredMemberId) => dispatch({ type: 'updateLifePolicy', index, patch: { insuredMemberId } })}>
-                  <SelectTrigger id={`re-life-${index}-insured`} className={FIELD_HEIGHT_CLASS}>
+                  <SelectTrigger id={`re-life-${index}-insured`} className={PATH_FIELD_HEIGHT_CLASS}>
                     <SelectValue placeholder="Scegli chi assicura" />
                   </SelectTrigger>
                   <SelectContent>
@@ -357,7 +372,7 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
             </div>
           </div>
         ))}
-        <Button type="button" variant="outline" className={cn(FIELD_HEIGHT_CLASS, 'w-fit gap-1.5')} onClick={() => dispatch({ type: 'addLifePolicy' })}>
+        <Button type="button" variant="outline" className={cn(PATH_FIELD_HEIGHT_CLASS, 'w-fit gap-1.5')} onClick={() => dispatch({ type: 'addLifePolicy' })}>
           <Plus className="h-4 w-4" aria-hidden="true" />
           Aggiungi una polizza vita
         </Button>
@@ -377,7 +392,7 @@ function EstinzioneScreen({ answers, dispatch, context }: ScreenProps) {
         const patchPayoff = (patch: Partial<typeof payoff>) =>
           dispatch({ type: 'patch', patch: { payoffs: [...answers.payoffs.filter((candidate) => candidate.loanId !== loan.id), { ...payoff, ...patch }] } });
         return (
-          <div key={loan.id} className="flex flex-col gap-3 rounded-xl border border-border px-4 py-4">
+          <div key={loan.id} className={cn('flex flex-col gap-3 border border-border px-4 py-4', COSTUME_FRAME_RADIUS_CLASS)}>
             <div className="flex items-start gap-3">
               <Checkbox id={`re-payoff-${loan.id}`} checked={payoff.include} onCheckedChange={(checked) => patchPayoff({ include: checked === true })} className="mt-0.5" />
               <Label htmlFor={`re-payoff-${loan.id}`} className="min-h-11 cursor-pointer leading-[1.45] desktop:min-h-0">
@@ -397,7 +412,7 @@ function SerieScreen({ answers, dispatch, context }: ScreenProps) {
   const series = futureSeriesAfter(answers.eventDateIso, context.expenses, loanIds, answers.propertyId || null);
   const selected = new Set(answers.stopSeriesIds);
   return (
-    <ul className="divide-y divide-border rounded-xl border border-border" aria-label="Serie con voci dopo il rogito">
+    <ul className={cn('divide-y divide-border border border-border', COSTUME_FRAME_RADIUS_CLASS)} aria-label="Serie con voci dopo il rogito">
       {series.map((entry) => {
         const id = `re-series-${entry.seriesId}`;
         return (
@@ -453,12 +468,12 @@ function CentroScreen({ answers, dispatch, context }: ScreenProps) {
       {center.mode === 'new' && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="re-center-name">Nome del centro</Label>
-          <Input id="re-center-name" className={FIELD_HEIGHT_CLASS} value={center.name} onChange={(event) => dispatch({ type: 'patch', patch: { costCenter: { ...center, name: event.target.value } } })} />
+          <Input id="re-center-name" className={PATH_FIELD_HEIGHT_CLASS} value={center.name} onChange={(event) => dispatch({ type: 'patch', patch: { costCenter: { ...center, name: event.target.value } } })} />
         </div>
       )}
       {center.mode === 'existing' && (
         <Select value={center.existingId || undefined} onValueChange={(existingId) => dispatch({ type: 'patch', patch: { costCenter: { ...center, existingId } } })}>
-          <SelectTrigger aria-label="Centro" className={FIELD_HEIGHT_CLASS}>
+          <SelectTrigger aria-label="Centro" className={PATH_FIELD_HEIGHT_CLASS}>
             <SelectValue placeholder="Scegli il centro" />
           </SelectTrigger>
           <SelectContent>

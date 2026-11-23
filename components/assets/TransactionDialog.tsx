@@ -25,13 +25,18 @@
  *     past month turns the settlement clause into a warning — the balance moves today, not then.
  */
 
+import type { AssetTransactionMutationResult } from '@/lib/services/assetTransactionService';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useExpenseCategories } from '@/lib/hooks/useExpenses';
+import { expenseFeeCategoryLabel, normalizeExpenseFee, resolveExpenseFeeCategory } from '@/lib/utils/expenseFee';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssets } from '@/lib/hooks/useAssets';
 import {
@@ -60,6 +65,9 @@ import {
   describeTradeIntent,
   describeWithheldTaxField,
   describeWriteError,
+  describeTradeFeeField,
+  TRADE_FEE_NEEDS_CATEGORY,
+  TRADE_FEE_NOT_WRITTEN,
   type ModalStatus,
 } from '@/lib/utils/dialogNarrative';
 import { prefillWithheldTax, resolveWithheldTaxToSend } from '@/lib/utils/saleTax';
@@ -84,6 +92,7 @@ import type {
   AssetTransactionFormData,
   AssetTransactionType,
 } from '@/types/assetTransactions';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // Sentinel for "no settlement account" — a Radix Select item value can never be the empty string.
 const NO_SETTLEMENT = '__none__';
@@ -119,6 +128,10 @@ interface TransactionDialogProps {
   asset: Asset;
   /** Present = edit mode (same field-visibility logic as create). */
   transaction?: AssetTransaction | null;
+  /** Opens a new trade already filled in (the PAC's «Registra»). Ignored in edit mode. */
+  prefill?: { type: 'buy' | 'sell'; quantity: number; linkedCashAssetId?: string; note?: string };
+  /** Called once a NEW trade is saved: the server's result, the form data and the estimated EUR unit price (the PAC links its line with them). */
+  onCreated?: (result: AssetTransactionMutationResult, data: AssetTransactionFormData, priceEur: number) => void;
 }
 
 /**
@@ -150,17 +163,19 @@ function previewSaleEffect(
 ): { value: number; taxableGain: number } {
   const replayed = replayTransactionsWithEffects([...base, draft]);
   const without = replayTransactions(base).realizedPnlEur;
-  // The tax base is the draft's own effect: the price difference, no commission on either side.
+  // The tax base is the draft's own effect: the fiscal gain, both fees deducted (2026-11-12).
   const taxableGain = replayed.effects.find((effect) => effect.transactionId === draft.id)?.taxableGainEur ?? 0;
   return { value: replayed.state.realizedPnlEur - without, taxableGain };
 }
 
-export function TransactionDialog({ open, onClose, asset, transaction }: TransactionDialogProps) {
+export function TransactionDialog({ open, onClose, asset, transaction, prefill, onCreated }: TransactionDialogProps) {
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const reducedMotion = useReducedMotion();
   const layoutId = useId();
   const isEdit = !!transaction;
+  // Primitives, not the `prefill` object: a parent re-render must never re-reset a form the reader is typing in.
+  const { type: prefillType, quantity: prefillQuantity, linkedCashAssetId: prefillCash, note: prefillNote } = prefill ?? {};
   const isBaseline = transaction?.isBaseline === true;
 
   const { data: allAssets = [] } = useAssets(ownerId);
@@ -170,6 +185,24 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
 
   const createMutation = useCreateAssetTransaction(ownerId || '');
   const updateMutation = useUpdateAssetTransaction(ownerId || '');
+
+  // Where a NEW fee lands (2026-11-12): the fee category of Impostazioni › Spese. Without one a
+  // trade that carries no fee yet takes none — the server would write no row — and the field links
+  // to the setting instead. A fee already saved stays editable: its row (or its legacy figure) is there.
+  const settingsQuery = useSettings(ownerId, { enabled: open });
+  const categoriesQuery = useExpenseCategories(ownerId, { enabled: open });
+  const feeReading = settingsQuery.isLoading || categoriesQuery.isLoading;
+  const feeCategory = feeReading ? undefined : resolveExpenseFeeCategory(categoriesQuery.data ?? [], settingsQuery.data);
+  const storedFee = normalizeExpenseFee(transaction?.fees);
+  const feeHint = describeTradeFeeField({
+    reading: feeReading,
+    categoryLabel: feeCategory ? expenseFeeCategoryLabel(feeCategory) : null,
+    hasRow: !!transaction?.feeExpenseId,
+    legacyFee: !!transaction && !transaction.feeExpenseId && storedFee !== null,
+  });
+  /** The success toast, with the decision-44 sentence when the fee's row could not be written. */
+  const withFeeOutcome = (text: string, feeRow: string | undefined) =>
+    feeRow === 'refused' ? `${text} · ${TRADE_FEE_NOT_WRITTEN}` : text;
   // The modal's reading IS the status line, so a failure lands there and not in a paragraph of
   // its own at the bottom of the form (DESIGN.md → The Status-Is-The-Reading Rule).
   const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
@@ -297,18 +330,18 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       });
     } else {
       reset({
-        type: 'buy',
+        type: prefillType ?? 'buy',
         date: todayIso,
-        quantity: undefined,
+        quantity: prefillQuantity,
         pricePerUnit: undefined,
         fees: undefined,
-        linkedCashAssetId: NO_SETTLEMENT,
+        linkedCashAssetId: prefillCash ?? NO_SETTLEMENT,
         withheldTaxEur: undefined,
         indexationCoefficient: knownCoefficient,
-        note: '',
+        note: prefillNote ?? '',
       });
     }
-  }, [open, transaction, reset, todayIso, isBondPctMode, bondNominal, knownCoefficient]);
+  }, [open, transaction, prefillType, prefillQuantity, prefillCash, prefillNote, reset, todayIso, isBondPctMode, bondNominal, knownCoefficient]);
 
   const isAdjustment = type === 'adjustment';
   const heldQuantity = asset.quantity;
@@ -452,11 +485,19 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
               ...(taxValue !== undefined ? { withheldTaxEur: taxValue } : {}),
               note: noteValue,
             };
-        const result = await updateMutation.mutateAsync({ transactionId: transaction.id, updates });
+        // The version the form was drawn from: a trade changed since (another tab) is refused, 409.
+        const result = await updateMutation.mutateAsync({
+          transactionId: transaction.id,
+          updates,
+          expectedUpdatedAt: transaction.updatedAt,
+        });
         toast.success(
-          result.realizedPnlEur !== undefined
-            ? `Operazione aggiornata · P&L realizzato ${formatSignedEur(result.realizedPnlEur)}`
-            : 'Operazione aggiornata'
+          withFeeOutcome(
+            result.realizedPnlEur !== undefined
+              ? `Operazione aggiornata · P&L realizzato ${formatSignedEur(result.realizedPnlEur)}`
+              : 'Operazione aggiornata',
+            result.feeRow
+          )
         );
       } else {
         const formData: AssetTransactionFormData = {
@@ -471,10 +512,14 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
           note: noteValue,
         };
         const result = await createMutation.mutateAsync(formData);
+        onCreated?.(result, formData, estimateTradePriceEur(asset, formData.pricePerUnit));
         toast.success(
-          result.realizedPnlEur !== undefined
-            ? `Operazione registrata · P&L realizzato ${formatSignedEur(result.realizedPnlEur)}`
-            : 'Operazione registrata'
+          withFeeOutcome(
+            result.realizedPnlEur !== undefined
+              ? `Operazione registrata · P&L realizzato ${formatSignedEur(result.realizedPnlEur)}`
+              : 'Operazione registrata',
+            result.feeRow
+          )
         );
       }
       onClose();
@@ -694,9 +739,22 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
                 step="0.01"
                 min="0"
                 placeholder="es. 1.00"
+                disabled={storedFee === null && !feeCategory}
+                aria-describedby="trade-fees-hint"
                 {...register('fees', { valueAsNumber: true })}
               />
               {errors.fees && <p className="text-sm text-destructive">{errors.fees.message}</p>}
+              <p id="trade-fees-hint" className="text-xs text-muted-foreground">
+                {feeHint ?? (
+                  <>
+                    {TRADE_FEE_NEEDS_CATEGORY}{' '}
+                    <Link href="/dashboard/settings?tab=spese" className="underline underline-offset-2 hover:text-foreground">
+                      Impostazioni › Spese
+                    </Link>
+                    .
+                  </>
+                )}
+              </p>
             </div>
 
             {type === 'sell' && (
@@ -769,7 +827,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
 
         {/* What the save will do — a sub-tile on the muted surface, at the tile's cadence. */}
         {summary && (
-          <div className="space-y-1 rounded-xl bg-muted p-3.5">
+          <div className={cn('space-y-1 bg-muted p-3.5', COSTUME_FRAME_RADIUS_CLASS)}>
             <p className={TILE_SUB_EYEBROW_CLASS}>Cosa succede al salvataggio</p>
             <div className="flex items-baseline justify-between gap-3 pt-1.5 text-sm">
               <span className="text-muted-foreground">

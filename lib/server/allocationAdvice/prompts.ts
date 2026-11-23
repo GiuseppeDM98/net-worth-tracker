@@ -30,6 +30,13 @@ import {
 import { formatQuestionAnswersForPrompt } from '@/lib/utils/questionSet';
 import { describeRoundCount } from '@/lib/utils/allocationAdviceNarrative';
 import { formatCashflowBlockSection, type AssistantPromptParts } from '@/lib/server/assistant/prompts';
+// Types only: the prompts' tests never load `server-only` nor the Admin SDK through the reader.
+import type { AccumulationPlanRead } from './accumulationPlan';
+import type { InstallmentLineStatus } from '@/types/accumulationPlan';
+import type { OperatingPlanFacts, OperatingPlanInstrument } from '@/lib/utils/operatingPlan';
+import { roundToCents } from '@/lib/utils/cents';
+import { formatNumberIt } from '@/lib/utils/formatters';
+import { addMonths } from '@/lib/utils/planMonths';
 
 function eur(value: number): string {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
@@ -153,18 +160,20 @@ const STRATEGY_CONTRACT = [
   "2. **L'allocazione proposta** — ogni classe con la percentuale e il perché; per ogni classe i sotto-target (nome e % della classe); la liquidità come percentuale o come riserva fissa in euro, dicendo quale e perché.",
   '3. **Casa, fondi pensione e illiquidi** — il ruolo scelto dall\'utente e il tuo giudizio su di esso.',
   '4. **Obiettivi** — per ogni obiettivo tenuto o nuovo: a quali strumenti POSSEDUTI legarlo e con quale quota (percentuale dello strumento), coerente con la sua scadenza e priorità; le quote dello stesso strumento su più obiettivi non superano il 100%; un obiettivo che l\'utente ha segnato da eliminare non compare.',
-  '5. **Cosa cambia rispetto a oggi** — le differenze principali con i target attuali e con le classi attuali, in punti percentuali.',
+  "5. **Cosa cambia rispetto a oggi** — le differenze principali con i target attuali e con le classi attuali, in punti percentuali; poi come arrivarci: accumulando con il risparmio mensile (un piano di accumulo che compra le classi sotto target) o vendendo, e in quanto tempo all'incirca, con la rata mensile come ordine di grandezza (una cifra tonda), dalla mediana del risparmio mensile del blocco CASHFLOW 12 MESI (senza quel blocco non stimare né il tempo né la rata); se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va già in quella direzione o va rivisto. Nessuna tabella di rate o di quote per strumento: le cifre esatte le scrive il piano operativo, dopo il report.",
   '6. **Rischi e revisione** — i rischi del piano e quando rivederlo (una data, motivata: di norma fra 1 e 3 anni, o prima se un obiettivo scade).',
   '',
   "Se i dati contengono il blocco IL PIANO IN VIGORE E IL PERCHÉ, è il piano che l'utente segue oggi e le ragioni di allora: non ripartire da zero. Tieni ciò che regge ancora, cambia ciò che i dati nuovi o le risposte nuove contraddicono, e aggiungi la sezione **Rispetto al piano precedente** (fra «Cosa cambia rispetto a oggi» e «Rischi e revisione») che dice cosa confermi, cosa cambi e perché, richieste di modifica di allora comprese.",
   '',
   'In `proposal` la proposta strutturata, con questi campi:',
   PROPOSAL_SCHEMA_TEXT,
-  'Vincoli: le "targetPercentage" delle classi senza "fixedAmount" sommano esattamente a 100; ogni classe compare una volta; i nomi in "assetName" sono copiati ESATTAMENTE dal blocco STRUMENTI; "assetRoles" contiene solo gli strumenti il cui ruolo deve CAMBIARE o che l\'utente ha nominato (casa, fondi pensione, illiquidi), non tutti; un sotto-target che corrisponde a uno strumento già posseduto lo nomina in "instrument". Il nome di un sotto-target è la SOTTOCATEGORIA che gli strumenti posseduti portano già nel blocco STRUMENTI (es. «All World», «Bond Singoli»): un sotto-target con un nome nuovo resta vuoto finché l\'utente non riclassifica lo strumento a mano — se lo proponi, dillo nel testo.',
+  'Vincoli: le "targetPercentage" delle classi senza "fixedAmount" sommano esattamente a 100; ogni classe compare una volta; i nomi in "assetName" sono copiati ESATTAMENTE dal blocco STRUMENTI; una riga «0 quote, mai comprato» è uno strumento già creato e mai acquistato: non è posseduto e non pesa nell\'allocazione, ma un sotto-target che gli corrisponde lo nomina in "instrument" con quel nome; "assetRoles" contiene solo gli strumenti il cui ruolo deve CAMBIARE o che l\'utente ha nominato (casa, fondi pensione, illiquidi), non tutti; un sotto-target che corrisponde a uno strumento già posseduto lo nomina in "instrument". Il nome di un sotto-target è la SOTTOCATEGORIA che gli strumenti posseduti portano già nel blocco STRUMENTI (es. «All World», «Bond Singoli»): un sotto-target con un nome nuovo resta vuoto finché l\'utente non riclassifica lo strumento a mano — se lo proponi, dillo nel testo.',
   // The goals' contributions and the cash reserve rest on the cashflow block (owner, 2026-11-01).
   'I "monthlyContribution" degli obiettivi stanno dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI (se la superano, dillo e perché); la riserva di liquidità si misura sulla spesa mensile mediana e sui conti liquidi del blocco.',
   // The bonds by horizon (owner, 2026-11-08, after the interview's phase F on the mirror): the block OBBLIGAZIONI is the data, the goals' dates the horizons.
-  "Nella classe Obbligazioni ogni sotto-target dice nel testo quale orizzonte copre (es. 1-3 anni, 3-7 anni) e quale obiettivo serve, a partire dalle scadenze degli obiettivi e dal blocco OBBLIGAZIONI (le scadenze dei titoli, le duration degli ETF): se l'orizzonte di un obiettivo resta scoperto, proponi il sotto-target che lo copre e di' che resta vuoto finché l'utente non ci mette uno strumento; se le scadenze possedute sono già allineate, dillo in una riga.",
+  "Nella classe Obbligazioni ogni sotto-target dice nel testo quale orizzonte copre (es. 1-3 anni, 3-7 anni) e quale obiettivo serve, a partire dalle scadenze degli obiettivi e dal blocco OBBLIGAZIONI (le scadenze dei titoli); non scrivere la duration di un ETF in numeri: la verifica il secondo agente con la ricerca web, tu descrivi l'orizzonte che il sotto-target deve coprire. Se l'orizzonte di un obiettivo resta scoperto, proponi il sotto-target che lo copre e di' che resta vuoto finché l'utente non ci mette uno strumento; se le scadenze possedute sono già allineate, dillo in una riga.",
+  // A goal with a date and an amount wants a known sum on that date (owner, 2026-11-20, on the mirror tour of the one-click «Applica»).
+  "Un obiettivo con una scadenza e un importo, servito dalle obbligazioni, chiede una cifra certa a quella data: proponi per lui un titolo di Stato tenuto a scadenza (un BTP, o un BTP€i se la cifra va protetta dall'inflazione) che scade entro l'anno dell'obiettivo, in un sotto-target che nel testo nomina l'obiettivo e l'anno di scadenza cercato. Un ETF obbligazionario non ha una scadenza: al posto del titolo lo proponi solo se l'utente nel colloquio ha scelto gli ETF per quell'obiettivo, e allora dici in una riga cosa perde (il suo prezzo a quella data non è garantito).",
   // The previous paths (owner, 2026-11-08): what changed since then, and whether the facts or the words moved it.
   "Se ci sono PERCORSI PRECEDENTI, «La situazione» dice cosa è cambiato rispetto ad allora — tolleranza, orizzonte, obiettivi, strumenti da tenere — e se il cambiamento nasce dai fatti (reddito, patrimonio, famiglia, obiettivi) o dalle parole dell'utente: se nelle sue parole, di allora o di oggi, leggi paura, fretta o euforia, nominale citando la frase che te lo fa pensare, senza giudicare; un piano che cambia direzione per emozione lo dice e propone il passo più piccolo che la rispetta.",
 ].join('\n');
@@ -189,9 +198,9 @@ export function formatPriorPlanForPrompt(plan: AllocationAdvicePriorPlan): strin
 
 /** The data intro of a run WITH the cashflow block, shared by the strategy and the interview so they never drift (2026-11-08). */
 const DATA_INTRO =
-  "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI e CASHFLOW 12 MESI sono esaustivi. Il blocco CASHFLOW del periodo copre solo l'anno in corso: per entrate, spesa e risparmio usa il blocco CASHFLOW 12 MESI.";
+  "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI, PIANO DI ACCUMULO e CASHFLOW 12 MESI sono esaustivi. Il blocco CASHFLOW del periodo copre solo l'anno in corso: per entrate, spesa e risparmio usa il blocco CASHFLOW 12 MESI.";
 const DATA_INTRO_WITHOUT_CASHFLOW =
-  "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA e OBBLIGAZIONI sono esaustivi.";
+  "Di seguito i dati dell'intero portafoglio, estratti in modo affidabile dal sistema. I blocchi STRUMENTI, ALLOCAZIONE OGGI, ALLOCAZIONE TARGET vs ATTUALE, REGISTRO OPERAZIONI, DIVIDENDI, PREVIDENZA, MUTUI, FAMIGLIA, OBBLIGAZIONI e PIANO DI ACCUMULO sono esaustivi.";
 
 /** One path's answers in a line: what the comparison with today needs, the rest stays in the archive. */
 function formatPathAnswersLine(answers: AllocationAdviceAnswers): string {
@@ -260,11 +269,65 @@ export function formatPreviousPathsForPrompt(previous: AllocationAdvicePreviousP
     if (revisionRounds.length > 0) lines.push(formatQuestionAnswersForPrompt(revisionRounds, 'Tornata della revisione'));
     if (proposal) {
       lines.push(`Proposta di allora: ${proposal.summary} — ${proposal.classes.map((cls) => `${ASSET_CLASS_LABELS[cls.assetClass] ?? cls.assetClass} ${cls.targetPercentage}%`).join(' · ')}`);
+      // Its new goals are its own doing: «Applica» created them (owner, 2026-11-20).
+      const proposedGoals = (proposal.goals ?? []).filter((goal) => !goal.goalId);
+      if (proposedGoals.length > 0) {
+        const described = proposedGoals.map((goal) => `${goal.name} (${[
+          goal.targetAmount !== undefined ? `target ${eur(goal.targetAmount)}` : 'senza importo',
+          goal.targetDateIso ? `scadenza ${goal.targetDateIso}` : 'senza scadenza',
+          `priorità ${goal.priority}`,
+        ].join(', ')})`).join(' · ');
+        lines.push(`Obiettivi nuovi proposti allora, ${path.applied ? 'creati da «Applica»' : 'mai creati'}: ${described}`);
+      }
     } else {
       lines.push(`Proposta di allora: nessuna (percorso ${path.status === 'failed' ? 'fallito' : 'interrotto'} alla fase ${path.stage ?? 'iniziale'})`);
     }
   });
   return lines.join('\n');
+}
+
+const PLAN_SALE_STATUS: Record<InstallmentLineStatus, string> = {
+  planned: 'da fare', executed: 'fatta', skipped: 'saltata',
+};
+
+/**
+ * The PIANO DI ACCUMULO block (owner, 2026-11-12): the active plan in one line (month k of N, the
+ * instalment, the end month), what it buys with its quotas and what it sells — or which absence
+ * it is: «nessun piano» and «non letto» are two different facts (The Absence-Has-Three-Names
+ * Rule). Never the model nor its criteria. Read by the strategy, the interview, the review and
+ * the revision; the instruments stage does not get it.
+ */
+export function formatAccumulationPlanForPrompt(state: AccumulationPlanRead): string {
+  const header = '--- PIANO DI ACCUMULO ---';
+  if (!state.read) return `${header}\nIl piano di accumulo non è stato letto in questa corsa: non so se ce n'è uno.`;
+  const plan = state.plan;
+  if (!plan) return `${header}\nNessun piano di accumulo attivo.`;
+  // A plan that refills the reserve first says so, and names its first instalment (owner, 2026-11-20).
+  const from = Math.max(plan.monthIndex, 1);
+  const first = plan.firstBuy;
+  const waitsFirst = first === null || first.index > from;
+  const waiting = first === null ? 0 : first.index - from;
+  const firstClause = first === null
+    ? 'non resta nessuna rata da comprare.'
+    : `${plan.monthIndex === 0 ? 'i mesi' : 'questo mese e i successivi'} fino a ${addMonths(first.month, -1)} ricostituiscono solo la riserva `
+      + `(${waiting} ${waiting === 1 ? 'mese' : 'mesi'} senza acquisti), prima rata ${eur(first.amountEur)} a ${first.month}.`;
+  const head = plan.monthIndex === 0
+    ? `Piano attivo, non ancora partito: parte a ${plan.startMonth}, ${plan.months} mesi fino a ${plan.endMonth}`
+      + (waitsFirst ? `; ${firstClause}` : `, prima rata ${eur(first.amountEur)}.`)
+    : waitsFirst
+      ? `Piano attivo: mese ${plan.monthIndex} di ${plan.months}, ultimo mese ${plan.endMonth}; ${firstClause}`
+      : `Piano attivo: mese ${plan.monthIndex} di ${plan.months}, rata del mese ${eur(plan.instalmentEur)}, ultimo mese ${plan.endMonth}.`;
+  // The shares of the plan's money, never the end weights: a held position has a weight and buys nothing (2026-11-20).
+  const buys = plan.buys.length === 0
+    ? 'niente'
+    : plan.buys.map((buy) => `${buy.name} ${formatNumberIt(buy.sharePct, Number.isInteger(buy.sharePct) ? 0 : 1)}% (${eur(buy.amountEur)})`).join(' · ');
+  const holds = plan.holds.length === 0 ? [] : [`Tiene al loro peso, senza comprarli: ${plan.holds.map((hold) => hold.name).join(' · ')}.`];
+  // An absent month is month 1, as the plan's own sales read it.
+  const sells = plan.sells.length === 0 ? 'niente' : plan.sells.map((sell) =>
+    `${sell.name}, ${sell.quantity === null ? 'tutte le quote' : `${sell.quantity} quote`}, al mese `
+    + `${sell.monthIndex ?? 1} (${PLAN_SALE_STATUS[sell.status]})`
+    + (sell.reinvestName ? `, e con il ricavato compra ${sell.reinvestName} nello stesso mese` : '')).join(' · ');
+  return [header, head, `Compra, in parti dei soldi del piano: ${buys}.`, ...holds, `Vende: ${sells}.`].join('\n');
 }
 
 /**
@@ -306,7 +369,7 @@ export const INTERVIEW_CONTRACT = [
   'In questa fase non proponi né consigli: chiedi.',
   "Hai davanti le risposte del percorso e i dati dell'intero portafoglio e del cashflow. Fai da amico critico: chiedi SOLO ciò che i dati o le risposte rendono dubbio e che cambierebbe la strategia. Esempi del genere di dubbio: un reddito concentrato su una sola fonte con un orizzonte lungo e una tolleranza alle perdite alta; un obiettivo entro pochi anni con molte azioni; una riserva di emergenza che i conti liquidi non coprono; una rata di prestito accanto a «niente da evitare».",
   'Non chiedere ciò che le risposte dicono già. Non dare consigli, non proporre allocazioni, non giudicare il mercato.',
-  "Le obbligazioni: se il blocco OBBLIGAZIONI elenca titoli o ETF, o la classe dovrà avere peso nel piano, chiedi a cosa servono (quale obiettivo, quale orizzonte), se l'utente preferisce titoli singoli, ETF o entrambi, e quali scadenze vuole coprire — nel `why` le scadenze e le duration che il blocco riporta.",
+  "Le obbligazioni: se il blocco OBBLIGAZIONI elenca titoli o ETF, o la classe dovrà avere peso nel piano, chiedi a cosa servono (quale obiettivo, quale orizzonte), se l'utente preferisce titoli singoli, ETF o entrambi, e quali scadenze vuole coprire — nel `why` le scadenze che il blocco riporta, mai una duration in numeri: il blocco non ne riporta. Se un obiettivo ha una scadenza e un importo e le obbligazioni lo servono, fra le opzioni c'è un titolo singolo che scade vicino a quella data, tenuto a scadenza, e nel `why` dici perché: la cifra a scadenza è nota, un ETF obbligazionario a quella data non la garantisce.",
   '',
   '# Cosa devi produrre',
   "La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfied`, `questions`.",
@@ -373,7 +436,7 @@ export function buildInterviewPrompt(
 
 const CANDIDATES_SCHEMA_TEXT = [
   '```instrument-candidates',
-  '{ "sleeves": [ { "assetClass": chiave di classe, "subTarget": nome del sotto-target, "candidates": [ { "name": string, "isin"?: string, "ticker"?: string, "exchange": string, "policy"?: "accumulazione" | "distribuzione", "ter"?: number (percento annuo, es. 0.2), "duration"?: number (anni: la duration effettiva di un ETF obbligazionario, verificata), "domicile"?: string, "alreadyHeld"?: boolean, "note": string, "source"?: string (URL o fonte) } ], "caveat"?: string } ] }',
+  '{ "sleeves": [ { "assetClass": chiave di classe, "subTarget": nome del sotto-target, "candidates": [ { "name": string, "isin"?: string, "ticker"?: string, "yahooSymbols"?: [ string ] (da 1 a 3 simboli con cui Yahoo Finance quota lo strumento: il primo sulla borsa indicata dall\'utente, poi altri listini in euro, es. "SWDA.MI", "EUNL.DE", "IWDA.AS"), "exchange": string, "policy"?: "accumulazione" | "distribuzione", "ter"?: number (percento annuo, es. 0.2), "duration"?: number (anni: la duration effettiva di un ETF obbligazionario, verificata), "domicile"?: string, "alreadyHeld"?: boolean, "note": string, "source"?: string (URL o fonte) } ], "caveat"?: string } ] }',
   '```',
 ].join('\n');
 
@@ -381,9 +444,10 @@ const INSTRUMENTS_CONTRACT = [
   '# Cosa devi fare',
   "Per OGNI sotto-target della proposta trova da 1 a 3 strumenti (ETF/ETC UCITS, o titoli di Stato quando il sotto-target lo richiede) negoziabili sulla borsa indicata dall'utente, con la politica dei proventi che preferisce. Usa la ricerca web per verificare: quotazione sulla borsa indicata, ISIN, ticker, TER, domicilio. Cita la fonte di ogni verifica.",
   "Se l'utente possiede già uno strumento adatto a un sotto-target, è il primo candidato e lo segni «alreadyHeld»: cambiare strumento ha un costo fiscale.",
-  'Non inventare ISIN o ticker: un dato che non riesci a verificare lo ometti e lo dici in "caveat". Non dare giudizi di mercato né previsioni.',
+  'Non inventare ISIN o ticker: un dato che non riesci a verificare lo ometti e lo dici in "caveat". Per ogni strumento che l\'utente non possiede scrivi in "yahooSymbols" i simboli di Yahoo Finance che hai verificato con la ricerca: il primo sulla borsa indicata, poi fino a due altri listini in euro dello stesso strumento (stesso ISIN) — l\'app userà il primo che ha un prezzo recente. Per un titolo di Stato basta l\'ISIN. Non dare giudizi di mercato né previsioni.',
   "Una ricerca per strumento, non per sotto-target: le ricerche sono limitate, quindi verifica prima gli strumenti che l'utente NON possiede ancora e per quelli già posseduti conferma solo quotazione e ISIN. Parla all'utente in seconda persona («lo possiedi già»), mai in prima.",
-  "Per un sotto-target obbligazionario verifica anche la duration effettiva (o la scadenza media) di ogni ETF e scrivila in \"duration\" (anni): il blocco OBBLIGAZIONI dei dati riporta le duration di Yahoo per gli strumenti posseduti, da confermare, e il testo della strategia dice quale orizzonte il sotto-target deve coprire — un candidato la cui duration non lo copre non è un candidato.",
+  "Per un sotto-target obbligazionario verifica anche la duration effettiva (o la scadenza media) di ogni ETF e scrivila in \"duration\" (anni): vale anche per gli ETF già posseduti, che il blocco OBBLIGAZIONI elenca senza duration; il testo della strategia dice quale orizzonte il sotto-target deve coprire — un candidato la cui duration non lo copre non è un candidato.",
+  "Per un sotto-target che chiede un titolo tenuto a scadenza, i candidati sono titoli di Stato (BTP, o BTP€i quando il testo chiede la protezione dall'inflazione) quotati sulla borsa indicata o sul MOT che scadono entro l'anno nominato dal testo della strategia, mai dopo, il più vicino a quell'anno per primo: verifica con la ricerca ISIN e data di scadenza e scrivi la data nella \"note\"; un titolo non ha \"duration\".",
   '',
   'Scrivi prima una breve nota in markdown (una riga per sotto-target: cosa hai trovato e cosa non hai potuto verificare), poi UN solo blocco di codice con linguaggio `instrument-candidates` con SOLO JSON valido, con questo schema:',
   CANDIDATES_SCHEMA_TEXT,
@@ -425,7 +489,7 @@ const REVIEW_CONTRACT = [
   "3. **Gli strumenti** — per ogni sotto-target lo strumento consigliato (ISIN e borsa), perché lui, e se è già in portafoglio; per gli obbligazionari la duration e l'orizzonte (l'obiettivo) che coprono; se la ricerca non ha verificato qualcosa, dillo.",
   '4. **Gli obiettivi** — ogni obiettivo con gli strumenti legati e le quote.',
   '5. **Casa, fondi pensione e illiquidi** — il ruolo e il giudizio.',
-  '6. **Cosa fare adesso** — i passi concreti, in ordine, con i costi fiscali di un eventuale cambio di strumento.',
+  "6. **Cosa fare adesso** — i passi concreti, in ordine, con i costi fiscali di un eventuale cambio di strumento; poi la strada che la strategia indica per arrivare ai target — accumulare con il risparmio mensile o vendere, il tempo indicativo e la rata come la strategia li stima, senza ricalcolarli — e, se il blocco PIANO DI ACCUMULO descrive un piano attivo, se va verso i nuovi target o va rivisto. Le cifre del piano — versamento, mesi, quote, vendite — le scrive il passo successivo, nella pagina «Il piano operativo»: qui ragiona a parole, niente tabelle di rate né quote per strumento.",
   '7. **Rischi e revisione** — e la data entro cui rivedere il piano.',
   '',
   'In `proposal` la proposta con gli stessi campi della strategia (il suo blocco `allocation-proposal` nei dati qui sotto), rivista alla luce degli strumenti: in ogni sotto-target "instrument" nomina lo strumento scelto (nome e ISIN); le percentuali, i ruoli, gli obiettivi e la data di revisione restano coerenti con il testo. Se non cambi nulla della strategia, ricopia la sua proposta.',
@@ -450,7 +514,7 @@ export function buildRevisionPrompt(
   candidates: InstrumentCandidates | null,
   previousReport: string,
   requests: readonly string[],
-  opts: { interview?: AllocationAdviceInterview | null } = {}
+  opts: { interview?: AllocationAdviceInterview | null; accumulationPlan?: string } = {}
 ): AssistantPromptParts {
   // The REVISION's round (asked on the written request, 2026-11-08), never the path's: that one
   // reached the revision through the strategy and the previous report it already carries.
@@ -478,6 +542,7 @@ export function buildRevisionPrompt(
           '',
         ]
       : []),
+    ...(opts.accumulationPlan ? [opts.accumulationPlan, ''] : []),
     "Riscrivi il report intero applicando l'ultima richiesta, come descritto.",
   ].join('\n');
   return { system: `${CONSULENTE_CORE}\n${REVIEW_CONTRACT}${REVISION_CONTRACT}`, userContent };
@@ -488,7 +553,7 @@ export function buildReviewPrompt(
   strategyMarkdown: string,
   instrumentsMarkdown: string,
   candidates: InstrumentCandidates | null,
-  opts: { interview?: AllocationAdviceInterview | null } = {}
+  opts: { interview?: AllocationAdviceInterview | null; accumulationPlan?: string } = {}
 ): AssistantPromptParts {
   const userContent = [
     formatAnswersForPrompt(answers),
@@ -500,7 +565,153 @@ export function buildReviewPrompt(
     instrumentsMarkdown,
     candidates ? '' : 'NOTA: il secondo agente non ha prodotto un blocco strutturato valido; usa solo il suo testo.',
     '',
+    ...(opts.accumulationPlan ? [opts.accumulationPlan, ''] : []),
     'Scrivi il report finale come descritto.',
   ].join('\n');
   return { system: `${CONSULENTE_CORE}\n${REVIEW_CONTRACT}`, userContent };
+}
+
+// ─── 4. The operating plan (Opus 5.5, 2026-11-19) ────────────────────────────
+// The «Piano» stage translates the finished report into ONE structured object: the monthly inflow,
+// the months, a row per instrument by the KEY of the DATI PER IL PIANO OPERATIVO block, the review
+// month. The app checks it (`reconcileOperatingPlan`); the instalments stay the engine's.
+
+/**
+ * Euros as the facts block prints them: «€12.000», the symbol first and the thousands grouped from
+ * four digits (it-IT alone leaves «1200» ungrouped), as the core's «Valute in formato italiano
+ * (es. €1.234)» asks the model to write them back.
+ */
+function euroFact(value: number, fractionDigits: { min: number; max: number }): string {
+  // `signDisplay: 'negative'`: a float's −0 (a reserve of nothing, 2026-11-19) or a value rounding to zero prints «€0», never «€-0».
+  const options = { minimumFractionDigits: fractionDigits.min, maximumFractionDigits: fractionDigits.max, useGrouping: 'always', signDisplay: 'negative' } as unknown as Intl.NumberFormatOptions;
+  return `€${new Intl.NumberFormat('it-IT', options).format(value)}`;
+}
+const euroWhole = (value: number) => euroFact(value, { min: 0, max: 0 });
+const euroPrice = (value: number) => euroFact(value, { min: 2, max: 2 });
+const euroCents = (value: number) => euroFact(value, { min: 0, max: 2 });
+const quantityFact = (value: number) => new Intl.NumberFormat('it-IT', { maximumFractionDigits: 6 }).format(value);
+const pctFact = (value: number) => `${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 }).format(value)}%`;
+
+const TAX_UNKNOWN_FACT = { rate: "tasse non stimabili (manca l'aliquota)", 'cost-basis': 'tasse non stimabili (manca il costo fiscale)' } as const;
+
+function classFact(instrument: OperatingPlanInstrument): string {
+  const label = ASSET_CLASS_LABELS[instrument.assetClass] ?? instrument.assetClass;
+  return instrument.subCategory ? `${label} › ${instrument.subCategory}` : label;
+}
+
+/** One held instrument's line: key, name, class, quotes, price and — while it holds something — value, tax, «DA TENERE», limits. */
+function heldFactLine(instrument: OperatingPlanInstrument, fact: OperatingPlanFacts['held'][string], withClass: boolean): string {
+  // Names as the user typed them may carry outer spaces (2026-11-19): the block prints them trimmed.
+  const parts = [instrument.ref, instrument.name.trim(), ...(withClass ? [classFact(instrument)] : [])];
+  if (fact.quantity > 0) {
+    parts.push(`${quantityFact(fact.quantity)} quote`, euroPrice(fact.priceEur), euroWhole(fact.valueEur));
+    const tax = fact.tax;
+    parts.push(tax.kind === 'taxed' ? `tasse stimate ${euroCents(roundToCents(fact.valueEur * tax.perEuro))}` : tax.kind === 'exempt' ? 'esente' : TAX_UNKNOWN_FACT[tax.reason]);
+  } else {
+    // Created empty for a plan, or sold down to 0 and chosen again: either way it holds nothing (owner, 2026-11-19).
+    parts.push('0 quote, non posseduto', euroPrice(fact.priceEur));
+  }
+  if (fact.keep) parts.push('DA TENERE');
+  const limits = [fact.minPct !== undefined ? `minimo ${pctFact(fact.minPct)}` : null, fact.maxPct !== undefined ? `massimo ${pctFact(fact.maxPct)}` : null].filter((part): part is string => part !== null);
+  if (limits.length > 0) parts.push(`limite: ${limits.join(' · ')}`);
+  return parts.join(' · ');
+}
+
+/**
+ * The DATI PER IL PIANO OPERATIVO block: the plan's first month, the investment account (or the
+ * accounts' sum), the reserve the click will use and how far the cash is from it, then every key
+ * with its legend — the held instruments a plan can buy, the money-market funds, the new
+ * instruments of the report. Never an asset id, a tax rate or a held ISIN; a section with no row
+ * prints «nessuno».
+ */
+export function formatOperatingPlanFacts(input: {
+  facts: OperatingPlanFacts;
+  /** «dicembre 2026»: the month after `now`, Italian. */
+  firstMonthLabel: string;
+  investmentAccount: { name: string; balanceEur: number } | null;
+  /** Σ of the source accounts. */
+  accountsEur: number;
+  /** The reserve the click will use. */
+  reserveEur: number;
+}): string {
+  const { facts, firstMonthLabel, investmentAccount, accountsEur, reserveEur } = input;
+  const cashEur = investmentAccount ? investmentAccount.balanceEur : accountsEur;
+  const above = cashEur - reserveEur;
+  const lines = [
+    '--- DATI PER IL PIANO OPERATIVO ---',
+    `Mese 1 del piano: ${firstMonthLabel}.`,
+    investmentAccount
+      ? `Conto per gli investimenti: ${investmentAccount.name.trim()}, saldo ${euroWhole(investmentAccount.balanceEur)}.`
+      : `Conto per gli investimenti: non impostato: i conti liquidi sommano ${euroWhole(accountsEur)}.`,
+    `Riserva di liquidità dell'allocazione proposta: ${euroWhole(reserveEur)}. ${above >= 0 ? `Sopra la riserva ci sono ${euroWhole(above)}.` : `Mancano ${euroWhole(-above)} alla riserva.`}`,
+  ];
+  const section = (header: string, rows: string[]) => lines.push(header, ...(rows.length > 0 ? rows : ['nessuno']));
+  const of = (kind: OperatingPlanInstrument['kind']) => facts.instruments.filter((instrument) => instrument.kind === kind);
+  section(
+    'Strumenti posseduti che un piano può comprare (chiave · nome · classe › sotto-categoria · quote · prezzo · valore · tasse stimate se venduto tutto):',
+    of('held').map((instrument) => heldFactLine(instrument, facts.held[instrument.ref], true))
+  );
+  section('Fondi monetari (si possono vendere, mai comprare):', of('cashFund').map((instrument) => heldFactLine(instrument, facts.held[instrument.ref], false)));
+  section(
+    'Strumenti nuovi indicati dal report (0 quote, da creare):',
+    of('new').map((instrument) => [instrument.ref, instrument.prefill?.isin ? `${instrument.name.trim()} (${instrument.prefill.isin})` : instrument.name.trim(), classFact(instrument)].join(' · '))
+  );
+  return lines.join('\n');
+}
+
+export const PLAN_CONTRACT = [
+  '# Cosa devi produrre',
+  "La risposta è UN oggetto JSON: il PIANO OPERATIVO, cioè il piano di accumulo mensile che porta il portafoglio di oggi verso l'allocazione del report. Il report è già scritto e non lo riscrivi: lo traduci in operazioni che l'utente può eseguire. L'app creerà il piano da questo oggetto, con un clic.",
+  'Campi:',
+  '{',
+  '  "summary": string (2-3 frasi: il piano in breve, a parole),',
+  '  "monthlyInflowEur": number (quanto l\'utente versa nel piano ogni mese, in euro: dentro la mediana del risparmio mensile del blocco CASHFLOW 12 MESI; se la superi, dillo in "departures" con il perché; se il blocco non dà una mediana, usa la rata che il report indica come ordine di grandezza e dillo in "departures"),',
+  '  "months": number (la durata in mesi, da 1 a 60: quella che serve a coprire lo scarto dai target del report con il versamento che l\'utente può sostenere — non più lunga del necessario, non così corta da chiedere un versamento sopra la mediana; in "summary" scrivi perché dura così),',
+  '  "rows": [ { "ref": chiave copiata ESATTAMENTE dal blocco DATI PER IL PIANO OPERATIVO (S…, N…, M…), "action": "buy" | "hold" | "sell", "targetPercentage": number, "sellQuantity"?: number (quote intere da vendere; assente = tutte), "sellMonth"?: number (il mese del piano in cui vendere, da 1 a "months"; assente = 1), "reinvestInto"?: string (solo su una riga "sell": la chiave della riga "buy" che il ricavato compra tutto nel mese della vendita, lo scambio), "reason": string (una frase: perché) } ],',
+  '  "reviewMonth"?: number (il mese del piano in cui riguardare quote e rata, se ha senso riguardarle prima della fine),',
+  '  "reviewReason": string,',
+  '  "departures": [ string ] (dove il piano si discosta dal report o dalla strategia, una frase ciascuna; vuoto se non si discosta)',
+  '}',
+  'Regole:',
+  '- Una riga per OGNI chiave S: "buy" (il piano lo compra), "hold" (smetti di comprarlo: resta dov\'è) o "sell". Una riga "buy" per ogni chiave N che il piano compra. Le chiavi M compaiono solo se le vendi.',
+  '- "targetPercentage" è il peso a cui il piano porta lo strumento fra gli strumenti che compra: le righe "buy" sommano esattamente a 100; "hold" e "sell" hanno 0. I pesi seguono l\'allocazione e i sotto-target del report; rispetta i limiti scritti accanto a uno strumento.',
+  '- Vendi solo quando serve ad arrivare ai target in un tempo ragionevole o a uscire da uno strumento che il report sostituisce: ogni vendita ha un costo fiscale, scritto nel blocco («tasse stimate»), e la sua ragione lo pesa. Non vendere MAI uno strumento segnato DA TENERE: puoi solo smettere di comprarlo.',
+  '- Una vendita in un mese successivo al primo fa entrare il suo ricavato nelle rate da quel mese: usala per diluire le tasse o per non restare fuori dal mercato.',
+  // The swap (owner, 2026-11-20): the proceeds buy one instrument at once, never the reserve.
+  '- Scrivi "reinvestInto" solo quando il report dice di vendere uno strumento per comprarne un altro con quei soldi (uno scambio): il ricavato compra tutto lo strumento indicato nel mese della vendita, senza passare dalla riserva né dalle rate. "targetPercentage" della riga comprata conta solo i soldi delle rate: una riga comprata solo con lo scambio ha "targetPercentage" 0. Senza "reinvestInto" il ricavato entra nel piano come ogni vendita.',
+  "- Il piano compra dal conto per gli investimenti e non scende mai sotto la riserva scritta nel blocco: se alla riserva manca qualcosa, le vendite e i primi versamenti la ricostituiscono prima che il piano compri (lo fa l'app, anche con una vendita in un mese successivo). Tienine conto nella durata e nel versamento, e non proporre di spendere la riserva.",
+  "- Le quote da vendere non superano quelle possedute. Non scrivere prezzi né importi che non siano nei campi: gli importi delle rate li calcola l'app dai tuoi campi.",
+  '- Usa esclusivamente i numeri dei blocchi: non ricalcolarli e non inventarne.',
+].join('\n');
+
+/**
+ * The «Piano» stage's user turn: the answers, the report with its `allocation-proposal` block, the
+ * instruments with their block, the DATI PER IL PIANO OPERATIVO block, the CASHFLOW 12 MESI block
+ * and the PIANO DI ACCUMULO block, in this order. `system` is the same for every user: every fact
+ * (the keys, the month, the account) sits here.
+ */
+export function buildPlanPrompt(
+  answers: AllocationAdviceAnswers,
+  reportMarkdown: string,
+  instrumentsMarkdown: string,
+  candidates: InstrumentCandidates | null,
+  opts: { factsBlock: string; cashflowBlock: string; accumulationPlan: string }
+): AssistantPromptParts {
+  const userContent = [
+    formatAnswersForPrompt(answers),
+    '--- IL REPORT (la revisione) ---',
+    reportMarkdown,
+    '',
+    '--- STRUMENTI TROVATI ---',
+    instrumentsMarkdown,
+    candidates ? '' : 'NOTA: il secondo agente non ha prodotto un blocco strutturato valido; usa solo il suo testo.',
+    '',
+    opts.factsBlock,
+    '',
+    ...formatCashflowBlockSection(opts.cashflowBlock),
+    opts.accumulationPlan,
+    '',
+    'Scrivi il piano operativo come descritto.',
+  ].join('\n');
+  return { system: `${CONSULENTE_CORE}\n${PLAN_CONTRACT}`, userContent };
 }

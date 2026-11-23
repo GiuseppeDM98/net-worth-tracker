@@ -21,9 +21,10 @@
  */
 
 import { cachedFormatCurrencyEUR, formatPercentageIt as formatPercentage } from '@/lib/utils/formatters';
+import { meaningfulSavingsRate } from '@/lib/utils/savingsRate';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
-import { atThePercent, pluralArticleFor } from '@/lib/utils/patrimonioNarrative';
+import { articleForPercent, atThePercent, pluralArticleFor } from '@/lib/utils/patrimonioNarrative';
 import { resolveDeclineCause, resolveTaxedGrowth, type PeriodSalesSummary } from '@/lib/utils/periodSales';
 import { debtRepaidTotal, declineHeadlineTail, describeDebtNames, describePurchases, describeSales, taxedGrowthHeadline } from '@/lib/utils/salesNarrative';
 import { isPrintedZero } from '@/lib/utils/verdictStrip';
@@ -270,7 +271,7 @@ export interface PeriodEmailVerdictInput {
    * saw, which is why the tile that prints it says so and the verdict never calls it
    * "performance". The tax is taken OUT of it because the ledger knows it (`sales`): the broker's
    * withholding leaves the account with no cashflow row, and read as «mercato» it turned a
-   * 4.000 € tax into a market loss on the real account (settembre 2026).
+   * sale's tax into a market loss (seen live).
    */
   marketEffect: number | null;
   /**
@@ -338,6 +339,7 @@ function resolveHeadline(input: PeriodEmailVerdictInput): { headline: string; to
     marketEffect: input.marketEffect,
     ownFlows: null,
     salesTax: input.sales?.estimatedTax ?? null,
+    delta: input.netWorthDelta,
   });
   return {
     headline: `${subject} è in calo${declineHeadlineTail(cause, input.sales)}`,
@@ -381,13 +383,14 @@ export function buildPeriodEmailVerdict(input: PeriodEmailVerdictInput): PageVer
     parts.forEach((part, index) => sentence.push(prose(index === parts.length - 1 ? ' e ' : ', '), ...part));
     sentence.push(prose('.'));
   } else if (input.totalIncome > 0) {
-    sentence.push(
-      prose(' Hai messo da parte '),
-      signedEuro(savings),
-      prose(', il '),
-      figure(formatPercentage((savings / input.totalIncome) * 100, 1)),
-      prose(' di quanto è entrato.'),
-    );
+    // A deficit reads as the tile reads it (`describeCashflowTile`), never as a negative share
+    // of the income (2026-11-12).
+    const rate = meaningfulSavingsRate(input.totalIncome, input.totalExpenses);
+    if (savings < 0 || rate === null) {
+      sentence.push(prose(' Sono usciti '), euro(-savings), prose(' più di quanto è entrato.'));
+    } else {
+      sentence.push(prose(' Hai messo da parte '), signedEuro(savings), prose(`, ${articleForPercent(rate, 1)}`), figure(formatPercentage(rate, 1)), prose(' di quanto è entrato.'));
+    }
   }
 
   if (input.rank) {
@@ -560,11 +563,14 @@ export function describeCashflowTile(input: { totalIncome: number; totalExpenses
     ];
   }
 
+  // A surplus over a positive income is always a rate; `meaningfulSavingsRate` is the one door.
+  // The article follows the figure as printed (The Comma Rule): «il 28,2%», «l'81,0%».
+  const rate = meaningfulSavingsRate(input.totalIncome, input.totalExpenses) ?? 0;
   return [
     prose('Hai messo da parte '),
     euro(savings),
-    prose(', il '),
-    figure(formatPercentage((savings / input.totalIncome) * 100, 1)),
+    prose(`, ${articleForPercent(rate, 1)}`),
+    figure(formatPercentage(rate, 1)),
     prose(' di quanto è entrato.'),
   ];
 }
@@ -576,7 +582,7 @@ export function describeCashflowTile(input: { totalIncome: number; totalExpenses
 function describeRankedShare(
   entries: Array<{ name: string; amount: number }>,
   shownCount: number,
-  leadIn: (name: string, share: string) => Narrative,
+  leadIn: (name: string, share: string, sharePercent: number) => Narrative,
 ): Narrative | null {
   const positive = entries.filter((entry) => entry.amount > 0);
   if (positive.length === 0) return null;
@@ -585,7 +591,8 @@ function describeRankedShare(
 
   const sorted = [...positive].sort((a, b) => b.amount - a.amount);
   const top = sorted[0];
-  const narrative = leadIn(top.name, formatPercentage((top.amount / total) * 100, 1));
+  const topShare = (top.amount / total) * 100;
+  const narrative = leadIn(top.name, formatPercentage(topShare, 1), topShare);
 
   // The "first N explain X%" clause exists only when rows are actually being withheld.
   const shown = Math.min(shownCount, sorted.length);
@@ -619,14 +626,14 @@ export function describeIncomeCategoriesTile(
   categories: Array<{ name: string; amount: number }>,
   shownCount: number,
 ): Narrative | null {
-  return describeRankedShare(categories, shownCount, (name, share) => [
-    prose(`${name} copre il `),
+  return describeRankedShare(categories, shownCount, (name, share, sharePercent) => [
+    prose(`${name} copre ${articleForPercent(sharePercent, 1)}`),
     figure(share),
     prose(' di quanto è entrato'),
   ]);
 }
 
-/** Spese per tipo — the Fisse/Variabili/Debiti split, as the expense tile's footer. */
+/** Spese per tipo — the Necessarie/Non necessarie/Debiti split, as the expense tile's footer. */
 export function describeExpenseTypes(
   types: Array<{ label: string; amount: number }>,
 ): Narrative | null {

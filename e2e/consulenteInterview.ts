@@ -7,9 +7,14 @@
  * every body the page sent — what the specs assert on (which rounds and answers reached the
  * strategy, whether the skip carried the round as it stood). A round may be delayed, to see the
  * skeleton; a fulfil on a request «Salta il colloquio» aborted is swallowed.
+ *
+ * The plan stage (2026-11-19): BEFORE answering, the fake writes `operatingPlan` on the emulator
+ * (`ready` with the summary «Piano finto n. N», N counting the plan requests, or `failed` with an
+ * error event); a revise writes a new report instant and drops the plan first.
  */
 
 import type { Page } from '@playwright/test';
+import { FAKE_PLAN_ERROR, writeOperatingPlan, writeRevisedReport } from './consulenteReport';
 
 export const sse = (events: object[]) => events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('');
 export const stream = (events: object[]) => ({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: sse(events) });
@@ -141,15 +146,19 @@ export interface FakeRunRecorder {
   interview: InterviewBody[];
   strategy: StrategyBody[];
   revise: ReviseBody[];
+  plan: { stage: 'plan' }[];
+  /** What the next plan request writes; a test may change it between two requests. */
+  planOutcome: 'ready' | 'failed';
 }
 
 /**
  * Fakes the run route. An `interview` request answers the round after the ones the body holds
  * (`FAKE_ROUNDS`), or `REVISION_ROUND` when the body carries a revision; `delayRoundMs(n)` holds
- * round n before answering. A `strategy` request fails on the decoy; a `revise` request completes.
+ * round n before answering. A `strategy` request fails on the decoy; a `revise` request completes;
+ * a `plan` request writes the plan (`options.plan`, default `ready`) and answers it.
  */
-export async function installFakeRun(page: Page, options: { delayRoundMs?: (round: number) => number } = {}): Promise<FakeRunRecorder> {
-  const recorder: FakeRunRecorder = { interview: [], strategy: [], revise: [] };
+export async function installFakeRun(page: Page, options: { delayRoundMs?: (round: number) => number; plan?: 'ready' | 'failed' } = {}): Promise<FakeRunRecorder> {
+  const recorder: FakeRunRecorder = { interview: [], strategy: [], revise: [], plan: [], planOutcome: options.plan ?? 'ready' };
   await page.route('**/api/allocation-advice/run', async (route) => {
     const body = route.request().postDataJSON() as InterviewBody | StrategyBody | ReviseBody;
     if (body.stage === 'interview') {
@@ -172,7 +181,17 @@ export async function installFakeRun(page: Page, options: { delayRoundMs?: (roun
     }
     if (body.stage === 'revise') {
       recorder.revise.push(body);
+      await writeRevisedReport();
       await route.fulfill(stream([{ type: 'stage', stage: 'review' }, { type: 'done' }]));
+      return;
+    }
+    if ((body as { stage: string }).stage === 'plan') {
+      recorder.plan.push({ stage: 'plan' });
+      const outcome = recorder.planOutcome;
+      await writeOperatingPlan(outcome, `Piano finto n. ${recorder.plan.length}.`);
+      await route.fulfill(
+        stream(outcome === 'ready' ? [{ type: 'stage', stage: 'plan' }, { type: 'done' }] : [{ type: 'stage', stage: 'plan' }, { type: 'error', error: FAKE_PLAN_ERROR, retryable: true }]),
+      );
       return;
     }
     await route.fulfill(stream([{ type: 'done' }]));

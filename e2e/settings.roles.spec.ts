@@ -191,6 +191,9 @@ test('a role saved in the dialog reaches Analisi\'s Flusso without a reload', as
   // the global staleTime is 5 minutes, and that copy is what a missing invalidation would serve back.
   await page.locator('a[href="/dashboard/analisi"]:visible').first().click();
   await expect(page).toHaveURL(/\/dashboard\/analisi/);
+  // The Flusso lives in «Dettaglio» (2026-11-12), closed at every mount.
+  const dettaglio = page.getByRole('button', { name: 'Dettaglio', exact: true });
+  await dettaglio.click({ timeout: 30_000 });
   const chart = page.getByRole('region', { name: 'Flusso', exact: true }).getByRole('img', { name: /^Flusso del periodo/ });
   const roleNode = (label: string) => chart.locator('text').filter({ hasText: new RegExp(`^${label}$`) });
   // The base seed's Alimentari and Casa carry no role: both flow into «Da classificare».
@@ -205,5 +208,7 @@ test('a role saved in the dialog reaches Analisi\'s Flusso without a reload', as
 
   // Forward to the same Analisi: its categories were invalidated by the write, so the role is there.
   await page.goForward();
+  // Analisi remounts with «Dettaglio» closed.
+  await dettaglio.click({ timeout: 30_000 });
   await expect(roleNode('Necessità')).toHaveCount(1, { timeout: 30_000 });
 });

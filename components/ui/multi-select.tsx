@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { HeadingText } from "@/components/ui/heading-text";
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -315,7 +316,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 						buttonRef.current.focus();
 						const originalOutline = buttonRef.current.style.outline;
 						const originalOutlineOffset = buttonRef.current.style.outlineOffset;
-						buttonRef.current.style.outline = "2px solid hsl(var(--ring))";
+						buttonRef.current.style.outline = "2px solid var(--ring)";
 						buttonRef.current.style.outlineOffset = "2px";
 						setTimeout(() => {
 							if (buttonRef.current) {
@@ -1141,7 +1142,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 						<Drawer open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
 							<DrawerContent>
 								<DrawerHeader>
-									<DrawerTitle>{placeholder}</DrawerTitle>
+									<DrawerTitle className="costume-title"><HeadingText text={placeholder} /></DrawerTitle>
 									<DrawerDescription className="sr-only">
 										Seleziona una o più opzioni dalla lista.
 									</DrawerDescription>

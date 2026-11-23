@@ -1,25 +1,22 @@
 /**
- * «Nothing moves when a lazy Cashflow tab's chunk lands» (2026-10-06): the placeholder the page
+ * «Nothing moves when a lazy tab's chunk lands» (2026-10-06, Cashflow; Allocazione › Accumulo since 2026-11-17): the placeholder the page
  * draws while the chunk is on its way (`components/cashflow/CashflowTabSkeletons.tsx`) must have
  * the geometry of what the tab draws first — its own loading state. Until that day the fallback of
  * Dividendi lacked the phone's toolbar row and Divisione's lacked the period picker rows, so on a
  * deep link the grid jumped down when the tab mounted.
  *
- * Both routines hold the tab's chunk, measure the first cell of the placeholder grid, then put the
+ * The Cashflow routines hold the tab's chunk, measure the first cell of the placeholder grid, then put the
  * tab itself in its loading state and measure the same cell again. A helper, not a spec: the
  * FILENAME chooses the account (AGENTS.md § 5), so each spec that runs one sits on the right
  * fixture — Dividendi on the base account at 390 (`bundle.lazy.mobile.spec.ts`; at 1440 the
  * phone's axis row is not drawn — since 2026-10-12 the period pill and the «+» sit in the
  * verdict's `axis` slot, and the fallback draws them in `VerdictSkeleton.axis`), Divisione on the
  * split account at 390 and 1440 (`cashflow.split{,.mobile}.spec.ts`). Seen red on 2026-10-06 with
- * the old fallbacks put back.
+ * the old fallbacks put back. The Accumulo routine (below, its own header) runs from
+ * `bundle.lazy.mobile.spec.ts` on the base account.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
-import { holdChunks, holdRequests } from './chunkProbe';
-
-/** A function only the tab's own module defines (a dev chunk keeps the names; the page's chunk names only the path). */
-const DIVIDENDS_TAB_SIGNATURE = 'function DividendTrackingTab(';
-const SPLIT_TAB_SIGNATURE = 'function ExpenseSplitTab(';
+import { ACCUMULO_TAB_SIGNATURE, DIVIDENDS_TAB_SIGNATURE, SPLIT_TAB_SIGNATURE, holdChunks, holdRequests } from './chunkProbe';
 
 /** The first cell of the tile grid inside the panel's loading state (`TileGridSkeleton`). */
 function firstSkeletonCell(panel: Locator): Locator {
@@ -50,6 +47,36 @@ async function settledTopOf(locator: Locator): Promise<number> {
 }
 
 /**
+ * Allocazione › Accumulo (2026-11-12): only the chunk is held — the plans come from the Firestore SDK,
+ * already read by the page for the Piano's note, so the tab mounts with its content, not its loading
+ * state. The check is therefore the fallback's first cell against the tab's first tile: the fallback
+ * (`AccumuloTabSkeleton`) holds the verdict's place, and the tab's first tile (`section`) starts where its
+ * grid started. The tab bar is on screen while the chunk is held. Seen red with the tab imported
+ * statically (no chunk to hold).
+ */
+export async function expectAccumuloTabLandsInPlace(page: Page): Promise<void> {
+  const tabChunk = await holdChunks(page, ACCUMULO_TAB_SIGNATURE);
+  await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'domcontentloaded' });
+
+  const panel = page.getByRole('tabpanel', { name: 'Accumulo' });
+  const cell = firstSkeletonCell(panel);
+  await expect(cell).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('tab', { name: 'Accumulo' })).toBeVisible();
+  const placeholderTop = await settledTopOf(cell);
+  expect(tabChunk.held(), 'the Accumulo tab\'s chunk is held while the placeholder is measured').toBeGreaterThan(0);
+
+  tabChunk.release();
+  // A tile is a `section` with its `aria-label` (components/ui/tile.tsx); the verdict is one too, so it is
+  // left out. The placeholder holds an UNLABELLED `section` (the verdict's skeleton) for a frame or two after
+  // the chunk lands: matched by an unlabelled selector, it was measured while React removed it — a `null`
+  // box, the flake of 2026-11-18/19 (doc/guide/e2e-suite.md) — so the check waits for the placeholder to go.
+  await expect(panel.getByRole('status', { name: 'Caricamento' })).toHaveCount(0, { timeout: 30_000 });
+  const firstTile = panel.locator('section[aria-label]:not([aria-label^="Verdetto"])').first();
+  await expect(firstTile).toBeVisible({ timeout: 30_000 });
+  expect(Math.abs((await settledTopOf(firstTile)) - placeholderTop)).toBeLessThan(1);
+}
+
+/**
  * Dividendi: the chunk is held, then its data (`/api/dividends/stats`), so once the chunk lands the
  * tab mounts in its loading state — which since 2026-10-06 IS the page's fallback element.
  */
@@ -63,6 +90,9 @@ export async function expectDividendsTabLandsInPlace(page: Page): Promise<void> 
   const cell = firstSkeletonCell(panel);
   await expect(cell).toBeVisible({ timeout: 60_000 });
   const placeholderTop = await settledTopOf(cell);
+  // The cell measured is the PAGE's placeholder only while the tab's chunk is stopped: since the tab's
+  // own loading state is that same element, nothing else here would tell a held chunk from none.
+  expect(tabChunk.held(), 'the Dividendi tab\'s chunk is held while the placeholder is measured').toBeGreaterThan(0);
 
   tabChunk.release();
   // The chunk is fulfilled at once; evaluating it and mounting the tab is well inside this wait,

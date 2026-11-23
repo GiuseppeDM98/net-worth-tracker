@@ -32,8 +32,10 @@ import type {
   AssetAllocationTarget,
   AssetClass,
   FamilyMember,
+  IdealAllocationSettings,
   SubCategoryTarget,
 } from '@/types/assets';
+import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/constants/idealAllocation';
 import {
   dropUnnamedSubTargets,
   findTargetProblem,
@@ -177,6 +179,8 @@ export interface GeneraleSlice {
 export interface SpeseSlice {
   defaultDebitCashAssetId: string;
   defaultCreditCashAssetId: string;
+  /** The account a plan of accumulation draws from by default; `NO_SELECTION` = none. */
+  investmentCashAssetId: string;
   /** '' = none: the expense form's «Commissione» stays off. */
   transferFeeCategoryId: string;
   transferFeeSubCategoryId: string;
@@ -193,10 +197,14 @@ export interface DividendiSlice {
 
 /**
  * Read-only declarations: fields OWNED by other pages (FIRE › Calcolatore, Coast FIRE, the
- * Assistant's popover). The page reads them for a tile's reading line and never writes them —
- * no dirty check, not in `composeSettingsDocument`.
+ * Assistant's popover, Allocazione › Accumulo). The page reads them for a tile's reading line and
+ * never writes them from a control — no dirty check. The model portfolio's criteria are CARRIED
+ * THROUGH `composeSettingsDocument` from the document read just before «Salva» (the write goes
+ * through `setSettings`, which replaces the targets and must not lose them).
  */
 export interface SettingsDeclarations {
+  /** The optimizer's criteria, edited in Allocazione › Accumulo; summarised on the Allocazione tab. */
+  idealAllocation: IdealAllocationSettings;
   planParams: {
     withdrawalRate?: number;
     plannedAnnualExpenses?: number;
@@ -411,6 +419,7 @@ export function sliceSettings(
   const spese: SpeseSlice = {
     defaultDebitCashAssetId: data.defaultDebitCashAssetId || NO_SELECTION,
     defaultCreditCashAssetId: data.defaultCreditCashAssetId || NO_SELECTION,
+    investmentCashAssetId: data.investmentCashAssetId || NO_SELECTION,
     transferFeeCategoryId: data.transferFeeCategoryId || '',
     transferFeeSubCategoryId: data.transferFeeSubCategoryId || '',
     spendingRolesEnabled: data.spendingRolesEnabled ?? false,
@@ -424,6 +433,7 @@ export function sliceSettings(
   };
 
   const declarations: SettingsDeclarations = {
+    idealAllocation: data.idealAllocation ?? DEFAULT_IDEAL_ALLOCATION,
     planParams: {
       withdrawalRate: data.withdrawalRate,
       plannedAnnualExpenses: data.plannedAnnualExpenses,
@@ -527,12 +537,16 @@ export function composeSettingsDocument(
     goalDrivenAllocationEnabled: generale.goalDrivenAllocationEnabled,
     withdrawalRate: current?.withdrawalRate,
     plannedAnnualExpenses: current?.plannedAnnualExpenses,
+    // The model portfolio's criteria are read-only here (edited in Allocazione › Accumulo): what the
+    // document holds NOW goes back, never the copy this page loaded.
+    ...(current?.idealAllocation ? { idealAllocation: current.idealAllocation } : {}),
     targets: composeTargets(cleaned),
     dividendIncomeCategoryId: dividendi.dividendIncomeCategoryId || undefined,
     dividendIncomeSubCategoryId: dividendi.dividendIncomeSubCategoryId || undefined,
     dividendCashAssetId: dividendi.dividendCashAssetId !== NO_SELECTION ? dividendi.dividendCashAssetId : undefined,
     defaultDebitCashAssetId: spese.defaultDebitCashAssetId !== NO_SELECTION ? spese.defaultDebitCashAssetId : undefined,
     defaultCreditCashAssetId: spese.defaultCreditCashAssetId !== NO_SELECTION ? spese.defaultCreditCashAssetId : undefined,
+    investmentCashAssetId: spese.investmentCashAssetId !== NO_SELECTION ? spese.investmentCashAssetId : undefined,
     transferFeeCategoryId: spese.transferFeeCategoryId || undefined,
     transferFeeSubCategoryId: spese.transferFeeSubCategoryId || undefined,
     realEstateCostCategories: spese.realEstateCostCategories.length > 0 ? spese.realEstateCostCategories : undefined,

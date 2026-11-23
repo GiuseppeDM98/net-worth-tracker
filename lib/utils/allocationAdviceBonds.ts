@@ -1,21 +1,27 @@
 /**
  * The Consulente's bond block (2026-11-08, the owner's addition after the interview's phase F on the mirror):
- * «--- OBBLIGAZIONI: SCADENZE E DURATION ---», the one place the interview, the strategy and the
- * instrument search read what the bond part is made of — every single bond with its redemption
- * date and the years to it, every bond ETF with the effective duration and the average maturity
- * Yahoo publishes (`topHoldings.bondHoldings`, read through the Esposizione's shared profile
- * cache) — so the strategy can tie each bond sub-target to a goal's horizon and name the maturity
- * nobody covers. Yahoo's figures are «secondo Yahoo», unverified: the second agent confirms them
- * with the web search before it names a candidate's `duration`.
+ * «--- OBBLIGAZIONI: SCADENZE ---», the one place the interview, the strategy and the instrument
+ * search read what the bond part is made of — every single bond with its redemption date and the
+ * years to it, every bond ETF with its value and role — so the strategy can tie each bond
+ * sub-target to a goal's horizon and name the maturity nobody covers.
  *
- * Pure: the server hands it the holdings, the coupon facts, the profiles it resolved and today's
- * date. Nothing here reaches Firestore or Yahoo (the server does, in `run.ts`).
+ * No duration (owner, 2026-11-20, on the mirror tour of the one-click «Applica»): Yahoo's
+ * `topHoldings.bondHoldings` proved wrong on real ETFs — an inflation-linked fund at 1,08 years of
+ * duration against about 7, a 1-3 year fund at 9,8 years of average maturity — and the strategy
+ * built its reasoning on the wrong figure. Only the second agent writes a duration, verified with
+ * the web search; the block says so instead of printing one.
+ *
+ * Pure: the server hands it the holdings, the coupon facts and today's date. Nothing here reaches
+ * Firestore (the server does, in `run.ts`).
  */
 import type { AssistantCouponFact, AssistantHoldingRow } from '@/lib/utils/assistantPortfolioContext';
-import type { InstrumentProfile, ProfileRequest } from '@/types/exposure';
 import { formatNumberIt } from '@/lib/utils/formatters';
 
-export const BOND_TERMS_HEADER = 'OBBLIGAZIONI: SCADENZE E DURATION';
+export const BOND_TERMS_HEADER = 'OBBLIGAZIONI: SCADENZE';
+
+/** The line over the funds: no duration here, and nobody writes one in figures before the search (2026-11-20). */
+export const BOND_FUNDS_LINE =
+  'ETF e fondi obbligazionari (nessuna duration qui: la verifica il secondo agente con la ricerca web, e nessuno ne scrive una in numeri prima):';
 
 const ROLE_LABELS: Record<AssistantHoldingRow['role'], string> = {
   tradable: 'negoziabile',
@@ -39,26 +45,9 @@ export function selectBondHoldings(holdings: AssistantHoldingRow[]): BondHolding
   };
 }
 
-/** The profile requests for the bond funds Yahoo can describe: an ETF with the raw ticker, the `fund` module, each once. */
-export function bondProfileRequests(funds: AssistantHoldingRow[]): ProfileRequest[] {
-  const seen = new Set<string>();
-  const requests: ProfileRequest[] = [];
-  for (const row of funds) {
-    const ticker = row.profileTicker?.trim() ?? '';
-    if (row.type !== 'etf' || ticker === '' || seen.has(ticker)) continue;
-    seen.add(ticker);
-    requests.push({ ticker, module: 'fund' });
-  }
-  return requests.sort((a, b) => a.ticker.localeCompare(b.ticker));
-}
-
 export interface BondTermsInput {
   holdings: AssistantHoldingRow[];
   coupons: AssistantCouponFact[];
-  /** The profiles the server resolved, keyed by raw ticker; `{}` when nothing was asked. */
-  profiles: Record<string, InstrumentProfile>;
-  /** False when the profile read itself failed: the ETF lines say so instead of «non pubblicata». */
-  profilesRead: boolean;
   /** The Italian day, ISO, the years to maturity are counted from. */
   todayIso: string;
 }
@@ -78,10 +67,8 @@ const years = (value: number): string => `${formatNumberIt(value, 1)} anni`;
 const label = (row: AssistantHoldingRow): string => `${row.name}${row.ticker ? ` (${row.ticker})` : ''}`;
 
 /**
- * The block, as lines. Three states, each named: nothing held → one sentence; a single bond → its
- * maturity and the years to it (plus the coupon when the registry knows it); a fund → Yahoo's
- * duration and average maturity with the date they were read, «non pubblicata» when Yahoo has
- * none, «non letta» when the profiles could not be read at all.
+ * The block, as lines. Nothing held → one sentence; a single bond → its maturity and the years to
+ * it (plus the coupon when the registry knows it); a fund → its value and role, never a duration.
  */
 export function formatBondTermsBlock(input: BondTermsInput): string[] {
   const { singles, funds } = selectBondHoldings(input.holdings);
@@ -114,25 +101,8 @@ export function formatBondTermsBlock(input: BondTermsInput): string[] {
   }
 
   if (funds.length > 0) {
-    lines.push(
-      'ETF e fondi obbligazionari (duration effettiva e scadenza media secondo Yahoo Finance, non verificate: il secondo agente le conferma con la ricerca web):',
-    );
-    for (const row of funds) {
-      const profile = row.profileTicker ? input.profiles[row.profileTicker]?.fund : undefined;
-      const bond = profile?.bond;
-      const parts: string[] = [];
-      if (!input.profilesRead) {
-        parts.push('duration non letta (profili non disponibili in questa corsa)');
-      } else if (bond && (bond.durationYears !== null || bond.maturityYears !== null)) {
-        if (bond.durationYears !== null) parts.push(`duration ${years(bond.durationYears)}`);
-        if (bond.maturityYears !== null) parts.push(`scadenza media ${years(bond.maturityYears)}`);
-        if (profile?.fetchedAt) parts.push(`letto il ${profile.fetchedAt.slice(0, 10)}`);
-      } else {
-        parts.push('duration non pubblicata da Yahoo');
-      }
-      parts.push(`valore ${eur(row.valueEur)}`, ROLE_LABELS[row.role]);
-      lines.push(`- ${label(row)}: ${parts.join(', ')}`);
-    }
+    lines.push(BOND_FUNDS_LINE);
+    for (const row of funds) lines.push(`- ${label(row)}: valore ${eur(row.valueEur)}, ${ROLE_LABELS[row.role]}`);
   }
   return lines;
 }

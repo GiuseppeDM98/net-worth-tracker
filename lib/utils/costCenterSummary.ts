@@ -26,11 +26,12 @@
  */
 
 import type { Expense } from '@/types/expenses';
-import type { CostCenter, CostCenterBudgetPeriod, CostCenterLifecycle, CostCenterRecurringSplit } from '@/types/costCenters';
+import type { CostCenter, CostCenterBudgetPeriod, CostCenterLifecycle, CostCenterRecurringSplit, CostCenterSubCategorySlice } from '@/types/costCenters';
 import { getLifecycleStatus, resolveLastActivityDate, splitRecurringVsOneOff } from '@/lib/utils/costCenterUtils';
 import { summarizeCeiling } from '@/lib/utils/budgetSummary';
 import { getItalyDate, getItalyMonth, getItalyYear, isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
+import { RING_CATEGORY_COLORS, isRingWhole, type RingSegment } from '@/lib/utils/ringChart';
 
 // ─── The phone composition: the ids (since 2026-10-12) ────────────────────────
 
@@ -241,6 +242,38 @@ export interface CenterSummary {
   budget: CenterBudgetSummary | null;
   lifecycle: CostCenterLifecycle;
   recurring: CostCenterRecurringSplit;
+}
+
+/**
+ * The split's two slots; a centre wearing slot 3 or 7 shares a hue with them on its own detail —
+ * declared (doc/guide/centri-di-costo.md).
+ */
+export const COST_SPLIT_RING_COLORS = { recurring: 'var(--chart-7)', oneOff: 'var(--chart-3)' } as const;
+
+/** Fixed (recurring, instalments) and one-off as ring parts of the booked total; null unless both are spent. */
+export function costCenterRingSegments(summary: CenterSummary): RingSegment[] | null {
+  const segments: RingSegment[] = [
+    { key: 'recurring', label: 'Fisso', value: summary.recurring.recurring, color: COST_SPLIT_RING_COLORS.recurring },
+    { key: 'one-off', label: 'Una tantum', value: summary.recurring.oneOff, color: COST_SPLIT_RING_COLORS.oneOff },
+  ];
+  return isRingWhole(segments) ? segments : null;
+}
+
+/**
+ * «Per sottocategoria» as ring parts (the owner on the mirror tour, 2026-11-15): the subcategories still counted,
+ * in the tile's order, coloured by their rank among them — an excluded row is not a part, the ring is the net
+ * total; null with fewer than two counted.
+ */
+export function subCategoryRingSegments(slices: readonly CostCenterSubCategorySlice[], excludedKeys: ReadonlySet<string>): RingSegment[] | null {
+  const segments = slices
+    .filter((slice) => !excludedKeys.has(slice.key))
+    .map((slice, rank) => ({
+      key: slice.key,
+      label: slice.subCategoryName,
+      value: slice.total,
+      color: RING_CATEGORY_COLORS[rank % RING_CATEGORY_COLORS.length],
+    }));
+  return isRingWhole(segments) ? segments : null;
 }
 
 export function summarizeCenter(center: CostCenter, expenses: Expense[], now: Date): CenterSummary {

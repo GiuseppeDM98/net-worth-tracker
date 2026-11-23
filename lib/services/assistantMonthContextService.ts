@@ -60,7 +60,9 @@ import { calculateAssetValue } from '@/lib/services/assetService';
 import { assignmentFraction, assignmentSlice } from '@/lib/utils/goalMath';
 import { formatOwnerSlice } from '@/lib/utils/assetOwnership';
 import { sliceUnit } from '@/lib/utils/assetSlice';
-import { buildAssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
+import { buildAssistantPortfolioContext, type AssistantPortfolioPeriod } from '@/lib/utils/assistantPortfolioContext';
+import { buildAssistantNetWorthDrivers, pensionPaidInByClass, type AssistantNetWorthDrivers } from '@/lib/utils/assistantNetWorthDrivers';
+import { resolvePensionReturnStart } from '@/lib/utils/pensionReturn';
 import {
   CASHFLOW_BLOCK_FUTURE_MONTHS,
   type CashflowBlockInput,
@@ -175,7 +177,8 @@ async function fetchExpenses(
   });
 }
 
-async function fetchSettings(userId: string): Promise<AssetAllocationSettings | null> {
+/** The settings the server reads, a field at a time: the EIGHTH place a new settings field is added to (doc/guide/impostazioni.md § Settings). */
+export async function fetchSettings(userId: string): Promise<AssetAllocationSettings | null> {
   const doc = await adminDb.collection('assetAllocationTargets').doc(userId).get();
   if (!doc.exists) {
     return null;
@@ -206,6 +209,9 @@ async function fetchSettings(userId: string): Promise<AssetAllocationSettings | 
     transferFeeCategoryId: data.transferFeeCategoryId,
     transferFeeSubCategoryId: data.transferFeeSubCategoryId,
     assistantMemoryEnabled: data.assistantMemoryEnabled,
+    // The Consulente's operating plan (2026-11-19): the plan's account and the limits of «Criteri del modello».
+    investmentCashAssetId: data.investmentCashAssetId,
+    idealAllocation: data.idealAllocation,
   } as AssetAllocationSettings;
 }
 
@@ -308,6 +314,48 @@ async function fetchPortfolioDocuments(userId: string): Promise<PortfolioDocumen
 }
 
 /**
+ * The period's change split as Storico's Driver splits it, from the snapshot before the period to
+ * the one it closes on, over the period's own expenses, the trades and the pension contributions.
+ */
+function buildDriverFields(
+  allSnapshots: MonthlySnapshot[],
+  previousSnapshot: MonthlySnapshot | null,
+  currentSnapshot: MonthlySnapshot | null,
+  includeDummySnapshots: boolean,
+  input: { expenses: Expense[]; assets: Asset[]; documents: PortfolioDocuments; settings: AssetAllocationSettings | null; now: Date }
+): AssistantNetWorthDrivers | null {
+  const contributions = input.documents.pensionContributions;
+  return buildAssistantNetWorthDrivers({
+    snapshots: allSnapshots.filter((s) => !s.isDummy || includeDummySnapshots),
+    from: previousSnapshot,
+    to: currentSnapshot,
+    context: {
+      expenses: input.expenses,
+      transactions: input.documents.transactions,
+      assets: input.assets,
+      pension: { contributions, startMonth: resolvePensionReturnStart(contributions, input.settings?.pensionReturnStartMonth) },
+      today: input.now,
+    },
+  });
+}
+
+const monthLower = (month: number) => MONTH_NAMES[month - 1].toLowerCase();
+const monthKeyOf = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`;
+
+/**
+ * A bundle's months as the portfolio block reads them (the pension contributions that moved a fund
+ * in them, `valueEffectMonth` keys): from the first month through the last, both included.
+ */
+function portfolioPeriod(
+  from: { year: number; month: number },
+  through: { year: number; month: number },
+  label: string
+): AssistantPortfolioPeriod {
+  const before = from.month === 1 ? { year: from.year - 1, month: 12 } : { year: from.year, month: from.month - 1 };
+  return { afterKey: monthKeyOf(before.year, before.month), throughKey: monthKeyOf(through.year, through.month), label };
+}
+
+/**
  * The portfolio block of every builder: the same documents, the same pure function, so the five
  * periods can never describe five different portfolios. The expenses are the PERIOD's rows (for
  * the last instalment of a loan); everything else is today's.
@@ -318,10 +366,12 @@ function buildPortfolioFields(
   expenses: Expense[],
   settings: AssetAllocationSettings | null,
   goalData: GoalBasedInvestingData | null,
-  now: Date
+  now: Date,
+  period: AssistantPortfolioPeriod | null
 ): Pick<AssistantMonthContextBundle, 'portfolio'> {
   return {
     portfolio: buildAssistantPortfolioContext({
+      period,
       assets,
       transactions: documents.transactions,
       dividends: documents.dividends,
@@ -354,7 +404,7 @@ export async function buildAssistantTodayContext(userId: string): Promise<Assist
   ]);
   return {
     ...buildGoalFields(settings, goalData, assets, now),
-    ...buildPortfolioFields(assets, portfolioDocuments, [], settings, goalData, now),
+    ...buildPortfolioFields(assets, portfolioDocuments, [], settings, goalData, now, null),
   };
 }
 
@@ -694,10 +744,30 @@ function buildNetWorthFields(
  */
 function buildAllocationChanges(
   currentSnapshot: MonthlySnapshot | null,
-  previousSnapshot: MonthlySnapshot | null
+  previousSnapshot: MonthlySnapshot | null,
+  pensionInput: { contributions: PensionContribution[]; assets: Asset[] }
 ): AssistantMonthContextBundle['allocationChanges'] {
   const allocationChanges: AssistantMonthContextBundle['allocationChanges'] = [];
   if (!currentSnapshot) return allocationChanges;
+
+  // The funds' part of each class needs it recorded at BOTH ends (`pension` is absent on old and
+  // hand-entered snapshots); the contributions are those that moved a fund between the two.
+  const pensionBefore = previousSnapshot?.pension?.byAssetClass ?? null;
+  const pensionAfter = currentSnapshot.pension?.byAssetClass ?? null;
+  const paidInByClass = pensionBefore && pensionAfter && previousSnapshot
+    ? pensionPaidInByClass(
+        pensionInput.contributions,
+        pensionInput.assets,
+        monthKeyOf(previousSnapshot.year, previousSnapshot.month),
+        monthKeyOf(currentSnapshot.year, currentSnapshot.month)
+      )
+    : null;
+  const pensionOf = (assetClass: string) => {
+    if (!pensionBefore || !pensionAfter || !paidInByClass) return null;
+    const change = (pensionAfter[assetClass] ?? 0) - (pensionBefore[assetClass] ?? 0);
+    const paidIn = paidInByClass[assetClass] ?? 0;
+    return Math.round(change) === 0 && Math.round(paidIn) === 0 ? null : { change, paidIn };
+  };
 
   const currentByClass = currentSnapshot.byAssetClass ?? {};
   const previousByClass = previousSnapshot?.byAssetClass ?? {};
@@ -730,6 +800,7 @@ function buildAllocationChanges(
       currentValue,
       absoluteChange,
       percentagePointsChange,
+      pension: pensionOf(assetClass),
     });
   }
 
@@ -810,11 +881,14 @@ export async function buildAssistantMonthContext(
   const unclassifiedNote = buildUnclassifiedSubCategoryNote(breakdown.unclassifiedSubCategoryShare);
   if (unclassifiedNote) notes.push(unclassifiedNote);
 
-  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
+  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot, { contributions: portfolioDocuments.pensionContributions, assets });
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
   const goalFields = buildGoalFields(settings, goalData, assets, now);
 
-  const portfolioFields = buildPortfolioFields(assets, portfolioDocuments, monthExpenses, settings, goalData, now);
+  const portfolioFields = buildPortfolioFields(
+    assets, portfolioDocuments, monthExpenses, settings, goalData, now,
+    portfolioPeriod({ year, month }, { year, month }, `${monthLower(month)} ${year}`)
+  );
 
   return {
     selector,
@@ -822,6 +896,9 @@ export async function buildAssistantMonthContext(
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
     netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
+    netWorthDrivers: buildDriverFields(allSnapshots, previousSnapshot, currentSnapshot, includeDummySnapshots, {
+      expenses: monthExpenses, assets, documents: portfolioDocuments, settings, now,
+    }),
     allocationChanges,
     bySubCategoryAllocation,
     ...goalFields,
@@ -908,11 +985,14 @@ export async function buildAssistantYearContext(
   const unclassifiedNote = buildUnclassifiedSubCategoryNote(breakdown.unclassifiedSubCategoryShare);
   if (unclassifiedNote) notes.push(unclassifiedNote);
 
-  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
+  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot, { contributions: portfolioDocuments.pensionContributions, assets });
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
   const goalFields = buildGoalFields(settings, goalData, assets, now);
 
-  const portfolioFields = buildPortfolioFields(assets, portfolioDocuments, yearExpenses, settings, goalData, now);
+  const portfolioFields = buildPortfolioFields(
+    assets, portfolioDocuments, yearExpenses, settings, goalData, now,
+    portfolioPeriod({ year, month: 1 }, { year, month: 12 }, `tutto il ${year}`)
+  );
 
   // selector.month = 0 signals "year-level" period to prompt builders and the context card
   return {
@@ -921,6 +1001,9 @@ export async function buildAssistantYearContext(
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
     netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
+    netWorthDrivers: buildDriverFields(allSnapshots, previousSnapshot, currentSnapshot, includeDummySnapshots, {
+      expenses: yearExpenses, assets, documents: portfolioDocuments, settings, now,
+    }),
     allocationChanges,
     bySubCategoryAllocation,
     ...goalFields,
@@ -996,11 +1079,14 @@ export async function buildAssistantYtdContext(
   const unclassifiedNote = buildUnclassifiedSubCategoryNote(breakdown.unclassifiedSubCategoryShare);
   if (unclassifiedNote) notes.push(unclassifiedNote);
 
-  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
+  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot, { contributions: portfolioDocuments.pensionContributions, assets });
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
   const goalFields = buildGoalFields(settings, goalData, assets, now);
 
-  const portfolioFields = buildPortfolioFields(assets, portfolioDocuments, ytdExpenses, settings, goalData, now);
+  const portfolioFields = buildPortfolioFields(
+    assets, portfolioDocuments, ytdExpenses, settings, goalData, now,
+    portfolioPeriod({ year: currentYear, month: 1 }, { year: currentYear, month: currentMonth }, `gennaio–${monthLower(currentMonth)} ${currentYear}`)
+  );
 
   // selector.month = -1 signals "YTD" period
   return {
@@ -1009,6 +1095,9 @@ export async function buildAssistantYtdContext(
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
     netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
+    netWorthDrivers: buildDriverFields(allSnapshots, previousSnapshot, currentSnapshot, includeDummySnapshots, {
+      expenses: ytdExpenses, assets, documents: portfolioDocuments, settings, now,
+    }),
     allocationChanges,
     bySubCategoryAllocation,
     ...goalFields,
@@ -1175,11 +1264,21 @@ export async function buildAssistantPeriodRangeContext(
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
     netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
-    allocationChanges: buildAllocationChanges(currentSnapshot, previousSnapshot),
+    netWorthDrivers: buildDriverFields(allSnapshots, previousSnapshot, currentSnapshot, includeDummySnapshots, {
+      expenses: windowExpenses, assets, documents: portfolioDocuments, settings, now,
+    }),
+    allocationChanges: buildAllocationChanges(currentSnapshot, previousSnapshot, { contributions: portfolioDocuments.pensionContributions, assets }),
     bySubCategoryAllocation: buildSubCategoryAllocation(currentSnapshot, assets),
     ...buildGoalFields(settings, goalData, assets, now),
 
-    ...buildPortfolioFields(assets, portfolioDocuments, windowExpenses, settings, goalData, now),
+    ...buildPortfolioFields(
+      assets, portfolioDocuments, windowExpenses, settings, goalData, now,
+      portfolioPeriod(
+        { year, month: startMonth },
+        { year, month: endMonth },
+        startMonth === endMonth ? `${monthLower(startMonth)} ${year}` : `${monthLower(startMonth)}–${monthLower(endMonth)} ${year}`
+      )
+    ),
     expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
@@ -1258,11 +1357,14 @@ export async function buildAssistantHistoryContext(
   const unclassifiedNote = buildUnclassifiedSubCategoryNote(breakdown.unclassifiedSubCategoryShare);
   if (unclassifiedNote) notes.push(unclassifiedNote);
 
-  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
+  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot, { contributions: portfolioDocuments.pensionContributions, assets });
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
   const goalFields = buildGoalFields(settings, goalData, assets, now);
 
-  const portfolioFields = buildPortfolioFields(assets, portfolioDocuments, historyExpenses, settings, goalData, now);
+  const portfolioFields = buildPortfolioFields(
+    assets, portfolioDocuments, historyExpenses, settings, goalData, now,
+    portfolioPeriod({ year: startYear, month: 1 }, { year: currentYear, month: currentMonth }, `tutta la storia (dal ${startYear})`)
+  );
 
   // selector.month = -2 signals "total history" period
   return {
@@ -1271,6 +1373,9 @@ export async function buildAssistantHistoryContext(
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
     netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
+    netWorthDrivers: buildDriverFields(allSnapshots, previousSnapshot, currentSnapshot, includeDummySnapshots, {
+      expenses: historyExpenses, assets, documents: portfolioDocuments, settings, now,
+    }),
     allocationChanges,
     bySubCategoryAllocation,
     ...goalFields,

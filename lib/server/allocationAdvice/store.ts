@@ -52,10 +52,14 @@ export async function listAllocationAdviceHistoryAdmin(userId: string, limit: nu
   return snap.docs.map((doc) => mapAllocationAdviceData(userId, doc.data()));
 }
 
-/** Merges a partial onto the document; only the fields present in `patch` move. */
-export async function patchAllocationAdviceAdmin(userId: string, patch: Partial<AllocationAdviceDocument>): Promise<void> {
+/**
+ * Merges a partial onto the document; only the fields present in `patch` move. `keepUpdatedAt`
+ * (the operating plan, 2026-11-19) skips the `updatedAt` stamp: the page compares it to «Rifai il
+ * percorso» and to the browser's draft, and a plan landing late must not bring a hidden report back.
+ */
+export async function patchAllocationAdviceAdmin(userId: string, patch: Partial<AllocationAdviceDocument>, options: { keepUpdatedAt?: boolean } = {}): Promise<void> {
   await adminDb
     .collection(COLLECTION)
     .doc(userId)
-    .set(removeUndefinedDeep({ ...patch, updatedAt: new Date() }), { merge: true });
+    .set(removeUndefinedDeep(options.keepUpdatedAt ? { ...patch } : { ...patch, updatedAt: new Date() }), { merge: true });
 }

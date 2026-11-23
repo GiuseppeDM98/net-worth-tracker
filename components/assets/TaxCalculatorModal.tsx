@@ -43,10 +43,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
-import { costBasisPerUnitEur, isEurNative, unitPriceEur } from '@/lib/utils/costBasisEur';
+import { costBasisPerUnitEur, fiscalCostPerUnitEur, isEurNative, unitPriceEur } from '@/lib/utils/costBasisEur';
+import { TAX_SIMULATION_READING } from '@/lib/utils/dialogNarrative';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // The restyle of 2026-08-22 touches presentation only: every figure in the numeric face on the
 // type ramp (22px hero, 13px rows), sign and warning colours through the theme tokens, no
@@ -86,11 +88,12 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
    * 1. Quantity mode: user enters units → calculate sale value
    * 2. Target value mode: user enters desired amount → calculate required units
    */
-  // Both sides in EUR (costBasisEur.ts): the unit price the value is computed with and the EUR
-  // PMC, purchase fees included — the fiscal cost the gain is taxed on. Before 2026-09-07 a USD
-  // position was simulated in dollars and labelled €.
+  // Both sides in EUR (costBasisEur.ts): the unit price the value is computed with and the fiscal
+  // cost the gain is taxed on — the PMC plus the purchase fees (2026-11-12); the PMC itself is
+  // fee-free and shown beside it. Before 2026-09-07 a USD position was simulated in dollars and labelled €.
   const currentPrice = unitPriceEur(asset);
   const averageCost = costBasisPerUnitEur(asset) ?? 0;
+  const fiscalCost = fiscalCostPerUnitEur(asset) ?? 0;
   const showsNativeFigures = !isEurNative(asset);
 
   const calculateResults = () => {
@@ -117,7 +120,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
 
     // Step 1-2: Calculate sale value and cost basis
     const saleValue = clampedQuantity * currentPrice;
-    const costBasis = clampedQuantity * averageCost;
+    const costBasis = clampedQuantity * fiscalCost;
 
     // Step 3: Calculate gain or loss
     const gainLoss = saleValue - costBasis;
@@ -137,6 +140,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
       exceedsOwned,
       currentPrice,
       averageCost,
+      fiscalCost,
       taxRate,
       saleValue,
       costBasis,
@@ -162,7 +166,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
       onClose={onClose}
       eyebrow={`Patrimonio · ${asset.name}`}
       title="Quanto costa vendere"
-      reading="Una simulazione: niente viene registrato. La plusvalenza è calcolata in euro sul PMC del registro operazioni, commissioni d'acquisto incluse, con l'aliquota dello strumento."
+      reading={TAX_SIMULATION_READING}
       width="md"
       footer={
         <Button type="button" variant="outline" onClick={onClose}>
@@ -181,6 +185,9 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
                 ? [{ label: `Prezzo corrente (${asset.currency})`, value: formatCurrency(asset.currentPrice, asset.currency, 4) }]
                 : []),
               { label: 'PMC', value: formatCurrency(averageCost, 'EUR', 4) },
+              ...(Math.abs(fiscalCost - averageCost) >= 0.0001
+                ? [{ label: 'Costo fiscale', value: formatCurrency(fiscalCost, 'EUR', 4) }]
+                : []),
               ...(showsNativeFigures && asset.averageCost
                 ? [{ label: `PMC (${asset.currency})`, value: formatCurrency(asset.averageCost, asset.currency, 4) }]
                 : []),
@@ -264,7 +271,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
 
           {/* Results */}
           {hasInput ? (
-            <div className="space-y-4 rounded-xl bg-muted/40 p-4">
+            <div className={cn('space-y-4 bg-muted/40 p-4', COSTUME_FRAME_RADIUS_CLASS)}>
               <div className="flex flex-col gap-1.5">
                 <p className={TILE_SUB_EYEBROW_CLASS}>Ricavo netto dopo le tasse</p>
                 <p className="font-mono text-[22px] font-bold leading-none tracking-[-0.03em] tabular-nums text-foreground">
@@ -280,7 +287,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
               <div className="divide-y divide-border border-t border-border">
                 {[
                   { label: 'Prezzo per unità', value: formatCurrency(results.currentPrice, 'EUR', 4) },
-                  { label: 'Prezzo medio di carico (PMC)', value: formatCurrency(results.averageCost, 'EUR', 4) },
+                  { label: 'Costo fiscale per quota', value: formatCurrency(results.fiscalCost, 'EUR', 4) },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between gap-3 py-2">
                     <span className={ROW_LABEL_CLASS}>{row.label}</span>
