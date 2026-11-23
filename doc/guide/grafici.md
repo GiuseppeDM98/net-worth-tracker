@@ -24,7 +24,8 @@
 - **A null value has no tooltip item** (recharts 3.8, 2026-11-23): the payload drops it, so `formatter` is never called
   for a gap — what a missing point is goes in `labelFormatter` («Mar 26 · spese oltre le entrate»,
   `SavingsRateLineChart`). A gap is bridged with a `ReferenceLine segment` between the two points around it, never
-  with `connectNulls`, which would draw the gap as a rate.
+  with `connectNulls`, which would draw the gap as a rate (the segments are computed and tested apart, the drawing
+  is not: doc/guide/cashflow-analisi.md).
 - **Three tooltip style props, none inherited**: `contentStyle`, `labelStyle`, `itemStyle` (without `itemStyle` the rows
   are invisible on dark) — module-level `as const` objects on `var(--card)`/`var(--border)`/`var(--card-foreground)`.
 - **Axis ticks and legends are numbers: the Mono Mandate covers them, a Tailwind class cannot reach them** — `tick=

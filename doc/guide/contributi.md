@@ -15,7 +15,7 @@ For whoever tries, accepts or integrates a contributor's pull request. Moved who
   build, remove the worktree, count `ls node_modules | wc -l`.
 - **An accepted PR merged "with changes" is its diff applied, not its commits** (2026-09-07): `git apply --reject` of
   `base...head`, the session's fixes on top, one commit with the author as `Co-authored-by`, never the PR's own
-  `CLAUDE.md` and draft hunks. **While a spec series is open** (2026-09-27; `doc/perf/` closed on 2026-10-08,
+  `CLAUDE.md` and draft hunks; the PR itself is then closed by the owner with a link to the merge (2026-11-12). **While a spec series is open** (2026-09-27; `doc/perf/` closed on 2026-10-08,
   `doc/mobile/` on 2026-10-17) it is crossed with the open specs (a cited line that moves, a count, a baseline, a rule the new code should follow), the
   specs amended in the same commit; it lands BEFORE a spec that rewrites the same files. Look first for the five defects
   of that day's three PRs: a sentence or number born in a component, an overflow asserted on `document`, an absence

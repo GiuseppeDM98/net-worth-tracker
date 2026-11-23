@@ -84,6 +84,9 @@ for (const costume of COSTUMES) {
         const drawer = page.locator('[data-slot="drawer-content"]', { hasText: 'Seleziona periodo' });
         await expect(drawer).toBeVisible();
         expect(await drawer.evaluate((node) => node.hasAttribute('data-costume-scope'))).toBe(true);
+        // A selector's sheet is a modal: its title wears the costume face, as «Nuova Spesa»'s does.
+        const sheetTitle = await drawer.locator('[data-slot="drawer-title"]').evaluate((node) => getComputedStyle(node).fontFamily);
+        expect(sheetTitle).toMatch(COSTUME_FACE[costume]);
         // Its preset chips (`chip.tsx`) are pills: square under Orbita, round in Egeo.
         const chip = await cornerOf(page, '[data-slot="drawer-content"] button[aria-pressed]');
         if (costume === 'orbita') expect(chip).toBe('0px');

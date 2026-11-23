@@ -49,7 +49,7 @@ const MENU = '[data-slot="dropdown-menu-content"]';
 const POPOVER = '[data-radix-popper-content-wrapper] > [role="listbox"][aria-label="Available options"]';
 const SELECT = '[data-slot="select-content"]';
 
-/** Criterion 2's radii, light and dark alike (the scope blocks declare them once). */
+/** Each costume's control radii, light and dark alike (the scope blocks declare them once). */
 const RADII: Record<Costume, { menu: string; chip: string; frame: string }> = {
   egeo: { menu: '3px', chip: '9px', frame: '4px' },
   orbita: { menu: '0px', chip: '0px', frame: '0px' },

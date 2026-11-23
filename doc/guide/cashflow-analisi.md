@@ -194,7 +194,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   too — in `SPENDING_ROLE_FLOW_ORDER`, the order the Sankey and the bar draw, rounded so they add up to 100 as printed.
   Its nodes keep the builder's order (`nodeSort="input"`), or a role's categories interleave with another's by value.
   Entrate and Budget keep the type view's colours — under a costume the theme's slots (`costumeSankeyPalette`); the
-  type view's memo then depends on them only —; the roles are the five `--role-*` aliases (doc/guide/temi.md), mapped
+  type view's memo then reads these colours only, never the roles' —; the roles are the five `--role-*` aliases (doc/guide/temi.md), mapped
   once in `lib/constants/spendingRoleColors.ts` (`SPENDING_ROLE_TOKEN`, `spendingRoleColorVar`),
   resolved to hex by `useCssColorTokens` ONLY while the roles Sankey is on screen (its `enabled`), their categories
   the derived shades as under a type; the type view's memo never depends on them.
@@ -251,7 +251,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   month before the gap to the month after it, however long the gap (`buildSavingsRateBridges`, a recharts
   `ReferenceLine segment`), none at an edge of the window; the month is still not a point, and its tooltip label says
   why («Mar 26 · spese oltre le entrate» — through `labelFormatter`: recharts drops a null value, so `formatter` is
-  never called for it). Pinned by `__tests__/{analisiNarrative,savingsRateTrend}.test.ts`.
+  never called for it). `__tests__/savingsRateTrend.test.ts` pins the points and the bridges
+  (`buildSavingsRateTrendPoints`, `buildSavingsRateBridges`: a long gap, the edges, an empty window),
+  `analisiNarrative.test.ts` the deficit sentence; the dashed segment and the tooltip label are drawn by
+  `SavingsRateLineChart` and have no test — the repo renders no Recharts chart under jsdom —, seen on the tour of 2026-11-23.
 
 ## Composizione mobile
 

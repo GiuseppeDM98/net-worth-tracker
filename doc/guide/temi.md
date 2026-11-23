@@ -261,8 +261,12 @@ mechanism has a neutral default, and the palette themes are held to render exact
   image layers (Egeo's cap, Orbita's corner marks) — never `data-tile`, whose rule would trade the Float shadow for
   the tile's. The dialog's corner is `rounded-2xl`, so it follows `--radius-2xl` on its own; the drawer's top corners
   read `--costume-control-frame-radius` with their 10px. `.costume-title` (the font and its case, not the size) sits
-  on `ResponsiveModal`'s title in both shells and on `AlertDialogTitle`; a STRING title and the eyebrow go through
+  on `ResponsiveModal`'s title in both shells, on `AlertDialogTitle` and on the title of a selector's sheet (the
+  period picker's, the searchable combobox's, the multi-select's: found in Geist beside a costumed modal and
+  dressed on 2026-11-23); a STRING title and the eyebrow go through
   `HeadingText`, a node title is rendered as passed (the host wraps its own figures: `AIAnalysisDialog`'s verdict).
+  `themeCostume.test.ts` reads every `DrawerTitle` and `DialogTitle` of `components/` and `app/`: a new one without
+  the class is red (`command.tsx`'s sits in an `sr-only` header and is left out).
   The primitives never set `data-costume-frame` on anything else: a sheet (`sheet.tsx`), a popover and a menu are
   not tiles. Held by `__tests__/{costumePortals,responsiveModalCostume}.test.tsx` and `e2e/theme.costume*.spec.ts`.
 - **The scenes of a path are tiles** (2026-11-23): `PathCard`'s two cards and the Consulente's wizard, interview
@@ -274,9 +278,11 @@ mechanism has a neutral default, and the palette themes are held to render exact
   `cn()`, every bar track and fill, pill and round chip `COSTUME_PILL_RADIUS_CLASS`, every chip with a literal radius
   the chip property with its px, every chart tooltip's inline `borderRadius` the frame property with its px.
   `themeCostume.test.ts` holds three file lists: `FRAME_BOX_FILES` (no `rounded-xl` left), `NO_LITERAL_FILES` (no
-  `rounded-full` left) and `ONE_ROUND_THING` (the files that keep ONE round thing — a dot, a handle, an avatar, a
-  spinner — named by a substring of its line). A new box in one of those files that is not a tile takes the class,
-  or the test goes red; a new file is added to its list.
+  `rounded-full` left) and `ONE_ROUND_THING` (the files that keep ONE round thing — a dot, a knob, a spinner, a
+  round icon button — named by a substring of its line). A new box in one of those files that is not a tile takes
+  the class, or the test goes red; a new file is added to its list. A `rounded-lg` or `rounded-md` box keeps
+  following `--radius` (5px / 3px in Egeo, 0 in Orbita): a `rounded-lg` box 1px rounder than Egeo's 4px tile is
+  accepted, as the tablet rail's target is.
 - **A generated sub-tile's fill** (2026-11-23): `COSTUME_GENERATED_FILL_CLASS` reads
   `--costume-page-generated-fill` with `bg-muted/40` as its fallback — Egeo declares `var(--card)`, because its
   `--ai-accent` on the muted wash read 4,48 / 4,39:1; Orbita leaves it `initial` (4,63 / 4,97). The Assistente's
@@ -453,10 +459,14 @@ Where a costume theme's numbers live, the shell's included; a later pass adds it
   in a costume theme only: a palette theme renders as before by contract, and a palette contrast fix is a decision on
   that theme's look, not a costume rule. The toaster (`app/layout.tsx`, outside the dashboard layout) and the
   landing's `ThemePicker` are out of the scope too: palette only, by the owner's rule of 2026-11-12.
-- **What the dialogs' pass left round or untouched, on purpose** (2026-11-23): the dots, the drag handles, the
-  avatars and the spinners of the listed files (`ONE_ROUND_THING`), the Consulente run's progress dot, the
-  sidebar's own menu badge and the Storybook stories; the emails, the PDF export, the landing and the access pages
+- **What the dialogs' pass left round or untouched, on purpose** (2026-11-23): the dots, the knob, the spinners and
+  the round icon button of the listed files (`ONE_ROUND_THING`), the drag handles and the avatars (in no list: a
+  role that stays round), the Consulente run's progress dot, the sidebar's own menu badge and its unused `inset`
+  variant, and the Storybook stories; the emails, the PDF export, the landing and the access pages
   wear no costume (the browser's print of the book is reset instead).
+- **A theme copies no game** (owner, 2026-11-12, when Egeo and Orbita were asked for in the spirit of two browser
+  games): no name, image, sound or look of a game — a costume is an original world with our own names. It holds
+  for every theme added later.
 - **Retro-arcade dark prints its `--foreground` on a pill at 4,02:1** (2026-10-08): the theme's foreground is a light
   teal (L 0.70) and the pill (`--muted`) now sits at L 0.36 — lowering it further would make it indistinguishable from
   the card (L 0.31). Only `--muted-foreground` is held to the floor on `--muted` (`mutedForegroundContrast`); an active

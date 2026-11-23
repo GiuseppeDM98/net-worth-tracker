@@ -100,7 +100,8 @@
   by the hand-off; class, then name, then id), **N** new from the report (with the candidates' Yahoo symbols), **M**
   money-market funds (sold, never bought) — each with quantity, unit price, value and the estimated tax of selling it
   all (a plan in shares cannot be written without them: «tasse stimate €…», «esente», «tasse non stimabili (manca l'aliquota | il costo fiscale)»), «DA TENERE»
-  and the limits of «Criteri del modello» (the limits only, never the model). «0 quote, non posseduto» at zero shares
+  and the limits of «Criteri del modello» (the limits only, never the model: no stage of the Consulente reads the
+  model portfolio nor its other criteria — owner, 2026-11-12 —, «Applica» only WRITES the model from the plan's weights). «0 quote, non posseduto» at zero shares
   (owner, 2026-11-19: an instrument sold down to 0 and chosen again was bought once, so not «mai comprato»). Never an
   id, a rate or a held ISIN.
 - **The contract** (`PLAN_CONTRACT`): one row per S key, N only when bought, M only when sold; the «buy» quotas sum to
@@ -182,7 +183,8 @@
   60 in all (said), each sale's month shifted. `validateDraftAgainstAssets` runs here (`issues` → `blocked`); the
   quotes come from `useAdviceQuotes` (one `/api/prices/quote` per symbol, the first with a last trade ≤ 5 days).
 - **The quotas are shares of the plan's money** (owner, 2026-11-20, found on the mirror tour: a 60/40 between a small
-  and a large holding went almost whole to the small one). The engine reads a position's weight as its share of the
+  and a large holding went almost whole to the small one). A new instrument takes the quota the Consulente writes
+  also in a class without sub-targets (owner, 2026-11-19): no branch reads the class. The engine reads a position's weight as its share of the
   plan's portfolio at the end and splits the money `L` by what each lacks (`computeTotalPurchases`), so the build
   turns the quotas into weights (`weightsFromQuotas`, `lib/utils/advicePlan.ts`): a priced instrument to buy weighs
   (today's value + its quota of `L`) ÷ (today's value of the plan + `L`), one to hold or partly sold weighs what it
