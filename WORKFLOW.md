@@ -321,7 +321,8 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
   whatever is active (usually `develop`) and merges into it by PR. **A series of specs lands on `develop`, one
   session at a time, and reaches `main` together after its last spec is retired, by a PR the owner opens** (owner,
   2026-10-12, for the mobile-composition series, whose last spec was retired on 2026-10-17; the PERF series went to
-  `main` on its own, PR #446). While a series is open, its index's status table says which spec is in `develop`.
+  `main` on its own, PR #446; the DATI series of 2026-11-23 goes to `main` spec by spec, each as soon as it is implemented — owner,
+  2026-11-23, `doc/dati/README.md` § 8). While a series is open, its index's status table says which spec is in `develop`.
 - **A spec is retired by a session of its own** (since 2026-09-28): the code read against the spec, every divergence
   given a verdict, the lessons home, then the spec and every pointer go; **the LAST spec of a series retires its whole
   folder**. A text-only defect found there is fixed with `tsc`, lint and Vitest, no Playwright; a runtime one only on
