@@ -149,6 +149,7 @@ export function PianoClient({ fromModel: fromModelProp }: { fromModel?: boolean 
 
   const header = (
     <PageHeader
+      emblem="allocazione"
       label="Allocazione"
       title={PLAN_PATH_TITLE}
       description={revision ? PLAN_PATH_REVISION_DESCRIPTION : undefined}

@@ -77,6 +77,8 @@ import { DividendiTab } from '@/components/settings/tabs/DividendiTab';
 import { GeneraleTab } from '@/components/settings/tabs/GeneraleTab';
 import { SpeseTab } from '@/components/settings/tabs/SpeseTab';
 import { runGuarded, SETTINGS_TABS_LAYOUT_ID } from '@/components/settings/tabs/shared';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 // Module-level tab definitions drive both the mobile pill and the desktop underline tabs.
 const SETTINGS_TABS: TabDef[] = [
@@ -91,7 +93,7 @@ const SETTINGS_TABS: TabDef[] = [
 const EMPTY_CATEGORIES: ExpenseCategory[] = [];
 const EMPTY_ASSETS: Asset[] = [];
 
-const PAGE_HEADER = { label: 'Configurazione', title: 'Impostazioni', description: 'Target, preferenze e flussi' } as const;
+const PAGE_HEADER = { label: 'Configurazione', title: 'Impostazioni', description: 'Target, preferenze e flussi', emblem: 'impostazioni' } as const;
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -349,7 +351,7 @@ export default function SettingsPage() {
                 on each tab; the header keeps the actions. In demo the disabled reason is visible
                 copy (never a title). */}
             {isDemo && (
-              <span className="hidden sm:inline-flex items-center rounded-full border border-border bg-muted px-2 py-1 text-xs text-foreground">
+              <span className={cn('hidden sm:inline-flex items-center border border-border bg-muted px-2 py-1 text-xs text-foreground', COSTUME_PILL_RADIUS_CLASS)}>
                 Modalità demo: salvataggio disattivato
               </span>
             )}

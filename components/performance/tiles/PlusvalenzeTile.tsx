@@ -7,6 +7,7 @@ import { signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { Tile, type TileCollapse } from '@/components/ui/tile';
 import { TileMethodNote } from '@/components/ui/tile-method-note';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface PlusvalenzeTileProps {
   /** The row of the phone composition (`useMobileSections().collapse(id)`); `undefined` at 1440. */
@@ -48,9 +49,9 @@ export function PlusvalenzeTile({ collapse, asideWhenClosed, reading, summary, s
           {summary.years.map((y) => (
             <li key={y.year} className="grid grid-cols-[44px_minmax(0,1fr)_96px] items-center gap-3 py-[9px]">
               <span className="font-mono text-[13px] tabular-nums text-foreground">{y.year}</span>
-              <span className="h-[3px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <span className={cn('h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)} aria-hidden="true">
                 <span
-                  className="block h-full rounded-full"
+                  className={cn('block h-full', COSTUME_PILL_RADIUS_CLASS)}
                   style={{ width: `${(Math.abs(y.amount) / maxAbs) * 100}%`, background: y.amount < 0 ? 'var(--destructive)' : 'var(--positive)' }}
                 />
               </span>

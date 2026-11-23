@@ -80,6 +80,7 @@ export function ConsulenteClient({ configured, startFresh = false, initialPage =
 
   const header = (
     <PageHeader
+      emblem="allocazione"
       label="Pianificazione"
       title="Consulente"
       description="Imposta la tua allocazione con due agenti: uno propone, l'altro cerca gli strumenti."

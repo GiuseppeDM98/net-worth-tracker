@@ -692,3 +692,31 @@ export function buildSavingsRateTrendPoints(
     return { label, month, year, rate, overspent: rate === null && income > 0 };
   });
 }
+
+/** One end of a bridge: a month that has a rate. */
+export interface SavingsRateBridgeEnd {
+  label: string;
+  rate: number;
+}
+
+/**
+ * The bridges over the line's gaps (owner, 2026-11-23): a gap between two months that have a rate is
+ * joined by ONE dashed segment from the month before it to the month after, however many months it
+ * lasts — the line read as broken, and a month that is not a rate is still not a point. A gap at an
+ * edge of the window has nothing to be joined to.
+ */
+export function buildSavingsRateBridges(points: readonly { label: string; rate: number | null }[]): { from: SavingsRateBridgeEnd; to: SavingsRateBridgeEnd }[] {
+  const bridges: { from: SavingsRateBridgeEnd; to: SavingsRateBridgeEnd }[] = [];
+  let before: SavingsRateBridgeEnd | null = null;
+  let inGap = false;
+  for (const { label, rate } of points) {
+    if (rate === null) {
+      inGap = true;
+      continue;
+    }
+    if (inGap && before) bridges.push({ from: before, to: { label, rate } });
+    before = { label, rate };
+    inGap = false;
+  }
+  return bridges;
+}

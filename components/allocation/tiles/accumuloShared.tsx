@@ -6,6 +6,8 @@ import { calculateAssetValue } from '@/lib/services/assetService';
 import { unitPriceEur, type PlanDeps } from '@/lib/utils/accumulationPlanUtils';
 import type { LineUiState } from '@/lib/utils/accumulationPlanMatching';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 export const DEPS: PlanDeps = { valueOf: calculateAssetValue, priceOf: unitPriceEur };
 
@@ -35,7 +37,7 @@ export function DraftBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-const CHIP_BASE = 'shrink-0 whitespace-nowrap rounded-full border border-transparent px-2 py-0.5 text-[10.5px]';
+const CHIP_BASE = cn('shrink-0 whitespace-nowrap border border-transparent px-2 py-0.5 text-[10.5px]', COSTUME_PILL_RADIUS_CLASS);
 const CHIP_TONE: Partial<Record<LineUiState, string>> = {
   executed: 'bg-accent text-accent-foreground',
   toConfirm: 'border border-warning-border bg-warning text-warning-foreground',

@@ -22,6 +22,7 @@ import { formatDate } from '@/lib/utils/formatters';
 import { GOAL_PROPOSAL_LANGUAGE, parseGoalProposal } from '@/lib/utils/goalProposal';
 import { ASSISTANT_QUESTION_LANGUAGE } from '@/lib/utils/questionSet';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface AssistantStreamingResponseProps {
   messages: AssistantMessage[];
@@ -91,7 +92,7 @@ function MarkdownPre({ children, node }: React.ComponentProps<'pre'> & ExtraProp
   const offset = node?.position?.start.offset;
   const block = offset === undefined ? undefined : blocks.find((candidate) => candidate.offset === offset);
   const codeBlock = (
-    <pre className="my-3 overflow-x-auto rounded-xl bg-muted/40 p-3 font-mono text-[12px]">
+    <pre className={cn('my-3 overflow-x-auto bg-muted/40 p-3 font-mono text-[12px]', COSTUME_FRAME_RADIUS_CLASS)}>
       {children}
     </pre>
   );
@@ -214,7 +215,7 @@ export function AssistantStreamingResponse({
               // min-w-0 prevents the flex/grid child from overflowing its grid cell on narrow viewports.
               className={cn(
                 'min-w-0',
-                isUser ? 'ml-auto max-w-[85%] rounded-xl bg-muted/40 px-4 py-3' : 'w-full'
+                isUser ? cn('ml-auto max-w-[85%] bg-muted/40 px-4 py-3', COSTUME_FRAME_RADIUS_CLASS) : 'w-full'
               )}
             >
               {/* Role label + timestamp */}
@@ -306,7 +307,7 @@ export function AssistantStreamingResponse({
       </AnimatePresence>
 
       {isInterrupted && (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/40 px-4 py-3">
+        <div role="status" className={cn('flex flex-wrap items-center justify-between gap-3 bg-muted/40 px-4 py-3', COSTUME_FRAME_RADIUS_CLASS)}>
           <span className="inline-flex items-center gap-2 text-[13px] text-foreground">
             <RotateCcw className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             Risposta interrotta: la parte arrivata è rimasta visibile.

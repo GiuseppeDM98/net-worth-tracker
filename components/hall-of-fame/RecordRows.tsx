@@ -7,6 +7,7 @@ import { signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NoteTrigger, type NotePrefill } from '@/components/hall-of-fame/NoteTrigger';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface RecordRowsProps {
   rows: RecordEntry[];
@@ -116,9 +117,9 @@ export function RecordRows({
               {partial && <span className={cn(TILE_SUB_EYEBROW_CLASS, 'shrink-0 normal-case tracking-normal')}>{partial}</span>}
             </span>
 
-            <div className="h-[3px] min-w-[28px] flex-1 overflow-hidden rounded-full bg-muted" role="presentation">
+            <div className={cn('h-[3px] min-w-[28px] flex-1 overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)} role="presentation">
               <div
-                className="h-full rounded-full"
+                className={cn('h-full', COSTUME_PILL_RADIUS_CLASS)}
                 style={{
                   width: `${maxValue > 0 ? (Math.abs(row.value) / maxValue) * 100 : 0}%`,
                   background: barColor,

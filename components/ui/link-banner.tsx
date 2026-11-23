@@ -2,6 +2,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface LinkBannerProps {
   /** Destination href — passed to `next/link`. */
@@ -38,7 +39,7 @@ export function LinkBanner({ href, title, description, onClick, className }: Rea
       href={href}
       onClick={onClick}
       className={cn(
-        'flex items-center justify-between rounded-xl bg-muted/40 px-3.5 py-2.5',
+        'flex items-center justify-between bg-muted/40 px-3.5 py-2.5', COSTUME_FRAME_RADIUS_CLASS,
         'hover:bg-muted/60 transition-colors',
         className,
       )}

@@ -25,6 +25,7 @@ import { GoalProposal, GoalWriteAssignment } from '@/lib/utils/goalProposal';
 import { PRIORITY_META } from '@/components/goals/goalVerdictMeta';
 import type { InvestmentGoal } from '@/types/goals';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS, COSTUME_GENERATED_FILL_CLASS, COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface GoalProposalCardProps {
   proposal: GoalProposal;
@@ -109,7 +110,8 @@ const NONE = 'Nessuna';
  * (ReactMarkdown re-mounts the whole tree otherwise), so there is nowhere to thread handlers
  * through.
  *
- * Inside an assistant message it is a muted sub-tile (`bg-muted/40`, 12px radius), never a
+ * Inside an assistant message it is a muted sub-tile (40 % of the muted token — the card itself where a
+ * costume needs it for the accent's contrast — at the frame radius), never a
  * card: a card inside the Conversazione tile would be a card inside a card. Its cadence is
  * the tile's — the 10px eyebrow, the name at 15px, flat 13px rows with mono figures.
  *
@@ -209,7 +211,7 @@ export function GoalProposalCard({ proposal, index }: GoalProposalCardProps) {
       animate="center"
       data-generated
       data-proposal={key}
-      className={cn('not-prose my-3 rounded-xl border bg-muted/40 p-4', AI_GENERATED_SURFACE_CLASS)}
+      className={cn('not-prose my-3 border p-4', COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -224,7 +226,7 @@ export function GoalProposalCard({ proposal, index }: GoalProposalCardProps) {
         </div>
         <span
           className={cn(
-            'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium',
+            'shrink-0 px-2 py-0.5 text-[11px] font-medium', COSTUME_PILL_RADIUS_CLASS,
             PRIORITY_META[proposal.priority].chipClass
           )}
         >

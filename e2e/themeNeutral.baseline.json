@@ -3234,6 +3234,32 @@
           "border-top-color": "rgb(229, 229, 229)",
           "border-top-left-radius": "6px",
           "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "lab(100 0 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "default·dark": {
@@ -3368,6 +3394,32 @@
           "background-image": "none",
           "border-top-color": "lab(100 0 0 / 0.1)",
           "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "lab(7.78201 -0.0000149012 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "0px",
           "box-shadow": "none"
         }
       },
@@ -3504,6 +3556,32 @@
           "border-top-color": "lab(87.0262 0.435174 15.7629)",
           "border-top-left-radius": "6px",
           "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "lab(96.3802 0.616372 3.41275)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "solar-dusk·dark": {
@@ -3638,6 +3716,32 @@
           "background-image": "none",
           "border-top-color": "lab(27.3153 5.54103 10.3981)",
           "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(15.0133 5.99495 7.47473)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "0px",
           "box-shadow": "none"
         }
       },
@@ -3774,6 +3878,32 @@
           "border-top-color": "lab(92.6054 1.91969 12.4222)",
           "border-top-left-radius": "6px",
           "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "lab(97.4255 0.77793 1.34106)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "elegant-luxury·dark": {
@@ -3908,6 +4038,32 @@
           "background-image": "none",
           "border-top-color": "lab(27.1426 7.94655 3.3935)",
           "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "lab(14.9164 7.06771 2.7149)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "0px",
           "box-shadow": "none"
         }
       },
@@ -4044,6 +4200,32 @@
           "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
           "border-top-left-radius": "6px",
           "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "lab(100 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "midnight-bloom·dark": {
@@ -4178,6 +4360,32 @@
           "background-image": "none",
           "border-top-color": "lab(28.6962 0.574768 -9.27358)",
           "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "lab(21.0401 0.612825 -11.0262)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "0px",
           "box-shadow": "none"
         }
       },
@@ -4314,6 +4522,32 @@
           "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
           "border-top-left-radius": "6px",
           "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "lab(100 0 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "cyberpunk·dark": {
@@ -4448,6 +4682,32 @@
           "background-image": "none",
           "border-top-color": "lab(21.0039 11.3406 -29.2132)",
           "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "lab(12.7432 8.19375 -21.4592)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "0px",
           "box-shadow": "none"
         }
       },
@@ -4584,6 +4844,32 @@
           "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
           "border-top-left-radius": "6px",
           "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "lab(92.0886 -0.266433 10.0248)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "retro-arcade·dark": {
@@ -4718,6 +5004,32 @@
           "background-image": "none",
           "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
           "border-top-left-radius": "6px",
+          "box-shadow": "none"
+        },
+        "drawer": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "400",
+          "font-size": "16px",
+          "letter-spacing": "normal",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "10px",
+          "box-shadow": "none"
+        },
+        "drawerTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "0px",
           "box-shadow": "none"
         }
       }
@@ -8090,6 +8402,19 @@
           "border-top-color": "rgb(229, 229, 229)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(2.75381 0 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "rgb(229, 229, 229)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "default·dark": {
@@ -8225,6 +8550,19 @@
           "border-top-color": "lab(100 0 0 / 0.1)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(98.26 0 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(100 0 0 / 0.1)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "solar-dusk·light": {
@@ -8360,6 +8698,19 @@
           "border-top-color": "lab(87.0262 0.435174 15.7629)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(26.3365 5.75252 7.57988)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(87.0262 0.435174 15.7629)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "solar-dusk·dark": {
@@ -8495,6 +8846,19 @@
           "border-top-color": "lab(27.3153 5.54103 10.3981)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.3153 5.54103 10.3981)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "elegant-luxury·light": {
@@ -8630,6 +8994,19 @@
           "border-top-color": "lab(92.6054 1.91969 12.4222)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(9.2648 -0.00000745058 0)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(92.6054 1.91969 12.4222)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "elegant-luxury·dark": {
@@ -8765,6 +9142,19 @@
           "border-top-color": "lab(27.1426 7.94655 3.3935)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(96.5196 -0.128806 0.473607)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(27.1426 7.94655 3.3935)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "midnight-bloom·light": {
@@ -8900,6 +9290,19 @@
           "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(21.2476 -0.0000149012 0.00000596046)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(84.9084 -0.0000596046 0.0000119209)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "midnight-bloom·dark": {
@@ -9035,6 +9438,19 @@
           "border-top-color": "lab(28.6962 0.574768 -9.27358)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(90.9404 0 -0.0000119209)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(28.6962 0.574768 -9.27358)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "cyberpunk·light": {
@@ -9170,6 +9586,19 @@
           "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(3.79387 2.93769 -10.5157)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(90.8213 -2.0178 -2.32914)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "cyberpunk·dark": {
@@ -9305,6 +9734,19 @@
           "border-top-color": "lab(21.0039 11.3406 -29.2132)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(94.3261 -0.358105 -2.77311)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(21.0039 11.3406 -29.2132)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "retro-arcade·light": {
@@ -9440,6 +9882,19 @@
           "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(20.1314 -11.9702 -12.1356)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(60.0066 -5.96857 -3.23025)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       },
       "retro-arcade·dark": {
@@ -9575,6 +10030,19 @@
           "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
           "border-top-left-radius": "16px",
           "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.28) 0px 4px 24px 0px"
+        },
+        "dialogTitle": {
+          "font-family": "Geist, \"Geist Fallback\"",
+          "font-weight": "600",
+          "font-size": "20px",
+          "letter-spacing": "-0.2px",
+          "text-transform": "none",
+          "color": "lab(65.1228 -5.13402 -1.78832)",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "background-image": "none",
+          "border-top-color": "lab(44.8388 -7.14397 -6.74677)",
+          "border-top-left-radius": "0px",
+          "box-shadow": "none"
         }
       }
     }

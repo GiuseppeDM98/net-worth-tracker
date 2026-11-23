@@ -62,6 +62,8 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        // The tile's cap or marks under a costume, never `data-tile`: the Float shadow stays the modal's.
+        data-costume-frame=""
         {...scopeProps}
         className={cn(
           // The surface is `bg-card`, not `bg-background`: DESIGN.md §2 gives Charcoal Surface to

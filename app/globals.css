@@ -852,6 +852,8 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --costume-control-pill-radius: initial;
   --costume-control-chip-radius: initial;
   --costume-control-switch-on: var(--primary);
+  /* The AI accent reads 4,48:1 on 40 % of this theme's muted over the card: the generated sub-tiles sit on the card. */
+  --costume-page-generated-fill: var(--card);
 }
 
 .dark[data-theme="egeo"] [data-costume-scope] {
@@ -972,6 +974,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --costume-control-pill-radius: 0px;
   --costume-control-chip-radius: 0px;
   --costume-control-switch-on: var(--primary);
+  --costume-page-generated-fill: initial;
 }
 
 .dark[data-theme="orbita"] [data-costume-scope] {
@@ -1059,6 +1062,36 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
 [data-costume] [data-costume-scope] .costume-wordmark {
   font-family: var(--costume-heading-font); font-weight: var(--costume-heading-weight);
   letter-spacing: var(--costume-heading-tracking); text-transform: var(--costume-heading-case); font-synthesis: none;
+}
+/* A modal is a tile lifted off the page: the tile's cap or marks, but its own Float shadow (DESIGN.md → The
+   Modal-Is-A-Tile Rule). Not `data-tile`, whose shadow rule would take the Float away. */
+[data-costume] [data-costume-scope][data-costume-frame] {
+  background-image: var(--costume-tile-image); background-position: var(--costume-tile-image-position);
+  background-size: var(--costume-tile-image-size); background-repeat: no-repeat; background-origin: border-box;
+}
+/* A modal's title: the heading face at the title's own size. */
+[data-costume] [data-costume-scope] .costume-title {
+  font-family: var(--costume-heading-font); font-weight: var(--costume-heading-weight);
+  letter-spacing: var(--costume-heading-tracking); text-transform: var(--costume-heading-case); font-synthesis: none;
+}
+/* Paper is the palette's: every scope property back to «off». */
+@media print {
+  [data-costume] [data-costume-scope] {
+    --radius: inherit !important; --radius-2xl: 1rem !important;
+    --costume-ground: var(--background) !important; --costume-ornament: var(--muted-foreground) !important;
+    --costume-tile-image: none !important; --costume-tile-image-position: 0 0 !important;
+    --costume-tile-image-size: auto !important;
+    --costume-tile-shadow: 0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a !important;
+    --costume-heading-font: var(--font-geist-sans), system-ui, sans-serif !important;
+    --costume-heading-weight: 600 !important; --costume-heading-tracking: -0.025em !important;
+    --costume-heading-case: none !important; --costume-heading-size: 30px !important;
+    --costume-eyebrow-color: var(--muted-foreground) !important; --costume-eyebrow-weight: 600 !important;
+    --costume-header-band: none !important; --costume-header-band-height: 0px !important;
+    --costume-primary-glow: none !important;
+    --costume-control-frame-radius: initial !important; --costume-control-pill-radius: initial !important;
+    --costume-control-chip-radius: initial !important; --costume-control-switch-on: initial !important;
+    --costume-page-generated-fill: initial !important;
+  }
 }
 /* ─── End of theme costume ── */
 

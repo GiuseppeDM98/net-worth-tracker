@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { applyThemeWithTransition } from '@/lib/utils/themeTransition';
 import { describeColorTheme, describeThemeMode, type ThemeMode } from '@/lib/utils/settingsNarrative';
 import { SettingsTabPanel } from './shared';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // Stable no-op store for the SSR/hydration split (same guard ThemePicker uses).
 const neverChanges = () => () => {};
@@ -86,7 +87,7 @@ export function AspettoTab() {
                   aria-label={`Colore ${index + 1} di ${COLOR_THEMES.length}: ${name}`}
                   aria-pressed={isActive}
                   className={cn(
-                    'relative flex flex-col rounded-[10px] border-2 p-2.5 text-left transition-all hover:border-primary/60',
+                    'relative flex flex-col rounded-[var(--costume-control-frame-radius,10px)] border-2 p-2.5 text-left transition-all hover:border-primary/60',
                     isActive ? 'border-primary shadow-sm' : 'border-border'
                   )}
                 >
@@ -94,11 +95,11 @@ export function AspettoTab() {
                   <div className="mb-2.5 h-14 overflow-hidden rounded-md border border-border/50" aria-hidden="true">
                     <div data-theme={id} className="flex h-7 w-full items-center gap-1.5 bg-background px-2">
                       <div className="h-3 w-3 flex-shrink-0 rounded-sm bg-primary" />
-                      <div className="h-2 flex-1 rounded-full bg-accent" />
+                      <div className={cn('h-2 flex-1 bg-accent', COSTUME_PILL_RADIUS_CLASS)} />
                     </div>
                     <div data-theme={id} className="dark flex h-7 w-full items-center gap-1.5 bg-background px-2">
                       <div className="h-3 w-3 flex-shrink-0 rounded-sm bg-primary" />
-                      <div className="h-2 flex-1 rounded-full bg-primary opacity-30" />
+                      <div className={cn('h-2 flex-1 bg-primary opacity-30', COSTUME_PILL_RADIUS_CLASS)} />
                     </div>
                   </div>
                   <span className="text-[13px] font-medium leading-none">{name}</span>

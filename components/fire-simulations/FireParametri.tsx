@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch';
 import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 /** 44px on touch, the 36px control from desktop: (`h-11 desktop:h-9`, AGENTS → Accessibility). */
 const CONTROL_CLASS =
@@ -259,7 +260,7 @@ export function FireParametri({
             <Tile eyebrow="Scenari" aside="crescita e inflazione annue, %" reading={describeScenarioParams()} ariaLabel="Parametri degli scenari">
               <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {SCENARIO_META.map(({ key, label, slot, icon: Icon }) => (
-                  <div key={key} className="rounded-xl border border-border bg-muted p-3.5">
+                  <div key={key} className={cn('border border-border bg-muted p-3.5', COSTUME_FRAME_RADIUS_CLASS)}>
                     {/* A chart slot is not a text colour: the slot is the swatch, the label stays muted. */}
                     <p className="flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: chartColors[slot] }} aria-hidden="true" />

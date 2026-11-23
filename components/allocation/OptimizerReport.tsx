@@ -19,6 +19,8 @@ import {
   OPTIMIZER_REPORT_TITLE,
   OPTIMIZER_WARNINGS_TITLE,
 } from '@/lib/utils/weightOptimizerNarrative';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 /**
  * The objectives as rows: name, priority chip, «target → raggiunto» in mono and a `TargetTick`
@@ -93,7 +95,7 @@ const PRIORITY_CHIP_CLASS: Record<ObjectiveReport['priority'], string> = {
 function PriorityChip({ priority }: { priority: ObjectiveReport['priority'] }) {
   const label = OBJECTIVE_PRIORITY_LABELS[priority];
   return (
-    <span className={`ml-1.5 rounded-full px-1.5 py-px text-[10px] font-medium ${PRIORITY_CHIP_CLASS[priority]}`}>
+    <span className={cn('ml-1.5 px-1.5 py-px text-[10px] font-medium', COSTUME_PILL_RADIUS_CLASS, PRIORITY_CHIP_CLASS[priority])}>
       {label.charAt(0).toUpperCase() + label.slice(1)}
     </span>
   );
@@ -111,9 +113,9 @@ function ObjectiveTrack({ achieved, target, ariaLabel }: { achieved: number; tar
   const progress = target > 0 ? Math.min(100, Math.max(0, Math.round((achieved / target) * 100))) : 100;
   return (
     <div className="relative mt-1 h-[10px] w-full" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={ariaLabel}>
-      <div className="absolute inset-x-0 top-[3px] h-1 overflow-hidden rounded-full bg-muted">
+      <div className={cn('absolute inset-x-0 top-[3px] h-1 overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}>
         <div
-          className="h-full rounded-full"
+          className={cn('h-full', COSTUME_PILL_RADIUS_CLASS)}
           style={{ width: `${fillWidth}%`, backgroundColor: 'var(--hero-series)' }}
         />
       </div>

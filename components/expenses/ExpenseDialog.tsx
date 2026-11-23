@@ -142,6 +142,7 @@ import {
 } from '@/lib/utils/dialogNarrative';
 import { isTradeFeeRow } from '@/lib/utils/tradeFeeExpense';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS, COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 
 // ---------------------------------------------------------------------------
@@ -1018,7 +1019,7 @@ function ExpenseFormBody({
                 <label
                   key={option.id || '__common__'}
                   className={cn(
-                    'inline-flex h-11 cursor-pointer items-center rounded-full border px-4 text-sm transition-colors',
+                    'inline-flex h-11 cursor-pointer items-center border px-4 text-sm transition-colors', COSTUME_PILL_RADIUS_CLASS,
                     'focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
                     checked
                       ? 'border-primary bg-primary text-primary-foreground'
@@ -1055,7 +1056,7 @@ function ExpenseFormBody({
             type="button"
             className={cn(
               'group w-full flex items-center justify-between px-4 py-3',
-              'rounded-xl border border-border/60 bg-muted/20',
+              'border border-border/60 bg-muted/20', COSTUME_FRAME_RADIUS_CLASS,
               'text-sm font-medium hover:bg-muted/40 transition-colors duration-150',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             )}
@@ -1151,7 +1152,7 @@ function ExpenseFormBody({
 
           {/* ---- Acquisto rateale (solo spese non necessarie/necessarie, solo creazione) ---- */}
           {!expense && (selectedType === 'variable' || selectedType === 'fixed') && (
-            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/30 p-4">
+            <div className={cn('space-y-4 border border-border/60 bg-muted/30 p-4', COSTUME_FRAME_RADIUS_CLASS)}>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="isInstallment" className="text-sm font-medium cursor-pointer">
@@ -1388,7 +1389,7 @@ function ExpenseFormBody({
                switches kept out of sync by hand are a state machine the user has to run.
                `canTypeRecur` is the single source on which types may recur. */}
           {canTypeRecur(selectedType) && !expense && (
-            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/30 p-4">
+            <div className={cn('space-y-4 border border-border/60 bg-muted/30 p-4', COSTUME_FRAME_RADIUS_CLASS)}>
               <div className="flex items-center justify-between gap-3">
                 <div className="space-y-0.5 min-w-0">
                   <Label htmlFor="isRecurring" className="text-sm font-medium cursor-pointer">

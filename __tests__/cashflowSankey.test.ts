@@ -6,6 +6,8 @@ import {
   buildSpendingRoleDrillDownData,
   buildSpendingRolesFlowData,
   buildSpendingRolesFlowDataWithSubcategories,
+  costumeSankeyPalette,
+  DEFAULT_SANKEY_TYPE_PALETTE,
   DEFAULT_SPENDING_ROLE_PALETTE,
   DEFICIT_NODE_LABEL,
   deriveSubcategoryColors,
@@ -16,6 +18,7 @@ import {
   TYPE_COLORS,
   type SankeyView,
 } from '@/lib/utils/cashflowSankey';
+import type { SankeyCostumeKey } from '@/lib/constants/sankeyCostumeColors';
 import type { SpendingRoleSource } from '@/lib/utils/spendingRoles';
 // Row-selection vocabulary from its home module — the cashflowSankey re-export
 // fell with the internal category drill (2026-08-14). Its tests stay in this file
@@ -935,5 +938,64 @@ describe('buildSpendingRolesFlowData — the type view’s colours on income and
     expect(colours(buildSpendingRolesFlowData(rows, [], DEFAULT_SPENDING_ROLE_PALETTE))).toEqual(
       colours(buildBudgetFlowData(rows))
     );
+  });
+});
+
+// A costume theme paints the flow with its slots; a palette theme keeps the hexes (2026-11-23).
+// Seen red with `costumeSankeyPalette` mapping variable to `slot2`.
+describe('the type flow’s palette', () => {
+  const HEX: Record<SankeyCostumeKey, string> = {
+    slot1: '#010101', slot2: '#020202', slot3: '#030303', slot4: '#040404', slot5: '#050505',
+    slot6: '#060606', slot7: '#070707', slot8: '#080808', slot9: '#090909', positive: '#0a0a0a',
+  };
+  const incomes = Array.from({ length: 11 }, (_, index) =>
+    makeExpense({ type: 'income', amount: 2000 - index * 100, categoryId: `i${index}`, categoryName: `Entrata ${index}` }),
+  );
+  const rows = [
+    ...incomes,
+    makeExpense({ type: 'fixed', amount: -900, categoryId: 'f1', categoryName: 'Casa' }),
+    makeExpense({ type: 'variable', amount: -400, categoryId: 'v1', categoryName: 'Svago' }),
+    makeExpense({ type: 'debt', amount: -300, categoryId: 'd1', categoryName: 'Mutuo' }),
+  ];
+  const colourOf = (view: SankeyView, label: string) => view.nodes.find((node) => node.label === label)?.nodeColor;
+
+  it('paints today’s hexes with no palette, in both budget builders', () => {
+    for (const view of [buildBudgetFlowData(rows), buildBudgetFlowDataWithSubcategories(rows)]) {
+      expect(colourOf(view, EXPENSE_TYPE_LABELS.fixed)).toBe('#3b82f6');
+      expect(colourOf(view, EXPENSE_TYPE_LABELS.variable)).toBe('#8b5cf6');
+      expect(colourOf(view, EXPENSE_TYPE_LABELS.debt)).toBe('#f59e0b');
+      expect(colourOf(view, 'Budget')).toBe('#10b981');
+      expect(colourOf(view, 'Risparmi')).toBe('#3b82f6');
+      // Ten income hexes in turn: the eleventh source takes the first again.
+      expect(colourOf(view, 'Entrata 0')).toBe('#3b82f6');
+      expect(colourOf(view, 'Entrata 10')).toBe('#3b82f6');
+    }
+    expect(DEFAULT_SANKEY_TYPE_PALETTE.income).toHaveLength(10);
+  });
+
+  it('paints a costume’s slots: fixed 1, variable 4, debt 3, Budget the positive, Risparmi 2, the income in turn over nine', () => {
+    const palette = costumeSankeyPalette(HEX);
+    for (const view of [buildBudgetFlowData(rows, palette), buildBudgetFlowDataWithSubcategories(rows, palette)]) {
+      expect(colourOf(view, EXPENSE_TYPE_LABELS.fixed)).toBe(HEX.slot1);
+      expect(colourOf(view, EXPENSE_TYPE_LABELS.variable)).toBe(HEX.slot4);
+      expect(colourOf(view, EXPENSE_TYPE_LABELS.debt)).toBe(HEX.slot3);
+      expect(colourOf(view, 'Budget')).toBe(HEX.positive);
+      expect(colourOf(view, 'Risparmi')).toBe(HEX.slot2);
+      incomes.forEach((_, position) => {
+        expect(colourOf(view, `Entrata ${position}`), `income ${position}`).toBe(HEX[`slot${(position % 9) + 1}` as SankeyCostumeKey]);
+      });
+    }
+  });
+
+  it('paints the roles flow’s income and Budget with the costume’s slots too', () => {
+    const palette = costumeSankeyPalette(HEX);
+    const builders = [buildSpendingRolesFlowData, buildSpendingRolesFlowDataWithSubcategories];
+    for (const build of builders) {
+      const view = build(rows, [], DEFAULT_SPENDING_ROLE_PALETTE, palette);
+      expect(colourOf(view, 'Budget')).toBe(HEX.positive);
+      expect(colourOf(view, 'Entrata 0')).toBe(HEX.slot1);
+      expect(colourOf(view, 'Entrata 9')).toBe(HEX.slot1);
+      expect(colourOf(build(rows, [], DEFAULT_SPENDING_ROLE_PALETTE), 'Budget')).toBe('#10b981');
+    }
   });
 });

@@ -26,6 +26,7 @@ import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { resolveHeroValueClass } from '@/components/dashboard/overview/PatrimonioTile';
 import { SettledCurrencyValue, SettledPercentageValue } from '@/components/fire-simulations/SettledValue';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface CoastTraguardoTileProps {
   /** `describeCoastTarget(target)`. */
@@ -63,14 +64,14 @@ export function CoastTraguardoTile({ reading, target, caption, chart, footer, cl
             their own gap instead of a space that would never paint. */}
         {/* ONE name for the figure on the tile: «numero Coast FIRE», as the reading and the
             sub-eyebrow say it — «numero Coast» beside them read as a third thing (2026-09-23). */}
-        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-[9px] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground">
           <SettledPercentageValue value={target.progressPct} />
           <span>del numero Coast FIRE</span>
         </span>
         <NarrativeText segments={caption} className="min-w-0 text-[11px] leading-[1.4] text-muted-foreground" figureClassName="font-medium" />
       </div>
       <div
-        className="mt-2.5 h-[3px] overflow-hidden rounded-full bg-muted"
+        className={cn('mt-2.5 h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}
         role="progressbar"
         aria-label="Progresso verso il numero Coast FIRE"
         aria-valuemin={0}
@@ -79,7 +80,7 @@ export function CoastTraguardoTile({ reading, target, caption, chart, footer, cl
         // The bar caps at 100; the text says the true share, so 140% is not announced as 100.
         aria-valuetext={`${formatPercentage(target.progressPct, 1)} del numero Coast FIRE`}
       >
-        <div className={cn('h-full rounded-full', target.reached ? 'bg-positive' : 'bg-[var(--chart-1)]')} style={{ width: `${fill}%` }} />
+        <div className={cn('h-full', COSTUME_PILL_RADIUS_CLASS, target.reached ? 'bg-positive' : 'bg-[var(--chart-1)]')} style={{ width: `${fill}%` }} />
       </div>
 
       {/* The chart stretches with the tile's free height: the SVG's 100% height resolves

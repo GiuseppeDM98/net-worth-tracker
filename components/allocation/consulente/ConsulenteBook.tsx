@@ -42,6 +42,7 @@ import { PathRail } from '@/components/ui/path-rail';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS, TILE_SURFACE_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -225,6 +226,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
         <section
           ref={cardRef}
           aria-label={eyebrow}
+          data-tile=""
           data-generated={page.generated ? '' : undefined}
           className={cn(TILE_SURFACE_CLASS, SCENE_CARD_CLASS, 'scroll-mt-4 desktop:scroll-mt-5', page.generated && AI_GENERATED_SURFACE_CLASS)}
         >
@@ -232,7 +234,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
             <BookPageSlide key={page.id} pageId={page.id} direction={direction} reduced={reduced} turned={turned} cascade={plays.cascade} onSettled={() => focusTarget(sceneTurn)}>
               <motion.div variants={cardItem} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
                 {/* One h2 per page: the eyebrow, or on the cover the verdict's own. */}
-                {page.id === 'copertina' ? <p className={eyebrowClass}>{eyebrow}</p> : <h2 className={eyebrowClass}>{eyebrow}</h2>}
+                {page.id === 'copertina' ? <p className={eyebrowClass}><HeadingText text={eyebrow} /></p> : <h2 className={eyebrowClass}><HeadingText text={eyebrow} /></h2>}
                 {pieces.aside && <div className="min-w-0 max-w-full shrink-0 text-[10px] text-muted-foreground">{pieces.aside}</div>}
               </motion.div>
               <motion.div variants={cardItem}>
@@ -242,7 +244,7 @@ export function ConsulenteBook(props: ConsulenteBookProps) {
                   </div>
                 ) : (
                   <p ref={targetRef as RefObject<HTMLParagraphElement | null>} tabIndex={-1} className={cn(PATH_HEADLINE_CLASS, 'mt-3 outline-none')}>
-                    {page.title}
+                    <HeadingText text={page.title} />
                   </p>
                 )}
               </motion.div>

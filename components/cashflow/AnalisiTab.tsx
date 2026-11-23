@@ -48,6 +48,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { COMPACT_QUERY } from '@/lib/hooks/useCompactLayout';
 import { useMobileSections, type SectionSpec } from '@/lib/hooks/useMobileSections';
 import { useTabletComposition, useTabletStage } from '@/lib/hooks/useTabletComposition';
+import { useBalancedRows } from '@/lib/hooks/useBalancedRows';
 import {
   COMPACT_GRID_CLASS,
   COMPACT_GRID_WRAPPER_CLASS,
@@ -553,6 +554,12 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   const sections = useMobileSections({ route: 'analisi', sections: sectionSpecs });
   const stageRef = useTabletStage();
   const tablet = useTabletComposition({ sections, order: sectionSpecs.map((section) => section.id) });
+  // At 1440 «Dove vanno i soldi» and «Spese maggiori» share a grid row: the shorter one draws the rows that
+  // fill its void (owner, 2026-11-23). Below it they are a lead tile and a closed row, and nothing is handed.
+  const [classificaCell, maggioriCell, [classificaExtraRows, maggioriExtraRows]] = useBalancedRows(
+    !sections.compact,
+    `${expenseSlices.length > 0}:${topExpenses.rows.length > 0}`,
+  );
 
   // Cold-load focus restore: the URL triple is captured once at mount, then applied as soon as
   // the data needed to validate it has loaded (expenses/taxonomy, both async).
@@ -758,6 +765,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
 
   const header = (
     <PageHeader
+      emblem="analisi"
       label="Analisi"
       title="Analisi Cashflow"
       description="Dove vanno i soldi, e cosa è cambiato"
@@ -861,7 +869,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
         {/* ── Tile grid ───────────────────────────────────────────────────────────── */}
         <div className={COMPACT_GRID_WRAPPER_CLASS}>
         <div className={COMPACT_GRID_CLASS}>
-          <div data-stage="lead" className={cn(TILE_CELL_CLASS, LEAD_CELL_CLASS, 'desktop:col-span-7')}>
+          <div ref={classificaCell} data-stage="lead" className={cn(TILE_CELL_CLASS, LEAD_CELL_CLASS, 'desktop:col-span-7')}>
             <ClassificaTile
               id={ANALISI_CLASSIFICA_ID}
               eyebrow={`Dove vanno i soldi · ${periodLabel}`}
@@ -875,6 +883,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
               activeKey={focus?.kind === 'expenses' ? activeSliceKey : null}
               activeSubKey={activeSubSliceKey}
               onSelect={handleEntitySelect}
+              extraRows={classificaExtraRows}
             />
           </div>
 
@@ -882,10 +891,11 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
           <div className={INDEX_CLASS}>
           <PageRest sections={sections} buttonId={ANALISI_REST_BUTTON_ID} className={REST_CELL_CLASS} />
 
-          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.maggiori), 'desktop:col-span-5')}>
+          <div ref={maggioriCell} className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(ANALISI_SECTION_IDS.maggiori), 'desktop:col-span-5')}>
             <SpeseMaggioriTile
               top={topExpenses}
               onSelect={handleTopExpenseSelect}
+              extraRows={maggioriExtraRows}
               collapse={sections.collapse(ANALISI_SECTION_IDS.maggiori)}
               asideWhenClosed={ANALISI_CLOSED_ASIDES.maggiori}
             />

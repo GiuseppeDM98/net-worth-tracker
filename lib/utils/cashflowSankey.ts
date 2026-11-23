@@ -50,8 +50,10 @@ import {
   SPENDING_ROLE_FLOW_ORDER,
   summarizeSpendingRoles,
   type SpendingBucket,
+  type SpendingExpenseType,
   type SpendingRoleSource,
 } from '@/lib/utils/spendingRoles';
+import type { SankeyCostumeKey } from '@/lib/constants/sankeyCostumeColors';
 import {
   getCategoryKey,
   getCategoryName,
@@ -64,8 +66,9 @@ import {
 // ── Palette ──────────────────────────────────────────────────────────────────
 
 // Color palette for income category nodes. These are semantic hex values that
-// remain stable across themes — the Sankey uses intentional semantic colors
-// (blue=fixed, violet=variable, amber=debt) that should not follow the chart palette.
+// remain stable across the palette themes — the Sankey uses intentional semantic colors
+// (blue=fixed, violet=variable, amber=debt) that should not follow the chart palette; a
+// costume theme paints the types with its slots (`costumeSankeyPalette`).
 export const COLORS = [
   '#3b82f6', // blue
   '#ef4444', // red
@@ -79,7 +82,7 @@ export const COLORS = [
   '#14b8a6', // teal
 ];
 
-/** Semantic per-type node colors. Deliberately theme-independent, see COLORS. */
+/** Semantic per-type node colors. Theme-independent in the palette themes, see COLORS. */
 export const TYPE_COLORS: Record<ExpenseType, string> = {
   fixed: '#3b82f6',     // blue
   variable: '#8b5cf6',  // violet
@@ -90,6 +93,31 @@ export const TYPE_COLORS: Record<ExpenseType, string> = {
 
 const BUDGET_NODE_COLOR = '#10b981';
 const SAVINGS_NODE_COLOR = '#3b82f6';
+
+/** The colours a type flow paints with: today's hexes, or a costume's slots. */
+export interface SankeyTypePalette {
+  types: Record<SpendingExpenseType, string>;
+  income: readonly string[];
+  budget: string;
+  savings: string;
+}
+
+export const DEFAULT_SANKEY_TYPE_PALETTE: SankeyTypePalette = {
+  types: { fixed: TYPE_COLORS.fixed, variable: TYPE_COLORS.variable, debt: TYPE_COLORS.debt },
+  income: COLORS,
+  budget: BUDGET_NODE_COLOR,
+  savings: SAVINGS_NODE_COLOR,
+};
+
+/** A costume paints the types as every other chart of the page does (EXPENSE_TYPE_COLOR_VAR). */
+export function costumeSankeyPalette(hex: Record<SankeyCostumeKey, string>): SankeyTypePalette {
+  return {
+    types: { fixed: hex.slot1, variable: hex.slot4, debt: hex.slot3 },
+    income: [hex.slot1, hex.slot2, hex.slot3, hex.slot4, hex.slot5, hex.slot6, hex.slot7, hex.slot8, hex.slot9],
+    budget: hex.positive,
+    savings: hex.slot2,
+  };
+}
 
 /**
  * The subcategory layer is a detail of the biggest categories, not a fifth column for every
@@ -435,8 +463,9 @@ interface BudgetFlowOptions {
  * (→ Subcategories) + Savings.
  *
  * @param expenses All rows for the period, income and expenses together.
+ * @param palette Today's hexes, or a costume theme's slots.
  */
-function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): SankeyView {
+function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions, palette: SankeyTypePalette = DEFAULT_SANKEY_TYPE_PALETTE): SankeyView {
   const { withSubcategories } = options;
   const totals = aggregateFlow(expenses);
   const savings = totals.totalIncome - totals.totalExpenses;
@@ -482,7 +511,7 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
   incomeCategories.forEach((category, position) => {
     const nodeId = categoryNodeId('income', category.key);
     const label = labels.get(nodeId) ?? category.name;
-    builder.addNode(nodeId, label, COLORS[position % COLORS.length], {
+    builder.addNode(nodeId, label, palette.income[position % palette.income.length], {
       kind: 'category',
       expenseType: 'income',
       categoryKey: category.key,
@@ -492,7 +521,7 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
   });
 
   // Layer 2: the Budget node itself
-  builder.addNode(BUDGET_NODE_ID, 'Budget', BUDGET_NODE_COLOR, { kind: 'budget' });
+  builder.addNode(BUDGET_NODE_ID, 'Budget', palette.budget, { kind: 'budget' });
 
   // Layer 3+: one branch per spending type
   for (const type of SPENDING_EXPENSE_TYPES) {
@@ -500,11 +529,11 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
     if (typeTotal <= 0) continue;
 
     const typeId = typeNodeId(type);
-    builder.addNode(typeId, EXPENSE_TYPE_LABELS[type], TYPE_COLORS[type], { kind: 'expenseType', expenseType: type });
+    builder.addNode(typeId, EXPENSE_TYPE_LABELS[type], palette.types[type], { kind: 'expenseType', expenseType: type });
     builder.addLink(BUDGET_NODE_ID, typeId, typeTotal);
 
     const categories = categoriesByType.get(type) ?? [];
-    const categoryColors = deriveSubcategoryColors(TYPE_COLORS[type], categories.length);
+    const categoryColors = deriveSubcategoryColors(palette.types[type], categories.length);
 
     categories.forEach((category, position) => {
       const categoryId = categoryNodeId(type, category.key);
@@ -562,7 +591,7 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
   // Savings is what the budget does not spend — absent when spending exceeds income,
   // because a negative flow has no width to draw.
   if (savings > 0) {
-    builder.addNode(SAVINGS_NODE_ID, 'Risparmi', SAVINGS_NODE_COLOR, { kind: 'savings' });
+    builder.addNode(SAVINGS_NODE_ID, 'Risparmi', palette.savings, { kind: 'savings' });
     builder.addLink(BUDGET_NODE_ID, SAVINGS_NODE_ID, savings);
   }
 
@@ -572,8 +601,8 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
 /**
  * 4-layer budget flow: Income categories → Budget → Expense types → Categories + Savings.
  */
-export function buildBudgetFlowData(expenses: Expense[]): SankeyView {
-  return buildBudgetFlow(expenses, { withSubcategories: false });
+export function buildBudgetFlowData(expenses: Expense[], palette?: SankeyTypePalette): SankeyView {
+  return buildBudgetFlow(expenses, { withSubcategories: false }, palette);
 }
 
 /**
@@ -581,8 +610,8 @@ export function buildBudgetFlowData(expenses: Expense[]): SankeyView {
  * (MAX_SUBCATEGORY_CATEGORIES, MAX_SUBCATEGORIES + one «Altre N» node each); every other
  * category, and one whose rows carry no subcategory at all (hasRealBreakdown), stays a leaf.
  */
-export function buildBudgetFlowDataWithSubcategories(expenses: Expense[]): SankeyView {
-  return buildBudgetFlow(expenses, { withSubcategories: true });
+export function buildBudgetFlowDataWithSubcategories(expenses: Expense[], palette?: SankeyTypePalette): SankeyView {
+  return buildBudgetFlow(expenses, { withSubcategories: true }, palette);
 }
 
 /**
@@ -637,7 +666,7 @@ export function buildTypeDrillDownData(
 // Risparmi carries the saving-classified categories plus the surplus, which has no child: a Sankey
 // node's value is max(in, out), so the surplus simply ends there.
 //
-// Income and Budget keep the type view's colours; the roles take theme tokens (the five `--role-*`
+// Income and Budget keep the type view's colours (the costume's slots under a costume); the roles take theme tokens (the five `--role-*`
 // aliases in globals.css), resolved to hex by the tile through useCssColorTokens, and their
 // categories the same derived shades as a type's.
 
@@ -764,7 +793,8 @@ function buildSpendingRolesFlow(
   expenses: Expense[],
   categories: SpendingRoleSource[],
   palette: SpendingRolePalette,
-  options: BudgetFlowOptions
+  options: BudgetFlowOptions,
+  typePalette: SankeyTypePalette = DEFAULT_SANKEY_TYPE_PALETTE
 ): SankeyView {
   const { withSubcategories } = options;
   const summary = summarizeSpendingRoles(expenses, categories);
@@ -830,7 +860,7 @@ function buildSpendingRolesFlow(
   incomeCategories.forEach((category, position) => {
     const nodeId = categoryNodeId('income', category.key);
     const label = labels.get(nodeId) ?? category.name;
-    builder.addNode(nodeId, label, COLORS[position % COLORS.length], {
+    builder.addNode(nodeId, label, typePalette.income[position % typePalette.income.length], {
       kind: 'category',
       expenseType: 'income',
       categoryKey: category.key,
@@ -846,7 +876,7 @@ function buildSpendingRolesFlow(
   }
 
   // Layer 2
-  builder.addNode(BUDGET_NODE_ID, 'Budget', BUDGET_NODE_COLOR, { kind: 'budget' });
+  builder.addNode(BUDGET_NODE_ID, 'Budget', typePalette.budget, { kind: 'budget' });
 
   // Layer 3+: one branch per role
   for (const bucket of SPENDING_ROLE_FLOW_ORDER) {
@@ -913,18 +943,20 @@ function buildSpendingRolesFlow(
 export function buildSpendingRolesFlowData(
   expenses: Expense[],
   categories: SpendingRoleSource[],
-  palette: SpendingRolePalette
+  palette: SpendingRolePalette,
+  typePalette?: SankeyTypePalette
 ): SankeyView {
-  return buildSpendingRolesFlow(expenses, categories, palette, { withSubcategories: false });
+  return buildSpendingRolesFlow(expenses, categories, palette, { withSubcategories: false }, typePalette);
 }
 
 /** The same flow with a subcategory layer under the largest categories, as in the type view. */
 export function buildSpendingRolesFlowDataWithSubcategories(
   expenses: Expense[],
   categories: SpendingRoleSource[],
-  palette: SpendingRolePalette
+  palette: SpendingRolePalette,
+  typePalette?: SankeyTypePalette
 ): SankeyView {
-  return buildSpendingRolesFlow(expenses, categories, palette, { withSubcategories: true });
+  return buildSpendingRolesFlow(expenses, categories, palette, { withSubcategories: true }, typePalette);
 }
 
 /**

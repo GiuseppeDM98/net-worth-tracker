@@ -87,7 +87,7 @@ function shortTick(key: string): string {
 const TOOLTIP_CONTENT_STYLE = {
   backgroundColor: 'var(--card)',
   border: '1px solid var(--border)',
-  borderRadius: '8px',
+  borderRadius: 'var(--costume-control-frame-radius, 8px)',
   padding: '8px 10px',
   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
 } as const;

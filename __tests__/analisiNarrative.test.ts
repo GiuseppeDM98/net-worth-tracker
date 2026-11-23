@@ -384,6 +384,15 @@ describe('describeTopExpenses', () => {
     expect(plain(describeTopExpenses({ ...top, shownTotal: 4350, total: 4360, count: 7 }))).toBe('Le cinque più grandi fanno quasi tutte le spese; la più grande è Vacanze · Volo (1180 €).');
   });
 
+  // «Spese maggiori» fills its void with rows past the tenth (owner, 2026-11-23): the count stays a word up to twenty.
+  it('should say the count in words up to twenty', () => {
+    const rows = Array.from({ length: 14 }, (_, index) => row(`Voce ${index}`, 1000 - index * 10));
+    const top: TopExpenses = { rows, shownTotal: 13090, total: 52360, count: 412 };
+    expect(plain(describeTopExpenses(top))).toBe('Le quattordici più grandi fanno il 25% delle spese; la più grande è Voce 0 (1000 €).');
+    const twenty = Array.from({ length: 20 }, (_, index) => row(`Voce ${index}`, 1000 - index * 10));
+    expect(plain(describeTopExpenses({ rows: twenty, shownTotal: 18100, total: 72400, count: 412 }))).toContain('Le venti più grandi fanno il 25%');
+  });
+
   it('should count them all when nothing is cut, and handle a single row', () => {
     const three: TopExpenses = { rows: [row('Casa', 860), row('Auto', 300), row('Cibo', 40)], shownTotal: 1200, total: 1200, count: 3 };
     expect(plain(describeTopExpenses(three))).toBe('3 spese in tutto; la più grande è Casa (860 €).');

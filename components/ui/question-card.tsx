@@ -30,6 +30,7 @@ import {
   type QuestionAnswerValue,
 } from '@/lib/utils/questionSet';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface QuestionCardProps {
   question: Question;
@@ -92,7 +93,7 @@ export function QuestionCard({ question, index, total, answer, onAnswer, eyebrow
     : { value: QUESTION_OTHER_VALUE, label: `${QUESTION_OTHER_LABEL.replace('…', '')} — ${question.text}`, text: otherText, onTextChange: (text: string) => onAnswer({ other: text.slice(0, 500) }) };
 
   return (
-    <div className={cn('rounded-xl border p-4 desktop:p-5', AI_GENERATED_SURFACE_CLASS)} data-question-card={question.id}>
+    <div className={cn('border p-4 desktop:p-5', COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)} data-question-card={question.id}>
       <p className={cn(TILE_SUB_EYEBROW_CLASS, AI_GENERATED_EYEBROW_CLASS)}>{eyebrow ?? `Il Consulente chiede · ${index} di ${total}`}</p>
       <p className="mt-2 text-[16px] font-medium leading-[1.4] text-foreground desktop:text-[20px]">{question.text}</p>
       {question.why && <p className="mt-1 text-[13px] leading-[1.45] text-muted-foreground">{question.why}</p>}

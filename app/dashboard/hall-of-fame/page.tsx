@@ -359,6 +359,7 @@ export default function HallOfFamePage() {
 
   const header = (
     <PageHeader
+      emblem="hall-of-fame"
       label="Analisi"
       title="Hall of Fame"
       description={describeHallOfFameHeader(summary.stats, summary.rankingsUpdatedAt)}

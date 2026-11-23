@@ -18,7 +18,7 @@ const TOOLTIP_CONTENT_STYLE = {
   border: '1px solid var(--border)',
   color: 'var(--card-foreground)',
   fontSize: 12,
-  borderRadius: 8,
+  borderRadius: 'var(--costume-control-frame-radius, 8px)',
 } as const;
 
 const TOOLTIP_LABEL_STYLE = {

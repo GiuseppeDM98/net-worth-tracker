@@ -42,7 +42,7 @@ interface TraiettoriaTileProps {
 const ACTION_CLASS =
   'inline-flex h-11 items-center justify-center gap-1 rounded-md border border-border px-3 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 desktop:h-7 desktop:border-0 desktop:px-2';
 
-const CHIP_CLASS = 'inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-[9px] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground';
+const CHIP_CLASS = 'inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] bg-muted px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tabular-nums text-foreground';
 
 function Chip({ chip }: { chip: TraiettoriaChip }) {
   return (

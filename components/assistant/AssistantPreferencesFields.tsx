@@ -4,6 +4,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AssistantMemoryDocument, AssistantPreferences } from '@/types/assistant';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 interface AssistantPreferencesFieldsProps {
   memory: AssistantMemoryDocument | undefined;
@@ -14,7 +16,7 @@ interface AssistantPreferencesFieldsProps {
   disabled?: boolean;
 }
 
-const ROW_CLASS = 'flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3';
+const ROW_CLASS = cn('flex items-center justify-between gap-4 border border-border px-4 py-3', COSTUME_FRAME_RADIUS_CLASS);
 
 function SwitchRow({ id, title, hint, checked, onCheckedChange, disabled }: {
   id: string; title: string; hint: string; checked: boolean; onCheckedChange: (checked: boolean) => void; disabled: boolean;

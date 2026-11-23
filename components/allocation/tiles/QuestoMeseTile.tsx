@@ -127,6 +127,8 @@ import {
   describeMoreAdvisorNotes,
 } from '@/lib/utils/accumulationNarrative';
 import { comparePlanToModel } from '@/lib/utils/modelPortfolio';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 interface QuestoMeseTileProps {
   ownerId: string;
@@ -864,7 +866,7 @@ export function QuestoMeseTile({
             return (
               <div
                 key={installment.index}
-                className={`h-[3px] flex-1 rounded-full ${hasLate ? 'bg-destructive' : closed ? 'bg-[var(--progress-fill)]' : isCurrent ? 'bg-muted-foreground/60' : 'bg-muted'}`}
+                className={cn('h-[3px] flex-1', COSTUME_PILL_RADIUS_CLASS, hasLate ? 'bg-destructive' : closed ? 'bg-[var(--progress-fill)]' : isCurrent ? 'bg-muted-foreground/60' : 'bg-muted')}
               />
             );
           })}

@@ -18,11 +18,13 @@ import type { AllocationAdviceStage } from '@/types/allocationAdvice';
 import { STAGE_COPY, describeRunHeadline, describeStageTypical } from '@/lib/utils/allocationAdviceNarrative';
 import { runStageStates, stageOfRunStage, type StageRowState } from '@/lib/utils/allocationAdviceDocument';
 import { AI_CONTROL_ACCENT_CLASS, AI_GENERATED_SURFACE_CLASS } from '@/lib/constants/aiAccent';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS, TILE_SURFACE_CLASS } from '@/components/ui/tile';
 import { PathRail } from '@/components/ui/path-rail';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { ConsulenteRunState } from './useConsulenteRun';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface ConsulenteRunProps {
   state: Exclude<ConsulenteRunState, { kind: 'idle' }>;
@@ -63,7 +65,7 @@ function useElapsed(since: number | null): string {
  */
 export function StageRows({ rows, elapsed }: { rows: readonly { stage: AllocationAdviceStage; state: StageRowState }[]; elapsed?: string }) {
   return (
-    <ol aria-label="Le fasi" className="divide-y divide-border rounded-xl border border-border">
+    <ol aria-label="Le fasi" className={cn('divide-y divide-border border border-border', COSTUME_FRAME_RADIUS_CLASS)}>
       {rows.map(({ stage, state }) => {
         const typical = describeStageTypical(stage);
         const active = state === 'active';
@@ -71,7 +73,7 @@ export function StageRows({ rows, elapsed }: { rows: readonly { stage: Allocatio
           <li
             key={stage}
             data-state={state}
-            className={cn('flex items-start gap-3 px-4 py-3', active && cn('relative z-[1] -m-px border first:rounded-t-xl last:rounded-b-xl', AI_GENERATED_SURFACE_CLASS))}
+            className={cn('flex items-start gap-3 px-4 py-3', active && cn('relative z-[1] -m-px border first:rounded-t-[inherit] last:rounded-b-[inherit]', AI_GENERATED_SURFACE_CLASS))}
           >
             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
               {state === 'done' ? (
@@ -116,10 +118,10 @@ export function ConsulenteRun({ state, onRetry, onBack }: ConsulenteRunProps) {
   return (
     <div className={SCENE_GRID_CLASS}>
       <PathRail mode="run" stages={rows.map((row) => ({ label: STAGE_COPY[row.stage].label, state: row.state }))} />
-      <section className={cn(TILE_SURFACE_CLASS, SCENE_CARD_CLASS)} aria-label="Corsa del Consulente">
+      <section data-tile="" className={cn(TILE_SURFACE_CLASS, SCENE_CARD_CLASS)} aria-label="Corsa del Consulente">
         <h2 className={TILE_EYEBROW_CLASS}>Consulente · in corso</h2>
-        <p className="mt-3 text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]" role="status" aria-live="polite">
-          {state.kind === 'failed' ? 'Il percorso non si è concluso.' : state.kind === 'done' ? 'La proposta è pronta.' : describeRunHeadline(stage)}
+        <p className="costume-heading mt-3 text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]" role="status" aria-live="polite">
+          <HeadingText text={state.kind === 'failed' ? 'Il percorso non si è concluso.' : state.kind === 'done' ? 'La proposta è pronta.' : describeRunHeadline(stage)} />
         </p>
         {state.kind === 'failed' && <p className="mt-2 text-[14px] leading-[1.6] text-destructive">{state.error}</p>}
         <div className="mt-5">

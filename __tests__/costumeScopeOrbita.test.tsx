@@ -59,17 +59,24 @@ describe('PageHeader in Orbita', () => {
     expect(container.querySelectorAll('svg')).toHaveLength(0);
   });
 
-  // 2026-11-22: Egeo draws a page's own art on Patrimonio; Orbita keeps the planet there too.
-  it('draws the planet on Patrimonio', () => {
+  // 2026-11-22: Egeo draws a page's own art; Orbita keeps the planet on every page (the twelve ids, 2026-11-23).
+  it.each([
+    'panoramica', 'patrimonio', 'cashflow', 'analisi', 'rendimenti', 'storico', 'allocazione', 'previdenza', 'fire', 'hall-of-fame', 'assistente', 'impostazioni',
+  ] as const)('draws the planet on %s', (page) => {
     const { container } = render(
       <ColorThemeProvider>
         <CostumeScope>
-          <PageHeader title="Novembre" label="Patrimonio" emblem="patrimonio" />
+          <PageHeader title="Novembre" label="Pagina" emblem={page} />
         </CostumeScope>
       </ColorThemeProvider>,
     );
-    const circles = [...container.querySelectorAll('svg[aria-hidden="true"] circle')];
-    expect(circles.map((circle) => circle.getAttribute('r'))).toEqual(['5', '5']);
+    const svgs = [...container.querySelectorAll('svg[aria-hidden="true"]')];
+    expect(svgs).toHaveLength(2);
+    for (const svg of svgs) {
+      expect([...svg.querySelectorAll('circle')].map((circle) => circle.getAttribute('r'))).toEqual(['5']);
+      expect(svg.querySelectorAll('ellipse')).toHaveLength(1);
+      expect(svg.querySelectorAll('path')).toHaveLength(0);
+    }
   });
 
   it('registers the planet as the fallback of every page', () => {

@@ -47,6 +47,8 @@ interface ClassificaTileProps {
   /** The subcategory slice focused elsewhere, in the «Sottocategorie» view. */
   activeSubKey?: string | null;
   onSelect: (target: EntitySearchTarget) => void;
+  /** Rows past the eighth that fill the void beside a longer «Spese maggiori» (`useBalancedRows`). */
+  extraRows?: number;
   className?: string;
 }
 
@@ -55,9 +57,11 @@ interface ClassificaTileProps {
  * in the hole, beside the ranking of the categories (or of the subcategories, on the aside's toggle).
  * Every ranking row carries its type's swatch, the key to the legend under the ring; the bars stay,
  * because the ranking is not the ring's legend. With one type the ring is no ring (The Ring Rule):
- * the total stands as a hero line above the single legend row.
+ * the total stands as a hero line above the single legend row. At 1440, beside a longer «Spese
+ * maggiori», the page hands it the rows that fill its void (`extraRows`, 2026-11-23): eight
+ * categories at rest, as many more as fit, the rest still summed in one row.
  */
-export function ClassificaTile({ id, eyebrow, ariaLabel, categories, subCategories, typeShares, spending, ringSize, reading, activeKey, activeSubKey = null, onSelect, className }: ClassificaTileProps) {
+export function ClassificaTile({ id, eyebrow, ariaLabel, categories, subCategories, typeShares, spending, ringSize, reading, activeKey, activeSubKey = null, onSelect, extraRows = 0, className }: ClassificaTileProps) {
   const [view, setView] = useState<ClassificaView>('categories');
   const [showAll, setShowAll] = useState(false);
   const bySub = view === 'subcategories';
@@ -67,8 +71,13 @@ export function ClassificaTile({ id, eyebrow, ariaLabel, categories, subCategori
   // A focused row beyond the fold stays visible: the row the reader clicked must not vanish.
   const activeHidden = focused !== null && slices.findIndex((slice) => slice.key === focused) >= VISIBLE_ROWS;
   const expanded = showAll || activeHidden;
-  const visible = expanded ? slices : slices.slice(0, VISIBLE_ROWS);
-  const hidden = expanded ? [] : slices.slice(VISIBLE_ROWS);
+  // At rest the tile draws eight rows and the remainder's: `room` is what the whole ranking adds to those nine.
+  const room = expanded ? 0 : Math.max(0, slices.length - VISIBLE_ROWS - 1);
+  const extra = Math.min(Math.max(0, extraRows), room);
+  // One category alone behind the remainder takes the remainder's row: the same height, and a name instead of «Un'altra».
+  const fitted = extra > 0 && slices.length - (VISIBLE_ROWS + extra) === 1 ? slices.length : VISIBLE_ROWS + extra;
+  const visible = expanded ? slices : slices.slice(0, fitted);
+  const hidden = expanded ? [] : slices.slice(fitted);
   const hiddenAmount = hidden.reduce((sum, slice) => sum + slice.value, 0);
   const noun = bySub ? 'sottocategorie' : 'categorie';
   const hiddenLabel = hidden.length === 1 ? (bySub ? "Un'altra sottocategoria" : "Un'altra categoria") : `Altre ${hidden.length} ${noun}`;
@@ -95,7 +104,7 @@ export function ClassificaTile({ id, eyebrow, ariaLabel, categories, subCategori
         <p className="mt-3 text-[13px] text-muted-foreground">Nessuna spesa registrata nel periodo.</p>
       ) : (
         <div className="@container mt-3.5 flex flex-1 flex-col">
-          <div className="flex flex-col gap-5 @min-[520px]:flex-row">
+          <div data-fill-body="" data-fill-extra={extra} data-fill-room={room} className="flex flex-col gap-5 @min-[520px]:flex-row">
             <div className="flex shrink-0 items-center gap-5 @min-[520px]:w-[180px] @min-[520px]:flex-col @min-[520px]:items-stretch @min-[520px]:gap-4">
               {oneType ? (
                 <p className="m-0 flex flex-col">
@@ -125,7 +134,7 @@ export function ClassificaTile({ id, eyebrow, ariaLabel, categories, subCategori
                 ))}
               </ul>
             </div>
-            <div className="min-w-0 flex-1">
+            <div data-fill-list="" className="min-w-0 flex-1">
               <RankedRows
                 rows={visible.map((slice) => ({
                   key: slice.key,
@@ -146,9 +155,9 @@ export function ClassificaTile({ id, eyebrow, ariaLabel, categories, subCategori
               />
             </div>
           </div>
-          <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3.5 text-[11px] text-muted-foreground">
+          <div data-fill-foot="" className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3.5 text-[11px] text-muted-foreground">
             <span>{bySub ? 'Una riga apre la scheda della sottocategoria o, dove manca, della categoria.' : 'Una riga apre la scheda della categoria.'}</span>
-            {slices.length > VISIBLE_ROWS && !activeHidden && (
+            {(showAll || hidden.length > 0) && !activeHidden && (
               <button
                 type="button"
                 onClick={() => setShowAll((value) => !value)}

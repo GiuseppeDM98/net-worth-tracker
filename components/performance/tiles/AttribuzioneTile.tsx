@@ -8,6 +8,7 @@ import { signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { Tile, type TileCollapse } from '@/components/ui/tile';
 import { TileMethodNote } from '@/components/ui/tile-method-note';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface AttribuzioneTileProps {
   /**
@@ -82,9 +83,9 @@ export function AttribuzioneTile({ collapse, asideWhenClosed, aside, reading, at
                   <span className="block font-mono text-[11px] tabular-nums text-muted-foreground">{signedEuro(row.dividends)} dividendi</span>
                 )}
               </span>
-              <span className={cn(BAR_CELL_CLASS, 'h-[3px] overflow-hidden rounded-full bg-muted')} aria-hidden="true">
+              <span className={cn(BAR_CELL_CLASS, 'h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)} aria-hidden="true">
                 <span
-                  className="block h-full rounded-full motion-safe:transition-[width,background-color] motion-safe:duration-300 motion-safe:ease-out"
+                  className={cn('block h-full motion-safe:transition-[width,background-color] motion-safe:duration-300 motion-safe:ease-out', COSTUME_PILL_RADIUS_CLASS)}
                   style={{ width: `${(Math.abs(row.total) / maxAbs) * 100}%`, background: row.total < 0 ? 'var(--destructive)' : 'var(--positive)' }}
                 />
               </span>

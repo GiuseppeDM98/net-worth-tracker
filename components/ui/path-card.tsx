@@ -12,12 +12,14 @@
  */
 
 import { useRef, type ReactNode } from 'react';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS, TILE_SURFACE_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 
-export const PATH_HEADLINE_CLASS = 'text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]';
+/** `costume-heading`: under a costume theme a scene's headline wears the heading face, as the page's verdict does. */
+export const PATH_HEADLINE_CLASS = 'costume-heading text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]';
 export const PATH_HELP_CLASS = 'text-[14px] leading-[1.6] text-muted-foreground desktop:text-[15px]';
 /** 44 px to touch below `desktop:`, 36 px from it. */
 export const PATH_BUTTON_CLASS = 'h-11 desktop:h-9';
@@ -45,11 +47,13 @@ export function PathCard({ step, question, help, children, back, restart, status
   const position = `Passo ${step.index + 1} di ${step.total}`;
 
   return (
-    <section className={CARD_CLASS} aria-label={`${position}: ${step.theme}`}>
+    <section className={CARD_CLASS} data-tile="" aria-label={`${position}: ${step.theme}`}>
       <h2 className={TILE_EYEBROW_CLASS}>
-        {position} · {step.theme}
+        <HeadingText text={`${position} · ${step.theme}`} />
       </h2>
-      <p className={cn(PATH_HEADLINE_CLASS, 'mt-3')}>{question}</p>
+      <p className={cn(PATH_HEADLINE_CLASS, 'mt-3')}>
+        <HeadingText text={question} />
+      </p>
       <p className={cn(PATH_HELP_CLASS, 'mt-2 max-w-[600px]')}>{help}</p>
 
       <div className="mt-5 flex flex-col gap-4">{children}</div>
@@ -94,10 +98,10 @@ export function PathCard({ step, question, help, children, back, restart, status
 export function PathDoneCard({ ariaLabel, headline, help, children }: { ariaLabel: string; headline: string; help: string | readonly string[]; children: ReactNode }) {
   const lines = typeof help === 'string' ? [help] : help;
   return (
-    <section className={CARD_CLASS} aria-label={ariaLabel}>
+    <section className={CARD_CLASS} data-tile="" aria-label={ariaLabel}>
       <h2 className={TILE_EYEBROW_CLASS}>Fatto</h2>
       <p className={cn(PATH_HEADLINE_CLASS, 'mt-3')} role="status">
-        {headline}
+        <HeadingText text={headline} />
       </p>
       {lines.map((line) => (
         <p key={line} className={cn(PATH_HELP_CLASS, 'mt-2')}>

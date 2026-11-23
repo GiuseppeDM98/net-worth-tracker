@@ -164,7 +164,7 @@ export function ObiettiviDialog({ open, onClose, ownerId, allAssets, targets, ta
       }
     >
       <div className="space-y-4">
-        <section aria-label={OBJECTIVES_CLASS_TARGETS_EYEBROW} className="rounded-[10px] bg-muted px-3.5 py-3">
+        <section aria-label={OBJECTIVES_CLASS_TARGETS_EYEBROW} className="rounded-[var(--costume-control-frame-radius,10px)] bg-muted px-3.5 py-3">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{OBJECTIVES_CLASS_TARGETS_EYEBROW}</p>
           <p className="mt-1 text-[12px] text-muted-foreground">{classTargets.rows.length > 0 ? OBJECTIVES_CLASS_TARGETS_READING : OBJECTIVES_CLASS_TARGETS_EMPTY}</p>
           {classTargets.rows.length > 0 && (

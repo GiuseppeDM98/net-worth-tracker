@@ -18,6 +18,16 @@
  * with `segmented-pill.tsx`'s indicator back to `rounded-full` and `choice-list.tsx` back to `rounded-xl`; the
  * hsl() scan with `sidebar.tsx`'s `hsl(var(--sidebar-border))` restored; the switch case with the fallback dropped.
  * `chip.tsx` joined the site scan the same day, at the retirement, seen red on its `rounded-full`.
+ *
+ * The dialogs and the pages beyond the first three (2026-11-23): a 23rd scope property, the generated fill, read
+ * through `COSTUME_GENERATED_FILL_CLASS`; a print block that hands every scope property back to «off»; the boxes
+ * inside a tile or a modal as frames, the Recharts tooltips too; the bars, pills and chips of the nine pages on
+ * the control radii; an emblem id on every page header. Seen red that day: the print case with `--costume-ground`
+ * deleted from the block; the emblem class without `print:hidden`; the frame scan with `question-card.tsx` and
+ * `ExpenseProposalCard.tsx` back to `rounded-xl`, a tooltip back to `borderRadius: 8`, a proposal card back to
+ * `bg-muted/40`, the model dialog's options back to `max-desktop:rounded-xl`; the pill scan with `RecordRows.tsx`
+ * and `CambiatoTile.tsx` back to `rounded-full` and `RendimentoTile.tsx`'s chip back to a literal 9px; the
+ * header case with the plan path's `emblem` dropped.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -26,6 +36,7 @@ import { COLOR_THEMES, COLOR_THEME_META, COSTUME_THEMES } from '@/lib/constants/
 import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
 import {
   COSTUME_FRAME_RADIUS_CLASS,
+  COSTUME_GENERATED_FILL_CLASS,
   COSTUME_PILL_RADIUS_CLASS,
   COSTUME_SCOPE_PROPERTIES,
   resolveEmblem,
@@ -148,8 +159,8 @@ describe('every costume rule is gated, and nothing outside the section paints wi
 const POPPER_SHEET_RADIUS = 'var(--costume-control-frame-radius, 10px) var(--costume-control-frame-radius, 10px) 0 0';
 
 describe('the scope properties', () => {
-  it('lists the twenty-two properties in the contract order', () => {
-    expect(COSTUME_SCOPE_PROPERTIES).toHaveLength(22);
+  it('lists the twenty-three properties in the contract order', () => {
+    expect(COSTUME_SCOPE_PROPERTIES).toHaveLength(23);
     expect(COSTUME_SCOPE_PROPERTIES).toEqual([
       '--radius',
       '--radius-2xl',
@@ -173,6 +184,7 @@ describe('the scope properties', () => {
       '--costume-control-pill-radius',
       '--costume-control-chip-radius',
       '--costume-control-switch-on',
+      '--costume-page-generated-fill',
     ]);
   });
 
@@ -189,6 +201,10 @@ describe('the control radii are layered', () => {
   it('reads each costume radius with today’s value as its fallback', () => {
     expect(COSTUME_PILL_RADIUS_CLASS).toBe('rounded-[var(--costume-control-pill-radius,calc(infinity*1px))]');
     expect(COSTUME_FRAME_RADIUS_CLASS).toBe('rounded-[var(--costume-control-frame-radius,calc(var(--radius)_+_4px))]');
+  });
+
+  it('reads the generated fill with today’s 40 % of --muted as its fallback', () => {
+    expect(COSTUME_GENERATED_FILL_CLASS).toBe('bg-[color:var(--costume-page-generated-fill,color-mix(in_oklab,var(--muted)_40%,transparent))]');
   });
 
   it('survives a caller’s padding through cn()', () => {
@@ -264,6 +280,194 @@ describe('the sites read the costume radii, not a literal', () => {
     const text = source('components/ui/switch.tsx');
     expect(text).toContain('dark:data-[state=checked]:bg-[var(--costume-control-switch-on,oklch(54.6%_0.245_262.881))]');
     expect(text).not.toContain('blue-600');
+  });
+});
+
+describe('paper is the palette’s', () => {
+  it('resets each of the twenty-three scope properties in the section’s print block, each !important', () => {
+    const { section } = splitSection();
+    const print = walk(section).declarations.filter(
+      ({ selectors }) => selectors.length === 2 && selectors[0] === '@media print' && selectors[1] === GATE,
+    );
+    const declared = new Map(print.map(({ property, value }) => [property, value]));
+    for (const property of COSTUME_SCOPE_PROPERTIES) {
+      expect(declared.has(property), `${property} in the print block`).toBe(true);
+      expect(declared.get(property), property).toMatch(/ !important$/);
+    }
+    expect(declared.size).toBe(COSTUME_SCOPE_PROPERTIES.length);
+    // The palette block's own radius, handed back from <html>.
+    expect(declared.get('--radius')).toBe('inherit !important');
+  });
+
+  it('hides the emblem on paper: it is React, the reset cannot reach it', () => {
+    const svgClass = /className="([^"]*)"/.exec(source('components/ui/theme-costume.tsx').split('export function EmblemSvg')[1] ?? '');
+    expect(svgClass?.[1].split(' ')).toContain('print:hidden');
+  });
+});
+
+describe('the boxes inside a tile or a modal are frames', () => {
+  const FRAME_BOX_FILES = [
+    'components/ui/card.tsx',
+    'components/ui/link-banner.tsx',
+    'components/ui/question-card.tsx',
+    'components/allocation/consulente/ConsulenteInterviewScene.tsx',
+    'components/allocation/consulente/ConsulenteRun.tsx',
+    'components/allocation/consulente/ConsulenteWizard.tsx',
+    'components/assets/compravendita/CompravenditaScreens.tsx',
+    'components/assets/compravendita/CompravenditaWizard.tsx',
+    'components/assistant/AssistantComposer.tsx',
+    'components/assistant/AssistantConversazioneTile.tsx',
+    'components/assistant/AssistantQuestionBlock.tsx',
+    'components/assistant/AssistantStreamingResponse.tsx',
+    'components/assistant/ExpenseProposalCard.tsx',
+    'components/assistant/GoalProposalCard.tsx',
+    'components/assistant/AssistantPreferencesFields.tsx',
+    'components/assistant/AssistantRouteChooser.tsx',
+    'components/fire-simulations/FireParametri.tsx',
+    'components/monte-carlo/tiles/ParametriTile.tsx',
+    'components/performance/AIAnalysisDialog.tsx',
+    'components/DeleteDummyDataDialog.tsx',
+    'components/assets/AssetMovementsDialog.tsx',
+    'components/assets/TaxCalculatorModal.tsx',
+    'components/assets/TransactionDialog.tsx',
+    'components/expenses/ExpenseDialog.tsx',
+    'components/expenses/CategoryManagementDialog.tsx',
+  ];
+  // `rounded-xl` on every corner or on one side: the run's active stage rounded its ends by itself.
+  const ROUNDED_XL = /\brounded-(?:[tblr]-)?xl\b/;
+
+  it.each(FRAME_BOX_FILES)('%s takes the frame class and no rounded-xl', (file) => {
+    const text = source(file);
+    expect(text).toContain('COSTUME_FRAME_RADIUS_CLASS');
+    expect(text.split('\n').filter((line) => ROUNDED_XL.test(line)), file).toEqual([]);
+  });
+
+  // A variant cannot be composed with a constant: the class is written whole, under its `max-desktop:` prefix.
+  it('squares the model dialog’s mode options below desktop through the frame radius', () => {
+    const text = source('components/allocation/IdealCompositionDialog.tsx');
+    expect(text).toContain(`max-desktop:${COSTUME_FRAME_RADIUS_CLASS}`);
+    expect(text).not.toMatch(ROUNDED_XL);
+  });
+
+  const TOOLTIP_FILES = [
+    'components/history/tiles/ComposizioneTile.tsx',
+    'components/history/tiles/EvoluzioneTile.tsx',
+    'components/history/tiles/ValoreStrumentoTile.tsx',
+    'components/history/StoricoDettaglio.tsx',
+    'components/dashboard/LaborMetricsChart.tsx',
+    'components/fire-simulations/FireDettaglio.tsx',
+    'components/performance/RollingLineChart.tsx',
+    'components/cashflow/AndamentoStoricoCharts.tsx',
+    'components/cashflow/ConfrontoAnnualeCharts.tsx',
+    'components/cashflow/EntityTrendChart.tsx',
+    'components/cashflow/SavingsRateLineChart.tsx',
+    'components/goals/GoalProjectionChart.tsx',
+  ];
+
+  it.each(TOOLTIP_FILES)('%s gives its Recharts tooltip the frame radius, today’s value as the fallback', (file) => {
+    const text = source(file);
+    expect(text).not.toMatch(/borderRadius: (?:'8px'|8\b|10\b)/);
+    const fallback = file.endsWith('GoalProjectionChart.tsx') ? '10px' : '8px';
+    expect(text).toContain(`borderRadius: 'var(--costume-control-frame-radius, ${fallback})'`);
+  });
+
+  it.each([
+    { file: 'components/assistant/AssistantQuestionBlock.tsx', tiles: 2 },
+    { file: 'components/assistant/ExpenseProposalCard.tsx', tiles: 1 },
+    { file: 'components/assistant/GoalProposalCard.tsx', tiles: 1 },
+  ])('$file paints its $tiles generated sub-tile(s) through the generated fill', ({ file, tiles }) => {
+    const lines = source(file).split('\n');
+    expect(lines.filter((line) => line.includes('bg-muted/40')), file).toEqual([]);
+    expect(lines.filter((line) => line.includes('className') && line.includes('COSTUME_GENERATED_FILL_CLASS'))).toHaveLength(tiles);
+  });
+});
+
+describe('the bars, pills and chips of the pages read the costume radii', () => {
+  // A literal pill end, or a literal radius other than a legend swatch's 2px.
+  const LITERAL_RADIUS = /\brounded-(?:[lr]-)?full\b|\brounded-\[(?!2px\])\d+px\]/;
+  const literals = (file: string) => source(file).split('\n').filter((line) => LITERAL_RADIUS.test(line));
+
+  const NO_LITERAL_FILES = [
+    'components/performance/tiles/AttribuzioneTile.tsx',
+    'components/performance/tiles/PlusvalenzeTile.tsx',
+    'components/performance/MonthlyReturnsHeatmap.tsx',
+    'app/dashboard/performance/page.tsx',
+    'components/history/tiles/DriverTile.tsx',
+    'components/history/tiles/RaddoppiTile.tsx',
+    'components/cashflow/ConfrontoAnnualeSection.tsx',
+    'components/cashflow/analisi/tiles/CambiatoTile.tsx',
+    'components/allocation/ActionChip.tsx',
+    'components/allocation/tiles/EsposizioneTile.tsx',
+    'components/allocation/OptimizerReport.tsx',
+    'components/allocation/tiles/PortafoglioModelloTile.tsx',
+    'components/allocation/tiles/QuestoMeseTile.tsx',
+    'components/allocation/tiles/accumuloShared.tsx',
+    'components/allocation/ObiettiviDialog.tsx',
+    'components/allocation/tiles/ObiettiviTile.tsx',
+    'components/allocation/tiles/PianoTile.tsx',
+    'components/pension/tiles/AnnoFiscaleTile.tsx',
+    'components/pension/tiles/FondoOggiTile.tsx',
+    'components/fire-simulations/tiles/TraguardoTile.tsx',
+    'components/fire-simulations/coast/tiles/CoastTraguardoTile.tsx',
+    'components/monte-carlo/tiles/ScenariConfrontoTile.tsx',
+    'components/monte-carlo/tiles/ProbabilitaTile.tsx',
+    'components/goals/tiles/TraiettoriaTile.tsx',
+    'components/hall-of-fame/RecordRows.tsx',
+    'components/assistant/GoalProposalCard.tsx',
+    'components/assistant/tiles/PatrimonioContestoTile.tsx',
+    'components/settings/tabs/AllocazioneTab.tsx',
+    'components/assets/AssetMovementsDialog.tsx',
+    'components/expenses/ExpenseDialog.tsx',
+  ];
+  // The one round thing each of these keeps in every theme: a dot, a knob, a spinner, a round icon button.
+  const ONE_ROUND_THING = [
+    { file: 'components/goals/tiles/ObiettiviTile.tsx', stays: 'h-2.5 w-2.5 shrink-0 rounded-full' },
+    { file: 'app/dashboard/settings/page.tsx', stays: 'h-1.5 w-1.5 shrink-0 rounded-full' },
+    { file: 'components/history/tiles/EvoluzioneTile.tsx', stays: 'inline-block h-2 w-2 rounded-full' },
+    { file: 'components/settings/tabs/AspettoTab.tsx', stays: 'absolute right-2 top-2 h-2 w-2 rounded-full' },
+    { file: 'components/allocation/TargetTick.tsx', stays: 'size-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full' },
+    { file: 'components/settings/tabs/GeneraleTab.tsx', stays: 'h-3 w-3 animate-spin rounded-full' },
+    { file: 'components/performance/tiles/RendimentoTile.tsx', stays: 'h-3 w-3 animate-spin rounded-full' },
+    { file: 'components/performance/PerformancePeriodPicker.tsx', stays: 'h-11 w-11 shrink-0 items-center justify-center rounded-full' },
+  ];
+
+  it.each(NO_LITERAL_FILES)('%s has no literal pill end nor literal chip radius', (file) => {
+    expect(literals(file), file).toEqual([]);
+  });
+
+  it.each(ONE_ROUND_THING)('$file keeps one round thing and no other literal', ({ file, stays }) => {
+    const hits = literals(file);
+    expect(hits, file).toHaveLength(1);
+    expect(hits[0]).toContain(stays);
+  });
+});
+
+describe('every page header names its emblem', () => {
+  // A page's guided paths wear the page's mark: Compravendita Patrimonio's, the Consulente and the plan Allocazione's.
+  it.each([
+    { file: 'app/dashboard/page.tsx', id: 'panoramica' },
+    { file: 'app/dashboard/assets/page.tsx', id: 'patrimonio' },
+    { file: 'components/assets/compravendita/CompravenditaClient.tsx', id: 'patrimonio' },
+    { file: 'components/cashflow/CashflowPageClient.tsx', id: 'cashflow' },
+    { file: 'components/cashflow/AnalisiTab.tsx', id: 'analisi' },
+    { file: 'app/dashboard/performance/page.tsx', id: 'rendimenti' },
+    { file: 'app/dashboard/history/page.tsx', id: 'storico' },
+    { file: 'app/dashboard/allocation/page.tsx', id: 'allocazione' },
+    { file: 'components/allocation/consulente/ConsulenteClient.tsx', id: 'allocazione' },
+    { file: 'components/allocation/piano/PianoClient.tsx', id: 'allocazione' },
+    { file: 'app/dashboard/pension/page.tsx', id: 'previdenza' },
+    { file: 'app/dashboard/fire-simulations/page.tsx', id: 'fire' },
+    { file: 'app/dashboard/hall-of-fame/page.tsx', id: 'hall-of-fame' },
+    { file: 'components/assistant/AssistantHeader.tsx', id: 'assistente' },
+    { file: 'app/dashboard/settings/page.tsx', id: 'impostazioni' },
+  ])('$file passes $id', ({ file, id }) => {
+    const text = source(file);
+    const headers = text.split('<PageHeader').length - 1;
+    expect(headers, `${file}: its page headers`).toBeGreaterThan(0);
+    // Impostazioni spreads one props object into its headers; every other host writes the prop on each.
+    const named = text.split(`emblem="${id}"`).length - 1;
+    if (named === 0) expect(text).toContain(`emblem: '${id}'`);
+    else expect(named).toBe(headers);
   });
 });
 

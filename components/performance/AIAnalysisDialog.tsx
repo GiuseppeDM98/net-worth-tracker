@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toast } from 'sonner';
 import type { PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 import type { PerformanceMetrics, TimePeriod } from '@/types/performance';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 /**
  * AIAnalysisDialog — the AI report as a verdict over reading tiles (DESIGN.md → §5 Modal).
@@ -278,7 +280,8 @@ export function AIAnalysisDialog({
       title={
         verdict ? (
           <>
-            {verdict.headline.endsWith('.') ? verdict.headline.slice(0, -1) : verdict.headline}
+            {/* A node title is the caller's to dress: its figures stay in the mono under a costume's heading face. */}
+            <HeadingText text={verdict.headline.endsWith('.') ? verdict.headline.slice(0, -1) : verdict.headline} />
             <span className={TONE_DOT_CLASS[verdict.tone]} aria-hidden="true">
               .
             </span>
@@ -357,7 +360,7 @@ export function AIAnalysisDialog({
           });
           if (!yields) return null;
           return (
-            <div className="rounded-xl bg-muted p-3.5">
+            <div className={cn('bg-muted p-3.5', COSTUME_FRAME_RADIUS_CLASS)}>
               <p className={TILE_SUB_EYEBROW_CLASS}>Dividendi</p>
               <NarrativeText
                 segments={yields}
@@ -437,7 +440,7 @@ function ReadingTile({
   kpiCaption: string;
 }) {
   return (
-    <section aria-label={eyebrow} className="flex min-w-0 flex-col rounded-xl bg-muted p-3.5">
+    <section aria-label={eyebrow} className={cn('flex min-w-0 flex-col bg-muted p-3.5', COSTUME_FRAME_RADIUS_CLASS)}>
       <p className={TILE_SUB_EYEBROW_CLASS}>{eyebrow}</p>
       <div className="mt-1.5">{reading}</div>
       {kpi !== null && kpi !== undefined && (

@@ -1,13 +1,14 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        "bg-card text-card-foreground flex flex-col gap-6 border py-6 shadow-sm", COSTUME_FRAME_RADIUS_CLASS,
         className
       )}
       {...props}

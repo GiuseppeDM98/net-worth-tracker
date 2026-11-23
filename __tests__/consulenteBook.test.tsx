@@ -311,6 +311,22 @@ describe('the pages keep their figures and their author', () => {
     }
   });
 
+  // 2026-11-23: the card is a tile to the costume (its cap or marks); a generated page keeps `data-generated`, so
+  // the AI border and glow stay its own. Seen red with `data-tile` dropped from the card.
+  it('the card is a tile on every page, a generated one both; the headline is a costume heading, the eyebrow’s figures wrapped', () => {
+    for (const id of ['allocazione', 'colloquio']) {
+      const { unmount } = renderBook(makeDocument(), id);
+      expect(card().hasAttribute('data-tile')).toBe(true);
+      expect(card().matches('[data-tile][data-generated]')).toBe(id === 'allocazione');
+      const eyebrow = card().querySelector('h2');
+      expect([...(eyebrow?.querySelectorAll('.costume-figure') ?? [])].map((span) => span.textContent)).toEqual(
+        eyebrow?.textContent?.match(/\d+/g) ?? ['no figure'],
+      );
+      expect(card().querySelector('p.costume-heading')?.getAttribute('tabindex')).toBe('-1');
+      unmount();
+    }
+  });
+
   it('the cover without model text is a plain card (the degenerate book), the text page is accented', () => {
     const { unmount } = renderBook(makeDocument({ report: { markdown: 'Solo testo.', proposal: PROPOSAL, model: 'opus-finto', finishedAt: NOW } }));
     expect(card().hasAttribute('data-generated')).toBe(false);
