@@ -369,6 +369,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `sticky bottom-0 max-desktop:portrait:bottom-20` inside the left column. The pill's strip bleeds `max-desktop:-mx-4
   max-desktop:px-4` (the page padding) and its tabs are 44px there. `TileGridSkeleton` with `cells={[]}` is the verdict's
   placeholder while a bundle loads.
+- **A generated sub-tile's fill is the costume's** (2026-11-23): the question block and the two proposal cards paint
+  `COSTUME_GENERATED_FILL_CLASS` — `bg-muted/40` in every theme but Egeo, where the fill is the card so the AI accent
+  stays over 4,5:1 — and their boxes, the preferences' rows and the route chooser's are frames (doc/guide/temi.md § Il costume).
 - **Messages are flat** (`AssistantStreamingResponse`): the user's in a `bg-muted/40` sub-tile, the assistant's full-width prose;
   the proposal cards (`GoalProposalCard`, `ExpenseProposalCard`) are `not-prose` blocks with the AI accent (DESIGN.md → The
   AI-Accent Rule), never a card in the tile; `MARKDOWN_COMPONENTS` stays module-level. The

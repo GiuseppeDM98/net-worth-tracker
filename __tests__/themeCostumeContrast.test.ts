@@ -20,9 +20,13 @@
  *     and its quiet text, in a costume theme (`.costume-shell-eyebrow`, `.costume-shell-quiet`).
  *   - K5 (2026-11-22): in dark, `--primary` ≥ 3:1 on `--card` and `--background` ≥ 3:1 on `--primary` — the
  *     switch's ON track (`--costume-control-switch-on`) and its thumb.
+ *   - K6 (2026-11-23): `--warning-foreground` ≥ 4,5:1 on K3's surfaces and on `--warning`, the banner's fill.
+ *   - K7 (2026-11-23): `--ai-accent` ≥ 4,5:1 on `--card` and on the generated sub-tile's fill over it
+ *     (`--costume-page-generated-fill`: the card, or «off» — `--muted` at 40 % over the card).
  *
  * Seen red on 2026-11-22: K4 with Egeo light's `--sidebar` at `oklch(0.62 0.05 87)`; K5 with Orbita dark's
- * `--primary` set to its `--card`.
+ * `--primary` set to its `--card`. On 2026-11-23: K6 with Egeo light's `--warning-foreground` at
+ * `oklch(0.62 0.11 80)`; K7 with Egeo light's fill left `initial` (4,48:1).
  *
  * Reads `app/globals.css` itself, over `COSTUME_THEMES`, so a theme that becomes a costume is measured from
  * the day it does. Own oklch → sRGB code, as the sibling gate tests.
@@ -175,6 +179,21 @@ const scopeColour = (theme: ColorTheme, mode: Mode, name: string): Oklch => {
   return colour;
 };
 
+/** `bg-muted/40`: what a generated sub-tile paints when the costume leaves its fill «off». */
+const GENERATED_FILL_OFF_ALPHA = 0.4;
+
+/**
+ * The surface under an AI eyebrow on a generated sub-tile: `var(--card)` is the card itself, `initial` is «off» —
+ * `--muted` at 40 % over the card. Any other value is one this test cannot measure, and fails.
+ */
+function generatedFill(theme: ColorTheme, mode: Mode): Surface {
+  const value = scopeValue(theme, mode, '--costume-page-generated-fill').trim();
+  const card = resolveToken(theme, mode, '--card');
+  if (value === 'var(--card)') return card;
+  expect(value, `${theme} · ${mode}: --costume-page-generated-fill`).toBe('initial');
+  return compositeOver(resolveToken(theme, mode, '--muted'), GENERATED_FILL_OFF_ALPHA, card);
+}
+
 const CASES = COSTUME_THEMES.flatMap((theme) => (['light', 'dark'] as const).map((mode) => ({ theme, mode, label: `${theme} · ${mode}` })));
 
 describe('a costume theme is declared', () => {
@@ -256,6 +275,25 @@ describe.each(CASES)('the costume of $label', ({ theme, mode }) => {
     const thumb = contrast(resolveToken(theme, mode, '--background'), track);
     expect(onCard, `the track on the card: ${onCard.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_NON_TEXT_CONTRAST);
     expect(thumb, `the thumb on the track: ${thumb.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_NON_TEXT_CONTRAST);
+  });
+
+  // K6 (2026-11-23): the caution ink is printed on every surface a sign token is, and on the banner's own fill.
+  it('prints --warning-foreground at 4,5:1 on the card, the page, the pill, every colour of the ground and --warning', () => {
+    const ink = resolveToken(theme, mode, '--warning-foreground');
+    for (const [name, surface] of [...surfaces(), ['--warning', resolveToken(theme, mode, '--warning')] as [string, Surface]]) {
+      const ratio = contrast(ink, surface);
+      expect(ratio, `--warning-foreground on ${name}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+    }
+  });
+
+  // K7 (2026-11-23): an AI eyebrow sits on the card or on a generated sub-tile over it (DESIGN.md → The AI-Accent Rule).
+  it('prints --ai-accent at 4,5:1 on the card and on the generated fill over the card', () => {
+    const ink = resolveToken(theme, mode, '--ai-accent');
+    const card = resolveToken(theme, mode, '--card');
+    const onCard = contrast(ink, card);
+    expect(onCard, `the AI accent on the card: ${onCard.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+    const onFill = contrast(ink, generatedFill(theme, mode));
+    expect(onFill, `the AI accent on the generated fill: ${onFill.toFixed(2)}:1`).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
   });
 
   it('keeps COMPRA (--chart-3) 30° of hue from --destructive, so a chip never wears the red of a loss', () => {

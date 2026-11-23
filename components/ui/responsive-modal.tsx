@@ -17,6 +17,7 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer';
 import { ModalStatusLine } from '@/components/ui/modal-status-line';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 // From ColorThemeContext, not CostumeScopeContext: the shared bundle (see `CostumeScopeContext` there).
@@ -206,9 +207,9 @@ export function ResponsiveModal({
       <Drawer open={open} onOpenChange={(v) => !v && onClose()} noBodyStyles repositionInputs={false}>
         <DrawerContent onEscapeKeyDown={refuseEscapeWhileArmed} onCloseAutoFocus={handleCloseAutoFocus} {...costumeScopeProps}>
           <DrawerHeader className="border-b px-4 pb-3 pt-2 text-left">
-            {eyebrow && <p className={TILE_EYEBROW_CLASS}>{eyebrow}</p>}
-            <DrawerTitle className="text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">
-              {title}
+            {eyebrow && <p className={TILE_EYEBROW_CLASS}><HeadingText text={eyebrow} /></p>}
+            <DrawerTitle className="costume-title text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">
+              {typeof title === 'string' ? <HeadingText text={title} /> : title}
             </DrawerTitle>
             {resolvedReading ? (
               <DrawerDescription asChild>
@@ -251,9 +252,9 @@ export function ResponsiveModal({
         {/* pr-14 clears the close button, which sits at top-4 right-4 in a 36px box. The
             hairline exists because the body scrolls under it: it is a scroll edge, not a rule. */}
         <DialogHeader className="shrink-0 gap-1.5 border-b px-6 pb-4 pr-14 pt-6 text-left">
-          {eyebrow && <p className={TILE_EYEBROW_CLASS}>{eyebrow}</p>}
-          <DialogTitle className="text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">
-            {title}
+          {eyebrow && <p className={TILE_EYEBROW_CLASS}><HeadingText text={eyebrow} /></p>}
+          <DialogTitle className="costume-title text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">
+            {typeof title === 'string' ? <HeadingText text={title} /> : title}
           </DialogTitle>
           {resolvedReading ? (
             <DialogDescription asChild>

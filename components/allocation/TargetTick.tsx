@@ -28,6 +28,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { formatPercentage } from '@/lib/services/chartService';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface TargetTickProps {
   /** The fill's colour; the row's class colour, behind the theme's --allocation-row-bar. */
@@ -67,9 +68,9 @@ export function TargetTick({
       aria-label={ariaLabel ?? `Allocazione corrente ${formatPercentage(currentPercentage, 1)}, target ${formatPercentage(targetPercentage, 0)}${projectedClause}`}
     >
       {/* The 4px track, centred in the 10px root so the marker has 3px on each side. */}
-      <div className="absolute inset-x-0 top-[3px] h-1 overflow-hidden rounded-full bg-muted">
+      <div className={cn('absolute inset-x-0 top-[3px] h-1 overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}>
         <motion.div
-          className="absolute inset-y-0 left-0 rounded-full"
+          className={cn('absolute inset-y-0 left-0', COSTUME_PILL_RADIUS_CLASS)}
           style={{
             backgroundColor: color,
             ...(reducedMotion ? { width: `${fillWidth}%` } : {}),

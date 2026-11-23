@@ -16,7 +16,9 @@
   2026-11-20), `CompravenditaScreens.tsx` (each screen's controls), `fields.tsx` (`DateField`, `CategoryField` — a
   category or one of its subcategories, by allowed type; `NumberField` and `AccountField` are the shared
   `components/ui/path-fields.tsx`, the browser draft goes through `lib/utils/pathDraftStorage.ts`); the choice rows are `ChoiceList` (`components/ui/choice-list.tsx`, shared with the Consulente, 2026-11-07).
-  Reached from Patrimonio's header, «Compra o vendi casa».
+  Reached from Patrimonio's header, «Compra o vendi casa». Under a costume theme the card is a tile and its
+  headline the costume's face (`PathCard`: `data-tile`, `.costume-heading`), the header's emblem Patrimonio's
+  (2026-11-23, doc/guide/temi.md § Il costume).
 - **Pure**: `types/realEstateOperation.ts` (the answers, the cost kinds and their allowed types, the screens, the
   defaults list), `lib/utils/realEstateOperationPlan.ts` (the arithmetic, what the account holds, the category
   suggestion, `buildRealEstatePlan`), `realEstateOperationDraft.ts` (the reducer, `screensFor`, the prefill, the draft

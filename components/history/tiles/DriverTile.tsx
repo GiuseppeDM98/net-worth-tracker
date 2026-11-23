@@ -33,6 +33,7 @@ import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui
 import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { SeriesLegend, type SeriesLegendItem } from '@/components/ui/series-legend';
 import { ChartHoverTip, useChartHover } from '@/components/ui/chart-hover';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface DriverTileProps {
   reading: Narrative | null;
@@ -136,7 +137,7 @@ function PeriodRow({ model, open, onToggle }: { model: PeriodRowModel; open: boo
           {model.window && <span className="ml-1 font-mono text-[11px] tabular-nums text-muted-foreground">{model.window}</span>}
         </span>
         <span
-          className="flex h-[3px] min-w-[32px] flex-1 overflow-hidden rounded-full bg-muted"
+          className={cn('flex h-[3px] min-w-[32px] flex-1 overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}
           role={shares ? 'img' : 'presentation'}
           aria-label={shares ? `Dei due motori: risparmio ${shares.savings}%, mercato ${shares.market}%` : undefined}
         >

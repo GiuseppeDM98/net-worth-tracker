@@ -4,6 +4,7 @@ import { CalendarDays, X } from 'lucide-react';
 import type { TimePeriod } from '@/types/performance';
 import { SegmentedPill } from '@/components/ui/segmented-pill';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export type PickerPeriod = Extract<TimePeriod, 'YTD' | '1Y' | '3Y' | '5Y' | 'ALL'>;
 
@@ -71,7 +72,7 @@ export function CustomPeriodChip({ startDate, endDate, onClear }: CustomPeriodCh
   return (
     // No padding on the button's side: the «×» target IS the chip's height — 44px on touch, 32px
     // from `desktop:` (it was a 24px circle until 2026-09-20) — and the 12px glyph stays as it was.
-    <div className="flex w-fit items-center gap-2 rounded-full border border-border bg-muted/40 pl-3 text-xs font-medium text-foreground">
+    <div className={cn('flex w-fit items-center gap-2 border border-border bg-muted/40 pl-3 text-xs font-medium text-foreground', COSTUME_PILL_RADIUS_CLASS)}>
       <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
       <span className="font-mono tabular-nums">
         {startDate.toLocaleDateString('it-IT')} – {endDate.toLocaleDateString('it-IT')}

@@ -22,6 +22,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { QuestionCard } from '@/components/ui/question-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
 import { ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, type AllocationAdviceInterview } from '@/types/allocationAdvice';
@@ -32,6 +33,7 @@ import { answerOf, type QuestionAnswerValue } from '@/lib/utils/questionSet';
 import { cn } from '@/lib/utils';
 import { PATH_BUTTON_CLASS, PATH_HEADLINE_CLASS } from '@/components/ui/path-card';
 import type { ConsulenteInterviewState } from './useConsulenteInterview';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 const PRIMARY_CLASS = cn(PATH_BUTTON_CLASS, 'border border-transparent', AI_CONTROL_ACCENT_CLASS);
 
@@ -43,7 +45,7 @@ export function InterviewSkeleton({ className }: { className?: string }) {
         {INTERVIEW_COPY.asking}
       </p>
       {[0, 1].map((index) => (
-        <div key={index} className="rounded-xl border border-border p-4 desktop:p-5">
+        <div key={index} className={cn('border border-border p-4 desktop:p-5', COSTUME_FRAME_RADIUS_CLASS)}>
           <Skeleton className="h-2.5 w-32" />
           <Skeleton className="mt-3 h-5 w-3/4" />
           <Skeleton className="mt-2 h-3.5 w-1/2" />
@@ -90,9 +92,11 @@ export function ConsulenteInterviewScene({ interview, round, configured, headlin
 
   return (
     <>
-      <h2 className={TILE_EYEBROW_CLASS}>{INTERVIEW_COPY.eyebrow(roundNumber, ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS)}</h2>
+      <h2 className={TILE_EYEBROW_CLASS}>
+        <HeadingText text={INTERVIEW_COPY.eyebrow(roundNumber, ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS)} />
+      </h2>
       <p ref={headlineRef} tabIndex={-1} className={cn(PATH_HEADLINE_CLASS, 'mt-3 outline-none')}>
-        {headline}
+        <HeadingText text={headline} />
       </p>
       <div className="mt-5">
         {asking ? (

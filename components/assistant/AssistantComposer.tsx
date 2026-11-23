@@ -8,6 +8,7 @@ import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
 import { CHAT_COMPOSER_PLACEHOLDER } from '@/lib/utils/assistantChatNarrative';
 import { ASSISTANT_PROMPT_MAX_LENGTH, describePromptLength } from '@/lib/utils/assistantPeriodOptions';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface AssistantComposerProps {
   draft: string;
@@ -81,7 +82,7 @@ export function AssistantComposer({
           aria-describedby={lengthLabel ? counterId : undefined}
           rows={1}
           className={cn(
-            'flex-1 resize-none rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-foreground',
+            'flex-1 resize-none border border-border bg-muted/30 px-4 py-3 text-sm text-foreground', COSTUME_FRAME_RADIUS_CLASS,
             'placeholder:text-muted-foreground',
             'focus:outline-none focus:ring-1 focus:ring-ring',
             'disabled:opacity-50',
@@ -98,7 +99,7 @@ export function AssistantComposer({
             ref={stopRef}
             onClick={() => onStop()}
             size="icon"
-            className="h-[44px] w-[44px] shrink-0 rounded-xl"
+            className={cn('h-[44px] w-[44px] shrink-0', COSTUME_FRAME_RADIUS_CLASS)}
             aria-label="Interrompi risposta"
             variant="destructive"
           >
@@ -111,7 +112,7 @@ export function AssistantComposer({
             size="icon"
             // It calls the model: the accent on hover and keyboard focus, never at rest. A filled
             // button has no border of its own, hence the transparent one the accent colours.
-            className={cn('h-[44px] w-[44px] shrink-0 rounded-xl border border-transparent', AI_CONTROL_ACCENT_CLASS)}
+            className={cn('h-[44px] w-[44px] shrink-0 border border-transparent', COSTUME_FRAME_RADIUS_CLASS, AI_CONTROL_ACCENT_CLASS)}
             aria-label="Invia messaggio"
           >
             <Send className="h-4 w-4" />

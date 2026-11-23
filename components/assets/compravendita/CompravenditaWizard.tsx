@@ -31,6 +31,8 @@ import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { PATH_BUTTON_CLASS, PathCard, PathDoneCard } from '@/components/ui/path-card';
 import { Button } from '@/components/ui/button';
 import { ScreenBody } from './CompravenditaScreens';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 type RunState = { kind: 'idle' } | { kind: 'running' } | { kind: 'done'; message: string } | { kind: 'failed'; message: string };
 
@@ -128,7 +130,7 @@ export function CompravenditaWizard({ ownerId, context, familyMembers }: Comprav
       primary={primary}
     >
       {screen === 'riepilogo' && plan ? (
-        <ol className="flex flex-col divide-y divide-border rounded-xl border border-border" aria-label="Le scritture, in ordine">
+        <ol className={cn('flex flex-col divide-y divide-border border border-border', COSTUME_FRAME_RADIUS_CLASS)} aria-label="Le scritture, in ordine">
           {plan.steps.map((step, index) => (
             <li key={index} className="flex gap-3 px-4 py-3 text-[13px] leading-[1.5] text-foreground">
               <span className="w-5 shrink-0 font-mono text-muted-foreground">{index + 1}</span>

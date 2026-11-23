@@ -34,6 +34,7 @@ import { Tile } from '@/components/ui/tile';
 import { Skeleton } from '@/components/ui/skeleton';
 import { lazyComponent } from '@/components/ui/lazy-component';
 import { cn } from '@/lib/utils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 /** The two plots' heights: the chart draws at them and its placeholder holds them, so it lands in place. */
 const MENSILE_CHART_HEIGHT = 240;
@@ -120,10 +121,10 @@ function CategoryDeltaList({
                   </Badge>
                 )}
               </span>
-              <span className="block h-[3px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <span className={cn('block h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)} aria-hidden="true">
                 {row.delta !== 0 && (
                   <span
-                    className="block h-full rounded-full"
+                    className={cn('block h-full', COSTUME_PILL_RADIUS_CLASS)}
                     style={{
                       width: `${(Math.abs(row.delta) / maxAbsDelta) * 100}%`,
                       // Sanctioned sign tokens as raw CSS vars (inline style cannot take a

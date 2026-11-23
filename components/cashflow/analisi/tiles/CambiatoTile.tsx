@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Tile, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { TileMethodNote } from '@/components/ui/tile-method-note';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface CambiatoTileProps {
   /** AnalisiTab's `comparisonPhrase` («su 2025»), or the anomaly month without a comparison; the same words closed. */
@@ -65,11 +66,11 @@ export function CambiatoTile({ aside, reading, changes, anomaliesReading, footer
                     </>
                   )}
                 </span>{' '}
-                <span className="relative h-2 min-w-[40px] flex-1 rounded-full bg-muted" aria-hidden="true">
+                <span className={cn('relative h-2 min-w-[40px] flex-1 bg-muted', COSTUME_PILL_RADIUS_CLASS)} aria-hidden="true">
                   <span className="absolute inset-y-[-2px] left-1/2 w-px bg-border" />
                   <span
                     data-change-bar=""
-                    className="absolute inset-y-0 rounded-full"
+                    className={cn('absolute inset-y-0', COSTUME_PILL_RADIUS_CLASS)}
                     style={{ left: `${row.bar.left}%`, width: `${row.bar.width}%`, background: riseOrFall(row.delta) }}
                   />
                 </span>{' '}

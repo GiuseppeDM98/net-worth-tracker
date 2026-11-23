@@ -8,7 +8,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Temi**: `app/globals.css` (sixteen theme blocks — eight themes; Egeo and Orbita also with two scope blocks each —, plus the five `--role-*` aliases in `:root`), `contexts/ColorThemeContext.tsx`, `contexts/ChartColorsContext.tsx` (`ChartColorsProvider`, mounted by `app/dashboard/layout.tsx`), `lib/hooks/{useThemePaletteReader,useChartColors,useActionColors,useCssColorTokens}.ts`, pure `lib/utils/themePalette.ts` (`readThemePalette`: the slots through the luminance filter, the action colours, the `--role-*` hexes), `lib/utils/colorParse.ts` (the ONE colour parser: `oklch()`, `lab()`, `#hex`, `rgb()` → OKLCH, and OKLCH → hex), `lib/utils/cssColorToHex.ts` (a served colour → `#rrggbb` for Nivo), `lib/utils/actionColor.ts` (the COMPRA/VENDI/OK clamp), `lib/utils/costCenterColors.ts` — doc/guide/temi.md; tests `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext}.test.ts`, `e2e/motion.layout.spec.ts` (a client navigation reads no palette token)
 - **The costume** (2026-11-21, § Il costume): `lib/constants/colorTheme.ts` (`COLOR_THEME_META`, `COSTUME_ATTRIBUTE`, `COSTUME_THEMES`, `buildColorThemeInitScript`), `lib/constants/themeCostume.ts` (`COSTUME_SCOPE_PROPERTIES`, the emblem types, `THEME_EMBLEMS`, `resolveEmblem`), `contexts/CostumeScopeContext.tsx` (`CostumeScope`; `useCostumeScope` and `useThemeCostume` re-exported from `contexts/ColorThemeContext.tsx`, where they and the context live), `components/ui/theme-costume.tsx` (`EmblemSvg`, `ThemeEmblem`, `ThemeEmblemLead`, `ThemeHeaderBand`, `HeadingText` re-exported), `components/ui/heading-text.tsx`, pure `lib/utils/headingFigures.ts` (`splitHeadingFigures`), `components/dashboard/overview/ResourceBar.tsx` with `selectResourceBar` in `lib/utils/overviewSummary.ts` (the resource bar, 2026-11-22); tests `__tests__/{themeBlocks.ts,themeCostume,headingFigures,colorTheme}.test.ts`, `__tests__/{aspettoTab,costumeScope,costumeScopeEgeo,costumeScopeOrbita,resourceBar,responsiveModalCostume}.test.tsx`, `__tests__/themeCostumeContrast.test.ts` (generic over `COSTUME_THEMES`), `e2e/theme.neutral{,.mobile}.spec.ts` on `e2e/themeNeutral.ts` + `e2e/themeNeutral.baseline.json`, `e2e/theme.egeo{,.mobile}.spec.ts` on `e2e/themeEgeo.ts` (they write `userPreferences/test-user-1.colorTheme` and put it back; `e2e/theme.orbita{,.mobile,.tablet}.spec.ts` reuse the same helper), `e2e/shell.boot{,.mobile}.spec.ts` (Geist, the scope's boundary)
-- **Suites to run after a change here**: `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext,mutedForegroundContrast,themeColor,colorTheme,themeCostume,themeCostumeContrast,headingFigures}.test.ts`, `__tests__/{aspettoTab,costumeScope,costumeScopeEgeo,costumeScopeOrbita,resourceBar,responsiveModalCostume,assistantHeader}.test.tsx`, `__tests__/overviewSummary.test.ts`; `npx playwright test e2e/theme.neutral e2e/theme.egeo e2e/theme.orbita e2e/shell.boot` on the emulators
+- **Suites to run after a change here**: `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext,mutedForegroundContrast,themeColor,colorTheme,themeCostume,themeCostumeContrast,headingFigures}.test.ts`, `__tests__/{aspettoTab,costumeScope,costumeScopeEgeo,costumeScopeOrbita,resourceBar,responsiveModalCostume,assistantHeader}.test.tsx`, `__tests__/overviewSummary.test.ts`; `__tests__/{cashflowSankey,chartColorsContext}.test.ts` and `__tests__/{costumePortals,consulenteBook,pathCard,expenseProposalCard}.test.tsx` (the costume on the dialogs and the pages, 2026-11-23); `npx playwright test e2e/theme.neutral e2e/theme.egeo e2e/theme.orbita e2e/theme.costume e2e/shell.boot` on the emulators
 - **The browser's chrome** (2026-10-17): `lib/utils/themeColor.ts` (`DEFAULT_THEME_COLORS`, `resolveThemeColor`), `components/providers/ThemeColorSync.tsx`, the `viewport.themeColor` export in `app/layout.tsx`, the `html`/`html.dark` rules in `app/globals.css`; tests `__tests__/themeColor.test.ts`, `e2e/shell.boot{,.mobile}.spec.ts` → `expectBrowserChromeFollowsTheme` (`e2e/shellBoot.ts`)
 
 ## Color Theme System
@@ -216,7 +216,7 @@ mechanism has a neutral default, and the palette themes are held to render exact
   `Switch` paints its ON track `--primary` (`--costume-control-switch-on`, fallback Tailwind's blue-600 written as
   `oklch(54.6% 0.245 262.881)`). The loading tile of `TileGridSkeleton` carries `data-tile`, so the cap line or the
   corner marks are there before the data.
-- **The scope properties** — `COSTUME_SCOPE_PROPERTIES` (`lib/constants/themeCostume.ts`, 22), declared ONLY in a
+- **The scope properties** — `COSTUME_SCOPE_PROPERTIES` (`lib/constants/themeCostume.ts`, 23), declared ONLY in a
   costume theme's `[data-theme="<id>"] [data-costume-scope]` (all of them) and `.dark[data-theme="<id>"]
   [data-costume-scope]` (those that differ); a palette theme declares none. «Off» is the value a palette theme paints:
 
@@ -228,7 +228,7 @@ mechanism has a neutral default, and the palette themes are held to render exact
   | `--costume-ornament` | band, cap, corners, emblem strokes | `var(--muted-foreground)` |
   | `--costume-tile-image` · `-position` · `-size` | layers over a tile (cap line, corner marks) | `none` · `0 0` · `auto` |
   | `--costume-tile-shadow` | a tile's shadow | `0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a` |
-  | `--costume-heading-font` | verdict headline, eyebrows, the wordmark | `var(--font-geist-sans), system-ui, sans-serif` |
+  | `--costume-heading-font` | verdict headline, eyebrows, the wordmark, a modal's title | `var(--font-geist-sans), system-ui, sans-serif` |
   | `--costume-heading-weight` · `-tracking` · `-case` | verdict headline | `600` · `-0.025em` · `none` |
   | `--costume-heading-size` | verdict headline at ≥ 1440 | `30px` |
   | `--costume-eyebrow-color` · `--costume-eyebrow-weight` | eyebrows | `var(--muted-foreground)` · `600` |
@@ -238,15 +238,17 @@ mechanism has a neutral default, and the palette themes are held to render exact
   | `--costume-control-pill-radius` | pill controls, bar tracks and fills, pill chips | `initial` (`rounded-full`) |
   | `--costume-control-chip-radius` | chips with a literal radius | `initial` (the site's px) |
   | `--costume-control-switch-on` | the dark switch's ON track | `initial` (blue-600) |
+  | `--costume-page-generated-fill` | a generated sub-tile inside a tile or a modal | `initial` (`bg-muted/40`) |
 
-  The four `--costume-control-*` are `initial` when off — guaranteed-invalid, so a `var()` with a fallback takes the
+  The four `--costume-control-*` and `--costume-page-generated-fill` (2026-11-23) are `initial` when off — guaranteed-invalid, so a `var()` with a fallback takes the
   fallback, while a bare `var()` would make its declaration invalid (radius 0): they are read ONLY through a `var()`
   carrying today's value.
 - **The gated rule set** — `app/globals.css`, unlayered, between the banners `/* ─── Theme costume (DESIGN.md → The
   Costume Rule) ── */` and `/* ─── End of theme costume ── */`, after the last theme block; later rules go before
   the closing banner. Every selector starts with `[data-costume] [data-costume-scope]`; the hooks are `#page-main`,
   `[data-tile]` (both `Tile` sections and `ErrorNotice`), `.costume-heading` (the verdict's `h2`), `.tile-eyebrow`
-  (inside `TILE_EYEBROW_CLASS`), `.costume-figure`, `.costume-header-band` and the primary `[data-slot="button"]
+  (inside `TILE_EYEBROW_CLASS`), `.costume-figure`, `.costume-header-band`, `[data-costume-frame]` and
+  `.costume-title` (a modal, below) and the primary `[data-slot="button"]
   [data-variant="default"]`. Unlayered beats every utility, so each rule excludes what a utility must keep: the tile
   shadow skips `[data-generated]` (the AI accent's glow), the primary glow skips `.ai-control` (the marker that opens
   `AI_CONTROL_ACCENT_CLASS`) and `:focus-visible` (the ring is a box-shadow too). Outside the banners a `--costume-*`
@@ -254,7 +256,46 @@ mechanism has a neutral default, and the palette themes are held to render exact
   --costume-ornament), …)`), and by one unlayered rule that reads a scope property, `[data-popper-sheet]`, always
   with today's fallback (`var(--costume-control-frame-radius, 10px)`). Held by `__tests__/themeCostume.test.ts` (the
   palette-theme, gate and scope-property cases).
-- **The layered consumers** are `TILE_EYEBROW_CLASS`, `COSTUME_PILL_RADIUS_CLASS`, `COSTUME_FRAME_RADIUS_CLASS` and the
+- **A modal is a tile lifted off the page** (2026-11-23; DESIGN.md → The Modal-Is-A-Tile Rule): `DialogContent`,
+  `AlertDialogContent` and `DrawerContent` carry `data-costume-frame`, and ONE gated rule gives a frame the tile's
+  image layers (Egeo's cap, Orbita's corner marks) — never `data-tile`, whose rule would trade the Float shadow for
+  the tile's. The dialog's corner is `rounded-2xl`, so it follows `--radius-2xl` on its own; the drawer's top corners
+  read `--costume-control-frame-radius` with their 10px. `.costume-title` (the font and its case, not the size) sits
+  on `ResponsiveModal`'s title in both shells and on `AlertDialogTitle`; a STRING title and the eyebrow go through
+  `HeadingText`, a node title is rendered as passed (the host wraps its own figures: `AIAnalysisDialog`'s verdict).
+  The primitives never set `data-costume-frame` on anything else: a sheet (`sheet.tsx`), a popover and a menu are
+  not tiles. Held by `__tests__/{costumePortals,responsiveModalCostume}.test.tsx` and `e2e/theme.costume*.spec.ts`.
+- **The scenes of a path are tiles** (2026-11-23): `PathCard`'s two cards and the Consulente's wizard, interview
+  and run cards carry `data-tile`, their headline `.costume-heading` with `HeadingText` (`PATH_HEADLINE_CLASS`); a
+  card of the book is a tile too, a model's page `[data-tile][data-generated]` (the accent's glow, not the tile's
+  shadow). A row list inside such a card inherits the corner (`first:rounded-t-[inherit] last:rounded-b-[inherit]`).
+- **A box inside a tile or a modal is a frame; a bar, a pill and a chip read their radius** (2026-11-23): every
+  `rounded-xl` box of the dialogs and of the pages beyond the first three is `COSTUME_FRAME_RADIUS_CLASS` through
+  `cn()`, every bar track and fill, pill and round chip `COSTUME_PILL_RADIUS_CLASS`, every chip with a literal radius
+  the chip property with its px, every chart tooltip's inline `borderRadius` the frame property with its px.
+  `themeCostume.test.ts` holds three file lists: `FRAME_BOX_FILES` (no `rounded-xl` left), `NO_LITERAL_FILES` (no
+  `rounded-full` left) and `ONE_ROUND_THING` (the files that keep ONE round thing — a dot, a handle, an avatar, a
+  spinner — named by a substring of its line). A new box in one of those files that is not a tile takes the class,
+  or the test goes red; a new file is added to its list.
+- **A generated sub-tile's fill** (2026-11-23): `COSTUME_GENERATED_FILL_CLASS` reads
+  `--costume-page-generated-fill` with `bg-muted/40` as its fallback — Egeo declares `var(--card)`, because its
+  `--ai-accent` on the muted wash read 4,48 / 4,39:1; Orbita leaves it `initial` (4,63 / 4,97). The Assistente's
+  question block, the expense and the goal proposal cards (`themeCostumeContrast` K7).
+- **Paper is the palette's** (2026-11-23): `@media print { [data-costume] [data-costume-scope] { … } }` puts every
+  scope property back to its off value with `!important` (`--radius` to `inherit`), and `EmblemSvg` is
+  `print:hidden`: the Consulente's book printed from a costume theme has Geist headings, no band, no cap, no emblem.
+  A new scope property is added to that block in the same commit (`themeCostume.test.ts`, «paper is the palette’s»).
+- **The Analisi flow under a costume** (2026-11-23): in a palette theme the Sankey's types keep their hexes
+  (`DEFAULT_SANKEY_TYPE_PALETTE`); in a costume theme `FlussoTile` reads the slots of
+  `SANKEY_COSTUME_TOKEN` (`lib/constants/sankeyCostumeColors.ts`; part of `THEME_HEX_TOKENS`, so
+  `ChartColorsProvider` resolves them once per theme) and `costumeSankeyPalette` maps them: fixed `--chart-1`,
+  variable `--chart-4`, debt `--chart-3`, Budget `--positive`, Risparmi `--chart-2`, the incomes the nine slots in
+  turn. Nivo cannot take a CSS token, so the palette is hexes handed to the pure builders (doc/guide/cashflow-analisi.md).
+- **A chart's red is the token, not a hex read once** (2026-11-23): `UnderwaterDrawdownChart` paints
+  `var(--destructive)` on its gradient stops and its stroke — an SVG attribute resolves a custom property, so the
+  chart follows a theme or a mode change with no state and no effect.
+- **The layered consumers** are `TILE_EYEBROW_CLASS`, `COSTUME_PILL_RADIUS_CLASS`, `COSTUME_FRAME_RADIUS_CLASS`,
+  `COSTUME_GENERATED_FILL_CLASS` and the
   chip sites whose arbitrary radius reads `--costume-control-chip-radius`. A doc or a comment never quotes such a class
   with a placeholder in its value: Tailwind scans every file and emits it as invalid CSS (2026-11-22, every page a 500
   on `next dev`). `TILE_EYEBROW_CLASS` paints
@@ -267,10 +308,17 @@ mechanism has a neutral default, and the palette themes are held to render exact
   opaque `--background` strip.
 - **A figure in a heading stays mono** (The Mono Mandate): `HeadingText` wraps each figure `splitHeadingFigures` finds —
   a signed amount with its €, a percentage, a year, a date «08/11/2027» and a time «18:42» as ONE figure; a full stop
-  after it, and «Q3-x», stay prose — in a `.costume-figure` span, in the verdict's headline, every tile eyebrow and the
-  header label. `HeadingText` lives in `components/ui/heading-text.tsx`, a module with no hooks, re-exported by
+  after it, and «Q3-x», stay prose — in a `.costume-figure` span, in the verdict's headline, every tile eyebrow, the
+  header label and, since 2026-11-23, a modal's eyebrow and string title and a path scene's headline. `HeadingText` lives in `components/ui/heading-text.tsx`, a module with no hooks, re-exported by
   `theme-costume.tsx`: `Tile` and `PageVerdict` render it, and through `theme-costume.tsx` they pulled in
   `ColorThemeContext → AuthContext → Firebase` — eighteen test files failed at import (2026-11-21).
+- **Egeo draws twelve emblems, Orbita one** (2026-11-23): the temple is Egeo's fallback (Panoramica) and its `pages` name
+  eleven arts — Patrimonio's amphora, Cashflow's waves, Analisi's balance, Rendimenti's laurel, Storico's scroll,
+  Allocazione's meander, Previdenza's shield (the one with circles), FIRE's flame, Hall of Fame's wreath,
+  Assistente's lamp, Impostazioni's column — of the nine of 2026-11-23 eight are `egeoMark(d)`, a single stroked
+  path on the 22px grid, and the shield two circles; Orbita keeps the planet everywhere (`pages: {}`). Every `PageHeader` host passes `emblem`: the Consulente
+  and the Piano di accumulo are `allocazione`, the Compravendita `patrimonio`
+  (`themeCostume.test.ts`, «every page header names its emblem»; `costumeScopeEgeo.test.tsx`, twelve distinct arts).
 - **Emblems**: `THEME_EMBLEMS` (a theme's `fallback` and optional `pages`), `resolveEmblem(theme, page, inScope)` —
   `null` out of scope —, drawn by `ThemeEmblem` beside the desktop label (22px) and `ThemeEmblemLead` around the
   phone's `h1` (18px; without an emblem the `h1` alone, the DOM of today); `PageHeader`'s `emblem?: EmblemPage`. The
@@ -293,8 +341,9 @@ mechanism has a neutral default, and the palette themes are held to render exact
 - **A test of the emblem mocks the provider's STORAGE, not the hook** (2026-11-22, `__tests__/costumeScopeEgeo.test.tsx`): `useThemeCostume` calls its own module's `useColorTheme`, which a `vi.mock` of `ColorThemeContext` does not reach, so the scope read `default` and no temple drew. The test mounts the real `ColorThemeProvider` with `color-theme = egeo` in `localStorage`; the sibling `costumeScope.test.tsx` stubs the registry instead, so the real-registry half lives in its own file (`vi.mock` is per file).
 - **A new costume theme runs the ring-fold gate too** (2026-11-22): the four gate tests are not four tests; `chartPaletteDistinctness` also holds every slot ΔE00 ≥ 14 from `--muted-foreground`, and the mock's ink failed it (Egeo light, 11,8 and 12,5). Run all four before trusting a palette, and read the numbers § Per-theme measures records.
 - **The palette themes render as before, measured**: `e2e/theme.neutral{,.mobile}.spec.ts` read eight probes (`html`,
-  `body`, `#page-main`, the header label, the verdict `h2`, the first tile and its `h3`, the first primary button)
-  and the «Nuova Spesa» dialog at 1440 on Panoramica, Storico and Cashflow, every palette theme in both modes, at 1440
+  `body`, `#page-main`, the header label, the verdict `h2`, the first tile and its `h3`, the first primary button),
+  the «Nuova Spesa» dialog and its title at 1440 and, since 2026-11-23, its drawer and the drawer's title at 390
+  (recorded on the code before the dialogs' pass, additions only) on Panoramica, Storico and Cashflow, every palette theme in both modes, at 1440
   and 390, and compare eleven computed properties with `e2e/themeNeutral.baseline.json`, recorded on 2026-11-21 on
   the tree with only the Geist fix applied. Every string is compared exact but `color`, `background-color` and
   `border-top-color`, compared as colours (ΔOKLab < 0.002, alpha within 0.01): the production build's minifier
@@ -314,7 +363,7 @@ mechanism has a neutral default, and the palette themes are held to render exact
   owner); in landscape the empty tile, 3,5px shorter, made the stack sticky, and the stage check now measures it stuck
   (doc/guide/e2e-playwright.md).
 
-## Per-theme measures (2026-11-22)
+## Per-theme measures (2026-11-22, the dialogs' pass 2026-11-23)
 
 Where a costume theme's numbers live, the shell's included; a later pass adds its own here. The tests re-measure every figure
 (`__tests__/{chartPaletteDistinctness,actionColorContrast,mutedForegroundContrast,themeCostumeContrast}.test.ts`).
@@ -351,6 +400,19 @@ Where a costume theme's numbers live, the shell's included; a later pass adds it
   `--muted-foreground`, 9,22 / 8,64 / 6,52 / 10,13 (Orbita dark measured on the ink the Orbita gates moved to `0.78`,
   above; 9,11 on the mock's); `--positive` on `--muted` 6,10 / 6,49 / 4,54 / 7,38; the dark ON track, `--primary` on
   `--card`, 8,75 (Egeo) / 9,58 (Orbita), the thumb `--background` on it 9,83 / 10,44.
+- **The banner's ink and the AI accent** (2026-11-23; `themeCostumeContrast` K6, K7; alpha composited in sRGB over
+  the card):
+
+  | Theme · mode | `--warning-foreground`, worst surface | AI accent on `--card` | on the generated fill | on `bg-muted/40` |
+  | --- | --- | --- | --- | --- |
+  | Egeo light | 5,44 (stripe) | 4,78 | 4,78 (card) | 4,48 |
+  | Egeo dark | 8,98 (muted) | 4,65 | 4,65 (card) | 4,39 |
+  | Orbita light | 5,63 (muted) | 4,99 | 4,63 | 4,63 |
+  | Orbita dark | 10,21 (muted) | 5,23 | 4,97 | 4,97 |
+
+  `--warning-foreground` on `--warning` (the banner's fill; the two themes share the trio): 6,72 light, 9,94 dark.
+  No AI text lands on plain `--muted` (4,05 / 3,99 / 4,13 / 4,53): every `AI_GENERATED_EYEBROW_CLASS` use sits on
+  the card or on a generated sub-tile.
 - **Orbita's `--chart-3` is the mock's Criptovalute re-pitched to hue 60** (`0.52 0.10 60` light, `0.64 0.13 60` dark), 30° from `--destructive`; `--chart-4` Immobili is the gold, `--chart-5` Liquidità the violet; Azioni light C 0.098, Immobili light `0.66 0.13 75`, `--primary` light C 0.10 and the eyebrow light C 0.115 are the mock's values pulled into the sRGB gamut. A figure a spec writes as «−1.200,00 €» is «−1200,00 €» in the app: `Intl` (it-IT) groups from five digits.
 
 ## The browser's chrome follows the page (2026-10-17)
@@ -382,16 +444,19 @@ Where a costume theme's numbers live, the shell's included; a later pass adds it
   value per mode by the owner's choice of 2026-11-01, so an AI eyebrow reads under AA there; Midnight
   Bloom's `--primary` (hue 283) also sits 22° from the accent, Cyberpunk's (341) 36°. The fix is a per-theme
   `--ai-accent`, a decision on those themes' look.
-- **The AI accent on a `bg-muted/40` sub-tile over the card reads ≈ 4,48:1 in Egeo light and ≈ 4,39:1 in Egeo dark**
-  (2026-11-22): the same per-theme `--ai-accent` gap as the entry above, recorded, not fixed.
+- **The AI accent on a `bg-muted/40` sub-tile over the card would read 4,48:1 in Egeo light and 4,39:1 in Egeo dark**:
+  cured on 2026-11-23 by moving the FILL, not the accent — Egeo's generated sub-tiles sit on `--card`
+  (`--costume-page-generated-fill`, § Il costume); there is still ONE `--ai-accent` per mode, no per-theme accent.
+  A new generated sub-tile that paints `bg-muted/40` by hand instead of `COSTUME_GENERATED_FILL_CLASS` reopens it.
 - **The default theme's quiet shell labels read 4,35:1** (2026-11-22): the inactive bottom-pill labels,
   `text-sidebar-foreground/55`, on `--sidebar` in default light. `.costume-shell-quiet` lifts them to `--muted-foreground`
   in a costume theme only: a palette theme renders as before by contract, and a palette contrast fix is a decision on
   that theme's look, not a costume rule. The toaster (`app/layout.tsx`, outside the dashboard layout) and the
   landing's `ThemePicker` are out of the scope too: palette only, by the owner's rule of 2026-11-12.
-- **A select sheet opened inside a drawer has the costume's top corners inside a 10px drawer** (2026-11-22): the
-  popper sheet reads `--costume-control-frame-radius`, the drawer's own frame (`drawer.tsx`, `rounded-t-[10px]`) does
-  not yet; the dialog and drawer frames are the costume's next pass.
+- **What the dialogs' pass left round or untouched, on purpose** (2026-11-23): the dots, the drag handles, the
+  avatars and the spinners of the listed files (`ONE_ROUND_THING`), the Consulente run's progress dot, the
+  sidebar's own menu badge and the Storybook stories; the emails, the PDF export, the landing and the access pages
+  wear no costume (the browser's print of the book is reset instead).
 - **Retro-arcade dark prints its `--foreground` on a pill at 4,02:1** (2026-10-08): the theme's foreground is a light
   teal (L 0.70) and the pill (`--muted`) now sits at L 0.36 — lowering it further would make it indistinguishable from
   the card (L 0.31). Only `--muted-foreground` is held to the floor on `--muted` (`mutedForegroundContrast`); an active

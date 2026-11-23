@@ -11,7 +11,10 @@ import {
   buildSpendingRolesFlowData,
   buildSpendingRolesFlowDataWithSubcategories,
   buildTypeDrillDownData,
+  COLORS,
+  costumeSankeyPalette,
   countSankeyLayers,
+  DEFAULT_SANKEY_TYPE_PALETTE,
   DEFAULT_SPENDING_ROLE_PALETTE,
   resolveSankeyHeight,
   MAX_SUBCATEGORY_CATEGORIES,
@@ -23,7 +26,10 @@ import { SPENDING_BUCKET_LABELS, type SpendingBucket, type SpendingRoleSource, t
 import { buildTypeFlowBreakdown, type FlowSummary, type FlussoLiftedBlock } from '@/lib/utils/analisiSummary';
 import type { ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 import { useCssColorTokens } from '@/lib/hooks/useCssColorTokens';
+import { SANKEY_COSTUME_TOKEN, type SankeyCostumeKey } from '@/lib/constants/sankeyCostumeColors';
 import { SPENDING_ROLE_TOKEN } from '@/lib/constants/spendingRoleColors';
+// From ColorThemeContext, not CostumeScopeContext: the shared bundle (see `CostumeScopeContext` there).
+import { useThemeCostume } from '@/contexts/ColorThemeContext';
 import { narrativeToText } from '@/lib/utils/narrative';
 import { cn } from '@/lib/utils';
 import { Tile } from '@/components/ui/tile';
@@ -95,6 +101,12 @@ if (typeof window !== 'undefined' && window.matchMedia(SANKEY_DRAWN_QUERY).match
   CashflowSankeyChart.preload().catch(() => {}); // a failure is retried by the first draw
 }
 
+/** What a costumed flow paints with until the theme's slots are read: today's hexes, slot by slot. */
+const SANKEY_COSTUME_FALLBACK: Record<SankeyCostumeKey, string> = {
+  slot1: COLORS[0], slot2: COLORS[1], slot3: COLORS[2], slot4: COLORS[3], slot5: COLORS[4],
+  slot6: COLORS[5], slot7: COLORS[6], slot8: COLORS[7], slot9: COLORS[8], positive: '#10b981',
+};
+
 type FlowMode = 'types' | 'roles';
 
 // Parallel names that say what the flow is grouped by, one always pressed: the tile-aside view
@@ -148,24 +160,29 @@ export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, s
   const rolesSankeyDrawn = !isMobile && spendingRoles !== null && mode === 'roles';
   // SPENDING_ROLE_TOKEN is a module-level constant, so the hook's effect sees a stable identity.
   const palette: SpendingRolePalette = useCssColorTokens(SPENDING_ROLE_TOKEN, DEFAULT_SPENDING_ROLE_PALETTE, rolesSankeyDrawn);
+  // Under a costume theme the flow takes the theme's slots, as the ring beside it does; in a palette theme the
+  // module constant, so no memo below ever rebuilds for it.
+  const costumed = useThemeCostume() !== null;
+  const slotHex = useCssColorTokens(SANKEY_COSTUME_TOKEN, SANKEY_COSTUME_FALLBACK, costumed && !isMobile);
+  const typePalette = useMemo(() => (costumed ? costumeSankeyPalette(slotHex) : DEFAULT_SANKEY_TYPE_PALETTE), [costumed, slotHex]);
 
-  // Every view that does NOT read the palette — the type flow and both drills (a drill takes its
-  // colour from the clicked node) — so a palette read never rebuilds them. Null on a phone.
+  // Every view that does NOT read the role palette — the type flow and both drills (a drill takes its
+  // colour from the clicked node) — so a role-palette read never rebuilds them. Null on a phone.
   const plainView = useMemo((): SankeyView | null => {
     if (isMobile) return null;
     if (drill?.kind === 'type') return buildTypeDrillDownData(expenses, drill.expenseType, drill.color);
     if (drill?.kind === 'role' && spendingRoles) return buildSpendingRoleDrillDownData(expenses, spendingRoles.categories, drill.bucket, drill.color);
     if (mode === 'roles') return null;
-    return showSubcategories ? buildBudgetFlowDataWithSubcategories(expenses) : buildBudgetFlowData(expenses);
-  }, [isMobile, drill, expenses, spendingRoles, mode, showSubcategories]);
+    return showSubcategories ? buildBudgetFlowDataWithSubcategories(expenses, typePalette) : buildBudgetFlowData(expenses, typePalette);
+  }, [isMobile, drill, expenses, spendingRoles, mode, showSubcategories, typePalette]);
 
   // The roles flow, the one view painted with the theme's role colours.
   const rolesView = useMemo((): SankeyView | null => {
     if (!rolesSankeyDrawn || drill || !spendingRoles) return null;
     return showSubcategories
-      ? buildSpendingRolesFlowDataWithSubcategories(expenses, spendingRoles.categories, palette)
-      : buildSpendingRolesFlowData(expenses, spendingRoles.categories, palette);
-  }, [rolesSankeyDrawn, drill, spendingRoles, showSubcategories, expenses, palette]);
+      ? buildSpendingRolesFlowDataWithSubcategories(expenses, spendingRoles.categories, palette, typePalette)
+      : buildSpendingRolesFlowData(expenses, spendingRoles.categories, palette, typePalette);
+  }, [rolesSankeyDrawn, drill, spendingRoles, showSubcategories, expenses, palette, typePalette]);
 
   const view = rolesView ?? plainView;
 

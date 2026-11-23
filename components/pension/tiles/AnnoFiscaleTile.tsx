@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { ASIDE_LINK_CLASS } from '@/components/pension/pensionStyles';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface AnnoFiscaleTileProps {
   /** The axis year every figure is read on («Anno fiscale 2026»). */
@@ -86,14 +87,14 @@ function MemberBlock({ block, tax, named }: { block: PensionMemberBlock; tax: Pe
           <span className="shrink-0 font-mono tabular-nums">tetto {ceiling}</span>
         </div>
         <div
-          className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-muted"
+          className={cn('mt-1.5 h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}
           role="progressbar"
           aria-valuenow={Math.round(share)}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label={`Dedotto ${deducted} su un tetto di ${ceiling}`}
         >
-          <div className="h-full rounded-full bg-foreground" style={{ width: `${share}%` }} />
+          <div className={cn('h-full bg-foreground', COSTUME_PILL_RADIUS_CLASS)} style={{ width: `${share}%` }} />
         </div>
       </div>
 

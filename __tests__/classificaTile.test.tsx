@@ -107,6 +107,54 @@ describe('ClassificaTile', () => {
     });
   });
 
+  // The void beside a longer «Spese maggiori» is filled with categories past the eighth (owner, 2026-11-23).
+  // Seen red with `extraRows` unread, with one category left alone behind «Un'altra categoria» and with
+  // the fill kept under «Mostra tutte».
+  describe('the rows that fill the void', () => {
+    const many = (count: number): CategorySlice[] =>
+      Array.from({ length: count }, (_, index) => ({ key: `fixed:cat-${index}`, name: `Categoria ${index}`, value: 1000 - index * 10, percentage: 5, expenseType: 'fixed', categoryKey: `cat-${index}` }));
+    const ranking = () => screen.getByRole('list', { name: 'Classifica delle spese' });
+
+    it('shows eight categories and the rest in one row when it is handed none', () => {
+      const { container } = renderTile({ categories: many(23) });
+      expect(within(ranking()).getAllByRole('button')).toHaveLength(8);
+      expect(text(ranking())).toContain('Altre 15 categorie');
+      const body = container.querySelector('[data-fill-body]');
+      expect(body?.getAttribute('data-fill-extra')).toBe('0');
+      // Twenty-three rows at most, nine drawn: fourteen more.
+      expect(body?.getAttribute('data-fill-room')).toBe('14');
+      expect(container.querySelector('[data-fill-list] ul')).toBe(ranking());
+      expect(container.querySelector('[data-fill-foot]')).not.toBeNull();
+    });
+
+    it('shows the extra categories it is handed, the rest still summed in one row', () => {
+      const { container } = renderTile({ categories: many(23), extraRows: 5 });
+      expect(within(ranking()).getAllByRole('button')).toHaveLength(13);
+      expect(text(ranking())).toContain('Altre 10 categorie');
+      expect(container.querySelector('[data-fill-body]')?.getAttribute('data-fill-extra')).toBe('5');
+      expect(screen.getByRole('button', { name: /Mostra tutte \(23\)/ })).toBeTruthy();
+    });
+
+    it('never leaves one category alone behind the remainder: its row takes the remainder’s place', () => {
+      renderTile({ categories: many(12), extraRows: 9 });
+      // Room for three rows more: 8 + 3 and the twelfth in the remainder's row.
+      expect(within(ranking()).getAllByRole('button')).toHaveLength(12);
+      expect(text(ranking())).not.toMatch(/altr/i);
+      expect(screen.queryByRole('button', { name: /Mostra/ })).toBeNull();
+    });
+
+    it('hands the fill back under «Mostra tutte»', () => {
+      const { container } = renderTile({ categories: many(23), extraRows: 5 });
+      fireEvent.click(screen.getByRole('button', { name: /Mostra tutte \(23\)/ }));
+      expect(within(ranking()).getAllByRole('button')).toHaveLength(23);
+      const body = container.querySelector('[data-fill-body]');
+      expect(body?.getAttribute('data-fill-extra')).toBe('0');
+      expect(body?.getAttribute('data-fill-room')).toBe('0');
+      fireEvent.click(screen.getByRole('button', { name: /Mostra meno/ }));
+      expect(within(ranking()).getAllByRole('button')).toHaveLength(13);
+    });
+  });
+
   it('K5: with ONE type no ring is drawn, the total stands as the column’s hero line', () => {
     const { container } = renderTile({
       categories: [CATEGORIES[0]],

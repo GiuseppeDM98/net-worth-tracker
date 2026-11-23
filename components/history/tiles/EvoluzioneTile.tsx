@@ -71,7 +71,7 @@ function Chip({ value, caption, className, children }: { value: number | null; c
     <div className={cn('flex w-min min-w-0 flex-col gap-1.5', className)}>
       <span
         className={cn(
-          'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[9px] px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
+          'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
           value === null ? 'bg-muted text-foreground' : signChipClass(value),
         )}
       >
@@ -107,7 +107,7 @@ const renderNoteDot = (props: { key?: React.Key | null; cx?: number; cy?: number
 const TOOLTIP_STYLE = {
   backgroundColor: 'var(--card)',
   border: '1px solid var(--border)',
-  borderRadius: '8px',
+  borderRadius: 'var(--costume-control-frame-radius, 8px)',
   padding: '8px 10px',
   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
   maxWidth: 260,

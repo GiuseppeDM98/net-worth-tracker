@@ -72,7 +72,7 @@ export function GoalProjectionChart({ series, deadlineTs, color, height = '100%'
             contentStyle={{
               backgroundColor: 'var(--popover)',
               border: '1px solid var(--border)',
-              borderRadius: 10,
+              borderRadius: 'var(--costume-control-frame-radius, 10px)',
               color: 'var(--popover-foreground)',
               fontSize: 12,
             }}

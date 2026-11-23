@@ -127,3 +127,24 @@ describe.each(CASES)('$name', ({ slot, tree }) => {
     expect(content!.hasAttribute('data-costume-scope')).toBe(false);
   });
 });
+
+// A modal is a tile lifted off the page (2026-11-23): its content carries `data-costume-frame` — the tile's cap or
+// marks, never `data-tile`, whose shadow rule would take the Float away — and the confirm's title the heading hook.
+// A menu, a popover, a tooltip and the sidebar's sheet are no tiles: no frame. Seen red with the attribute dropped
+// from `alert-dialog.tsx`, then from `dialog.tsx`, and with `costume-title` off the confirm's title.
+describe('the costume frame', () => {
+  it.each(CASES.map(({ name, slot, tree }) => ({ name, slot, tree, framed: name === 'Dialog' || name === 'AlertDialog' })))(
+    '$name: framed $framed, and never a tile',
+    ({ slot, tree, framed }) => {
+      render(<CostumeScope>{tree}</CostumeScope>);
+      const content = contentOf(slot);
+      expect(content!.hasAttribute('data-costume-frame')).toBe(framed);
+      expect(content!.hasAttribute('data-tile')).toBe(false);
+    },
+  );
+
+  it('hooks the confirm’s title to the heading face', () => {
+    render(CASES.find(({ name }) => name === 'AlertDialog')!.tree);
+    expect(document.querySelector('[data-slot="alert-dialog-title"]')?.classList.contains('costume-title')).toBe(true);
+  });
+});

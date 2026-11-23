@@ -56,6 +56,7 @@ export function AssistantHeader({
 
   return (
     <PageHeader
+      emblem="assistente"
       label="Assistente AI"
       title="Una frase, una risposta"
       description={description}

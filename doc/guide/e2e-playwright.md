@@ -4,6 +4,16 @@
 
 ## Browser-Driven E2E (Playwright)
 - **The Egeo specs** (2026-11-22): `e2e/theme.egeo{,.mobile}.spec.ts` on the helper `e2e/themeEgeo.ts` — `setAccountColorTheme` reads `userPreferences/test-user-1.colorTheme` once through the emulator REST, writes `egeo` (or `default`) and `restoreColorTheme` puts it back in `afterAll` (the account's preference overrides `localStorage` after sign-in, `e2e/motion.layout.spec.ts`); `workers: 1` is what makes the write safe. Traps: signed out, `/login` has NO `h1` and `/` draws the header's `h1` twice (the phone's hidden at 1440) — wait for the first VISIBLE `h1, h2, h3`; a serial `describe` stops at the first red, so a mutation shows one failure, not all. Signed out on `/login` the check is «every `document.fonts` face of Marcellus is `unloaded`» and the headings are Geist Sans (2026-11-22): «not `loaded`» passed a face in `error`, seen red with the `.woff2` aborted and the font loaded by hand.
+- **A costume spec on another fixture account** (2026-11-23): the FILENAME picks the account, so the Analisi flow under
+  a costume is `e2e/theme.costume.analisi.spec.ts` and the Hall of Fame bar `e2e/theme.costume.hof.spec.ts` (the base
+  account has no records and Analisi's has no snapshots: the drawdown and the Consulente's book stay in
+  `theme.costume.spec.ts`, the book on a PLANTED report). `setAccountColorTheme(theme, uid)` writes that account's
+  preference and `restoreColorThemeOf(uid)` puts it back — wrapped in an arrow in `afterAll`, because a hook hands the
+  fixtures to its first argument. Traps: no control opens «Nuova Spesa» at 1024×768 (the rail has no «+»): the tablet
+  spec dispatches `cashflow:add-expense`, the event the page's own controls dispatch; a Nivo node's `fill` and a slot's
+  served form differ, so both go through `colorToHex` before the comparison; a mutation written as `@media not all`
+  around a CSS block SURVIVED on `next dev` — make the block's selector unmatchable instead; a page of a context the
+  spec opens itself has NO action timeout, so a click on a control that is not there waits out the whole test.
 - **The ring specs** (2026-11-15; doc/guide/grafici.md § The ring): `e2e/ring-chart{,.mobile,.tablet}.spec.ts` (the
   homes of 2026-11-12, one body `ringChartSuite.ts`) and the minor tiles' seven files —
   `e2e/ring-chart.split{,.mobile}.spec.ts` (projects `split`, `split-mobile`), `e2e/ring-chart.centri{,.mobile}.spec.ts`
@@ -373,6 +383,10 @@
   `new Date('YYYY-MM-DD')`, UTC midnight, so every coupon derived from a local-midnight fixture reads the 14th.
   (Moved here whole from `AGENTS.md` → *Audit habits* on 2026-09-20; the rule stays there in one line.)
 - **A throwaway probe on the dev server** (2026-11-13): the Next dev overlay (`nextjs-portal`) covers the bottom-left button of the 1024×768 rail and swallows its click — the probe hides it with `nextjs-portal{display:none!important}`; the dashboard never reaches `networkidle` (Firestore listeners stay open), so a window opened for the owner waits on `domcontentloaded` and a failed `goto` is caught, or the script exits and takes the window with it.
+- **A `tsx` probe's `page.evaluate` with a named inner function dies on `__name is not defined`** (2026-11-23):
+  esbuild wraps a `const read = () => …` declared inside the evaluated function with its `__name` helper, which the
+  page does not have — `context.addInitScript('window.__name = (fn) => fn')` before the first page, or no named
+  function inside the callback. A spec run by Playwright's own transform is not touched.
 - **`browser.newContext()` inside a test inherits the project's `use`, `storageState` included** (2026-11-15): an
   «anonymous» context opened that way is logged in, and `/` redirects to the Panoramica. A context for the landing
   passes `storageState: { cookies: [], origins: [] }`. A `tile.screenshot()` taken as soon as the tile is visible can

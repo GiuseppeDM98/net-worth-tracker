@@ -34,6 +34,7 @@ import { proposalKey } from '@/lib/utils/expenseProposal';
 import { describeAnswer, formatQuestionAnswersAsMessage, isEntityQuestion, type EntityQuestionKind, type Question } from '@/lib/utils/questionSet';
 import { cn } from '@/lib/utils';
 import type { AssistantProposalState } from '@/types/assistant';
+import { COSTUME_FRAME_RADIUS_CLASS, COSTUME_GENERATED_FILL_CLASS } from '@/lib/constants/themeCostume';
 
 export const QUESTION_EYEBROW = "L'Assistente chiede";
 export const QUESTION_NOT_ANSWERED_HERE = 'Non risposta qui';
@@ -144,7 +145,7 @@ export function AssistantQuestionBlock({ index, codeBlock }: AssistantQuestionBl
   return (
     <div className="not-prose my-3">
       {answeredLine !== null ? (
-        <div className={cn('rounded-xl border bg-muted/40 p-4 desktop:p-5', AI_GENERATED_SURFACE_CLASS)} data-question-card={question.id}>
+        <div className={cn('border p-4 desktop:p-5', COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)} data-question-card={question.id}>
           <p className={cn(TILE_SUB_EYEBROW_CLASS, AI_GENERATED_EYEBROW_CLASS)}>{QUESTION_EYEBROW}</p>
           <p className="mt-2 text-[16px] font-medium leading-[1.4] text-foreground desktop:text-[20px]">{question.text}</p>
           <p
@@ -156,7 +157,7 @@ export function AssistantQuestionBlock({ index, codeBlock }: AssistantQuestionBl
           </p>
         </div>
       ) : (
-        <div className="rounded-xl bg-muted/40">
+        <div className={cn(COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS)}>
           <QuestionCard
             question={question}
             index={validBlocks.findIndex((candidate) => candidate.index === index) + 1}

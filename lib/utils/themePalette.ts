@@ -19,6 +19,7 @@
  */
 
 import { CHART_COLORS } from '@/lib/constants/colors';
+import { SANKEY_COSTUME_TOKEN } from '@/lib/constants/sankeyCostumeColors';
 import { SPENDING_ROLE_TOKEN } from '@/lib/constants/spendingRoleColors';
 import { clampActionLightness } from '@/lib/utils/actionColor';
 import { ACTION_CHART_NUMBER, type AllocationAction } from '@/lib/utils/allocationUtils';
@@ -47,7 +48,7 @@ export const CHART_DARK_MIN_L = 0.3;
  * A token read through `useCssColorTokens` must be in this list: with the provider mounted, a
  * token outside it gets its fallback.
  */
-export const THEME_HEX_TOKENS: readonly string[] = Object.values(SPENDING_ROLE_TOKEN);
+export const THEME_HEX_TOKENS: readonly string[] = [...Object.values(SPENDING_ROLE_TOKEN), ...Object.values(SANKEY_COSTUME_TOKEN)];
 
 /** Legible default-theme action colours, shown until the first read. */
 export const INITIAL_ACTION_COLORS: Record<AllocationAction, string> = {

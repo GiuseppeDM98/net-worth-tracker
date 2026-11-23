@@ -498,6 +498,7 @@ export default function AllocationPage() {
 
   const header = (
     <PageHeader
+      emblem="allocazione"
       label="Pianificazione"
       title="Allocazione"
       description={headerDescription}

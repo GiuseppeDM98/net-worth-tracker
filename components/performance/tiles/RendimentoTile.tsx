@@ -78,7 +78,7 @@ function Chip({ value, caption, className, children }: { value: number | null; c
     <div className={cn('flex min-w-0 flex-col gap-1', className)}>
       <span
         className={cn(
-          'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[9px] px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
+          'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
           sign === null || sign === 0 ? 'bg-muted text-foreground' : signChipClass(sign),
         )}
       >

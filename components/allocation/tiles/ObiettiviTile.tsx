@@ -102,7 +102,7 @@ export function ObiettiviTile({ idealAllocation, targetLeverageRatio, snapshot, 
       {reached && (
         <div className="mt-3">
           <ObjectiveBars objectives={reached.objectives} />
-          {firstConflict && <p className="mt-3 rounded-[10px] bg-muted px-3 py-2.5 text-[12px] text-foreground">{describeConflictReading(firstConflict, reached.objectives)}</p>}
+          {firstConflict && <p className="mt-3 rounded-[var(--costume-control-frame-radius,10px)] bg-muted px-3 py-2.5 text-[12px] text-foreground">{describeConflictReading(firstConflict, reached.objectives)}</p>}
           <p className="mt-2 text-[11px] text-muted-foreground">{planObjectives ? OBJECTIVES_TILE_PLAN_NOTE : OBJECTIVES_TILE_CALCULATED_ON}</p>
         </div>
       )}

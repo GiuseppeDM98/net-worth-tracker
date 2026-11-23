@@ -25,7 +25,8 @@ export function EmblemSvg({ art, size }: { art: EmblemArt; size: number }) {
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="shrink-0 self-center"
+      // Never on paper: the print reset is CSS and cannot reach a React mark.
+      className="shrink-0 self-center print:hidden"
     >
       {art.shapes.map((shape, index) => {
         const style = { stroke: EMBLEM_TONE_COLOR[shape.tone], strokeWidth: shape.strokeWidth };

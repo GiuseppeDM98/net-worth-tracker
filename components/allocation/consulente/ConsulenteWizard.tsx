@@ -61,6 +61,7 @@ import { formatCurrency } from '@/lib/utils/formatters';
 import { sceneVariants, sceneVariantsReduced } from '@/lib/utils/motionVariants';
 import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
 import { NarrativeText } from '@/components/ui/narrative-text';
+import { HeadingText } from '@/components/ui/heading-text';
 import { TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS, TILE_SURFACE_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +79,7 @@ import { ConsulenteInterviewScene } from './ConsulenteInterviewScene';
 import { useConsulenteInterview } from './useConsulenteInterview';
 import { useSceneTurn } from './useSceneTurn';
 import type { useConsulenteRun } from './useConsulenteRun';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface ConsulenteWizardProps {
   ownerId: string;
@@ -227,7 +229,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
   return (
     <div className={SCENE_GRID_CLASS}>
       <PathRail mode="path" steps={STEP_NAMES} current={draft.step} interview={{ total: ALLOCATION_ADVICE_INTERVIEW_MAX_ROUNDS, reached: inInterview ? roundNumber : null }} />
-      <section className={cn(TILE_SURFACE_CLASS, SCENE_CARD_CLASS)} aria-label={inInterview ? interviewEyebrow : `Passo ${stepNumber} di ${ALLOCATION_ADVICE_STEPS.length}: ${copy.eyebrow}`}>
+      <section data-tile="" className={cn(TILE_SURFACE_CLASS, SCENE_CARD_CLASS)} aria-label={inInterview ? interviewEyebrow : `Passo ${stepNumber} di ${ALLOCATION_ADVICE_STEPS.length}: ${copy.eyebrow}`}>
         {/* The summary and the interview trade places as whole scenes (the interview's eyebrow and footer are its own); the path's screens slide inside the second branch. */}
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           {inInterview ? (
@@ -258,7 +260,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
             <motion.div key="path" custom={direction} variants={variants} initial="enter" animate="center" exit="exit" onAnimationComplete={(definition) => definition === 'center' && focusTarget(sceneTurn)}>
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className={TILE_EYEBROW_CLASS}>
-                  Passo {stepNumber} di {ALLOCATION_ADVICE_STEPS.length} · {copy.eyebrow}
+                  <HeadingText text={`Passo ${stepNumber} di ${ALLOCATION_ADVICE_STEPS.length} · ${copy.eyebrow}`} />
                 </h2>
                 {subEyebrow && <span className={cn(TILE_SUB_EYEBROW_CLASS, 'shrink-0')}>{subEyebrow}</span>}
               </div>
@@ -273,7 +275,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
                   exit="exit"
                   onAnimationComplete={(definition) => definition === 'center' && focusTarget(sceneTurn)}
                 >
-                  <p ref={headlineRef} tabIndex={-1} className={cn(PATH_HEADLINE_CLASS, 'mt-3 outline-none')}>{currentGoal ? (currentGoal.goalId ? `«${currentGoal.name}» è ancora un tuo obiettivo?` : 'Un nuovo obiettivo.') : copy.question}</p>
+                  <p ref={headlineRef} tabIndex={-1} className={cn(PATH_HEADLINE_CLASS, 'mt-3 outline-none')}><HeadingText text={currentGoal ? (currentGoal.goalId ? `«${currentGoal.name}» è ancora un tuo obiettivo?` : 'Un nuovo obiettivo.') : copy.question} /></p>
                   <p className={cn(PATH_HELP_CLASS, 'mt-2 max-w-[600px]')}>{copy.help}</p>
 
                   <div className="mt-5 flex flex-col gap-4">
@@ -292,7 +294,7 @@ export function ConsulenteWizard({ ownerId, configured, settings, goalData, asse
 
                     {step === 'tolleranza' && (
                       <>
-                        <ul className="divide-y divide-border rounded-xl border border-border bg-muted/40 px-4" aria-label="Scenari di perdita sulla tua base">
+                        <ul className={cn('divide-y divide-border border border-border bg-muted/40 px-4', COSTUME_FRAME_RADIUS_CLASS)} aria-label="Scenari di perdita sulla tua base">
                           {scenarios.map((scenario) => (
                             <li key={scenario.pct} className="py-2.5">
                               <NarrativeText segments={describeLossScenario(scenario.pct, scenario.eur)} className="text-[13px] leading-[1.45] text-foreground" />

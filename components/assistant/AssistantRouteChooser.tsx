@@ -22,6 +22,8 @@ import { AI_CONTROL_ACCENT_CLASS } from '@/lib/constants/aiAccent';
 import { buildMonthOptions, buildYearOptions } from '@/lib/utils/assistantPeriodOptions';
 import { chooserDraftToOverride, routeToChooserDraft, type RouteChooserDraft, type RouteChooserKind } from '@/lib/utils/assistantRoute';
 import type { AssistantRouteOverride, AssistantRoutePeriod, AssistantRouteReading } from '@/types/assistant';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 type PeriodKind = AssistantRoutePeriod['kind'];
 
@@ -126,7 +128,7 @@ function ChooserModal({ open, reading, today, onReread, onClose, returnFocusTo }
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className={cn('flex items-center justify-between gap-4 border border-border px-4 py-3', COSTUME_FRAME_RADIUS_CLASS)}>
               <Label htmlFor="route-web" className="flex flex-col items-start gap-0.5">
                 <span className="text-[14px] font-medium text-foreground">Cerca anche sul web</span>
                 <span className="text-[13px] font-normal text-muted-foreground">Per mercati, tassi e notizie</span>

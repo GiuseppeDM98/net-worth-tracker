@@ -74,7 +74,7 @@ const monthKey = (ref: MonthRef) => `${ref.year}-${ref.month}`;
 /** The colour block of a cell; the gap between cells is the `td`'s padding (see the table below). */
 // 44px tall below desktop: twelve columns in a 316px tile leave a cell ~21px wide, so the height is
 // the only dimension a finger can be given (measured 21×28 on 2026-09-20).
-const CELL_BLOCK_CLASS = 'block h-11 w-full rounded-[3px] motion-safe:transition-colors motion-safe:duration-300 desktop:h-[28px]';
+const CELL_BLOCK_CLASS = 'block h-11 w-full rounded-[var(--costume-control-chip-radius,3px)] motion-safe:transition-colors motion-safe:duration-300 desktop:h-[28px]';
 
 /**
  * One cell per month, colour by sign and intensity, no figure inside: at a tile's width twelve

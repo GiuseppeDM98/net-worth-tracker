@@ -71,7 +71,7 @@ interface StoricoDettaglioProps {
   disabled?: boolean;
 }
 
-const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)', fontSize: 12 } as const;
+const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--costume-control-frame-radius, 8px)', color: 'var(--card-foreground)', fontSize: 12 } as const;
 const TOOLTIP_LABEL_STYLE = { color: 'var(--card-foreground)', fontWeight: 600 } as const;
 const TOOLTIP_ITEM_STYLE = { color: 'var(--card-foreground)' } as const;
 const CURSOR_FILL = { fill: 'var(--foreground)', fillOpacity: 0.06 } as const;

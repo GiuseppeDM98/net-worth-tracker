@@ -52,6 +52,7 @@ import { CategoryMoveDialog } from './CategoryMoveDialog';
 import { IconPickerPopover, CategoryIcon } from './IconPickerPopover';
 import { CATEGORY_ICONS } from '@/lib/constants/categoryIcons';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 
 // ---------------------------------------------------------------------------
@@ -338,7 +339,7 @@ function CategoryFormBody({
       )}
 
       {/* ---- Aspetto: Icona + Colore ---- */}
-      <div className="space-y-4 rounded-xl border border-border/60 bg-muted/30 p-4">
+      <div className={cn('space-y-4 border border-border/60 bg-muted/30 p-4', COSTUME_FRAME_RADIUS_CLASS)}>
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">Aspetto</p>
 
         {/* Icona */}
@@ -406,7 +407,7 @@ function CategoryFormBody({
 
         {/* Existing subcategories — inline editable list */}
         {subCategories.length > 0 && (
-          <div className="divide-y divide-border/50 rounded-xl border border-border/60 overflow-hidden">
+          <div className={cn('divide-y divide-border/50 border border-border/60 overflow-hidden', COSTUME_FRAME_RADIUS_CLASS)}>
             {subCategories.map((sub) => (
               <div key={sub.id} className="group flex items-center gap-2 px-3 py-1.5 hover:bg-muted/30 transition-colors">
                 <IconPickerPopover

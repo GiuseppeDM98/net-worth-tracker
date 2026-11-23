@@ -134,6 +134,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   ref); what proves it is a `[role=dialog][data-state="closed"]` frame watched from BEFORE the Escape
   (`e2e/assets.rows.spec.ts`). On a hand-over to another modal, clear the closing one's opener (or move it to the next
   modal), or its restore sends the focus behind the modal that is opening.
+- **A modal in costume** (2026-11-23; DESIGN.md → The Costume Rule, doc/guide/temi.md § Il costume): the dialog,
+  the alert dialog and the drawer carry `data-costume-frame`, which gives them the tile's corner and its cap or
+  marks and keeps the Float shadow (never `data-tile`: the tile's shadow would replace it); the title is
+  `.costume-title` — the costume's face, its 20px unchanged —, a string title and the eyebrow go through
+  `HeadingText` so a figure stays mono, a node title is the host's (it wraps its own figures); the drawer's top
+  corners read the frame radius with their 10px. A box inside a modal that is not a tile takes
+  `COSTUME_FRAME_RADIUS_CLASS` through `cn()`, never a bare `rounded-xl` (`themeCostume.test.ts` scans the listed
+  files). A palette theme renders as before: the neutral baseline holds the dialog, the drawer and both titles.
 - **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
   comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
   shadow; assert the modal's surface equals a TILE's instead.

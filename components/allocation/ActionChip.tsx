@@ -12,6 +12,7 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ACTION_CHIP_FILL_PCT, type AllocationAction } from '@/lib/utils/allocationUtils';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 const ACTION_ICON: Record<AllocationAction, typeof TrendingUp> = {
   COMPRA: TrendingUp,
@@ -34,7 +35,7 @@ export function ActionChip({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+        'inline-flex shrink-0 items-center gap-0.5 border px-1.5 py-0.5 text-[10px] font-semibold', COSTUME_PILL_RADIUS_CLASS,
         className
       )}
       style={{

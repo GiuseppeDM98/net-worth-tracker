@@ -4,7 +4,9 @@
  * dialog at 1440 —, every palette theme in both modes, compared with `e2e/themeNeutral.baseline.json`.
  * Since 2026-11-22 six more, the surfaces the costume reaches outside the tiles: the sidebar's group
  * label and the account menu (1440), an inactive bottom-pill label and the Cashflow phone tab (390),
- * the axis pill with its indicator and the first PatrimonioTile chip (both widths).
+ * the axis pill with its indicator and the first PatrimonioTile chip (both widths); and, recorded the same
+ * day before the costume reached the modals, the «Nuova Spesa» title (1440) and the same form as a drawer
+ * with its title (390).
  * A helper, not a spec (the FILENAME chooses the project): `theme.neutral.spec.ts` runs it at 1440,
  * `theme.neutral.mobile.spec.ts` at 390.
  *
@@ -206,9 +208,25 @@ export function describeThemeNeutrality(viewport: ViewportKey): void {
             const dialog = page.getByRole('dialog');
             await expect(dialog).toBeVisible();
             await page.waitForTimeout(600);
-            Object.assign(signature, await readSignature(page, { dialog: '[role="dialog"]' }));
+            Object.assign(
+              signature,
+              await readSignature(page, { dialog: '[role="dialog"]', dialogTitle: '[role="dialog"] [data-slot="dialog-title"]' }),
+            );
             await dialog.getByRole('button', { name: 'Annulla' }).first().click();
             await expect(dialog).toBeHidden();
+          }
+          // At 390 the same form is a drawer, opened by the bottom pill's «+»: read once it has risen, closed unsent.
+          if (viewport === '390' && path.includes('cashflow')) {
+            await page.getByRole('button', { name: 'Aggiungi nuova voce' }).click();
+            const drawer = page.locator('[data-slot="drawer-content"]');
+            await expect(drawer).toBeVisible();
+            await page.waitForTimeout(800);
+            Object.assign(
+              signature,
+              await readSignature(page, { drawer: '[data-slot="drawer-content"]', drawerTitle: '[data-slot="drawer-content"] [data-slot="drawer-title"]' }),
+            );
+            await page.keyboard.press('Escape');
+            await expect(drawer).toBeHidden();
           }
           signatures[path] = signature;
         }

@@ -64,6 +64,33 @@ describe('SpeseMaggioriTile', () => {
     expect(sub?.querySelector('[role="presentation"]')).not.toBeNull();
   });
 
+  // The void beside a longer «Dove vanno i soldi» is filled with rows past the tenth (owner, 2026-11-23).
+  // Seen red with `extraRows` unread, with the toggle still counting from ten and with the rows marked for
+  // the fill left out.
+  it('shows the extra rows it is handed, counts them in the aside and offers only the rest', () => {
+    const { container } = render(<SpeseMaggioriTile top={top(20)} onSelect={vi.fn()} extraRows={4} />);
+    const list = screen.getByRole('list', { name: 'Spese maggiori del periodo' });
+    expect(within(list).getAllByRole('button')).toHaveLength(14);
+    expect(asideOf(container)).toBe('14 di 20');
+    const body = container.querySelector('[data-fill-body]');
+    expect(body?.getAttribute('data-fill-extra')).toBe('4');
+    expect(body?.getAttribute('data-fill-room')).toBe('10');
+    expect(container.querySelector('[data-fill-list] ul')).toBe(list);
+    expect(container.querySelector('[data-fill-foot]')).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Mostra altre 6/ }));
+    expect(within(list).getAllByRole('button')).toHaveLength(20);
+    // Unfolded by the reader: nothing left to hand, whatever the page offers.
+    expect(body?.getAttribute('data-fill-extra')).toBe('0');
+    expect(body?.getAttribute('data-fill-room')).toBe('0');
+  });
+
+  it('never shows more extra rows than it has, and drops the toggle once all are shown', () => {
+    render(<SpeseMaggioriTile top={top(12)} onSelect={vi.fn()} extraRows={5} />);
+    expect(within(screen.getByRole('list', { name: 'Spese maggiori del periodo' })).getAllByRole('button')).toHaveLength(12);
+    expect(screen.queryByRole('button', { name: /Mostra/ })).toBeNull();
+  });
+
   it('has no toggle when every row is shown', () => {
     render(<SpeseMaggioriTile top={top(7)} onSelect={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /Mostra/ })).toBeNull();

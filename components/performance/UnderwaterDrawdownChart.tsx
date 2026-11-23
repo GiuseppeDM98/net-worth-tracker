@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useId } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { UnderwaterDrawdownData } from '@/types/performance';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from '@/components/ui/charts/recharts';
@@ -98,16 +98,6 @@ export function UnderwaterDrawdownChart({
   const prefersReducedMotion = useReducedMotion();
   const gradientId = useId();
 
-  // Read --destructive once after paint so the color is theme-aware
-  const [destructiveColor, setDestructiveColor] = useState('oklch(0.5771 0.2152 27.325)');
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const c = getComputedStyle(document.documentElement).getPropertyValue('--destructive').trim();
-      if (c) setDestructiveColor(c.startsWith('oklch') ? c : `oklch(${c})`);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
   if (data.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -129,9 +119,9 @@ export function UnderwaterDrawdownChart({
       <AreaChart data={data} role="img" aria-label={describeUnderwaterChart(data)} accessibilityLayer={false}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={destructiveColor} stopOpacity={0.72} />
-            <stop offset="55%" stopColor={destructiveColor} stopOpacity={0.45} />
-            <stop offset="100%" stopColor={destructiveColor} stopOpacity={0.18} />
+            <stop offset="0%" stopColor="var(--destructive)" stopOpacity={0.72} />
+            <stop offset="55%" stopColor="var(--destructive)" stopOpacity={0.45} />
+            <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0.18} />
           </linearGradient>
         </defs>
         {/* stroke="var(--border)" makes the grid theme-aware without JS theme detection */}
@@ -155,7 +145,8 @@ export function UnderwaterDrawdownChart({
         <Area
           type="monotone"
           dataKey="drawdown"
-          stroke={destructiveColor}
+          // The token itself, as the grid's `var(--border)`: right from the first frame, and it follows a theme switch.
+          stroke="var(--destructive)"
           strokeWidth={2}
           fill={`url(#${gradientId})`}
           name="Drawdown"

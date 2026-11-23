@@ -9,6 +9,8 @@ import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import type { AssistantFollowUp } from '@/lib/utils/assistantFollowUps';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { AssistantMessage, AssistantProposalState } from '@/types/assistant';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 interface AssistantConversazioneTileProps {
   /** How the last answer was read, as the tile's aside («Analisi di ottobre 2026»); null on an empty chat. */
@@ -121,13 +123,13 @@ export function AssistantConversazioneTile({
           ) : (
             // The overview is loading: four rows of the same height, so the suggestions never jump in.
             <div className="space-y-1" aria-hidden="true">
-              {[0, 1, 2, 3].map((index) => <Skeleton key={index} className="h-11 rounded-xl" />)}
+              {[0, 1, 2, 3].map((index) => <Skeleton key={index} className={cn('h-11', COSTUME_FRAME_RADIUS_CLASS)} />)}
             </div>
           )}
         </div>
       ) : loadingThreadDetail ? (
         <div className="mt-4 space-y-2" role="status" aria-label="Caricamento conversazione">
-          <Skeleton className="ml-auto h-10 w-2/3 rounded-xl" />
+          <Skeleton className={cn('ml-auto h-10 w-2/3', COSTUME_FRAME_RADIUS_CLASS)} />
           <Skeleton className="h-3.5 w-full" />
           <Skeleton className="h-3.5 w-5/6" />
         </div>

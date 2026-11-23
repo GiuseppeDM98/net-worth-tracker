@@ -37,6 +37,7 @@ export default function PensionPage() {
   return (
     <PageContainer>
       <PageHeader
+        emblem="previdenza"
         label="Pianificazione"
         title="Previdenza"
         description="Versamenti, beneficio fiscale e plafond del tuo fondo pensione"

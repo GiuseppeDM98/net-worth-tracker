@@ -48,6 +48,7 @@ import { TAX_SIMULATION_READING } from '@/lib/utils/dialogNarrative';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cn } from '@/lib/utils';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // The restyle of 2026-08-22 touches presentation only: every figure in the numeric face on the
 // type ramp (22px hero, 13px rows), sign and warning colours through the theme tokens, no
@@ -270,7 +271,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
 
           {/* Results */}
           {hasInput ? (
-            <div className="space-y-4 rounded-xl bg-muted/40 p-4">
+            <div className={cn('space-y-4 bg-muted/40 p-4', COSTUME_FRAME_RADIUS_CLASS)}>
               <div className="flex flex-col gap-1.5">
                 <p className={TILE_SUB_EYEBROW_CLASS}>Ricavo netto dopo le tasse</p>
                 <p className="font-mono text-[22px] font-bold leading-none tracking-[-0.03em] tabular-nums text-foreground">

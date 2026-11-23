@@ -48,6 +48,7 @@ import {
 } from '@/lib/utils/settingsDraft';
 import type { ExpenseCategory } from '@/types/expenses';
 import { DeclarationRow, INTERACTIVE_CONTROL_CLASS, pctLabel, runGuarded, SettingsTabPanel } from './shared';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // The assistant is a route gated by this flag; its state tile follows the same gate.
 const SHOW_ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false';
@@ -437,7 +438,7 @@ export function GeneraleTab({
                         })
                       }
                       className={cn(
-                        'inline-flex h-11 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors desktop:h-8',
+                        'inline-flex h-11 items-center gap-1.5 border px-3 text-xs transition-colors desktop:h-8', COSTUME_PILL_RADIUS_CLASS,
                         checked
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-border bg-background text-foreground hover:bg-muted'

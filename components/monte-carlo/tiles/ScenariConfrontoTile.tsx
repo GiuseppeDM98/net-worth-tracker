@@ -18,6 +18,8 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 import { Tile, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { SCENARIO_SLOT } from '@/components/monte-carlo/ScenarioOverlayChart';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 export interface ScenarioRow {
   key: ScenarioKey;
@@ -57,8 +59,8 @@ export function ScenariConfrontoTile({ reading, aside, rows, footer, collapse, a
                 </span>
                 <span className="font-mono text-[18px] font-semibold leading-none tabular-nums text-foreground">{formatPercentage(row.successRate, decimals)}</span>
               </div>
-              <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
-                <div className="h-full rounded-full" style={{ width: `${fill}%`, background: color }} />
+              <div className={cn('mt-1.5 h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)} aria-hidden="true">
+                <div className={cn('h-full', COSTUME_PILL_RADIUS_CLASS)} style={{ width: `${fill}%`, background: color }} />
               </div>
               <NarrativeText segments={row.note} className="mt-1.5 text-[11px] leading-[1.4] text-muted-foreground" figureClassName="font-medium" />
             </li>

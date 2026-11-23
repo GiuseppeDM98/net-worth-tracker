@@ -297,6 +297,11 @@
   date is required, so «Rischi e revisione» always follows a proposal), «Gli strumenti» with the instruments,
   «Gli obiettivi» with the proposal's goals, the roles' page with a change or a name not found, «Il colloquio» with a
   round, «Chiedi una modifica» with a report, «Cosa fare adesso» only with its section; the cover and «Applica» always.
+- **Under a costume theme the scene cards and the book's cards are tiles** (2026-11-23; doc/guide/temi.md § Il
+  costume): the wizard's, the interview's and the run's cards and every card of the book carry `data-tile`, the
+  headlines `.costume-heading`, a model's page `[data-tile][data-generated]`; the boxes inside them are frames. The
+  book printed from the browser is the palette's — the print reset, the emblem `print:hidden`
+  (`e2e/theme.costume.spec.ts`, on a planted report).
 - **The text splits by its sections onto the page of the tile it explains** (`splitReportSections`,
   `assignSections`): three heading shapes open a section — an ATX heading (`#`–`####`), a line that is only bold
   («**Gli strumenti**», «2. **…**»), and the contracts' own list shape «1. **In una frase** — testo» when the bold IS a

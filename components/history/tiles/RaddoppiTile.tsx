@@ -23,6 +23,8 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
 import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { AsideToggle } from '@/components/ui/aside-toggle';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 const MODE_OPTIONS: ReadonlyArray<{ value: DoublingMode; label: string }> = [
   { value: 'geometric', label: 'Geometrico' },
@@ -97,7 +99,7 @@ function InProgressRow({ milestone, latestValue }: { milestone: DoublingMileston
         </span>
       </div>
       <div
-        className="h-[3px] overflow-hidden rounded-full bg-muted"
+        className={cn('h-[3px] overflow-hidden bg-muted', COSTUME_PILL_RADIUS_CLASS)}
         role="progressbar"
         aria-valuenow={progress}
         aria-valuemin={0}
@@ -105,7 +107,7 @@ function InProgressRow({ milestone, latestValue }: { milestone: DoublingMileston
         aria-label={`Avanzamento verso ${cachedFormatCurrencyEUR(milestone.endValue, true)}`}
         aria-valuetext={`${cachedFormatCurrencyEUR(latestValue, true)}, il ${progress}%`}
       >
-        <div className="h-full rounded-full bg-foreground" style={{ width: `${progress}%` }} />
+        <div className={cn('h-full bg-foreground', COSTUME_PILL_RADIUS_CLASS)} style={{ width: `${progress}%` }} />
       </div>
       <div className="flex justify-between font-mono text-[11px] tabular-nums text-muted-foreground">
         <span>{cachedFormatCurrencyEUR(milestone.startValue, true)}</span>

@@ -17,6 +17,7 @@
 import { describe, expect, it } from 'vitest';
 import { THEME_MODES, themeBlockBody } from './themeBlocks';
 import { CHART_COLORS } from '@/lib/constants/colors';
+import { SANKEY_COSTUME_TOKEN } from '@/lib/constants/sankeyCostumeColors';
 import { SPENDING_ROLE_TOKEN } from '@/lib/constants/spendingRoleColors';
 import { clampActionLightness } from '@/lib/utils/actionColor';
 import { cssColorToOklch, oklchToHex, parseToOklch, type Triple } from '@/lib/utils/colorParse';
@@ -126,7 +127,11 @@ describe('readThemePalette — the action colours and the Sankey hexes from the 
       '--role-deficit': 'lab(52% 68 52)',
     };
     const { tokenHex } = readThemePalette(servedStyle(served), false);
-    expect(THEME_HEX_TOKENS).toEqual(Object.values(SPENDING_ROLE_TOKEN));
+    // The role aliases, then the ten tokens a costumed Sankey paints with (2026-11-23).
+    expect(THEME_HEX_TOKENS).toEqual([...Object.values(SPENDING_ROLE_TOKEN), ...Object.values(SANKEY_COSTUME_TOKEN)]);
+    expect(Object.values(SANKEY_COSTUME_TOKEN)).toEqual([
+      '--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5', '--chart-6', '--chart-7', '--chart-8', '--chart-9', '--positive',
+    ]);
     for (const [token, value] of Object.entries(served)) expect(tokenHex[token]).toBe(colorToHex(value));
   });
 

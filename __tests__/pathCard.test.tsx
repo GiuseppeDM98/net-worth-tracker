@@ -32,6 +32,20 @@ describe('PathCard', () => {
     expect(screen.getByText('corpo')).toBeTruthy();
   });
 
+  // 2026-11-23: a scene card is a tile to the costume, its headline a heading, its figures the mono's.
+  // Seen red with `data-tile` dropped from the card and with the eyebrow printed as bare JSX.
+  it('is a tile, with a costume heading and the eyebrow’s and the question’s figures wrapped', () => {
+    render(<PathCard {...props({ question: 'Per quanti mesi, 12 o 24?' })} />);
+    const section = screen.getByRole('region', { name: 'Passo 3 di 8: Durata' });
+    expect(section.hasAttribute('data-tile')).toBe(true);
+    const figures = (node: Element | null) => [...(node?.querySelectorAll('.costume-figure') ?? [])].map((span) => span.textContent);
+    expect(figures(section.querySelector('h2'))).toEqual(['3', '8']);
+    const headline = section.querySelector('h2 + p');
+    expect(headline?.textContent).toBe('Per quanti mesi, 12 o 24?');
+    expect(headline?.classList.contains('costume-heading')).toBe(true);
+    expect(figures(headline)).toEqual(['12', '24']);
+  });
+
   it('paints the status line by its tone', () => {
     const { rerender } = render(<PathCard {...props({ status: { tone: 'warning', text: 'Scegli almeno un conto.' } })} />);
     expect(screen.getByRole('status').className).toContain('text-warning-foreground');
@@ -78,5 +92,9 @@ describe('PathDoneCard', () => {
     expect(section.querySelector('h2')?.textContent).toBe('Fatto');
     expect(screen.getByRole('status').textContent).toBe('Piano attivo: prima rata a gennaio, 500 €.');
     expect(screen.getByRole('button', { name: 'Apri Accumulo' })).toBeTruthy();
+    // 2026-11-23: a tile, its headline a costume heading.
+    expect(section.hasAttribute('data-tile')).toBe(true);
+    expect(screen.getByRole('status').classList.contains('costume-heading')).toBe(true);
+    expect(screen.getByRole('status').querySelectorAll('.costume-figure').length).toBeGreaterThan(0);
   });
 });

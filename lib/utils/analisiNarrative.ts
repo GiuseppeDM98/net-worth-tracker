@@ -461,7 +461,11 @@ export function describeSpendingChartFooter(points: SpendingPoint[], kind: 'mont
   return narrative;
 }
 
-const COUNT_WORDS = ['', 'una', 'due', 'tre', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove', 'dieci'];
+// Up to twenty: «Spese maggiori» shows ten rows, as many as fill its void, or all twenty (`TOP_EXPENSES_MORE`).
+const COUNT_WORDS = [
+  '', 'una', 'due', 'tre', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove', 'dieci',
+  'undici', 'dodici', 'tredici', 'quattordici', 'quindici', 'sedici', 'diciassette', 'diciotto', 'diciannove', 'venti',
+];
 
 /** «Le cinque più grandi fanno il 14% delle spese; la più grande è Vacanze · Volo (1180 €).» */
 export function describeTopExpenses(top: TopExpenses): Narrative | null {

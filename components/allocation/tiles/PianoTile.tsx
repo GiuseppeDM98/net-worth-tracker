@@ -221,7 +221,7 @@ export function PianoTile({ mode, onModeChange, amountInput, onAmountInputChange
     >
       {/* The three engines ignore the accumulation plan; the line above the moves says so. */}
       {pacNote && (
-        <div className="mt-3 rounded-[10px] bg-muted px-3 py-2.5 text-[12px] leading-[1.5] text-foreground">
+        <div className="mt-3 rounded-[var(--costume-control-frame-radius,10px)] bg-muted px-3 py-2.5 text-[12px] leading-[1.5] text-foreground">
           <NarrativeText segments={pacNote.reading} className="inline" />{' '}
           <button type="button" onClick={pacNote.onOpenAccumulo} className={TILE_FOOTER_ACTION_CLASS}>
             {ACCUMULO_OPEN_LINK}

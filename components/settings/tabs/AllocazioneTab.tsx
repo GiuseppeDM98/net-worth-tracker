@@ -36,6 +36,7 @@ import type { AssetClass, IdealAllocationSettings } from '@/types/assets';
 import { AllocationClassEditor } from '@/components/settings/allocation/AllocationClassEditor';
 import { IdealAllocationSummary } from '@/components/settings/IdealAllocationSummary';
 import { DeclarationRow, INTERACTIVE_CONTROL_CLASS, pctLabel, SettingsTabPanel } from './shared';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface AllocazioneTabProps {
   slice: AllocazioneSlice;
@@ -111,7 +112,7 @@ export function AllocazioneTab({ slice, onChange, onClassChange, pendingFocus, o
               {pctLabel(total)}
             </p>
             {hasTargetLeverage && (
-              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 font-mono text-[12px] font-medium tabular-nums">
+              <span className={cn('border border-border bg-muted px-2.5 py-0.5 font-mono text-[12px] font-medium tabular-nums', COSTUME_PILL_RADIUS_CLASS)}>
                 Leva {formatNumber(derivedTargetLeverage, 2)}×
               </span>
             )}

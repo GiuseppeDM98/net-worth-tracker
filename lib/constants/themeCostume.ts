@@ -34,14 +34,18 @@ export const COSTUME_SCOPE_PROPERTIES = [
   '--costume-control-pill-radius',
   '--costume-control-chip-radius',
   '--costume-control-switch-on',
+  '--costume-page-generated-fill',
 ] as const;
 
-// The four control properties are read ONLY through a `var()` whose fallback is today's value: «off» is `initial`,
+// The four control properties and the generated fill are read ONLY through a `var()` whose fallback is today's value: «off» is `initial`,
 // guaranteed-invalid, so the fallback applies — a bare `var()` would make the declaration invalid (radius 0).
 /** `rounded-full` unless a costume squares its pills (temi.md § Il costume). Same computed value as today. */
 export const COSTUME_PILL_RADIUS_CLASS = 'rounded-[var(--costume-control-pill-radius,calc(infinity*1px))]';
 /** `rounded-xl` unless a costume gives a card-like box the tile's radius. */
 export const COSTUME_FRAME_RADIUS_CLASS = 'rounded-[var(--costume-control-frame-radius,calc(var(--radius)_+_4px))]';
+/** `bg-muted/40` unless a costume needs the card for the AI accent's 4.5:1 (DESIGN.md → The AI-Accent Rule). */
+export const COSTUME_GENERATED_FILL_CLASS =
+  'bg-[color:var(--costume-page-generated-fill,color-mix(in_oklab,var(--muted)_40%,transparent))]';
 
 export type EmblemPage =
   | 'panoramica'
@@ -103,6 +107,40 @@ const EGEO_WAVES: EmblemArt = {
     strokeWidth: 1.6 }],
 };
 
+/** One Egeo mark for a page, as every other: a single stroked ornament on the 22 × 22 box. */
+const egeoMark = (d: string): EmblemArt => ({ viewBox: '0 0 22 22', shapes: [{ kind: 'path', d, tone: 'ornament', strokeWidth: 1.6 }] });
+
+/** A balance: Egeo's mark on Analisi. */
+const EGEO_BALANCE = egeoMark('M11 3 V19 M7 19 H15 M4 6 H18 M4 6 L2 12 H6 Z M18 6 L16 12 H20 Z');
+/** A laurel branch: Rendimenti. */
+const EGEO_LAUREL = egeoMark('M6 19 C9 15 11 10 12 3 M9 15 C7 15 5 13 5 11 C7 11 9 13 9 15 M11 10 C9 9 8 7 9 5 C11 6 11 8 11 10');
+/** A scroll: Storico. */
+const EGEO_SCROLL = egeoMark(
+  'M5 4 H15 C17 4 17 7 15 7 H5 M5 4 C3 4 3 7 5 7 M7 7 V18 M13 7 V18 M5 18 H15 C17 18 17 21 15 21 H5 C3 21 3 18 5 18',
+);
+/** A meander: Allocazione, and the paths that belong to it. */
+const EGEO_MEANDER = egeoMark('M3 19 V3 H19 V15 H7 V7 H15 V11 H11');
+/** A round shield, two circles on one centre: Previdenza. */
+const EGEO_SHIELD: EmblemArt = {
+  viewBox: '0 0 22 22',
+  shapes: [
+    { kind: 'circle', cx: 11, cy: 11, r: 8, tone: 'ornament', strokeWidth: 1.6 },
+    { kind: 'circle', cx: 11, cy: 11, r: 3, tone: 'ornament', strokeWidth: 1.6 },
+  ],
+};
+/** A flame: FIRE. */
+const EGEO_FLAME = egeoMark('M11 3 C14 7 16 10 14 13 C16 12 17 14 16 16 C15 19 7 19 6 16 C5 13 8 9 11 3 M9 20 H13');
+/** A wreath: Hall of Fame. */
+const EGEO_WREATH = egeoMark(
+  'M7 19 C2 15 2 7 7 3 M15 19 C20 15 20 7 15 3 M5 15 L3 14 M4 11 L2 10 M5 7 L3 6 M17 15 L19 14 M18 11 L20 10 M17 7 L19 6',
+);
+/** An oil lamp: the Assistente. */
+const EGEO_LAMP = egeoMark('M3 12 H14 C16 12 18 11 20 9 C19 13 17 17 11 17 C7 17 4 15 3 12 Z M11 12 C11 10 12 9 11 7');
+/** A column: Impostazioni. */
+const EGEO_COLUMN = egeoMark(
+  'M6 4 H16 M6 4 C4 4 4 7 6 7 M16 4 C18 4 18 7 16 7 M6 7 H16 M8 7 V18 M11 7 V18 M14 7 V18 M6 18 H16 M5 20 H17',
+);
+
 /** A planet with a tilted ring: the Orbita costume's mark (decorative, DESIGN.md → The Costume Rule). */
 const ORBITA_PLANET: EmblemArt = {
   viewBox: '0 0 22 22',
@@ -112,9 +150,27 @@ const ORBITA_PLANET: EmblemArt = {
   ],
 };
 
-/** Filled by each costume theme: one mark for every page, and the pages that have their own (Egeo, 2026-11-22). */
+/**
+ * Filled by each costume theme: one mark for every page, and the pages that have their own — in Egeo every page
+ * but the Panoramica, which keeps the temple (2026-11-23); Orbita draws the planet everywhere.
+ */
 export const THEME_EMBLEMS: Partial<Record<ColorTheme, ThemeEmblems>> = {
-  egeo: { fallback: EGEO_TEMPLE, pages: { patrimonio: EGEO_AMPHORA, cashflow: EGEO_WAVES } },
+  egeo: {
+    fallback: EGEO_TEMPLE,
+    pages: {
+      patrimonio: EGEO_AMPHORA,
+      cashflow: EGEO_WAVES,
+      analisi: EGEO_BALANCE,
+      rendimenti: EGEO_LAUREL,
+      storico: EGEO_SCROLL,
+      allocazione: EGEO_MEANDER,
+      previdenza: EGEO_SHIELD,
+      fire: EGEO_FLAME,
+      'hall-of-fame': EGEO_WREATH,
+      assistente: EGEO_LAMP,
+      impostazioni: EGEO_COLUMN,
+    },
+  },
   orbita: { fallback: ORBITA_PLANET, pages: {} },
 };
 

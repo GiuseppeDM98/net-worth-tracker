@@ -55,7 +55,7 @@ export function PatrimonioContestoTile(props: PatrimonioContestoTileProps) {
                   <VariationChip value={overview.variations.yearly.value} percentage={overview.variations.yearly.percentage} caption="da inizio anno" />
                 )}
                 {overview.ath?.isNewATH && (
-                  <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-[9px] bg-positive/10 px-[11px] py-[6px] text-[12px] font-semibold leading-none text-positive">
+                  <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-[var(--costume-control-chip-radius,9px)] bg-positive/10 px-[11px] py-[6px] text-[12px] font-semibold leading-none text-positive">
                     <Trophy className="h-[13px] w-[13px]" aria-hidden="true" />
                     Massimo storico
                   </span>

@@ -70,6 +70,8 @@ import { TILE_ACTION_CLASS } from '@/components/allocation/tiles/accumuloShared'
 import { planPathStorageKey, seededPlanPathDraft } from '@/lib/utils/planPath';
 import { writeStoredJson } from '@/lib/utils/pathDraftStorage';
 import { PLAN_PATH_HREF } from '@/lib/utils/accumuloCopy';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
+import { cn } from '@/lib/utils';
 
 interface PortafoglioModelloTileProps {
   ownerId: string;
@@ -239,15 +241,15 @@ export function PortafoglioModelloTile({
                       <span className="block text-[11px] text-muted-foreground">
                         {labelOf(row.assetId)}
                         {row.candidate && (
-                          <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-[10.5px]">{MODEL_CANDIDATE_TAG}</span>
+                          <span className={cn('ml-1.5 bg-muted px-2 py-0.5 text-[10.5px]', COSTUME_PILL_RADIUS_CLASS)}>{MODEL_CANDIDATE_TAG}</span>
                         )}
                       </span>
                     </th>
                     <td className={`${NUM_CELL_CLASS} text-muted-foreground`}>{formatPercentageIt(row.todayPct, 1)}</td>
                     <td className={`${NUM_CELL_CLASS} text-foreground`}>
                       <span className="inline-flex items-center justify-end gap-2">
-                        <span className="relative hidden h-[3px] w-14 rounded-full bg-muted tablet:inline-block" aria-hidden="true">
-                          <span className="absolute inset-y-0 left-0 rounded-full bg-muted-foreground/60" style={{ width: `${(row.todayPct / barScale) * 100}%` }} />
+                        <span className={cn('relative hidden h-[3px] w-14 bg-muted tablet:inline-block', COSTUME_PILL_RADIUS_CLASS)} aria-hidden="true">
+                          <span className={cn('absolute inset-y-0 left-0 bg-muted-foreground/60', COSTUME_PILL_RADIUS_CLASS)} style={{ width: `${(row.todayPct / barScale) * 100}%` }} />
                           <span className="absolute -inset-y-[3px] w-px bg-foreground" style={{ left: `${(row.modelPct / barScale) * 100}%` }} />
                         </span>
                         {formatPercentageIt(row.modelPct, 1)}

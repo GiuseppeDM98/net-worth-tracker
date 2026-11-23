@@ -90,6 +90,7 @@ export default function FireSimulationsPage() {
   return (
     <PageContainer>
       <PageHeader
+        emblem="fire"
         label="Pianificazione"
         title="FIRE e Simulazioni"
         description="Libertà finanziaria e sostenibilità del piano"

@@ -43,6 +43,7 @@ import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { AsideToggle } from '@/components/ui/aside-toggle';
 import { RankedRows, type RankedRow } from '@/components/ui/ranked-rows';
+import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface EsposizioneTileProps {
   /** Whose portfolio: the route reads the OWNER's instruments, a delegate included. */
@@ -89,7 +90,7 @@ function SkeletonRow() {
   return (
     <div className="flex items-center gap-3 py-[9px]">
       <Skeleton className="h-3 w-[128px] shrink-0" />
-      <Skeleton className="h-[3px] flex-1 rounded-full" />
+      <Skeleton className={cn('h-[3px] flex-1', COSTUME_PILL_RADIUS_CLASS)} />
       <Skeleton className="h-3 w-[64px] shrink-0" />
       <Skeleton className="h-3 w-[34px] shrink-0" />
     </div>

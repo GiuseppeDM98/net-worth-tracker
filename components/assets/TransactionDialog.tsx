@@ -92,6 +92,7 @@ import type {
   AssetTransactionFormData,
   AssetTransactionType,
 } from '@/types/assetTransactions';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 // Sentinel for "no settlement account" — a Radix Select item value can never be the empty string.
 const NO_SETTLEMENT = '__none__';
@@ -826,7 +827,7 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
 
         {/* What the save will do — a sub-tile on the muted surface, at the tile's cadence. */}
         {summary && (
-          <div className="space-y-1 rounded-xl bg-muted p-3.5">
+          <div className={cn('space-y-1 bg-muted p-3.5', COSTUME_FRAME_RADIUS_CLASS)}>
             <p className={TILE_SUB_EYEBROW_CLASS}>Cosa succede al salvataggio</p>
             <div className="flex items-baseline justify-between gap-3 pt-1.5 text-sm">
               <span className="text-muted-foreground">

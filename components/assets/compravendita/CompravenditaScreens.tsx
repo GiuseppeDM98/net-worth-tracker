@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils';
 import { ChoiceList } from '@/components/ui/choice-list';
 import { AccountField, NumberField, PATH_FIELD_HEIGHT_CLASS } from '@/components/ui/path-fields';
 import { CategoryField, DateField } from './fields';
+import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 export interface ScreenProps {
   screen: RealEstateOperationScreen;
@@ -81,7 +82,7 @@ export function ScreenBody(props: ScreenProps) {
     case 'saldo':
       return <SaldoScreen {...props} />;
     case 'rivaluta':
-      return <p className="rounded-xl border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground">{describeSaleAdjustment(props.answers, props.context, props.propertyName)}</p>;
+      return <p className={cn('border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground', COSTUME_FRAME_RADIUS_CLASS)}>{describeSaleAdjustment(props.answers, props.context, props.propertyName)}</p>;
     case 'polizze':
       return <PolizzeScreen {...props} />;
     case 'estinzione':
@@ -265,7 +266,7 @@ function SaldoScreen({ answers, dispatch, context, accounts }: ScreenProps) {
           onChange={(depositsReceived) => dispatch({ type: 'patch', patch: { depositsReceived } })}
         />
       )}
-      <p className="rounded-xl border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground">{describeBalance(answers, context, accountName)}</p>
+      <p className={cn('border border-border bg-muted px-4 py-3 text-[14px] leading-[1.55] text-foreground', COSTUME_FRAME_RADIUS_CLASS)}>{describeBalance(answers, context, accountName)}</p>
     </div>
   );
 }
@@ -312,7 +313,7 @@ function PolizzeScreen({ answers, dispatch, context }: ScreenProps) {
         <p className={TILE_SUB_EYEBROW_CLASS}>Vita e CPI</p>
         {answers.lifePolicies.length === 0 && <p className="text-[13px] text-muted-foreground">Nessuna polizza vita.</p>}
         {answers.lifePolicies.map((policy, index) => (
-          <div key={index} className="flex flex-col gap-3 rounded-xl border border-border bg-muted px-4 py-4">
+          <div key={index} className={cn('flex flex-col gap-3 border border-border bg-muted px-4 py-4', COSTUME_FRAME_RADIUS_CLASS)}>
             <div className="flex items-center justify-between gap-3">
               <p className="text-[13px] font-medium text-foreground">Polizza vita {index + 1}</p>
               <Button type="button" variant="ghost" className={cn(PATH_FIELD_HEIGHT_CLASS, 'gap-1.5 text-destructive')} onClick={() => dispatch({ type: 'removeLifePolicy', index })}>
@@ -391,7 +392,7 @@ function EstinzioneScreen({ answers, dispatch, context }: ScreenProps) {
         const patchPayoff = (patch: Partial<typeof payoff>) =>
           dispatch({ type: 'patch', patch: { payoffs: [...answers.payoffs.filter((candidate) => candidate.loanId !== loan.id), { ...payoff, ...patch }] } });
         return (
-          <div key={loan.id} className="flex flex-col gap-3 rounded-xl border border-border px-4 py-4">
+          <div key={loan.id} className={cn('flex flex-col gap-3 border border-border px-4 py-4', COSTUME_FRAME_RADIUS_CLASS)}>
             <div className="flex items-start gap-3">
               <Checkbox id={`re-payoff-${loan.id}`} checked={payoff.include} onCheckedChange={(checked) => patchPayoff({ include: checked === true })} className="mt-0.5" />
               <Label htmlFor={`re-payoff-${loan.id}`} className="min-h-11 cursor-pointer leading-[1.45] desktop:min-h-0">
@@ -411,7 +412,7 @@ function SerieScreen({ answers, dispatch, context }: ScreenProps) {
   const series = futureSeriesAfter(answers.eventDateIso, context.expenses, loanIds, answers.propertyId || null);
   const selected = new Set(answers.stopSeriesIds);
   return (
-    <ul className="divide-y divide-border rounded-xl border border-border" aria-label="Serie con voci dopo il rogito">
+    <ul className={cn('divide-y divide-border border border-border', COSTUME_FRAME_RADIUS_CLASS)} aria-label="Serie con voci dopo il rogito">
       {series.map((entry) => {
         const id = `re-series-${entry.seriesId}`;
         return (

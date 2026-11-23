@@ -423,7 +423,8 @@ export function IdealCompositionDialog({
             semantics="radio"
             // Three modes do not fit a 390 row: below `desktop:` three equal cells, the labels on two lines.
             className="max-desktop:grid max-desktop:w-full max-desktop:grid-cols-3 max-desktop:rounded-2xl"
-            optionClassName="min-h-11 leading-tight max-desktop:rounded-xl max-desktop:px-2 max-desktop:text-[13px] desktop:min-h-0"
+            // The frame radius, written whole: a variant cannot be composed with the contract's constant.
+            optionClassName="min-h-11 leading-tight max-desktop:rounded-[var(--costume-control-frame-radius,calc(var(--radius)_+_4px))] max-desktop:px-2 max-desktop:text-[13px] desktop:min-h-0"
           />
           <p className="mt-1.5 text-[11px] text-muted-foreground">
             {canReachable || isTargeted ? describeOptimizerMode(effectiveMode) : IDEAL_COMPOSITION_REACHABLE_DISABLED_REASON}
