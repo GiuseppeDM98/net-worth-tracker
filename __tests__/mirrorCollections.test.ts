@@ -5,15 +5,17 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { PER_USER_DOCS, TOUR_ONLY_DOCS, USER_COLLECTIONS } from '../scripts/mirrorCollections';
+import { PER_USER_DOCS, PER_USER_MONTH_DOCS, TOUR_ONLY_DOCS, USER_COLLECTIONS } from '../scripts/mirrorCollections';
 
-const walked = [...USER_COLLECTIONS, ...PER_USER_DOCS, ...TOUR_ONLY_DOCS];
+const walked = [...USER_COLLECTIONS, ...PER_USER_DOCS, ...PER_USER_MONTH_DOCS, ...TOUR_ONLY_DOCS];
 
 describe('the mirror owns every per-account document', () => {
   it('lists each collection the rules key by account', () => {
     const rules = readFileSync('firestore.rules', 'utf8');
     const keyed = [...rules.matchAll(/match \/([\w-]+)\/\{(?:userId|ownerUid)\}/g)].map((m) => m[1]);
     expect(keyed).toContain('account-access');
+    // The daily archive (2026-11-23), seen red with PER_USER_MONTH_DOCS out of the union.
+    expect(keyed).toContain('dailySnapshots');
     expect(keyed.filter((name) => !walked.includes(name))).toEqual([]);
   });
 
@@ -28,6 +30,13 @@ describe('the mirror owns every per-account document', () => {
       .filter((name): name is string => !!name);
     expect(byField).toContain('accumulationPlans');
     expect(byField.filter((name) => !USER_COLLECTIONS.includes(name) && !PER_USER_DOCS.includes(name))).toEqual([]);
+  });
+
+  // No code reads or writes a `goals` collection (the goals live in goalBasedInvesting/{uid}): a dead entry
+  // left on 2026-11-23. Seen red with 'goals' back in USER_COLLECTIONS.
+  it('lists no collection the app does not have', () => {
+    expect(walked).not.toContain('goals');
+    expect(walked).toContain('goalBasedInvesting');
   });
 
   it('lists the memory, which the rules deny and only the Admin SDK writes', () => {

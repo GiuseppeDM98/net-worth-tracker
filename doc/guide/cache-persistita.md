@@ -30,6 +30,13 @@ Moved here from `AGENTS.md` § Caching on 2026-09-30.
   Measured on the mirror (2026-10-04, one visit to Rendimenti): the metrics are ~40 KB and the yields ~3 KB of a
   136 KB record whose snapshots are 55.
 
+- **The daily archive** (2026-11-23): `['daily-snapshots']` is persisted, one query per month. A month copy fetched on
+  an Italian day after the month's last is FINAL (`isDailyMonthFinal`, `lib/utils/dailySnapshot.ts`) and takes
+  `staleTime: Infinity`; the month in course, and a past month whose copy was fetched while it was still open, take the
+  global five minutes. A restored query keeps its `dataUpdatedAt`, which is what the rule reads: a copy taken on the
+  20th is read again after the month closes, a copy taken after it never is — within the 24 hours of `maxAge`. A new
+  prefix renames nothing, so no `PERSIST_CACHE_VERSION` bump.
+
 ### Retention: `maxAge` and `gcTime`
 
 - `maxAge` 24 h, and the same 24 h as `gcTime` set PER PREFIX by `applyPersistedQueryDefaults` — the global ten

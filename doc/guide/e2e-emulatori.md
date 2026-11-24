@@ -106,7 +106,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   too** (2026-11-03, `TOUR_ONLY_DOCS` in `scripts/mirrorCollections.ts`, held against `firestore.rules` by
   `__tests__/mirrorCollections.test.ts`): a Consulente run leaves `allocationAdvice/prod-mirror` (and, under it, the `history` of the paths it replaced, 2026-11-08), the theme `userPreferences/prod-mirror`, a chat
   `assistantMemory/prod-mirror` and the `messages` under its thread (`recursiveDelete`: a delete does not cascade), a grant `account-access/prod-mirror`,
-  and none is read from production; a new per-account document the app writes joins that list. Check after a tour by listing the emulator's collections for `prod-mirror`. A saved `.emulator-data` older than that
+  and none is read from production; a new per-account document the app writes joins that list. **The daily archive is copied** (2026-11-23, `PER_USER_MONTH_DOCS`): `dailySnapshots/{uid}/months/*` is read from production under the key `months:dailySnapshots`, written to `dailySnapshots/prod-mirror/months/{id}` and removed by the same `recursiveDelete` loop; a production account with no day yet logs «read dailySnapshots months: 0» and does not fail. Check after a tour by listing the emulator's collections for `prod-mirror`. A saved `.emulator-data` older than that
   date may bring a `userPreferences/prod-mirror` back at the next start: it is local and git-ignored.
 - **Stopping the emulators: export FIRST, then kill.** `--export-on-exit` runs only on a SIGINT delivered to the
   `firebase` CLI process itself: on macOS `kill -INT <cli pid>` does it (2026-09-06) — but not reliably on emulators started as

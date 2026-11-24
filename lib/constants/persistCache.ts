@@ -22,7 +22,7 @@
  * asset (the mortgage instalments under its key too), an expense, a snapshot, a category, the
  * settings document, a contribution, a trade, the ledger's meta document, a cost centre, the Hall
  * of Fame rankings, a goal, a dividend receipt, an accumulation plan, the overview payload, Rendimenti's
- * `PerformanceData` and its dividend yields. A client that restores an
+ * `PerformanceData` and its dividend yields, a month of the daily archive. A client that restores an
  * older shape would read it as truth until the refetch lands. A new optional field whose absence means the default does not need it
  * (AGENTS.md § Caching, beside `CACHE_MATH_VERSION`).
  */
@@ -89,6 +89,8 @@ export const PERSISTED_QUERY_PREFIXES: readonly (readonly string[])[] = [
   // from (restored inputs resolve to the same key, so the pair is consistent), and the yields.
   ['performance', 'data'],
   ['performance', 'yields'],
+  // The daily archive, a query per month: a closed month is read once and kept (2026-11-23).
+  ['daily-snapshots'],
 ];
 
 function matchesPrefix(queryKey: readonly unknown[], prefix: readonly string[]): boolean {

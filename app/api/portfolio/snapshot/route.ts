@@ -21,6 +21,8 @@ import { snapshotRequestSchema, parseOr400 } from '@/lib/server/validation';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 import { settleDueBalances } from '@/lib/server/cashSettlement';
 import { preserveUserAuthoredSnapshotFields } from '@/lib/utils/snapshotUserFields';
+import { buildDailySnapshotDay } from '@/lib/utils/dailySnapshot';
+import { writeDailySnapshotDay } from '@/lib/server/dailySnapshotStore';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -69,6 +71,8 @@ function buildByAssetBreakdown(assets: Asset[]) {
  *   - One document per user per month
  *   - Document ID: "{userId}-{year}-{M}"
  *   - Contains: net worth, allocations, per-asset breakdown
+ *   - A run with no year/month also files today's row in the daily archive
+ *     (`dailySnapshots/{userId}/months/{YYYY-MM}`); the answer says so in `data.dailyWritten`
  *
  * Idempotency:
  *   - If snapshot exists for year/month: Updates (overwrites)
@@ -179,7 +183,9 @@ export async function POST(request: NextRequest) {
     //
     // getItalyMonthYear() ensures snapshots align with Italian investor's
     // local calendar month boundaries
-    const { month: currentMonth, year: currentYear } = (await import('@/lib/utils/dateHelpers')).getItalyMonthYear();
+    const now = new Date();
+    const { getItalyMonthYear, getItalyDateIso } = await import('@/lib/utils/dateHelpers');
+    const { month: currentMonth, year: currentYear } = getItalyMonthYear(now);
     const snapshotYear = year ?? currentYear;
     const snapshotMonth = month ?? currentMonth;
 
@@ -255,6 +261,28 @@ export async function POST(request: NextRequest) {
       existingSnapshotDocument.exists ? 'snapshot_overwritten' : 'snapshot_created'
     );
 
+    // The daily archive (lib/server/dailySnapshotStore.ts, 2026-11-23): a run of TODAY — the
+    // evening cron or «Crea snapshot», neither sends year/month — also files today's row. A past
+    // month rewritten is not today's portfolio, so it files none. `now` is the instant the monthly
+    // document was keyed on: a click at midnight of a month's last day files the same month in
+    // both. A failure here is logged and never fails the snapshot, which is already written.
+    let dailyWritten = false;
+    if (year === undefined && month === undefined) {
+      try {
+        const day = buildDailySnapshotDay({
+          totalNetWorth,
+          liquidNetWorth,
+          byAssetClass: allocation.byAssetClass,
+          byAsset,
+          at: now,
+        });
+        await writeDailySnapshotDay(adminDb, userId, getItalyDateIso(now), day);
+        dailyWritten = true;
+      } catch (error) {
+        console.error('Error writing daily snapshot:', error);
+      }
+    }
+
     // Hall of Fame Integration: Client-side trigger pattern
     //
     // Design Decision: Client calls updateHallOfFame after snapshot success
@@ -285,6 +313,7 @@ export async function POST(request: NextRequest) {
         totalNetWorth,
         liquidNetWorth,
         assetsCount: assets.length,
+        dailyWritten,
       },
     });
   } catch (error) {

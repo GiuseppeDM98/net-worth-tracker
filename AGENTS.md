@@ -263,7 +263,8 @@ holds it): how it was learned is `git log`'s.
   A value that disappears "sometimes" is a periodic write over a window, never a TTL (2026-09-07: the snapshot cron
   rewrites only the CURRENT month). Keep the replace and carry the hand-written fields across it
   (`preserveUserAuthoredSnapshotFields`, pinned by `__tests__/apiAuthRoutes.test.ts` → *keeps the Storico note of the
-  snapshot it overwrites*); `merge: true` is the wrong fix whenever the doc holds a MAP the pipeline recomputes.
+  snapshot it overwrites*); `merge: true` is the wrong fix whenever the doc holds a MAP the pipeline recomputes. A day
+  inside a map document is written with `mergeFields` on its own path (`days.DD`, 2026-11-23, `dailySnapshotStore.ts`).
 
 ### Firestore Queries and the Rules
 - **A `list` must carry the constraint the rule needs, or it is refused entirely**: every collection guarded by `allow
