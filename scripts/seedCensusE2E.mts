@@ -73,7 +73,7 @@ const now = new Date();
 
 // The same lists `scripts/mirrorProdAccount.mts` clears for its account, plus the two per-user
 // documents only this fixture can have left behind.
-const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'goals', 'assistantThreads', 'accumulationPlans'];
+const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'assistantThreads', 'accumulationPlans'];
 const PER_USER_DOCS = ['users', 'assetAllocationTargets', 'assetTransactionsMeta', 'budgets', 'hall-of-fame', 'performance-cache', 'dashboardOverviewSummaries', 'goalBasedInvesting', 'userPreferences', 'accumulationPlanLocks', 'modelPortfolios'];
 
 // ── The calendar of the run ─────────────────────────────────────────────────────────────────────

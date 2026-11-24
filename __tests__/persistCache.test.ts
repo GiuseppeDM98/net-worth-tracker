@@ -45,6 +45,8 @@ describe('isPersistableQuery', () => {
       queryKeys.accumulationPlans.all(OWNER),
       queryKeys.performance.data(OWNER, 'v8-cache-key'),
       queryKeys.performance.yields(OWNER, 'ytd:2026-01-01T00:00:00.000Z:2026-10-04:9'),
+      // A month of the daily archive: a closed one is read once and kept (2026-11-23).
+      queryKeys.dailySnapshots.month(OWNER, '2026-11'),
     ];
     for (const key of persisted) expect(isPersistableQuery(key, DEMO), key.join('/')).toBe(true);
     expect(persisted).toHaveLength(PERSISTED_QUERY_PREFIXES.length);
@@ -75,6 +77,7 @@ describe('isPersistableQuery', () => {
     expect(isPersistableQuery(queryKeys.settings.all(DEMO), DEMO)).toBe(false);
     expect(isPersistableQuery(queryKeys.performance.data(DEMO, 'v8-cache-key'), DEMO)).toBe(false);
     expect(isPersistableQuery(queryKeys.performance.yields(DEMO, 'ytd'), DEMO)).toBe(false);
+    expect(isPersistableQuery(queryKeys.dailySnapshots.month(DEMO, '2026-11'), DEMO)).toBe(false);
   });
 
   it('should not persist a key with no owner (a hook mounted before the sign-in resolves)', () => {
@@ -105,6 +108,8 @@ describe('every key builder under a persisted prefix', () => {
     'assetTransactions.meta',
     'assets.all',
     'costCenters.all',
+    'dailySnapshots.all',
+    'dailySnapshots.month',
     'dashboard.overview',
     'dividendReceipts.all',
     'expenses.all',

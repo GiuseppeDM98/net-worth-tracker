@@ -263,20 +263,6 @@
           "order": "ASCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "price-history",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "ticker",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "date",
-          "order": "DESCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": []
