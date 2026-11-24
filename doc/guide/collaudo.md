@@ -89,7 +89,7 @@ The app **is** locally runnable; there is no fallback to declare.
   in-page detector's count before quoting it** (2026-09-18, Centri di Costo: 71 and 110 findings, the CLI on the same
   files 0): every Cashflow tab stays mounted and hidden (`forceMount`), so ~36 hits per scan were Tracciamento's; the
   9–11px «undersized text» is the enumerated ramp; the shell, the sidebar and the overlay's own yellow (`dark-glow
-  #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe never opens a control that SPENDS** (2026-09-20): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. **The session's background tasks die with it**: a restart of the Claude Code session, or its memory watchdog (on both of the owner's machines, even with memory free and even mid-suite), kills the emulators and the dev
+  #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe opens a control that SPENDS only with the owner's yes, asked before** (2026-09-20; the yes since 2026-11-23): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. A step that needs the real model, a real email or a paid service is asked to the owner each time, before it runs; a committed test never spends. **The session's background tasks die with it**: a restart of the Claude Code session, or its memory watchdog (on both of the owner's machines, even with memory free and even mid-suite), kills the emulators and the dev
   server alike, and an emulator killed that way exports nothing. The safe default for the owner's tour: the emulators and
   the dev server run in the OWNER's terminals, which the watchdog does not touch; the agent re-seeds the mirror, checks
   the ports and reports the URLs, and does not restart a killed process on its own. When the owner asks the agent to
@@ -152,15 +152,17 @@ The app **is** locally runnable; there is no fallback to declare.
   whatever is active (usually `develop`) and merges into it by PR. **A series of specs lands on `develop`, one
   session at a time, and reaches `main` together after its last spec is retired, by a PR the owner opens** (owner,
   2026-10-12, for the mobile-composition series, whose last spec was retired on 2026-10-17; the PERF series went to
-  `main` on its own, PR #446). While a series is open, its index's status table says which spec is in `develop`.
+  `main` on its own, PR #446; the DATI series of 2026-11-23 goes to `main` spec by spec, each as soon as it is
+  implemented — owner, 2026-11-23). While a series is open, its index's status table says which spec is in `develop`.
 - **A spec is retired by a session of its own** (since 2026-09-28: the fourteen PERF specs, then the nine MOB ones —
-  their history in README.md § Documentation): the code is read against the
+  a retired series is read in `git log -- doc/<serie>/` and in its pull requests): the code is read against the
   spec, every divergence gets a verdict, the lessons go home (AGENTS.md, the guide, a comment at the line, CLAUDE.md),
   then the spec and every pointer to it go. **The LAST spec of a series retires its whole folder** (`doc/perf/` on
   2026-10-08, `doc/mobile/` on 2026-10-17): before the delete, each operative piece of the index goes to ONE home — a rule
   to AGENTS.md or the guide, a measure table to a guide, a live artefact (a budget file) moved with `git mv` and never
   deleted —, every numbered decision cited in code, tests and guides is rewritten as its rule and date (a number outlives
-  the document that numbered it), and the series' history goes to README.md § Documentation. **A spec's label never
+  the document that numbered it). **No history of the series is written anywhere** (owner, 2026-11-23; README.md's three
+  such paragraphs were removed on 2026-11-24): the folder's `git log` and the pull requests are the history. **A spec's label never
   enters the code in the first place** (2026-11-12): no spec name or number in a file, function or test name nor in a
   comment, no «decision N», «criterion N» or section sign of a spec — a comment cites the rule and its date. A text-only defect found there is fixed in the retirement with `tsc`, lint
   and Vitest, no Playwright; a runtime one only on the owner's call, with the area suite and the full Playwright; a

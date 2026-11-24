@@ -29,6 +29,11 @@ npm run mobile:budget                                     # due secondi: last-ru
 npm run mobile:census -- --selftest                       # la misura su un frammento noto, nessun server
 ```
 
+**Una catena che aspetta `perf:serve` lo interroga su `localhost`, mai su `127.0.0.1`** (2026-11-23): su Windows :3200
+ascolta solo su IPv6, e `curl http://127.0.0.1:3200/` risponde 000 a server vivo — un ciclo d'attesa scritto così è
+scaduto dopo dieci minuti con il server pronto; gli emulatori invece rispondono su `127.0.0.1`
+(doc/guide/velocita.md § Il benchmark, per fermarlo).
+
 **Le opzioni dopo `--`, da Git Bash su Windows** (PowerShell 5.1 mangia il `--`): `--email=` (default
 `census@example.com`), `--password=` (default `test1234`, la password di ogni account degli emulatori), `--base=`
 (default :3200), `--viewports=390,768,1024`, `--surfaces=panoramica,cashflow-budget` (le chiavi di `surfaces` in
