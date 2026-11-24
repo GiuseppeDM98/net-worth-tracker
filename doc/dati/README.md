@@ -332,7 +332,7 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [03](DATI-03-colonne-e-curva.md) | Two columns end on one line; a sparkline stays in its box | S | — | Sonnet 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 0 decisioni |
+| [03](DATI-03-colonne-e-curva.md) | Two columns end on one line; a sparkline stays in its box | S | — | Sonnet 5.5 · medium | implemented (2026-11-24) |
 | [04](DATI-04-dividendi-quantita-allo-stacco.md) | A dividend is worth what was held at the ex-date | M | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 4 decisioni |
 | [05](DATI-05-strumenti-azzerati.md) | Sold-out instruments: a closed group, no deletion over a history | M | — | Sonnet 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 2 decisioni |
 | [06](DATI-06-valuta-estera-operazioni.md) | A trade in a foreign currency | L | 04 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 22 rilievi, 4 decisioni |

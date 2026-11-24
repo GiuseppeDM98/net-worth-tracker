@@ -94,7 +94,7 @@ import { PageVerdict } from '@/components/ui/page-verdict';
 import { VerdictStrip } from '@/components/ui/verdict-strip';
 import { PageRest } from '@/components/ui/page-rest';
 import { RowAnswers } from '@/components/ui/row-answers';
-import { TILE_CELL_CLASS, TILE_ROW_CELL_CLASS } from '@/components/ui/tile';
+import { TILE_CELL_CLASS, TILE_COLUMN_CLASS, TILE_COLUMN_END_CLASS, TILE_ROW_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure } from '@/lib/utils/statesNarrative';
@@ -983,12 +983,12 @@ export default function PerformancePage() {
         </div>
 
         {/* Below the first row the grid is TWO COLUMNS from desktop (2026-09-20, Storico's answer): each
-            tile keeps its natural height and the capital chart — the one element that can be any
-            height — takes the slack, so no tile is stretched into a void beside a taller neighbour
-            (Plusvalenze with one fiscal year is a sentence). Below desktop the wrappers are
+            tile keeps its natural height but the LAST of each column, which grows so the two columns
+            end on one line (owner, 2026-11-23): the capital chart on the left, Plusvalenze (or
+            Consistenza when there is none) on the right. Below desktop the wrappers are
             `contents`: the tiles are items of the grid again, in the DOM's order; on a tablet in
             landscape each is a column of the index, with the index's hairlines (INDEX_GROUP_CLASS). */}
-        <div className={cn('contents desktop:flex desktop:flex-col desktop:gap-3 desktop:col-span-7', INDEX_GROUP_CLASS)}>
+        <div data-tile-column className={cn(TILE_COLUMN_CLASS, 'desktop:col-span-7', INDEX_GROUP_CLASS)}>
           {attribution && (
             <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.attribuzione))}>
               <AttribuzioneTile
@@ -1001,7 +1001,7 @@ export default function PerformancePage() {
             </div>
           )}
 
-          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.capitale), 'desktop:flex-1')}>
+          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.capitale), TILE_COLUMN_END_CLASS)}>
             <CapitaleMercatoTile
               collapse={sections.collapse(PERFORMANCE_SECTION_IDS.capitale)}
               asideWhenClosed={PERFORMANCE_CLOSED_ASIDES[PERFORMANCE_SECTION_IDS.capitale]}
@@ -1014,7 +1014,7 @@ export default function PerformancePage() {
           </div>
         </div>
 
-        <div className={cn('contents desktop:flex desktop:flex-col desktop:gap-3 desktop:col-span-5', INDEX_GROUP_CLASS)}>
+        <div data-tile-column className={cn(TILE_COLUMN_CLASS, 'desktop:col-span-5', INDEX_GROUP_CLASS)}>
           <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.rischio))}>
             <RischioTile
               collapse={sections.collapse(PERFORMANCE_SECTION_IDS.rischio)}
@@ -1029,7 +1029,7 @@ export default function PerformancePage() {
             />
           </div>
 
-          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.consistenza), realizedState === 'absent' && 'desktop:flex-1')}>
+          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.consistenza), realizedState === 'absent' && TILE_COLUMN_END_CLASS)}>
             <ConsistenzaTile
               collapse={sections.collapse(PERFORMANCE_SECTION_IDS.consistenza)}
               asideWhenClosed={PERFORMANCE_CLOSED_ASIDES[PERFORMANCE_SECTION_IDS.consistenza]}
@@ -1041,7 +1041,7 @@ export default function PerformancePage() {
           {/* A tile with a closed sale, a failed read of the ledger's meta, or nothing (`resolveRealizedGainsState`):
               until 2026-10-14 a meta in error read as «not migrated» and the tile vanished in silence. */}
           {realizedState === 'failed' && (
-            <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.plusvalenze))}>
+            <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.plusvalenze), TILE_COLUMN_END_CLASS)}>
               <ErrorNotice
                 compact
                 collapse={sections.collapse(PERFORMANCE_SECTION_IDS.plusvalenze)}
@@ -1057,7 +1057,7 @@ export default function PerformancePage() {
             </div>
           )}
           {realizedState === 'ready' && realizedSummary && (
-            <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.plusvalenze))}>
+            <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(PERFORMANCE_SECTION_IDS.plusvalenze), TILE_COLUMN_END_CLASS)}>
               <PlusvalenzeTile
                 collapse={sections.collapse(PERFORMANCE_SECTION_IDS.plusvalenze)}
                 asideWhenClosed={PERFORMANCE_CLOSED_ASIDES[PERFORMANCE_SECTION_IDS.plusvalenze]}

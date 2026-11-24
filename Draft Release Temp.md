@@ -81,6 +81,10 @@
 
 ## 🐛 Bug Fixes
 
+- **Rendimenti, Coast FIRE e Impostazioni › Spese — le due colonne finiscono sulla stessa riga** — Fixed: the last tile of the shorter column now grows to the taller one's edge.
+
+- **Previdenza e Panoramica — la curva non esce più dal riquadro** — Fixed: the sparkline's curve no longer overshoots its own maximum.
+
 - **Ogni pagina — il carattere** — The app now reads in Geist Sans, the typeface it was designed in: until now the text fell back to your system's font (Segoe UI on Windows, SF on Apple devices). Some lines break in a slightly different place; on Allocazione › Accumulo without a plan the title now reads «Nessun piano di accumulo.», which fits one line on a phone.
 
 - **Allocazione › Accumulo — una vendita saltata** — A sale you skipped in «Questo mese» no longer blocks «Rivedi il piano» with «… è una posizione del piano».

@@ -93,6 +93,15 @@ export const TILE_CELL_CLASS = 'flex min-w-0 [&>section]:flex-1';
 export const TILE_ROW_CELL_CLASS = `${TILE_CELL_CLASS} max-desktop:self-start`;
 
 /**
+ * A column of tiles inside the 12-column grid, from `desktop:`; below it the wrapper is `contents` and
+ * its tiles are items of the grid again, in the DOM's order. Two such columns (or a column beside a
+ * single cell) END ON ONE LINE (owner, 2026-11-23): the last cell of each takes TILE_COLUMN_END_CLASS,
+ * so the shorter column's last tile grows — rows at the top, the one-line footer on the bottom edge.
+ */
+export const TILE_COLUMN_CLASS = 'contents desktop:flex desktop:flex-col desktop:gap-3';
+export const TILE_COLUMN_END_CLASS = 'desktop:flex-1';
+
+/**
  * The block of a tile that the verdict's strip already prints, hidden wherever the strip is drawn —
  * below `desktop:`, the tablet included since 2026-10-16 (The Lifted-Figure Rule:
  * on a tablet the tile was whole beside the strip and the same figures read twice): a key from `liftedBlocks(strip, section)` takes this class. The

@@ -4,7 +4,7 @@
 
 ## Files
 
-- **Grafici**: `components/ui/charts/recharts.ts` (the ONE door to recharts: the one module of real code that keeps the library in ONE chunk), every `*Chart.tsx` (`components/{cashflow,dashboard,fire-simulations,goals,monte-carlo,performance}/…`), every `*Sparkline.tsx` (`components/assets/AssetSparkline.tsx`, `components/dashboard/NetWorthSparkline.tsx`), `components/hall-of-fame/RecordBars.tsx`, `lib/hooks/useChartColors.ts`, `lib/hooks/useMorphingSeries.ts` (a hand-written SVG gliding between windows), `components/ui/series-legend.tsx` (`SeriesLegend`), `components/ui/chart-hover.tsx`, `components/ui/ring-chart.tsx` + `lib/utils/ringChart.ts` (the ring, § The ring); tests `__tests__/ringChart.test.ts`, `__tests__/ringChart.dom.test.tsx`, `__tests__/rankedRows.test.tsx`, `e2e/ring-chart{,.mobile,.tablet}.spec.ts` (body `e2e/ringChartSuite.ts`, helper `e2e/ringFit.ts`); the minor tiles' (2026-11-15): `e2e/ring-chart.{split,centri,owners}{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts` and one assertion in `e2e/cashflow.mortgage.spec.ts`, `__tests__/chartColorsContext.test.ts`, `__tests__/actionColorContrast.test.ts`, `e2e/bundle.lazy.spec.ts`
+- **Grafici**: `components/ui/charts/recharts.ts` (the ONE door to recharts: the one module of real code that keeps the library in ONE chunk), every `*Chart.tsx` (`components/{cashflow,dashboard,fire-simulations,goals,monte-carlo,performance}/…`), every `*Sparkline.tsx` (`components/assets/AssetSparkline.tsx`, `components/dashboard/NetWorthSparkline.tsx`), `components/hall-of-fame/RecordBars.tsx`, `lib/hooks/useChartColors.ts`, `lib/hooks/useMorphingSeries.ts` (a hand-written SVG gliding between windows), `components/ui/series-legend.tsx` (`SeriesLegend`), `components/ui/chart-hover.tsx`, `components/ui/ring-chart.tsx` + `lib/utils/ringChart.ts` (the ring, § The ring); `lib/utils/sparklinePath.ts` (the sparkline's monotone path); tests `__tests__/sparklinePath.test.ts`, `__tests__/netWorthSparkline.test.tsx`, `__tests__/ringChart.test.ts`, `__tests__/ringChart.dom.test.tsx`, `__tests__/rankedRows.test.tsx`, `e2e/ring-chart{,.mobile,.tablet}.spec.ts` (body `e2e/ringChartSuite.ts`, helper `e2e/ringFit.ts`); the minor tiles' (2026-11-15): `e2e/ring-chart.{split,centri,owners}{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts` and one assertion in `e2e/cashflow.mortgage.spec.ts`, `__tests__/chartColorsContext.test.ts`, `__tests__/actionColorContrast.test.ts`, `e2e/bundle.lazy.spec.ts`
 
 ## Recharts
 - **Import recharts from `@/components/ui/charts/recharts`, never from `'recharts'`** (2026-09-30): the one module of
@@ -51,6 +51,12 @@
 - **Server-cached chart data has colours baked in — remap at render time for EVERY array**; positional remap is safe
   only without cross-page identity: asset classes remap via `ASSET_CLASS_CHART_INDEX[d.assetClass]`.
 - A sticky `<thead>` needs a fully opaque token, never an alpha background.
+- **A sparkline's path is a monotone cubic, not a Catmull-Rom spline** (2026-11-23, `lib/utils/sparklinePath.ts`): a
+  Catmull-Rom segment overshoots where the slope turns sharply, so a fund that sat flat, was topped up and sat flat again
+  drew a curve ABOVE its own maximum, cut by the viewBox (Previdenza's «Andamento», the Panoramica's hero). The tangents
+  are zero at a turning point and the harmonic mean of the two slopes elsewhere (Fritsch–Butland), so the curve never
+  leaves the band between the two points it joins; a padding big enough for any overshoot would flatten every ordinary
+  curve. Held by `__tests__/sparklinePath.test.ts` and, on the rendered path, `__tests__/netWorthSparkline.test.tsx`.
 
 ## The ring (2026-11-12)
 - **Parts of one positive whole are `RingChart`** (`components/ui/ring-chart.tsx` on the pure `lib/utils/ringChart.ts`;
