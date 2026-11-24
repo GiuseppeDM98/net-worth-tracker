@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tile, TILE_CELL_CLASS, TILE_FOOTER_ACTION_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { Tile, TILE_CELL_CLASS, TILE_COLUMN_CLASS, TILE_COLUMN_END_CLASS, TILE_FOOTER_ACTION_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { CreateDummySnapshotModal } from '@/components/CreateDummySnapshotModal';
 import { DeleteDummyDataDialog } from '@/components/DeleteDummyDataDialog';
 import { cn } from '@/lib/utils';
@@ -259,7 +259,7 @@ export function GeneraleTab({
       {/* Costi and FIRE e obiettivi stack beside Calcolo dei rendimenti: three tiles in one
           row left ~300px empty in the two short ones (critique of 2026-09-22). Below
           `desktop:` the wrapper dissolves and each tile is a cell of its own. */}
-      <div className="contents desktop:col-span-6 desktop:flex desktop:flex-col desktop:gap-3">
+      <div data-tile-column className={cn(TILE_COLUMN_CLASS, 'desktop:col-span-6')}>
       {/* Costi — imposta di bollo */}
       <div className={cn(TILE_CELL_CLASS)}>
         <Tile
@@ -331,7 +331,7 @@ export function GeneraleTab({
       </div>
 
       {/* FIRE e obiettivi — the three toggles this page OWNS; it takes the column's slack */}
-      <div className={cn(TILE_CELL_CLASS, 'desktop:flex-1')}>
+      <div className={cn(TILE_CELL_CLASS, TILE_COLUMN_END_CLASS)}>
         <Tile
           eyebrow="FIRE e obiettivi"
           reading={describeFireToggles({

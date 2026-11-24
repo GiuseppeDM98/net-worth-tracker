@@ -42,9 +42,10 @@
   tooltip, `aria-valuetext` on the progressbar, and the hero LANDS on its first value (`SettledValue` →
   `landFirstValue`): a count from «0 €» under a track already at 40,8% was two readings of one figure. The two tile
   footers are ONE line with the method behind «Come si calcola» (`COAST_INFLOWS_METHOD`, `COAST_SCENARIOS_METHOD`).
-- **The Ipotesi are two columns at natural height** (Profilo + Modello 5 | Pensioni + Scaglioni 7; `contents` wrappers
-  below `desktop:`, the tiles in the DOM's order — no `order-*` since 2026-10-15, § Composizione mobile): paired by rows, Pensioni stretched 127 px beside Profilo and Modello 251 px beside
-  Scaglioni, measured. Every control is `h-11 desktop:h-9`; the two ages say an out-of-range value AT the field
+- **The Ipotesi are two columns that end on one line** (Profilo + Modello 5 | Pensioni + Scaglioni 7; `contents` wrappers
+  below `desktop:`, the tiles in the DOM's order — no `order-*` since 2026-10-15, § Composizione mobile): the last cell of
+  each (Modello della pensione, Scaglioni IRPEF) grows (owner, 2026-11-23; `TILE_COLUMN_CLASS`, `TILE_COLUMN_END_CLASS`,
+  `e2e/coast.spec.ts` DATI-03 E2). Every control is `h-11 desktop:h-9`; the two ages say an out-of-range value AT the field
   (`aria-invalid`, the help line in `text-destructive`) before the toast repeats it on «Salva ipotesi».
 - **The target line of the projection steps WITH the fund** (`fireService.calculateCoastFIREProjection`, 2026-08-25):
   `retirementCapitalRequired` is already net of the fund (the walk subtracts it valued at retirement —

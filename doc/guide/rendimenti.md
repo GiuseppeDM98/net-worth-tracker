@@ -210,9 +210,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   before `byAsset` the reading names «nei N mesi con il dettaglio per strumento (da …)»
   instead of pretending the sum is the period's. Every sentence from `describeAttribution` (the tile) and
   `describeAttributionCoverage` (the Dettaglio's full table with Prezzo · Dividendi · Totale apart).
-- **Grid** (2026-09-20): one row of the three tall tiles — Rendimento(5) · Benchmark(4) · Contributi(3) — then TWO COLUMNS whose
-  tiles keep their natural height: left (7) this tile over Capitale e mercato, which takes the slack; right (5) Rischio ·
-  Consistenza · Plusvalenze. The wrappers are `contents` below desktop, so the phone keeps its `order-*`. Rendimento used to
+- **Grid** (2026-09-20): one row of the three tall tiles — Rendimento(5) · Benchmark(4) · Contributi(3) — then TWO COLUMNS that
+  end on one line (owner, 2026-11-23): left (7) this tile over Capitale e mercato, the last cell, which grows; right (5)
+  Rischio · Consistenza · Plusvalenze, whose last cell grows (Consistenza when there is no closed sale) — `TILE_COLUMN_CLASS`
+  and `TILE_COLUMN_END_CLASS`, held by `e2e/performance.degraded.spec.ts` (DATI-03 E1). The wrappers are `contents` below desktop, so the phone keeps its `order-*`. Rendimento used to
   span two rows (plot 669px tall, three neighbours half void). The tile lists the top 6 by |total| and folds the rest into «Altri strumenti», then
   «Non attribuito» and «Mercato» = the gain, so the rows visibly add up.
 - **The residual guard says WHERE the residual comes from** (2026-09-07, the structural answer to issue #320, which

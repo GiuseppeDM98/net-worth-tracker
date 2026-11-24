@@ -14,7 +14,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19 **with the React Compiler on** (since 2026-10-05), TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - Tests: Vitest in `__tests__/` (one file per pure module), held green in `Europe/Rome`, in the machine's zone AND under `TZ=UTC` (since 2026-10-08); Playwright specs in `e2e/` (the projects and the traps: doc/guide/e2e-playwright.md; the full run and its known flakes: doc/guide/e2e-suite.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, the ones beside midnight are named by the Italian clock.
-- Latest (2026-11-24): **DATI-02 is retired**: every snapshot run of today files one row of the Italian day in `dailySnapshots/{uid}/months/{YYYY-MM}` (doc/guide/storico.md § The daily archive), read by `useDailySnapshots` one month per query; no page reads it yet. Open: doc/dati/ (README § 6). Next: DATI-03.
+- Latest (2026-11-24): **DATI-03 is implemented**: two columns of tiles always end on one line (`TILE_COLUMN_CLASS` / `TILE_COLUMN_END_CLASS`, held at 1440 by `e2e/tileColumns.ts` on Rendimenti, Coast FIRE › Ipotesi and Impostazioni › Spese), and the sparkline's curve is a monotone cubic (`lib/utils/sparklinePath.ts`) that never leaves its box; the guided tour (Rendimenti, Previdenza) done and closed. Open: doc/dati/ (README § 6). Next: DATI-04.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

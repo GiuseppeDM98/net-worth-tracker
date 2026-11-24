@@ -21,6 +21,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { test, expect, type Page } from '@playwright/test';
+import { expectColumnsEndTogether, expectLastFooterOnEdge, forceColumnTaller } from './tileColumns';
 import { persistedQueryKeys, readPersistedRecord, readRecording, recordLoad } from './freshnessProbe';
 
 const UID = 'test-user-degraded';
@@ -336,4 +337,89 @@ test('a refused report says so, with «Rigenera» beside it even when no text wa
   await expect(dialog.getByRole('button', { name: 'Copia il report' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Rigenera', exact: true })).toBeVisible();
   expect(calls).toBe(2);
+});
+
+// ─── The two columns end on one line (DATI-03, owner 2026-11-23) ─────────────
+//
+// Below the first row Rendimenti is two columns from 1440; the LAST tile of each (Capitale e mercato on the
+// left, Plusvalenze — or Consistenza when there is none — on the right) grows, so the columns end on one line
+// whichever is the taller. The fixture's heights are not the test's business: a style tag stretches the first
+// tile of one column and `forceColumnTaller` proves that column is the taller before anything is measured.
+// Each case was seen red alone by taking the class off its cell (the Plusvalenze cell; the Capitale cell;
+// Consistenza's condition). The failed-read cell carries the same constant and is proven on the diff: no
+// browser test can make the meta read fail.
+
+const SALE_ASSET_ID = 'e2e-columns-ornitorinco';
+
+async function adminDb() {
+  process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+  process.env.GCLOUD_PROJECT = 'demo-net-worth';
+  const { initializeApp, getApps } = await import('firebase-admin/app');
+  const { getFirestore } = await import('firebase-admin/firestore');
+  return getFirestore(getApps()[0] ?? initializeApp({ projectId: process.env.GCLOUD_PROJECT }));
+}
+
+/** A closed sale in gain of a decoy instrument, plus the ledger's meta when the fixture has none. Returns what to undo. */
+async function plantClosedSale(db: FirebaseFirestore.Firestore): Promise<{ plantedMeta: boolean }> {
+  const now = new Date();
+  const metaRef = db.collection('assetTransactionsMeta').doc(UID);
+  const plantedMeta = !(await metaRef.get()).exists;
+  if (plantedMeta) {
+    await metaRef.set({ userId: UID, migratedAt: now, baselineDate: new Date(2025, 0, 1), migratedAssetCount: 0, createdAt: now, updatedAt: now });
+  }
+  await db.collection('assets').doc(SALE_ASSET_ID).set({
+    userId: UID, ticker: 'ORNITO', name: 'ETF Ornitorinco', type: 'etf', assetClass: 'equity', currency: 'EUR',
+    quantity: 5, averageCost: 100, averageCostEur: 100, currentPrice: 150, isLiquid: true, autoUpdatePrice: false,
+    taxRate: 26, allocationRole: 'tradable', createdAt: now, updatedAt: now, lastPriceUpdate: now,
+  });
+  await db.collection('assetTransactions').doc(`${SALE_ASSET_ID}-buy`).set({
+    userId: UID, assetId: SALE_ASSET_ID, type: 'buy', date: new Date(2026, 0, 5, 12), quantity: 10,
+    pricePerUnit: 100, priceEur: 100, createdAt: now, updatedAt: now,
+  });
+  await db.collection('assetTransactions').doc(`${SALE_ASSET_ID}-sell`).set({
+    userId: UID, assetId: SALE_ASSET_ID, type: 'sell', date: new Date(2026, 1, 5, 12), quantity: 5,
+    pricePerUnit: 150, priceEur: 150, createdAt: now, updatedAt: now,
+  });
+  return { plantedMeta };
+}
+
+async function removeClosedSale(db: FirebaseFirestore.Firestore, plantedMeta: boolean): Promise<void> {
+  await db.collection('assetTransactions').doc(`${SALE_ASSET_ID}-buy`).delete();
+  await db.collection('assetTransactions').doc(`${SALE_ASSET_ID}-sell`).delete();
+  await db.collection('assets').doc(SALE_ASSET_ID).delete();
+  if (plantedMeta) await db.collection('assetTransactionsMeta').doc(UID).delete();
+}
+
+test('Rendimenti: the two columns end on one line, whichever is taller, with Plusvalenze or without (DATI-03 E1)', async ({ page }) => {
+  test.setTimeout(240_000);
+  const db = await adminDb();
+  await removeClosedSale(db, false);
+  await setPensionToggle(false);
+  const scope = page.locator('main');
+  const plusvalenze = page.getByRole('region', { name: 'Plusvalenze realizzate', exact: true });
+
+  // The bare fixture first: no sale, no Plusvalenze, Consistenza ends the right column.
+  await gotoPerformance(page);
+  await expect(plusvalenze).toHaveCount(0);
+  const undoBare = await forceColumnTaller(page, scope, 0);
+  await expectColumnsEndTogether(page, scope, 'senza plusvalenze, sinistra più alta');
+  await undoBare();
+
+  const { plantedMeta } = await plantClosedSale(db);
+  try {
+    await gotoPerformance(page);
+    await expect(plusvalenze).toBeVisible({ timeout: 30_000 });
+
+    const undoLeft = await forceColumnTaller(page, scope, 0);
+    await expectColumnsEndTogether(page, scope, 'con la vendita, sinistra più alta');
+    await expectLastFooterOnEdge(scope, 1, 'Plusvalenze cresciuta');
+    await undoLeft();
+
+    const undoRight = await forceColumnTaller(page, scope, 1);
+    await expectColumnsEndTogether(page, scope, 'con la vendita, destra più alta');
+    await expectLastFooterOnEdge(scope, 0, 'Capitale e mercato cresciuto');
+    await undoRight();
+  } finally {
+    await removeClosedSale(db, plantedMeta);
+  }
 });

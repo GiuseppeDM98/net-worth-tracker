@@ -20,6 +20,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { expectColumnsEndTogether, forceColumnTaller } from './tileColumns';
 
 /** A compact euro amount as the tiles print it: dot-grouped or plain up to four digits, no cents. */
 const EURO_COMPACT = /^(\d{1,3}(\.\d{3})+|\d{1,4})[\s ]*€$/;
@@ -187,4 +188,25 @@ test('at 1440 the tab is the tab of today: no closed row, no strip, the pace and
   await expect(verdict.getByText(/Al ritmo attuale/)).toBeVisible();
   // The lock sentence is in the paragraph at 1440 (the fixture's fund unlocks at 57): no scope line doubles it.
   await expect(verdict.getByText(/sono esclusi da queste cifre/)).toBeVisible();
+});
+
+// ─── The Ipotesi's two columns end on one line (DATI-03, owner 2026-11-23) ───
+//
+// «Ipotesi» is Profilo over Modello beside Pensioni statali over Scaglioni IRPEF, from 1440. The LAST tile of
+// each column grows, so the columns end on one line whichever is taller; a style tag stretches the first tile
+// of one column and `forceColumnTaller` proves it is the taller before anything is measured. Seen red alone by
+// taking the class off Modello della pensione's cell, then off Scaglioni IRPEF's.
+test('Ipotesi: the two columns end on one line, whichever is taller (DATI-03 E2)', async ({ page }) => {
+  await gotoCoast(page);
+  await page.getByRole('button', { name: /^Ipotesi/ }).first().click();
+  await expect(page.getByRole('region', { name: 'Profilo Coast FIRE' })).toBeVisible();
+  const scope = page.locator('main');
+
+  const undoLeft = await forceColumnTaller(page, scope, 0);
+  await expectColumnsEndTogether(page, scope, 'Ipotesi, sinistra più alta');
+  await undoLeft();
+
+  const undoRight = await forceColumnTaller(page, scope, 1);
+  await expectColumnsEndTogether(page, scope, 'Ipotesi, destra più alta');
+  await undoRight();
 });

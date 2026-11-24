@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tile, TILE_CELL_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { Tile, TILE_CELL_CLASS, TILE_COLUMN_CLASS, TILE_COLUMN_END_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { CategoryManagementDialog, invalidateCategoryCaches } from '@/components/expenses/CategoryManagementDialog';
 import { CategoryDeleteConfirmDialog } from '@/components/expenses/CategoryDeleteConfirmDialog';
@@ -432,8 +432,9 @@ export function SpeseTab({
     <SettingsTabPanel tab="spese" label="Spese">
       {/* Left column: the two settings the expense FORM reads, then the 50/30/20 switch. Below
           desktop the wrapper dissolves (`contents`) and each tile is a grid cell; from desktop
-          they stack at their natural height beside the taller import tile. */}
-      <div className="contents desktop:col-span-5 desktop:flex desktop:flex-col desktop:gap-3">
+          they stack beside the import tile and END ON ONE LINE with it: the last tile grows
+          (owner, 2026-11-23). */}
+      <div data-tile-column className={cn(TILE_COLUMN_CLASS, 'desktop:col-span-5')}>
       {/* Conti di default (moved here from Preferenze): debit and credit act in the expense dialog, the investment account (2026-11-19) in a new plan of accumulation */}
       <div className={TILE_CELL_CLASS}>
         {accountsState === 'failed' ? (
@@ -639,7 +640,7 @@ export function SpeseTab({
       {/* Ruoli 50/30/20 — opt-in; the roles themselves are set in the category dialog. Its own
           tile, not a row of Categorie: that tile gives way to an error notice when the
           categories fail to load, and the switch and the «non letti» reading must not. */}
-      <div className={TILE_CELL_CLASS}>
+      <div className={cn(TILE_CELL_CLASS, TILE_COLUMN_END_CLASS)}>
         <Tile
           eyebrow="Ruoli 50/30/20"
           reading={
@@ -671,7 +672,7 @@ export function SpeseTab({
       </div>
 
       {/* Import CSV — the section renders its own tile (preview-first, undo per batch) */}
-      <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-7')}>
+      <div data-tile-column className={cn(TILE_CELL_CLASS, 'desktop:col-span-7')}>
         <ExpenseImportSection onImported={onExpenseImported} />
       </div>
 
