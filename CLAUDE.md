@@ -14,7 +14,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19 **with the React Compiler on** (since 2026-10-05), TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - Tests: Vitest in `__tests__/` (one file per pure module), held green in `Europe/Rome`, in the machine's zone AND under `TZ=UTC` (since 2026-10-08); Playwright specs in `e2e/` (the projects and the traps: doc/guide/e2e-playwright.md; the full run and its known flakes: doc/guide/e2e-suite.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, the ones beside midnight are named by the Italian clock.
-- Latest (2026-11-24): **The series `doc/dati/` is open** (index doc/dati/README.md: the specs, the owner's decisions and the status table in § 6; it goes to `main` spec by spec). The series' history left README.md — a retired series is read in `git log -- doc/<serie>/` and in its pull requests — and the database question is answered in AGENTS.md § React Query and Derived State (2026-11-23: Firestore stays). Open: doc/dati/ (README § 6). Next: DATI-02.
+- Latest (2026-11-24): **DATI-01 is retired**: the series `doc/dati/` is open (index doc/dati/README.md: the specs, the owner's decisions and the status table in § 6; it goes to `main` spec by spec). The series' history left README.md — a retired series is read in `git log -- doc/<serie>/` and in its pull requests — and the database question is answered in AGENTS.md § React Query and Derived State (2026-11-23: Firestore stays). Open: doc/dati/ (README § 6). Next: DATI-02.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

@@ -59,7 +59,7 @@
   euro total of the statement can be entered and no rate is stored on the trade. A dividend is recorded in a
   currency typed by hand, with one withholding.
 - **3** — Firestore, with the Admin SDK on the server and the client SDK in the browser, security rules, React
-  Query on top; the count of the day is in DATI-01.
+  Query on top; the count of 2026-11-23 is in AGENTS.md § React Query and Derived State.
 - **4** — Patrimonio has no tabs; the Strumenti table shows three Δ columns (month, YTD, all-time) behind a
   desktop-only toggle, each today's price against one base.
 - **5** — one snapshot per month, rewritten every evening by the cron; nothing is kept per day.
@@ -332,7 +332,6 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [01](DATI-01-storia-serie-e-database.md) | The series' history leaves the README; the database decision restated | S | — | Sonnet 5.5 · medium | implemented |
 | [02](DATI-02-archivio-giornaliero.md) | The daily archive | M | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 18 rilievi, 5 decisioni |
 | [03](DATI-03-colonne-e-curva.md) | Two columns end on one line; a sparkline stays in its box | S | — | Sonnet 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 0 decisioni |
 | [04](DATI-04-dividendi-quantita-allo-stacco.md) | A dividend is worth what was held at the ex-date | M | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 4 decisioni |
@@ -578,11 +577,11 @@ says so; it never changes what is there. The full text of each is in the spec th
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
+`SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
 
 The adversarial reading of the specs together (prompt 07) was done on 2026-11-23, with DATI-20 and DATI-21
 written and read in it; prompt 08 (`08_CREA_RITIRO_SPEC`) ran on 2026-11-24, in a session of its own, and wrote
-`doc/dati/PROMPT-RITIRO.md`; the first implementation follows it. A retirement removes its number from the line
+`doc/dati/PROMPT-RITIRO.md`; DATI-01 was implemented and retired on 2026-11-24; the next spec is DATI-02. A retirement removes its number from the line
 above; the last one deletes the line with the folder.
 
 ## 10. What NOT to do (decided on 2026-11-23)

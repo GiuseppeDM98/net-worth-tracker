@@ -3,7 +3,7 @@
 > Generato il 2026-11-24 da `08_CREA_RITIRO_SPEC`. Chi lo usa dopo un ritiro aggiorna i precedenti e le misure e
 > lascia il corpo com'è; il ritiro dell'ultima spec porta via questo file con la cartella.
 >
-> Ritiri fatti: nessuno (il 2026-11-24 le ventuno spec sono `read`, nessuna implementata).
+> Ritiri fatti: 01 (2026-11-24, solo documenti); le altre venti sono `read`, nessuna implementata.
 >
 > Il prompt che il proprietario incolla per ritirare UNA spec di `doc/dati/` (`doc/dati/README.md` § 8 regola 12:
 > implementazione → ritiro → implementazione). Ogni segnaposto del corpo è sostituito con ciò che il repo diceva il
@@ -296,13 +296,13 @@ ORDINE DI LAVORO
 5) AGGIORNA indici e stato — lo stato vive in PIÙ punti che possono divergere e si
    chiude con un grep, non con una riga: la cartella è `doc/dati/` (21 spec
    `DATI-NN-<slug>.md`, l'indice, questo prompt: `ls doc/dati/`); l'indice è
-   `doc/dati/README.md` (609 righe; `grep -n "^## " doc/dati/README.md`: § 1 i quindici
+   `doc/dati/README.md` (608 righe al 2026-11-24, dopo il ritiro di 01; `grep -n "^## " doc/dati/README.md`: § 1 i quindici
    punti del proprietario, § 2 il codice di partenza, § 3 le decisioni 1–96, § 4 le scelte
    adottate, una riga per spec, § 5 l'ordine — il numero È l'ordine — e le dipendenze, § 6
    la tabella di stato, § 7 i contratti condivisi C1–C8 e gli altri nomi, § 8 le sedici
    regole, § 9 la riga SPEC VIVE, § 10 ciò che non si fa). LA RIGA DI STATO è l'ultima
    colonna della tabella di § 6 (`grep -n -E "^\| \[[0-9]{2}\]\(DATI-" doc/dati/README.md`
-   → 21 righe il 2026-11-24, tutte «read — riletta in modo adversariale il 2026-11-23: N
+   → 20 righe dopo il ritiro di 01 (2026-11-24), tutte «read — riletta in modo adversariale il 2026-11-23: N
    rilievi, M decisioni»): i valori sono `written` → `read` → `implemented` (in `develop`,
    in attesa del ritiro), e il ritiro TOGLIE la riga (il paragrafo sotto la tabella,
    regola 12) — nell'indice non si scrive nessun «retired on»: il ritiro sta in `git log
@@ -388,13 +388,13 @@ e 21 moderati, invariati dal 2026-11-20). Nel messaggio di commit, con i segnali
 10; la colonna «Model · effort» di § 6 finché la riga c'è).
 LIMITI: tetti e comandi, con la misura del 2026-11-24 accanto — CLAUDE.md «well under
 20.000 characters», contato in caratteri: `node -e
-"console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` → 18.660 (`wc -c` →
-18.920: conta i byte), 76 righe: restano circa 1.300 caratteri, il «Latest» si SOSTITUISCE
+"console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` → 18.135 (`wc -c` →
+18.396: conta i byte) dopo il ritiro di 01, 76 righe: restano circa 1.800 caratteri, il «Latest» si SOSTITUISCE
 e una riga d'area si riscrive a lunghezza uguale o minore; AGENTS.md ~1000 righe (§ 0):
-`wc -l AGENTS.md` → 989, undici sotto il tetto — una regola nuova entra come RULE + DATE +
+`wc -l AGENTS.md` → 997, tre sotto il tetto — una regola nuova entra come RULE + DATE +
 WHERE PINNED, uno stub di § 3 non cresce, una lezione di dominio va nella guida;
-WORKFLOW.md (351 righe) solo lo standard e la sua traduzione locale; README.md 540 righe
-(DATI-01 ne toglie 72); DESIGN.md (1481 righe) scritto a mano, senza tetto, mai
+WORKFLOW.md (351 righe) solo lo standard e la sua traduzione locale; README.md 467 righe
+(DATI-01 ne ha tolte 73); DESIGN.md (1481 righe) scritto a mano, senza tetto, mai
 rigenerato; le guide ~500 righe ciascuna, 50 file (`ls doc/guide/*.md | wc -l`), le più
 vicine al tetto con `wc -l doc/guide/*.md | sort -n | tail -10`: `consulente.md` 507 (GIÀ
 OLTRE, e 15, 19 e 21 vi scrivono), `patrimonio.md` 493 (sette spec), `velocita.md` 492
