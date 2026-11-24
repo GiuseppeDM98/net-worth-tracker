@@ -98,7 +98,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **«Ruoli 50/30/20» is its own tile in Spese**, under the two the expense form reads — not a row of Categorie,
   because that tile gives way to an `ErrorNotice` when the categories fail, and the switch and its reading must not.
   It is the LAST cell of Spese's left column and grows (`TILE_COLUMN_END_CLASS`, owner 2026-11-23) so the column ends
-  with the import tile beside it (`e2e/settings.spec.ts`, DATI-03 E3).
+  with the import tile beside it (`e2e/settings.spec.ts`, E3).
   The reading (`describeSpendingRolesSetting`) counts the classified spending categories
   (`summarizeCategoryClassification`) and says «non letti» on a failed read, never «0 classificate». Its spec builds
   the expected sentence from the counts it reads off the emulator at the assertion: the base account is shared, and

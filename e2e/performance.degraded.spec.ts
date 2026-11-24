@@ -339,7 +339,7 @@ test('a refused report says so, with «Rigenera» beside it even when no text wa
   expect(calls).toBe(2);
 });
 
-// ─── The two columns end on one line (DATI-03, owner 2026-11-23) ─────────────
+// ─── The two columns end on one line (owner, 2026-11-23) ─────────────
 //
 // Below the first row Rendimenti is two columns from 1440; the LAST tile of each (Capitale e mercato on the
 // left, Plusvalenze — or Consistenza when there is none — on the right) grows, so the columns end on one line
@@ -390,7 +390,7 @@ async function removeClosedSale(db: FirebaseFirestore.Firestore, plantedMeta: bo
   if (plantedMeta) await db.collection('assetTransactionsMeta').doc(UID).delete();
 }
 
-test('Rendimenti: the two columns end on one line, whichever is taller, with Plusvalenze or without (DATI-03 E1)', async ({ page }) => {
+test('Rendimenti: the two columns end on one line, whichever is taller, with Plusvalenze or without (E1)', async ({ page }) => {
   test.setTimeout(240_000);
   const db = await adminDb();
   await removeClosedSale(db, false);

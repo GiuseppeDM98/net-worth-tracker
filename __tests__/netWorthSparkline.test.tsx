@@ -2,6 +2,8 @@
  * `NetWorthSparkline` (components/dashboard/NetWorthSparkline.tsx, 2026-11-23): on a series that sits flat,
  * jumps and sits flat again, the line never leaves the plot's padding band (4 units top and bottom) —
  * the Catmull-Rom curve it replaced overshot and the viewBox cut it.
+ *
+ * Seen red with: restoring the Catmull-Rom path in the component (its y leaves `[4, height − 4]`).
  */
 
 import { describe, expect, it } from 'vitest';
