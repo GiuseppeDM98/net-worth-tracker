@@ -56,6 +56,7 @@ interface CreateSnapshotResponse {
     totalNetWorth: number;
     liquidNetWorth: number;
     assetsCount: number;
+    dailyWritten: boolean;
   };
   error?: string;
 }
@@ -111,6 +112,12 @@ export function useCreateSnapshot(userId: string) {
 
       queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.overview(userId),
+      });
+
+      // The same POST files today's row of the daily archive: the prefix of every month key, so
+      // the daily readers read today again.
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.dailySnapshots.all(userId),
       });
     },
   });

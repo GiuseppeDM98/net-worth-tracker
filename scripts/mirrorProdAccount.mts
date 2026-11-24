@@ -13,13 +13,13 @@
  * and nothing but `.get()`, then spawns itself as a child WITH the emulator variables and streams
  * the dump through its stdin — nothing is written to disk, and the child refuses to run unless it
  * is pointed at the emulators. Every row is re-keyed to the mirror uid (`userId`, the snapshot ids
- * `{uid}-{y}-{m}`, the per-user docs); `performance-cache` is not copied, so the page recomputes
+ * `{uid}-{y}-{m}`, the per-user docs, the daily archive's months); `performance-cache` is not copied, so the page recomputes
  * with the current math. doc/guide/e2e-emulatori.md § Emulator Exercise Scripts → «Reading PRODUCTION».
  */
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { PER_USER_DOCS, TOUR_ONLY_DOCS, USER_COLLECTIONS } from './mirrorCollections';
+import { PER_USER_DOCS, PER_USER_MONTH_DOCS, TOUR_ONLY_DOCS, USER_COLLECTIONS } from './mirrorCollections';
 
 /** Overridable (`MIRROR_UID=… npm run mirror:remove`) to clear a mirror seeded under another id. */
 export const MIRROR_UID = process.env.MIRROR_UID || 'prod-mirror';
@@ -87,6 +87,11 @@ async function seed(email: string | undefined) {
     const snap = await db.doc(`${c}/${uid}`).get();
     dump[`doc:${c}`] = snap.exists ? serialise(snap.data(), Timestamp) : null;
   }
+  for (const c of PER_USER_MONTH_DOCS) {
+    const snap = await db.collection(c).doc(uid).collection('months').get();
+    dump[`months:${c}`] = snap.docs.map((d) => ({ id: d.id, ...(serialise(d.data(), Timestamp) as AnyRecord) }));
+    console.info(`read ${c} months: ${snap.size}`);
+  }
 
   // The child: this same file, `--child-seed`, pointed at the emulators, the dump on its stdin.
   const child = spawn(process.execPath, [...process.execArgv, fileURLToPath(import.meta.url), '--child-seed'], {
@@ -134,6 +139,13 @@ async function childSeed() {
     await db.collection(c).doc(MIRROR_UID).set(payload);
     console.info(`seeded ${c}/${MIRROR_UID}`);
   }
+  for (const c of PER_USER_MONTH_DOCS) {
+    const rows = (dump[`months:${c}`] as AnyRecord[] | undefined) ?? [];
+    for (const { id, ...data } of rows) {
+      await db.collection(c).doc(MIRROR_UID).collection('months').doc(id as string).set({ ...data, userId: MIRROR_UID });
+    }
+    console.info(`seeded ${c} months: ${rows.length}`);
+  }
   console.info(`mirror ready — login ${MIRROR_EMAIL} / ${MIRROR_PASSWORD} on the emulator app`);
 }
 
@@ -172,8 +184,9 @@ async function removeRows(db: FirebaseFirestore.Firestore) {
     await batch.commit();
     if (snap.size > 0) console.info(`removed ${c}: ${snap.size}`);
   }
-  // recursiveDelete, because budgetHistory/{uid} holds only its months subcollection (2026-11-03).
-  for (const c of [...PER_USER_DOCS, ...TOUR_ONLY_DOCS]) await db.recursiveDelete(db.collection(c).doc(MIRROR_UID));
+  // recursiveDelete, because budgetHistory/{uid} and dailySnapshots/{uid} hold only their months
+  // subcollection (2026-11-03, 2026-11-23).
+  for (const c of [...PER_USER_DOCS, ...PER_USER_MONTH_DOCS, ...TOUR_ONLY_DOCS]) await db.recursiveDelete(db.collection(c).doc(MIRROR_UID));
 }
 
 try {

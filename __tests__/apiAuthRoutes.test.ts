@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { Asset } from '@/types/assets';
 
@@ -26,6 +26,8 @@ const {
   assetAllocationTargetsDocGetMock,
   snapshotDocGetMock,
   snapshotDocSetMock,
+  dailyMonthSetMock,
+  dailyMonthKeys,
   overviewSummaryDocGetMock,
   overviewSummaryDocSetMock,
   accountAccessDocGetMock,
@@ -50,6 +52,8 @@ const {
   assetAllocationTargetsDocGetMock: vi.fn(),
   snapshotDocGetMock: vi.fn(),
   snapshotDocSetMock: vi.fn(),
+  dailyMonthSetMock: vi.fn(),
+  dailyMonthKeys: [] as string[],
   overviewSummaryDocGetMock: vi.fn(),
   overviewSummaryDocSetMock: vi.fn(),
   accountAccessDocGetMock: vi.fn(),
@@ -102,6 +106,20 @@ vi.mock('@/lib/firebase/admin', () => ({
 
       if (name === 'expenses') {
         return createQueryChain(expensesGetMock);
+      }
+
+      // The daily archive: dailySnapshots/{uid}/months/{YYYY-MM}, the month key recorded.
+      if (name === 'dailySnapshots') {
+        return {
+          doc: vi.fn(() => ({
+            collection: vi.fn(() => ({
+              doc: vi.fn((monthKey: string) => {
+                dailyMonthKeys.push(monthKey);
+                return { set: dailyMonthSetMock };
+              }),
+            })),
+          })),
+        };
       }
 
       if (name === 'assetAllocationTargets') {
@@ -296,6 +314,8 @@ describe('Private API route auth', () => {
     // snapshot (the Storico note) across its full-replace write.
     snapshotDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
     snapshotDocSetMock.mockResolvedValue(undefined);
+    dailyMonthSetMock.mockResolvedValue(undefined);
+    dailyMonthKeys.length = 0;
     overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
     overviewSummaryDocSetMock.mockResolvedValue(undefined);
     goalBasedInvestingDocGetMock.mockResolvedValue({ exists: false });
@@ -889,5 +909,78 @@ describe('Private API route auth', () => {
     expect(written.note).toBe('ornitorinco');
     // The recomputed half is still replaced, never merged with the stored document.
     expect(written.totalNetWorth).not.toBe(1);
+  });
+
+  // ── The daily archive beside the monthly snapshot (2026-11-23) ────────────
+
+  describe('the daily row', () => {
+    beforeEach(() => {
+      // getItalyMonthYear is mocked to April 2026; getItalyDateIso is real and reads this clock.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-04-23T16:00:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // Seen red with `{ merge: true }` in the store.
+    it('files today under days.DD of its month, replacing only that day', async () => {
+      const response = await snapshotRoute(
+        createJsonRequest('http://localhost/api/portfolio/snapshot', {
+          method: 'POST',
+          body: { userId: 'user-1', cronSecret: 'test-cron-secret' },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, data: { dailyWritten: true } });
+      expect(dailyMonthKeys).toEqual(['2026-04']);
+      expect(dailyMonthSetMock).toHaveBeenCalledTimes(1);
+      const [document, options] = dailyMonthSetMock.mock.calls[0];
+      expect(Object.keys(document.days)).toEqual(['23']);
+      expect(document).toMatchObject({ userId: 'user-1', month: '2026-04' });
+      expect(document.days['23']).toMatchObject({
+        netWorth: 1000,
+        liquid: 700,
+        assets: { 'asset-1': { q: 10, v: 1000 } },
+        at: '2026-04-23T16:00:00.000Z',
+      });
+      expect(options).toEqual({ mergeFields: ['userId', 'month', 'updatedAt', 'days.23'] });
+    });
+
+    // Seen red with the year/month guard dropped.
+    it('files no daily row when a past month is rewritten', async () => {
+      const response = await snapshotRoute(
+        createJsonRequest('http://localhost/api/portfolio/snapshot', {
+          method: 'POST',
+          body: { userId: 'user-1', cronSecret: 'test-cron-secret', month: 4 },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, data: { dailyWritten: false } });
+      expect(snapshotDocSetMock).toHaveBeenCalledTimes(1);
+      expect(dailyMonthSetMock).not.toHaveBeenCalled();
+    });
+
+    // Seen red with the try/catch around the daily write removed.
+    it('still answers success when the daily write fails', async () => {
+      dailyMonthSetMock.mockRejectedValue(new Error('boom'));
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const response = await snapshotRoute(
+        createJsonRequest('http://localhost/api/portfolio/snapshot', {
+          method: 'POST',
+          body: { userId: 'user-1', cronSecret: 'test-cron-secret' },
+        })
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, data: { dailyWritten: false } });
+      expect(snapshotDocSetMock).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith('Error writing daily snapshot:', expect.any(Error));
+      consoleError.mockRestore();
+    });
   });
 });

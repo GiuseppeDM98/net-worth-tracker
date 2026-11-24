@@ -7,7 +7,8 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Storico / snapshots**: `app/dashboard/history/page.tsx`, `components/history/*` (+ `tiles/*`), pure `lib/utils/{storicoSummary,storicoNarrative,snapshotAssetBreakdown,historyComposition,snapshotUserFields}.ts` (`preserveUserAuthoredSnapshotFields` = i campi che nessuna pipeline ricalcola, portati attraverso la sostituzione; `summarizeLaborMetrics` + `laborWindowsOf` = il recap Lavoro sulle finestre del Driver; `buildDriverLedger` + `reconcileRemainder` = le righe che sommano, all'euro; `isFlowDominated` = un Δ che è un flusso), `lib/utils/growthDrivers.ts` (the Driver's parts, over `lib/utils/marketEffect.ts` shared with the Panoramica), `lib/services/{chartService,snapshotService}.ts`, `components/CreateManualSnapshotModal.tsx` over `lib/utils/manualSnapshotAmounts.ts`, `components/dashboard/LaborMetricsChart.tsx`, shared `components/ui/{tile-method-note,series-legend}.tsx` + `lib/hooks/useRovingFocus.ts`; specs `e2e/history{,.mobile}.spec.ts`; collection `monthly-snapshots`
-- **Suites to run after a change here — Storico** (moved from `AGENTS.md` § Commands on 2026-09-30): `storicoSummary`, `storicoNarrative` (with `describeStoricoClosedAnswers`, the landscape index), `tabletComposition`, `snapshotAssetBreakdown`, `chartService`, `historyComposition`, `growthDrivers` · **Browser** `e2e/history{,.mobile}.spec.ts`
+- **The daily archive** (2026-11-23, § The daily archive): `lib/utils/dailySnapshot.ts` (the row, the windows, `dailyUnitPrice`, `isDailyMonthFinal`), `lib/server/dailySnapshotStore.ts` (`writeDailySnapshotDay`, `readDailyPoints`), `lib/services/dailySnapshotService.ts` (the client read), `lib/hooks/useDailySnapshots.ts`; spec `e2e/daily-snapshots.rules.spec.ts` (the rule and the `mergeFields` write, on the emulators); collection `dailySnapshots/{uid}/months/{YYYY-MM}`
+- **Suites to run after a change here — Storico** (moved from `AGENTS.md` § Commands on 2026-09-30): `storicoSummary`, `storicoNarrative` (with `describeStoricoClosedAnswers`, the landscape index), `tabletComposition`, `snapshotAssetBreakdown`, `chartService`, `historyComposition`, `growthDrivers` · the daily archive: `dailySnapshot`, `useDailySnapshots`, `useSnapshots`, `apiAuthRoutes` (the snapshot block), `persistCache`, `mirrorCollections` · **Browser** `e2e/history{,.mobile}.spec.ts`, `e2e/daily-snapshots.rules.spec.ts`
 
 ## History and Snapshot Baselines
 
@@ -49,6 +50,32 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   stay STRINGS — an `<input type="number">` where an empty field, a half-typed `1.` and a `0` are three different
   things — and parsing happens once, at the boundary. The same test that pins one field per union member is what a
   future widening trips on.
+
+## The daily archive
+
+- **What it is** (2026-11-23): one compact row per Italian day, beside the monthly snapshots and never among them —
+  thirty-eight readers count on ONE `monthly-snapshots` document a month, and a second document in a month breaks each.
+  The path is `dailySnapshots/{uid}/months/{YYYY-MM}`: `{ userId, month, updatedAt, days: { 'DD': row } }`, a map of
+  days per month (~1,4 KB a day for thirty instruments, twelve reads a year). The row (`DailySnapshotDay`): `netWorth`,
+  `liquid`, `byClass`, and per instrument `{ q, v }` — quantity as stored, value in euro to the cent, a zero row
+  (quantity 0, value 0) skipped, a loan kept with its residual principal in `q` and `v = −q` — plus `at`, the
+  write's instant. The euro unit price is `dailyUnitPrice` (`v / q`, null without a positive quantity or with a
+  negative value); whether an instrument has a MARKET price at all is the reader's question, it holds the asset.
+- **Who writes**: `/api/portfolio/snapshot` alone, through the Admin SDK, when its body carries neither `year` nor
+  `month` — the evening cron and «Crea snapshot» — keyed on `getItalyDateIso(now)`, the same instant that keys the
+  monthly document. A past month rewritten files no row; a failure of the daily write is logged and the snapshot still
+  answers `success: true` (`data.dailyWritten` says which). The rule lets the owner and a member read and nobody write
+  (`firestore.rules`, the shape of `budgetHistory`: a month never written reads as absent).
+- **`mergeFields` on `days.DD`, never a bare `.set()` nor `{ merge: true }`**: the bare replace would erase the
+  other days of the month, the merge would deep-merge the day and keep the row of an instrument sold since the
+  morning. A second run the same day replaces that day whole (`__tests__/apiAuthRoutes.test.ts`, the snapshot block;
+  `e2e/daily-snapshots.rules.spec.ts` on the emulators).
+- **The readers**: `useDailySnapshots(ownerId, days)` — the last `days` Italian days, ascending, ONE query per month
+  (`['daily-snapshots', uid, 'YYYY-MM']`), `ownerId` the only gate; a month fetched after it closed is final
+  (`staleTime: Infinity`, `isDailyMonthFinal`), the month in course and a copy taken while its month was open take the
+  global five minutes. The prefix is persisted (doc/guide/cache-persistita.md), so «read once» means once a day per
+  device at most. «Crea snapshot» invalidates `['daily-snapshots', uid]`. On the server `readDailyPoints(db, uid, from,
+  to)`. No page reads it yet; the archive started the day it shipped, with no reconstruction of the past.
 
 ## Storico — a verdict over tiles (`app/dashboard/history/page.tsx`, `components/history/tiles/*`, `lib/utils/{storicoSummary,storicoNarrative}.ts`)
 
@@ -133,4 +160,9 @@ Composed for a small screen on 2026-10-14 (its spec, retired on 2026-10-15, is i
 
 ## Per-page blind spots
 
+- **The daily archive**: a US instrument's row is its price at 18:00 UTC, mid-session, not the close (every day at the
+  same hour, so the series is consistent with itself); a row written after a failed price update repeats the stored
+  price and carries no mark; a day the cron skipped stays a hole; a deleted asset stays as a key in the old rows; the
+  manual snapshot route (`.../snapshot/manual`) files no daily row — it files a typed total for a chosen month; no
+  daily price exists for an instrument the account does not hold.
 - **Storico**: `e2e/history.spec.ts` and `e2e/history.mobile.spec.ts` assert STRUCTURE only (the base fixture's «saldi dei conti» is huge — two snapshots, a month of expenses — so no amount is pinned); the pace and the next-doubling projection need the snapshot of EXACTLY twelve months earlier and the pace verdict 24 months of history; the projection is linear, dropped beyond fifty years; the Driver shows only years from `cashflowHistoryStartYear` (untracked income lands in «mercato» where `byAsset` is missing, in «saldi dei conti» where it is not) and its bars the last twelve CALENDAR months; its market is measured only from the first pair of snapshots that both carry `byAsset` and before `pensionReturnStartMonth` a pension fund's whole growth is «fondo pensione non tracciato»; «saldi dei conti» swings month to month with a credit card (the rows in one month, the debit in the next) and nets out over a year, and in a ledger it also carries the euros of rounding (it is the remainder BY CONSTRUCTION, so it can differ by a few € from `GrowthDrivers.otherAccounts`); a property and a deleted asset are never in «quantità fuori dal registro» (a property moves by transfers and by its debt, a deleted asset has no type to read: both stay in «saldi dei conti»), a hand-valued stake's revaluation is; the tax is an ESTIMATE (the rate × the realized gain, no minusvalenze pregresse); a property present on one side only moves no «mutuo»; the Lavoro recap follows the Driver's windows, so a year the Driver skips (snapshots but no cashflow row) is absent from its Select and from the cumulative too, and its figures never match a Cashflow total that includes the rows in calendar — compare it with the Driver «Dal {startYear}»; the Lavoro net can be negative on a positive gross (taxes on ALL latent gains, cumulative recap only); the Evoluzione Y axis prints full amounts under 10.000 € of span; the Dettaglio's open state and the chosen month are session state, not in the URL (a month cannot be linked); at 1440 the chips repeat three figures of the verdict by design (the verdict says, the hero shows — as on the Panoramica; below `desktop:` they are lifted, the tablet included since 2026-10-16, § Composizione mobile); `--chart-1` in dark is the hero line at ~2,6:1 (doc/guide/temi.md); the light remainder of a 3px track (`bg-muted` on a card) is nearly invisible, app-wide. The note under «Risparmio e mercato per mese» (`DRIVER_MONTHLY_NO_BAR_NOTE`, `storicoNarrative.ts`) names the parts that have no bar by the SAME labels the month tooltip prints (2026-11-14, pinned by `storicoNarrative.test.ts`): a part renamed there is renamed in the note, and «altre variazioni» stays only in «Lavoro e investimenti».

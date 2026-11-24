@@ -58,6 +58,13 @@ export const queryKeys = {
       ['snapshots', userId, 'range', startYear, startMonth, endYear, endMonth] as const,
   },
 
+  // The daily archive, one query per month (lib/hooks/useDailySnapshots.ts). `all` is the prefix
+  // of every month, what «Crea snapshot» invalidates.
+  dailySnapshots: {
+    all: (userId: string) => ['daily-snapshots', userId] as const,
+    month: (userId: string, monthKey: string) => ['daily-snapshots', userId, monthKey] as const,
+  },
+
   // Expenses
   expenses: {
     all: (userId: string) => ['expenses', userId] as const,
