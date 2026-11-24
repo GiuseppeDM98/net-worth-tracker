@@ -216,7 +216,7 @@ Composed on 2026-10-15 (its spec, retired on 2026-10-16, is in `git log -- doc/m
 
 ## Per-page blind spots
 
-- **The sparkline's line is uneven in thickness** (2026-11-23, declared out of scope of DATI-03): the SVG's viewBox is stretched (`preserveAspectRatio="none"`) with no `vector-effect` on the stroke, so a steep stretch of the curve is thinner than a flat one — on «Andamento» and on the Panoramica's hero alike. Kept: curing it changes the look of the hero, a design choice of its own. The curve itself no longer leaves its box (monotone path, doc/guide/grafici.md).
+- **The sparkline's line is uneven in thickness** (2026-11-23, declared out of scope of the columns-and-curve change): the SVG's viewBox is stretched (`preserveAspectRatio="none"`) with no `vector-effect` on the stroke, so a steep stretch of the curve is thinner than a flat one — on «Andamento» and on the Panoramica's hero alike. Kept: curing it changes the look of the hero, a design choice of its own. The curve itself no longer leaves its box (monotone path, doc/guide/grafici.md).
 
 - **Previdenza**: a contribution can be deleted but not edited — a wrong amount is a delete (which reverses the cash
   transfer) plus a re-entry, because the service has no update path and an in-place edit of a voluntary row would

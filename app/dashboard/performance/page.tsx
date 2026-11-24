@@ -10,7 +10,8 @@
  * the grid behind the «Dettaglio» disclosure.
  *
  *   Desktop (12 col): Rendimento(5) | Benchmark(4) | Contributi(3)      — one row, the three tall tiles
- *                     then two columns, every tile at its natural height:
+ *                     then two columns that END ON ONE LINE (owner, 2026-11-23): every tile keeps its
+ *                     natural height but the last of each column, which grows:
  *                       left (7)  Da dove viene il rendimento · Capitale e mercato (takes the slack)
  *                       right (5) Rischio · Consistenza · Plusvalenze (absent without a closed sale)
  *   Below desktop:    ONE sequence, the DOM above (DESIGN.md → The First-Screen Rule,

@@ -4,7 +4,7 @@
 > lascia il corpo com'è; il ritiro dell'ultima spec porta via questo file con la cartella.
 >
 > Ritiri fatti: 01 (2026-11-24, solo documenti); 02 (2026-11-24: il cron lanciato a mano dal proprietario su Vercel come
-> controllo in produzione, un commento corretto); le altre diciannove sono `read`, nessuna implementata.
+> controllo in produzione, un commento corretto); 03 (2026-11-24: solo etichette riscritte, controllo del proprietario su Rendimenti, Previdenza e Panoramica); le altre diciotto sono `read`, nessuna implementata.
 >
 > Il prompt che il proprietario incolla per ritirare UNA spec di `doc/dati/` (`doc/dati/README.md` § 8 regola 12:
 > implementazione → ritiro → implementazione). Ogni segnaposto del corpo è sostituito con ciò che il repo diceva il

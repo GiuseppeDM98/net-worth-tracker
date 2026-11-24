@@ -1,6 +1,10 @@
 /**
  * Tests for lib/utils/sparklinePath.ts (2026-11-23): the sparkline's monotone cubic. A flat-jump-flat
  * series is the shape a Catmull-Rom spline overshoots on; the controls here must stay in their band.
+ *
+ * Seen red with: the interior tangent → `(before + after) / 2` (the arithmetic mean, Catmull-Rom's on a
+ * uniform step) turns the band test red; `to: [x2, y1]` the endpoint test; `pts.length < 2` → `< 3` in
+ * `monotonePath` the two-point test.
  */
 
 import { describe, it, expect } from 'vitest';
