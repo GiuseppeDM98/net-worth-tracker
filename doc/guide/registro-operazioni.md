@@ -7,7 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Asset trade ledger**: engine `lib/utils/assetTransactionUtils.ts` + `types/assetTransactions.ts`; server `lib/server/{assetTransactionUseCase,tradeFxService}.ts` (+ `backfillAverageCostEur`) + `app/api/asset-transactions/*` (incl. `backfill-average-cost-eur`); client `lib/services/assetTransactionService.ts`, UI `components/assets/{TransactionDialog,AssetMovementsDialog}.tsx`; collections `assetTransactions`/`assetTransactionsMeta`
-- **Suites to run after a change here — Asset Trade Ledger** (moved from `AGENTS.md` § Commands on 2026-09-30): **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx`, `assetTransactionAverageCostEurBackfill`, `ledgerMetaFreshness`, `saleTax`, `cents`, `periodSales`, `tradeFeeExpense`, `assetDeleteRoute` · **Browser** `e2e/assets.sale-tax.spec.ts`, `e2e/assets.ledger-meta.spec.ts`, `e2e/assets.trade-fee.spec.ts`
+- **Suites to run after a change here — Asset Trade Ledger** (moved from `AGENTS.md` § Commands on 2026-09-30): **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx`, `assetTransactionAverageCostEurBackfill`, `ledgerMetaFreshness`, `saleTax`, `cents`, `periodSales`, `tradeFeeExpense`, `assetDeleteRoute`, `assetMovementsDialogReread` (dom) · **Browser** `e2e/assets.sale-tax.spec.ts`, `e2e/assets.ledger-meta.spec.ts`, `e2e/assets.trade-fee.spec.ts`
 
 ## Asset Trade Ledger
 
@@ -166,7 +166,11 @@ transactions and gates chosen calls.
   «L'operazione è cambiata nel frattempo: riapri e riprova.». **An edit and a delete carry `expectedUpdatedAt`**, the
   version the form or the button was drawn from (PUT body / DELETE query, ISO; absent from an older client = the
   server's own read), so a form left open in another tab on an older version gets the same 409 (owner, 2026-11-12).
-  An edit on a changed trade is refused, never merged.
+  An edit on a changed trade is refused, never merged. **So Movimenti holds a row's edit and delete while its trades
+  are a copy restored from before this load and still being reread** (2026-11-24, `resolveFreshness` in
+  `AssetMovementsDialog`; `__tests__/assetMovementsDialogReread.test.tsx`): a reload right after an edit painted the
+  pre-edit copy from the persisted cache, and a delete pressed on it was a 409 that left the trade — the intermittent
+  red of `e2e/assets.trade-fee.spec.ts`, traced in its trace. A refetch of a list read in this load holds nothing.
 - **The asset's type and the settlement account are checked at commit**: a trade on an asset that left the ledger
   meanwhile is 422 «Questo tipo di asset non usa il registro operazioni.», a settlement account that is no longer
   `cash`/`cash` 422 «Il conto di regolamento selezionato non è valido.» (a missing one is still skipped with a warning).

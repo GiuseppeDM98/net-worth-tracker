@@ -10,8 +10,8 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility}.ts` (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` (`useDividendRegistry` for the page's list, `useDividendStats` for the tab's measures: ONE request) → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
-- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendEntitlement`, `dividendServiceItalyDay`, `dividendScrapeRoute`, `couponScheduling`, `dividendAccount`, `dividendIncomeService`, `floatNoise` · **Email** `monthlyEmailService`
-- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles), `pagatoriTile`, `searchableComboboxRefocus` (the picker after a refusal) · **Browser** `e2e/cashflow.dividendi{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts` · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
+- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendEntitlement`, `dividendServiceItalyDay`, `dividendScrapeRoute`, `couponScheduling`, `transactionDialog.announced` (dom), `dividendAccount`, `dividendIncomeService`, `floatNoise` · **Email** `monthlyEmailService`
+- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles), `pagatoriTile`, `searchableComboboxRefocus` (the picker after a refusal) · **Browser** `e2e/cashflow.dividendi{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts`, `e2e/assets.announced-dividends.spec.ts` · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
 
 ## Cashflow › Dividendi (`components/dividends/DividendTrackingTab.tsx`, `components/dividends/tiles/*`)
 - **RECEIVED AND ANNOUNCED ARE NEVER ONE FIGURE.** A dividend whose `paymentDate` is in the future is
@@ -339,7 +339,8 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
   changes the quantity while `dividendPerShare` stays as scraped; an instrument re-created on an ISIN that already
   paid shares the asset id, so its trades reach only the records still to be paid; a record whose income row the
   user deleted is pending again, and follows the ledger like any other; no one-off pass rewrote the stale records on
-  the day of the deploy — each is corrected at its asset's next trade or on its payment day.
+  the day of the deploy — each is corrected at its asset's next trade or on its payment day; an instrument of a type
+  the ledger does not track has no trades, so its dividends keep today's quantity.
 - **A coupon recovered the day after a missed cron is NOT credited to its account** — by the owner's rule (only a
   payment dated today or later credits, so arrears never count twice). The income row is there, without an account:
   adjust the balance by hand or link the row from Tracciamento.

@@ -332,7 +332,6 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [04](DATI-04-dividendi-quantita-allo-stacco.md) | A dividend is worth what was held at the ex-date | M | — | Opus 5.5 · medium | implemented — 2026-11-24 |
 | [05](DATI-05-strumenti-azzerati.md) | Sold-out instruments: a closed group, no deletion over a history | M | — | Sonnet 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 2 decisioni |
 | [06](DATI-06-valuta-estera-operazioni.md) | A trade in a foreign currency | L | 04 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 22 rilievi, 4 decisioni |
 | [07](DATI-07-valuta-estera-dividendi.md) | A dividend in a foreign currency | M | 04, 06 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 4 decisioni |
@@ -353,6 +352,9 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 Status values: `written` → `read` (after the adversarial reading) → `implemented` (in `develop`, awaiting its
 retirement) → the row is removed by the retirement.
+
+Still to be seen in production after a retirement (the calendar's, never waited for): 04 — the stale pending records
+written before the deploy, corrected one by one on their payment day or at their asset's next trade.
 
 ## 7. Shared contracts (name, signature, file — as this section states them, in every spec that reads them)
 
@@ -499,9 +501,10 @@ says so; it never changes what is there. The full text of each is in the spec th
 - `lib/utils/dividendEntitlement.ts`: `SETTLEMENT_LAG_DAYS = 2`, `settlementDayIso(tradeDayIso)` (the value date:
   read by 18 and 21, never copied), `type EntitlementBasis = 'trade' | 'settlement'`,
   `entitlementBasisOf(dividendType)`, `quantityHeldBefore(trades, exDate, basis)`,
-  `entitledQuantity(assetQuantity, trades, exDate, basis)`, `EntitlementVerdict`, `AnnouncedDividend`,
-  `reconcileAnnouncedDividend(dividend, trades, asOfIso)`, `AnnouncedDividendsOutcome`,
-  `describeAnnouncedDividendsOutcome`.
+  `entitledQuantity(assetQuantity, trades, exDate, basis)`, `canBeOwedSince(assetQuantity, trades, windowStart)`,
+  `EntitlementVerdict`, `AnnouncedDividend`, `reconcileAnnouncedDividend(dividend, trades, asOfIso)`;
+  `AnnouncedDividendsOutcome` and `describeAnnouncedDividendsOutcome` live in `lib/utils/announcedDividendsOutcome.ts`
+  (the light module the trade dialogs import) and are re-exported here (aligned with the code on 2026-11-24).
 - `lib/server/dividendEntitlementService.ts`: `reconcileAnnouncedDividendsForAsset(ownerId, assetId)`;
   `lib/server/assetAdminRepository.ts`: `getAssetTransactionsForAssetAdmin(userId, assetId)`;
   `TradeMutationResult.announcedDividends`.
@@ -575,11 +578,11 @@ says so; it never changes what is there. The full text of each is in the spec th
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
+`SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
 
 The adversarial reading of the specs together (prompt 07) was done on 2026-11-23, with DATI-20 and DATI-21
 written and read in it; prompt 08 (`08_CREA_RITIRO_SPEC`) ran on 2026-11-24, in a session of its own, and wrote
-`doc/dati/PROMPT-RITIRO.md`; DATI-01, DATI-02 and DATI-03 were implemented and retired on 2026-11-24; the next spec is DATI-04. A retirement removes its number from the line
+`doc/dati/PROMPT-RITIRO.md`; DATI-01 to DATI-04 were implemented and retired on 2026-11-24; the next spec is DATI-05. A retirement removes its number from the line
 above; the last one deletes the line with the folder.
 
 ## 10. What NOT to do (decided on 2026-11-23)
