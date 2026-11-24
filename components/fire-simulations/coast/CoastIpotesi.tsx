@@ -46,7 +46,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS } from '@/components/ui/tile';
+import { Tile, TILE_CELL_CLASS, TILE_COLUMN_CLASS, TILE_COLUMN_END_CLASS, TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 
 const CONTROL_CLASS =
   'mt-1 h-11 desktop:h-9 font-mono tabular-nums transition-[border-color,background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-primary/25 motion-reduce:transition-none';
@@ -134,7 +134,7 @@ export function CoastIpotesi({
       <CollapsibleContent className="pt-1">
         <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
           {/* Left column from desktop: Profilo over Modello. Below it, the wrapper dissolves. */}
-          <div className="contents desktop:col-span-5 desktop:flex desktop:flex-col desktop:gap-3">
+          <div data-tile-column className={cn(TILE_COLUMN_CLASS, 'desktop:col-span-5')}>
           {/* Profilo */}
           <div className={TILE_CELL_CLASS}>
             <Tile eyebrow="Profilo" aside="salvato nel profilo" reading={describeProfilo(draft.hasUnsavedChanges)} ariaLabel="Profilo Coast FIRE">
@@ -248,7 +248,7 @@ export function CoastIpotesi({
           </div>
 
           {/* Modello della pensione */}
-          <div className={TILE_CELL_CLASS}>
+          <div className={cn(TILE_CELL_CLASS, TILE_COLUMN_END_CLASS)}>
             <Tile eyebrow="Modello della pensione" reading={PENSION_MODEL_READING} ariaLabel="Modello della pensione">
               <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 text-[13px] leading-[1.5] text-muted-foreground">
                 <p>
@@ -269,7 +269,7 @@ export function CoastIpotesi({
           </div>
 
           {/* Right column from desktop: Pensioni over Scaglioni. */}
-          <div className="contents desktop:col-span-7 desktop:flex desktop:flex-col desktop:gap-3">
+          <div data-tile-column className={cn(TILE_COLUMN_CLASS, 'desktop:col-span-7')}>
           {/* Pensioni statali */}
           <div className={TILE_CELL_CLASS}>
             <Tile eyebrow="Pensioni statali" aside="lordo mensile nominale alla decorrenza" reading={describePensioniStatali(draft.pensions.length, incompleteCount)} ariaLabel="Pensioni statali">
@@ -386,7 +386,7 @@ export function CoastIpotesi({
           </div>
 
           {/* Scaglioni IRPEF */}
-          <div className={TILE_CELL_CLASS}>
+          <div className={cn(TILE_CELL_CLASS, TILE_COLUMN_END_CLASS)}>
             <Tile eyebrow="Scaglioni IRPEF" aside="sul lordo annuo reale" reading={describeScaglioni(draft.taxBrackets.length)} ariaLabel="Scaglioni IRPEF">
               <div className="mt-2.5 flex flex-col divide-y divide-border">
                 {draft.taxBrackets.map((bracket, index) => {

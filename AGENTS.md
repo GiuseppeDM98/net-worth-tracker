@@ -692,8 +692,7 @@ file used to carry.
 > The visual rules themselves are DESIGN.md's; only the implementation traps live here.
 - **Keep ONE sequence: the DOM order is the reading order on every device**; the desktop places cells with
   `desktop:col-start-*`/`row-start-*`, never an `order` swap (2026-09-27): no composed grid carries `order-*`.
-- **A tile stretched beside a taller neighbour is cured in the GRID, never in the tile** (2026-09-20); the declared
-  exceptions are all on Allocazione (2026-10-17, 2026-11-12, 2026-11-18).
+- **Two columns END ON ONE LINE, always** (owner, 2026-11-23, after Rendimenti left a hole under Plusvalenze; asked for Allocazione 2026-10-17 and 2026-11-12, Accumulo 2026-11-18): the LAST cell of each grows, rows at the top, one-line footer on the bottom edge — cured in the GRID, never in the tile (2026-09-20). Rendimenti, Coast FIRE, Impostazioni: wrapper `TILE_COLUMN_CLASS`, last cell `TILE_COLUMN_END_CLASS`, held at 1440 by `e2e/tileColumns.ts`; Allocazione, Accumulo, Storico by their own grid (`e2e/allocation.spec.ts`, `e2e/accumulo.spec.ts`).
 - **A tile's footer is ONE line; the method goes behind «Come si calcola»** (2026-09-20); a list that must add up adds up
   ON SCREEN. **A row's caption WRAPS, it is never truncated** (2026-09-14, `RankedRows`).
 - Il resto — the «Custom» period chip, the cardified view's reading note, the Impostazioni worked example of render

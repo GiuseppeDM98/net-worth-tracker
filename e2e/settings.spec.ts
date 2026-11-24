@@ -24,6 +24,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { expectColumnsEndTogether, forceColumnTaller } from './tileColumns';
 
 const SETTINGS_DOC =
   'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/assetAllocationTargets/test-user-1';
@@ -151,4 +152,16 @@ test('una lettura fallita degli accessi non diventa «nessun accesso»', async (
   await page.unroute('**/api/account/members');
   await notice.getByRole('button', { name: 'Riprova' }).click();
   await expect(page.locator('section[aria-label="Condivisione account"]')).toBeVisible();
+});
+
+// Impostazioni › Spese: the left column's last tile (Ruoli 50/30/20) ends with the single import cell beside it
+// (DATI-03, owner 2026-11-23). The import cell is stretched by a style tag and `forceColumnTaller` proves it is
+// the taller before anything is measured. Seen red with the class off Ruoli 50/30/20's cell.
+test('Spese: the left column ends where the import tile ends (DATI-03 E3)', async ({ page }) => {
+  await openSettings(page, 'spese');
+  const scope = page.locator('#settings-tab-pill-panel-spese');
+
+  const undo = await forceColumnTaller(page, scope, 1);
+  await expectColumnsEndTogether(page, scope, 'Spese, import più alto');
+  await undo();
 });

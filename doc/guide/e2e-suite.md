@@ -39,6 +39,9 @@
     (2026-10-15/16): `apiResponse.json: Response has been disposed` — the response a probe holds across `page.reload()`,
     the shape of the `holdChunks` entry below. Closed on 2026-10-16: `patchOverview` reads the body in a `try` and lets a
     disposed response go with `route.continue()` (green ×5 on both).
+  - `allocation.consulente.report.spec.ts` «Salta le domande» while the round is still asked (2026-11-24): the revision's
+    `interview.rounds` held a round with the request «niente ornitorinchi» that the test expected empty, in the 564-green
+    full run of DATI-03 (no Consulente file touched); green alone (16/16). Not traced: a second red of it is to be.
   - `mobile-composition.performance.degraded.mobile.spec.ts` «Analizza con AI … a thumb's target» (2026-10-16): 43,999996 px
     against `>= 44`, the sub-pixel shape of the pill's «Dividendi» below; the assertion takes half a pixel of tolerance.
   - The pill's selector (2026-10-16): the landscape `TabletRail` is the same landmark «Navigazione principale» and comes
