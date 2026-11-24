@@ -45,6 +45,7 @@ import { useAssets, useDeleteAsset } from '@/lib/hooks/useAssets';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { calculateAssetValue, calculateTotalValue } from '@/lib/services/assetService';
 import { summarizeOwnership } from '@/lib/utils/assetOwnership';
+import { summarizeLedgerFootprints } from '@/lib/utils/instrumentArchive';
 import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
 import { migrateAssetLedger, backfillAverageCostEur } from '@/lib/services/assetTransactionService';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
@@ -288,6 +289,8 @@ export default function AssetsPage() {
   const { data: trades = [], isLoading: loadingTrades, isError: tradesError } = tradesQuery;
   // The assets the ledger names: STRUMENTI's «Mai comprato» chip reads it, «Azzerato» while unread.
   const tradedAssetIds = useMemo(() => (tradesQuery.data ? new Set(tradesQuery.data.map((t) => t.assetId)) : null), [tradesQuery.data]);
+  // What the ledger says per instrument: the sold-out group and the trash's refusal read it.
+  const ledgerFootprints = useMemo(() => (tradesQuery.data ? summarizeLedgerFootprints(tradesQuery.data) : null), [tradesQuery.data]);
   // A failed read of the ledger (or of its meta) is not «nessuna operazione»: Movimenti says so at
   // every width (2026-10-14) — until then the tile printed the month as empty.
   const movimentiFailed = ledgerMetaError || tradesError;
@@ -921,6 +924,7 @@ export default function AssetsPage() {
               members={familyMembers}
               allAssets={assets}
               tradedAssetIds={tradedAssetIds}
+              ledgerFootprints={ledgerFootprints}
             />
           </motion.div>
           </div>

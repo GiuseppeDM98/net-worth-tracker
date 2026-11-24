@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import {
   assertCanAccessAccount,
   getApiAuthErrorResponse,
@@ -13,13 +13,17 @@ import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboa
  *
  * Delete asset with cascade cleanup of related data
  *
+ * Refused with 409 `has-ledger-operations` (and `operations`, the count) when the asset has any row in
+ * the Registro operazioni other than the migration's opening position: those trades are what the
+ * realized gains and Rendimenti are computed from, and a delete would orphan them (2026-11-23).
+ *
  * Cascade Logic:
  *   - Asset document: Deleted
+ *   - Its opening position (`isBaseline`), when it is the only row: Deleted with it
  *   - Future dividends (exDate > today): Deleted
  *   - Historical dividends (exDate <= today): Preserved
- *   - Linked expenses: Preserved (user's cashflow history)
- *   - Its trades' fee rows: Preserved as plain spending, unlinked (`feeOfTradeId` removed,
- *     2026-11-12): the money left, and an unlinked row is no longer locked in Cashflow
+ *   - Linked expenses: Preserved (user's cashflow history); none can be a fee row of this asset's
+ *     trades, since an asset with a trade is never deleted
  *
  * Why preserve historical data?
  *   - User needs historical dividend/expense records for taxes
@@ -80,6 +84,21 @@ export async function DELETE(
       );
     }
 
+    // The asset's whole ledger, read BEFORE anything is deleted: its own trades forbid the delete.
+    const tradesSnapshot = await adminDb
+      .collection('assetTransactions')
+      .where('userId', '==', userId)
+      .where('assetId', '==', assetId)
+      .get();
+    // The migration's opening position is not an operation of the owner's: it leaves with the instrument (2026-11-23).
+    const ownTrades = tradesSnapshot.docs.filter((tradeDoc) => tradeDoc.data().isBaseline !== true);
+    if (ownTrades.length > 0) {
+      return NextResponse.json(
+        { error: 'Asset has ledger operations', code: 'has-ledger-operations', operations: ownTrades.length },
+        { status: 409 },
+      );
+    }
+
     // Future dividends deletion strategy: Delete > today, preserve <= today
     //
     // Calculate today at midnight for clean date-only comparison
@@ -106,17 +125,6 @@ export async function DELETE(
       .where('exDate', '>', todayTimestamp)
       .get();
 
-    // The fee rows the asset's trades name (2026-11-12): read now, unlinked in the same batch.
-    const tradesSnapshot = await adminDb
-      .collection('assetTransactions')
-      .where('userId', '==', userId)
-      .where('assetId', '==', assetId)
-      .get();
-    const feeRowIds = tradesSnapshot.docs
-      .map((tradeDoc) => tradeDoc.data().feeExpenseId as string | undefined)
-      .filter((id): id is string => !!id);
-    const feeRowSnaps = await Promise.all(feeRowIds.map((id) => adminDb.collection('expenses').doc(id).get()));
-
     // Atomic batch deletion: All-or-nothing transaction
     //
     // Why batch instead of sequential deletes?
@@ -140,9 +148,9 @@ export async function DELETE(
       batch.delete(dividendDoc.ref);
     });
 
-    // Keep the fee rows as plain, deletable spending
-    feeRowSnaps.forEach((feeRowSnap) => {
-      if (feeRowSnap.exists) batch.update(feeRowSnap.ref, { feeOfTradeId: FieldValue.delete(), updatedAt: new Date() });
+    // Past the check every remaining trade is an opening position: it goes with the asset
+    tradesSnapshot.docs.forEach((tradeDoc) => {
+      batch.delete(tradeDoc.ref);
     });
 
     // Delete the asset
@@ -152,7 +160,9 @@ export async function DELETE(
     await batch.commit();
     await invalidateDashboardOverviewSummaryServer(userId, 'asset_deleted');
 
-    console.log(`Asset ${assetId} deleted with ${dividendsSnapshot.size} future dividends removed`);
+    console.log(
+      `Asset ${assetId} deleted with ${dividendsSnapshot.size} future dividends and ${tradesSnapshot.docs.length} opening rows removed`,
+    );
 
     return NextResponse.json({
       success: true,

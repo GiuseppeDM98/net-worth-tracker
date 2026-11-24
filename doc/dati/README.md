@@ -332,7 +332,7 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [05](DATI-05-strumenti-azzerati.md) | Sold-out instruments: a closed group, no deletion over a history | M | — | Sonnet 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 2 decisioni |
+| [05](DATI-05-strumenti-azzerati.md) | Sold-out instruments: a closed group, no deletion over a history | M | — | Sonnet 5.5 · medium | implemented |
 | [06](DATI-06-valuta-estera-operazioni.md) | A trade in a foreign currency | L | 04 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 22 rilievi, 4 decisioni |
 | [07](DATI-07-valuta-estera-dividendi.md) | A dividend in a foreign currency | M | 04, 06 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 4 decisioni |
 | [08](DATI-08-assistente-forma-della-risposta.md) | Assistente: one form for every answer | L | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 1 decisione |

@@ -9,13 +9,19 @@
  *
  * Run it directly (the usual way; options after `--`):
  *   npx tsx scripts/collaudo-finestre.mts --email=test@example.com --url=/dashboard/assets [--url=/dashboard/assets]
- *     [--title="Finestra 1"] [--title="Finestra 2"] [--base=http://localhost:3000] [--minutes=30]
+ *     [--title="Finestra 1"] [--title="Finestra 2"] [--base=http://localhost:3000] [--minutes=30] [--width=390]
  * Two `--url` open two windows of ONE signed-in session (the same account in two tabs — a comparison); each window's
  * tab title starts with its `--title` (default «Finestra N»), so the owner can tell them apart.
+ *
+ * `--width=390` (optionally `--height=844`) opens the windows at a FIXED viewport: a phone's width stays that width
+ * even if the owner maximises the window (without it the window follows its real size, `viewport: null`).
+ * `--chiudi` closes the windows still alive (every `collaudo-finestre` process tree) and exits: `taskkill` on
+ * Windows, where Git Bash has no `pkill`; `pkill -TERM -f` elsewhere.
  *
  * Or import it from a throwaway script: `await openTourWindows({ email, windows: [{ url, title }] })`.
  * Password: `test1234`, every emulator fixture's (WORKFLOW.md § 3). Emulators only: refuses a non-local base URL.
  */
+import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright';
 
@@ -33,6 +39,10 @@ export interface TourOptions {
   base?: string;
   /** The time limit, after which the windows close by themselves. */
   minutes?: number;
+  /** A fixed viewport width in px (a phone: 390); without it the window follows its real size. */
+  width?: number;
+  /** The fixed viewport's height; only read with `width`. */
+  height?: number;
 }
 
 const DEFAULT_BASE = 'http://localhost:3000';
@@ -77,11 +87,12 @@ export async function openTourWindows(options: TourOptions): Promise<string> {
   }
   const minutes = options.minutes ?? DEFAULT_MINUTES;
   const browser = await chromium.launch({ headless: false });
+  const viewport = options.width ? { width: options.width, height: options.height ?? 844 } : null;
   const stop = () => void browser.close().finally(() => process.exit(0));
   process.once('SIGTERM', stop);
   process.once('SIGINT', stop);
   try {
-    const context = await browser.newContext({ viewport: null });
+    const context = await browser.newContext({ viewport });
     const pages: Page[] = [];
     for (const [index, window] of options.windows.entries()) {
       const page = await context.newPage();
@@ -98,15 +109,39 @@ export async function openTourWindows(options: TourOptions): Promise<string> {
   }
 }
 
+/** Closes every live `collaudo-finestre` tree except this process; the platform's own tool (no `pkill` on Windows). */
+export function closeTourWindows(): number {
+  if (process.platform === 'win32') {
+    const script =
+      "$all = Get-CimInstance Win32_Process; $keep = @(" +
+      process.pid +
+      "); $cur = " +
+      process.pid +
+      "; while ($cur) { $p = $all | Where-Object { $_.ProcessId -eq $cur }; if (-not $p) { break }; $cur = $p.ParentProcessId; $keep += $cur }; " +
+      "$n = 0; $all | Where-Object { $_.CommandLine -match 'collaudo-finestre' -and $_.Name -in 'node.exe','cmd.exe' -and $keep -notcontains $_.ProcessId } | ForEach-Object { taskkill /PID $_.ProcessId /T /F 2>&1 | Out-Null; $n++ }; $n";
+    return Number(execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { encoding: 'utf8' }).trim()) || 0;
+  }
+  try {
+    execFileSync('pkill', ['-TERM', '-f', 'scripts/collaudo-finestre.mts']);
+    return 1;
+  } catch {
+    return 0;
+  }
+}
+
 // CLI: run directly with tsx. `pathToFileURL`, not `file://` + argv[1]: on Windows the URL is `file:///C:/…` and
 // the path `C:\…`, so the plain concatenation never matched and the script exited 0 with no window (2026-11-15).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const values = (name: string) =>
     process.argv.filter((a) => a.startsWith(`--${name}=`)).map((a) => a.slice(name.length + 3));
+  if (process.argv.includes('--chiudi')) {
+    console.log(`[collaudo-finestre] chiusi ${closeTourWindows()} processi`);
+    process.exit(0);
+  }
   const [email] = values('email');
   const urls = values('url');
   if (!email || urls.length === 0) {
-    console.error('Uso: npx tsx scripts/collaudo-finestre.mts --email=<fixture> --url=<path> [--url=…] [--title=…] [--base=…] [--minutes=N]');
+    console.error('Uso: npx tsx scripts/collaudo-finestre.mts --email=<fixture> --url=<path> [--url=…] [--title=…] [--base=…] [--minutes=N] [--width=PX] [--height=PX] | --chiudi');
     process.exit(1);
   }
   const titles = values('title');
@@ -115,6 +150,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     windows: urls.map((url, i) => ({ url, title: titles[i] })),
     base: values('base')[0],
     minutes: values('minutes')[0] ? Number(values('minutes')[0]) : undefined,
+    width: values('width')[0] ? Number(values('width')[0]) : undefined,
+    height: values('height')[0] ? Number(values('height')[0]) : undefined,
   });
   console.log(`[collaudo-finestre] fine: ${reason}`);
   process.exit(0);
