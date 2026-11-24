@@ -83,7 +83,7 @@ const CATEGORY_COLORS: { value: string; label: string }[] = [
   { value: '#64748b', label: 'Grigio' },
 ];
 
-// For screen-reader labels (AGENTS.md § Accessibility — colour-swatch buttons)
+// For screen-reader labels (doc/guide/accessibilita.md § Accessibility — colour-swatch buttons)
 const COLOR_LABELS: Record<string, string> = Object.fromEntries(
   CATEGORY_COLORS.map((c) => [c.value, c.label])
 );

@@ -275,7 +275,7 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      // 44×44: the one control of the bar a phone turned sideways shows, under a thumb (2026-10-16, AGENTS.md § Accessibility).
+      // 44×44: the one control of the bar a phone turned sideways shows, under a thumb (2026-10-16, doc/guide/accessibilita.md § Accessibility).
       className={cn("size-11", className)}
       onClick={(event) => {
         onClick?.(event)

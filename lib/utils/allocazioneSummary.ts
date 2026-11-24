@@ -924,7 +924,7 @@ export const UNREAD_LABEL = 'Non letto';
  *
  * Every share is rounded to the printed unit and the drift goes to the row that is a remainder BY
  * DEFINITION, «Resto letto»; without it (every read euro is named, as in Emittenti with few
- * families) the largest row takes it, where one point is the smallest relative error — AGENTS.md
+ * families) the largest row takes it, where one point is the smallest relative error — doc/guide/gerarchia.md
  * § Hierarchy, a list that must add up adds up ON SCREEN. A remainder never goes negative or, when
  * it had a point, to zero: what it cannot absorb goes to the largest row too.
  */

@@ -35,7 +35,7 @@ interface NoteTriggerProps {
 /**
  * The 44px-on-touch, 28px-on-pointer box of both markers: a row is 47px tall on a phone, so the
  * thumb target fits it. The 28px is this row's own exception, gated on the POINTER and not on the
- * width: AGENTS.md § Accessibility names `h-11 → desktop:h-8` as the idiom and `desktop:h-7` as
+ * width: doc/guide/accessibilita.md § Accessibility names `h-11 → desktop:h-8` as the idiom and `desktop:h-7` as
  * never a target.
  */
 const MARKER_CLASS =

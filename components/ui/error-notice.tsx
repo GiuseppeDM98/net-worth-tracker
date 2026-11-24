@@ -27,7 +27,7 @@ interface ErrorNoticeProps {
   /**
    * `role="alert"` on this notice. A page passes `live={!sections.compact}`: below `desktop:` the
    * ONE live node is `PageRest`'s announcement, so three failed reads are one sentence and not
-   * three alerts (AGENTS.md § Accessibility, one live region per list).
+   * three alerts (doc/guide/accessibilita.md § Accessibility, one live region per list).
    */
   live?: boolean;
   className?: string;

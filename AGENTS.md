@@ -27,11 +27,13 @@ page, tab, integration or subsystem, read only by whoever touches that area: the
 shell and the persisted cache since 2026-09-30 (`shell`, `cache-persistita`), the first-screen census since 2026-10-10
 (`prima-schermata`; its record — baselines, fixture table, widened entries — since 2026-10-17, `prima-schermata-misure`), and since 2026-10-10 the charts (`grafici`) and the server layer (`server`), which left this file
 whole, the two-step dialogs and the form reset joining `dialog` the same day, the Assistente's Registra mode out of
-`assistente` since 2026-11-16 (`assistente-registra`), and since 2026-11-06 the motion (`motion`:
+`assistente` since 2026-11-16 (`assistente-registra`), the hierarchy and accessibility rules since 2026-11-24
+(`gerarchia`, `accessibilita`), and since 2026-11-06 the motion (`motion`:
 Framer, scenes, count-up, collapsibles — the React Compiler and `react-hooks` rules stayed here, § React Compiler and
 the hooks rules, because they hold for every component). **How to use them**: section 3 is the index — for each guide the 3–4 things to know BEFORE opening it, then the
 pointer; the three subsystem guides born from sections 2 and 4 keep their stub under the heading the code cites
-(§ Server Layer and API Authorization, § Dialog Form Reset, § Two-Step Create Dialogs, § Recharts). A stub that grows
+(§ Server Layer and API Authorization, § Dialog Form Reset, § Two-Step Create Dialogs, § Recharts, § Hierarchy,
+Density and Disclosure, § Accessibility). A stub that grows
 past 3–4 points is a guide leaking back (2026-09-20: ten had, up to 2700 characters each; 2026-09-30: four more, up to
 2970). **Sizes** (owner, 2026-10-10): this file ~1000 lines, a guide ~500 — past that a guide splits by sub-topic in a
 session of its own, never trimmed at a session's close (`prima-schermata.md` left `velocita.md` at 514 lines). Each
@@ -93,26 +95,19 @@ holds it): how it was learned is `git log`'s.
   (`@[760px]:table-cell`) does not. **The landscape stage**, the closed rows that answer in its index and the row tiles that lay out by their container (2026-10-16): doc/guide/shell.md § The landscape stage — read it before touching a composed page's grid, a row tile or a `tablet-landscape:` class.
 - **A grid item stretches to the row height, a normal-flow child does not inherit it without its own `h-full`**: both
   the grid-item wrapper and the card `div`.
-- **`sticky`, three rules**: it travels only inside its containing block — put it on the box whose PARENT is the tall
-  one and prove it by scrolling `main` in a spec (2026-09-22, the compact `PageHeader`'s mobile navbar,
-  `e2e/settings.mobile.spec.ts`); on a grid item it needs `self-start`, or a stretched `sticky top-6` column has no room
-  to travel and silently behaves as static; its offset is measured from the scroller's CONTENT edge, padding excluded
-  (2026-09-14, Strumenti's actions column: `sticky right-5` mirroring a `-mx-5 px-5` wrapper sat 20px over the last
-  cell) — `right-0`, and draw the edge rule only while `scrollWidth > clientWidth`, measured.
-- **Horizontal page scroll on mobile**: an implicit-`auto`-track grid expands to its widest child — explicit
-  `grid-cols-1` and `min-w-0` on flex/grid children (they default to `min-width:auto`); to center one flex child use
-  `self-center`, not `items-center`. **`main` is the horizontal scroll container, not the document**: `<main
-  class="flex-1 overflow-y-auto">`'s non-`visible` `overflow-y` computes `overflow-x` to `auto`, so
-  `document.scrollWidth - clientWidth` reads 0 while the page scrolls sideways — assert `main.scrollWidth ===
-  main.clientWidth`, and **measure the elements, not the container**: walk `main *` and flag `rect.right >
-  main.getBoundingClientRect().left + main.clientWidth` (at 1440 `main` starts 256px in), the culpable node is the fix,
-  `.sr-only` descendants excluded from the walk (2026-09-20, `e2e/history.mobile.spec.ts`: a visually hidden TABLE is
-  clipped to 1px but its cells keep their rectangles). Reference guard: `e2e/fire.mobile.spec.ts`.
-- **One scroll container per region**: a nested scrollable captures the wheel (desktop-only symptom), and
-  `overflow-x-hidden` on an ancestor CLIPS a descendant's `overflow-x:auto`. **An overflow INSIDE a tile never reaches
-  `main`** (2026-09-14, «Entrate per categoria»: 37px past the tile's border, 0 on `main`): measure a list against its own
-  `section` (`e2e/cashflow.tracciamento.spec.ts`), let a column yield under a container query. **`max-w` on a `td` does
-  not bind an auto-layout table** (2026-09-14, the armed row of the Movimenti table): constrain the BLOCK inside the cell.
+- **`sticky`, three rules**: it travels only inside its containing block — on the box whose PARENT is tall, proved by
+  scrolling `main` (2026-09-22, `e2e/settings.mobile.spec.ts`); on a grid item it needs `self-start`; its offset counts
+  from the scroller's CONTENT edge, padding excluded (2026-09-14, Strumenti: `right-0`, the edge rule drawn only while
+  `scrollWidth > clientWidth`).
+- **Horizontal page scroll on mobile**: explicit `grid-cols-1` and `min-w-0` on flex/grid children; center one flex
+  child with `self-center`. **`main` is the horizontal scroll container, not the document** (its `overflow-y-auto`
+  makes `overflow-x` `auto`): assert `main.scrollWidth === main.clientWidth` and **measure the elements**: walk `main *`
+  for `rect.right > main.getBoundingClientRect().left + main.clientWidth`, `.sr-only` descendants excluded (2026-09-20,
+  `e2e/history.mobile.spec.ts`). Reference guard: `e2e/fire.mobile.spec.ts`.
+- **One scroll container per region**: a nested scrollable captures the wheel, `overflow-x-hidden` on an ancestor CLIPS
+  a descendant's `overflow-x:auto`. **An overflow INSIDE a tile never reaches `main`** (2026-09-14): measure a list
+  against its own `section` (`e2e/cashflow.tracciamento.spec.ts`). **`max-w` on a `td` does not bind an auto-layout
+  table** (2026-09-14): constrain the BLOCK inside the cell.
 
 ### shadcn Card and Dialog Surface
 - **`CardHeader` is `flex flex-col`**: a `flex justify-between` row inside it makes a `flex-1` grandchild act vertically
@@ -137,37 +132,27 @@ holds it): how it was learned is `git log`'s.
 - **`NarrativeText` renders its own `<p>`**: its host is a `<div>`, never a `<p>` (a `<p>` in a `<p>` is a hydration
   error; 2026-11-18, «Questo mese»; held by `__tests__/narrativeTextNesting.test.ts`, a scan of `components/`).
 - **Sign colors are tokens: `text-positive`/`text-destructive`**, chips `bg-positive/10`, resolved via
-  `getMetricValueColor()` — drop `dark:` variants (the token swaps itself); the function returns neutral for the
-  `currency` format by design, signed currency uses `signChipClass`/`signTextClass`. No legacy `text-emerald-*` is left
-  (the Tracciamento feed 2026-08-22; `ExpenseTable`, the dividend dialogs and table 2026-09-14; `budgetProgressStyle`
-  speaks tokens). **An expense type has ONE colour map** (`lib/constants/expenseTypeColors.ts`, 2026-09-14): the feed's
-  dot, the table's badge and the hero's legend; a row's `income` is the sign token `positive`, each outflow a chart slot,
-  the SERIES (bars) take chart slots, never the sign token. **Sign tokens mean gain and loss, and nothing else**: a
-  neutral delta (a class gaining share) stays `text-muted-foreground`. **A figure that PRINTS as zero takes no sign and
-  no sign token, whatever the raw value** (2026-10-10, the phone composition: a strip cell and the tile beside it must print
-  the same zero — DESIGN.md → The Lifted-Figure Rule; on the tiles since 2026-10-12): decide
-  the «−» on the formatted text with `withTypographicMinus`/`formatEuroMinus` (`lib/utils/formatters.ts`, where
-  `isPrintedZero` lives, pinned by `__tests__/formatters.test.ts`), never on `value < 0`; a percent or a gap in points
-  takes `printedSign`/`formatSignedPercentIt`/`formatSignedPoints` from the same module (the Rendimento (TWR) tile since
-  2026-10-14: its hero and chips repeat a strip cell), a signed euro `formatSignedEuro` (Patrimonio's G/P and Storico's
-  «ultimi 12 mesi» chip since 2026-10-14, the chip's percentage since 2026-10-15, `__tests__/evoluzioneTileChips.test.ts`).
-  The sites outside the composed surfaces (the rest of Rendimenti and Storico, email, PDF) still decide on the raw value, on purpose — count them with
-  `grep -rnE "< 0 \? ['\"]−" lib components app`, never quote a number (the helper itself is among the hits).
+  `getMetricValueColor()` — no `dark:` variants; neutral for the `currency` format by design, signed currency uses
+  `signChipClass`/`signTextClass`; no legacy `text-emerald-*` left (2026-08-22, 2026-09-14; `ExpenseTable`,
+  `budgetProgressStyle`). **An expense type has ONE colour map** (`lib/constants/expenseTypeColors.ts`, 2026-09-14):
+  `income` is the sign token `positive`, each outflow and every SERIES a chart slot. **Sign tokens mean gain and loss,
+  nothing else**: a neutral delta stays `text-muted-foreground`. **A figure that PRINTS as zero takes no sign and no sign
+  token** (2026-10-10; the tiles since 2026-10-12; DESIGN.md → The Lifted-Figure Rule): decide the «−» on the formatted
+  text — `withTypographicMinus`, `formatEuroMinus`, `isPrintedZero`, `printedSign`, `formatSignedPercentIt`,
+  `formatSignedPoints`, `formatSignedEuro` (`lib/utils/formatters.ts`, `__tests__/formatters.test.ts`; TWR, G/P and
+  Storico's chips 2026-10-14/2026-10-15, `__tests__/evoluzioneTileChips.test.ts`), never on `value < 0`. The uncomposed
+  sites (rest of Rendimenti and Storico, email, PDF) read the raw value on purpose: count them with
+  `grep -rnE "< 0 \? ['\"]−" lib components app`, never quote a number.
 - **`--warning` is near-white in light mode**: text on a `bg-warning` fill MUST be `text-warning-foreground`; a caution
   reading and the verdict's dot use `text-warning-foreground` too.
-- **A chart slot is not a text colour** — `--chart-1..8` target ~3:1 against a plot area (`text-[var(--chart-3)]`
-  measured 1.02:1 on one theme; the 2026-08-30 tail audited the twelve blocks to 3.38:1 worst case, so the range is
-  1..8; but on 2026-09-18 `--chart-3` light measured 2,74:1 and `--chart-1` dark 2,62:1 ON A CARD — re-measure before
-  leaning on that floor, doc/guide/temi.md § Per-page blind spots). The semantic amber is `--warning-foreground`; only
-  `ExpenseTable`'s chips are exempt. **A chart slot used as TEXT is held to 4,5:1**: `__tests__/actionColorContrast.test.ts`
-  measures COMPRA/VENDI/OK across all sixteen theme blocks, on `--card` and on the chip's own `color-mix` fill (the
-  HARDER surface).
-- **A computed custom property comes back as `lab()`, never as the `oklch()` you authored**: anything that READS a
-  colour token parses `lab()` (and `#hex`) too and never asserts `/^oklch\(/` — through `lib/utils/colorParse.ts`, the
-  ONE parser since 2026-10-08. Two readers were DEAD CODE from the day they were written: `useActionColors`' legibility
-  clamp (until 2026-09-21, raw chart slots as 10-18px text at 2,39-4,02:1) and `useChartColors`' luminance filter
-  (until 2026-10-08, `__tests__/chartColorsContext.test.ts`). Worked example: `lib/utils/actionColor.ts`, whose test
-  feeds it the browser's own serialisation.
+- **A chart slot is not a text colour** — `--chart-1..8` target ~3:1 on a plot area (audited 2026-08-30; ON A CARD two
+  slots measured below on 2026-09-18 — re-measure, doc/guide/temi.md § Per-page blind spots). The semantic amber is
+  `--warning-foreground`; only `ExpenseTable`'s chips are exempt. **A chart slot used as TEXT is held to 4,5:1** on
+  `--card` and on the chip's `color-mix` fill, all sixteen blocks (`__tests__/actionColorContrast.test.ts`).
+- **A computed custom property comes back as `lab()`, never the `oklch()` you authored**: a token READER parses `lab()`
+  and `#hex` through `lib/utils/colorParse.ts`, the ONE parser since 2026-10-08, never asserting `/^oklch\(/`
+  (`useActionColors` was dead code until 2026-09-21, `useChartColors` until 2026-10-08,
+  `__tests__/chartColorsContext.test.ts`; worked example `lib/utils/actionColor.ts`).
 - **Sidebar tokens**: `--sidebar-accent` is a background, `--sidebar-accent-foreground` text ON it; hover on inactive
   items `hover:text-sidebar-foreground`. **Inline `style` blocks Tailwind hover variants**: migrate to classes first.
 - **CSS custom properties never reach emails or the PDF** (both render outside the DOM): the sign hexes there are
@@ -308,10 +293,9 @@ holds it): how it was learned is `git log`'s.
 - **Components must be at module level** — one defined in a render body is a new type every render (remount,
   `AnimatePresence` enter never plays, `useEffect([])` re-fires, the React Compiler throws).
   **`react-hooks/static-components` flags ANY component obtained from a call during render, `useMemo(() => lazy(…))`
-  included** (probed 2026-09-06): only a property read of a module constant passes — the icon pickers' ONE map
-  `LAZY_CATEGORY_ICONS` (`IconPickerPopover`), one chunk per icon since 2026-09-30 through the 121 loaders of
-  `components/expenses/categoryIconLoaders.ts`, never `import('lucide-react')` by a runtime name nor
-  `lucide-react/dynamicIconImports` (+49 KB gz, measured); a new curated name needs its loader
+  included** (2026-09-06): only a property read of a module constant passes — `LAZY_CATEGORY_ICONS`
+  (`IconPickerPopover`), one chunk per icon since 2026-09-30 via `components/expenses/categoryIconLoaders.ts`, never
+  `import('lucide-react')` by name nor `lucide-react/dynamicIconImports` (+49 KB gz); a new name needs its loader
   (`__tests__/categoryIcons.test.ts`) — doc/guide/cashflow.md.
 - **A library several pages use goes behind ONE module of real code** (2026-09-30): recharts only from
   `components/ui/charts/recharts.ts`, which binds `export const X = RechartsX` — Turbopack batches a library by where it
@@ -674,14 +658,11 @@ file used to carry.
   compiled when its chunks carry `react.memo_cache_sentinel`** (3 without, 1318 with, 2026-10-05; `_c(` does not
   survive minification). **The price**: +20–26% gz on component code (`doc/guide/velocita.md` § Registro) and `next
   build` 29 → 47 s; Cashflow paid the most, so its four non-default tabs load on demand (doc/guide/cashflow.md).
-  **Compiled is not memoized** (2026-10-07): the compiler compiled `AssetDialog` and left its whole step-2 form outside
-  every memo scope, so one root `useWatch` re-rendered 562 components per key — measure a form with the census and
-  move a per-keystroke watch into the leaf that reads it (doc/guide/patrimonio.md § Two-Step). **And it can leave ONE
-  call out of the cache beside identical calls it caches** (2026-10-10, Hall of Fame: `describeIncomeRecords(…)` and
-  `describeSavingsRecords(…)` recomputed on every render, `describeNetWorthRecords(…)` and `describeWorstYear(…)`
-  cached — a new `Narrative` prop, two rows re-rendered on every tap of a third): read the COMPILED output before
-  guessing (`transformAsync` with `babel-plugin-react-compiler` from a throwaway `scripts/*.tmp.mjs`, grep `const tN =
-  …` outside an `if ($[…]`), then a `useMemo` on the call's own inputs, which the compiler preserves.
+  **Compiled is not memoized** (2026-10-07, `AssetDialog`: one root `useWatch` re-rendered 562 components per key):
+  measure a form with the census, move a per-keystroke watch into its leaf (doc/guide/patrimonio.md § Two-Step). **It
+  can leave ONE call out of the cache beside identical ones it caches** (2026-10-10, Hall of Fame's
+  `describeIncomeRecords`): read the COMPILED output (`transformAsync` with `babel-plugin-react-compiler` from a
+  throwaway `scripts/*.tmp.mjs`, grep `const tN =` outside an `if ($[…]`), then `useMemo` on the call's own inputs.
   **`react-hooks/preserve-manual-memoization` ("Compilation Skipped")**: a dep array *more specific* than the inferred
   value skips the component — align the dep; «Memoized in source but not in output» cannot be aligned away: a `useMemo`
   whose value never escapes is pruned — inline the computation.
@@ -707,116 +688,27 @@ file used to carry.
 - Il resto — `PageTabs` panels that name themselves and keep their `div`, the icon rail's 44px geometry, the eyebrow,
   the bottom nav and the FAB, the page scene and `data-vt` scoping, the `PageTabBar` pill at 44×44 — in `doc/guide/shell.md`.
 
-### Hierarchy, Density and Disclosure
+### Hierarchy, Density and Disclosure → `doc/guide/gerarchia.md`
 > The visual rules themselves are DESIGN.md's; only the implementation traps live here.
-- **Never give a "Custom" state a permanent slot in a period selector** (it looks disabled until active): a
-  `rounded-full` chip below the selector only when active. A selector working across multiple return paths uses plain
-  `<button role="tab">` + a module-level Framer `layoutId`, not shadcn `<Tabs>`.
-- **A cardified mobile view needs its own reading note**: a matrix collapsing to per-row cards has no rows and columns,
-  so split the help copy (`hidden desktop:block` / `desktop:hidden`) and label each card's axes explicitly.
-- **Prefer rendering large local subtrees as pure render helpers or top-level components** — a nested JSX definition
-  inside a page component means a simple row selection remounts the whole table (`cn` is NOT auto-imported in pages).
-  **The worked example is Impostazioni** (2026-10-08): one 4100-line component with 70 `useState`s re-ran whole on every
-  keystroke (286 components per key on one machine, compiler on — it cannot split a component); now an orchestrator
-  under 500 lines holding ONE `useReducer` draft, each tab a module-level CONTROLLED view of its slice (`slice` in,
-  `onChange(patch)` out, no form state of its own because Radix unmounts an inactive panel), so a keystroke re-renders
-  that view and the page, never the other tabs (`npm run perf:census -- --scenario=settings,allocation`;
-  doc/guide/impostazioni.md).
-- **A radius on the element that carries a `divide-y` hairline bends the ends of the rule** (2026-09-18,
-  `AssistantThreadList`): the `li` stays square, the hover/selected wash goes on an inner box.
-- **A tile's footer is ONE line; the method goes behind «Come si calcola»** (`components/ui/tile-method-note.tsx`,
-  2026-09-20): help printed on every tile at all times stops being read, and an 11px footnote at full tile width runs to
-  95–130 characters a line (the detector's `line-length`); the line that stays says what the figures ARE, the trigger
-  is named after its subject. **A list that must add up adds up ON SCREEN**: round every row to the printed unit and
-  give the drift to the row that is a remainder by definition.
-- **A tile stretched beside a taller neighbour is cured in the GRID, never in the tile** (2026-09-20, Rendimenti:
-  moving eight method footers behind «Come si calcola» made the voids BIGGER, Benchmark ~170 → ~215px, Plusvalenze ~280
-  → ~380px). Tiles share a row only with tiles of their own height; below that row two columns at natural height —
-  wrappers `contents` below `desktop:`, `desktop:flex desktop:flex-col` from it — and the ONE element that can be any
-  height (a chart, `desktop:flex-1`) takes the slack. **The declared exceptions are all on Allocazione**: Per classe (owner,
-  2026-10-17) fills the grid's `1fr` row to the Piano's bottom edge, its footer on the Piano's last line, because
-  the owner preferred the aligned edges to the void under it; the Piano (owner, 2026-11-12) stretches to Per
-  classe's bottom edge when it is the shorter, its cell without `desktop:self-start` (doc/guide/allocazione.md); on Accumulo (owner, 2026-11-18) Portafoglio modello or Criteri del modello stretches to the other column's bottom edge (doc/guide/accumulo.md). **Keep ONE sequence: the DOM order is the reading order on every
-  device**; the desktop places cells with `desktop:col-start-*`/`row-start-*`, never with an `order` swap (2026-09-27,
-  DESIGN.md → The First-Screen Rule; Hall of Fame lost its `order-1…5` on 2026-10-10,
-  `e2e/mobile-composition.hof.mobile.spec.ts` holds the DOM-equals-vertical order at 390 and 1440 and the `order-*`
-  utilities in `main` at 0 — read from `classList` with `/^(?:[a-z-]+:)*order-/`, since `[class*="order-"]` matches
-  every `border-*`, doc/guide/e2e-playwright.md). The Panoramica lost its `order-1…8` on 2026-10-11
-  (`e2e/overview.{mobile.,}spec.ts`), the five Cashflow tabs theirs on 2026-10-12 (Budget, Centri, the centre's detail,
-  Dividendi; `e2e/mobile-composition.cashflow.mobile.spec.ts`), Rendimenti its `order-1…8` on 2026-10-14
-  (`e2e/mobile-composition.performance.degraded.mobile.spec.ts`), Analisi its `order-1…7` and Storico its `order-*` on
-  2026-10-14 (`e2e/mobile-composition.{analisi,history}.mobile.spec.ts`), Allocazione, Previdenza and the five FIRE tabs
-  theirs on 2026-10-15 (`e2e/allocation.mobile.spec.ts`; since 2026-10-16 `e2e/fire.mobile.spec.ts` for the Calcolatore and
-  What If and `e2e/coast.mobile.spec.ts` for the Coast Ipotesi's four tiles — Modello now reads second on a phone, the DOM's
-  order; each probe reads the `classList` AND the vertical order, seen red with an `order-*` put back): no composed grid
-  carries `order-*` any more.
-- **The small-screen composition is DESIGN.md's** (§ 5 → Small-Screen Composition: The First-Screen, Lifted-Figure,
-  Closed-Row and Binding-Clause Rules, written 2026-10-17 when the series closed; what each page does with them, its guide
-  § Composizione mobile). Three code traps, 2026-10-17: **a closed row's panel is EMPTY** until its first opening, so a spec opens
-  the row before reading what is in it (`e2e/mobile-composition.hof.mobile.spec.ts`); **the memory (`mobile-sections:`) is
-  written only by a gesture** — a row's trigger, «Apri tutte»/«Chiudi tutte», a strip cell (`createSectionHandler`,
-  `setAll`, `reveal` in `lib/hooks/useMobileSections.ts`) — never by a default nor by a failed read opening itself: the
-  gestures that write are held by the Hall of Fame spec, «a tab nobody touched writes nothing» by
-  `e2e/mobile-composition.cashflow.mobile.spec.ts`, and «a failed read opening itself writes nothing» only by
-  `createSectionHandler`'s structure (its auto-open is not in the written list; no test); **no `order-*`** in a composed
-  grid (the bullet above). The primitives' own traps stay in doc/guide/motion.md (`TileRowShell`, the controller) and
-  § Accessibility (one live node).
-- **A row's caption WRAPS, it is never truncated, and the label column never grows to make room for it** (2026-09-14,
-  `RankedRows`): a cut fact is no fact («30 set · Asilo nido · in calendario»); at 4 grid columns 46% is the most the
-  label can take beside the bar's 40px floor, the amount and the share (58% painted the share outside the tile,
-  measured) — the caption takes a second line (`line-clamp-2`). Spese maggiori lays its rows `layout="stacked"` (owner,
-  2026-11-15): the label beside the figures, the caption (category · subcategory · day) beside the bar on a line of its own.
+- **Keep ONE sequence: the DOM order is the reading order on every device**; the desktop places cells with
+  `desktop:col-start-*`/`row-start-*`, never an `order` swap (2026-09-27): no composed grid carries `order-*`.
+- **A tile stretched beside a taller neighbour is cured in the GRID, never in the tile** (2026-09-20); the declared
+  exceptions are all on Allocazione (2026-10-17, 2026-11-12, 2026-11-18).
+- **A tile's footer is ONE line; the method goes behind «Come si calcola»** (2026-09-20); a list that must add up adds up
+  ON SCREEN. **A row's caption WRAPS, it is never truncated** (2026-09-14, `RankedRows`).
+- Il resto — the «Custom» period chip, the cardified view's reading note, the Impostazioni worked example of render
+  helpers, `divide-y` and the radius, the small-screen code traps (2026-10-17) and every page's `order-*` removal with
+  its spec — in doc/guide/gerarchia.md.
 
-### Accessibility
-- **`title` is not an accessible name** (VoiceOver on iOS ignores it, touch never fires it): `aria-label` on icon-only
-  buttons, a Radix `<Popover>` for information; a `title` added by a STATE CHANGE is never shown — put the consequence
-  in visible copy.
-- **Touch targets ≥ 44×44px**: `h-8 w-8` in dense lists, `h-10 w-10` for primary and destructive actions (shadcn
-  `size="icon"` is 36px). **A control that must stay small grows its HIT BOX, not its paint**: the `Switch` is 36×20 on
-  screen and 44×44 to the finger through a `before:absolute before:-inset-x-1 before:-inset-y-3` pseudo-element
-  (2026-10-08); `boundingBox()` cannot see it, so a spec proves it by `elementFromPoint` (`e2e/fire.spec.ts`).
-  **Actions hidden with `opacity-0` are unreachable on keyboard AND invisible on touch**: gate them behind
-  `[@media(pointer:fine)]:`. **`desktop:h-7` is 28px — never a target**: copy `h-11 → desktop:h-8` (`AsideToggle` since
-  2026-09-20; four Previdenza sites shipped 28px until 2026-09-13). A 1440px tablet in landscape reads the desktop
-  layout by touch (doc/guide/shell.md § Per-page blind spots).
-- **A non-interactive element with `onClick` needs `role="button"`, `tabIndex={0}`, `aria-label`, Enter/Space and a
-  focus ring — better, a native `<button>`. But an `aria-label` on a `role="button"` REPLACES its contents**
-  (2026-09-21, Allocazione's Per classe hid eight percentages): when the element's text is the information it IS the
-  name, and the expand wording moves onto the chevron as `sr-only` text.
-- **Tabs**: `role="tab"` + `aria-selected` in a named `role="tablist"`, `id` + `aria-controls` for a real panel. **A
-  `SegmentedPill` that picks a VALUE the page reads (a year, a period) is `semantics="radio"`** — a tablist with no
-  tabpanel is a promise the DOM cannot keep (2026-09-13 Previdenza and the Panoramica's period, 2026-09-14 Dividendi;
-  the others stay `tabs` until reviewed); its inactive label is `text-foreground/70` (`text-muted-foreground` measured
-  4,34:1 on `bg-muted`); an active state with no tab (a CUSTOM range) needs an `sr-only` `role="status"` description.
-  **A toggle that shows a panel needs `aria-expanded` + `aria-haspopup`** and a document Escape handler inside
-  `useEffect([isOpen])`. **`PageTabBar` tabs carry `aria-label={label}` unconditionally** (2026-08-22: icon-only below
-  1440); pass `ariaLabel` to `PageTabs` so the tablist is named too.
-- **A tile's `ariaLabel` is its visible eyebrow, year included** (`Anno fiscale 2026`; WCAG 2.5.3) — Playwright locates
-  it with a regex.
-- **`aria-live` regions**: streaming content `aria-live="polite" aria-atomic="false"` + `aria-label`. **Emptying a live
-  region announces nothing** — a two-click confirm announces the *disarm* explicitly.
-- **Data tables**: every `<thead>` `<th>` has `scope="col"`, row headers are `<th scope="row">`. **Calendar grids need
-  explicit ARIA rows**: `role="grid"`, `role="row"` per week (slice the flat 42 cells), `role="columnheader"`,
-  `role="gridcell"`.
-- **Colour-swatch buttons**: never a hex nor a hue name — the **position**, `Colore ${i+1} di ${n}` + `aria-pressed`.
-  **`<Button asChild>` inside `<Link>`**, never `<Button>` (it emits `<a><button>`).
-- **Two-click confirm: no timer, and not `onBlur` alone** (a 3 s auto-disarm is a WCAG 2.2.1 time limit; Safari does
-  not focus a tapped `<button>`): a document `pointerdown` with a `ref.contains(target)` guard, Escape, `onBlur`.
-  **Disarm BEFORE delegating** (on failure nothing resets the flag). **Inside a modal Escape cannot be intercepted from
-  the button** (2026-08-31): Radix's dismiss layer listens from the dialog's MOUNT, so `useArmedDelete` exports
-  `hasArmedConfirm()` and `ResponsiveModal` calls `preventDefault()` in `onEscapeKeyDown`. **The armed button stays a
-  compact «Conferma» and the ROW prints the consequence** (2026-09-13, `VersamentiTile`, `text-destructive`). **One
-  live region per list, not per row** — and **one live node for a phone's failed reads** (2026-10-10,
-  `components/ui/page-rest.tsx`): below `desktop:` every `ErrorNotice` row takes `live={!sections.compact}` and `PageRest` carries the ONE
-  `role="alert"` with `describeFailedSections` («2 sezioni non sono state lette: Benchmark, Contributi.»), a stable
-  `sr-only` node that changes text and empties; the header's `freshness` status stays.
-- **A list of same-kind controls is ONE Tab stop** (`lib/hooks/useRovingFocus.ts`, 2026-09-20: 24 checkboxes put
-  «Dettaglio» ~55 Tabs down Storico): `containerProps` on the wrapper, `itemProps(i)` on each control (`data-roving-item`,
-  no ref), an `sr-only` hint the table is `aria-describedby`. **The dashboard's first Tab stop is «Vai al contenuto
-  principale»** (`#page-main`, `tabIndex={-1}` on `<main>`) and **a tile's eyebrow is an `<h3>`** under the verdict's
-  `<h2>` (`components/ui/tile.tsx`); a keyboard-walk spec presses Tab right after the load.
-- **Form error text needs the sign token too**: `text-red-500` fails AA on a dialog and diverges from `--destructive` on
-  the other themes (the last 76 retired 2026-08-31); a FORM-level failure belongs to the modal's reading line.
+### Accessibility → `doc/guide/accessibilita.md`
+- **`title` is not an accessible name**: `aria-label` on icon-only buttons, a Radix `<Popover>` for information.
+- **Touch targets ≥ 44×44px** (`desktop:h-7` is never a target); a control that must stay small grows its HIT BOX
+  (2026-10-08, `Switch`, proved by `elementFromPoint` in `e2e/fire.spec.ts`).
+- **An `aria-label` on a `role="button"` REPLACES its contents** (2026-09-21): prefer a native `<button>`.
+- **One live region per list, not per row; one live node for a phone's failed reads** (2026-10-10, `PageRest`).
+- Il resto — tabs and `SegmentedPill` semantics, a tile's `ariaLabel`, live regions, data tables and calendar grids,
+  colour swatches, the two-click confirm inside a modal, the roving Tab stop and the skip link, form error tokens — in
+  doc/guide/accessibilita.md.
 
 ---
 
@@ -827,63 +719,48 @@ file used to carry.
 
 ### Commands
 - **The dependency gate** (Node 24 first, the whole list): `doc/guide/dipendenze.md` § How an upgrade is done (2026-11-03).
-- **Phantom errors after a branch switch are a stale `node_modules`** (untracked, branch-shared): ~25 `tsc` errors
-  clustered in `e2e/` and `lib/utils/expenseImport.ts` (`papaparse`, `@playwright/test` missing), or `next build`'s
-  «Failed to resolve package babel-plugin-react-compiler» (2026-10-07) — `npm install` first, then put back any lock
-  line npm rewrote for the platform (`fsevents`'s `dev`). **A dependency RANGE alone is changed by hand in both files**
-  (2026-09-30: `npm install --package-lock-only` rewrote 66 unrelated lock lines): `package.json` + the lock's root
-  entry, then `git diff --stat`.
-- `npm test -- <file>` / `npx vitest run <file>` for targeted tests; **`npx tsc --noEmit` before any PR**, re-run AFTER
-  writing the tests. **Never `git checkout <file>` to undo ONE edit on uncommitted work** (2026-09-24): it throws away
-  the session's rewrite of it — undo a falsification with the tool that made it, then `tsc` again; a scripted
-  falsification that DELETES a line puts a marker comment in its place, since an empty replacement cannot be found
-  again to undo it (2026-11-07: a chat mutation stayed applied until restored by hand). **`next dev`
-  rewrites `tsconfig.json`** (an extra dist dir in `include`, the formatting): a stray `tsconfig.json` in a diff is
-  checked out again, never committed (2026-10-10).
+- **Phantom errors after a branch switch are a stale `node_modules`** (2026-10-07): ~25 `tsc` errors in `e2e/` and
+  `lib/utils/expenseImport.ts`, or «Failed to resolve package babel-plugin-react-compiler» — `npm install`, then restore
+  any lock line rewritten for the platform (`fsevents`'s `dev`). **A dependency RANGE alone is changed by hand** in
+  `package.json` + the lock's root entry (2026-09-30: `npm install --package-lock-only` rewrote 66 unrelated lines).
+- `npm test -- <file>` / `npx vitest run <file>`; **`npx tsc --noEmit` before any PR**, again AFTER the tests. **Never
+  `git checkout <file>` to undo ONE edit on uncommitted work** (2026-09-24): undo with the tool that made it; a scripted
+  falsification that DELETES a line leaves a marker comment, or it cannot be undone (2026-11-07). **`next dev` rewrites
+  `tsconfig.json`**: checked out again, never committed (2026-10-10).
 - **Never `prettier --write` a whole file** (2026-11-17): `.prettierrc` exists but the repo is not formatted by it — one run rewrapped 143 lines of `IdealAllocationTile.tsx` and turned it LF; the file was rebuilt from the index. Edit by hand; a file that loses its CRLF shows in `git diff --stat` as a rewrite.
 - **Tailwind scans every non-ignored file, `doc/` and `SESSION_NOTES.md` included** (2026-11-13): an arbitrary `rounded` class that holds a `var(--costume-control-*,…)`, quoted in a spec, made the CSS fail to compile and every page answer 500 in dev — a test's comment too (2026-11-22, a placeholder radius in `themeCostume.test.ts`'s header). Quote such a class broken up, or describe it in words; once removed, restart `next dev` (its cache keeps the broken rule). Pinned by nothing: a dev server that 500s on every page is the symptom.
-- **Components and hooks are tested under jsdom** (2026-11-07): `__tests__/<name>.test.tsx` runs in the `dom`
-  project of `vitest.config.ts` (Testing Library, `@testing-library/user-event`, `__tests__/domSetup.ts` for cleanup,
-  `ResizeObserver` and `matchMedia`), `.test.ts` in the `node` one; plain assertions, no jest-dom. An `aria-hidden`
-  element has NO accessible name (accname step 2A): `getByRole(…, { name, hidden: true })` finds nothing — take it from
-  the DOM (`querySelector`) and check it is among `getAllByRole(…, { hidden: true })` (`__tests__/pathRail.test.tsx`).
-  A test that reads a clock uses `vi.useFakeTimers` on a noon fixture; a hook's `Date.now()` stamps
-  `vi.useFakeTimers({ toFake: ['Date'] })` + `vi.setSystemTime` (`__tests__/useConsulenteRun.test.tsx`). A Radix `Select`
-  opens on `fireEvent.pointerDown(trigger)` once `hasPointerCapture`, `releasePointerCapture` and `scrollIntoView` are
-  polyfilled on `HTMLElement.prototype`, and an option is picked by `focus()` + `keyDown` Enter — `userEvent.click` on it
-  selects nothing (2026-11-08, `__tests__/questionCard.test.tsx`).
+- **Components and hooks are tested under jsdom** (2026-11-07): `.test.tsx` in the `dom` project of `vitest.config.ts`
+  (Testing Library, `@testing-library/user-event`, `__tests__/domSetup.ts`: cleanup, `ResizeObserver`, `matchMedia`), no
+  jest-dom. An `aria-hidden` element has NO accessible name: take it by `querySelector`, then
+  check it is among `getAllByRole(…, { hidden: true })` (`__tests__/pathRail.test.tsx`).
+  Clocks: `vi.useFakeTimers` on a noon fixture, `{ toFake: ['Date'] }` + `vi.setSystemTime` for a hook's `Date.now()`
+  (`__tests__/useConsulenteRun.test.tsx`). A Radix `Select` opens on `fireEvent.pointerDown` with `hasPointerCapture`,
+  `releasePointerCapture`, `scrollIntoView` polyfilled; an option is picked by `focus()` + Enter, never `userEvent.click`
+  (2026-11-08, `__tests__/questionCard.test.tsx`).
 - **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, no new
   `eslint-disable`; a local named `module` is refused by `@next/next/no-assign-module-variable` (2026-09-28). The config
   ignores `.agents/**` and the `.next-*/**` dist dirs.
 - **A heavy module graph is a FIXTURE**: hoist a slow `await import()` into `beforeAll` with an explicit timeout (after
   checking nothing is read at module scope); inside a test its one-time cost lands on whichever case runs first.
-- **Generated `.next*` type files that break `tsc` or `next build` are deleted, never edited**: a TS1109 only in
-  `.next/dev/types/validator.ts` is a half-written file of a killed dev server (delete that file); a TS2307 on
-  `…/app/api/<route>/route.js` in the `validator.ts` of every `.next-*` (2026-09-28), or in a production build's
-  `.next/types/` (2026-10-07, after PERF-09 removed `current-yield`), cites a route that no longer exists;
-  `.next-e2e/dev/types/` goes whole (2026-09-20) — it is the suite server's alone.
-- **A Node script's `execSync` on Windows runs through cmd.exe, where `^` is the escape**: `git show <sha>^:<file>`
-  loses its caret (2026-11-15: a cites-mapping script read nothing, the error swallowed by its `try`) — write the
-  parent as `<sha>~1`, which both systems read alike.
-- **Git Bash on Windows, two traps**: MSYS rewrites an argument starting with `//` or `/` (2026-10-04: `/api/cron/…`
-  became a Windows path) — prefix `MSYS_NO_PATHCONV=1`; **its `sed -i` is not a falsification tool** (2026-09-28: a
-  pattern with `€` matched nothing and exited 0, and a CRLF file came back LF) — swap text with a node script that
-  asserts exactly one match, and grep the line before trusting the run. A Markdown backtick inside a double-quoted
-  `node -e` is run by bash as a command (write the text through a file); a `\\` inside a quoted heredoc reached the
-  file as ONE backslash (2026-11-07: a patch script's `'\\n'` wrote a real newline into a test) — text with
-  backslashes goes through the editor tools, never a heredoc.
+- **Generated `.next*` type files that break `tsc` or `next build` are deleted, never edited**: a TS1109 in
+  `.next/dev/types/validator.ts` is a killed dev server's half-written file; a TS2307 on a removed
+  `…/app/api/<route>/route.js` in a `.next-*` `validator.ts` (2026-09-28) or in `.next/types/` (2026-10-07, PERF-09's
+  `current-yield`); `.next-e2e/dev/types/` goes whole (2026-09-20).
+- **A Node `execSync` on Windows runs through cmd.exe, where `^` escapes**: write `git show <sha>~1:<file>`, never
+  `<sha>^` (2026-11-15).
+- **Git Bash on Windows**: prefix `MSYS_NO_PATHCONV=1` to an argument starting with `/` (2026-10-04); **its `sed -i` is
+  not a falsification tool** (2026-09-28: `€` matched nothing, exit 0, CRLF came back LF) — a node script asserting one
+  match; a Markdown backtick in a double-quoted `node -e` runs as a command, and a `\\` in a quoted heredoc lands as ONE
+  backslash (2026-11-07) — such text goes through the editor tools.
 - **A surface with no DOM is verified by RENDERING it** (the PDF through `renderToFile` under Vitest, the emails in
   Chromium at 390 / 600 / 1440), and a render with hand-built data proves the WORDS, not the data path (2026-09-07: run
   `fetchPDFData` itself on the emulators) — doc/guide/email-pdf.md § Verifying a surface with no DOM.
 - **A contributor's PR is tried in a worktree and merged as its diff applied, never its commits** (2026-09-07; never
   `git worktree remove --force` a worktree that held a junction, 2026-09-30) — doc/guide/contributi.md.
-- **Run the suite under `TZ=Europe/Rome` too**: every date fixture sits at noon, twelve hours clear of the DST edge,
-  while production dates are local midnight and the pure layer runs in the user's browser. Day-of-year from calendar
-  fields in UTC (`Date.UTC(y,m,d) - Date.UTC(y,0,0)`), and one fixture built the way the dialog builds one. **A fixture
-  that sits BESIDE midnight is named by the Italian clock** — `fromZonedTime('2026-07-31T23:59:00', 'Europe/Rome')`,
-  never `new Date(2026, 6, 31, 23, 59)`: the rule under test reads the Italian day, and the process-zone date is the
-  next day in Rome whenever the suite runs in UTC (four cases were red there until 2026-10-08; the suite is green under
-  `TZ=UTC` as well, and stays so).
+- **Run the suite under `TZ=Europe/Rome` too, and green under `TZ=UTC`** (2026-10-08): date fixtures sit at noon,
+  day-of-year from UTC calendar fields (`Date.UTC(y,m,d) - Date.UTC(y,0,0)`), one fixture built as the dialog builds it.
+  **A fixture BESIDE midnight is named by the Italian clock**: `fromZonedTime('2026-07-31T23:59:00', 'Europe/Rome')`,
+  never `new Date(2026, 6, 31, 23, 59)`.
 - **The suites to run after a change are listed per area in each guide's § *Files*** (since 2026-09-30). Two crossings
   no guide owns: `types/assets.ts`'s `AssetType` also means `assetDialogHelpers` + `allocationUtils` + the three ledger
   suites, `TYPE_TO_CLASS` and `TYPE_CARDS` in `AssetDialog.tsx`, `MANUALLY_VALUED_TYPES` when hand-valued,
@@ -961,25 +838,20 @@ file used to carry.
   fix the comment in the same commit. Knip marks a dead chain's intermediate links "live", and a function that always
   returns `[]` keeps its pipeline "live": trace inward, delete the chain in ONE commit.
 - **A green check never seen red asserts nothing** — the check's own arithmetic included. **When a falsification stays
-  GREEN, the test is the bug** — one of five, each met here: another line holds the property (name it in the test, or it
-  is deleted as dead code — 2026-09-21: the re-cap of `splitFromSurplus`, `estimateSaleTax`'s floor, the explicit
-  `tabIndex` beside `AsideToggle`'s `itemProps`; 2026-11-07, the after-today guard on the cashflow block's first series
-  row and three dead conjuncts of its counting, deleted at the retirement); a test added beside others is proven by a falsification that turns
-  ONLY it red (2026-09-28, `__tests__/exposureEngine.test.ts`); the ASSERTION is the inert one — suspect its anchor
-  (2026-09-21, the monthly email: `toContain('1400')` matched the caption, not the `<td align="right">` cell); the
-  fixture makes a branch unreachable (`allocateByShare`'s rounding correction cannot fire on two shares); the test PINS
-  the defect (2026-09-07, `summarizeLaborMetrics`'s baseline month and missing right edge asserted as expected) — put
-  one row past every boundary the function should have.
+  GREEN, the test is the bug** — one of five: another line holds the property (name it, or delete it as dead code —
+  2026-09-21 `splitFromSurplus`, `estimateSaleTax`, `AsideToggle`; 2026-11-07 the cashflow block); a test added beside
+  others is proven by a falsification turning ONLY it red (2026-09-28, `__tests__/exposureEngine.test.ts`); the
+  ASSERTION is inert — suspect its anchor (2026-09-21, `toContain('1400')` matched a caption); the fixture makes a branch
+  unreachable (`allocateByShare` on two shares); the test PINS the defect (2026-09-07, `summarizeLaborMetrics`) — put
+  one row past every boundary.
 - **A fire-and-forget whose `catch` only logs is verified by READING the document it should have written** (2026-09-06,
   `e2e/performance.degraded.spec.ts` on `performance-cache/{uid}`: an `undefined` in the metrics failed every write);
   `removeUndefinedDeep` before every `setDoc`.
 - **A spec that edits a document another fixture writes RESTORES what it read, never deletes** (2026-09-11,
-  `cashflow.owner.spec.ts`) — the WHOLE document when a page save rewrites it (2026-09-25,
-  `e2e/cashflow.transfer-fee.spec.ts` with `set()`); a fixture ISIN is one the account never held; a fixture date is UTC
-  midnight like the form's — doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright).
-- **An assertion of ABSENCE needs a positive anchor first**: `toHaveCount(0)` passes against a page that has not
-  rendered — wait for something expected in both states, then assert the absence; a chunk held from the first
-  navigation keeps an absence at mount green whatever the page mounts (2026-10-07, `e2e/assets.rows.mobile.spec.ts`).
+  `cashflow.owner.spec.ts`), the WHOLE document when a page save rewrites it (2026-09-25,
+  `e2e/cashflow.transfer-fee.spec.ts`) — doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright).
+- **An assertion of ABSENCE needs a positive anchor first** (`toHaveCount(0)` passes on an unrendered page), and a
+  chunk held from the first navigation keeps an absence at mount green (2026-10-07, `e2e/assets.rows.mobile.spec.ts`).
 
 ### Per-page blind spots
 The "looks like a bug, is not" behaviours live at the end of each `doc/guide/<page>.md` (*Per-page blind spots*,

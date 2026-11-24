@@ -675,7 +675,7 @@ export const OWNERSHIP_FOOTER =
   'Le quote per persona si scrivono nel form di ogni asset; un fondo pensione segue il membro di Previdenza, un mutuo le quote del suo immobile.';
 
 /**
- * The footer of the Intestatari tile, ONE line (AGENTS.md § Hierarchy, Density and Disclosure):
+ * The footer of the Intestatari tile, ONE line (doc/guide/gerarchia.md § Hierarchy, Density and Disclosure):
  * in the warning tone the assets whose stored quotas no longer fit their quantity («1 asset ha
  * quote da riassegnare: VWCE.»), since a sale or a value typed lower leaves the units as written
  * (lib/utils/assetSlice.ts) — on either basis, a datum to fix comes first; else, on the Carico

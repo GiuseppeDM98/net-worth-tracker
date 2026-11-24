@@ -7,7 +7,7 @@
  * copies merged here; the interview's question cards and the Assistente's cards read this contract).
  *
  * Single mode is the Radix `RadioGroup` (its own roving focus); multiple mode is a `role="group"`
- * of checkboxes made ONE Tab stop by `useRovingFocus` (AGENTS.md § Accessibility). An `exclusive`
+ * of checkboxes made ONE Tab stop by `useRovingFocus` (doc/guide/accessibilita.md § Accessibility). An `exclusive`
  * option («Nessuna di queste») clears the others and is cleared by any other (2026-11-01). The
  * «Altro…» row opens a text field under its label while it is chosen — with no autofocus: Radix
  * selects a radio as the arrows reach it, and a focus jump would pull a keyboard reader out of

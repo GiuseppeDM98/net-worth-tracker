@@ -137,7 +137,7 @@ describe('describeFreshness', () => {
 
 /**
  * The one announcement of a phone's failed reads (`PageRest`'s live node, since 2026-10-10;
- * AGENTS.md § Accessibility). Falsified on
+ * doc/guide/accessibilita.md § Accessibility). Falsified on
  * 2026-10-10: the two-section case went red with the singular sentence fixed for every count.
  */
 describe('describeFailedSections', () => {
