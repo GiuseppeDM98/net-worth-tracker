@@ -1,7 +1,8 @@
 # DATI-02 — The daily archive: one row a day, beside the monthly snapshots
 
 > Series `doc/dati/` (index: [README.md](README.md)). Depends on: nothing. Written on 2026-11-23; every `file:line`
-> is cited @ b0bf8276. Owner's point 5; decisions 10, 11 and 28. Defines the shared contract **C1** (index § 7).
+> is cited @ b0bf8276 (a line number is a hint, the function's name is the anchor). Owner's point 5; decisions 10,
+> 11, 28, 48, 49, 50, 53 and 88. Defines the shared contract **C1** (index § 7).
 
 ## 1. The problem today (evidence on the code)
 
@@ -31,22 +32,27 @@ function); it draws nothing. The consumers are DATI-13, DATI-14 and DATI-15.
 1. A snapshot run with no `year`/`month` in its body writes `dailySnapshots/{userId}/months/{YYYY-MM}` with the row
    under `days.{DD}`, the Italian day of the run. Proof: R1 (§ 6).
 2. A second run the same day replaces that day's row whole and leaves the other days of the document untouched.
-   Proof: R1 asserts the `mergeFields` option names exactly `days.{DD}` beside the three header fields; E2 reads two
-   days back after two writes on the emulator.
+   Proof: R1 asserts the `mergeFields` option names exactly `days.{DD}` beside the three header fields; E2 plants
+   another day of the month, calls the route once on the emulator and reads both days back.
 3. A run with an explicit `year` or `month` (a past month rewritten) writes no daily row. Proof: R2.
 4. A failure of the daily write does not fail the snapshot: the route answers `success: true`, the monthly document
    is written, the error is logged. Proof: R3.
 5. The row skips an instrument with quantity 0 and value 0, rounds the euro figures to cents and keeps the quantity as
    it is. Proof: U1, U2.
 6. `monthly-snapshots` is written exactly as before: the monthly `.set()` call and its argument are unchanged. Proof:
-   the existing `apiAuthRoutes.test.ts:853-888` stays green untouched.
-7. The owner (or a member of the shared account) reads a month through the client SDK; another signed-in user is
+   the existing snapshot tests of `__tests__/apiAuthRoutes.test.ts` (the block that asserts the monthly `set`) stay
+   green with their bodies untouched; only the file's `adminDb` mock gains a branch (§ 6).
+7. The owner and a member of the shared account read a month through the client SDK; another signed-in user is
    refused; nobody writes from the browser; a month never written reads as «absent», not as an error. Proof: E1.
 8. `useDailySnapshots(ownerId, days)` returns the points of the last `days` Italian days in ascending order, reading
-   one document per month touched. Proof: U4 (the flattening), H1 (the hook under jsdom with the service mocked).
-9. `mirror:seed` copies the account's daily months into the emulators and `mirror:remove` deletes them. Proof: M1 and
-   one run of each against the emulators in the guided verification.
-10. `npx tsc --noEmit`, `npm run lint`, `TZ=Europe/Rome npx vitest run`, `TZ=UTC npx vitest run` green.
+   one document per month touched, each month a query of its own; a month read after it closed is never read again
+   while the device keeps it (decision 88). Proof: U4 (the flattening), U6 (the finality rule), H1 (the hook under
+   jsdom with the service mocked), P1 (the key is persisted).
+9. `mirror:seed` copies the account's daily months into the emulators and `mirror:remove` deletes them. Proof: M1
+   (the lists), the planted month deleted by `mirror:remove` in the guided verification (§ 7 G), and the measure of
+   § 8.4 on the first morning the archive holds a day.
+10. «Crea snapshot» makes the daily readers read today's row again. Proof: H2.
+11. `npx tsc --noEmit`, `npm run lint`, `TZ=Europe/Rome npx vitest run`, `TZ=UTC npx vitest run` green.
 
 ## 3. Decisions
 
@@ -54,6 +60,19 @@ function); it draws nothing. The consumers are DATI-13, DATI-14 and DATI-15.
 - **Decision 28** (owner, 2026-11-23): no reconstruction of the past — the archive starts the day it ships.
 - **Decision 11** (owner, 2026-11-23): four consumers in this series (Patrimonio › Andamento, Assistente and
   Consulente, Rendimenti, Panoramica) — built by DATI-13, 14, 15, not here.
+- **Decision 49** (owner, 2026-11-23): the cron stays at 18:00 UTC; a US instrument's row is its price at that hour,
+  mid-session, not the close — accepted and declared (§ 9, blind spots). Every day is taken at the same hour, so the
+  daily series is consistent with itself.
+- **Decision 50** (owner, 2026-11-23): when the evening's price update fails the row is written on the prices already
+  stored and carries no mark; declared (§ 9, blind spots).
+- **Decision 53** (owner, 2026-11-23): what has no market price — an account, a pension fund, a property, a loan —
+  has no daily price. The row keeps `q` and `v` for every instrument; `dailyUnitPrice` answers null where the
+  arithmetic has no meaning (below), and the readers that hold the asset (DATI-13, DATI-15) apply the type rule of
+  DATI-12 (`hasNoMarketPrice`).
+- **Decision 88** (owner, 2026-11-23): Rendimenti's daily risk follows the chosen period, whatever its length; the
+  months it needs are read once and kept by the device — (e) below.
+- **Decision 48** (owner, 2026-11-23): a verification step may reach a paid or external service only after the
+  owner's yes, asked before; § 6 and § 7 are built so that none is needed.
 - Adopted, reversible:
   - (a) **one document per account per month, a map of days** (`days.{DD}`), not one document per day: ~1,4 KB a day
     for thirty instruments, ~42 KB a month, twelve reads a year — a document per day would cost 365 reads a year and
@@ -61,13 +80,20 @@ function); it draws nothing. The consumers are DATI-13, DATI-14 and DATI-15.
   - (b) **the path is nested under the uid** (`dailySnapshots/{userId}/months/{YYYY-MM}`), the shape of
     `budgetHistory` (`firestore.rules:220-227`): the rule never reads `resource.data`, so a missing month answers null.
   - (c) **per instrument the row stores `q` and `v`** (quantity, value in euro), the monthly `byAsset` convention: the
-    euro unit price is `v / q`; an instrument with no quantity (a loan) has a value and no unit price.
+    euro unit price is `v / q` where both are positive. A loan keeps its residual principal in `q` at price 1 and
+    its value is `−q` (`calculateAssetValue`, `lib/services/assetService.ts`): its `v / q` is −1, not a price, so
+    `dailyUnitPrice` answers null when `q ≤ 0` or `v < 0`.
   - (d) **every day is written, weekends included** (the cron runs daily): a reader that wants trading days filters
     them (DATI-14 does).
-  - (e) **kept forever, never persisted to IndexedDB**: `['daily-snapshots']` is not added to
-    `PERSISTED_QUERY_PREFIXES` (`lib/constants/persistCache.ts:70-92`); 5 minutes of `staleTime` like the snapshots.
+  - (e) **kept forever, one query per month, persisted** (decision 88): the key is
+    `['daily-snapshots', uid, 'YYYY-MM']` and `['daily-snapshots']` joins `PERSISTED_QUERY_PREFIXES`
+    (`lib/constants/persistCache.ts`). A month fetched AFTER it closed is final — `staleTime: Infinity`; the month in
+    course, and a past month whose copy was fetched while it was still open, take the global five-minute default.
+    The persisted cache lives 24 hours (`PERSIST_CACHE_MAX_AGE_MS`): «read once» means once a day per device at
+    most, whatever the period's length. No bump of `PERSIST_CACHE_VERSION` (a new prefix renames nothing).
   - (f) **«Crea snapshot» on Panoramica also writes today's row** (it posts with no year/month): the row carries its
-    instant (`at`), so a reader can tell the evening cron from a later click.
+    instant (`at`), so a reader can tell the evening cron from a later click; the mutation invalidates the daily
+    keys (§ 4.5).
   - (g) the two dead entries found by the count of 2026-11-23 leave with this spec (§ 4.6).
 
 ## 4. Solution
@@ -98,7 +124,7 @@ import { roundToCents } from '@/lib/utils/cents';
 export const DAILY_SNAPSHOTS_COLLECTION = 'dailySnapshots';
 export const DAILY_SNAPSHOTS_SUBCOLLECTION = 'months';
 
-/** One instrument on one day. The euro unit price is `v / q`; a loan has a value and no quantity. */
+/** One instrument on one day. A loan keeps its residual principal in `q` and a negative `v`. */
 export interface DailyAssetRow {
   q: number;
   v: number;
@@ -192,10 +218,23 @@ export function flattenDailyMonths(months: DailySnapshotMonth[], fromIso: string
   return points.sort((a, b) => (a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0));
 }
 
-/** The euro unit price of a row, or null when the instrument has no quantity to divide by. */
+/**
+ * The euro unit price of a row, or null where `v / q` is not a price: nothing to divide by, or a
+ * loan (its quantity is the residual principal, its value the same figure below zero). Whether the
+ * instrument has a MARKET price at all — an account, a pension fund and a property have none — is
+ * the reader's question: it holds the asset, the row does not.
+ */
 export function dailyUnitPrice(row: DailyAssetRow | undefined): number | null {
-  if (!row || row.q <= 0) return null;
+  if (!row || row.q <= 0 || row.v < 0) return null;
   return row.v / row.q;
+}
+
+/**
+ * Whether the copy of a month is final: it was fetched on an Italian day after the month's last.
+ * A copy taken while the month was open misses its later days, however old the month is now.
+ */
+export function isDailyMonthFinal(monthKey: string, fetchedOnIso: string): boolean {
+  return fetchedOnIso.slice(0, 7) > monthKey;
 }
 ```
 
@@ -236,8 +275,12 @@ export async function readDailyPoints(db: Firestore, userId: string, fromIso: st
 Hall of Fame comment: when the validated body carries neither `year` nor `month`, build the day with
 `buildDailySnapshotDay({ totalNetWorth, liquidNetWorth, byAssetClass: allocation.byAssetClass, byAsset, at: now })`
 and call `writeDailySnapshotDay(adminDb, userId, getItalyDateIso(now), day)` inside its own `try/catch`
-(`console.error('Error writing daily snapshot:', error)`); `now` is one `new Date()` taken where the route already
-resolves the Italian month (`:182`). The JSON answer gains `data.dailyWritten: boolean`. Nothing above `:253` changes.
+(`console.error('Error writing daily snapshot:', error)`). `now` is ONE instant for the two archives: where the route
+resolves the Italian month (`getItalyMonthYear()`, `:182`) it becomes `const now = new Date();` and
+`getItalyMonthYear(now)`, and `getItalyDateIso` comes from the same dynamic import of `dateHelpers` — a click at
+midnight of a month's last day files the same month in both. That line is the only change above `:253`. The JSON
+answer gains `data.dailyWritten: boolean`. A run on an account with no asset answers `success: false` before the
+write, as today: no daily row.
 The manual route (`app/api/portfolio/snapshot/manual/route.ts`) writes no daily row: it files a typed total for a
 chosen month, not today's portfolio.
 
@@ -259,13 +302,39 @@ No index: the documents are read by id.
 
 - `lib/services/dailySnapshotService.ts`: `getDailySnapshotMonths(userId: string, monthKeys: string[]): Promise<DailySnapshotMonth[]>`,
   one `getDoc(doc(db, 'dailySnapshots', userId, 'months', key))` per key, the missing ones dropped — the body of
-  `getBudgetHistory` (`lib/services/budgetHistoryService.ts:18-36`) with no field mapping (the row has no Timestamp but
-  `updatedAt`, which is not returned).
-- `lib/query/queryKeys.ts`: `dailySnapshots: { months: (userId: string, monthKeys: string[]) => ['daily-snapshots', userId, ...monthKeys] as const }`.
+  `getBudgetHistory` (`lib/services/budgetHistoryService.ts:18-36`); each existing snap maps to
+  `{ userId: data.userId, month: data.month, days: data.days ?? {} }` (`updatedAt`, the document's only Timestamp, is
+  dropped). Beside it `getDailySnapshotMonth(userId: string, monthKey: string): Promise<DailySnapshotMonth | null>`,
+  the same read for one key, null when the document is absent.
+- `lib/query/queryKeys.ts`:
+  `dailySnapshots: { all: (userId: string) => ['daily-snapshots', userId] as const, month: (userId: string, monthKey: string) => ['daily-snapshots', userId, monthKey] as const }`.
+- `lib/constants/persistCache.ts`: `['daily-snapshots']` joins `PERSISTED_QUERY_PREFIXES`, with the comment «the
+  daily archive, a query per month: a closed month is read once and kept (2026-11-23)».
 - `lib/hooks/useDailySnapshots.ts`: `useDailySnapshots(ownerId: string | undefined, days: number)` — `toIso =
-  getItalyDateIso()`, `fromIso = isoDaysBefore(toIso, days - 1)`, `monthKeys = monthKeysBetween(fromIso, toIso)`; a
-  `useQuery` on those keys, `enabled: Boolean(ownerId)`, `select` → `flattenDailyMonths(data, fromIso, toIso)`; it
-  returns the query (`data: DailyPoint[]`). The demo account reads its own archive like any other (the cron writes it).
+  getItalyDateIso()`, `fromIso = isoDaysBefore(toIso, Math.max(1, days) - 1)`, `monthKeys = monthKeysBetween(fromIso,
+  toIso)`; `useQueries` with one query per key — `queryKey: queryKeys.dailySnapshots.month(ownerId, key)`,
+  `queryFn: () => getDailySnapshotMonth(ownerId, key)`, `enabled: Boolean(ownerId)`,
+  `staleTime: (query) => (isDailyMonthFinal(key, getItalyDateIso(new Date(query.state.dataUpdatedAt))) ? Infinity : QUERY_STALE_TIME_MS)`
+  (`QUERY_STALE_TIME_MS` from `lib/query/queryDefaults`, the global default; `dataUpdatedAt` 0 reads as 1970, never final) — and
+  `combine` to ONE result:
+
+  ```ts
+  export interface DailySnapshotsResult {
+    /** Ascending; undefined until every month of the window has answered once. */
+    data: DailyPoint[] | undefined;
+    isPending: boolean;
+    /** A month failed and no copy of it is held. */
+    isError: boolean;
+  }
+  ```
+
+  `data` is `flattenDailyMonths(months that are not null, fromIso, toIso)` once no query is pending; `isError` is
+  true when a query is in error with `data === undefined`. The hook returns that object, the same reference while
+  its inputs are the same (`combine` is memoised by the library). The demo account reads its own archive like any
+  other (the cron writes it) and is not persisted (`isPersistableQuery` refuses the demo uid).
+- `lib/hooks/useSnapshots.ts`, `useCreateSnapshot`: its `onSuccess` also invalidates
+  `queryKeys.dailySnapshots.all(userId)`, the prefix of every month key, so the page that holds the button — the
+  Panoramica, whose line DATI-14 draws on the days — reads today's row again.
 
 ### 4.6 Mirror and the two dead entries
 
@@ -288,8 +357,12 @@ No index: the documents are read by id.
   only — `buildDailySnapshotDay` never emits `undefined`, so no stripping pass is needed; keep it that way.
 - **Italian day, not UTC** (`lib/utils/dateHelpers.ts:61`): here it means the key is `getItalyDateIso(now)`; at 18:00
   UTC the two agree, at a «Crea snapshot» click at 00:30 Italian time they do not.
-- **Rules are published by hand and are inert until then** (AGENTS.md:601-603): here it means the cron's write works
-  before the publish (Admin SDK), the readers of DATI-13/14 do not — § 8 orders the publish first.
+- **Rules are published by hand and are inert until then** (AGENTS.md § Firestore Writes): here it means the cron's
+  write works before the publish (Admin SDK), the readers of DATI-13/14 do not — § 8 has the publish done before or
+  with the merge; the readers arrive with DATI-13.
+- **The persisted cache restores a query as it was fetched** (doc/guide/cache-persistita.md): here it means a
+  restored month keeps its `dataUpdatedAt`, which is what `isDailyMonthFinal` reads — a copy taken on the 20th is
+  read again after the month closes, a copy taken after it never is.
 - **The three enforcement layers**: here it means a reader passes `ownerId` (the account), never `user.uid`, as every
   hook does.
 - **No owner data in a tracked file**: the tests and E1 use invented round figures (10.000, 2.500) and ids like
@@ -301,24 +374,41 @@ No index: the documents are read by id.
 
 | # | Level · file | What it asserts | Mutation that must turn it red |
 |---|---|---|---|
-| U1 | unit · `__tests__/dailySnapshot.test.ts` | a zero row (quantity 0, value 0) is not in `assets`; a loan (quantity 0, value −50.000) is | delete the `continue` |
+| U1 | unit · `__tests__/dailySnapshot.test.ts` | a zero row (quantity 0, value 0) is not in `assets`; a loan (quantity 50.000, price 1, value −50.000) is, as `{ q: 50000, v: -50000 }` | delete the `continue` |
 | U2 | unit · same | 1.000,005 → 1.000,01 on `netWorth`, `v`, `byClass`; `q` 3,333333 kept | drop `roundToCents` on `v` |
 | U3 | unit · same | `monthKeysBetween('2026-11-20','2027-02-03')` = four keys ending `2027-02` | `month > 12` → `month > 11` |
 | U4 | unit · same | `flattenDailyMonths` sorts across two months and drops a day outside the window | remove the window test |
-| U5 | unit · same | `dailyUnitPrice` null on `q: 0`, 25 on `{ q: 4, v: 100 }`; `isoDaysBefore('2026-03-01', 1)` = `2026-02-28` | `row.q <= 0` → `row.q < 0` |
-| R1 | unit · `__tests__/apiAuthRoutes.test.ts` (snapshot block) | the cron path calls the months doc's `set` with `days: { '23': … }` and `mergeFields` equal to the four paths | `{ merge: true }` in the store |
+| U5 | unit · same | `dailyUnitPrice` null on `q: 0`, null on the loan `{ q: 50000, v: -50000 }`, 25 on `{ q: 4, v: 100 }`; `isoDaysBefore('2026-03-01', 1)` = `2026-02-28` | `row.q <= 0` → `row.q < 0`; and, for the loan, drop `\|\| row.v < 0` |
+| U6 | unit · same | `isDailyMonthFinal('2026-10', '2026-11-01')` true; `('2026-10', '2026-10-31')` false; `('2026-10', '1970-01-01')` false | `>` → `>=` |
+| R1 | unit · `__tests__/apiAuthRoutes.test.ts` (snapshot block) | with the clock at 2026-04-23T16:00:00Z the cron path calls the months doc `2026-04`'s `set` with `days: { '23': … }` and `mergeFields` equal to the four paths | `{ merge: true }` in the store |
 | R2 | unit · same | a body with `month: 4` writes the monthly document and no daily row | drop the year/month guard |
-| R3 | unit · same | the daily `set` rejecting → 200, `success: true`, `data.dailyWritten: false`, monthly `set` called | remove the `try/catch` |
-| H1 | dom · `__tests__/useDailySnapshots.test.tsx` | with the service mocked on two months, `data` is ascending and has only the last `days` days; `ownerId` undefined → no call | `isoDaysBefore(toIso, days - 1)` → `days` |
+| R3 | unit · same | the daily `set` rejecting → 200, `success: true`, `data.dailyWritten: false`, monthly `set` called, `console.error` called with 'Error writing daily snapshot:' | remove the `try/catch` |
+| H1 | dom · `__tests__/useDailySnapshots.test.tsx` | clock at 2026-03-02T12:00:00Z, `days` = 3, the service mocked per month (2026-02 with '27','28', 2026-03 with '01','02'): `data` = the points of 2026-02-28, 2026-03-01, 2026-03-02; the service is called once for `2026-02` and once for `2026-03`; `ownerId` undefined → no call | `isoDaysBefore(toIso, days - 1)` → `days` |
+| H2 | dom · `__tests__/useSnapshots.test.tsx` (new) | `useCreateSnapshot`'s success invalidates `['daily-snapshots', uid]` (a spy on `queryClient.invalidateQueries`) | remove the invalidation |
+| P1 | unit · `__tests__/persistCache.test.ts` | `isPersistableQuery(queryKeys.dailySnapshots.month(OWNER, '2026-11'), DEMO)` is true, false for the demo uid | remove the prefix |
 | M1 | unit · `__tests__/mirrorCollections.test.ts` | `dailySnapshots` is owned by the mirror; `goals` is in no list | remove the new list |
-| E1 | e2e · `e2e/daily-snapshots.rules.spec.ts` | REST on the Firestore emulator with Auth-emulator ID tokens: owner 200, another user 403, a PATCH by the owner 403, a month never written 404 | rule → `allow read: if isAuthenticated()` |
-| E2 | e2e · same | two POSTs to `/api/portfolio/snapshot` (cron secret) on two planted days leave two keys under `days` | bare `.set()` in the store |
+| E1 | e2e · `e2e/daily-snapshots.rules.spec.ts` | REST on the Firestore emulator with Auth-emulator ID tokens: owner 200, another user 403, the same user 200 once `account-access/{owner}` names it as a member, a PATCH by the owner 403, a month never written 404 | rule → `allow read: if isAuthenticated()` |
+| E2 | e2e · same | one POST to `/api/portfolio/snapshot` as the account itself, on a month document that already holds another day, leaves both keys under `days` | bare `.set()` in the store |
 
-E1/E2 plant and read through REST at `:8080/v1/projects/demo-net-worth/databases/(default)/documents` as
-`e2e/accumuloFixture.ts:28` does; the ID tokens come from the Auth emulator
-(`:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`, `test@example.com` and a second
-fixture account, password `test1234`). E2's second day is planted by writing the first day's row through the Admin
-REST (`Bearer owner`) under yesterday's key, then calling the route once: the document must hold both.
+**The unit harness.** `__tests__/apiAuthRoutes.test.ts` throws on a collection its `adminDb` mock does not list: the
+mock gains a `dailySnapshots` branch — `doc() → { collection: () => ({ doc: (monthKey) => ({ set: dailyMonthSetMock }) }) }`,
+the month key recorded — and the existing tests keep their bodies. The file mocks `getItalyMonthYear` and leaves
+`getItalyDateIso` real, so R1–R3 fix the clock (`vi.useFakeTimers({ toFake: ['Date'] })`,
+`vi.setSystemTime(new Date('2026-04-23T16:00:00Z'))`, restored in `afterEach`).
+
+**The emulator specs.** E1/E2 plant and read through REST at
+`:8080/v1/projects/demo-net-worth/databases/(default)/documents` as `e2e/accumuloFixture.ts` does; the ID tokens come
+from the Auth emulator (`:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`, password
+`test1234`). E1's owner is `test@example.com`, the other user `degraded@example.com`; the member case plants
+`account-access/test-user-1 { memberUids: [<the uid of degraded>] }` through the Admin REST (`Bearer owner`) and
+deletes it in `finally`. E2 runs on an account of its own, created in `beforeAll` in the Auth emulator
+(`daily-e2e@example.com`) and given, through the Admin REST, one cash account and one instrument with
+`autoUpdatePrice: false`: the route's price update finds nothing to ask the market, so the spec reaches no market
+service and rewrites no price of the shared seed. It plants a row under another day of the CURRENT month's document
+(`'02'` when today's Italian day is `'01'`, else `'01'`), calls the route once with
+`Authorization: Bearer <the account's ID token>` and body `{ userId }` — the «Crea snapshot» path; the Playwright
+runner has no `CRON_SECRET` — and reads both keys. `afterAll` deletes the account, its assets, its monthly snapshot
+and `dailySnapshots/{its uid}`.
 
 ## 7. Guided verification (WORKFLOW.md § 2)
 
@@ -326,11 +416,22 @@ Expected outcome, declared first: after one «Crea snapshot» on Panoramica the 
 `dailySnapshots/{uid}/months/{this month}` with one key under `days` (today), its `netWorth` equal to the Panoramica's
 figure to the cent, and `monthly-snapshots` unchanged in shape.
 
-- A — the diff, read by the owner.
-- B–E, automated by a throwaway Playwright script on the emulators (never a control that spends: none here): B the
-  click and the document; C a second click the same day → still one key, a later `at`; D a loan-only and a
-  zero-quantity instrument planted (decoys «ornitorinco», «fenicottero») → the first is in `assets`, the second is
-  not; E the mirror — `npm run mirror:seed -- <email>` then `mirror:remove`, the collection gone.
+The phases are WORKFLOW.md § 2's. B–E are automated by a throwaway Playwright script on the emulators, on E2's kind
+of account (a cash account and instruments with `autoUpdatePrice: false`, never `test-user-1`): no step reaches a
+market service, a model or a mailbox, so no yes of the owner's is needed (decision 48).
+
+- A, invariance — the diff read by the owner; the month's `monthly-snapshots` document has the same fields before
+  and after a run.
+- B, change of context — a second account's click writes under its own uid, never the first's.
+- C, the new behaviour — the click and the document; a second click the same day → still one key, a later `at`.
+- D, under the UI — the route called directly with a loan (quantity 50.000, value −50.000) and a zero-quantity
+  instrument planted (decoys «ornitorinco», «fenicottero») → the first is in `assets`, the second is not.
+- E, the negative pair — another account reads the month through the client SDK → permission-denied; the owner →
+  the document.
+- G, the mirror — a month planted at `dailySnapshots/prod-mirror/months/{this month}` through the Admin REST, then
+  `npm run mirror:remove`: the document is gone. `npm run mirror:seed -- <email>` reads production, where the
+  archive holds no day before the first evening after the merge to `main`: it logs 0 months copied and does not
+  fail. It is run once, with the owner (it reads his account).
 - F — at the owner's «pronto», on the mirror: Panoramica › «Crea snapshot», then the document in the emulator UI.
 
 ## 8. Putting it into service
@@ -340,17 +441,28 @@ figure to the cent, and `monthly-snapshots` unchanged in shape.
 2. The owner publishes `firestore.indexes.json` when convenient: the deploy offers to delete `price-history`; yes.
 3. Merge to `develop`, then `develop → main` at once, as every spec of this series (index § 8, rule 13): days not
    filed are lost (decision 28).
-4. Measure, the morning after the first 18:00 UTC run in production: one key under `days` per account. No budget
+4. Measure, the morning after the first 18:00 UTC run in production: one key under `days` per account; then
+   `npm run mirror:seed -- <email>` logs one daily month copied, and `npm run mirror:remove` closes it. No budget
    moves (`perf:budget`: no page imports the hook yet; run it once to see +0,0).
 
 ## 9. Documentation
 
 - `doc/guide/storico.md` — new § «The daily archive» (the path, the row, who writes, `mergeFields`, what it is not:
-  not a second snapshot series, never read by the monthly readers); its § Files gains the three modules.
-- `AGENTS.md` § Firestore Writes — one sentence: a day inside a map document is written with `mergeFields` on its
-  path (2026-11-23), beside the bare-`.set()` rule.
+  not a second snapshot series, never read by the monthly readers; one query per month, a closed month final and
+  persisted, 24 hours of persisted cache); its § Files gains the four modules (util, server store, client service,
+  hook) and `e2e/daily-snapshots.rules.spec.ts`; its § Per-page blind spots gains: a US instrument's row is its
+  price at 18:00 UTC, mid-session (decision 49); a row written after a failed price update repeats the stored price
+  and carries no mark (decision 50); a day the cron skipped stays a hole; a deleted asset stays as a key in the old
+  rows; the manual snapshot route files no daily row; no daily price exists for an instrument the account does not
+  hold.
+- `doc/guide/cache-persistita.md` — the new prefix and the finality rule (`isDailyMonthFinal`), one paragraph.
+- `AGENTS.md` § Firestore Writes — one sentence inside the bare-`.set()` bullet, which is rewritten and not grown by
+  more than two lines (the file is at 989 of ~1.000): a day inside a map document is written with `mergeFields` on
+  its path (2026-11-23).
 - `CLAUDE.md` — Architecture Snapshot, one clause («a daily archive beside the monthly snapshots,
-  doc/guide/storico.md § The daily archive»); stays under 20.000 characters.
+  doc/guide/storico.md § The daily archive»); the «Latest» entry REPLACED whole (decision 46: the date, this spec in
+  one sentence, «Open: doc/dati/ (README § 6)», «Next: DATI-03»); under 20.000 characters, counted with `node`
+  (doc/guide/collaudo.md § Where things are recorded).
 - `doc/guide/e2e-emulatori.md` — the mirror's new list.
 - `Draft Release Temp.md`: no entry (nothing a user sees yet).
 - `doc/dati/README.md` § 6: status row.
@@ -360,8 +472,12 @@ figure to the cent, and `monthly-snapshots` unchanged in shape.
 - Every consumer: the daily chart and the month-to-date figure → DATI-13; Rendimenti's daily volatility and drawdown
   and Panoramica's daily line → DATI-14; the Assistente's and the Consulente's thirty-day block → DATI-15.
 - A reconstruction of the past from Yahoo's daily history → not planned (decision 28).
-- A daily row from the manual snapshot route → not planned (it files a typed total of another month).
-- Daily prices of instruments the account does not hold → not planned.
+- A daily row from the manual snapshot route → not planned (it files a typed total of another month); recorded in
+  doc/guide/storico.md § Per-page blind spots.
+- Daily prices of instruments the account does not hold → not planned; recorded in doc/guide/storico.md § Per-page
+  blind spots.
+- A mark on a row whose prices were not refreshed, the US close instead of the 18:00 UTC price → not planned
+  (decisions 50 and 49); recorded in the same blind spots.
 
 ## 11. The prompt that implements it
 
@@ -404,17 +520,22 @@ nel riassunto. Se serve un comando che solo io posso lanciare (produzione, un lo
 interattivo), dammelo una riga alla volta con l'esito atteso.
 
 Implementa la spec così com'è scritta, nell'ordine: il modulo puro con i suoi test (U1–U5, ognuno
-visto rosso con la sua mutazione), lo store server e la route (R1–R3), la rule, il servizio client con
-chiave e hook (H1), il mirror e le due voci morte (M1), poi E1 ed E2 sugli emulatori. Il codice dei
-§ 4.2 e § 4.3 è già scritto: copialo.
+visto rosso con la sua mutazione: U1–U6), lo store server e la route (R1–R3, con il ramo nuovo del mock
+descritto nel § 6), la rule, il servizio client con chiavi, prefisso persistito e hook (H1, P1),
+l'invalidazione in useCreateSnapshot (H2), il mirror e le due voci morte (M1), poi E1 ed E2 sugli
+emulatori, i documenti del § 9 e la riga 02 di doc/dati/README.md § 6 a `implemented`. Il codice dei
+§ 4.2 e § 4.3 è già scritto: copialo. I due comandi del § 8 (rules, indexes) li lancio io: dammeli una
+riga alla volta con l'esito atteso. `npm run perf:budget` una volta, atteso +0,0.
 
 Fermati e chiedimi se: la route dello snapshot non è più come la descrive il § 1 (commit b0bf8276),
 `mergeFields` con un percorso `days.DD` non si comporta sull'emulatore come dice il § 4.3, oppure un
 test esistente dello snapshot diventa rosso.
 
-Collaudo: § 7, la F al mio «pronto». Un branch, un commit, solo dopo il mio OK con il riassunto del diff.
-SESSION_NOTES.md non si committa.
+Collaudo: § 7 (nessun passo raggiunge un servizio di mercato, un modello o una casella: se uno ti serve,
+chiedimelo prima), la G con me, la F al mio «pronto». Un branch, un commit, solo dopo il mio OK con il
+riassunto del diff. SESSION_NOTES.md non si committa. A commit in develop, ricordami la PR develop → main
+(regola 13 dell'indice): i giorni non archiviati sono persi.
 ```
 
 Model: **Opus 5.5**, effort **medium** — a new collection with its security rule and a shared contract. Estimated
-size: M (three new modules, one route, the rules, the mirror; ~12 tests).
+size: M (four new modules, one route, the rules, the mirror; 16 tests).
