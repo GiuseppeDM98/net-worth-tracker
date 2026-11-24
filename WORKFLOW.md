@@ -290,7 +290,10 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
   server, copied into the repo root as `.tmp-*.mjs`, waiting on the page's `h1`, never on `networkidle`; say it is
   Playwright's. The tour still goes on the MIRROR. Count only the detector's hits that belong to the surface
   (2026-09-18).
-- **A probe never opens a control that SPENDS** (2026-09-20): read what a control does before scripting a click on it.
+- **A probe opens a control that SPENDS only with the owner's yes, asked before** (2026-09-20; owner, 2026-11-23:
+  «quando collaudiamo qualcosa possiamo chiamare le api di anthropic o quel che ci serve per il collaudo, sempre
+  chiedendomelo prima»): read what a control does before scripting a click on it; a step that would call the real
+  model, send a real email or reach a paid service is asked each time. A committed test never spends.
 - **The session's background tasks die with it**: the emulators and the dev server of a tour run in the OWNER's
   terminals; when the agent starts them on Windows, each one DETACHED (`Start-Process cmd.exe "/c npm run <script> >
   <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden`), the full suite too, followed with a monitor; at the end export
