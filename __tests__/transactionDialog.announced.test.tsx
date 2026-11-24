@@ -62,7 +62,7 @@ describe('TransactionDialog — what follows a saved trade', () => {
     stubMatchMedia(true);
   });
 
-  // D1
+  // Red when the toast fires unconditionally.
   it('names the announced dividends the trade rewrote, and says nothing when none', async () => {
     createMock.mockResolvedValueOnce(resultWith({ updated: 1, deleted: 0 }));
     await saveTrade(BOND, { type: 'buy', quantity: 1000 });
@@ -76,7 +76,7 @@ describe('TransactionDialog — what follows a saved trade', () => {
     expect(toastMock.info).not.toHaveBeenCalled();
   });
 
-  // D2
+  // Red when the opened-position scheduler is called for every trade type.
   it('asks for the coupon of a bond bought from 0 with the derived quantity', async () => {
     createMock.mockResolvedValueOnce(resultWith({ updated: 0, deleted: 0 }, 1000));
     await saveTrade(BOND, { type: 'buy', quantity: 1000 });

@@ -500,7 +500,7 @@ describe('the cron reads the quantity held at the ex-date', () => {
     collectionMocks['assets'] = { doc: vi.fn(() => ({ get: vi.fn().mockResolvedValue(assetDocData) })) };
   }
 
-  // P1
+  // Red when the `canBeOwedSince` skip is dropped.
   it('does not ask Borsa Italiana for an instrument sold out before the window', async () => {
     collectionMocks['assets'] = makeCollection(makeQuerySnapshot([makeAssetDoc({ ...stock, quantity: 0 })]));
     givenLedger([trade('buy', daysAgo(120), 100), trade('sell', daysAgo(90), 100)]);
@@ -511,7 +511,7 @@ describe('the cron reads the quantity held at the ex-date', () => {
     expect(result.assetsScraped).toBe(0);
   });
 
-  // P2
+  // Red when `entitledQuantity` is replaced by `asset.quantity`.
   it('creates a scraped dividend on the quantity held before its ex-date, and none where nothing was held', async () => {
     collectionMocks['assets'] = makeCollection(makeQuerySnapshot([makeAssetDoc({ ...stock, quantity: 150 })]));
     givenLedger([trade('buy', daysAgo(30), 100), trade('buy', daysAgo(5), 50)]);
@@ -531,7 +531,7 @@ describe('the cron reads the quantity held at the ex-date', () => {
     expect(result.newDividends).toBe(1);
   });
 
-  // P3
+  // Red when `runExpenseCreation` skips the entitlement verdict.
   it('on the payment day deletes a record not held at its ex-date, with no income', async () => {
     configureIncomeCategory();
     collectionMocks['dividends'] = makeCollection(makeQuerySnapshot([dueAutoDividend()]));
@@ -568,7 +568,7 @@ describe('the cron reads the quantity held at the ex-date', () => {
     expect(result.processedDividends[0].amount).toBe(20);
   });
 
-  // P4
+  // Red when the step-over at quantity 0 becomes a `break`.
   it('steps over a past coupon date at quantity 0 and creates the first future one owed', async () => {
     collectionMocks['dividends'] = makeCollection(makeQuerySnapshot([couponOf(at('2025-12-15'))]));
     bondAsset();
@@ -600,7 +600,7 @@ describe('the cron reads the quantity held at the ex-date', () => {
     expect(result.scheduled).toBe(0);
   });
 
-  // P5
+  // Red when a rejected ledger read falls back to `[]`.
   it('skips, in every phase, the user whose ledger cannot be read, and counts the error', async () => {
     vi.mocked(getAssetTransactionsAdmin).mockImplementation(async (userId: string) => {
       if (userId === 'u1') throw new Error('Failed to fetch asset transactions');

@@ -2,7 +2,7 @@
  * What a dividend is owed on (lib/utils/dividendEntitlement.ts): the quantity the ledger held at the
  * end of the Italian day before the ex-date — the trade day for a share, the value date for a coupon.
  *
- * Every date sits at noon UTC (the same Italian day under any TZ), except U3's, which is an instant of
+ * Every date sits at noon UTC (the same Italian day under any TZ), except the Italian-day test's, which is an instant of
  * 23:30 UTC on purpose: in Italy it is already the next day. Figures are invented and round.
  */
 import { describe, it, expect } from 'vitest';
@@ -46,7 +46,7 @@ function announced(overrides: Partial<AnnouncedDividend> = {}): AnnouncedDividen
 }
 
 describe('quantityHeldBefore', () => {
-  // U1
+  // Red when the day filter reads `<=` for `<` (a sale ON the ex-date would count).
   it('counts the trades of the days before the ex-date, a sale ON the ex-date not among them', () => {
     const trades = [trade('buy', noon('2026-03-01'), 100), trade('sell', noon('2026-03-10'), 40)];
 
@@ -55,14 +55,14 @@ describe('quantityHeldBefore', () => {
     expect(quantityHeldBefore(trades, noon('2026-03-15'))).toBe(60);
   });
 
-  // U2
+  // Red when the `isBaseline` branch is dropped.
   it('cannot say without trades, nor before a migration baseline; says 0 before a first real purchase', () => {
     expect(quantityHeldBefore([], noon('2026-03-10'))).toBeNull();
     expect(quantityHeldBefore([trade('buy', noon('2026-03-20'), 100, { isBaseline: true })], noon('2026-03-10'))).toBeNull();
     expect(quantityHeldBefore([trade('buy', noon('2026-03-20'), 100)], noon('2026-03-10'))).toBe(0);
   });
 
-  // U3
+  // Red when the Italian day is replaced by `toISOString().slice(0, 10)`.
   it('reads the trade on the Italian day: 23:30 UTC on the eve is already the ex-date in Italy', () => {
     const trades = [
       trade('buy', noon('2026-03-01'), 100),
@@ -92,7 +92,7 @@ describe('entitledQuantity and canBeOwedSince', () => {
 describe('reconcileAnnouncedDividend', () => {
   const ASOF = '2026-03-12';
 
-  // U4
+  // Red when `taxShare` is replaced by a fixed 0.26 (the 12,5% record).
   it('rewrites a pending record on the quantity held, keeping its own tax share', () => {
     const trades = [trade('buy', noon('2026-03-01'), 100), trade('sell', noon('2026-03-10'), 40)];
 
@@ -112,7 +112,7 @@ describe('reconcileAnnouncedDividend', () => {
     expect(at125.netAmount).toBeCloseTo(26.25, 9);
   });
 
-  // U5
+  // Red when the hand-entered / cashed guard is dropped.
   it('never touches a hand-entered record nor a cashed one', () => {
     const soldOut = [trade('buy', noon('2026-03-01'), 100), trade('sell', noon('2026-03-10'), 100)];
 
@@ -120,7 +120,7 @@ describe('reconcileAnnouncedDividend', () => {
     expect(reconcileAnnouncedDividend(announced({ expenseId: 'exp-1' }), soldOut, ASOF)).toEqual({ kind: 'keep' });
   });
 
-  // U6
+  // Red when `held < EPSILON` becomes `held <= dividend.quantity` (the sale after), or the equality test moves back above the zero test (the record at 0).
   it('deletes what was not held at the ex-date, keeps what a later sale leaves owed, and drops a record written at 0', () => {
     const soldBefore = [trade('buy', noon('2026-03-01'), 100), trade('sell', noon('2026-03-10'), 100)];
     const soldAfter = [trade('buy', noon('2026-03-01'), 100), trade('sell', noon('2026-03-20'), 100)];
@@ -131,7 +131,7 @@ describe('reconcileAnnouncedDividend', () => {
       .toEqual({ kind: 'delete' });
   });
 
-  // U8
+  // Red when the payment-day guard is dropped.
   it('leaves a record whose payment day has passed, and treats the payment day itself as still to be paid', () => {
     const soldBefore = [trade('buy', noon('2026-03-01'), 100), trade('sell', noon('2026-03-10'), 100)];
 
@@ -141,7 +141,7 @@ describe('reconcileAnnouncedDividend', () => {
       .toEqual({ kind: 'delete' });
   });
 
-  // U9
+  // Red when `entitlementBasisOf` always answers `'trade'`.
   it('reads a coupon on the value date, a share dividend on the trade day, a baseline on its own day', () => {
     expect(settlementDayIso('2026-03-05')).toBe('2026-03-09');
     expect(entitlementBasisOf('coupon')).toBe('settlement');
@@ -165,7 +165,7 @@ describe('reconcileAnnouncedDividend', () => {
 });
 
 describe('describeAnnouncedDividendsOutcome', () => {
-  // U7
+  // Red when the two singular forms are swapped.
   it('says nothing when nothing moved, and names what was recomputed and what was removed', () => {
     expect(describeAnnouncedDividendsOutcome({ updated: 0, deleted: 0 })).toBeNull();
     expect(describeAnnouncedDividendsOutcome({ updated: 1, deleted: 0 }))

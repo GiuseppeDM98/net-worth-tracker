@@ -15,7 +15,8 @@
  *
  * Reads are lazy: the trade query fires only while the dialog is open (the exposure/lazy-load rule).
  * Deletes use the two-click confirm WITHOUT a timer (`useArmedDelete`); the baseline row cannot be
- * deleted, only edited (quantity/PMC/note) via TransactionDialog.
+ * deleted, only edited (quantity/PMC/note) via TransactionDialog. A row's edit and delete wait while
+ * the trades on screen are a copy restored from before this load and still being reread (2026-11-24).
  */
 
 import { useMemo, useRef, useState } from 'react';
@@ -58,6 +59,7 @@ import { cn } from '@/lib/utils';
 import { Info, Pencil, Plus, Trash2, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastAnnouncedDividends } from '@/components/assets/announcedDividendsToast';
+import { resolveFreshness } from '@/lib/utils/freshness';
 import type { Asset } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
 import { COSTUME_FRAME_RADIUS_CLASS, COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
@@ -72,9 +74,17 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
 
-  const { data: transactions = [], isLoading } = useAssetTransactions(ownerId, asset.id, {
-    enabled: open,
-  });
+  const ledgerQuery = useAssetTransactions(ownerId, asset.id, { enabled: open });
+  const { data: transactions = [], isLoading } = ledgerQuery;
+  // Each edit and delete carries the `updatedAt` of the row it was drawn from, and the server
+  // refuses a stale one (409). A reload paints the trades restored from the persisted cache —
+  // possibly from before the last edit — and rereads them behind: a delete pressed on that copy was
+  // refused and the trade stayed (2026-11-24). The actions wait for the reread; a refetch of a list
+  // read in this load (the invalidation after a save) holds nothing.
+  const rereadingRestoredCopy = resolveFreshness([ledgerQuery], new Date().getTime(), {
+    openedAt: typeof performance !== 'undefined' ? performance.timeOrigin : undefined,
+  }).stale;
+  const rowActionsDisabled = isDemo || rereadingRestoredCopy;
   const deleteMutation = useDeleteAssetTransaction(ownerId || '');
 
   const [txDialogOpen, setTxDialogOpen] = useState(false);
@@ -264,7 +274,7 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
                       transaction={transaction}
                       currency={asset.currency || 'EUR'}
                       effect={effectsById[transaction.id]}
-                      isDemo={isDemo}
+                      actionsDisabled={rowActionsDisabled}
                       onEdit={() => openEditTrade(transaction)}
                       onDelete={() => void performDelete(transaction)}
                     />
@@ -279,7 +289,7 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
                     transaction={transaction}
                     currency={asset.currency || 'EUR'}
                     effect={effectsById[transaction.id]}
-                    isDemo={isDemo}
+                    actionsDisabled={rowActionsDisabled}
                     onEdit={() => openEditTrade(transaction)}
                     onDelete={() => void performDelete(transaction)}
                   />
@@ -313,7 +323,7 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
 
 interface DeleteButtonProps {
   transaction: AssetTransaction;
-  isDemo: boolean;
+  actionsDisabled: boolean;
   onDelete: () => void;
   className?: string;
 }
@@ -322,7 +332,7 @@ interface DeleteButtonProps {
  * Two clicks, no timer, and the armed label names what is about to be reversed — a settlement
  * storno is a second consequence the reader cannot see from the row.
  */
-function DeleteButton({ transaction, isDemo, onDelete, className }: DeleteButtonProps) {
+function DeleteButton({ transaction, actionsDisabled, onDelete, className }: DeleteButtonProps) {
   const ref = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick, onBlur } = useArmedDelete(ref, onDelete);
   // Emptying a live region announces nothing, so the disarm is announced explicitly.
@@ -343,7 +353,7 @@ function DeleteButton({ transaction, isDemo, onDelete, className }: DeleteButton
         className={cn(armed ? 'h-8 px-2 text-[11px]' : 'h-8 w-8', className)}
         onClick={onClick}
         onBlur={onBlur}
-        disabled={isDemo}
+        disabled={actionsDisabled}
         aria-pressed={armed}
         aria-label={armed ? `Premi di nuovo per ${consequence}` : 'Elimina operazione'}
       >
@@ -370,7 +380,7 @@ interface MovementRowProps {
   transaction: AssetTransaction;
   currency: string;
   effect: LedgerTransactionEffect | undefined;
-  isDemo: boolean;
+  actionsDisabled: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -379,7 +389,7 @@ function MovementTableRow({
   transaction,
   currency,
   effect,
-  isDemo,
+  actionsDisabled,
   onEdit,
   onDelete,
 }: MovementRowProps) {
@@ -418,21 +428,21 @@ function MovementTableRow({
           size="icon"
           className="h-8 w-8"
           onClick={onEdit}
-          disabled={isDemo}
+          disabled={actionsDisabled}
           aria-label="Modifica operazione"
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
         </Button>
         {/* Baseline cannot be deleted — it is the frozen opening position. */}
         {!isBaseline && (
-          <DeleteButton transaction={transaction} isDemo={isDemo} onDelete={onDelete} className="ml-1" />
+          <DeleteButton transaction={transaction} actionsDisabled={actionsDisabled} onDelete={onDelete} className="ml-1" />
         )}
       </td>
     </tr>
   );
 }
 
-function MovementRow({ transaction, currency, effect, isDemo, onEdit, onDelete }: MovementRowProps) {
+function MovementRow({ transaction, currency, effect, actionsDisabled, onEdit, onDelete }: MovementRowProps) {
   const isBaseline = transaction.isBaseline === true;
   const fees = transaction.fees;
   const gross = transaction.quantity * transaction.priceEur;
@@ -476,13 +486,13 @@ function MovementRow({ transaction, currency, effect, isDemo, onEdit, onDelete }
           size="icon"
           className="h-11 w-11"
           onClick={onEdit}
-          disabled={isDemo}
+          disabled={actionsDisabled}
           aria-label="Modifica operazione"
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
         </Button>
         {!isBaseline && (
-          <DeleteButton transaction={transaction} isDemo={isDemo} onDelete={onDelete} className="h-11 w-11" />
+          <DeleteButton transaction={transaction} actionsDisabled={actionsDisabled} onDelete={onDelete} className="h-11 w-11" />
         )}
       </div>
     </div>

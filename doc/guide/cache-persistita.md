@@ -82,6 +82,9 @@ Three traps, each paid for on 2026-09-29:
 - **The restore INVALIDATES what it restored** (`onSuccess`, `refetchType: 'none'`): every load rereads,
   stale-while-revalidate — without it a reload within `staleTime` painted the restored figures and read nothing for
   five minutes (an Admin write between two `goto` stayed invisible to four specs).
+- **A write that carries a version never starts from a restored copy still being reread** (2026-11-24): the copy
+  may predate the last save, and its `updatedAt` is refused (409). The control waits for the reread —
+  `resolveFreshness(...).stale` with `openedAt` — as Movimenti does (doc/guide/registro-operazioni.md § Concurrency).
 
 ### The freshness reading
 

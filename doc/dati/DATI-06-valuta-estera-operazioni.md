@@ -421,7 +421,7 @@ server's `priceEur` through `onCreated`, so `executedAmountEur` is the real amou
 - The instrument closed without a purchase reads «Mai comprato» (`createdEmpty`, no ledger row): the chip the app
   already has, and DATI-05 keeps it in the list, deletable.
 - A bond's first coupon and final premium are no longer scheduled at the create (quantity 0: DATI-04's guard): the
-  first purchase schedules them (`scheduleCouponsForOpenedPosition`, DATI-04 § 4.5). The bond's price basis — the
+  first purchase schedules them (`scheduleCouponsForOpenedPosition` in `lib/services/couponScheduling.ts`, called by `TransactionDialog`). The bond's price basis — the
   quote in percent, the indexation coefficient — is the trade form's own (`resolveBondPrice`, `indexationCoefficient`).
 - The classic create is untouched: a non-ledger type (an account, a property, a pension fund, a loan) and a ledger
   type on an account with no ledger yet (`metaNow == null`) still write quantity and average cost directly.
