@@ -195,7 +195,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   date and account, so the row's form hides type, amount, date and account and prints `TRADE_FEE_ROW_NOTE` in their
   place (`isTradeFeeRow`); its delete is disabled in the table and in the detail («Si elimina con la sua operazione, in
   Patrimonio»), and the detail's reading appends the same note. `isFeeRow` is true on it (it takes no fee of its own,
-  the AI's patterns skip it). Category, subcategory, member, centre and note stay editable. A row whose trade or asset
+  the AI's patterns skip it). Category, subcategory, member, centre and note stay editable. A row whose trade
   was deleted wholesale loses `feeOfTradeId` and is a plain spending row again.
 - **A `debt` row can repay a LOAN — by its PRINCIPAL** (2026-09-25 on the property's own debt, on a `loan` asset since
   2026-10-10 — doc/guide/patrimonio.md; `lib/utils/mortgageRepayment.ts`). `debtAssetId` names the loan; on the row's

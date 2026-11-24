@@ -521,9 +521,23 @@ export async function updateCashAssetBalancesAtomic(
 }
 
 /**
+ * The server refused to delete an asset that has operations in the Registro (409
+ * `has-ledger-operations`, 2026-11-23): `operations` is the count of the owner's own rows. A typed error
+ * so the UI can say why instead of printing a generic failure.
+ */
+export class AssetDeleteRefusedError extends Error {
+  readonly code = 'has-ledger-operations';
+  constructor(readonly operations: number) {
+    super('Asset has ledger operations');
+  }
+}
+
+/**
  * Delete an asset and its future dividends
  * Only deletes dividends with ex-date > today to preserve historical data
  * Uses API endpoint to leverage Admin SDK and bypass Firestore Security Rules
+ *
+ * @throws AssetDeleteRefusedError when the asset has operations of the owner's in the ledger
  */
 export async function deleteAsset(assetId: string, userId: string): Promise<void> {
   try {
@@ -550,6 +564,17 @@ export async function deleteAsset(assetId: string, userId: string): Promise<void
     }
 
     if (!response.ok) {
+      if (
+        response.status === 409 &&
+        typeof responseBody === 'object' &&
+        responseBody !== null &&
+        'code' in responseBody &&
+        responseBody.code === 'has-ledger-operations'
+      ) {
+        const operations = 'operations' in responseBody && typeof responseBody.operations === 'number' ? responseBody.operations : 0;
+        throw new AssetDeleteRefusedError(operations);
+      }
+
       const apiError =
         typeof responseBody === 'object' &&
         responseBody !== null &&
@@ -575,6 +600,8 @@ export async function deleteAsset(assetId: string, userId: string): Promise<void
       deletedFutureDividends,
     });
   } catch (error) {
+    // A refusal is an answer, not a failure: it reaches the UI untouched.
+    if (error instanceof AssetDeleteRefusedError) throw error;
     console.error('Failed to delete asset', {
       userId,
       assetId,

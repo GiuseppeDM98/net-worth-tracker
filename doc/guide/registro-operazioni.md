@@ -105,8 +105,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   has the same field and rules (`#openingFees`), and the fee rides on the first buy it already sends, so the server
   plans its row like any trade's.
 - **Rows that outlive their trades stay as plain spending**: `deleteAllAssetTransactionsForAsset` (the pensionFund
-  conversion) and the asset's delete route (`app/api/assets/[assetId]/route.ts`) remove `feeOfTradeId` from each row a
-  trade names, in the same transaction / batch — the money left, and an unlinked row is deletable in Cashflow again.
+  conversion) removes `feeOfTradeId` from each row a trade names, in the same transaction — the money left, and an
+  unlinked row is deletable in Cashflow again. The asset's delete route no longer unlinks anything: an instrument with
+  operations of the owner's cannot be deleted (409 `has-ledger-operations`) and one whose only row is the opening
+  position, which carries no fee, goes with it (doc/guide/patrimonio-strumenti.md).
 - **The PMCs stored before then are re-projected once per account**, never backfilled with rows: the Patrimonio page's
   first visit runs `backfillAverageCostEur`, which writes both PMCs and stamps `averageCostEurFeeFreeAt` on the meta
   (§ Engine above; `assetTransactionAverageCostEurBackfill.test.ts`).

@@ -8,6 +8,10 @@
  * table never scrolls at 1440 — the optional grouping by class, the `--chart-3` tint on
  * hand-priced rows and the two-click delete.
  *
+ * An instrument sold out WITH a history in the Registro leaves the list for a closed group at the
+ * bottom (`ArchivedInstruments`, 2026-11-23), and one with operations of the owner's has a
+ * trash that says why it does nothing: its trades are what the realized gains are computed from.
+ *
  * Three things the table says that the storage does not (2026-09-14, the page's first critique):
  * a hand-valued holding (a property, a fund, a private-equity stake) prints its VALUE and when
  * it was typed («valore a mano dal 12/08»), never a quantity of 130.000 at 1,0000 €; a bond
@@ -52,11 +56,19 @@ import {
 import { toast } from 'sonner';
 import { isLoanAsset, type Asset, type FamilyMember } from '@/types/assets';
 import { describeZeroQuantityChip } from '@/lib/utils/zeroQuantityChip';
+import {
+  ALL_ARCHIVED_SENTENCE,
+  DELETED_INSTRUMENT_NAME,
+  deleteBlockingOperations,
+  describeDeleteRefusal,
+  splitArchivedInstruments,
+  type LedgerFootprint,
+} from '@/lib/utils/instrumentArchive';
 import { describeAssetOwnerLabel, listAssetOwnerFilterOptions, matchesAssetOwnerFilter } from '@/lib/utils/assetOwnership';
 import { OWNER_FILTER_ALL } from '@/lib/utils/movementsOwnerFilter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { isLedgerAssetType } from '@/types/assetTransactions';
-import { calculateAssetValue } from '@/lib/services/assetService';
+import { AssetDeleteRefusedError, calculateAssetValue } from '@/lib/services/assetService';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { useDeleteAsset } from '@/lib/hooks/useAssets';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
@@ -75,7 +87,7 @@ import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
-import { usePreloadWhenIdle } from '@/components/ui/lazy-component';
+import { lazyComponent, usePreloadWhenIdle } from '@/components/ui/lazy-component';
 import {
   ASSET_ROW_LAZY_CHARTS,
   AssetClassChip,
@@ -86,6 +98,14 @@ import {
   formatDeltaPercent,
   resolveMortgageOf,
 } from '@/components/assets/AssetRow';
+
+/**
+ * The sold-out group's code is a chunk of its own: it is closed by default, sits under the table and
+ * exists only for an account with a sold-out instrument, so it stays out of the page's initial JS
+ * (the budget of `/dashboard/assets`, doc/guide/velocita.md). The fallback holds the closed header's height.
+ */
+const ArchivedInstruments = lazyComponent(() => import('@/components/assets/ArchivedInstruments').then((m) => m.ArchivedInstruments));
+const ARCHIVED_FALLBACK = <div className="mt-3 h-10 border-t border-border max-desktop:h-12" aria-hidden="true" />;
 
 const DELTA_WINDOWS = [
   { key: 'lastSnapshotDelta', label: 'Δ Mese' },
@@ -117,8 +137,12 @@ const MANUAL_ROW_TINT = 'bg-[color-mix(in_oklch,var(--chart-3)_6%,var(--card))]'
  */
 const STICKY_ACTIONS_CLASS = 'sticky right-0 z-[1] bg-card';
 
-/** The two toggles are remembered per browser: a monthly reader keeps the Δ windows on. */
-const STORAGE_KEYS = { showDeltas: 'patrimonio.strumenti.andamento', groupByClass: 'patrimonio.strumenti.raggruppa' } as const;
+/** The toggles are remembered per browser: a monthly reader keeps the Δ windows on and the sold-out group open. */
+const STORAGE_KEYS = {
+  showDeltas: 'patrimonio.strumenti.andamento',
+  groupByClass: 'patrimonio.strumenti.raggruppa',
+  showArchived: 'patrimonio.strumenti.azzerati',
+} as const;
 /** A stable empty list for an account without household members (a literal would be a new identity every render). */
 const EMPTY_MEMBERS: readonly FamilyMember[] = [];
 
@@ -179,6 +203,8 @@ function SortHead({ column, children, align = 'right', sortState, onSort, classN
 interface DeleteButtonProps {
   asset: Asset;
   onDelete: (assetId: string) => void;
+  /** The rows of the owner's the ledger holds for it (`deleteBlockingOperations`); null = the ledger is not read. */
+  operations: number | null;
   disabled: boolean;
   /** The tile's one live region: arm and disarm are sentences, spoken there. */
   announce: (text: string) => void;
@@ -189,11 +215,21 @@ interface DeleteButtonProps {
  * WCAG 2.2.1 time limit, kept on these rows until 2026-09-14. The armed label repeats what the
  * second press loses; the arm and the disarm are announced through ONE live region per tile
  * (emptying a live region announces nothing, and one region per row made a keyboard reader hear
- * «annullata» on every Tab away).
+ * «annullata» on every Tab away). With operations in the ledger the press never arms: it says why
+ * (a toast, not a disabled button — a disabled control explains nothing on touch).
  */
-function DeleteButton({ asset, onDelete, disabled, announce }: DeleteButtonProps) {
+function DeleteButton({ asset, onDelete, operations, disabled, announce }: DeleteButtonProps) {
   const ref = useRef<HTMLButtonElement | null>(null);
-  const { armed, onClick, onBlur } = useArmedDelete(ref, () => onDelete(asset.id));
+  const { armed, onClick: onArmedClick, onBlur } = useArmedDelete(ref, () => onDelete(asset.id));
+  const onClick = () => {
+    if (operations !== null && operations > 0) {
+      const sentence = describeDeleteRefusal(asset.name, operations);
+      toast.info(sentence);
+      announce(sentence);
+      return;
+    }
+    onArmedClick();
+  };
   const wasArmed = useRef(false);
   useEffect(() => {
     if (armed) {
@@ -261,6 +297,11 @@ interface StrumentiTileProps {
    * bought says «Mai comprato» (lib/utils/zeroQuantityChip.ts, the plan's rule); else «Azzerato».
    */
   tradedAssetIds?: ReadonlySet<string> | null;
+  /**
+   * What the ledger says per instrument (`summarizeLedgerFootprints`), null while it is not read: an
+   * instrument at zero WITH rows joins the closed group, one with operations of the owner's cannot be deleted.
+   */
+  ledgerFootprints?: ReadonlyMap<string, LedgerFootprint> | null;
   className?: string;
 }
 
@@ -286,6 +327,7 @@ export function StrumentiTile({
   members = EMPTY_MEMBERS,
   allAssets,
   tradedAssetIds = null,
+  ledgerFootprints = null,
   className,
 }: StrumentiTileProps) {
   const deleteAssetMutation = useDeleteAsset(ownerId || '');
@@ -304,6 +346,9 @@ export function StrumentiTile({
     () => (ownerFilter === OWNER_FILTER_ALL ? assets : assets.filter((asset) => matchesAssetOwnerFilter(asset, ownerLookup, ownerFilter, knownMemberIds))),
     [assets, ownerFilter, ownerLookup, knownMemberIds],
   );
+  // The sold-out instruments with a history leave the list for the closed group: the owner filter
+  // narrows both, no other control touches the group.
+  const { live, archived } = splitArchivedInstruments(visibleAssets, ledgerFootprints);
   // The table OR the rows, never both, on the composition's ONE query (`useCompactLayout`, the
   // `max-desktop:` of the CSS, since 2026-10-14): the server snapshot is `false` — not compact — so
   // a first frame would be the TABLE; the page is behind `ProtectedRoute` and mounts this tile
@@ -318,6 +363,7 @@ export function StrumentiTile({
   // toggles come back the way the reader left them (per browser).
   const [showDeltas, setShowDeltas] = useState(() => readStoredToggle(STORAGE_KEYS.showDeltas));
   const [groupByClass, setGroupByClass] = useState(() => readStoredToggle(STORAGE_KEYS.groupByClass));
+  const [showArchived, setShowArchived] = useState(() => readStoredToggle(STORAGE_KEYS.showArchived));
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [announcement, setAnnouncement] = useState('');
   // The dates under a row («scade il…», «valore a mano dal…») are read against one clock per mount.
@@ -337,8 +383,8 @@ export function StrumentiTile({
     return () => window.removeEventListener('resize', measure);
   }, [showDeltas, groupByClass, assets.length, isDesktop]);
 
-  // Sold-out rows stay in the table («Azzerato») but are not something the user owns: the
-  // reading counts held positions only.
+  // A sold-out row (the group's, or one with no history that stays in the list as «Azzerato») is not
+  // something the user owns: the reading counts held positions only.
   const held = assets.filter(isHeld);
   // The property a loan finances, for the loan row's sub-line («mutuo su Casa · TAN 3,2%»).
   const financedNameOf = (asset: Asset): string | null =>
@@ -356,16 +402,29 @@ export function StrumentiTile({
         await deleteAssetMutation.mutateAsync(assetId);
         toast.success('Asset eliminato');
       } catch (error) {
+        // The server's 409 (a trade created since the ledger was read): the same sentence as the button's.
+        if (error instanceof AssetDeleteRefusedError) {
+          const name = assets.find((candidate) => candidate.id === assetId)?.name ?? DELETED_INSTRUMENT_NAME;
+          toast.info(describeDeleteRefusal(name, error.operations));
+          return;
+        }
         console.error('Error deleting asset:', error);
         toast.error(describeWriteError(error));
       }
     },
-    [ownerId, deleteAssetMutation],
+    [ownerId, deleteAssetMutation, assets],
   );
 
   const toggleShowDeltas = () => {
     setShowDeltas((prev) => {
       writeStoredToggle(STORAGE_KEYS.showDeltas, !prev);
+      return !prev;
+    });
+  };
+
+  const toggleShowArchived = () => {
+    setShowArchived((prev) => {
+      writeStoredToggle(STORAGE_KEYS.showArchived, !prev);
       return !prev;
     });
   };
@@ -389,9 +448,9 @@ export function StrumentiTile({
   // The rows the list draws: the owner filter narrows ONLY the list (the reading counts every
   // position, as Tracciamento's filters narrow Movimenti and never a tile).
   const sortedAssets = useMemo(() => {
-    if (!sortState) return visibleAssets;
+    if (!sortState) return live;
     const gainPct = (a: Asset) => computeUnrealizedGain(a)?.gainPercent ?? 0;
-    return [...visibleAssets].sort((a, b) => {
+    return [...live].sort((a, b) => {
       // A Δ column: a row without the window (a pension fund, a hand-valued row) goes last in
       // both directions — «no measure» is not the smallest measure.
       if (DELTA_KEYS.has(sortState.column)) {
@@ -422,7 +481,7 @@ export function StrumentiTile({
       }
       return sortState.dir === 'asc' ? cmp : -cmp;
     });
-  }, [visibleAssets, sortState, performance]);
+  }, [live, sortState, performance]);
 
   // Grouped mode: an ordered map keyed by display class, in first-occurrence order of the sort.
   const groupedAssets = useMemo(() => {
@@ -602,7 +661,13 @@ export function StrumentiTile({
             >
               <Pencil className="h-4 w-4" aria-hidden="true" />
             </Button>
-            <DeleteButton asset={asset} onDelete={handleDelete} disabled={isDemo} announce={setAnnouncement} />
+            <DeleteButton
+              asset={asset}
+              onDelete={handleDelete}
+              operations={deleteBlockingOperations(asset.id, ledgerFootprints)}
+              disabled={isDemo}
+              announce={setAnnouncement}
+            />
           </div>
         </td>
       </tr>
@@ -712,7 +777,10 @@ export function StrumentiTile({
             {announcement}
           </span>
 
-          {!isDesktop ? (
+          {live.length === 0 && archived.length > 0 ? (
+            // Every instrument is in the group below: a sentence in place of an empty table.
+            <p className="mt-3 text-[13px] text-muted-foreground">{ALL_ARCHIVED_SENTENCE}</p>
+          ) : !isDesktop ? (
             // Below desktop: flat expandable rows (the Δ windows and actions live inside each).
             <div className="mt-2 flex flex-col divide-y divide-border">
               {sortedAssets.map((asset) => (
@@ -737,6 +805,7 @@ export function StrumentiTile({
                   onRegisterTrade={onRegisterTrade}
                   onMovements={onMovements}
                   tradedAssetIds={tradedAssetIds}
+                  deleteOperations={deleteBlockingOperations(asset.id, ledgerFootprints)}
                 />
               ))}
             </div>
@@ -800,6 +869,19 @@ export function StrumentiTile({
                 </tbody>
               </table>
             </div>
+          )}
+
+          {archived.length > 0 && (
+            <ArchivedInstruments
+              fallback={ARCHIVED_FALLBACK}
+              assets={archived}
+              footprints={ledgerFootprints}
+              open={showArchived}
+              onToggle={toggleShowArchived}
+              isDemo={isDemo}
+              onMovements={onMovements}
+              onRegisterTrade={onRegisterTrade}
+            />
           )}
 
           {/* The tint is a theme slot (blue on the default light theme), so the copy names the

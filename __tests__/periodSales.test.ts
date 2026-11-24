@@ -184,7 +184,7 @@ describe('summarizePeriodSales', () => {
     expect(summary.brokenLedgers).toBe(1);
   });
 
-  it('should list the instruments by proceeds, largest first, and label an unknown asset by its id', () => {
+  it('should list the instruments by proceeds, largest first, and name a sale whose asset is gone «Strumento eliminato» (id kept)', () => {
     const ledger = [
       tx('small', 'buy', new Date(2026, 6, 22, 12), 10, 10, undefined, true),
       tx('small', 'sell', new Date(2026, 8, 3, 12), 10, 12),
@@ -192,7 +192,8 @@ describe('summarizePeriodSales', () => {
       tx('big', 'sell', new Date(2026, 8, 3, 12), 10, 120),
     ];
     const summary = summarizePeriodSales([asset('big', 'Big', 26)], ledger, SEPTEMBER)!;
-    expect(summary.instruments.map((row) => row.name)).toEqual(['Big', 'small']);
+    expect(summary.instruments.map((row) => row.name)).toEqual(['Big', 'Strumento eliminato']);
+    expect(summary.instruments[1].id).toBe('small');
     expect(summary.instruments[1].estimatedTax).toBeNull();
   });
 });
