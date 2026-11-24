@@ -263,6 +263,15 @@ Taken in the adversarial reading (2026-11-23):
 94. After an edit or a delete of a purchase on a bond with a premium and a stored count: one line of reminder,
     «Controlla le unità con diritto al premio nella scheda dell'obbligazione.»; nothing changes by itself.
 
+Taken with the retirement prompt (2026-11-24):
+
+95. A spec is retired only when it is in service: its PR in `develop`, `develop` in `main`, its closing proof
+    redone on the merged code, AND the owner's check on the production account that its § 8 names done and said.
+    What waits for the calendar — a first automatic send, the twentieth day of the archive — is not waited for.
+96. What a spec publishes by hand — the rules of DATI-02 and DATI-10, the `price-history` index DATI-02 removes —
+    is published before that spec's retirement: the additive before or with the merge to `main`, the removal after
+    the deploy and alone.
+
 ## 4. The adopted choices (reversible before the implementation; each is listed in full in its spec § 3)
 
 | Spec | The adopted choices that shape it |
@@ -558,7 +567,8 @@ says so; it never changes what is there. The full text of each is in the spec th
     are recorded, where a series reaches `main` together at its end): once a spec's phase F is closed and its
     commit is in `develop`, the owner opens the PR `develop` → `main`; its retirement goes to `main` the same way.
     So a spec is complete in production on its own — its § 8 is done at that merge, never left to a later spec —
-    and the checks on the owner's production account follow each merge.
+    and the checks on the owner's production account follow each merge and precede the spec's retirement
+    (decision 95).
 14. **Status**: § 6's column — `written`, `read`, `implemented`; a spec's own header is not edited for status.
 15. **CLAUDE.md's «Latest» is replaced, never extended** (decision 46): each spec writes the date, itself in one
     sentence, «Open: doc/dati/ (README § 6)» and «Next: DATI-NN»; the last one names the retirement.
@@ -571,7 +581,7 @@ says so; it never changes what is there. The full text of each is in the spec th
 `SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
 
 The adversarial reading of the specs together (prompt 07) was done on 2026-11-23, with DATI-20 and DATI-21
-written and read in it; prompt 08 (`08_CREA_RITIRO_SPEC`) runs next, in a session of its own, and writes
+written and read in it; prompt 08 (`08_CREA_RITIRO_SPEC`) ran on 2026-11-24, in a session of its own, and wrote
 `doc/dati/PROMPT-RITIRO.md`; the first implementation follows it. A retirement removes its number from the line
 above; the last one deletes the line with the folder.
 
