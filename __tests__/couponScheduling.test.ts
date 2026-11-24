@@ -12,7 +12,7 @@ import type { BondDetails } from '@/types/assets';
 const authenticatedFetch = vi.fn();
 vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch: (...args: unknown[]) => authenticatedFetch(...args) }));
 
-import { scheduleNextCoupon } from '@/lib/services/couponScheduling';
+import { scheduleCouponsForOpenedPosition, scheduleFinalPremium, scheduleNextCoupon } from '@/lib/services/couponScheduling';
 
 const BASE_PARAMS = { assetId: 'asset-1', quantity: 5000, currency: 'EUR', taxRate: 12.5, userId: 'owner-1' };
 
@@ -70,5 +70,50 @@ describe('scheduleNextCoupon', () => {
     const body = JSON.parse(authenticatedFetch.mock.calls[0][1].body);
     expect(body.dividendData.dividendPerShare).toBeCloseTo(0.0025, 10);
     expect(body.dividendData.notes).toContain("all'ultimo coefficiente noto 1,25");
+  });
+});
+
+// Nothing held, nothing owed (2026-11-23): the schedulers' quantity guard and the coupon at opening.
+const PREMIUM_BOND: BondDetails = {
+  couponRate: 3,
+  couponFrequency: 'semiannual',
+  issueDate: new Date(2026, 2, 10),
+  maturityDate: new Date(2030, 2, 10),
+  finalPremiumRate: 0.8,
+};
+
+describe('the quantity decides whether a coupon is owed', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 11, 12));
+    authenticatedFetch.mockReset();
+    authenticatedFetch.mockResolvedValue({ ok: true });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  // C1
+  it('makes no request at quantity 0', async () => {
+    const params = { ...BASE_PARAMS, quantity: 0, bondDetails: PREMIUM_BOND };
+    expect(await scheduleNextCoupon(params)).toEqual({ scheduled: false });
+    expect(await scheduleFinalPremium(params)).toBe(false);
+    expect(authenticatedFetch).not.toHaveBeenCalled();
+  });
+
+  // C2
+  const bond = { id: 'asset-1', bondDetails: PREMIUM_BOND, currency: 'EUR', taxRate: 12.5 };
+  const typesSent = () =>
+    authenticatedFetch.mock.calls.map((call) => JSON.parse(call[1].body).dividendData as { dividendType: string; quantity: number });
+
+  it('schedules the coupon and the premium when a bond opens from 0', async () => {
+    await scheduleCouponsForOpenedPosition({ asset: bond, quantityBefore: 0, quantityAfter: 1000, userId: 'owner-1' });
+    expect(typesSent().map((d) => [d.dividendType, d.quantity])).toEqual([['coupon', 1000], ['finalPremium', 1000]]);
+  });
+
+  it('makes no request when the position was already open, nor for a stock', async () => {
+    await scheduleCouponsForOpenedPosition({ asset: bond, quantityBefore: 500, quantityAfter: 1500, userId: 'owner-1' });
+    await scheduleCouponsForOpenedPosition({
+      asset: { id: 'asset-2', bondDetails: undefined, currency: 'EUR' }, quantityBefore: 0, quantityAfter: 100, userId: 'owner-1',
+    });
+    expect(authenticatedFetch).not.toHaveBeenCalled();
   });
 });

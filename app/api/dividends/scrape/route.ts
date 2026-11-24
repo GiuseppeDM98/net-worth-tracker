@@ -10,8 +10,10 @@ import {
 import { scrapeDividendsByIsin } from '@/lib/services/borsaItalianaScraperService';
 import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService';
 import { DividendFormData } from '@/types/dividend';
-import { toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDateIso, isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { isDividendEligible, resolveDividendFloor } from '@/lib/utils/dividendEligibility';
+import { entitledQuantity } from '@/lib/utils/dividendEntitlement';
+import { getAssetTransactionsForAssetAdmin } from '@/lib/server/assetAdminRepository';
 import {
   assertCanAccessAccount,
   getApiAuthErrorResponse,
@@ -78,6 +80,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // The ledger decides the quantity of each dividend (2026-11-23): what was held the day before
+    // its ex-date. Read once; a sold-out instrument is still scraped, because the owner asked.
+    const trades = await getAssetTransactionsForAssetAdmin(userId, assetId);
+
     // Scrape dividend data
     console.log(`Scraping dividends for asset ${asset.ticker} (ISIN: ${asset.isin}, Type: ${asset.type})`);
     const scrapedDividends = await scrapeDividendsByIsin(asset.isin, asset.type);
@@ -89,6 +95,7 @@ export async function POST(request: NextRequest) {
         scraped: 0,
         created: 0,
         skipped: 0,
+        notHeld: 0,
       });
     }
 
@@ -138,12 +145,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Filter and create dividends
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Filter and create dividends; «already paid» is read by the ITALIAN day (2026-11-24).
+    const todayIso = getItalyDateIso();
 
     let created = 0;
     let skipped = 0;
+    let notHeld = 0;
     const createdIds: string[] = [];
 
     for (const scrapedDiv of relevantDividends) {
@@ -157,8 +164,14 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Calculate amounts (assume user holds current quantity)
-        const grossAmount = scrapedDiv.dividendPerShare * asset.quantity;
+        // What was held the day before the ex-date; nothing held, no record, and the answer counts it.
+        const quantity = entitledQuantity(asset.quantity, trades, scrapedDiv.exDate);
+        if (quantity <= 0) {
+          notHeld++;
+          continue;
+        }
+
+        const grossAmount = scrapedDiv.dividendPerShare * quantity;
         const taxAmount = grossAmount * 0.26; // Italian withholding tax (26%)
         const netAmount = grossAmount - taxAmount;
 
@@ -168,7 +181,7 @@ export async function POST(request: NextRequest) {
           exDate: scrapedDiv.exDate,
           paymentDate: scrapedDiv.paymentDate,
           dividendPerShare: scrapedDiv.dividendPerShare,
-          quantity: asset.quantity,
+          quantity,
           grossAmount,
           taxAmount,
           netAmount,
@@ -195,7 +208,7 @@ export async function POST(request: NextRequest) {
         console.log(`Created dividend: ${scrapedDiv.dividendType} - ${scrapedDiv.dividendPerShare} ${scrapedDiv.currency} on ${scrapedDiv.paymentDate.toLocaleDateString('it-IT')}`);
 
         // Create expense entry if payment date is in the past and category is configured
-        if (scrapedDiv.paymentDate <= today && categoryInfo) {
+        if (!isItalyDayAfter(scrapedDiv.paymentDate, todayIso) && categoryInfo) {
           try {
             const dividend = await getDividendById(dividendId);
             if (dividend) {
@@ -228,6 +241,7 @@ export async function POST(request: NextRequest) {
       floorSource: floor.source,
       created,
       skipped,
+      notHeld,
       createdIds,
     });
   } catch (error) {

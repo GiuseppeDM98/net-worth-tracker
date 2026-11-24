@@ -446,6 +446,9 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
       // «Nessun nuovo dividendo trovato» and nothing else.
       let filteredCount = 0;
       let filteredByCreation = 0;
+      // Dividends detached while the instrument was not held (2026-11-23): not created, and named
+      // when they are all the run found, so «nothing new» does not read as a broken scraper.
+      let notHeldCount = 0;
       const scrapeOne = async (asset: Asset) => {
         const response = await authenticatedFetch('/api/dividends/scrape', {
           method: 'POST',
@@ -455,6 +458,7 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
         if (response.ok) {
           const result = await response.json();
           if (result.created > 0) successCount += 1;
+          if (typeof result.notHeld === 'number') notHeldCount += result.notHeld;
           if (typeof result.filtered === 'number' && result.filtered > 0) {
             filteredCount += result.filtered;
             if (result.floorSource === 'created') filteredByCreation += 1;
@@ -472,6 +476,12 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
       if (successCount > 0) {
         toast.success(`Scaricati dividendi per ${successCount} ${successCount === 1 ? 'strumento' : 'strumenti'}`);
         await onRefresh();
+      } else if (notHeldCount > 0) {
+        toast.warning(
+          notHeldCount === 1
+            ? 'Nessun nuovo dividendo: 1 dividendo staccato quando non avevi lo strumento.'
+            : `Nessun nuovo dividendo: ${notHeldCount} dividendi staccati quando non avevi gli strumenti.`
+        );
       } else {
         toast.warning('Nessun nuovo dividendo trovato');
       }

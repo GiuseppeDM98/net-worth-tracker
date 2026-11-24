@@ -106,6 +106,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { toastAnnouncedDividends } from '@/components/assets/announcedDividendsToast';
 import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank, HandCoins } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
@@ -1692,7 +1693,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         };
         let openingFeeRow: string | undefined;
         try {
-          openingFeeRow = (await createTradeMutation.mutateAsync(firstBuy)).feeRow;
+          const firstBuyResult = await createTradeMutation.mutateAsync(firstBuy);
+          openingFeeRow = firstBuyResult.feeRow;
+          toastAnnouncedDividends(firstBuyResult.announcedDividends);
         } catch (buyError) {
           console.error('First-buy failed after asset creation:', buyError);
           // Refresh so the qty-0 asset appears; keep the dialog open with the error for a retry.

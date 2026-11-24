@@ -5,7 +5,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { Dividend } from '@/types/dividend';
 import { updateDividend } from '@/lib/services/dividendService';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
-import { toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDateIso, isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { appliedBalanceEffectsOf, type SettlementRow } from '@/lib/utils/cashSettlement';
 import { roundToCents } from '@/lib/utils/cents';
 import { dividendIncomeAmount, isPaymentDueOrAhead, resolveDividendAccount } from '@/lib/utils/dividendAccount';
@@ -251,9 +251,9 @@ export async function syncDividendExpenses(
     failed: 0,
   };
 
-  // Only create expenses for dividends already paid
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Only create expenses for dividends already paid, by the ITALIAN day (2026-11-24): a payment
+  // stored at UTC midnight is still today in Italy, not tomorrow.
+  const todayIso = getItalyDateIso();
 
   for (const dividend of dividends) {
     try {
@@ -265,7 +265,7 @@ export async function syncDividendExpenses(
 
       // Skip if payment date is in the future
       const paymentDate = toDate(dividend.paymentDate);
-      if (paymentDate > today) {
+      if (isItalyDayAfter(paymentDate, todayIso)) {
         results.skipped++;
         continue;
       }
