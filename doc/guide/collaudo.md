@@ -64,6 +64,10 @@ The app **is** locally runnable; there is no fallback to declare.
   the owner's own figures (Rendimenti, Storico): a fixture proves the mechanism, the mirror shows what the owner will
   see tomorrow. It is rule 6's copy of real data: it serves the tour only, and none of its figures enters a test, a
   draft or any other tracked file (this repo is public, so rule 6 has no exception here).
+- **A production check that waits for the evening cron can be brought forward** (owner, 2026-11-24): the owner runs
+  `/api/cron/monthly-snapshot` from Vercel › Cron Jobs. On a day that is no period's last and no Sunday it sends no
+  email and calls no model — the evening's writes, replaced by the evening's run. A count per account is then read
+  by a throwaway Admin script, `.get()` only, printing shortened uids and keys, never a value.
 - **A reading the owner cannot open with their own account**: this app has a role split — *viewer*
   (`user.uid`) vs *owner* (`ownerId`), grants in `account-access/{ownerUid}`. To show the delegated
   view, seed a grant for the second identity and log in as *that* identity (SETUP.md → Step 5b);
