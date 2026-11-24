@@ -1,5 +1,5 @@
 /**
- * Two columns of tiles END ON ONE LINE (owner, 2026-11-23; DATI-03): the helpers of the three specs that hold
+ * Two columns of tiles END ON ONE LINE (owner, 2026-11-23): the helpers of the three specs that hold
  * it at 1440 — Rendimenti, Coast FIRE › Ipotesi, Impostazioni › Spese. A helper, not a spec: no project
  * collects it (doc/guide/e2e-playwright.md).
  *

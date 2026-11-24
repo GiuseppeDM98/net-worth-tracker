@@ -155,9 +155,9 @@ test('una lettura fallita degli accessi non diventa «nessun accesso»', async (
 });
 
 // Impostazioni › Spese: the left column's last tile (Ruoli 50/30/20) ends with the single import cell beside it
-// (DATI-03, owner 2026-11-23). The import cell is stretched by a style tag and `forceColumnTaller` proves it is
+// (owner, 2026-11-23). The import cell is stretched by a style tag and `forceColumnTaller` proves it is
 // the taller before anything is measured. Seen red with the class off Ruoli 50/30/20's cell.
-test('Spese: the left column ends where the import tile ends (DATI-03 E3)', async ({ page }) => {
+test('Spese: the left column ends where the import tile ends (E3)', async ({ page }) => {
   await openSettings(page, 'spese');
   const scope = page.locator('#settings-tab-pill-panel-spese');
 

@@ -45,7 +45,7 @@
 - **The Ipotesi are two columns that end on one line** (Profilo + Modello 5 | Pensioni + Scaglioni 7; `contents` wrappers
   below `desktop:`, the tiles in the DOM's order — no `order-*` since 2026-10-15, § Composizione mobile): the last cell of
   each (Modello della pensione, Scaglioni IRPEF) grows (owner, 2026-11-23; `TILE_COLUMN_CLASS`, `TILE_COLUMN_END_CLASS`,
-  `e2e/coast.spec.ts` DATI-03 E2). Every control is `h-11 desktop:h-9`; the two ages say an out-of-range value AT the field
+  `e2e/coast.spec.ts`, E2). Every control is `h-11 desktop:h-9`; the two ages say an out-of-range value AT the field
   (`aria-invalid`, the help line in `text-destructive`) before the toast repeats it on «Salva ipotesi».
 - **The target line of the projection steps WITH the fund** (`fireService.calculateCoastFIREProjection`, 2026-08-25):
   `retirementCapitalRequired` is already net of the fund (the walk subtracts it valued at retirement —
