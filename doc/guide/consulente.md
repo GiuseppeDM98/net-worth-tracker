@@ -462,7 +462,6 @@ on a phone, and from the row under the Assistente's conversation).
   `EXCHANGE_OPTIONS` plus `EXCHANGE_OTHER`; «Altra…» is LOCAL state so the field stays open while the text is empty
   (`answers.exchange` is '' until typed, and step 3 does not pass), and a draft that comes back with an unlisted
   exchange reopens it (`isListedExchange`). The free text goes to the instrument agent as written.
-
 - **The run costs money and takes minutes** (four calls, three on Opus 5.5, one with web search): «Puoi lasciare la
   pagina» is true — every stage is saved — but the closed SSE connection does not stop the server; whoever reopens
   sees the saved stage and the page rereads the document while it is `running`. A run cut by the platform stays
@@ -480,21 +479,14 @@ on a phone, and from the row under the Assistente's conversation).
   the mirror (2026-10-20 with the owner's key; the outcomes in that session's SESSION_NOTES and in the commit).
 - **The interview writes nothing**: its rounds live in the draft until the strategy, and a cleared storage loses them.
 - **A round abandoned** («Salta il colloquio» while it is asked, or leaving the page) **still costs its slot**; its
-  late answer is ignored.
-- **The revision's round lives in the book's memory**: a turn keeps it, a reload before «Rivedi il report» loses it,
-  and its slot.
-- **A heading the model invents lands on the previous page**, never lost, never its own page.
-- **A report the reader cannot split onto two pages is one page «Il report»** after a cover with the verdict alone.
+  late answer is ignored. So does the revision's round lost to a reload (§ The report as a book).
 - **`?pagina=` is ignored with `rivedi=1`**, and a turn removes `rivedi`.
-- **A new report opens on its cover** whatever `?pagina=` says.
-- **The count-up plays on the proposal page's first mount in the session**, not on the cover.
 - **Copy and the browser's find see the open page only**; the print sheet holds every page.
 - **Twelve requests an hour**: a run with three rounds is five, a revision with its round three (the plan stage counts one, 2026-11-19).
 - **«Rifai il percorso» drops an interview the document on screen already used** (`reopenStoredDraft`): only rounds
   asked after that document's `updatedAt` survive.
 - **The arrows and a swipe never turn the card** (2026-11-11): a textarea and radios live on the pages; the arrows move
   along the rail only, from `desktop:`.
-- **«Rivedi con il Consulente» opens the screens, never a page of the book** (`?rivedi=1`, by design, 2026-11-11).
 - **The book remembers no page across sessions**: the address is the memory (`?pagina=`), no localStorage.
 - **The book changed no contract of the model** (2026-11-11): it reads the sections the strategy's and the review's
   contracts already prescribe; a heading a contract adds needs its alias in `BOOK_PAGE_TABLE`, or it lands on the page
