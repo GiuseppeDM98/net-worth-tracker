@@ -181,9 +181,17 @@ holds it): how it was learned is `git log`'s.
 - **Query + invalidation, never realtime — and Firestore is not the limit** (measured 2026-09-26, the speed dossier:
   with the emulator answering in ~1 ms Cashflow still took 2,1 s and Storico 2,3 s to show a figure — browser CPU and
   the boot chain, not the database; in production a round trip is 50–150 ms, so what counts is round trips IN SERIES).
-  No `onSnapshot`, no migration (Postgres/Supabase/Convex would rewrite ~40 services, the rules and the harness without
-  touching the measured causes): the two Firestore levers are the function region (SETUP.md § Function region) and the
-  materialized per-page summaries (§ Caching).
+  No `onSnapshot`, no migration — asked twice, answered twice. On 2026-09-26 for Postgres/Supabase/Convex; on
+  2026-11-23 for Turso (SQLite), counted on the code of that day: the browser writes 17 of the 26 collections of
+  `firestore.rules` directly and reads 25 (the 25 client services that import `firebase/firestore` export 167
+  functions), so leaving Firestore turns each into a server route (16–22 new route files), moves ~70 production
+  modules, ~100 unit files with Firestore-shaped fakes and the 108 E2E specs with their nine seed scripts and the
+  mirror, and the core (assets, expenses, the ledger, dividends, settings) moves in ONE cut,
+  because its transactions cross those collections. What SQL would give — no 500-write batch, no `in` of 30, foreign
+  keys, a file database instead of the JVM emulator — touches none of the measured causes, and the pages compute in
+  memory on whole lists (no query aggregates on the database). Firebase Auth is a separate decision, not taken. The
+  two Firestore levers are the function region (SETUP.md § Function region) and the materialized per-page summaries
+  (§ Caching).
 - **A page or a component never calls a read service: it reads a HOOK** (2026-09-29). One key per collection in
   `lib/query/queryKeys.ts`, one hook apiece in `lib/hooks/`: `useAssets`, `useSnapshots`, `useExpenses` (and its windows),
   `useExpenseCategories`, `useSettings` (the ONE `['settings', ownerId]`), `usePensionContributions`,

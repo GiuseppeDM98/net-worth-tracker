@@ -332,7 +332,7 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [01](DATI-01-storia-serie-e-database.md) | The series' history leaves the README; the database decision restated | S | — | Sonnet 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 15 rilievi, 2 decisioni |
+| [01](DATI-01-storia-serie-e-database.md) | The series' history leaves the README; the database decision restated | S | — | Sonnet 5.5 · medium | implemented |
 | [02](DATI-02-archivio-giornaliero.md) | The daily archive | M | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 18 rilievi, 5 decisioni |
 | [03](DATI-03-colonne-e-curva.md) | Two columns end on one line; a sparkline stays in its box | S | — | Sonnet 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 0 decisioni |
 | [04](DATI-04-dividendi-quantita-allo-stacco.md) | A dividend is worth what was held at the ex-date | M | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 21 rilievi, 4 decisioni |
