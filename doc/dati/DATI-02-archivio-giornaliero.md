@@ -438,7 +438,8 @@ market service, a model or a mailbox, so no yes of the owner's is needed (decisi
 
 1. The owner publishes `firestore.rules` (the hand deploy of SETUP.md) — before or with the merge: nothing reads the
    path until DATI-13.
-2. The owner publishes `firestore.indexes.json` when convenient: the deploy offers to delete `price-history`; yes.
+2. The owner publishes `firestore.indexes.json` when convenient — after the deploy, alone, and before this spec's
+   retirement (decision 96): the deploy offers to delete `price-history`; yes.
 3. Merge to `develop`, then `develop → main` at once, as every spec of this series (index § 8, rule 13): days not
    filed are lost (decision 28).
 4. Measure, the morning after the first 18:00 UTC run in production: one key under `days` per account; then
