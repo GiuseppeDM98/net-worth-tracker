@@ -352,7 +352,7 @@ export function monthlySparkline(data: DashboardOverviewSparklinePoint[]): Spark
 | N2 | unit · same | `readDailyRisk({ data: undefined }, window)` is null; with points it is the reading | a reading on undefined data |
 | D1 | dom · `__tests__/rischioTile.test.tsx` | with `daily` the tile shows the eyebrow and the sentence after its rows, and the method note's line «Sui giorni: …»; without it the tile's HTML is today's (no block, no line) | always render the block; the note's line unconditional |
 | D2 | dom · `__tests__/netWorthSparkline.test.tsx` | a daily point's hover reads «12 Nov», a monthly one «Nov 2026» | one format |
-| D3 | dom · `__tests__/useHeroSparkline.test.tsx` (new, `renderHook`, `getDailySnapshotMonth` mocked as in DATI-02's H1) | «3M» with 25 daily points returns 25 points with day labels; with 5 it returns the monthly ones | daily under the minimum |
+| D3 | dom · `__tests__/useHeroSparkline.test.tsx` (new, `renderHook`, `getDailySnapshotMonth` mocked as in `__tests__/useDailySnapshots.test.tsx`) | «3M» with 25 daily points returns 25 points with day labels; with 5 it returns the monthly ones | daily under the minimum |
 | D4 | dom · same | on «1A» the daily service is never called; switching to «3M» calls it | always read |
 | D5 | dom · same | the daily service rejecting leaves the monthly points and throws nothing | fail on the error |
 | E1 | e2e · `e2e/overview.spec.ts` | 25 daily rows planted for the base account under `dailySnapshots/{uid}/months/{YYYY-MM}` through the emulator's REST — the 25 Italian days ending today — and removed in `afterAll`: Panoramica on «3M» has more than 20 points in the sparkline's path and its hover names a day; on «1A» the path has the months | `dailySparkline` always null |
