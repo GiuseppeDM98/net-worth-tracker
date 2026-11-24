@@ -64,7 +64,10 @@
     pending blur (`__tests__/searchableComboboxRefocus.test.tsx`, red without it); 8/8 alone after.
   - `assets.trade-fee.spec.ts` «a trade’s fee becomes a locked spending row…» [desktop] (2026-11-17): after the trade's
     removal its fee row was still in Firestore at the 30 s poll (1 where 0) — once in a full run on the production build
-    (16,9 min, 421 green), green ×3 alone right after; the first time.
+    (16,9 min, 421 green), green ×3 alone right after; the first time. Red 3 in 4 on `next dev` on 2026-11-24 (2 in 3
+    on the commit before), then **traced and fixed — NOT a flake but a race of the page**: the trace showed the DELETE
+    answered 409, sent with the `updatedAt` of the copy restored from before the edit while the dialog reread it;
+    Movimenti now holds a row's actions during that reread (doc/guide/registro-operazioni.md § Concurrency). 8/8 after.
   - `bundle.lazy.mobile.spec.ts` «Allocazione › Accumulo at 390 lands where the page drew its placeholder…» [mobile]
     (2026-11-18, `next dev`): the first tile's box `null` at `e2e/lazyTabLanding.ts:72` — red 1 in 11 alone, then 1 in 7
     after the «Con vendite mirate» tour (PR #551); not the branch's (the same red with the Portafoglio modello tile's hunk reverted). A

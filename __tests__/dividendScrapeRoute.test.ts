@@ -83,7 +83,7 @@ describe('POST /api/dividends/scrape — the quantity held at the ex-date (2026-
     ]);
   });
 
-  // S1
+  // Red when the route keeps `asset.quantity`.
   it('on a sold-out asset creates the dividend held at its ex-date and counts the other as notHeld', async () => {
     const response = await POST(buildRequest());
     const body = await response.json();

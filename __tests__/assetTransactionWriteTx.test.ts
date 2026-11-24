@@ -614,7 +614,7 @@ describe('assetTransactionUseCase — atomic write transaction', () => {
     }
     const sellForty = { assetId: 'asset-1', type: 'sell' as const, date: new Date(), quantity: 40, pricePerUnit: 12 };
 
-    // T1
+    // Red when the reconciliation call after the commit is removed.
     it('rewrites the pending automatic record on the quantity held at its ex-date, with its currency, and leaves a hand-entered one', async () => {
       seedHolding();
       mocks.getDividendsByAsset.mockResolvedValue([pending('div-auto', true), pending('div-hand', false)]);
@@ -633,7 +633,7 @@ describe('assetTransactionUseCase — atomic write transaction', () => {
       expect(result.announcedDividends).toEqual({ updated: 1, deleted: 0 });
     });
 
-    // T2
+    // Red when the `try/catch` of `reconcileAnnouncedSafely` is removed.
     it('answers the trade with zeros when the reconciliation throws: the trade stands', async () => {
       seedHolding();
       mocks.getDividendsByAsset.mockRejectedValue(new Error('Failed to fetch dividends by asset'));

@@ -91,7 +91,7 @@ describe('the quantity decides whether a coupon is owed', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  // C1
+  // Red when the quantity-0 guard is dropped.
   it('makes no request at quantity 0', async () => {
     const params = { ...BASE_PARAMS, quantity: 0, bondDetails: PREMIUM_BOND };
     expect(await scheduleNextCoupon(params)).toEqual({ scheduled: false });
@@ -99,7 +99,7 @@ describe('the quantity decides whether a coupon is owed', () => {
     expect(authenticatedFetch).not.toHaveBeenCalled();
   });
 
-  // C2
+  // Red when the `quantityBefore === 0` test is dropped.
   const bond = { id: 'asset-1', bondDetails: PREMIUM_BOND, currency: 'EUR', taxRate: 12.5 };
   const typesSent = () =>
     authenticatedFetch.mock.calls.map((call) => JSON.parse(call[1].body).dividendData as { dividendType: string; quantity: number });

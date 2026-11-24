@@ -288,7 +288,7 @@ export function describePremiumReminder(input: {
   `premiumDetailsOf(asset)?.finalPremiumQuantity` — the stored count, raw (choice h); `undefined` for anything that
   is not a premium bond or stores no count — as the fourth argument of every verdict. It runs after the commit,
   so the asset already holds the new count.
-- `lib/server/dividendProcessor.ts`, `runExpenseCreation` (the payment-day verdict of DATI-04 § 4.4): for an
+- `lib/server/dividendProcessor.ts`, `runExpenseCreation` (the payment-day verdict, `reconcileAnnouncedDividend` applied before the income is built): for an
   automatic record whose `dividendType` is `'finalPremium'`, and for that type alone, it reads
   `assets/{assetId}` with the Admin SDK and passes the same fourth argument.
 - `lib/server/assetTransactionUseCase.ts`, `commitTradeMutation`: before the asset write `w2`, inside the
@@ -440,7 +440,7 @@ export function describePremiumReminder(input: {
 - **The Firestore fake of the use case's tests writes a dotted key as a literal field**
   (`__tests__/assetTransactionWriteTx.test.ts:132-138`, `merged[field] = value`): the new file's copy applies a
   dotted key as a nested path, or S1 proves nothing.
-- **A hand-entered or cashed record is never touched** (DATI-04 § 4.1): here it means a premium the owner typed by
+- **A hand-entered or cashed record is never touched** (`reconcileAnnouncedDividend`'s first guard, `lib/utils/dividendEntitlement.ts`): here it means a premium the owner typed by
   hand keeps its quantity; only the automatic, pending record follows the count.
 - **The system prompt is static** (index § 8): here it means no figure, name or ISIN enters `PLAN_CONTRACT` or
   `STRATEGY_CONTRACT`.
