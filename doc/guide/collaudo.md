@@ -152,15 +152,17 @@ The app **is** locally runnable; there is no fallback to declare.
   whatever is active (usually `develop`) and merges into it by PR. **A series of specs lands on `develop`, one
   session at a time, and reaches `main` together after its last spec is retired, by a PR the owner opens** (owner,
   2026-10-12, for the mobile-composition series, whose last spec was retired on 2026-10-17; the PERF series went to
-  `main` on its own, PR #446). While a series is open, its index's status table says which spec is in `develop`.
+  `main` on its own, PR #446; the DATI series of 2026-11-23 goes to `main` spec by spec, each as soon as it is
+  implemented — owner, 2026-11-23). While a series is open, its index's status table says which spec is in `develop`.
 - **A spec is retired by a session of its own** (since 2026-09-28: the fourteen PERF specs, then the nine MOB ones —
-  their history in README.md § Documentation): the code is read against the
+  a retired series is read in `git log -- doc/<serie>/` and in its pull requests): the code is read against the
   spec, every divergence gets a verdict, the lessons go home (AGENTS.md, the guide, a comment at the line, CLAUDE.md),
   then the spec and every pointer to it go. **The LAST spec of a series retires its whole folder** (`doc/perf/` on
   2026-10-08, `doc/mobile/` on 2026-10-17): before the delete, each operative piece of the index goes to ONE home — a rule
   to AGENTS.md or the guide, a measure table to a guide, a live artefact (a budget file) moved with `git mv` and never
   deleted —, every numbered decision cited in code, tests and guides is rewritten as its rule and date (a number outlives
-  the document that numbered it), and the series' history goes to README.md § Documentation. **A spec's label never
+  the document that numbered it). **No history of the series is written anywhere** (owner, 2026-11-23; README.md's three
+  such paragraphs were removed on 2026-11-24): the folder's `git log` and the pull requests are the history. **A spec's label never
   enters the code in the first place** (2026-11-12): no spec name or number in a file, function or test name nor in a
   comment, no «decision N», «criterion N» or section sign of a spec — a comment cites the rule and its date. A text-only defect found there is fixed in the retirement with `tsc`, lint
   and Vitest, no Playwright; a runtime one only on the owner's call, with the area suite and the full Playwright; a
