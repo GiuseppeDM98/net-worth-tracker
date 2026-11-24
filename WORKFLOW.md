@@ -290,14 +290,12 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
   server, copied into the repo root as `.tmp-*.mjs`, waiting on the page's `h1`, never on `networkidle`; say it is
   Playwright's. The tour still goes on the MIRROR. Count only the detector's hits that belong to the surface
   (2026-09-18).
-- **A probe opens a control that SPENDS only with the owner's yes, asked before** (2026-09-20; owner, 2026-11-23:
-  «quando collaudiamo qualcosa possiamo chiamare le api di anthropic o quel che ci serve per il collaudo, sempre
-  chiedendomelo prima»): read what a control does before scripting a click on it; a step that would call the real
-  model, send a real email or reach a paid service is asked each time. A committed test never spends.
-- **The session's background tasks die with it**: the emulators and the dev server of a tour run in the OWNER's
-  terminals; when the agent starts them on Windows, each one DETACHED (`Start-Process cmd.exe "/c npm run <script> >
-  <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden`), the full suite too, followed with a monitor; at the end export
-  through the hub and stop by PID (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
+- **A probe opens a control that SPENDS only with the owner's yes, asked before, each time** (2026-09-20; 2026-11-23):
+  the real model, a real email, a paid service; read what a control does before scripting a click. A committed test
+  never spends.
+- **The session's background tasks die with it**: a tour's services run in the OWNER's terminals; when the agent
+  starts them on Windows — the full suite too — each one DETACHED (`Start-Process cmd.exe "/c npm run <script> >
+  <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden`), stopped by PID at the end.
 - **Throwaway fixtures** follow the seed pattern (`scripts/seedEmulator.ts`, `scripts/seed*E2E.mts`) or live as an
   untracked `scripts/*.tmp.mts` inside the repo — never in the scratchpad; `.mts`, never `.ts`.
 - **The authenticated browser already exists**: `e2e/.auth/<account>.json`, minted by the six `auth*.setup.ts`;
@@ -321,11 +319,10 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
 ### Where things are recorded
 
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
-  whatever is active (usually `develop`) and merges into it by PR. **A series of specs lands on `develop`, one
-  session at a time, and reaches `main` together after its last spec is retired, by a PR the owner opens** (owner,
-  2026-10-12, for the mobile-composition series, whose last spec was retired on 2026-10-17; the PERF series went to
-  `main` on its own, PR #446; the DATI series of 2026-11-23 goes to `main` spec by spec, each as soon as it is implemented — owner,
-  2026-11-23, `doc/dati/README.md` § 8). While a series is open, its index's status table says which spec is in `develop`.
+  whatever is active (usually `develop`) and merges into it by PR. **A series of specs reaches `main` together after its
+  last spec is retired, by a PR the owner opens** (owner, 2026-10-12), unless its index says otherwise (the DATI series
+  of 2026-11-23 goes spec by spec, `doc/dati/README.md` § 8); its status table says which spec is in `develop`. The
+  precedents: `doc/guide/collaudo.md` § Where things are recorded.
 - **A spec is retired by a session of its own** (since 2026-09-28): the code read against the spec, every divergence
   given a verdict, the lessons home, then the spec and every pointer go; **the LAST spec of a series retires its whole
   folder**. A text-only defect found there is fixed with `tsc`, lint and Vitest, no Playwright; a runtime one only on
@@ -340,11 +337,10 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
   title, a quote line («Accumulates until the next tag (WORKFLOW.md § Where things are recorded). Grouped by area; one
   entry per surface, rewritten to its final state.»), then `## ✨ New Features`, `## 🐛 Bug Fixes`, `## 🔧 Improvements`,
   `## 📚 Documentation`, one blank line between the entries of different areas.
-- **Impeccable critiques are committed** (since 2026-09-12): `.impeccable/critique/*.md` is tracked, written on the
-  fixture, never on the mirror (2026-10-15); nothing of the real account nor the owner's machines by model or hostname
-  in a tracked file, the operating system may be named (owner, 2026-10-19). A snapshot closes only through `polish`
-  (2026-09-13), with `critique-storage close <target> <snapshot-file>` on the Windows machine, where Impeccable runs
-  since 2026-10-17 (owner). The traps of `latest` and `close`: `doc/guide/collaudo.md` § Where things are recorded.
+- **Impeccable critiques are committed** (since 2026-09-12), written on the fixture, never on the mirror (2026-10-15);
+  a snapshot closes only through `polish` (2026-09-13), with `critique-storage close <target> <snapshot-file>` on the
+  Windows machine (owner, 2026-10-17). The machines never named (2026-10-19) and the traps of `latest` and `close`:
+  `doc/guide/collaudo.md` § Where things are recorded.
 - **Do not duplicate project conventions here.** Code and comment conventions live in
   `DEVELOPMENT_GUIDELINES.md` and `COMMENTS.md`, repo-wide patterns and traps in `AGENTS.md`, the
   per-area rules in `doc/guide/<tema>.md`, the aesthetic in `DESIGN.md`, environment and emulators

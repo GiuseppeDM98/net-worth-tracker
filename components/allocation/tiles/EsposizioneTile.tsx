@@ -207,7 +207,7 @@ export function EsposizioneTile({ ownerId, assets, enabled = true, collapse, asi
 
       {/* A failed «Aggiorna» over profiles already read keeps the list and adds this notice. As a row
           of the phone composition it is silent: the page's ONE live node for failed reads is
-          `PageRest`'s announcement, and the row's red eyebrow says it (AGENTS.md § Accessibility). */}
+          `PageRest`'s announcement, and the row's red eyebrow says it (doc/guide/accessibilita.md § Accessibility). */}
       {isError && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5" role={collapse ? undefined : 'alert'}>
           <p className="text-[13px] leading-[1.45] text-destructive">Errore nel caricamento delle composizioni.</p>

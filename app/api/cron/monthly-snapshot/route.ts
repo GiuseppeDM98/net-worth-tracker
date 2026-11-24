@@ -29,7 +29,10 @@ import { verifyCronSecret } from '@/lib/server/apiAuth';
  *
  * Runs daily — snapshot ID is {userId}-{year}-{month}, so each run overwrites
  * the same document throughout the month (upsert via .set()). The last run of
- * the month becomes the permanent historical record.
+ * the month becomes the month's permanent record. The same call also files the
+ * day's row in dailySnapshots/{userId}/months/{YYYY-MM} (since 2026-11-23,
+ * lib/server/dailySnapshotStore.ts), so every evening is kept there; an account
+ * with no asset gets neither.
  * Emails are guarded by isLastDayOfMonthItaly / isLastDayOfQuarterItaly /
  * isLastDayOfYearItaly and are only sent once on the appropriate day. The
  * assistant's goal re-evaluation (phase 7) runs every day, like the snapshot, and so

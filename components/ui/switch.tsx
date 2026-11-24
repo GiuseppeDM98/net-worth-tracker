@@ -15,7 +15,7 @@ const Switch = React.forwardRef<
       // (`--costume-control-switch-on`).
       "peer relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary dark:data-[state=checked]:bg-[var(--costume-control-switch-on,oklch(54.6%_0.245_262.881))] data-[state=unchecked]:bg-input",
       COSTUME_PILL_RADIUS_CLASS,
-      // The painted control stays 36×20 (shadcn's), the TARGET is 44×44 (AGENTS.md § Accessibility):
+      // The painted control stays 36×20 (shadcn's), the TARGET is 44×44 (doc/guide/accessibilita.md § Accessibility):
       // a pseudo-element grows the button's hit box by 12px above and below and 4px on each
       // side without moving a label beside it. It paints before the thumb, so it never covers it.
       "before:absolute before:-inset-x-1 before:-inset-y-3 before:content-['']",

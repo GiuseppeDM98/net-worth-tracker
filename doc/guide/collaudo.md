@@ -64,6 +64,10 @@ The app **is** locally runnable; there is no fallback to declare.
   the owner's own figures (Rendimenti, Storico): a fixture proves the mechanism, the mirror shows what the owner will
   see tomorrow. It is rule 6's copy of real data: it serves the tour only, and none of its figures enters a test, a
   draft or any other tracked file (this repo is public, so rule 6 has no exception here).
+- **A production check that waits for the evening cron can be brought forward** (owner, 2026-11-24): the owner runs
+  `/api/cron/monthly-snapshot` from Vercel › Cron Jobs. On a day that is no period's last and no Sunday it sends no
+  email and calls no model — the evening's writes, replaced by the evening's run. A count per account is then read
+  by a throwaway Admin script, `.get()` only, printing shortened uids and keys, never a value.
 - **A reading the owner cannot open with their own account**: this app has a role split — *viewer*
   (`user.uid`) vs *owner* (`ownerId`), grants in `account-access/{ownerUid}`. To show the delegated
   view, seed a grant for the second identity and log in as *that* identity (SETUP.md → Step 5b);
@@ -89,7 +93,7 @@ The app **is** locally runnable; there is no fallback to declare.
   in-page detector's count before quoting it** (2026-09-18, Centri di Costo: 71 and 110 findings, the CLI on the same
   files 0): every Cashflow tab stays mounted and hidden (`forceMount`), so ~36 hits per scan were Tracciamento's; the
   9–11px «undersized text» is the enumerated ramp; the shell, the sidebar and the overlay's own yellow (`dark-glow
-  #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe opens a control that SPENDS only with the owner's yes, asked before** (2026-09-20; the yes since 2026-11-23): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. A step that needs the real model, a real email or a paid service is asked to the owner each time, before it runs; a committed test never spends. **The session's background tasks die with it**: a restart of the Claude Code session, or its memory watchdog (on both of the owner's machines, even with memory free and even mid-suite), kills the emulators and the dev
+  #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe opens a control that SPENDS only with the owner's yes, asked before** (2026-09-20; the yes since 2026-11-23 — the owner: «quando collaudiamo qualcosa possiamo chiamare le api di anthropic o quel che ci serve per il collaudo, sempre chiedendomelo prima»): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. A step that needs the real model, a real email or a paid service is asked to the owner each time, before it runs; a committed test never spends. **The session's background tasks die with it**: a restart of the Claude Code session, or its memory watchdog (on both of the owner's machines, even with memory free and even mid-suite), kills the emulators and the dev
   server alike, and an emulator killed that way exports nothing. The safe default for the owner's tour: the emulators and
   the dev server run in the OWNER's terminals, which the watchdog does not touch; the agent re-seeds the mirror, checks
   the ports and reports the URLs, and does not restart a killed process on its own. When the owner asks the agent to
@@ -153,7 +157,7 @@ The app **is** locally runnable; there is no fallback to declare.
   session at a time, and reaches `main` together after its last spec is retired, by a PR the owner opens** (owner,
   2026-10-12, for the mobile-composition series, whose last spec was retired on 2026-10-17; the PERF series went to
   `main` on its own, PR #446; the DATI series of 2026-11-23 goes to `main` spec by spec, each as soon as it is
-  implemented — owner, 2026-11-23). While a series is open, its index's status table says which spec is in `develop`.
+  implemented — owner, 2026-11-23, `doc/dati/README.md` § 8). While a series is open, its index's status table says which spec is in `develop`.
 - **A spec is retired by a session of its own** (since 2026-09-28: the fourteen PERF specs, then the nine MOB ones —
   a retired series is read in `git log -- doc/<serie>/` and in its pull requests): the code is read against the
   spec, every divergence gets a verdict, the lessons go home (AGENTS.md, the guide, a comment at the line, CLAUDE.md),

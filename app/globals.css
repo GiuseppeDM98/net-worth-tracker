@@ -1158,7 +1158,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   border-radius: 9999px;
   background: var(--muted);
 }
-/* Thumb-sized rows (AGENTS.md § Accessibility: targets ≥ 44px) at the drawer's text size. */
+/* Thumb-sized rows (doc/guide/accessibilita.md § Accessibility: targets ≥ 44px) at the drawer's text size. */
 [data-popper-sheet] [data-slot='select-item'],
 [data-popper-sheet] [data-slot='dropdown-menu-item'] {
   min-height: 44px;

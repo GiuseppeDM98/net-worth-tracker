@@ -375,7 +375,7 @@ export default function DashboardPage() {
       disabled={isDemo || creatingSnapshot || (overview?.flags.assetCount ?? 0) === 0}
       title={isDemo ? 'Non disponibile in modalità demo' : undefined}
       variant="outline"
-      // 44px to the thumb below `desktop:`, the 36px of the header row from it (AGENTS.md § Accessibility).
+      // 44px to the thumb below `desktop:`, the 36px of the header row from it (doc/guide/accessibilita.md § Accessibility).
       className="h-11 desktop:h-9"
       aria-label={creatingSnapshot ? 'Creazione snapshot in corso' : 'Crea snapshot'}
     >
