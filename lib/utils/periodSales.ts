@@ -22,6 +22,7 @@
 import { replayTransactionsWithEffects, LedgerValidationError } from '@/lib/utils/assetTransactionUtils';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { estimateSaleTax } from '@/lib/utils/saleTax';
+import { DELETED_INSTRUMENT_NAME } from '@/lib/utils/deletedInstrumentName';
 import type { Asset } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
 
@@ -136,7 +137,7 @@ export function summarizePeriodSales(
     const estimated = taxIsWithheld ? 0 : estimateSaleTax(gainToEstimate, asset?.taxRate);
     instruments.push({
       id: assetId,
-      name: asset ? getAssetDisplayTicker(asset) : assetId,
+      name: asset ? getAssetDisplayTicker(asset) : DELETED_INSTRUMENT_NAME,
       proceeds,
       realizedGain,
       estimatedTax: estimated === null ? null : withheld + estimated,

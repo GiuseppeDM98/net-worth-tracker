@@ -21,10 +21,12 @@ The app **is** locally runnable; there is no fallback to declare.
   way exports nothing, so the fixtures have to be re-seeded. The tour runs on the emulators plus
   ONE server.
 - **The windows: `scripts/collaudo-finestre.mts`** (2026-11-13, the § 2 helper written once): `npx tsx
-  scripts/collaudo-finestre.mts --email=<fixture> --url=<path> [--url=<path>] [--title=…]` opens visible windows
+  scripts/collaudo-finestre.mts --email=<fixture> --url=<path> [--url=<path>] [--title=…] [--width=390]` opens visible windows
   already signed in (two `--url` = one session in two windows, a comparison; the tab title starts with «Finestra N»),
-  refuses a non-local base, and exits when the owner closes every window, on SIGTERM (`pkill -TERM -f
-  scripts/collaudo-finestre.mts` — how the agent closes them after the owner's confirmation) or after 30 minutes.
+  refuses a non-local base, and exits when the owner closes every window, on SIGTERM (`npx tsx scripts/collaudo-finestre.mts
+  --chiudi` — how the agent closes them after the owner's confirmation; it uses `taskkill` on Windows, where Git Bash
+  has no `pkill`) or after 30 minutes. `--width=390` (`--height=844` by default) fixes the viewport, so a phone
+  window stays a phone when the owner maximises it (2026-11-24).
   Run it in the background, as its own task: a throwaway seed beside it in one command dies with it.
   **On Windows** (2026-11-15): until that day the script never ran there — its CLI guard compared `import.meta.url` with
   `file://` + the path, which never matches `file:///C:/…`, so it exited 0 with no window (now `pathToFileURL`); and from

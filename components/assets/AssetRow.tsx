@@ -14,7 +14,9 @@ import { describeBondRow, describeLoanRow, describeManualValuation } from '@/lib
 import { costBasisPerUnitEur, isEurNative } from '@/lib/utils/costBasisEur';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { toast } from 'sonner';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import { describeDeleteRefusal } from '@/lib/utils/instrumentArchive';
 import { getAssetClassCssVar } from '@/lib/constants/colors';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { describeAssetClassChip, type AssetClassChipModel } from '@/lib/utils/assetDisplayClass';
@@ -231,6 +233,8 @@ interface AssetRowProps {
   ownerLabel?: string | null;
   /** The assets the ledger names (the page's trades), null while it is not read: the chip says «Mai comprato» only with it. */
   tradedAssetIds?: ReadonlySet<string> | null;
+  /** The ledger rows of the owner's that forbid the delete (`deleteBlockingOperations`); null while the ledger is not read. */
+  deleteOperations?: number | null;
 }
 
 /**
@@ -261,13 +265,24 @@ export function AssetRow({
   financedAssetName = null,
   ownerLabel = null,
   tradedAssetIds = null,
+  deleteOperations = null,
 }: AssetRowProps) {
   const [open, setOpen] = useState(false);
   // The sparkline is born at the first opening and stays: unmounting it on close would empty the
   // panel while it collapses, and a reopened row would draw it again for nothing.
   const [hasOpened, setHasOpened] = useState(false);
   const deleteRef = useRef<HTMLButtonElement | null>(null);
-  const { armed, onClick: onDeleteClick, onBlur: onDeleteBlur } = useArmedDelete(deleteRef, () => onDelete(asset.id));
+  const { armed, onClick: onArmedDeleteClick, onBlur: onDeleteBlur } = useArmedDelete(deleteRef, () => onDelete(asset.id));
+  // With operations in the ledger the press never arms: it says why, in a toast and in the live region.
+  const onDeleteClick = () => {
+    if (deleteOperations !== null && deleteOperations > 0) {
+      const sentence = describeDeleteRefusal(asset.name, deleteOperations);
+      toast.info(sentence);
+      announce(sentence);
+      return;
+    }
+    onArmedDeleteClick();
+  };
   const wasArmed = useRef(false);
   useEffect(() => {
     if (armed) {

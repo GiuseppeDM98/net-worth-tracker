@@ -252,8 +252,11 @@ measures in `doc/guide/collaudo.md` (moved there whole on 2026-11-18).
 - **One `next dev` at a time** (2026-09-07): stop the :3100 server before the tour; the tour runs on the emulators
   plus ONE server.
 - **The windows: `scripts/collaudo-finestre.mts`** (2026-11-13): `npx tsx scripts/collaudo-finestre.mts
-  --email=<fixture> --url=<path> [--url=<path>] [--title=…]`, in the background as its own task; stopped with `pkill
-  -TERM -f scripts/collaudo-finestre.mts`; from Git Bash on Windows prefix `MSYS_NO_PATHCONV=1` (2026-11-15). A file
+  --email=<fixture> --url=<path> [--url=<path>] [--title=…] [--width=390]`, in the background as its own task;
+  `--width=390` opens a phone window that stays 390 px wide even maximised (2026-11-24), the built-in browser pane
+  does not (it returns to the pane's width when the turn ends); closed with `npx tsx scripts/collaudo-finestre.mts
+  --chiudi` (`taskkill` on Windows: Git Bash has no `pkill`, 2026-11-24); from Git Bash on Windows prefix
+  `MSYS_NO_PATHCONV=1` (2026-11-15). A file
   the page downloads goes through a throwaway Playwright script into the scratchpad (2026-11-14).
 - **Getting in**: email/password on `/login` (no OAuth, no MFA). Fixture identities, all password `test1234`:
 
