@@ -31,6 +31,7 @@ import {
   type AssetTransactionFormData,
   type AssetTransactionsMeta,
 } from '@/types/assetTransactions';
+import type { AnnouncedDividendsOutcome } from '@/lib/utils/announcedDividendsOutcome';
 
 /** Server response for a create/edit/delete (mirrors TradeMutationResult in the use case). */
 export interface AssetTransactionMutationResult {
@@ -39,6 +40,8 @@ export interface AssetTransactionMutationResult {
   realizedPnlEur?: number;
   /** What became of the trade's fee in the cashflow (2026-11-12); `'refused'` = no fee category document. */
   feeRow?: 'written' | 'none' | 'refused';
+  /** The announced dividends of the asset the trade rewrote or removed (2026-11-23); zeros when none, or when the reconciliation failed. */
+  announcedDividends?: AnnouncedDividendsOutcome;
 }
 
 export type AssetLedgerMigrationResult =

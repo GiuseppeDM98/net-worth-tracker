@@ -57,6 +57,8 @@ import {
 } from '@/lib/utils/bondPricing';
 import { latestIndexationCoefficient, resolveInflationIndexation } from '@/lib/utils/couponUtils';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
+import { toastAnnouncedDividends } from '@/components/assets/announcedDividendsToast';
+import type { OpenedPositionParams } from '@/lib/services/couponScheduling';
 
 import { cachedFormatCurrencyEUR, formatCurrency } from '@/lib/utils/formatters';
 import {
@@ -132,6 +134,16 @@ interface TransactionDialogProps {
   prefill?: { type: 'buy' | 'sell'; quantity: number; linkedCashAssetId?: string; note?: string };
   /** Called once a NEW trade is saved: the server's result, the form data and the estimated EUR unit price (the PAC links its line with them). */
   onCreated?: (result: AssetTransactionMutationResult, data: AssetTransactionFormData, priceEur: number) => void;
+}
+
+/**
+ * The coupon of a bond bought from 0, its module loaded on demand: the coupon math stays out of
+ * Patrimonio's first load (perf:budget). Module-level because the React Compiler cannot lower an
+ * `import()` inside a component.
+ */
+async function scheduleCouponsForOpenedPositionLazily(params: OpenedPositionParams): Promise<void> {
+  const { scheduleCouponsForOpenedPosition } = await import('@/lib/services/couponScheduling');
+  await scheduleCouponsForOpenedPosition(params);
 }
 
 /**
@@ -469,6 +481,17 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
     const noteValue = data.note?.trim() ? data.note.trim() : undefined;
     const feeValue = data.fees && !isNaN(data.fees) && data.fees > 0 ? data.fees : undefined;
 
+    // Never fails the trade: a rejected request is logged and named in a toast.
+    const scheduleOpenedPositionCoupons = async (quantityAfter: number) => {
+      const opened = { asset, quantityBefore: asset.quantity, quantityAfter, userId: ownerId };
+      try {
+        await scheduleCouponsForOpenedPositionLazily(opened);
+      } catch (error) {
+        console.error('Coupon scheduling after the purchase failed:', error);
+        toast.warning('Operazione registrata, ma la cedola automatica non è stata programmata.');
+      }
+    };
+
     // A nested function so the try below wraps ONE await: the React Compiler cannot lower
     // conditionals inside a try block.
     const persist = async () => {
@@ -499,6 +522,7 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
             result.feeRow
           )
         );
+        toastAnnouncedDividends(result.announcedDividends);
       } else {
         const formData: AssetTransactionFormData = {
           assetId: asset.id,
@@ -521,6 +545,9 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
             result.feeRow
           )
         );
+        toastAnnouncedDividends(result.announcedDividends);
+        // A bond bought from 0 has no pending coupon and the cron would not reseed it: schedule it now.
+        if (formData.type === 'buy' && asset.bondDetails) await scheduleOpenedPositionCoupons(result.derived.quantity);
       }
       onClose();
     };

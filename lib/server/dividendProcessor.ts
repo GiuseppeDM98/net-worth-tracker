@@ -1,11 +1,21 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { scrapeDividendsByIsin } from '@/lib/services/borsaItalianaScraperService';
-import { createDividend, isDuplicateDividend } from '@/lib/services/dividendService';
+import {
+  createDividend,
+  deleteDividend,
+  getDividendById,
+  isDuplicateDividend,
+  updateDividend,
+} from '@/lib/services/dividendService';
 import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService';
-import { DividendFormData } from '@/types/dividend';
+import { getAssetTransactionsAdmin } from '@/lib/server/assetAdminRepository';
+import { Dividend, DividendFormData } from '@/types/dividend';
 import { ExpenseSubCategory } from '@/types/expenses';
+import type { AssetTransaction } from '@/types/assetTransactions';
 import { isDividendEligible } from '@/lib/utils/dividendEligibility';
+import { canBeOwedSince, entitledQuantity, reconcileAnnouncedDividend } from '@/lib/utils/dividendEntitlement';
+import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 import { Asset, BondDetails } from '@/types/assets';
 import {
   getFollowingCouponDate,
@@ -58,6 +68,28 @@ function toJsDate(value: Date | Timestamp): Date {
   return value instanceof Date ? value : value.toDate();
 }
 
+/** One user's trades by asset id; an asset with no trade reads `[]` (the rule then takes today's quantity). */
+type LedgerByAsset = (assetId: string) => AssetTransaction[];
+
+/**
+ * The user's ledger, read ONCE per phase (2026-11-23): every quantity a dividend is created,
+ * corrected or cashed on is the one held at its ex-date. Null when the read fails — the phase then
+ * skips the user for the evening and counts an error, so nothing is written on a guessed quantity;
+ * the scrape's 60-day window and the coupons' catch-up absorb the day.
+ */
+async function readLedgerByAsset(userId: string): Promise<LedgerByAsset | null> {
+  let trades: AssetTransaction[];
+  try {
+    trades = await getAssetTransactionsAdmin(userId);
+  } catch (error) {
+    console.error(`Error reading the ledger of user ${userId}:`, error);
+    return null;
+  }
+  const byAsset = new Map<string, AssetTransaction[]>();
+  for (const trade of trades) byAsset.set(trade.assetId, [...(byAsset.get(trade.assetId) ?? []), trade]);
+  return (assetId) => byAsset.get(assetId) ?? [];
+}
+
 export interface ScrapingResult {
   assetsScraped: number;
   newDividends: number;
@@ -89,6 +121,10 @@ export interface CouponSchedulingResult {
  *
  * Uses a 60-day lookback window to balance coverage vs. scraping load.
  * Non-blocking per-asset: errors for one asset never stop other assets.
+ *
+ * Each dividend is created on the quantity the ledger held the day before its ex-date (today's
+ * when the ledger cannot say), and not at all when that was 0; an instrument sold out with no
+ * trade in the window is not scraped (2026-11-23).
  */
 export async function runDividendScraping(
   users: FirebaseFirestore.QueryDocumentSnapshot[],
@@ -118,9 +154,17 @@ export async function runDividendScraping(
 
       if (assetsWithIsin.length === 0) continue;
 
+      const tradesOf = await readLedgerByAsset(userId);
+      if (!tradesOf) {
+        errors++;
+        continue;
+      }
+
       console.log(`User ${userId}: Found ${assetsWithIsin.length} equity assets with ISIN`);
 
       for (const asset of assetsWithIsin) {
+        // Sold out with no trade in the window: nothing can be owed, so Borsa Italiana is not asked.
+        if (!canBeOwedSince(asset.quantity, tradesOf(asset.id), sixtyDaysAgo)) continue;
         try {
           console.log(`Scraping dividends for ${asset.ticker} (ISIN: ${asset.isin}, Type: ${asset.type})`);
 
@@ -141,7 +185,11 @@ export async function runDividendScraping(
               const isDuplicate = await isDuplicateDividend(userId, asset.id, scrapedDiv.exDate);
               if (isDuplicate) continue;
 
-              const grossAmount = scrapedDiv.dividendPerShare * asset.quantity;
+              // What was held the day before the ex-date, not today's quantity; nothing held, no record.
+              const quantity = entitledQuantity(asset.quantity, tradesOf(asset.id), scrapedDiv.exDate);
+              if (quantity <= 0) continue;
+
+              const grossAmount = scrapedDiv.dividendPerShare * quantity;
               // Italian capital gains withholding tax (26%) — Legislative Decree 461/1997, Art. 27
               const taxAmount = grossAmount * 0.26;
 
@@ -150,7 +198,7 @@ export async function runDividendScraping(
                 exDate: scrapedDiv.exDate,
                 paymentDate: scrapedDiv.paymentDate,
                 dividendPerShare: scrapedDiv.dividendPerShare,
-                quantity: asset.quantity,
+                quantity,
                 grossAmount,
                 taxAmount,
                 netAmount: grossAmount - taxAmount,
@@ -196,6 +244,9 @@ export async function runDividendScraping(
  * back-dated, to avoid surprising retroactive cashflow entries.
  *
  * Requires dividendIncomeCategoryId to be configured in user settings.
+ *
+ * Before an automatic record is cashed it is re-read against the ledger (2026-11-23): one left at a
+ * stale quantity is corrected first, one not held at its ex-date is deleted with no income.
  */
 export async function runExpenseCreation(
   users: FirebaseFirestore.QueryDocumentSnapshot[],
@@ -265,6 +316,13 @@ export async function runExpenseCreation(
         continue;
       }
 
+      const tradesOf = await readLedgerByAsset(userId);
+      if (!tradesOf) {
+        errorCount++;
+        errors.push({ userId, error: 'Failed to read the ledger' });
+        continue;
+      }
+
       console.log(`Found ${dividendsSnapshot.size} candidate dividends for user ${userId}`);
 
       for (const dividendDoc of dividendsSnapshot.docs) {
@@ -290,7 +348,7 @@ export async function runExpenseCreation(
 
         try {
           // Normalize Firestore Timestamps to Date for dividendIncomeService
-          const dividendData = {
+          const storedDividend = {
             id: dividendId,
             userId,
             assetId: dividend.assetId,
@@ -315,6 +373,29 @@ export async function runExpenseCreation(
             createdAt: dividend.createdAt?.toDate(),
             updatedAt: dividend.updatedAt?.toDate(),
           };
+          let dividendData: Dividend = storedDividend;
+
+          // The net under a failed or late reconciliation: an automatic record is cashed on what
+          // was held at its ex-date. As of its OWN payment day — this pass is cashing it now, a
+          // recovered coupon included, so «still to be paid» never excludes it.
+          if (dividendData.isAutoGenerated) {
+            const verdict = reconcileAnnouncedDividend(
+              dividendData, tradesOf(dividendData.assetId), getItalyDateIso(dividendData.paymentDate)
+            );
+            if (verdict.kind === 'delete') {
+              await deleteDividend(dividendId);
+              console.log(`Deleted dividend ${dividendId} (${dividend.assetTicker}): not held at its ex-date`);
+              continue;
+            }
+            if (verdict.kind === 'update') {
+              const { quantity, grossAmount, taxAmount, netAmount } = verdict;
+              await updateDividend(dividendId, { quantity, grossAmount, taxAmount, netAmount, currency: dividendData.currency });
+              // Read back: a foreign record's income reads netAmountEur, which the update recomputed.
+              const reread = await getDividendById(dividendId);
+              if (!reread) throw new Error(`Dividend ${dividendId} vanished after its reconciliation`);
+              dividendData = reread;
+            }
+          }
 
           const expenseId = await createExpenseFromDividend(
             dividendData,
@@ -363,6 +444,8 @@ export async function runExpenseCreation(
  *
  * Idempotent: isDuplicateDividend (plus deterministic IDs in createDividend)
  * prevents double-creation across runs and retries.
+ *
+ * Each coupon is created on the units entitled at its value date (2026-11-23), never at 0.
  */
 export async function runNextCouponScheduling(
   users: FirebaseFirestore.QueryDocumentSnapshot[],
@@ -391,6 +474,12 @@ export async function runNextCouponScheduling(
         .get();
 
       if (couponSnapshot.empty) continue;
+
+      const tradesOf = await readLedgerByAsset(userId);
+      if (!tradesOf) {
+        errors++;
+        continue;
+      }
 
       // Process each bond once, from its most recent paid coupon: the heal loop
       // below advances the whole chain, so older coupons of the same bond would
@@ -450,11 +539,21 @@ export async function runNextCouponScheduling(
               continue;
             }
 
+            // The units entitled on the coupon's value date. None (sold before it): no coupon, and the
+            // walk steps over it as over a duplicate — past a date at 0 to the first future one,
+            // so a bond sold before one coupon and bought back after it is scheduled again tonight.
+            const quantity = entitledQuantity(asset.quantity, tradesOf(coupon.assetId), nextDate, 'settlement');
+            if (quantity <= 0) {
+              if (nextDate.getTime() > todayEndMs) break;
+              fromDate = nextDate;
+              continue;
+            }
+
             // Resolve via the shared pure layer so the cron matches the client scheduler.
             // For inflation-linked bonds whose FOI rate for nextDate is not yet announced,
             // this yields a PROVISIONAL coupon at the guaranteed fixed floor.
             const resolved = resolveCoupon(nextDate, bd, nominalValue);
-            const gross = resolved.perShare * asset.quantity;
+            const gross = resolved.perShare * quantity;
             const tax = gross * (taxRate / 100);
 
             const couponData: DividendFormData = {
@@ -462,7 +561,7 @@ export async function runNextCouponScheduling(
               exDate: nextDate,
               paymentDate: nextDate,
               dividendPerShare: resolved.perShare,
-              quantity: asset.quantity,
+              quantity,
               grossAmount: gross,
               taxAmount: tax,
               netAmount: gross - tax,

@@ -12,6 +12,8 @@ import {
   resolveBaselinePriceEur,
 } from '@/lib/server/tradeFxService';
 import { getUserAssetsAdmin, mapAssetDoc } from '@/lib/server/assetAdminRepository';
+import { reconcileAnnouncedDividendsForAsset } from '@/lib/server/dividendEntitlementService';
+import type { AnnouncedDividendsOutcome } from '@/lib/utils/dividendEntitlement';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { toDate, getItalyDayBoundsUtc } from '@/lib/utils/dateHelpers';
@@ -54,6 +56,11 @@ import type { Asset, AssetType } from '@/types/assets';
  * A TRADE'S FEE (2026-11-12) is a spending row written by the same transaction as its trade
  * (lib/utils/tradeFeeExpense.ts): the plan — create, move, delete or nothing — is decided in the
  * commit on the stored trade, the fee category and the named row, all read there.
+ *
+ * THE ANNOUNCED DIVIDENDS (2026-11-23) follow every committed trade: after the transaction, outside
+ * it, the asset's automatic records still to be paid are re-read against the ledger
+ * (reconcileAnnouncedSafely). Not serialized with the commit — two trades on one asset within the
+ * same second can leave the earlier verdict written last; the next trade and the cron correct it.
  */
 
 const ASSETS_COLLECTION = 'assets';
@@ -88,6 +95,12 @@ export interface TradeMutationResult {
    * owner 2026-11-12), `'none'` otherwise (no fee, a fee saved before fees became rows, a delete).
    */
   feeRow: TradeFeeRowOutcome;
+  /**
+   * The automatic dividends still to be paid that this trade moved (2026-11-23): rewritten on the
+   * quantity held at their ex-date, or deleted at 0. Zeros when nothing moved or when the
+   * reconciliation failed — it runs after the commit and never fails the trade.
+   */
+  announcedDividends: AnnouncedDividendsOutcome;
 }
 
 export type TradeFeeRowOutcome = 'written' | 'none' | 'refused';
@@ -656,14 +669,34 @@ function buildNewSequence(existing: AssetTransaction[], plan: PreparedMutation):
   return existing.filter((t) => t.id !== plan.targetTransactionId);
 }
 
-function buildResult(plan: PreparedMutation, commit: CommitOutcome): TradeMutationResult {
+function buildResult(
+  plan: PreparedMutation,
+  commit: CommitOutcome,
+  announcedDividends: AnnouncedDividendsOutcome
+): TradeMutationResult {
   const includeRealized = plan.affectedType === 'sell' && commit.realizedDelta !== undefined;
   return {
     transactionId: plan.tradeRef.id,
     derived: commit.derived,
     ...(includeRealized ? { realizedPnlEur: commit.realizedDelta } : {}),
     feeRow: commit.feeRow,
+    announcedDividends,
   };
+}
+
+/**
+ * The asset's pending dividends follow the committed ledger (lib/server/dividendEntitlementService.ts).
+ * Outside the transaction on purpose: a dividend is a forecast, the commit already holds five
+ * collections, and the cron's payment-day pass re-applies the same verdict — so a failure here is
+ * logged and answered as zeros, never as a failed trade the owner would record twice.
+ */
+async function reconcileAnnouncedSafely(ownerId: string, assetId: string): Promise<AnnouncedDividendsOutcome> {
+  try {
+    return await reconcileAnnouncedDividendsForAsset(ownerId, assetId);
+  } catch (error) {
+    console.error('[assetTransactionUseCase] Announced-dividend reconciliation failed', { assetId, error });
+    return { updated: 0, deleted: 0 };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -676,7 +709,8 @@ export async function createAssetTransaction(
 ): Promise<TradeMutationResult> {
   const plan = await prepareCreate(ownerId, data);
   const commit = await commitTradeMutation(plan);
-  return buildResult(plan, commit);
+  const announcedDividends = await reconcileAnnouncedSafely(plan.ownerId, plan.assetId);
+  return buildResult(plan, commit, announcedDividends);
 }
 
 /** `expectedUpdatedAt`: the version the form was drawn from; a trade changed since is a 409. */
@@ -688,7 +722,8 @@ export async function updateAssetTransaction(
 ): Promise<TradeMutationResult> {
   const plan = await prepareEdit(ownerId, transactionId, updates, expectedUpdatedAt);
   const commit = await commitTradeMutation(plan);
-  return buildResult(plan, commit);
+  const announcedDividends = await reconcileAnnouncedSafely(plan.ownerId, plan.assetId);
+  return buildResult(plan, commit, announcedDividends);
 }
 
 /** `expectedUpdatedAt`: the version the delete button was drawn from; a trade changed since is a 409. */
@@ -699,7 +734,8 @@ export async function deleteAssetTransaction(
 ): Promise<TradeMutationResult> {
   const plan = await prepareDelete(ownerId, transactionId, expectedUpdatedAt);
   const commit = await commitTradeMutation(plan);
-  return buildResult(plan, commit);
+  const announcedDividends = await reconcileAnnouncedSafely(plan.ownerId, plan.assetId);
+  return buildResult(plan, commit, announcedDividends);
 }
 
 /**

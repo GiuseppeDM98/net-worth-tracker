@@ -62,12 +62,32 @@ export async function getUserSnapshotsAdmin(userId: string): Promise<MonthlySnap
 }
 
 /**
- * Fetch every trade-ledger transaction for a user using the Admin SDK (server-side only).
- *
- * Read-only mirror of the Timestamp→Date conversion in assetTransactionUseCase.ts
- * (docToAssetTransaction) — duplicated rather than imported: that module already imports
- * getUserAssetsAdmin from this file, so importing back would create a cycle.
+ * A stored trade doc in the domain shape. Read-only mirror of the Timestamp→Date conversion in
+ * assetTransactionUseCase.ts (docToAssetTransaction) — duplicated rather than imported: that module
+ * already imports getUserAssetsAdmin from this file, so importing back would create a cycle.
  */
+function mapAssetTransactionDoc(id: string, data: DocumentData): AssetTransaction {
+  return {
+    id,
+    userId: data.userId,
+    assetId: data.assetId,
+    type: data.type,
+    date: toDate(data.date),
+    quantity: data.quantity,
+    pricePerUnit: data.pricePerUnit,
+    priceEur: data.priceEur,
+    fees: data.fees,
+    linkedCashAssetId: data.linkedCashAssetId,
+    feeExpenseId: data.feeExpenseId,
+    withheldTaxEur: data.withheldTaxEur,
+    isBaseline: data.isBaseline,
+    note: data.note,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  } as AssetTransaction;
+}
+
+/** Fetch every trade-ledger transaction for a user using the Admin SDK (server-side only). */
 export async function getAssetTransactionsAdmin(userId: string): Promise<AssetTransaction[]> {
   try {
     const querySnapshot = await adminDb
@@ -75,29 +95,28 @@ export async function getAssetTransactionsAdmin(userId: string): Promise<AssetTr
       .where('userId', '==', userId)
       .get();
 
-    return querySnapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        userId: data.userId,
-        assetId: data.assetId,
-        type: data.type,
-        date: toDate(data.date),
-        quantity: data.quantity,
-        pricePerUnit: data.pricePerUnit,
-        priceEur: data.priceEur,
-        fees: data.fees,
-        linkedCashAssetId: data.linkedCashAssetId,
-        feeExpenseId: data.feeExpenseId,
-        withheldTaxEur: data.withheldTaxEur,
-        isBaseline: data.isBaseline,
-        note: data.note,
-        createdAt: toDate(data.createdAt),
-        updatedAt: toDate(data.updatedAt),
-      } as AssetTransaction;
-    });
+    return querySnapshot.docs.map((doc) => mapAssetTransactionDoc(doc.id, doc.data()));
   } catch (error) {
     console.error('[getAssetTransactionsAdmin] Error fetching asset transactions:', error);
+    throw new Error('Failed to fetch asset transactions');
+  }
+}
+
+/**
+ * The trades of ONE asset (server-side only): two equalities, no composite index — the query the
+ * ledger's commit already runs inside its transaction.
+ */
+export async function getAssetTransactionsForAssetAdmin(userId: string, assetId: string): Promise<AssetTransaction[]> {
+  try {
+    const querySnapshot = await adminDb
+      .collection(ASSET_TRANSACTIONS_COLLECTION)
+      .where('userId', '==', userId)
+      .where('assetId', '==', assetId)
+      .get();
+
+    return querySnapshot.docs.map((doc) => mapAssetTransactionDoc(doc.id, doc.data()));
+  } catch (error) {
+    console.error('[getAssetTransactionsForAssetAdmin] Error fetching asset transactions:', error);
     throw new Error('Failed to fetch asset transactions');
   }
 }

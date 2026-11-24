@@ -155,3 +155,11 @@ export const queryKeys = {
     all: (userId: string) => ['cost-centers', userId] as const,
   },
 } as const;
+
+/**
+ * The Dividendi tab's one request (`lib/hooks/useDividendStats.ts`, which re-exports it). Here so a
+ * trade's invalidation names it without loading the hook's module (2026-11-23).
+ */
+export function dividendStatsQueryKey(ownerId: string | null | undefined) {
+  return ['dividend-stats', ownerId ?? ''] as const;
+}

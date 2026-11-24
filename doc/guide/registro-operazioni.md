@@ -120,9 +120,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   DIRECTLY in-tx, not via `updateAsset`.
 - **Migration is idempotent and decides in ONE transaction** (2026-11-12): the meta doc is read inside it and
   `tx.create`d last; an existing baseline is never rewritten; at most 450 baselines (422 beyond); prices are resolved
-  before it, re-checked by currency and unit price, three attempts. Mutation hooks invalidate four keys:
+  before it, re-checked by currency and unit price, three attempts. Mutation hooks invalidate six keys:
   `assetTransactions.all` + `assets.all` + `dashboard.overview` + `expenses.all`, a trade's fee being a row the
-  server writes with it — on success AND on a refusal, so the list a form is reopened from is the stored one.
+  server writes with it, + `dividendReceipts.all` + `dividendStatsQueryKey` (2026-11-23), a trade rewriting the
+  asset's announced dividends — on success AND on a refusal, so the list a form is reopened from is the stored one.
+- **The trade's answer carries `announcedDividends`** (2026-11-23): `{ updated, deleted }`, the asset's pending
+  auto-generated dividends the reconciliation rewrote or removed after the commit (doc/guide/cashflow-dividendi.md
+  § A pending record follows the ledger); zeros when none, or when the reconciliation failed — it never fails the trade.
 - **`updateAssetMetadata` closes the `deleteField()` trap** — ledger-type edits go through it, never `updateAsset`.
   **Testing the atomic write**: the in-memory Admin fake is built inside the hoisted `vi.mock` factory, so reference
   `vi.hoisted(...)` state, never a plain const.
@@ -174,6 +178,9 @@ transactions and gates chosen calls.
   the decision inside the transaction it only lengthens a request; the Compravendita executor
   (`realEstateOperationService.ts`, its own single transaction) and the expense writes (`expenseService.ts`) are not
   ledger writes and were not reviewed for this shape — no report and no finding on them.
+- The announced-dividend reconciliation runs after the commit and is not serialized: two concurrent trades on one
+  asset can leave the earlier verdict written last; the next trade on the asset and the payment-day pass correct it
+  (2026-11-23).
 - A trade document always carries `updatedAt` (every writer stores it): a test fixture that edits or deletes a trade
   sets one, or `toDate(undefined)` reads «now» and the guard answers 409.
 

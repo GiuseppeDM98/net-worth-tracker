@@ -81,6 +81,8 @@
 
 ## 🐛 Bug Fixes
 
+- **Cashflow › Dividendi — una cedola non compare più due volte** — Fixed: a bond's next coupon could be listed twice on the same day, once from saving the bond and once from the evening update; the two now recognise each other.
+
 - **Rendimenti, Coast FIRE e Impostazioni › Spese — le due colonne finiscono sulla stessa riga** — Fixed: the last tile of the shorter column now grows to the taller one's edge.
 
 - **Previdenza e Panoramica — la curva non esce più dal riquadro** — Fixed: the sparkline's curve no longer overshoots its own maximum.
@@ -146,6 +148,8 @@
 - **Rendimenti › Analizza con AI** — Fixed the empty or cut-off report: when the model declines to write it, another model takes over where the kind of refusal allows it, and the dialog names the model that actually wrote the report; when the refusal stands, or the report reaches its maximum length, the dialog says so — refused, or stopped halfway with the text written so far incomplete — and «Rigenera» is offered after any failure, not only beside a finished report.
 
 ## 🔧 Improvements
+
+- **Cashflow › Dividendi — un dividendo annunciato segue le operazioni** — Changed: an announced dividend follows your purchases and sales until its ex-date (removed when you no longer hold the instrument), a bond's coupon follows the value date, and sold-out instruments are no longer searched every evening.
 
 - **Temi — Egeo e Orbita** — The two costume themes now dress every dialog and drawer and the other nine pages; in Egeo each page has its own emblem, and the Analisi flow takes the theme's colours.
 
