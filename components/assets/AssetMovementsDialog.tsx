@@ -57,6 +57,7 @@ import { TransactionDialog } from '@/components/assets/TransactionDialog';
 import { cn } from '@/lib/utils';
 import { Info, Pencil, Plus, Trash2, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastAnnouncedDividends } from '@/components/assets/announcedDividendsToast';
 import type { Asset } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
 import { COSTUME_FRAME_RADIUS_CLASS, COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
@@ -139,8 +140,9 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
   // The row's version travels with the delete: a trade changed or deleted since is refused.
   const performDelete = async (transaction: AssetTransaction) => {
     try {
-      await deleteMutation.mutateAsync({ transactionId: transaction.id, expectedUpdatedAt: transaction.updatedAt });
+      const result = await deleteMutation.mutateAsync({ transactionId: transaction.id, expectedUpdatedAt: transaction.updatedAt });
       toast.success('Operazione eliminata');
+      toastAnnouncedDividends(result.announcedDividends);
     } catch (error) {
       toast.error(describeWriteError(error));
     }

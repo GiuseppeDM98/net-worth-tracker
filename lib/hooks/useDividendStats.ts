@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { dividendStatsQueryKey } from '@/lib/query/queryKeys';
 import type { Dividend, DividendStatsPayload } from '@/types/dividend';
 
 /**
@@ -17,10 +18,8 @@ interface DividendTabAnswer {
   dividends: Dividend[];
 }
 
-/** The key both hooks read and every dividend write invalidates (`components/cashflow/CashflowPageClient.tsx`). */
-export function dividendStatsQueryKey(ownerId: string | null | undefined) {
-  return ['dividend-stats', ownerId ?? ''] as const;
-}
+/** The key both hooks read and every dividend write invalidates (`components/cashflow/CashflowPageClient.tsx`, a trade). */
+export { dividendStatsQueryKey };
 
 async function fetchDividendTab(ownerId: string): Promise<DividendTabAnswer> {
   const response = await authenticatedFetch(`/api/dividends/stats?userId=${ownerId}`);

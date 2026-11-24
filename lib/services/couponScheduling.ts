@@ -8,20 +8,24 @@
  * It is called from three places that must all behave identically:
  *   1. AssetDialog, right after a bond is created/updated;
  *   2. InflationRateDialog, after the user announces an inflation rate;
- *   3. (indirectly) the daily cron mirrors this logic server-side in dividendProcessor.
+ *   3. TransactionDialog, when a purchase opens a position from 0 (scheduleCouponsForOpenedPosition);
+ *   4. (indirectly) the daily cron mirrors this logic server-side in dividendProcessor.
  *
  * The actual coupon math + note live in the pure layer (resolveCoupon /
  * buildCouponNote in couponUtils) so the client and the cron stay in lockstep.
  *
  * Non-critical by contract: a failure here never rolls back the asset save —
  * callers wrap the call and surface a soft error.
+ *
+ * Nothing held, nothing owed (2026-11-23): at quantity 0 neither scheduler sends a request, so a
+ * sold-out bond saved again never gets a coupon of 0,00 €.
  */
 
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { stripFloatNoise } from '@/lib/utils/floatNoise';
 import { buildCouponNote, getNextCouponDate, hasCouponPayments, resolveCoupon } from '@/lib/utils/couponUtils';
-import { BondDetails } from '@/types/assets';
+import { Asset, BondDetails } from '@/types/assets';
 
 export interface ScheduleCouponParams {
   assetId: string;
@@ -59,6 +63,7 @@ function resolveCouponTaxRate(taxRate?: number): number {
 export async function scheduleNextCoupon(params: ScheduleCouponParams): Promise<ScheduleNextCouponResult> {
   const { assetId, bondDetails, quantity, currency, taxRate, userId } = params;
 
+  if (quantity <= 0) return { scheduled: false };
   if (!hasCouponPayments(bondDetails)) return { scheduled: false };
 
   const issueDate = toDate(bondDetails.issueDate);
@@ -106,6 +111,7 @@ export async function scheduleNextCoupon(params: ScheduleCouponParams): Promise<
 export async function scheduleFinalPremium(params: ScheduleCouponParams): Promise<boolean> {
   const { assetId, bondDetails, quantity, currency, taxRate, userId } = params;
 
+  if (quantity <= 0) return false;
   if (!bondDetails.finalPremiumRate) return false;
   const maturityDate = toDate(bondDetails.maturityDate);
   if (maturityDate <= new Date()) return false;
@@ -139,4 +145,36 @@ export async function scheduleFinalPremium(params: ScheduleCouponParams): Promis
   });
 
   return response.ok;
+}
+
+export interface OpenedPositionParams {
+  asset: Pick<Asset, 'id' | 'bondDetails' | 'currency' | 'taxRate'>;
+  quantityBefore: number;
+  quantityAfter: number;
+  userId: string;
+}
+
+/**
+ * A bond position that opens from 0 gets its coupon (and final premium) at the purchase.
+ *
+ * At quantity 0 no pending coupon exists — the reconciliation deleted it, or the scheduler never
+ * created it — and the cron reseeds a bond only from a coupon it PAID in the catch-up window, which
+ * a bond that never cashed one does not have. The record is created on today's quantity; a purchase
+ * within two working days of the coupon date is corrected by the payment-day pass.
+ * A no-op for anything but a bond going from 0 to a positive quantity.
+ */
+export async function scheduleCouponsForOpenedPosition(params: OpenedPositionParams): Promise<void> {
+  const { asset, quantityBefore, quantityAfter, userId } = params;
+  if (!asset.bondDetails || quantityBefore !== 0 || quantityAfter <= 0) return;
+
+  const scheduleParams: ScheduleCouponParams = {
+    assetId: asset.id,
+    bondDetails: asset.bondDetails,
+    quantity: quantityAfter,
+    currency: asset.currency,
+    taxRate: asset.taxRate,
+    userId,
+  };
+  await scheduleNextCoupon(scheduleParams);
+  await scheduleFinalPremium(scheduleParams);
 }

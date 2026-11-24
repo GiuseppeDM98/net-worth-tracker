@@ -62,6 +62,7 @@ vi.mock('@/lib/services/dashboardOverviewInvalidation.server', () => ({
 import {
   createExpenseFromDividend,
   deleteExpenseForDividend,
+  syncDividendExpenses,
   updateExpenseFromDividend,
 } from '@/lib/services/dividendIncomeService';
 import { updateDividend } from '@/lib/services/dividendService';
@@ -284,5 +285,21 @@ describe('updateDividend expenseId handling', () => {
     await updateDividend('div-1', { expenseId: 'exp-9' });
 
     expect((fake.dividendUpdateMock.mock.calls[0][0] as Record<string, unknown>).expenseId).toBe('exp-9');
+  });
+});
+
+describe('syncDividendExpenses — «already paid» by the Italian day (2026-11-24)', () => {
+  it('cashes a payment stored at UTC midnight of today in Italy, not one of tomorrow', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-14T23:30:00.000Z')); // 00:30 of 15/12 in Italy
+    seed();
+    fake.docs.set('dividends/div-2', { userId: 'u1' });
+    const today = dividend({ paymentDate: new Date('2026-12-15T00:00:00.000Z') });
+    const tomorrow = dividend({ id: 'div-2', paymentDate: new Date('2026-12-16T00:00:00.000Z') });
+
+    const result = await syncDividendExpenses('u1', [today, tomorrow], 'cat-1', 'Dividendi');
+    vi.useRealTimers();
+
+    expect(result).toEqual({ created: 1, skipped: 1, failed: 0 });
   });
 });

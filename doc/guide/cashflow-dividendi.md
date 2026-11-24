@@ -10,7 +10,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility}.ts` (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` (`useDividendRegistry` for the page's list, `useDividendStats` for the tab's measures: ONE request) → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
-- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendAccount`, `dividendIncomeService`, `floatNoise` · **Email** `monthlyEmailService`
+- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendEntitlement`, `dividendServiceItalyDay`, `dividendScrapeRoute`, `couponScheduling`, `dividendAccount`, `dividendIncomeService`, `floatNoise` · **Email** `monthlyEmailService`
 - **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles), `pagatoriTile`, `searchableComboboxRefocus` (the picker after a refusal) · **Browser** `e2e/cashflow.dividendi{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts` · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
 
 ## Cashflow › Dividendi (`components/dividends/DividendTrackingTab.tsx`, `components/dividends/tiles/*`)
@@ -136,6 +136,40 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `dividendAnalytics.test.ts` (V1), `__tests__/pagatoriTile.test.tsx`; browser `e2e/ring-chart.dividendi.spec.ts`.
 
 ## Dividends and Coupons
+- **A pending record follows the ledger** (2026-11-23, `lib/utils/dividendEntitlement.ts`, the server half
+  `lib/server/dividendEntitlementService.ts`). A dividend is owed on the quantity held at the end of the Italian day
+  before its ex-date — a share by its trade day, a coupon and a final premium by its value date (trade day + 2
+  working days, `settlementDayIso`), a baseline on its own day; no trade in the ledger, or an ex-date before a
+  migration baseline, → today's quantity. **What is touched**: an auto-generated record with no `expenseId` whose
+  Italian payment day is today or later — rewritten (quantity, gross, the tax in the proportion it had, net, the euro
+  fields) when its entitled quantity changed, deleted when it is 0. **What never is**: a hand-entered record, a cashed
+  one (`expenseId`), one already paid. **The three moments**: after every trade's commit — create, edit, delete — the
+  use case reconciles the asset OUTSIDE the transaction and never fails the trade (a failure logs and answers zeros;
+  the answer's `announcedDividends` is the one `toast.info` of `components/assets/announcedDividendsToast.ts`); the
+  cron's payment-day pass re-applies the verdict before cashing (a record deleted there writes no income, a rewritten
+  one is read back and cashed as written); phase 3 creates a coupon on its entitled quantity and steps over a date at
+  0 like a duplicate, so a bond sold before one coupon and bought back after it is scheduled again. **The scrape**:
+  the cron does not ask Borsa Italiana for an instrument at quantity 0 with no trade in the 60-day window
+  (`canBeOwedSince`); cron and button create each dividend on its entitled quantity and none at 0 — the button's
+  answer counts those in `notHeld`, and a run that found only those says «Nessun nuovo dividendo: 1 dividendo
+  staccato quando non avevi lo strumento.». **A user whose ledger does not read is skipped** in each cron phase and
+  counted as an error — never a fallback to `[]`, which would read as «held today»; on the button's route the
+  same failed read is its 500. The schedulers make no request
+  at quantity 0, and a purchase that opens a bond from 0 schedules its coupon and premium
+  (`scheduleCouponsForOpenedPosition`, from `TransactionDialog`). Pinned by `__tests__/{dividendEntitlement,
+  dividendProcessor,dividendScrapeRoute,couponScheduling,assetTransactionWriteTx}.test.ts`,
+  `__tests__/transactionDialog.announced.test.tsx` and `e2e/assets.announced-dividends.spec.ts`.
+- **An ex-date's day is the Italian one** (2026-11-24, `lib/services/dividendService.ts`): `isDuplicateDividend`
+  searches `getItalyDayBoundsUtc(exDate)` and the deterministic id of an automatic record keys `getItalyDateIso(exDate)`.
+  The cron stores a coupon at Italian midnight (23:00 UTC of the day before), the asset form at UTC midnight: with the
+  process zone's day (UTC on Vercel) the cron missed the form's coupon and wrote it again under another id — two
+  identical coupons on one day, on a lived account. Records created before keep their UTC-keyed ids; the duplicate
+  check, not the id, is what stops a second one. The same day governs «already paid» in `syncDividendExpenses` and
+  in the scrape route (`isItalyDayAfter`) and «upcoming» in `deleteUpcomingCouponsForAsset` (from the Italian day's
+  start). **A cashed coupon is never deleted by a bond's re-save** (owner, 2026-11-24): the cleanup skips a record
+  with `expenseId`, and `createDividendWithOptionalExpense` then creates no coupon on a day that still holds one —
+  re-creating it would drop its `expenseId` and the cron would cash it twice. Pinned by
+  `__tests__/{dividendServiceItalyDay,dividendUseCase,dividendIncomeService,dividendScrapeRoute}.test.ts`.
 - **A bond may pay ONE coupon, with the redemption** (`CouponFrequency 'maturity'`, 2026-10-10 — the BTP Valore
   «Insieme» of the 19–23 October dual-tranche issue, MEF comunicato of 2026-09-25: five years, no intermediate coupon,
   «rendimenti equivalenti» to the quarterly step-up Valore). The owner's reading of that equivalence is COMPOUND:
@@ -300,6 +334,12 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
   Before, «BTP» typed right after a refusal opened no list — the intermittent red of `e2e/cashflow.dividendi.spec.ts`
   «the form refuses…» since 2026-09-30 (doc/guide/e2e-suite.md).
 
+- **A pending record follows the ledger — where it cannot** (2026-11-23): a record created before a migration
+  baseline keeps today's quantity (the ledger knows nothing earlier); an ADJUSTMENT (a split) before the ex-date
+  changes the quantity while `dividendPerShare` stays as scraped; an instrument re-created on an ISIN that already
+  paid shares the asset id, so its trades reach only the records still to be paid; a record whose income row the
+  user deleted is pending again, and follows the ledger like any other; no one-off pass rewrote the stale records on
+  the day of the deploy — each is corrected at its asset's next trade or on its payment day.
 - **A coupon recovered the day after a missed cron is NOT credited to its account** — by the owner's rule (only a
   payment dated today or later credits, so arrears never count twice). The income row is there, without an account:
   adjust the balance by hand or link the row from Tracciamento.

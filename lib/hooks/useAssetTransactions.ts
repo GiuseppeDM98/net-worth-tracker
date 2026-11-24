@@ -3,15 +3,16 @@
 /**
  * React Query hooks for the asset trade ledger (Registro operazioni asset).
  *
- * Mutations invalidate four keys: assetTransactions.all + assets.all + dashboard.overview +
- * expenses.all. The dual asset/overview rule grows here because a trade's optional cash settlement
- * moves a cash asset balance, so both the hero total and the asset table change, and a trade's fee is
- * a row the server writes with it (2026-11-12). Demo mode is gated at the UI (button
+ * Mutations invalidate six keys: assetTransactions.all + assets.all + dashboard.overview +
+ * expenses.all + dividendReceipts.all + the dividend tab's stats. The dual asset/overview rule grows
+ * here because a trade's optional cash settlement moves a cash asset balance, so both the hero total
+ * and the asset table change, a trade's fee is a row the server writes with it (2026-11-12), and a
+ * trade rewrites the asset's announced dividends (2026-11-23). Demo mode is gated at the UI (button
  * disable), like every other mutation — not here.
  */
 
 import { queryOptions, useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/query/queryKeys';
+import { dividendStatsQueryKey, queryKeys } from '@/lib/query/queryKeys';
 import {
   getAssetTransactions,
   getAssetLedgerMeta,
@@ -57,7 +58,11 @@ export function useAssetLedgerMeta(ownerId: string | undefined) {
   });
 }
 
-/** Invalidate the trade list, the asset table, the expenses and the overview hero after a trade mutation. */
+/**
+ * Invalidate six keys after a trade mutation: the trade list, the asset table, the expenses, the
+ * overview hero, and the two dividend reads — Rendimenti's receipts and the Dividendi tab's one
+ * request — because the server rewrites the asset's announced dividends after the trade.
+ */
 function invalidateTradeCaches(queryClient: QueryClient, ownerId: string): void {
   // assetTransactions.all is a prefix of byAsset → this also refreshes any open movements list.
   queryClient.invalidateQueries({ queryKey: queryKeys.assetTransactions.all(ownerId) });
@@ -65,6 +70,8 @@ function invalidateTradeCaches(queryClient: QueryClient, ownerId: string): void 
   // A trade's fee is a cashflow row the server writes with it.
   queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.dividendReceipts.all(ownerId) });
+  queryClient.invalidateQueries({ queryKey: dividendStatsQueryKey(ownerId) });
 }
 
 export function useCreateAssetTransaction(ownerId: string) {
