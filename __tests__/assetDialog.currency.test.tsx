@@ -3,7 +3,8 @@
  * above the price; on a create the ticker's blur asks the quote once, silently, and sets it unless the
  * owner has already picked one — nor does the submit's quote overwrite that pick. A cash account has
  * no select and is saved in euro. An instrument with operations keeps its currency. The reads, the
- * writes and the quote are mocked; invented names and tickers.
+ * writes and the quote are mocked; invented names and tickers. Seen red (2026-11-25) with the
+ * currency set by every lookup, the owner's pick ignored.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
