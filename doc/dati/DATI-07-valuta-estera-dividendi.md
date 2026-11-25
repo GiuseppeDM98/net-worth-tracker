@@ -85,7 +85,8 @@
   - (g) amounts on a pound instrument are typed in pounds: pence are never a dividend's currency (C2's
     `normalizeCurrencyAmount` gives the code).
   - (h) a record saved on its payment day before the ECB publishes carries the previous fixing, labelled as the
-    day's (the blind spot DATI-06 declares for a trade).
+    day's (the blind spot declared for a trade: doc/guide/registro-operazioni.md § Per-page blind spots, «BCE del
+    {giorno}»).
 
 ## 4. Solution
 
@@ -303,7 +304,7 @@ export function resolveDividendFx(input: DividendFxInput): DividendFxResolution 
 - **`readCreditableAccount` refuses an account of another currency** (`dividendIncomeService.ts:73-74`): the row of a
   converted dividend is in euro, so the euro account passes — P1 keeps a euro account.
 - **Italian day**: the rate's day is the payment date's Italian day (the service of C2 does it).
-- **No E2E assertion depends on Frankfurter's answer** (the rule of DATI-06): E1 types a euro net inside the guard
+- **No E2E assertion depends on Frankfurter's answer** (the rule `e2e/assets.fx.spec.ts` follows for a trade): E1 types a euro net inside the guard
   for any plausible fixing.
 - **The service wraps every error** (`dividendService.ts`, the `catch` of `createDividend` and `updateDividend`):
   without the rethrow of § 4.3 a `total-off` reaches the routes as a generic 500.

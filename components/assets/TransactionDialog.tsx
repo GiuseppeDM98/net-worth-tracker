@@ -246,7 +246,8 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
     () => allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash' && isEuroAccount(a)),
     [allAssets]
   );
-  // An old trade settled on a foreign account keeps it until the owner picks another (decision 62).
+  // An old trade settled on a foreign account keeps it until the owner picks another: the server
+  // checks the currency only when the account changes (owner, 2026-11-23).
   const storedForeignAccount = useMemo(() => {
     const storedId = transaction?.linkedCashAssetId;
     if (!storedId) return undefined;
@@ -405,7 +406,8 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
   const isEur = currency === 'EUR';
   // The two foreign fields: a buy or a sale on a foreign instrument, never an adjustment or a baseline.
   const showsForeignFields = !isEur && !isAdjustment && !isBaseline;
-  // A fee saved in euro before 2026-11-23 (decision 61): it stays until the owner writes it in the currency.
+  // A fee saved in euro before 2026-11-23 lives inside a euro total typed alone (owner, 2026-11-23):
+  // it stays until the owner writes it in the currency.
   const legacyFeeEur = !isEur && transaction && transaction.feesNative === undefined ? storedFee : null;
   const typedFeesNative = positiveOrUndefined(feesNative);
   const typedTotal = positiveOrUndefined(settledTotalEur);
@@ -520,7 +522,7 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
   const hasSettlement = linkedCashAssetId !== NO_SETTLEMENT;
 
   // A new trade never settles on a foreign account: a prefill naming one (Accumulo's «Questo mese»)
-  // falls back to no account once the accounts are known. An edit keeps its stored one (decision 62).
+  // falls back to no account once the accounts are known. An edit keeps its stored one (owner, 2026-11-23).
   const prefilledForeignAccount =
     !isEdit && hasSettlement && allAssets.some((a) => a.id === linkedCashAssetId && a.type === 'cash' && !isEuroAccount(a));
   useEffect(() => {

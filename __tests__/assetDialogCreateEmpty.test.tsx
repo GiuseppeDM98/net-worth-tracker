@@ -9,7 +9,8 @@
  * instrument is created the same way, empty, and handed to `onRegisterTrade` — the Patrimonio page
  * opens «Registra operazione» on it for the first purchase. No trade is written here.
  *
- * The reads, the writes and the quote are mocked. Invented names and tickers.
+ * The reads, the writes and the quote are mocked. Invented names and tickers. The second block was
+ * seen red (2026-11-25) with the asset form's own first purchase kept.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';

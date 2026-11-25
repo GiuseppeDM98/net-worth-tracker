@@ -2,7 +2,8 @@
  * Tests for lib/server/tradeFxService.ts → resolveEcbRateToEur: which Frankfurter path answers a
  * trade's day, and whether the rate is that day's own fixing (`isLatest`). `fetch` is mocked by URL;
  * the rate cache of currencyConversionService lives for the whole module, so every test resets the
- * modules and imports the service again.
+ * modules and imports the service again. Seen red (2026-11-25) by `isLatest: false` on the cached
+ * fallback, and by `>` turned into `>=` in the future-day test.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

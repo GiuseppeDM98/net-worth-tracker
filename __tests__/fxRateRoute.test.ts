@@ -1,6 +1,7 @@
 /**
  * Tests for GET /api/fx/rate — the ECB rate the trade form previews: signed-in only, the query
  * validated before any read, the service's answer passed through, 503 when there is none.
+ * Seen red (2026-11-25) with `parseOr400` skipped.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';

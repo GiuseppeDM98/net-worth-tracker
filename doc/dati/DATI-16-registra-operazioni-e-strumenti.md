@@ -361,8 +361,8 @@ export function resolveTradeProposal(
 ```
 
 `feesNative` and `settledTotalEur` on `AssetTransactionFormData`, `nativeTotal`, `normalizeCurrencyAmount` and
-`isListedCurrency` are DATI-06's (C2 and § 4.6 there); `createdEmpty` is the flag the form's own create writes
-since DATI-06 § 4.7. `isCalendarDate` becomes `export` in `lib/utils/expenseProposal.ts`: one calendar check for the
+`isListedCurrency` are DATI-06's (C2; `lib/utils/tradeFx.ts`, `lib/constants/currencies.ts`); `createdEmpty` is the
+flag the form's own create writes since DATI-06 (`AssetDialog`'s ledger create, doc/guide/registro-operazioni.md). `isCalendarDate` becomes `export` in `lib/utils/expenseProposal.ts`: one calendar check for the
 proposal schemas.
 
 ### 4.2 Keys and the saved outcome
@@ -515,7 +515,7 @@ async function writeTradeProposal(
     settledTotalEur, withheldTaxEur, linkedCashAssetId, note }}` and `onCreated={(result) =>
     written([result.transactionId])}`;
   - new bond → `AssetDialog` with `initialType="bond"`, `createPrefill` from `newInstrument` and
-    `onRegisterTrade={(created) => …}`: since DATI-06 § 4.7 the form creates the bond EMPTY and hands it over — the
+    `onRegisterTrade={(created) => …}`: since DATI-06 (C2, the ONE form) the form creates the bond EMPTY and hands it over — the
     card keeps `created` in state and opens the same `TransactionDialog` on it, with the same prefill and
     `onCreated={(result) => written([result.transactionId, created.id])}`. A form closed without a purchase leaves
     the card open, and its button then opens the trade form on the bond already created.

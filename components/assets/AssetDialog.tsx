@@ -926,7 +926,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const isEdit = !!asset;
 
   // Trade-ledger wiring (Phase C). Ledger assets (stock/etf/bond/crypto/commodity) manage quantity
-  // and PMC through the ledger: edit becomes metadata-only, create opens the position as a first buy.
+  // and PMC through the ledger: edit becomes metadata-only, create makes the instrument empty and
+  // hands it to the trade form for its first purchase (2026-11-23).
   const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
   const { data: ledgerAllAssets = [] } = useAssets(ownerId);
   // The settings document — the family members for the pensionFund «Membro famiglia» Select and
@@ -1510,13 +1511,13 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         data.assetClass === 'bonds' &&
         !!(data.isin?.trim());
 
-      // Ledger flows (Phase C): edit is metadata-only; create opens the position as a first buy.
-      // Accumulo → Nuovo asset: an empty create never opens a first buy, so it is excluded
-      // from ledgerCreateFlow whatever `ledgerMeta` says — it never reads it.
+      // Ledger flows (Phase C): edit is metadata-only; create makes the instrument empty and hands it
+      // to the trade form (2026-11-23). Accumulo → Nuovo asset: an empty create never opens the trade
+      // form, so it is excluded from ledgerCreateFlow whatever `ledgerMeta` says — it never reads it.
       const ledgerEditFlow = !!asset && isLedgerAssetType(asset.type);
       const emptyCreateFlow = !asset && !!createEmpty && isLedgerAssetType(data.type);
       // A cached `null` may be a restored one (IndexedDB) on an account migrated elsewhere: ask once.
-      // An empty create never opens a first buy, so it never asks.
+      // An empty create never opens the trade form, so it never asks.
       const metaNow = !asset && !emptyCreateFlow && isLedgerAssetType(data.type) && ledgerMeta == null
         ? await fetchFreshLedgerMeta(queryClient, ownerId)
         : ledgerMeta;
@@ -2111,7 +2112,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
             )}
 
             {/* Quantity input — hidden for ledger types: on edit it is read-only (managed by the
-                ledger), on create it moves into the "Posizione iniziale" section below. */}
+                ledger), on create the instrument is born at 0 units and its first purchase is
+                «Registra operazione»'s (2026-11-23). */}
             {!isLedgerEdit && !isLedgerCreate && (
             <div className={`space-y-2${selectedType === 'cash' ? ' sm:col-span-2' : ''}`}>
               {/* Label varies by type: cash = Saldo, realestate = Valore stimato, others = Quantità */}
