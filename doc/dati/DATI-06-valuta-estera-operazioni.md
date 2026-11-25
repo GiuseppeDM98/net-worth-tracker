@@ -419,7 +419,7 @@ server's `priceEur` through `onCreated`, so `executedAmountEur` is the real amou
   it receives, on «Compra». With `createEmpty` (Accumulo's path and the model portfolio's tile) nothing changes:
   `onCreated(assetId)` and no trade form. The submit's label on that create reads «Crea e registra l'acquisto».
 - The instrument closed without a purchase reads «Mai comprato» (`createdEmpty`, no ledger row): the chip the app
-  already has, and DATI-05 keeps it in the list, deletable.
+  already has, and it stays in the Strumenti list, deletable (a zero position with no ledger row: doc/guide/patrimonio-strumenti.md).
 - A bond's first coupon and final premium are no longer scheduled at the create (quantity 0: DATI-04's guard): the
   first purchase schedules them (`scheduleCouponsForOpenedPosition` in `lib/services/couponScheduling.ts`, called by `TransactionDialog`). The bond's price basis — the
   quote in percent, the indexation coefficient — is the trade form's own (`resolveBondPrice`, `indexationCoefficient`).
@@ -520,7 +520,7 @@ the PR `develop` → `main` (index § 8 rule 13); the checks on the production a
   the first purchase from the asset form REWRITTEN to decision 60 (one form, the instrument created empty); § blind
   spots: the line «BCE del {giorno}» on a weekend, a holiday or today before the fixing carries the previous
   fixing; an edited opening position shows no rate.
-- `doc/guide/patrimonio-strumenti.md` (the guide DATI-05 split from `patrimonio.md`) — the currency select, the
+- `doc/guide/patrimonio-strumenti.md` (the Strumenti guide, split from `patrimonio.md`) — the currency select, the
   locked currency of an instrument with operations, the create that hands over to the trade form;
   `doc/guide/patrimonio.md` — the euro-only cash accounts; § Per-page blind spots: a hand-typed price on a foreign
   instrument leaves `currentPriceEur` as it was until the next quote; a migration baseline converts at today's

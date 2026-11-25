@@ -570,7 +570,7 @@ minimo» 1.000; a plan already active keeps its lines until revised.
 - `doc/guide/consulente-piano.md` § The stage — the lot in the facts block (in quotes), the contract's rule, the
   reconcile's two sentences, `AdvicePlanBuild.states`; § Per-page blind spots — the lot rule is in the plan stage
   alone: the strategy, the instruments search and the review do not read it.
-- `doc/guide/patrimonio.md` (or the guide DATI-05 moved the instruments' section to) — the bond's «Taglio minimo»
+- `doc/guide/patrimonio.md` (and `doc/guide/patrimonio-strumenti.md` for the instruments' rows) — the bond's «Taglio minimo»
   and «Multipli di» beside the nominal, one sentence where the bond pricing is described; § Per-page blind spots —
   the lot is the user's field: Borsa Italiana's page is not read for it.
 - `doc/guide/registro-operazioni.md` — the trade form's warning; § Per-page blind spots — it never blocks, the

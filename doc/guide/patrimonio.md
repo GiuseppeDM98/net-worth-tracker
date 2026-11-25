@@ -179,7 +179,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   whatever the toggles (`resolvePerformanceExclusions`), no Δ column (`hasNoUnitPrice`), no G/P, never a dividend
   payer. **FIRE leaves the loan out with the primary residence it finances** (`isFireExcluded`): the house out and its
   mortgage in would charge the FIRE number with a debt on a thing it does not count. A repaid loan (`quantity` 0)
-  reads «Estinto» where a sold position reads «Azzerato» and counts in nothing (`isHeld`); the hero's count line says
+  reads «Estinto» where a sold position with no operations reads «Azzerato» (with operations it is in Strumenti's closed group) and counts in nothing (`isHeld`); the hero's count line says
   «18 strumenti, 4 conti e 1 prestito» (`formatHoldingCounts`, loans counted apart). The TAN (`debtInterestRate`) and
   the financed property are user-clearable through `updateAsset`'s `'x' in updates` guard; the form always sends
   `outstandingDebt: undefined`, so a property saved after the migration sheds its legacy field.

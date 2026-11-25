@@ -97,6 +97,9 @@ describe.each([
 });
 
 // ─── 2026-11-23: the closed group of sold-out instruments, the sentence, the trash that refuses ───
+// Each case was seen red with its mutation: `live` → `visibleAssets` in `sortedAssets`; the group fed from `assets`
+// instead of `visibleAssets`; the group rendered in the table branch only; the `operations > 0` branch of the trash
+// dropped; `deleteAsset`'s catch rewrapping the typed error; the empty table kept when every instrument is archived.
 
 const trade = (assetId: string, type: 'buy' | 'sell', date: string, isBaseline = false): AssetTransaction =>
   ({ id: `${assetId}-${type}-${date}`, assetId, type, date: new Date(`${date}T12:00:00`), isBaseline }) as AssetTransaction;
