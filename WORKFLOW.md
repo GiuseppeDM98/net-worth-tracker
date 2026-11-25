@@ -249,6 +249,10 @@ measures in `doc/guide/collaudo.md` (moved there whole on 2026-11-18).
 - **The owner's go** (2026-10-05): say «pronto» and wait; the owner starts the tour when they can give it 20 minutes.
 - **Phase F before the commit** (owner, 2026-11-21; § 2 obligation 5): the tour first, then the diff summary and the
   OK; the assistant opens every window itself.
+- **Phase F has its data before the go** (owner, 2026-11-25): when the mirror holds nothing the tour needs (a foreign
+  instrument, a kind of record the owner does not have), the assistant plants it first — invented names and round
+  figures, on `prod-mirror`, so `npm run mirror:remove` takes it away — and names it in the tour's steps; never a
+  phase F that asks the owner for data he does not have.
 - **One `next dev` at a time** (2026-09-07): stop the :3100 server before the tour; the tour runs on the emulators
   plus ONE server.
 - **The windows: `scripts/collaudo-finestre.mts`** (2026-11-13): `npx tsx scripts/collaudo-finestre.mts

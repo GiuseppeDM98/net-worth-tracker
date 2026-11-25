@@ -142,6 +142,9 @@ and the Assistente asks what it needs with options before proposing.
   no per-user «always ask the account» setting (the asking policy is the contract's thresholds); it is a mode of the
   Assistente, never a page under Cashflow; what belongs to ONE mode never enters `formatBundleForPrompt` or
   `ASSISTANT_SYSTEM_CORE`, which the emails read too.
+- **Registra does not record a dividend** (2026-11-25): a dividend — its two withholdings, its rate, «Netto accreditato
+  in euro» — is entered from Cashflow › Dividendi (doc/guide/cashflow-dividendi.md § A dividend of a foreign issuer); an
+  income row typed in Registra is a plain income, with no record in the registry.
 - **The Cashflow bridge reads the key at build, as this page does**: `app/dashboard/cashflow/page.tsx` passes `Boolean(process.env.ANTHROPIC_API_KEY)`; a key added on Vercel shows «Chiedi all'Assistente» after the next deploy.
 - **IL MESE's totals are as fresh as the Panoramica's summary** (2026-11): the first line is the server summary, the lines under it are computed from the rows read for the message; a row written outside the app's services (an Admin write, a restore) leaves the two apart until the summary is rebuilt — seen on the emulator after a spec's Admin deletes.
 - **Registra adds about 25 KB gz to the page's first load** (2026-11-10, the ceiling raised with the owner's OK: doc/guide/velocita.md § Registro): the card's services, the protocol and the four reads ship with the page; only `ExpenseDialog` is lazy. Loading the three write services on «Conferma» was measured at −0,9 KB and dropped. The questions and the four kinds added 13,3 more on 2026-11-11 (738,1 → 751,4, ceiling 753).

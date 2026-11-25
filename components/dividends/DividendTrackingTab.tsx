@@ -949,6 +949,7 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
           setSelectedDividend(null);
         }}
         dividend={selectedDividend}
+        dividends={dividends}
         onSuccess={onRefresh}
         returnFocusTo={formTriggerRef}
       />

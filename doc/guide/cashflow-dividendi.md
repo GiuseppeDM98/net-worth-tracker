@@ -9,9 +9,9 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility}.ts` (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` (`useDividendRegistry` for the page's list, `useDividendStats` for the tab's measures: ONE request) → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
-- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendEntitlement`, `dividendServiceItalyDay`, `dividendScrapeRoute`, `couponScheduling`, `transactionDialog.announced` (dom), `dividendAccount`, `dividendIncomeService`, `floatNoise` · **Email** `monthlyEmailService`
-- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles), `pagatoriTile`, `searchableComboboxRefocus` (the picker after a refusal) · **Browser** `e2e/cashflow.dividendi{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts`, `e2e/assets.announced-dividends.spec.ts` · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
+- **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility,dividendFx}.ts` (`dividendFx`: the two withholdings and the euro side of a foreign dividend) (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` (`useDividendRegistry` for the page's list, `useDividendStats` for the tab's measures: ONE request) → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
+- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendEntitlement`, `dividendServiceItalyDay`, `dividendScrapeRoute`, `couponScheduling`, `transactionDialog.announced` (dom), `dividendAccount`, `dividendIncomeService`, `floatNoise`, `dividendFx`, `dividendService.fx`, `dividendRoutesFx`, `dividendDialog.fx` (dom) · **Email** `monthlyEmailService`
+- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (with `describeDividendiClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles), `pagatoriTile`, `searchableComboboxRefocus` (the picker after a refusal) · **Browser** `e2e/cashflow.dividendi{,.mobile}.spec.ts`, `e2e/ring-chart.dividendi.spec.ts`, `e2e/assets.announced-dividends.spec.ts`, `e2e/cashflow.dividendi.fx.spec.ts` · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
 
 ## Cashflow › Dividendi (`components/dividends/DividendTrackingTab.tsx`, `components/dividends/tiles/*`)
 - **RECEIVED AND ANNOUNCED ARE NEVER ONE FIGURE.** A dividend whose `paymentDate` is in the future is
@@ -302,6 +302,55 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Persist a bondDetails-only change with `updateAssetBondDetails`, never `updateAsset`** (which `deleteField()`s an
   absent `averageCost`/`taxRate`), passing the COMPLETE object — `updateDoc` replaces the whole map.
 
+## A dividend of a foreign issuer
+
+Since 2026-11-25 (`lib/utils/dividendFx.ts`, the service `lib/services/dividendService.ts`, the form
+`components/dividends/DividendDialog.tsx`). Two questions kept apart: the ISSUER decides the withholdings, the
+CURRENCY only the conversion.
+
+- **Two withholdings by the ISIN** (owner, 2026-11-23): an ISIN that does not start with `IT` — in any currency, the
+  euro included — is withheld abroad on the gross («Ritenuta estera per unità») and in Italy on what crosses the border
+  («Ritenuta italiana per unità», gross minus the foreign part); an instrument with no ISIN has them when its currency
+  is not EUR (`hasForeignWithholding`). An Italian ISIN keeps the single «Ritenuta per unità». **Stored**:
+  `foreignTaxAmount` (the foreign part, native) beside `taxAmount`, which STAYS THE TOTAL — every reader of
+  `taxAmount` and `netAmount` (the stats route, the tiles, the email, the PDF) is unchanged; `foreignTaxAmountEur`
+  on a converted record. A record with no `foreignTaxAmount` had one withholding.
+- **The proposals**, for a new record and an untouched field only: abroad, the rate of the instrument's LAST record
+  that had a foreign part (`foreignRateOf`, the latest `paymentDate` among the tab's registry), else 15% for an
+  EQUITY whose ISIN starts with `US` (`US_TREATY_RATE`, the treaty with the W-8BEN), else 0; in Italy, the
+  instrument's own `taxRate` (26% when it declares none) on the gross less the foreign part. Each label says
+  «proposta al {x}%». On an edit nothing is proposed: the reset shows the stored per-unit figures (a record without a
+  foreign part shows a foreign 0 and the saved total as the Italian one).
+- **The currency follows the instrument** on a new record until the owner picks one (GBp → GBP); the select offers
+  `INSTRUMENT_CURRENCIES` plus the instrument's own and the record's when not listed. Every amount label and the
+  «Riepilogo» carry it.
+- **The conversion, at the PAYMENT day**, the rate service and the 25% guard of a trade (C2: `resolveEcbRateToEur`,
+  doc/guide/registro-operazioni.md § A trade in a foreign currency). Three sources, stored in `fxSource` with
+  `exchangeRate`: `'statement'` — «Netto accreditato in euro» typed from the statement: the euro net IS that figure
+  (`settledNetEur`), the rate the one it implies, refused with a **422** (the sentence of `describeTotalOff`) when
+  more than 25% away from the day's ECB rate; `'ecb'` — the payment day's fixing; `'ecb-latest'` — the latest
+  fixing, for a payment still to come or a day the ECB has not published. No rate at all (the service down) → the
+  record is saved without euro fields, logged. The form previews the same figure (`useFxRate`, `resolveDividendFx`):
+  «Cambio BCE del …: EUR/USD … · netto stimato …», «Cambio dal tuo accredito: …», «Cambio di oggi: quello del giorno di
+  pagamento lo applico quando arriva.»; a refused credit is said under the field and the submit stays enabled.
+- **The re-conversion on the payment day** (decision 66): the cron's payment-day pass calls `reconvertAtPaymentDay`
+  BEFORE the income is created — a foreign record with `fxSource` `'ecb-latest'` or with none (announced before
+  this rule) and no `settledNetEur` is converted at its day's rate, and the income row is built from the record so
+  rewritten (its amount equals the euro net). A record with the credit or an `'ecb'` source is left as it is.
+- **An edit resolves a rate only for a changed value**: currency, gross, net, foreign part, credit or the Italian
+  payment day. A note corrected leaves the euro figures — and the income row of a cashed record — as they are. On the
+  wire `null` removes: `foreignTaxAmount: null` when the form went back to one withholding, `settledNetEur: null`
+  when a stored credit was cleared; a currency back to EUR deletes every euro field. The form sends
+  `foreignTaxAmount` on an edit only when the record had one or the owner typed it — a record corrected in its note
+  must not gain a foreign 0, which the next proposal would read as 0%.
+- **A pending record recomputed by a trade** (§ Dividends and Coupons, the ledger) scales its foreign part with the
+  rest (`reconcileAnnouncedDividend`).
+- **The scrape taxes at the INSTRUMENT's rate** (decision 65): cron and button, `computeDividendTaxes(gross, 0,
+  asset.taxRate ?? 26)`; a rate of 0 stays 0. A scraped dividend has no foreign part.
+- Pinned by `__tests__/{dividendFx,dividendService.fx,dividendRoutesFx,dividendEntitlement,dividendProcessor,
+  dividendScrapeRoute}.test.ts`, `__tests__/dividendDialog.fx.test.tsx` and `e2e/cashflow.dividendi.fx.spec.ts`
+  (a USD dividend with the credited euro → an income of exactly that figure).
+
 ## Composizione mobile
 
 Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log -- doc/mobile/`; the primitives in doc/guide/hall-of-fame.md § Composizione mobile): below `desktop:` one sequence, the desktop DOM — the `order-1/4/2/3/5/6` of the phone went that day, so Affidabilità now precedes Rendimento there too (the DOM order is the reading order: DESIGN.md → The First-Screen Rule). The rules are DESIGN.md's (§ 5 → Small-Screen Composition: The First-Screen, Lifted-Figure, Closed-Row and Binding-Clause Rules); here is what this page does with them.
@@ -346,4 +395,15 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
   adjust the balance by hand or link the row from Tracciamento.
 - **A single coupon at maturity** (2026-10-10): YOC and the current yield of a BTP Valore Insieme read 0 until the coupon is paid — the registry holds one future payment and the yields measure what was received; the coupon's note states the capitalisation the OWNER chose (compound), not a figure the MEF published — the scheda of 16/10 is the check; a step-up schedule saved on a bond later switched to «Unica a scadenza» is dropped by the form (`showStepUp` off), by design.
 - **Dividendi**: the payments table dropped *Tax/Netto/Costo per azione*; the calendar day opens the day dialog instead of filtering; under «Mese» no month arrows, under «Anno» they stop at January/December; the list toolbar is rendered twice (desktop and phone, one hidden). The yield never follows the period (TTM on the current holding); the DPS running-year column is a partial sum; no `averageCost` → the tile becomes an explanation. Since 2026-09-14: Chi paga di più ranks only the HELD payers while its aside's total is the whole period's (the «venduti» row closes the gap); the verdict's «da 3 strumenti» counts sold payers too, on purpose; an edit form opens with the picker focused and its list open (Radix focuses the first field); a phone has no delete for a payment; the Dividendi axis options are `radio`, not `tab`, in a spec.
+- **The form's dates left on «today» are the day's start** (2026-11-25, `startOfToday` in `DividendDialog.tsx`), as
+  a typed date (`T00:00:00`): with the clock of the form's opening a payment of today was later than the tab's
+  `now` (read once, at its mount) and showed «Attesa» among the announced until a reload. A record saved before
+  keeps its time; the tab's `now` still does not move while it stays open (`dividendDialog.fx` pins the dates).
+- **A foreign dividend** (2026-11-25): the foreign rate is a PROPOSAL (the last record's, else 15% on a US share),
+  not a treaty table — a French or a Swiss share starts at 0 until its first record is typed; a scraped dividend never
+  has a foreign part (Borsa Italiana gives the gross only); the foreign tax is recorded and no view credits it on the
+  tax return; an automatic coupon of a foreign-currency bond is converted at its payment day and has no foreign part;
+  a record saved on its payment day before the ECB publishes (≈ 16:00) carries the previous fixing
+  (`'ecb-latest'`) and is converted again by the cron only while it has no income; the PUT does not check the
+  currency against the instrument (the POST does: «Valuta non ammessa per questo strumento.»).
 - **YOC/Current Yield** exclude sold assets and are scoped to the current holding via `holdingStartDate`; a sell+rebuy inside one month counts the prior holding's dividends against the new cost basis (an overstated YOC, never a regression). (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
