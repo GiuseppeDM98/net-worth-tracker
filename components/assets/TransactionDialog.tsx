@@ -11,9 +11,10 @@
  *                            settlement, no realized P&L.
  *
  * Correctness notes:
- *   - `priceEur` is server-resolved; the client can only ESTIMATE it via the asset's
- *     current conversion ratio (`currentPriceEur / currentPrice`) — hence "stimato" on the preview.
- *     The authoritative realized figure comes back in the mutation response.
+ *   - `priceEur` is server-resolved. On a foreign instrument (2026-11-23) the form previews it with
+ *     the SAME pure rule the server applies (`resolveTradeFx`) on the ECB rate the server will read
+ *     (`useFxRate`), or on the broker's euro total when the owner types it; the fee is typed in the
+ *     instrument's currency. The authoritative figures come back in the mutation response.
  *   - The success toast fires AFTER the request resolves (toast-after-reconcile rule).
  *   - Bond quotes go through the SAME `resolveBondPrice` rule AssetDialog and the price cron use
  *     (`lib/utils/bondPricing.ts`) — never a re-implementation. A BTP€i's quote is real, so the
@@ -56,7 +57,17 @@ import {
   type BondQuoteBasis,
 } from '@/lib/utils/bondPricing';
 import { latestIndexationCoefficient, resolveInflationIndexation } from '@/lib/utils/couponUtils';
-import { getItalyDateIso } from '@/lib/utils/dateHelpers';
+import { formatItalianDate, getItalyDateIso } from '@/lib/utils/dateHelpers';
+import { useFxRate } from '@/lib/hooks/useFxRate';
+import {
+  describeTotalOff,
+  formatFxPair,
+  resolveTradeFx,
+  TradeFxError,
+  type EcbRate,
+  type TradeFxInput,
+  type TradeFxResolution,
+} from '@/lib/utils/tradeFx';
 import { toastAnnouncedDividends } from '@/components/assets/announcedDividendsToast';
 import type { OpenedPositionParams } from '@/lib/services/couponScheduling';
 
@@ -93,6 +104,7 @@ import type {
   AssetTransaction,
   AssetTransactionFormData,
   AssetTransactionType,
+  AssetTransactionUpdateData,
 } from '@/types/assetTransactions';
 import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
@@ -114,6 +126,9 @@ const transactionSchema = z.object({
   quantity: z.number().optional().or(z.nan()),
   pricePerUnit: z.number().optional().or(z.nan()),
   fees: z.number().min(0, 'Le commissioni non possono essere negative').optional().or(z.nan()),
+  // A foreign instrument only (2026-11-23): the fee in its currency and the broker's euro total.
+  feesNative: z.number().min(0, 'Le commissioni non possono essere negative').optional().or(z.nan()),
+  settledTotalEur: z.number().positive('Il totale deve essere maggiore di zero').optional().or(z.nan()),
   linkedCashAssetId: z.string(),
   // Sell only: the tax the broker withheld, prefilled with the estimate (lib/utils/saleTax.ts).
   withheldTaxEur: z.number().min(0, 'Le tasse non possono essere negative').optional().or(z.nan()),
@@ -132,7 +147,7 @@ interface TransactionDialogProps {
   transaction?: AssetTransaction | null;
   /** Opens a new trade already filled in (the PAC's «Registra»). Ignored in edit mode. */
   prefill?: { type: 'buy' | 'sell'; quantity: number; linkedCashAssetId?: string; note?: string };
-  /** Called once a NEW trade is saved: the server's result, the form data and the estimated EUR unit price (the PAC links its line with them). */
+  /** Called once a NEW trade is saved: the server's result, the form data and the stored EUR unit price (the PAC links its line with them). */
   onCreated?: (result: AssetTransactionMutationResult, data: AssetTransactionFormData, priceEur: number) => void;
 }
 
@@ -146,23 +161,27 @@ async function scheduleCouponsForOpenedPositionLazily(params: OpenedPositionPara
   await scheduleCouponsForOpenedPosition(params);
 }
 
-/**
- * Estimate a trade's per-unit EUR price for the CLIENT-SIDE preview only. The server resolves the
- * authoritative value from historical FX; here we scale the native price by the asset's
- * current conversion ratio. GBp is normalized to GBP first, mirroring `calculateAssetValue`.
- */
-function estimateTradePriceEur(asset: Asset, pricePerUnitNative: number): number {
-  const currency = (asset.currency || 'EUR').toUpperCase();
-  if (currency === 'EUR') return pricePerUnitNative;
+/** The preview of a foreign trade's euro side: the server's own rule, or why it cannot be read yet. */
+type FxPreview =
+  | { kind: 'resolved'; resolution: TradeFxResolution }
+  | { kind: 'error'; code: TradeFxError['code']; ecbRate?: number };
 
-  // currentPrice may be in pence for GBp listings — divide by 100 before taking the ratio.
-  const nativeCurrent = asset.currency === 'GBp' ? asset.currentPrice / 100 : asset.currentPrice;
-  if (asset.currentPriceEur && asset.currentPriceEur > 0 && nativeCurrent > 0) {
-    return pricePerUnitNative * (asset.currentPriceEur / nativeCurrent);
+/**
+ * `resolveTradeFx` without the throw. Module-level so the component's memo wraps a plain call: the
+ * React Compiler cannot lower conditionals inside a try block.
+ */
+function previewTradeFx(input: TradeFxInput): FxPreview {
+  try {
+    return { kind: 'resolved', resolution: resolveTradeFx(input) };
+  } catch (error) {
+    if (error instanceof TradeFxError) return { kind: 'error', code: error.code, ecbRate: error.ecbRate };
+    throw error;
   }
-  // Last resort: no conversion available — the server will correct it. Same pre-migration FX
-  // caveat already documented for `calculateUnrealizedGains`.
-  return pricePerUnitNative;
+}
+
+/** A typed number, or undefined for an empty or non-positive field. */
+function positiveOrUndefined(value: number | undefined): number | undefined {
+  return value !== undefined && !isNaN(value) && value > 0 ? value : undefined;
 }
 
 /**
@@ -221,11 +240,19 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
   // True once the owner has typed in «Tasse trattenute»: from then on the estimate stops driving it.
   const [isTaxTyped, setIsTaxTyped] = useState(false);
 
-  // Cash accounts eligible as a settlement target.
+  // Cash accounts eligible as a settlement target: in euro only (2026-11-23) — the app counts a
+  // foreign account's balance as euro, so a trade could never move it by the right figure.
   const cashAssets = useMemo(
-    () => allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'),
+    () => allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash' && isEuroAccount(a)),
     [allAssets]
   );
+  // An old trade settled on a foreign account keeps it until the owner picks another (decision 62).
+  const storedForeignAccount = useMemo(() => {
+    const storedId = transaction?.linkedCashAssetId;
+    if (!storedId) return undefined;
+    const account = allAssets.find((a) => a.id === storedId);
+    return account && !isEuroAccount(account) ? account : undefined;
+  }, [allAssets, transaction]);
 
   // Bond % of par ↔ EUR conversion (same rule as AssetDialog and the price cron): a bond with an
   // ISIN, the nominal defaulting to 1 € per unit. A BTP€i also scales by its coefficient.
@@ -267,6 +294,8 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
       quantity: undefined,
       pricePerUnit: undefined,
       fees: undefined,
+      feesNative: undefined,
+      settledTotalEur: undefined,
       linkedCashAssetId: NO_SETTLEMENT,
       withheldTaxEur: undefined,
       indexationCoefficient: undefined,
@@ -279,6 +308,8 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
   const quantity = useWatch({ control, name: 'quantity' });
   const pricePerUnit = useWatch({ control, name: 'pricePerUnit' });
   const fees = useWatch({ control, name: 'fees' });
+  const feesNative = useWatch({ control, name: 'feesNative' });
+  const settledTotalEur = useWatch({ control, name: 'settledTotalEur' });
   const linkedCashAssetId = useWatch({ control, name: 'linkedCashAssetId' });
   const withheldTaxEur = useWatch({ control, name: 'withheldTaxEur' });
   const indexationCoefficient = useWatch({ control, name: 'indexationCoefficient' });
@@ -335,6 +366,8 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
         quantity: transaction.quantity,
         pricePerUnit: toBI(transaction.pricePerUnit),
         fees: transaction.fees,
+        feesNative: transaction.feesNative,
+        settledTotalEur: transaction.settledTotalEur,
         linkedCashAssetId: transaction.linkedCashAssetId ?? NO_SETTLEMENT,
         withheldTaxEur: transaction.withheldTaxEur,
         indexationCoefficient: knownCoefficient,
@@ -347,6 +380,8 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
         quantity: prefillQuantity,
         pricePerUnit: undefined,
         fees: undefined,
+        feesNative: undefined,
+        settledTotalEur: undefined,
         linkedCashAssetId: prefillCash ?? NO_SETTLEMENT,
         withheldTaxEur: undefined,
         indexationCoefficient: knownCoefficient,
@@ -364,31 +399,86 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
     return resolveBondPrice(pricePerUnit, quoteBasis, isBondWithIsin);
   }, [pricePerUnit, quoteBasis, isBondWithIsin]);
 
-  // Live EUR figures for the summary (estimated for non-EUR assets — server resolves the real FX).
-  const currency = asset.currency || 'EUR';
-  const isEur = currency.toUpperCase() === 'EUR';
-  const feesEur = fees && !isNaN(fees) && fees > 0 ? fees : 0;
+  // The instrument's currency as the broker quotes it: a legacy `GBp` is typed in pounds, as the
+  // server's conversion already assumes.
+  const currency = asset.currency === 'GBp' ? 'GBP' : (asset.currency || 'EUR').toUpperCase();
+  const isEur = currency === 'EUR';
+  // The two foreign fields: a buy or a sale on a foreign instrument, never an adjustment or a baseline.
+  const showsForeignFields = !isEur && !isAdjustment && !isBaseline;
+  // A fee saved in euro before 2026-11-23 (decision 61): it stays until the owner writes it in the currency.
+  const legacyFeeEur = !isEur && transaction && transaction.feesNative === undefined ? storedFee : null;
+  const typedFeesNative = positiveOrUndefined(feesNative);
+  const typedTotal = positiveOrUndefined(settledTotalEur);
+  const keepsLegacyFee = legacyFeeEur !== null && typedFeesNative === undefined;
+
+  // The ECB rate the server will read for this day (the server reads it for every foreign trade).
+  const fxRateQuery = useFxRate(open && !isEur ? currency : undefined, date || undefined);
+  const ecb: EcbRate | null = fxRateQuery.data ?? null;
+
+  const hasQuantity = quantity !== undefined && !isNaN(quantity) && quantity > 0;
+  const fxPreview = useMemo((): FxPreview | null => {
+    if (isEur || resolvedPricePerUnit === undefined || !hasQuantity) return null;
+    if (type === 'adjustment' || isBaseline) {
+      // A position reset converts its price at the day's rate, nothing else.
+      if (!ecb) return { kind: 'error', code: 'no-rate' };
+      return {
+        kind: 'resolved',
+        resolution: { priceEur: resolvedPricePerUnit * ecb.rate, feesEur: 0, fxRate: ecb.rate, fxSource: ecb.isLatest ? 'ecb-latest' : 'ecb' },
+      };
+    }
+    return previewTradeFx({
+      type,
+      quantity,
+      pricePerUnit: resolvedPricePerUnit,
+      feesNative: typedFeesNative ?? 0,
+      legacyFeesEur: keepsLegacyFee ? (legacyFeeEur ?? undefined) : undefined,
+      settledTotalEur: typedTotal,
+      ecb,
+    });
+  }, [isEur, resolvedPricePerUnit, hasQuantity, type, isBaseline, ecb, quantity, typedFeesNative, keepsLegacyFee, legacyFeeEur, typedTotal]);
+  const fxResolution = fxPreview?.kind === 'resolved' ? fxPreview.resolution : null;
+  const isStatementTotal = fxResolution?.fxSource === 'statement';
+  const totalOffMessage =
+    showsForeignFields && fxPreview?.kind === 'error' && fxPreview.code === 'total-off' && fxPreview.ecbRate !== undefined
+      ? describeTotalOff(currency, fxPreview.ecbRate)
+      : null;
+
+  // The euro side the summary and the sale's P&L read: the typed figures on EUR, the resolution on a foreign one.
+  const priceEurPreview = isEur ? resolvedPricePerUnit : fxResolution?.priceEur;
+  const feesEur = isEur ? (fees && !isNaN(fees) && fees > 0 ? fees : 0) : (fxResolution?.feesEur ?? 0);
 
   const summary = useMemo(() => {
-    if (resolvedPricePerUnit === undefined || quantity === undefined || isNaN(quantity) || quantity <= 0) {
-      return null;
-    }
-    const priceEur = estimateTradePriceEur(asset, resolvedPricePerUnit);
-    const gross = quantity * priceEur;
+    if (priceEurPreview === undefined || !hasQuantity) return null;
+    const gross = quantity * priceEurPreview;
     if (type === 'buy') return { totalEur: gross + feesEur };
     if (type === 'sell') return { totalEur: gross - feesEur };
     return { totalEur: gross }; // adjustment: new position value at the new PMC
-  }, [resolvedPricePerUnit, quantity, feesEur, type, asset]);
+  }, [priceEurPreview, hasQuantity, quantity, feesEur, type]);
+
+  // The line naming the rate the preview used, or why there is none yet.
+  const fxLine = useMemo((): string | null => {
+    if (isEur || !fxPreview) return null;
+    if (fxPreview.kind === 'error') {
+      if (fxPreview.code !== 'no-rate') return null;
+      return fxRateQuery.isLoading ? 'Leggo il cambio…' : 'Cambio non disponibile: il totale si calcola al salvataggio.';
+    }
+    const { fxRate, fxSource } = fxPreview.resolution;
+    const pair = formatFxPair(currency, fxRate);
+    if (fxSource === 'statement') return `Cambio dal tuo totale: ${pair}`;
+    const estimated = summary ? ` · totale stimato ${cachedFormatCurrencyEUR(summary.totalEur)}` : '';
+    if (fxSource === 'ecb') return `Cambio BCE del ${formatItalianDate(`${date}T12:00:00`)}: ${pair}${estimated}`;
+    return `Cambio BCE più recente, quello del giorno non è disponibile: ${pair}${estimated}`;
+  }, [isEur, fxPreview, fxRateQuery.isLoading, currency, summary, date]);
 
   // Estimated realized P&L for a sell: replay the SAME engine on the prospective sequence and take
   // the marginal realized versus the current sequence (delta of cumulative realized). Reuses the one
   // engine so the preview always agrees with the server figure (up to the estimated FX).
   const realizedPreview = useMemo((): { value: number; taxableGain: number } | { error: string } | null => {
     if (type !== 'sell') return null;
-    if (resolvedPricePerUnit === undefined || quantity === undefined || isNaN(quantity) || quantity <= 0) {
+    if (resolvedPricePerUnit === undefined || priceEurPreview === undefined || !hasQuantity) {
       return null;
     }
-    const priceEur = estimateTradePriceEur(asset, resolvedPricePerUnit);
+    const priceEur = priceEurPreview;
     const draft: AssetTransaction = {
       id: transaction?.id ?? '__draft__',
       userId: ownerId || '',
@@ -411,7 +501,7 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
       if (error instanceof LedgerValidationError) return { error: error.userMessage };
       return { error: 'Sequenza non valida.' };
     }
-  }, [type, resolvedPricePerUnit, quantity, feesEur, asset, existingTransactions, transaction, ownerId]);
+  }, [type, resolvedPricePerUnit, priceEurPreview, hasQuantity, quantity, feesEur, asset, existingTransactions, transaction, ownerId]);
 
   // «Tasse trattenute» on a NEW sale follows the estimate until the owner types in it: the gain
   // moves with quantity, price and fees, and a prefill frozen at the first keystroke would be the
@@ -428,6 +518,14 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
 
   const taxEur = type === 'sell' && withheldTaxEur !== undefined && !isNaN(withheldTaxEur) && withheldTaxEur > 0 ? withheldTaxEur : 0;
   const hasSettlement = linkedCashAssetId !== NO_SETTLEMENT;
+
+  // A new trade never settles on a foreign account: a prefill naming one (Accumulo's «Questo mese»)
+  // falls back to no account once the accounts are known. An edit keeps its stored one (decision 62).
+  const prefilledForeignAccount =
+    !isEdit && hasSettlement && allAssets.some((a) => a.id === linkedCashAssetId && a.type === 'cash' && !isEuroAccount(a));
+  useEffect(() => {
+    if (open && prefilledForeignAccount) setValue('linkedCashAssetId', NO_SETTLEMENT);
+  }, [open, prefilledForeignAccount, setValue]);
   // An old sale credited its account gross: typing a tax now takes it out of the account TODAY.
   const isLegacySettledSell = isEdit && transaction?.type === 'sell' && !!transaction.linkedCashAssetId && transaction.withheldTaxEur === undefined;
 
@@ -467,6 +565,11 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
       return;
     }
 
+    if (totalOffMessage) {
+      setStatus({ phase: 'error', message: totalOffMessage });
+      return;
+    }
+
     setStatus({ phase: 'submitting' });
     const submitBasis: BondQuoteBasis = {
       nominalValue: bondNominal,
@@ -480,6 +583,29 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
         : undefined;
     const noteValue = data.note?.trim() ? data.note.trim() : undefined;
     const feeValue = data.fees && !isNaN(data.fees) && data.fees > 0 ? data.fees : undefined;
+    // The fee and the settlement of a buy or a sale: in euro on a EUR instrument; on a foreign one the
+    // native fee and the broker's euro total, and NO euro fee — the server converts it (2026-11-23).
+    const feesNativeValue = positiveOrUndefined(data.feesNative);
+    const totalValue = positiveOrUndefined(data.settledTotalEur);
+    const createFeeFields: Partial<AssetTransactionFormData> = isEur
+      ? { fees: feeValue }
+      : { feesNative: feesNativeValue, settledTotalEur: totalValue };
+    // An edit: a field the owner cleared is sent as null (the server deletes it), one never filled is
+    // left out; a legacy euro fee left alone travels in neither key.
+    const editFeeFields: Partial<AssetTransactionUpdateData> = isEur
+      ? { fees: feeValue }
+      : {
+          ...(feesNativeValue !== undefined
+            ? { feesNative: feesNativeValue }
+            : transaction?.feesNative !== undefined
+              ? { feesNative: null }
+              : {}),
+          ...(totalValue !== undefined
+            ? { settledTotalEur: totalValue }
+            : transaction?.settledTotalEur !== undefined
+              ? { settledTotalEur: null }
+              : {}),
+        };
 
     // Never fails the trade: a rejected request is logged and named in a toast.
     const scheduleOpenedPositionCoupons = async (quantityAfter: number) => {
@@ -497,14 +623,14 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
     const persist = async () => {
       if (transaction) {
         // Edit. Baseline trades accept only quantity/pricePerUnit/note (server enforces it too).
-        const updates: Partial<AssetTransactionFormData> = isBaseline
+        const updates: AssetTransactionUpdateData = isBaseline
           ? { quantity: qty, pricePerUnit: price, indexationCoefficient: coefficientValue, note: noteValue }
           : {
               date: new Date(data.date),
               quantity: qty,
               pricePerUnit: price,
               indexationCoefficient: coefficientValue,
-              ...(data.type === 'adjustment' ? {} : { fees: feeValue, linkedCashAssetId: settlement }),
+              ...(data.type === 'adjustment' ? {} : { ...editFeeFields, linkedCashAssetId: settlement }),
               ...(taxValue !== undefined ? { withheldTaxEur: taxValue } : {}),
               note: noteValue,
             };
@@ -531,12 +657,13 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
           quantity: qty,
           pricePerUnit: price,
           indexationCoefficient: coefficientValue,
-          ...(data.type === 'adjustment' ? {} : { fees: feeValue, linkedCashAssetId: settlement }),
+          ...(data.type === 'adjustment' ? {} : { ...createFeeFields, linkedCashAssetId: settlement }),
           ...(taxValue !== undefined ? { withheldTaxEur: taxValue } : {}),
           note: noteValue,
         };
         const result = await createMutation.mutateAsync(formData);
-        onCreated?.(result, formData, estimateTradePriceEur(asset, formData.pricePerUnit));
+        // The server's euro price, not a preview: the PAC's line records what the trade stored.
+        onCreated?.(result, formData, result.priceEur);
         toast.success(
           withFeeOutcome(
             result.realizedPnlEur !== undefined
@@ -593,7 +720,7 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
       <Button
         type="submit"
         form={formId}
-        disabled={isDemo || submitting}
+        disabled={isDemo || submitting || totalOffMessage !== null}
         aria-label={isDemo ? 'Non disponibile in modalità demo' : undefined}
       >
         {submitting ? 'Salvataggio...' : isEdit ? 'Salva modifiche' : 'Registra operazione'}
@@ -759,8 +886,9 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
         {!isAdjustment && !isBaseline && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="trade-fees">Commissioni (€)</Label>
+              <Label htmlFor="trade-fees">{isEur ? 'Commissioni (€)' : `Commissioni (${currency})`}</Label>
               <Input
+                key={isEur ? 'fees' : 'feesNative'}
                 id="trade-fees"
                 type="number"
                 step="0.01"
@@ -768,11 +896,14 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
                 placeholder="es. 1.00"
                 disabled={storedFee === null && !feeCategory}
                 aria-describedby="trade-fees-hint"
-                {...register('fees', { valueAsNumber: true })}
+                {...register(isEur ? 'fees' : 'feesNative', { valueAsNumber: true })}
               />
               {errors.fees && <p className="text-sm text-destructive">{errors.fees.message}</p>}
+              {errors.feesNative && <p className="text-sm text-destructive">{errors.feesNative.message}</p>}
               <p id="trade-fees-hint" className="text-xs text-muted-foreground">
-                {feeHint ?? (
+                {keepsLegacyFee && legacyFeeEur !== null
+                  ? `Commissione registrata in euro: ${cachedFormatCurrencyEUR(legacyFeeEur)}. Resta così finché non la scrivi in ${currency}.`
+                  : feeHint ?? (
                   <>
                     {TRADE_FEE_NEEDS_CATEGORY}{' '}
                     <Link href="/dashboard/settings?tab=spese" className="underline underline-offset-2 hover:text-foreground">
@@ -783,6 +914,37 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
                 )}
               </p>
             </div>
+
+            {showsForeignFields && (
+              <div className="space-y-2">
+                <Label htmlFor="trade-settled-total">
+                  {type === 'sell' ? 'Totale accreditato in euro' : 'Totale addebitato in euro'}{' '}
+                  <span className="font-normal text-muted-foreground">(opzionale)</span>
+                </Label>
+                <Input
+                  id="trade-settled-total"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  placeholder="es. 500.00"
+                  aria-describedby="trade-settled-total-hint"
+                  aria-invalid={totalOffMessage !== null || undefined}
+                  {...register('settledTotalEur', { valueAsNumber: true })}
+                />
+                {totalOffMessage && <p className="text-sm text-destructive">{totalOffMessage}</p>}
+                {errors.settledTotalEur && (
+                  <p className="text-sm text-destructive">{errors.settledTotalEur.message}</p>
+                )}
+                <p id="trade-settled-total-hint" className="text-xs text-muted-foreground">
+                  {keepsLegacyFee && legacyFeeEur !== null
+                    ? `Dall'estratto del broker: comprende la commissione di ${cachedFormatCurrencyEUR(legacyFeeEur)} già registrata.`
+                    : type === 'sell'
+                      ? "Dall'estratto del broker, al netto della commissione e prima delle tasse trattenute. Se lo lasci vuoto uso il cambio BCE del giorno."
+                      : "Dall'estratto del broker, commissione inclusa. Se lo lasci vuoto uso il cambio BCE del giorno."}
+                </p>
+              </div>
+            )}
 
             {type === 'sell' && (
               <div className="space-y-2">
@@ -818,6 +980,11 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {storedForeignAccount && linkedCashAssetId === storedForeignAccount.id && (
+                    <SelectItem value={storedForeignAccount.id} className="text-muted-foreground">
+                      {storedForeignAccount.name} (in {storedForeignAccount.currency.toUpperCase()}, non più selezionabile)
+                    </SelectItem>
+                  )}
                   <SelectItem value={NO_SETTLEMENT}>Nessuno</SelectItem>
                   {cashAssets.map((cash) => (
                     <SelectItem key={cash.id} value={cash.id}>
@@ -853,17 +1020,20 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
         </div>
 
         {/* What the save will do — a sub-tile on the muted surface, at the tile's cadence. */}
-        {summary && (
+        {(summary || fxLine) && (
           <div className={cn('space-y-1 bg-muted p-3.5', COSTUME_FRAME_RADIUS_CLASS)}>
             <p className={TILE_SUB_EYEBROW_CLASS}>Cosa succede al salvataggio</p>
-            <div className="flex items-baseline justify-between gap-3 pt-1.5 text-sm">
-              <span className="text-muted-foreground">
-                {isEur ? 'Totale' : 'Totale stimato'}
-              </span>
-              <span className="font-mono font-semibold tabular-nums text-foreground">
-                {cachedFormatCurrencyEUR(summary.totalEur)}
-              </span>
-            </div>
+            {fxLine && <p className="pt-1.5 text-xs text-muted-foreground">{fxLine}</p>}
+            {summary && (
+              <div className="flex items-baseline justify-between gap-3 pt-1.5 text-sm">
+                <span className="text-muted-foreground">
+                  {isEur || isStatementTotal ? 'Totale' : 'Totale stimato'}
+                </span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {cachedFormatCurrencyEUR(summary.totalEur)}
+                </span>
+              </div>
+            )}
             {type === 'sell' && realizedPreview && 'value' in realizedPreview && (
               <div className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">P&L realizzato stimato</span>
@@ -889,10 +1059,10 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
                 </span>
               </div>
             )}
-            {type === 'sell' && hasSettlement && (
+            {type === 'sell' && hasSettlement && summary && (
               <div className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">
-                  {isEur ? 'Accredito sul conto' : 'Accredito sul conto stimato'}
+                  {isEur || isStatementTotal ? 'Accredito sul conto' : 'Accredito sul conto stimato'}
                 </span>
                 <span className="font-mono font-semibold tabular-nums text-foreground">
                   {cachedFormatCurrencyEUR(roundToCents(summary.totalEur - taxEur))}
@@ -910,6 +1080,11 @@ export function TransactionDialog({ open, onClose, asset, transaction, prefill, 
 }
 
 // ── Local formatting helpers ────────────────────────────────────────────────
+
+/** A cash account the ledger may settle on: one in euro (a missing currency reads as euro). */
+function isEuroAccount(account: Asset): boolean {
+  return (account.currency || 'EUR').toUpperCase() === 'EUR';
+}
 
 /** Signed EUR, e.g. "+1.234,56 €" / "−89,00 €" — sign always explicit for P&L figures. */
 function formatSignedEur(value: number): string {

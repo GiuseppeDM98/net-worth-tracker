@@ -1,4 +1,5 @@
 import type { AssetType } from './assets';
+import type { TradeFxSource } from '@/lib/utils/tradeFx';
 
 /**
  * Firestore collection names for the trade ledger. Kept in this Firebase-free module so the
@@ -69,6 +70,11 @@ export interface AssetTransaction {
   // the replay never reads it.
   indexationCoefficient?: number;
   note?: string;
+  // Foreign-currency instruments only (2026-11-23).
+  feesNative?: number;        // the fee as the broker charged it, in the instrument's currency; `fees` is its euro value
+  settledTotalEur?: number;   // the statement's euro total: buy = debited, fee included; sell = credited net of the fee, before withheldTaxEur
+  fxRate?: number;            // euro per ONE unit of the instrument's currency used for priceEur and fees
+  fxSource?: TradeFxSource;   // where fxRate came from
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,9 +91,21 @@ export interface AssetTransactionFormData {
   withheldTaxEur?: number;
   indexationCoefficient?: number;
   note?: string;
+  // A foreign instrument only: the fee in its currency and the statement's euro total.
+  feesNative?: number;
+  settledTotalEur?: number;
   // priceEur is NOT part of the form: the server resolves it, so the client
   // can never write an inconsistent FX value.
 }
+
+/**
+ * An edit's payload: an absent key means «keep», and `null` REMOVES a foreign-currency field (JSON
+ * cannot carry an explicit undefined).
+ */
+export type AssetTransactionUpdateData = Omit<Partial<AssetTransactionFormData>, 'feesNative' | 'settledTotalEur'> & {
+  feesNative?: number | null;
+  settledTotalEur?: number | null;
+};
 
 /** Per-user ledger metadata (doc id == userId). */
 export interface AssetTransactionsMeta {

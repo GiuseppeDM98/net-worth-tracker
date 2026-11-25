@@ -332,7 +332,7 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [06](DATI-06-valuta-estera-operazioni.md) | A trade in a foreign currency | L | 04 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 22 rilievi, 4 decisioni |
+| [06](DATI-06-valuta-estera-operazioni.md) | A trade in a foreign currency | L | 04 | Opus 5.5 · medium | implemented — 2026-11-25, in `develop` |
 | [07](DATI-07-valuta-estera-dividendi.md) | A dividend in a foreign currency | M | 04, 06 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 4 decisioni |
 | [08](DATI-08-assistente-forma-della-risposta.md) | Assistente: one form for every answer | L | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 1 decisione |
 | [09](DATI-09-assistente-strumenti-cashflow.md) | Assistente: tools on the cashflow, the budget, the centres | L | 08 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 3 decisioni |
@@ -409,6 +409,11 @@ says so; it never changes what is there. The full text of each is in the spec th
 - ONE form (decision 60): `AssetDialog` creates the instrument empty, re-reads it and calls
   `onRegisterTrade(created)`; `TransactionDialog` records the first purchase. Read by 16, 18, 20, 21.
 - A settlement account is in euro: the server refuses another currency when the account changes.
+- As built (2026-11-25), every signature above unchanged. Beside them: `useFxRate` keys `queryKeys.fx.rate(currency,
+  isoDay)` (not persisted); the ledger create of `AssetDialog` re-reads the meta at submit and, when it is truly
+  absent, creates the instrument at 0 units by the classic path, with no trade form; `fetchMarketPrice(…, { silent })`
+  serves the ticker's lookup; the guides: doc/guide/registro-operazioni.md § A trade in a foreign currency,
+  doc/guide/patrimonio-strumenti.md, doc/guide/server.md.
 
 ### C3 — the Assistente's tools (created by DATI-09; extended by 15 and 18; read by 11, 15, 17)
 

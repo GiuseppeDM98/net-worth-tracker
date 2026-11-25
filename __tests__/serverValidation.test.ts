@@ -9,6 +9,7 @@ import {
   dividendDataSchema,
   assetTransactionDataSchema,
   assetTransactionUpdateSchema,
+  fxRateQuerySchema,
   parseOr400,
   assistantStreamRequestSchema,
   proposalPatchSchema,
@@ -197,6 +198,43 @@ describe('assetTransactionDataSchema / assetTransactionUpdateSchema', () => {
   it('rejects a null date on an update, and accepts an update without one', () => {
     expect(assetTransactionUpdateSchema.safeParse({ date: null }).success).toBe(false);
     expect(assetTransactionUpdateSchema.safeParse({ quantity: 5 }).success).toBe(true);
+  });
+
+  describe('the foreign-currency fields (2026-11-23)', () => {
+    const adjustment = { ...basePayload, type: 'adjustment' };
+
+    it('refuses a native fee on an adjustment', () => {
+      expect(assetTransactionDataSchema.safeParse({ ...adjustment, feesNative: 2 }).success).toBe(false);
+    });
+
+    it('refuses a euro total on an adjustment', () => {
+      expect(assetTransactionDataSchema.safeParse({ ...adjustment, settledTotalEur: 900 }).success).toBe(false);
+    });
+
+    it('refuses a fee in two currencies', () => {
+      const result = assetTransactionDataSchema.safeParse({ ...basePayload, fees: 3, feesNative: 4 });
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues[0].message).toBe('Indica la commissione in una sola valuta.');
+    });
+
+    it('accepts a euro total beside a euro fee', () => {
+      expect(assetTransactionDataSchema.safeParse({ ...basePayload, fees: 3, settledTotalEur: 1003 }).success).toBe(true);
+    });
+
+    it('accepts null for both fields on an update, and refuses it on a create', () => {
+      expect(assetTransactionUpdateSchema.safeParse({ feesNative: null, settledTotalEur: null }).success).toBe(true);
+      expect(assetTransactionDataSchema.safeParse({ ...basePayload, settledTotalEur: null }).success).toBe(false);
+    });
+  });
+});
+
+describe('fxRateQuerySchema', () => {
+  it('accepts a three-letter code and an ISO day', () => {
+    expect(fxRateQuerySchema.safeParse({ currency: 'USD', date: '2026-11-16' }).success).toBe(true);
+  });
+
+  it('refuses a code that is not three letters', () => {
+    expect(fxRateQuerySchema.safeParse({ currency: 'US', date: '2026-11-16' }).success).toBe(false);
   });
 });
 

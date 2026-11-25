@@ -62,6 +62,7 @@ import { toastAnnouncedDividends } from '@/components/assets/announcedDividendsT
 import { resolveFreshness } from '@/lib/utils/freshness';
 import type { Asset } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
+import { describeTradeFx } from '@/lib/utils/tradeFx';
 import { COSTUME_FRAME_RADIUS_CLASS, COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 
 interface AssetMovementsDialogProps {
@@ -409,6 +410,9 @@ function MovementTableRow({
       </td>
       <td className="py-2.5 text-right font-mono text-[13px] tabular-nums">
         {formatCurrency(transaction.pricePerUnit, currency, 4)}
+        {fxLineOf(transaction, currency) && (
+          <span className="block text-[11px] text-muted-foreground">{fxLineOf(transaction, currency)}</span>
+        )}
       </td>
       <td className="py-2.5 text-right font-mono text-[13px] tabular-nums">
         {cachedFormatCurrencyEUR(transaction.quantity * transaction.priceEur)}
@@ -461,7 +465,13 @@ function MovementRow({ transaction, currency, effect, actionsDisabled, onEdit, o
         </p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           <span>Totale {cachedFormatCurrencyEUR(gross)}</span>
-          {fees !== undefined && fees > 0 && <span>Commissioni {cachedFormatCurrencyEUR(fees)}</span>}
+          {fees !== undefined && fees > 0 && (
+            <span>
+              {transaction.feesNative !== undefined
+                ? `Commissioni ${formatNativeAmount(transaction.feesNative)} ${fxCode(currency)} (${cachedFormatCurrencyEUR(fees)})`
+                : `Commissioni ${cachedFormatCurrencyEUR(fees)}`}
+            </span>
+          )}
           {transaction.type === 'sell' && effect?.realizedPnlEur !== undefined && (
             <span className={cn('font-medium', signToneClass(effect.realizedPnlEur))}>
               P&L {formatSignedEur(effect.realizedPnlEur)}
@@ -474,6 +484,9 @@ function MovementRow({ transaction, currency, effect, actionsDisabled, onEdit, o
             <span>PMC {cachedFormatCurrencyEUR(effect.averageCostEurAtTrade)}</span>
           )}
         </div>
+        {fxLineOf(transaction, currency) && (
+          <p className="text-[11px] text-muted-foreground">{fxLineOf(transaction, currency)}</p>
+        )}
         {transaction.note && (
           <p className="truncate text-xs italic text-muted-foreground">{transaction.note}</p>
         )}
@@ -497,6 +510,22 @@ function MovementRow({ transaction, currency, effect, actionsDisabled, onEdit, o
       </div>
     </div>
   );
+}
+
+/** The rate a foreign trade used and where it came from (2026-11-23); null for a trade that stored none. */
+function fxLineOf(transaction: AssetTransaction, currency: string): string | null {
+  if (transaction.fxRate === undefined || transaction.fxSource === undefined) return null;
+  return describeTradeFx(currency, transaction.fxRate, transaction.fxSource, transaction.date);
+}
+
+/** The code a native amount is printed with: a legacy `GBp` instrument is typed in pounds. */
+function fxCode(currency: string): string {
+  return currency === 'GBp' ? 'GBP' : currency.toUpperCase();
+}
+
+/** «5,00»: a native amount at two decimals, the currency named beside it. */
+function formatNativeAmount(value: number): string {
+  return value.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function TypeChip({ type, isBaseline }: { type: AssetTransaction['type']; isBaseline: boolean }) {

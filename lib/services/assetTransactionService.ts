@@ -29,6 +29,7 @@ import {
   ASSET_TRANSACTIONS_META_COLLECTION,
   type AssetTransaction,
   type AssetTransactionFormData,
+  type AssetTransactionUpdateData,
   type AssetTransactionsMeta,
 } from '@/types/assetTransactions';
 import type { AnnouncedDividendsOutcome } from '@/lib/utils/announcedDividendsOutcome';
@@ -42,6 +43,9 @@ export interface AssetTransactionMutationResult {
   feeRow?: 'written' | 'none' | 'refused';
   /** The announced dividends of the asset the trade rewrote or removed (2026-11-23); zeros when none, or when the reconciliation failed. */
   announcedDividends?: AnnouncedDividendsOutcome;
+  /** The stored trade's euro price per unit and euro fee, as the server resolved them (2026-11-23); zeros on a delete. */
+  priceEur: number;
+  feesEur: number;
 }
 
 export type AssetLedgerMigrationResult =
@@ -70,6 +74,10 @@ function docToAssetTransaction(id: string, data: Record<string, unknown>): Asset
     isBaseline: data.isBaseline as boolean | undefined,
     indexationCoefficient: data.indexationCoefficient as number | undefined,
     note: data.note as string | undefined,
+    feesNative: data.feesNative as number | undefined,
+    settledTotalEur: data.settledTotalEur as number | undefined,
+    fxRate: data.fxRate as number | undefined,
+    fxSource: data.fxSource as AssetTransaction['fxSource'],
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),
   };
@@ -160,7 +168,7 @@ export async function createAssetTransaction(
 export async function updateAssetTransaction(
   ownerId: string,
   transactionId: string,
-  updates: Partial<AssetTransactionFormData>,
+  updates: AssetTransactionUpdateData,
   expectedUpdatedAt: Date
 ): Promise<AssetTransactionMutationResult> {
   const response = await authenticatedFetch(`/api/asset-transactions/${transactionId}`, {

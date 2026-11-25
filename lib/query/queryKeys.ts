@@ -110,6 +110,12 @@ export const queryKeys = {
     ecbRates: () => ['benchmarks', 'ecb-rates'] as const,
   },
 
+  // The ECB rate of one currency on one trade day (2026-11-23): a public figure, not the owner's, so
+  // it carries no uid and stays outside the persisted prefixes.
+  fx: {
+    rate: (currency: string, isoDay: string) => ['fx', 'rate', currency, isoDay] as const,
+  },
+
   // Portfolio — the Esposizione's Yahoo profiles, keyed by the OWNER and by the signature of the
   // tickers in view («AAPL:stock|VWCE.DE:fund»): a new ticker is a new key, so the read restarts
   // by itself (doc/guide/allocazione.md § Esposizione). The weighing happens in the browser, outside the cache.

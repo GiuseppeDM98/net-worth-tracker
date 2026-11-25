@@ -33,6 +33,7 @@ vi.mock('server-only', () => ({}));
 // FX is network-bound: mock it away. EUR trades → priceEur === pricePerUnit (identity).
 vi.mock('@/lib/server/tradeFxService', () => ({
   resolveTradePriceEur: vi.fn(async (_currency: string, pricePerUnit: number) => pricePerUnit),
+  resolveEcbRateToEur: vi.fn(async () => ({ rate: 1, isLatest: false })),
   resolveBaselinePriceEur: vi.fn(
     async (asset: { averageCost?: number; currentPrice: number }) => asset.averageCost ?? asset.currentPrice
   ),
@@ -168,7 +169,7 @@ import {
   deleteAssetTransaction,
   deleteAllAssetTransactionsForAsset,
 } from '@/lib/server/assetTransactionUseCase';
-import { resolveTradePriceEur } from '@/lib/server/tradeFxService';
+import { resolveEcbRateToEur } from '@/lib/server/tradeFxService';
 
 const OWNER = 'owner-1';
 const BASELINE_DATE = new Date(2024, 0, 1);
@@ -245,7 +246,7 @@ describe('assetTransactionUseCase — atomic write transaction', () => {
     // A USD trade at 100 USD/quota, but the trade-date rate made it 90 EUR/quota: the native PMC
     // and the EUR PMC must diverge on the asset doc, otherwise G/P math re-mixes the two currencies
     // (the bug this write path exists to prevent).
-    vi.mocked(resolveTradePriceEur).mockResolvedValueOnce(90);
+    vi.mocked(resolveEcbRateToEur).mockResolvedValueOnce({ rate: 0.9, isLatest: false });
     seedAsset({ quantity: 0, currency: 'USD' });
     seedCash('cash-1', 10000);
 

@@ -63,7 +63,10 @@ export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries
 // Bumped from 25→26: every G/P stands on the fee-free PMC, every estimated tax on the fiscal cost
 // (`fiscalCostPerUnitEur`), and `monthSales.realizedGain` is fee-free while `estimatedTax` deducts both fees
 // (2026-11-12) — a stored summary would mix the two bases.
-export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 26;
+// Bumped from 26→27: monthSales.realizedGains / realizedLosses (the gains and the losses apart,
+// 2026-11-25), so a month that sold at a gain and at a loss names both beside the tax — a stored
+// summary would keep the net alone until its next recompute.
+export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 27;
 // The materialized summary is stale when invalidated, of another source version, computed on an
 // earlier Italian DAY (the payload is the day's: the current/previous month and the month-end
 // projection are read from «today»), or older than this. Every mutation of an input already

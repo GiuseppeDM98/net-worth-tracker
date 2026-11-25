@@ -45,6 +45,7 @@ vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} })
 
 vi.mock('@/lib/server/tradeFxService', () => ({
   resolveTradePriceEur: vi.fn(async (_currency: string, pricePerUnit: number) => pricePerUnit),
+  resolveEcbRateToEur: vi.fn(async () => ({ rate: 1, isLatest: false })),
   resolveBaselinePriceEur: vi.fn(async (asset: { averageCost?: number; currentPrice: number }) => {
     const gate = mocks.fx.gate;
     if (gate) {
