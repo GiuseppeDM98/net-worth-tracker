@@ -274,7 +274,7 @@ export async function createDividend(
 /**
  * The euro side of a foreign record at the ECB rate of its payment day (or from the credit), or
  * undefined when no rate can be read at all — the record is then saved without euro fields, as
- * before 2026-11-23. A refused credit is rethrown.
+ * before 2026-11-25. A refused credit is rethrown.
  */
 async function resolveDividendFxOrNone(
   currency: string,
@@ -428,7 +428,7 @@ async function resolveFxUpdates(
 /**
  * On its payment day, before its income is built: a foreign record converted at a rate that was
  * not the day's — `'ecb-latest'` (announced for a later day), or none at all (saved before
- * 2026-11-23, owner's decision) — is converted again at the payment day's ECB rate and written.
+ * 2026-11-25; owner, 2026-11-23) — is converted again at the payment day's ECB rate and written.
  * A record with a credited net, one already at the day's rate and an EUR one are returned as
  * they are, with no read. With no rate it is returned unchanged: the income takes the euro figures
  * it has.

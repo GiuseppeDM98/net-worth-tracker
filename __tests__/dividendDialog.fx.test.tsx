@@ -4,6 +4,10 @@
  * their proposals, «Netto accreditato in euro» previews the euro side with the ECB rate the hook
  * reads (mocked here: the network is never asserted), and an edit sends the foreign part and the
  * credit only when they mean something. Invented, round figures and invented ISINs.
+ *
+ * Seen red (2026-11-25, each turning one test red) by: the currency set on every pick, the owner's
+ * choice ignored; two withholdings for every ISIN, an Italian one included; the «Cambio di oggi»
+ * sentence dropped for a payment still to come; `foreignTaxAmount` always sent on an edit.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

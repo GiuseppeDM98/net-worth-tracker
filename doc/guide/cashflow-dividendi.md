@@ -104,7 +104,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   closing. The picker lists every instrument of an equity or bonds class that is not a pension fund,
   an account or a house, held or sold («· venduto»), plus the record's own instrument on an edit; it
   stays mounted while the assets load (disabled). The withholding proposal is the instrument's own
-  `taxRate` over the gross per unit, on a new record and an untouched field only; a bond's payment
+  `taxRate` over the gross per unit — net of the foreign part for a foreign issuer, which has a foreign proposal too
+  (§ A dividend of a foreign issuer) — on a new record and an untouched field only; a bond's payment
   defaults to «Cedola». The summary is a `bg-muted` block in the mono face with no sign colour.
 - **The row is reachable and its delete arms in place.** The instrument's name in the desktop table
   is a `<button>` («Dettagli: la cedola di BTP del 10/09/2026») that opens the record and receives the
@@ -324,18 +325,21 @@ CURRENCY only the conversion.
 - **The currency follows the instrument** on a new record until the owner picks one (GBp → GBP); the select offers
   `INSTRUMENT_CURRENCIES` plus the instrument's own and the record's when not listed. Every amount label and the
   «Riepilogo» carry it.
-- **The conversion, at the PAYMENT day**, the rate service and the 25% guard of a trade (C2: `resolveEcbRateToEur`,
+- **The conversion, at the PAYMENT day**, the rate service and the 25% guard of a trade (`resolveEcbRateToEur`,
   doc/guide/registro-operazioni.md § A trade in a foreign currency). Three sources, stored in `fxSource` with
   `exchangeRate`: `'statement'` — «Netto accreditato in euro» typed from the statement: the euro net IS that figure
   (`settledNetEur`), the rate the one it implies, refused with a **422** (the sentence of `describeTotalOff`) when
   more than 25% away from the day's ECB rate; `'ecb'` — the payment day's fixing; `'ecb-latest'` — the latest
   fixing, for a payment still to come or a day the ECB has not published. No rate at all (the service down) → the
-  record is saved without euro fields, logged. The form previews the same figure (`useFxRate`, `resolveDividendFx`):
+  record is saved without euro fields, logged. The two routes map a refusal to its 422 sentence through ONE function,
+  `describeDividendFxRefusal` (`lib/utils/dividendFx.ts`; `nothing-to-convert` reads «Il netto accreditato in euro
+  richiede un netto maggiore di zero.»). The form previews the same figure (`useFxRate`, `resolveDividendFx`):
   «Cambio BCE del …: EUR/USD … · netto stimato …», «Cambio dal tuo accredito: …», «Cambio di oggi: quello del giorno di
-  pagamento lo applico quando arriva.»; a refused credit is said under the field and the submit stays enabled.
-- **The re-conversion on the payment day** (decision 66): the cron's payment-day pass calls `reconvertAtPaymentDay`
+  pagamento lo applico quando arriva.», and for a past day the ECB has not published «Cambio BCE più recente, quello
+  del giorno non è disponibile: …»; a refused credit is said under the field and the submit stays enabled.
+- **The re-conversion on the payment day** (owner, 2026-11-23): the cron's payment-day pass calls `reconvertAtPaymentDay`
   BEFORE the income is created — a foreign record with `fxSource` `'ecb-latest'` or with none (announced before
-  this rule) and no `settledNetEur` is converted at its day's rate, and the income row is built from the record so
+  2026-11-25) and no `settledNetEur` is converted at its day's rate, and the income row is built from the record so
   rewritten (its amount equals the euro net). A record with the credit or an `'ecb'` source is left as it is.
 - **An edit resolves a rate only for a changed value**: currency, gross, net, foreign part, credit or the Italian
   payment day. A note corrected leaves the euro figures — and the income row of a cashed record — as they are. On the
@@ -345,7 +349,7 @@ CURRENCY only the conversion.
   must not gain a foreign 0, which the next proposal would read as 0%.
 - **A pending record recomputed by a trade** (§ Dividends and Coupons, the ledger) scales its foreign part with the
   rest (`reconcileAnnouncedDividend`).
-- **The scrape taxes at the INSTRUMENT's rate** (decision 65): cron and button, `computeDividendTaxes(gross, 0,
+- **The scrape taxes at the INSTRUMENT's rate** (owner, 2026-11-23; until 2026-11-25 a fixed 26%): cron and button, `computeDividendTaxes(gross, 0,
   asset.taxRate ?? 26)`; a rate of 0 stays 0. A scraped dividend has no foreign part.
 - Pinned by `__tests__/{dividendFx,dividendService.fx,dividendRoutesFx,dividendEntitlement,dividendProcessor,
   dividendScrapeRoute}.test.ts`, `__tests__/dividendDialog.fx.test.tsx` and `e2e/cashflow.dividendi.fx.spec.ts`
@@ -405,5 +409,7 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
   tax return; an automatic coupon of a foreign-currency bond is converted at its payment day and has no foreign part;
   a record saved on its payment day before the ECB publishes (≈ 16:00) carries the previous fixing
   (`'ecb-latest'`) and is converted again by the cron only while it has no income; the PUT does not check the
-  currency against the instrument (the POST does: «Valuta non ammessa per questo strumento.»).
+  currency against the instrument (the POST does: «Valuta non ammessa per questo strumento.»); a dividend scraped
+  before 2026-11-25 on an instrument whose rate is not 26% keeps its 26% tax — no pass rewrote it, the owner edits
+  the record.
 - **YOC/Current Yield** exclude sold assets and are scoped to the current holding via `holdingStartDate`; a sell+rebuy inside one month counts the prior holding's dividends against the new cost basis (an overstated YOC, never a regression). (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

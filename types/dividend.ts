@@ -55,7 +55,7 @@ export interface Dividend {
   // The euro credited, from the statement (a non-EUR record only): the euro net IS this figure.
   settledNetEur?: number;
   // Where `exchangeRate` came from: the credit, the payment day's ECB fixing, or the latest one —
-  // a record at 'ecb-latest' (or saved before 2026-11-23, with none) is converted again on its payment day.
+  // a record at 'ecb-latest' (or saved before 2026-11-25, with none) is converted again on its payment day.
   fxSource?: TradeFxSource;
   // Historical cost basis snapshot: asset.averageCost (EUR per share) at the time of payment.
   // Used by calculateYocMetrics to compute YOC with the cost basis that was in effect when

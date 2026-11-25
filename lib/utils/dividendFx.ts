@@ -2,7 +2,7 @@
  * The taxes and the euro side of a dividend paid in a foreign currency.
  *
  * Such a dividend is withheld twice — abroad on the gross, in Italy on what crosses the border — and is
- * credited in euro at the rate of the day it is paid. Until 2026-11-23 the record had one withholding and
+ * credited in euro at the rate of the day it is paid. Until 2026-11-25 the record had one withholding and
  * the rate of the moment it was saved.
  */
 import { roundToCents } from '@/lib/utils/cents';
