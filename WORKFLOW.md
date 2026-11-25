@@ -249,19 +249,13 @@ measures in `doc/guide/collaudo.md` (moved there whole on 2026-11-18).
 - **The owner's go** (2026-10-05): say «pronto» and wait; the owner starts the tour when they can give it 20 minutes.
 - **Phase F before the commit** (owner, 2026-11-21; § 2 obligation 5): the tour first, then the diff summary and the
   OK; the assistant opens every window itself.
-- **Phase F has its data before the go** (owner, 2026-11-25): when the mirror holds nothing the tour needs (a foreign
-  instrument, a kind of record the owner does not have), the assistant plants it first — invented names and round
-  figures, on `prod-mirror`, so `npm run mirror:remove` takes it away — and names it in the tour's steps; never a
-  phase F that asks the owner for data he does not have.
+- **Phase F has its data before the go** (owner, 2026-11-25): what the tour needs and the mirror lacks, the assistant
+  plants first on `prod-mirror`, invented, and names it in the steps.
 - **One `next dev` at a time** (2026-09-07): stop the :3100 server before the tour; the tour runs on the emulators
   plus ONE server.
 - **The windows: `scripts/collaudo-finestre.mts`** (2026-11-13): `npx tsx scripts/collaudo-finestre.mts
-  --email=<fixture> --url=<path> [--url=<path>] [--title=…] [--width=390]`, in the background as its own task;
-  `--width=390` opens a phone window that stays 390 px wide even maximised (2026-11-24), the built-in browser pane
-  does not (it returns to the pane's width when the turn ends); closed with `npx tsx scripts/collaudo-finestre.mts
-  --chiudi` (`taskkill` on Windows: Git Bash has no `pkill`, 2026-11-24); from Git Bash on Windows prefix
-  `MSYS_NO_PATHCONV=1` (2026-11-15). A file
-  the page downloads goes through a throwaway Playwright script into the scratchpad (2026-11-14).
+  --email=<fixture> --url=<path> [--url=<path>] [--title=…] [--width=390]`, in the background as its own task,
+  closed with `npx tsx scripts/collaudo-finestre.mts --chiudi`; from Git Bash prefix `MSYS_NO_PATHCONV=1` (2026-11-15). A phone window, a download: the guide.
 - **Getting in**: email/password on `/login` (no OAuth, no MFA). Fixture identities, all password `test1234`:
 
   | Account | UID | What it is for |
@@ -293,10 +287,8 @@ measures in `doc/guide/collaudo.md` (moved there whole on 2026-11-18).
 
 The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
 
-- **No Claude-in-Chrome** (2026-09-13): the live evidence comes from a throwaway Playwright script on the emulator dev
-  server, copied into the repo root as `.tmp-*.mjs`, waiting on the page's `h1`, never on `networkidle`; say it is
-  Playwright's. The tour still goes on the MIRROR. Count only the detector's hits that belong to the surface
-  (2026-09-18).
+- **No Claude-in-Chrome** (2026-09-13): live evidence from a throwaway Playwright script (`.tmp-*.mjs` in the repo
+  root, waiting on `h1`), said to be Playwright's; the tour still on the MIRROR; only the surface's detector hits (2026-09-18).
 - **A probe opens a control that SPENDS only with the owner's yes, asked before, each time** (2026-09-20; 2026-11-23):
   the real model, a real email, a paid service; read what a control does before scripting a click. A committed test
   never spends.
@@ -332,8 +324,8 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
   precedents: `doc/guide/collaudo.md` § Where things are recorded.
 - **A spec is retired by a session of its own** (since 2026-09-28): the code read against the spec, every divergence
   given a verdict, the lessons home, then the spec and every pointer go; **the LAST spec of a series retires its whole
-  folder**. A text-only defect found there is fixed with `tsc`, lint and Vitest, no Playwright; a runtime one only on
-  the owner's call, with the area suite and the full Playwright. The full rule: `doc/guide/collaudo.md` § Where things are recorded.
+  folder**. The full rule, the
+  defects found there included: `doc/guide/collaudo.md` § Where things are recorded.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked, deleted before the commit, its
   last block *Cosa* · *Perché* · *Nota* · *Dove va a fine sessione*, owner 2026-09-27); its outcome one line of
   `CLAUDE.md` «Latest», the signals in the commit message and the guide.

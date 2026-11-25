@@ -26,7 +26,8 @@ The app **is** locally runnable; there is no fallback to declare.
   refuses a non-local base, and exits when the owner closes every window, on SIGTERM (`npx tsx scripts/collaudo-finestre.mts
   --chiudi` — how the agent closes them after the owner's confirmation; it uses `taskkill` on Windows, where Git Bash
   has no `pkill`) or after 30 minutes. `--width=390` (`--height=844` by default) fixes the viewport, so a phone
-  window stays a phone when the owner maximises it (2026-11-24).
+  window stays a phone when the owner maximises it (2026-11-24); the app's built-in browser pane does not (it returns
+  to the pane's width when the turn ends).
   Run it in the background, as its own task: a throwaway seed beside it in one command dies with it.
   **On Windows** (2026-11-15): until that day the script never ran there — its CLI guard compared `import.meta.url` with
   `file://` + the path, which never matches `file:///C:/…`, so it exited 0 with no window (now `pathToFileURL`); and from
@@ -36,6 +37,11 @@ The app **is** locally runnable; there is no fallback to declare.
   (2026-11-14; the helper keeps no handle on its pages): for that item a throwaway Playwright script signs in the same
   way and saves `page.on('download')` into the scratchpad, opens it for the owner, and deletes it with the fixtures
   (it carries the mirror's figures).
+- **Phase F has its data before the go** (owner, 2026-11-25): when the mirror holds nothing the tour needs (a foreign
+  instrument, a kind of record the owner does not have), the assistant plants it first — invented names and round
+  figures, on `prod-mirror`, so `npm run mirror:remove` takes it away — and names it in the tour's steps; never a
+  phase F that asks the owner for data he does not have. Seen on 2026-11-25: the foreign-dividend tour asked for «one
+  real foreign dividend from his statement» and the owner holds no foreign instrument.
 - **Getting in**: the login is email/password on `/login` — no OAuth, no MFA, so it is a five-second
   manual step and also fully scriptable. Fixture identities (all password `test1234`):
 
