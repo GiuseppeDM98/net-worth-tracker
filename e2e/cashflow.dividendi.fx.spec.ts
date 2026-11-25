@@ -9,7 +9,9 @@
  *
  * Nothing here depends on what Frankfurter answers: the credit implies EUR/USD 1,0920 (3,145 USD
  * for 2,88 €), inside the server's 25% guard for any fixing between 0,88 and 1,46, and accepted when
- * the service does not answer. The preview line of the form is D3's (Vitest).
+ * the service does not answer. The preview line of the form is pinned by
+ * `__tests__/dividendDialog.fx.test.tsx`. Seen red (2026-11-25) with `settledNetEur` not sent by the
+ * form: the income became the net at the ECB rate.
  *
  * Plants «Azione Alfa» (equity, USD, ISIN US0000000001, 10 units) and an income category named in
  * the settings as the dividends' (the whole settings document read first and restored); removes the

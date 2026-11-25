@@ -14,7 +14,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19 **with the React Compiler on** (since 2026-10-05), TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - Tests: Vitest in `__tests__/` (one file per pure module), held green in `Europe/Rome`, in the machine's zone AND under `TZ=UTC` (since 2026-10-08); Playwright specs in `e2e/` (the projects and the traps: doc/guide/e2e-playwright.md; the full run and its known flakes: doc/guide/e2e-suite.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, the ones beside midnight are named by the Italian clock.
-- Latest (2026-11-25): **DATI-07** implemented: a foreign dividend takes the instrument's currency, two withholdings for a foreign issuer, the payment day's ECB rate or the euro credited (doc/guide/cashflow-dividendi.md § A dividend of a foreign issuer); guided tour done and closed, phase F on the mirror included. Open: doc/dati/ (README § 6). Next: DATI-08.
+- Latest (2026-11-25): **DATI-07** retired (a foreign dividend: the instrument's currency, two withholdings, the payment day's rate — doc/guide/cashflow-dividendi.md § A dividend of a foreign issuer); text-only fixes, no code changed. Open: doc/dati/ (README § 6). Next: DATI-08.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

@@ -96,7 +96,7 @@ describe('POST /api/dividends/scrape — the quantity held at the ex-date (2026-
     expect(body).toMatchObject({ created: 1, notHeld: 1 });
   });
 
-  // Red when the tax is a fixed `grossAmount * 0.26` again (S4, owner 2026-11-23).
+  // Red when the tax is a fixed `grossAmount * 0.26` again (owner, 2026-11-23).
   it('taxes the created record at the instrument’s own rate', async () => {
     assetData.current = { ...assetData.current, taxRate: 12.5 };
 

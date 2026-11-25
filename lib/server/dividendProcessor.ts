@@ -406,7 +406,7 @@ export async function runExpenseCreation(
           }
 
           // A foreign record converted at another day's rate (announced ahead, or saved before
-          // 2026-11-23) is converted again at its payment day's before its income is built.
+          // 2026-11-25) is converted again at its payment day's before its income is built.
           dividendData = await reconvertAtPaymentDay(dividendData);
 
           const expenseId = await createExpenseFromDividend(
