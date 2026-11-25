@@ -352,8 +352,9 @@ PR #439: 10 tasti in «Target Criptovalute» di Impostazioni › Allocazione, la
 non la possiede mai, quindi il campo è abilitato su ogni account), **expense** (10 tasti in «Importo» di
 «Nuova Spesa» › Spesa non necessaria, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
 quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PR #434: 10 tasti in «Quantità» di
-«Aggiungi asset» › ETF, la posizione iniziale — non «Modifica»: un ETF è un tipo del registro, e in modifica quantità e
-PMC sono in sola lettura). Dal 2026-10-08 (PR #441) due scenari che non digitano: **mount** (un caricamento pieno della
+«Aggiungi asset» › Fondo Pensione dal 2026-11-25 — fino ad allora › ETF, la posizione iniziale, che dal 2026-11-23 non
+c'è più: un tipo del registro nasce a 0 quote e il primo acquisto è di «Registra operazione»; non «Modifica»: in
+modifica un tipo del registro mostra quantità e PMC in sola lettura). Dal 2026-10-08 (PR #441) due scenari che non digitano: **mount** (un caricamento pieno della
 route di `--route=`, una o più separate da virgole, default `history`: la registrazione si accende con un init script
 PRIMA della navigazione e si ferma a «dati a schermo» — `main h1`, una cifra in euro, nessuno skeleton — più 1 s; il
 login è già atterrato sulla Panoramica e le sue letture hanno 2 s per entrare nella cache persistita, quindi ogni run

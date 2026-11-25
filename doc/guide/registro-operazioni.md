@@ -163,17 +163,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **An edit resolves again only when a figure changed**: the merged `pricePerUnit`, `date`, `quantity`, `type`,
   native fee, euro fee or total DIFFERS from the stored trade's (the form sends every field at every save); otherwise
   `priceEur`, `fees` and the four fields are kept and no rate is read. `null` in an update removes a field
-  (`AssetTransactionUpdateData`); a merged adjustment drops both. A stored `feesNative` of 0 reads as absent; the
+  (`AssetTransactionUpdateData`); a merged adjustment drops both. A `feesNative` of 0 is never stored: the server drops it
+  and the form sends a typed 0 as absent (or `null` over a stored fee) — a document planted with 0 would read as a
+  native fee, not as absent. Clearing the native fee (`null`, no `fees`) leaves no fee at all: the stored `fees`
+  was its conversion, never a legacy euro fee (`prepareEdit`'s `legacyFeesEur`). The
   EUR guard (`feesNative`/`settledTotalEur` refused on an EUR instrument) holds on an edit too. The server compares
   the date the form sends — the ISO day at UTC midnight — so a trade written by another path at another hour of the same
   day reads as a changed date and is resolved again at its first edit (seen on a planted trade, 2026-11-25).
-- **A legacy euro fee lives inside the total** (decision 61): a trade saved before 2026-11-23 with `fees` in euro and
+- **A legacy euro fee lives inside the total** (owner, 2026-11-23): a trade saved before 2026-11-23 with `fees` in euro and
   no `feesNative` shows the native fee empty with a line that says so; a total typed alone INCLUDES that fee (titles
   = total − fee, a sale + fee), the account moves by the total and the fee's row stays as it is. A native fee typed
   there REPLACES the euro one from then on.
-- **The settlement account is in euro** (decision 6): the trade form lists euro accounts only, and the server refuses
+- **The settlement account is in euro** (owner, 2026-11-23: cash accounts are in euro only): the trade form lists euro accounts only, and the server refuses
   a foreign one (`assertCashSettlementAsset`, 422 «Il conto di regolamento deve essere in euro.») — only when the
-  account CHANGES (decision 62): a trade already settled on a foreign account is edited freely and shows it as
+  account CHANGES (owner, 2026-11-23): a trade already settled on a foreign account is edited freely and shows it as
   «{nome} (in {CUR}, non più selezionabile)»; `assertSettlementAccountsStillCash` in the transaction has no
   currency test. A foreign account prefilled on a NEW trade is reset to «Nessun conto».
 - **Adjustments and baselines**: an adjustment takes no fee and no total, its price converted at the ECB rate with

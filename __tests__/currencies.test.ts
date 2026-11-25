@@ -1,7 +1,7 @@
 /**
  * Tests for lib/constants/currencies.ts — the ONE currency rule (owner, 2026-11-23): pence are
  * pounds with the amount divided by 100, and a currency outside the listed thirteen is accepted only
- * as the instrument's own.
+ * as the instrument's own. Seen red (2026-11-25) with the instrument's-own branch dropped.
  */
 
 import { describe, expect, it } from 'vitest';

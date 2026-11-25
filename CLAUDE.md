@@ -14,7 +14,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19 **with the React Compiler on** (since 2026-10-05), TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - Tests: Vitest in `__tests__/` (one file per pure module), held green in `Europe/Rome`, in the machine's zone AND under `TZ=UTC` (since 2026-10-08); Playwright specs in `e2e/` (the projects and the traps: doc/guide/e2e-playwright.md; the full run and its known flakes: doc/guide/e2e-suite.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, the ones beside midnight are named by the Italian clock.
-- Latest (2026-11-25): **DATI-06** implemented: a trade in a foreign currency takes its fee in that currency and the statement's euro total, keeps the rate it used, settles on euro accounts only, and every purchase goes through «Registra operazione» (doc/guide/registro-operazioni.md § A trade in a foreign currency); a month selling at a gain and at a loss names both (doc/guide/panoramica.md); guided tour closed. Open: doc/dati/ (README § 6). Next: DATI-07.
+- Latest (2026-11-25): **DATI-06** retired: the foreign-currency trade and the one purchase form live in doc/guide/registro-operazioni.md § A trade in a foreign currency; the `perf:census` scenario `asset` fixed onto «Fondo Pensione» (doc/guide/velocita.md) — the signals are to be redone after the deploy. Open: doc/dati/ (README § 6). Next: DATI-07.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

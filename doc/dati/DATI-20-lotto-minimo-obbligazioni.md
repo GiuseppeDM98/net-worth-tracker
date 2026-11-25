@@ -658,7 +658,7 @@ lib/utils/advicePlan.ts (U13, P1, D2, U20, T1) —, il Consulente — fatti, con
 § 9 e la riga 20 di doc/dati/README.md § 6 a `implemented`. OGNI test del § 6 va visto rosso con la
 sua mutazione. Il codice dei §§ 4.1, 4.3, 4.4 e 4.5 è già scritto: copialo.
 
-Fermati e chiedimi se: DATI-06, DATI-18 o DATI-19 non sono in develop come li descrivono le loro spec
+Fermati e chiedimi se: DATI-06, DATI-18 o DATI-19 non sono in develop come li descrivono le loro spec (per una ritirata, l'indice § 7)
 (il modulo unico che rilegge lo strumento, il blocco obbligazione del modulo dell'operazione,
 OperatingPlanInstrument.wanted e le diciassette regole della riconciliazione), una suite esistente
 del piano di accumulo va rossa per uno strumento che non è un'obbligazione, la somma «righe + residuo

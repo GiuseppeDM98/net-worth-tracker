@@ -31,11 +31,12 @@
  *              `useWatch` at the dialog's root.
  *   tabs       Cashflow: Tracciamento ⇄ Budget, both already mounted (`forceMount`), four switches —
  *              does the hidden tab re-render?
- *   asset      Patrimonio › «Aggiungi asset» › ETF: 10 keys in «Quantità» of the opening position,
- *              watched by a leaf of `AssetDialog` since 2026-10-07 — at the dialog's root it
- *              re-rendered the whole form, 562 components per key (doc/guide/patrimonio.md
- *              § Two-Step). Not an edit: an ETF is a ledger type, and editing one shows quantity
- *              and PMC read-only.
+ *   asset      Patrimonio › «Aggiungi asset» › Fondo Pensione: 10 keys in «Quantità», watched by
+ *              leaves of `AssetDialog` since 2026-10-07 — at the dialog's root it re-rendered the
+ *              whole form, 562 components per key (doc/guide/patrimonio.md § Two-Step). A type
+ *              outside the trade ledger since 2026-11-25: from 2026-11-23 a new ETF (any ledger
+ *              type) is created at 0 units with no quantity field, and its first purchase goes
+ *              through «Registra operazione»; editing one shows quantity and PMC read-only.
  *   mount      A full load of one route (`--route=`, comma-separated; default `history`): recording is
  *              switched on by an init script BEFORE the navigation and stops when the page's data is
  *              on screen (`main h1`, a euro figure, no skeleton left) plus 1 s. One unit per load.
@@ -281,7 +282,7 @@ const scenarioRunners = {
     await page.goto(`${BASE}/dashboard/assets`, { waitUntil: 'load' });
     await page.getByRole('button', { name: 'Aggiungi asset' }).filter({ visible: true }).first().click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('radio', { name: /^ETF/ }).click();
+    await dialog.getByRole('radio', { name: /^Fondo Pensione/ }).click();
     const input = dialog.locator('#quantity');
     await input.waitFor({ state: 'visible', timeout: 30_000 });
     await page.waitForTimeout(1_000); // the dialog's entrance and the settings read it starts on open

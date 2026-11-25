@@ -289,8 +289,8 @@
   lines that fill `head` first — filter on `"\[(desktop|mobile)\]|[0-9]+ (passed|failed)"`. **A falsification must fail
   on the assertion it is about**: break ONE behaviour at a time, or an earlier assertion goes red and proves nothing.
   When the only mutation that breaks a LATER step also breaks an earlier one (2026-11-15, the opening fee's Tracciamento
-  row in `e2e/assets.trade-fee.spec.ts`: `fees` dropped from `firstBuy` fails first on the Firestore read), run a
-  throwaway copy of the spec with the earlier reads set aside (matching `testMatch`, deleted after) and watch the new
+  row in `e2e/assets.trade-fee.spec.ts`: `fees` dropped from the asset form's own first buy — gone since 2026-11-23,
+  the first purchase is the trade form's — failed first on the Firestore read), run a throwaway copy of the spec with the earlier reads set aside (matching `testMatch`, deleted after) and watch the new
   step fail there.
   **Shoot the SETTLED frame**: right after `dialog.waitFor()` a vaul drawer is half-way up (~500 ms) and a button is
   mid colour-transition — ~800 ms before a capture, never before an assertion.

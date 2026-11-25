@@ -2,6 +2,9 @@
  * Tests for lib/utils/tradeFx.ts — the euro side of a trade in a foreign currency: the statement's
  * euro total turned into a rate, the ECB rate of the day when there is none, the 25% typing guard,
  * a euro fee saved before 2026-11-23 inside the total, and the words Movimenti and the form print.
+ * Seen red (2026-11-25) by: a buy's titles equal to the whole total; the sale's two signs swapped; the
+ * `isLatest` branch dropped; the tolerance at 0,5; `fxRate` printed instead of its inverse; the
+ * legacy euro fee left out of the total (converted twice).
  */
 
 import { describe, expect, it } from 'vitest';

@@ -600,7 +600,7 @@ documenti del § 9 e la riga 21 di doc/dati/README.md § 6 a `implemented`. OGNI
 rosso con la sua mutazione prima di tenerlo.
 
 Fermati e chiedimi se: DATI-04, DATI-06, DATI-18 o DATI-20 non sono in develop come li descrivono le
-loro spec (mancano lib/utils/dividendEntitlement.ts con settlementDayIso e reconcileAnnouncedDividend,
+loro spec, o l'indice § 7 per una ritirata (mancano lib/utils/dividendEntitlement.ts con settlementDayIso e reconcileAnnouncedDividend,
 scheduleCouponsForOpenedPosition, il modulo unico, lib/utils/bondLot.ts); il passo 6 di
 reconcileOperatingPlan non ha il ramo del taglio minimo di DATI-20; un prompt di sistema del
 Consulente smette di essere identico tra due utenti; un tetto di perf:budget si alzerebbe di più di

@@ -362,7 +362,8 @@ form whose fields depend on a discriminant, and the marker rule itself, stay the
   2026-11-23: the first purchase is the trade form's). The React Compiler compiles `AssetDialog`
   but leaves the step-2 form outside every memo scope (its output, read on 2026-10-07: the form JSX is rebuilt at each
   render), so a watch at the root re-renders EVERYTHING: 562 components and 2 commits per key in «Quantità» on the
-  census, 0 and 0 after the move (`npm run perf:census -- --scenario=asset`; one `useWatch('quantity')` put back at the
+  census, 0 and 0 after the move (`npm run perf:census -- --scenario=asset`, measured on an ETF then, on «Fondo Pensione» since 2026-11-25 — a
+  ledger type has no «Quantità» on create; one `useWatch('quantity')` put back at the
   root read 563, seen red). The root keeps the watches that decide the form's SHAPE (type, class, the switches and
   selects — one change per click) and the ISIN. Submit-time reads stay `getValues()`/the `data` of `handleSubmit`.
 - **A marker on a label is a claim the validation has to honour.** `*` = required, `(opzionale)` in

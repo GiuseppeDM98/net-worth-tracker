@@ -1,7 +1,8 @@
 /**
  * CashAccountDialog on an account in a foreign currency (2026-11-23): the app counts its balance as
  * euro and never settles a trade on it, so the detail says so and asks for the balance in euro. A
- * euro account reads no warning. Invented names and figures.
+ * euro account reads no warning. Invented names and figures. Seen red (2026-11-25) with the warning
+ * shown for every account.
  */
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
