@@ -10,7 +10,10 @@ import {
 import {
   resolveTradePriceEur,
   resolveBaselinePriceEur,
+  resolveEcbRateToEur,
+  TradeFxUnavailableError,
 } from '@/lib/server/tradeFxService';
+import { TradeFxError, describeTotalOff, resolveTradeFx, type TradeFxSource } from '@/lib/utils/tradeFx';
 import { getUserAssetsAdmin, mapAssetDoc } from '@/lib/server/assetAdminRepository';
 import { reconcileAnnouncedDividendsForAsset } from '@/lib/server/dividendEntitlementService';
 import type { AnnouncedDividendsOutcome } from '@/lib/utils/dividendEntitlement';
@@ -28,6 +31,7 @@ import {
   type AssetTransaction,
   type AssetTransactionFormData,
   type AssetTransactionType,
+  type AssetTransactionUpdateData,
 } from '@/types/assetTransactions';
 import type { Asset, AssetType } from '@/types/assets';
 
@@ -101,6 +105,12 @@ export interface TradeMutationResult {
    * reconciliation failed — it runs after the commit and never fails the trade.
    */
   announcedDividends: AnnouncedDividendsOutcome;
+  /**
+   * The stored trade's euro price per unit and euro fee (2026-11-23): what the server resolved, so a
+   * caller files the real amount and never its own estimate (Accumulo). Zeros on a delete.
+   */
+  priceEur: number;
+  feesEur: number;
 }
 
 export type TradeFeeRowOutcome = 'written' | 'none' | 'refused';
@@ -131,6 +141,10 @@ function docToAssetTransaction(id: string, data: DocumentData): AssetTransaction
     isBaseline: data.isBaseline,
     indexationCoefficient: data.indexationCoefficient,
     note: data.note,
+    feesNative: data.feesNative,
+    settledTotalEur: data.settledTotalEur,
+    fxRate: data.fxRate,
+    fxSource: data.fxSource,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   };
@@ -153,6 +167,10 @@ function buildTradeSetDocData(t: AssetTransaction): Record<string, unknown> {
     isBaseline: t.isBaseline,
     indexationCoefficient: t.indexationCoefficient,
     note: t.note,
+    feesNative: t.feesNative,
+    settledTotalEur: t.settledTotalEur,
+    fxRate: t.fxRate,
+    fxSource: t.fxSource,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
   });
@@ -176,6 +194,10 @@ function buildTradeUpdateDocData(t: AssetTransaction): Record<string, unknown> {
     withheldTaxEur: t.withheldTaxEur ?? FieldValue.delete(),
     indexationCoefficient: t.indexationCoefficient ?? FieldValue.delete(),
     note: t.note ?? FieldValue.delete(),
+    feesNative: t.feesNative ?? FieldValue.delete(),
+    settledTotalEur: t.settledTotalEur ?? FieldValue.delete(),
+    fxRate: t.fxRate ?? FieldValue.delete(),
+    fxSource: t.fxSource ?? FieldValue.delete(),
     updatedAt: t.updatedAt,
   };
 }
@@ -218,6 +240,11 @@ async function assertCashSettlementAsset(ownerId: string, cashAssetId: string): 
   if (!data || data.userId !== ownerId || data.assetClass !== 'cash' || data.type !== 'cash') {
     throw new TradeUseCaseError(422, 'Il conto di regolamento selezionato non è valido.');
   }
+  // The app values a cash account one to one in euro, so a trade settled on a foreign one would add a
+  // euro delta to a dollar balance (owner, 2026-11-23: cash accounts are in euro only).
+  if (((data.currency as string | undefined) ?? 'EUR').toUpperCase() !== 'EUR') {
+    throw new TradeUseCaseError(422, 'Il conto di regolamento deve essere in euro.');
+  }
 }
 
 /**
@@ -235,7 +262,7 @@ function assertDateNotInFuture(date: Date): void {
 }
 
 /** Baseline is the frozen opening position: only quantity/pricePerUnit/note may change. */
-function assertBaselineEditableFields(updates: Partial<AssetTransactionFormData>): void {
+function assertBaselineEditableFields(updates: AssetTransactionUpdateData): void {
   if (
     updates.type !== undefined ||
     updates.date !== undefined ||
@@ -288,17 +315,110 @@ function addCashDelta(map: Map<string, number>, t: AssetTransaction, sign: 1 | -
   map.set(t.linkedCashAssetId, (map.get(t.linkedCashAssetId) ?? 0) + delta);
 }
 
+// ---------------------------------------------------------------------------
+// A trade in a foreign currency (2026-11-23; the pure rules in lib/utils/tradeFx.ts)
+// ---------------------------------------------------------------------------
+
+function isEurCurrency(currency: string): boolean {
+  return currency.toUpperCase() === 'EUR';
+}
+
+/** The values a foreign trade is resolved on: a create's, or an edit's MERGED ones. */
+interface ForeignTradeInput {
+  type: AssetTransactionType;
+  date: Date;
+  quantity: number;
+  pricePerUnit: number;
+  feesNative?: number;
+  /** A euro fee saved before 2026-11-23 (or sent by an older client): kept, and inside a euro total. */
+  legacyFeesEur?: number;
+  settledTotalEur?: number;
+}
+
+/** The euro side the trade stores: price, euro fee, the two inputs as typed, the rate and its source. */
+interface ForeignTradeFields {
+  priceEur: number;
+  fees?: number;
+  feesNative?: number;
+  settledTotalEur?: number;
+  fxRate: number;
+  fxSource: TradeFxSource;
+}
+
+function fxSourceOf(isLatest: boolean): TradeFxSource {
+  return isLatest ? 'ecb-latest' : 'ecb';
+}
+
+/** A refusal of the pure resolution, in the words the trade form shows. */
+function mapTradeFxError(error: unknown, currency: string): never {
+  if (!(error instanceof TradeFxError)) throw error;
+  if (error.code === 'no-rate') throw new TradeFxUnavailableError(currency);
+  if (error.code === 'total-off') throw new TradeUseCaseError(422, describeTotalOff(currency, error.ecbRate!));
+  throw new TradeUseCaseError(422, 'Il totale in euro non si può convertire: controlla quantità, prezzo e commissione.');
+}
+
+/**
+ * The euro side of a foreign trade. The day's ECB rate is read for every trade, a euro total
+ * included: it is the 25% guard's reference, and without the total it IS the conversion. Network:
+ * called in prepare, never inside the transaction.
+ */
+async function resolveForeignTrade(currency: string, trade: ForeignTradeInput): Promise<ForeignTradeFields> {
+  const ecb = await resolveEcbRateToEur(currency, trade.date);
+  if (trade.type === 'adjustment') {
+    // An absolute reset moves no money: no fee, no total — the new PMC at the day's rate.
+    if (!ecb) throw new TradeFxUnavailableError(currency);
+    return { priceEur: trade.pricePerUnit * ecb.rate, fxRate: ecb.rate, fxSource: fxSourceOf(ecb.isLatest) };
+  }
+  let resolution: ReturnType<typeof resolveTradeFx>;
+  try {
+    resolution = resolveTradeFx({
+      type: trade.type,
+      quantity: trade.quantity,
+      pricePerUnit: trade.pricePerUnit,
+      feesNative: trade.feesNative ?? 0,
+      legacyFeesEur: trade.legacyFeesEur,
+      settledTotalEur: trade.settledTotalEur,
+      ecb,
+    });
+  } catch (error) {
+    mapTradeFxError(error, currency);
+  }
+  return {
+    priceEur: resolution.priceEur,
+    fees: resolution.feesEur > 0 ? resolution.feesEur : undefined,
+    feesNative: trade.feesNative !== undefined && trade.feesNative > 0 ? trade.feesNative : undefined,
+    settledTotalEur: trade.settledTotalEur,
+    fxRate: resolution.fxRate,
+    fxSource: resolution.fxSource,
+  };
+}
+
 async function prepareCreate(
   ownerId: string,
   data: AssetTransactionFormData
 ): Promise<PreparedMutation> {
   await assertLedgerInitialized(ownerId);
   const currency = await getLedgerAssetCurrencyOrThrow(ownerId, data.assetId);
+  const isEur = isEurCurrency(currency);
+  if (isEur && (data.feesNative !== undefined || data.settledTotalEur !== undefined)) {
+    throw new TradeUseCaseError(422, 'Commissione in valuta e totale in euro valgono solo per uno strumento in valuta.');
+  }
   assertDateNotInFuture(data.date);
   if (data.linkedCashAssetId) await assertCashSettlementAsset(ownerId, data.linkedCashAssetId);
 
-  // priceEur resolved here (network) — never inside the Firestore transaction.
-  const priceEur = await resolveTradePriceEur(currency, data.pricePerUnit, data.date);
+  // The euro side resolved here (network) — never inside the Firestore transaction. A euro fee sent
+  // for a foreign instrument (an older client) is kept as it is.
+  const fx: Omit<ForeignTradeFields, 'fxRate' | 'fxSource'> & Partial<ForeignTradeFields> = isEur
+    ? { priceEur: await resolveTradePriceEur(currency, data.pricePerUnit, data.date), fees: data.fees }
+    : await resolveForeignTrade(currency, {
+        type: data.type,
+        date: data.date,
+        quantity: data.quantity,
+        pricePerUnit: data.pricePerUnit,
+        feesNative: data.feesNative,
+        legacyFeesEur: data.fees,
+        settledTotalEur: data.settledTotalEur,
+      });
 
   const tradeRef = adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc();
   const now = new Date();
@@ -310,12 +430,16 @@ async function prepareCreate(
     date: data.date,
     quantity: data.quantity,
     pricePerUnit: data.pricePerUnit,
-    priceEur,
-    fees: data.fees,
+    priceEur: fx.priceEur,
+    fees: fx.fees,
     linkedCashAssetId: data.linkedCashAssetId,
     withheldTaxEur: data.type === 'sell' ? data.withheldTaxEur : undefined,
     indexationCoefficient: data.indexationCoefficient,
     note: data.note,
+    feesNative: fx.feesNative,
+    settledTotalEur: fx.settledTotalEur,
+    fxRate: fx.fxRate,
+    fxSource: fx.fxSource,
     createdAt: now,
     updatedAt: now,
   };
@@ -336,6 +460,86 @@ async function prepareCreate(
   };
 }
 
+/** An edit's merged values, before its euro side is settled. */
+interface MergedTrade {
+  type: AssetTransactionType;
+  date: Date;
+  quantity: number;
+  pricePerUnit: number;
+  fees?: number;
+  feesNative?: number;
+  settledTotalEur?: number;
+}
+
+type EuroSide = Pick<AssetTransaction, 'priceEur' | 'fees' | 'feesNative' | 'settledTotalEur' | 'fxRate' | 'fxSource'>;
+
+const NO_FOREIGN_FIELDS = { feesNative: undefined, settledTotalEur: undefined, fxRate: undefined, fxSource: undefined };
+
+/**
+ * The euro side of an edited trade. EUR: as before, the price re-resolved when the update carries a
+ * price or a date. A migration's opening position: its price converted at its own date when it
+ * changes, and none of the four foreign fields (its euro price is the migration's). A foreign trade:
+ * the rate is resolved again only when a merged value DIFFERS from the stored trade's — the form sends
+ * every field at every save, so «is in the update» would read a rate at each one — and otherwise
+ * the stored price, fee, rate and source are kept.
+ */
+async function resolveEditedEuroSide(
+  currency: string,
+  oldTrade: AssetTransaction,
+  merged: MergedTrade,
+  updates: AssetTransactionUpdateData
+): Promise<EuroSide> {
+  if (isEurCurrency(currency)) {
+    const priceEur =
+      updates.pricePerUnit !== undefined || updates.date !== undefined
+        ? await resolveTradePriceEur(currency, merged.pricePerUnit, merged.date)
+        : oldTrade.priceEur;
+    return { priceEur, fees: merged.fees, ...NO_FOREIGN_FIELDS };
+  }
+
+  if (oldTrade.isBaseline) {
+    if (merged.pricePerUnit === oldTrade.pricePerUnit) return { priceEur: oldTrade.priceEur, fees: merged.fees, ...NO_FOREIGN_FIELDS };
+    const ecb = await resolveEcbRateToEur(currency, oldTrade.date);
+    if (!ecb) throw new TradeFxUnavailableError(currency);
+    return { priceEur: merged.pricePerUnit * ecb.rate, fees: merged.fees, ...NO_FOREIGN_FIELDS };
+  }
+
+  const changed =
+    merged.type !== oldTrade.type ||
+    merged.date.getTime() !== oldTrade.date.getTime() ||
+    merged.quantity !== oldTrade.quantity ||
+    merged.pricePerUnit !== oldTrade.pricePerUnit ||
+    merged.feesNative !== oldTrade.feesNative ||
+    merged.fees !== oldTrade.fees ||
+    merged.settledTotalEur !== oldTrade.settledTotalEur;
+  if (!changed) {
+    return {
+      priceEur: oldTrade.priceEur, fees: oldTrade.fees, feesNative: oldTrade.feesNative,
+      settledTotalEur: oldTrade.settledTotalEur, fxRate: oldTrade.fxRate, fxSource: oldTrade.fxSource,
+    };
+  }
+
+  // A native fee replaces a euro one. The stored `fees` is a LEGACY euro fee only on a trade that
+  // has no native fee: beside one it is that fee's conversion, and is resolved again from it.
+  const legacyFeesEur =
+    merged.feesNative !== undefined || (updates.fees === undefined && oldTrade.feesNative !== undefined)
+      ? undefined
+      : merged.fees;
+  const resolved = await resolveForeignTrade(currency, {
+    type: merged.type,
+    date: merged.date,
+    quantity: merged.quantity,
+    pricePerUnit: merged.pricePerUnit,
+    feesNative: merged.feesNative,
+    legacyFeesEur,
+    settledTotalEur: merged.settledTotalEur,
+  });
+  return {
+    priceEur: resolved.priceEur, fees: resolved.fees, feesNative: resolved.feesNative,
+    settledTotalEur: resolved.settledTotalEur, fxRate: resolved.fxRate, fxSource: resolved.fxSource,
+  };
+}
+
 /**
  * `expectedUpdatedAt` is the version the client's form was drawn from (absent from an older client:
  * the server's own read is then the version). Either way the commit refuses a trade changed since.
@@ -343,12 +547,16 @@ async function prepareCreate(
 async function prepareEdit(
   ownerId: string,
   transactionId: string,
-  updates: Partial<AssetTransactionFormData>,
+  updates: AssetTransactionUpdateData,
   expectedUpdatedAt?: Date
 ): Promise<PreparedMutation> {
   const oldTrade = await getOwnedTradeOrThrow(ownerId, transactionId);
   await assertLedgerInitialized(ownerId);
   const currency = await getLedgerAssetCurrencyOrThrow(ownerId, oldTrade.assetId);
+  const isEur = isEurCurrency(currency);
+  if (isEur && (typeof updates.feesNative === 'number' || typeof updates.settledTotalEur === 'number')) {
+    throw new TradeUseCaseError(422, 'Commissione in valuta e totale in euro valgono solo per uno strumento in valuta.');
+  }
 
   if (oldTrade.isBaseline) assertBaselineEditableFields(updates);
 
@@ -378,16 +586,31 @@ async function prepareEdit(
   const mergedIndexationCoefficient =
     updates.pricePerUnit !== undefined ? updates.indexationCoefficient : oldTrade.indexationCoefficient;
 
+  // A foreign trade's two inputs: `null` removes one, an absent key keeps it; an adjustment has neither.
+  const mergedFeesNative = isAdjustment
+    ? undefined
+    : updates.feesNative !== undefined ? updates.feesNative ?? undefined : oldTrade.feesNative;
+  const mergedSettledTotal = isAdjustment
+    ? undefined
+    : updates.settledTotalEur !== undefined ? updates.settledTotalEur ?? undefined : oldTrade.settledTotalEur;
+
   assertDateNotInFuture(mergedDate);
-  if (updates.linkedCashAssetId !== undefined && mergedLinkedCash) {
+  // The account's currency is checked only when the trade CHOOSES it: a trade already settled on a
+  // foreign account stays editable in everything else (owner, 2026-11-23). The commit re-checks that
+  // every touched account is still a cash account.
+  if (updates.linkedCashAssetId !== undefined && mergedLinkedCash && mergedLinkedCash !== oldTrade.linkedCashAssetId) {
     await assertCashSettlementAsset(ownerId, mergedLinkedCash);
   }
 
-  // Re-resolve priceEur only when price or date changed (otherwise reuse — avoids a network call).
-  const priceEur =
-    updates.pricePerUnit !== undefined || updates.date !== undefined
-      ? await resolveTradePriceEur(currency, mergedPricePerUnit, mergedDate)
-      : oldTrade.priceEur;
+  const euroSide = await resolveEditedEuroSide(currency, oldTrade, {
+    type: mergedType,
+    date: mergedDate,
+    quantity: mergedQuantity,
+    pricePerUnit: mergedPricePerUnit,
+    fees: mergedFees,
+    feesNative: mergedFeesNative,
+    settledTotalEur: mergedSettledTotal,
+  }, updates);
 
   const newTransaction: AssetTransaction = {
     ...oldTrade,
@@ -395,8 +618,7 @@ async function prepareEdit(
     date: mergedDate,
     quantity: mergedQuantity,
     pricePerUnit: mergedPricePerUnit,
-    priceEur,
-    fees: mergedFees,
+    ...euroSide,
     linkedCashAssetId: mergedLinkedCash,
     withheldTaxEur: mergedWithheldTax,
     indexationCoefficient: mergedIndexationCoefficient,
@@ -681,6 +903,8 @@ function buildResult(
     ...(includeRealized ? { realizedPnlEur: commit.realizedDelta } : {}),
     feeRow: commit.feeRow,
     announcedDividends,
+    priceEur: plan.newTransaction?.priceEur ?? 0,
+    feesEur: plan.newTransaction?.fees ?? 0,
   };
 }
 
@@ -717,7 +941,7 @@ export async function createAssetTransaction(
 export async function updateAssetTransaction(
   ownerId: string,
   transactionId: string,
-  updates: Partial<AssetTransactionFormData>,
+  updates: AssetTransactionUpdateData,
   expectedUpdatedAt?: Date
 ): Promise<TradeMutationResult> {
   const plan = await prepareEdit(ownerId, transactionId, updates, expectedUpdatedAt);

@@ -384,12 +384,13 @@ file used to carry.
 
 ### Asset Trade Ledger → `doc/guide/registro-operazioni.md`
 - ALL trade money-math (replay, PMC, realized P&L, XIRR, invested capital) lives in `assetTransactionUtils.ts`, pure; the service/route layer is a thin atomic writer. A new `AssetTransactionType` updates the replay switch, the zod schema AND `TransactionDialog`.
-- Writes are Admin-API-only, all reads before any writes, derived fields written in-tx (never via `updateAsset`); ledger-type edits go through `updateAssetMetadata`. A settlement moves CENTS (`lib/utils/cents.ts`), and a sell credits proceeds − fees − `withheldTaxEur` (`lib/utils/saleTax.ts`, 2026-09-20); realized P&L and XIRR stay gross of the tax.
+- Writes are Admin-API-only, all reads before any writes, derived fields written in-tx (never via `updateAsset`); ledger-type edits go through `updateAssetMetadata`. A settlement moves CENTS (`lib/utils/cents.ts`), and a sell credits proceeds − fees − `withheldTaxEur` (2026-09-20); realized P&L and XIRR stay gross of the tax.
 - The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`; a replay returning `holdingStartDate: undefined` means leave the doc untouched (never `deleteField()`).
-- A trade date has ONE floor — the asset's OWN baseline (`BASELINE_NOT_FIRST`) — and the future as its only ceiling (2026-09-13); `assetTransactionsMeta.baselineDate` is NOT a floor.
+- A trade date's ONE floor is the asset's OWN baseline (`BASELINE_NOT_FIRST`), its ceiling the future (2026-09-13); the meta's `baselineDate` is NOT a floor.
 - Per-transaction derived data comes from `replayTransactionsWithEffects` (one pass), never a replay per prefix.
-- The PMC is fee-free and every tax reads `fiscalCostPerUnitEur`; a trade's fee row is planned and written in the trade's transaction (2026-11-12; `assetTransactionWriteTx.test.ts` W1, X1) — `lib/utils/tradeFeeExpense.ts`, its id drawn in prepare, a fee saved before then never gets one.
-- Il resto — settlement timing, `buildDerivedAssetFields` and the `averageCostEur` backfill, `resolveBondPrice` reuse, the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
+- The PMC is fee-free and every tax reads `fiscalCostPerUnitEur`; a trade's fee row is written in the trade's transaction (`lib/utils/tradeFeeExpense.ts`, 2026-11-12), never for a fee saved before then.
+- A foreign trade (2026-11-23): price and fee in its currency, an optional euro total; `resolveTradeFx` (`lib/utils/tradeFx.ts`) stores the rate it implies, or the ECB day's.
+- Il resto — settlement timing, the `averageCostEur` backfill, `resolveBondPrice`, `totalReturnAssets`, the static-copy rule, the FX sources and guard — in the guide.
 
 ### Cashflow — expense mechanics → `doc/guide/cashflow.md`
 - Category names are NOT unique: group by `getCategoryKey`/`getSubCategoryKey`, display via `resolveDisplayLabels`.

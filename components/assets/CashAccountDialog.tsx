@@ -58,6 +58,8 @@ export function CashAccountDialog({
   onExitComplete,
 }: CashAccountDialogProps) {
   const value = calculateAssetValue(asset);
+  const currencyCode = (asset.currency || 'EUR').toUpperCase();
+  const foreignCurrency = currencyCode === 'EUR' ? null : currencyCode;
   const deleteRef = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick, onBlur } = useArmedDelete(deleteRef, () => onDelete(asset.id));
   const reading = describeCashAccountReading({ name: asset.name, balanceEur: value, armed, isDemo });
@@ -109,6 +111,15 @@ export function CashAccountDialog({
           {formatCurrency(value, asset.currency)}
         </p>
       </div>
+
+      {/* A cash account in a foreign currency (2026-11-23): its balance is counted as euro and the
+          ledger never settles on it — the owner rewrites it in euro, and the save makes it one. */}
+      {foreignCurrency && (
+        <p className="mt-4 text-[13px] text-muted-foreground">
+          Conto in {foreignCurrency}: l&apos;app lo conta come se fossero euro e non può regolare operazioni. Riscrivi il saldo in
+          euro: salvando diventa un conto in euro.
+        </p>
+      )}
 
       <div className="mt-4 divide-y divide-border border-t border-border">
         {[

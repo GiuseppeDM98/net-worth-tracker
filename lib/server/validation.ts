@@ -100,6 +100,10 @@ const assetTransactionBaseSchema = z.object({
   // BTP€i: the indexation coefficient behind pricePerUnit (metadata for the edit form; > 0).
   indexationCoefficient: z.number().finite().positive().optional(),
   note: z.string().max(500).optional(),
+  // A foreign instrument only (2026-11-23): the fee in its currency, and the statement's euro total
+  // (buy = debited, fee included; sell = credited net of the fee, before the withheld tax).
+  feesNative: z.number().finite().min(0).optional(),
+  settledTotalEur: z.number().finite().positive().optional(),
 });
 
 /** Cross-field rules shared by create and update. `type`/`quantity` may be absent on an update. */
@@ -110,6 +114,8 @@ function refineAssetTransaction(
     fees?: number;
     linkedCashAssetId?: string;
     withheldTaxEur?: number;
+    feesNative?: number | null;
+    settledTotalEur?: number | null;
   },
   ctx: z.RefinementCtx
 ): void {
@@ -136,6 +142,30 @@ function refineAssetTransaction(
       message: 'Una rettifica non movimenta liquidità.',
     });
   }
+  // `null` (an edit removing the field) is no value: only a number is refused on an adjustment.
+  if (data.type === 'adjustment' && typeof data.feesNative === 'number') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['feesNative'],
+      message: 'Una rettifica non prevede commissioni.',
+    });
+  }
+  if (data.type === 'adjustment' && typeof data.settledTotalEur === 'number') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['settledTotalEur'],
+      message: 'Una rettifica non movimenta liquidità.',
+    });
+  }
+  // One fee, one currency. A euro fee beside a euro TOTAL is not refused: it is the trade saved with a
+  // euro fee whose total the owner types later, which includes that fee (owner, 2026-11-23).
+  if ((data.fees ?? 0) > 0 && (data.feesNative ?? 0) > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['feesNative'],
+      message: 'Indica la commissione in una sola valuta.',
+    });
+  }
   // A withheld tax exists only on a sale. `type` absent (a partial update) is judged by the use
   // case, which knows the stored type and drops the field from a trade that is not a sell.
   if (data.type !== undefined && data.type !== 'sell' && data.withheldTaxEur !== undefined) {
@@ -149,11 +179,25 @@ function refineAssetTransaction(
 
 export const assetTransactionDataSchema = assetTransactionBaseSchema.superRefine(refineAssetTransaction);
 
-/** PUT payload: every field optional, and a trade can never be moved to another asset. */
+/**
+ * PUT payload: every field optional, and a trade can never be moved to another asset. The two
+ * foreign-currency fields also take `null`, which REMOVES them (an absent key means «keep», and JSON
+ * cannot carry an explicit undefined); the inferred type is `AssetTransactionUpdateData`.
+ */
 export const assetTransactionUpdateSchema = assetTransactionBaseSchema
   .omit({ assetId: true })
   .partial()
+  .extend({
+    feesNative: assetTransactionBaseSchema.shape.feesNative.nullable(),
+    settledTotalEur: assetTransactionBaseSchema.shape.settledTotalEur.nullable(),
+  })
   .superRefine(refineAssetTransaction);
+
+/** GET /api/fx/rate — the ECB rate of a currency on a day, for the trade form's preview. */
+export const fxRateQuerySchema = z.object({
+  currency: z.string().regex(/^[A-Za-z]{3}$/),
+  date: isoDateSchema,
+});
 
 /**
  * The version of a trade an edit or a delete was drawn from (`updatedAt`, ISO). Absent from an older

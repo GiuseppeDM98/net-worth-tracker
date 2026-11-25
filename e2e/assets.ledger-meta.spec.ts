@@ -4,12 +4,13 @@
  * The meta query is persisted to IndexedDB, `null` included: on an account migrated from another
  * device a restored `null` used to send a new ETF or bond down the NON-ledger path (its quantity
  * typed on the asset, no opening trade), and the first later trade replayed it from zero. Since
- * 2026-11-12 `AssetDialog` asks the server once (`fetchFreshLedgerMeta`) before choosing.
+ * 2026-11-12 `AssetDialog` asks the server once (`fetchFreshLedgerMeta`) before choosing; since
+ * 2026-11-23 the ledger path creates the instrument empty and opens «Registra operazione» on it.
  *
  * The page is made to read `null` for real: the meta is removed before the load and the migration
  * the page then fires is aborted; once that request is seen the meta is planted again with the Admin
- * SDK, so only a fresh read can find it. Asserted on Firestore: ONE opening `buy` of 1000 and the
- * asset at quantity 1000. The fetch itself is pinned by __tests__/ledgerMetaFreshness.test.ts; the
+ * SDK, so only a fresh read can find it. Asserted on Firestore: the asset created empty, then ONE
+ * `buy` of 1000 from the trade form and the asset at quantity 1000. The fetch itself is pinned by __tests__/ledgerMetaFreshness.test.ts; the
  * races of the server writes by __tests__/assetTransactionsRoutes.test.ts — a browser cannot drive
  * them. Restores the meta it read (or removes the one it planted) and removes what it created.
  */
@@ -62,15 +63,19 @@ test('a new ledger instrument takes the ledger path when the cached meta is null
     await dialog.getByRole('radio', { name: /Obbligazione/ }).click();
     await dialog.locator('#ticker').fill(TICKER);
     await dialog.locator('#name').fill('BTP Ornitorinco Meta');
-    await dialog.locator('#quantity').fill('1000');
-    await dialog.locator('#averageCost').fill('100');
-    // The dialog still holds the cached null: the hint of an uninitialised ledger is on screen.
-    await expect(dialog.getByText('Il registro operazioni si sta inizializzando', { exact: false })).toBeVisible();
-    await dialog.getByRole('button', { name: 'Crea strumento' }).click();
-    await expect(dialog).toBeHidden({ timeout: 90_000 });
-
-    const created = await db.collection('assets').where('userId', '==', UID).where('ticker', '==', TICKER).get();
+    await dialog.getByRole('button', { name: 'Crea e registra l’acquisto' }).click();
+    // The fresh read found the ledger: the instrument is created empty and the trade form opens.
+    const buy = page.getByRole('dialog', { name: 'Registra operazione' });
+    await expect(buy).toBeVisible({ timeout: 90_000 });
+    let created = await db.collection('assets').where('userId', '==', UID).where('ticker', '==', TICKER).get();
     expect(created.size).toBe(1);
+    expect(created.docs[0].data()).toMatchObject({ quantity: 0, createdEmpty: true });
+    await buy.locator('#trade-quantity').fill('1000');
+    await buy.locator('#trade-price').fill('100');
+    await buy.getByRole('button', { name: 'Registra operazione' }).click();
+    await expect(buy).toBeHidden({ timeout: 60_000 });
+
+    created = await db.collection('assets').where('userId', '==', UID).where('ticker', '==', TICKER).get();
     expect(created.docs[0].data().quantity).toBe(1000);
     const trades = await db.collection('assetTransactions').where('userId', '==', UID).where('assetId', '==', created.docs[0].id).get();
     expect(trades.size).toBe(1);

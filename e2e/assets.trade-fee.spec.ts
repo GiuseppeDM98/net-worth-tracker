@@ -2,14 +2,13 @@
  * Patrimonio · Registro operazioni — a trade's fee is a spending row of its own, out of the PMC
  * (2026-11-12, lib/utils/tradeFeeExpense.ts). Desktop 1440.
  *
- * What only a browser can prove: without a fee category the trade form's «Commissioni (€)» and the
- * new-instrument form's opening fee are off and link Impostazioni › Spese; with one, a buy with a
+ * What only a browser can prove: without a fee category the trade form's «Commissioni (€)» is off
+ * and links Impostazioni › Spese; with one, a buy with a
  * fee writes ONE row in the cashflow that Tracciamento refuses to delete and whose form shows the
  * note in place of amount and date; editing the trade's fee moves the row; «Quanto costa vendere»
  * lists the fee-free PMC and the fiscal cost beside it and taxes the gain on the latter; deleting
- * the trade removes the row; the opening buy's fee lands in Tracciamento as the same locked row.
- * Seen red once (2026-11-15): with `fees` dropped from the form's `firstBuy` and the Firestore reads set
- * aside, the Tracciamento step alone fails (no row). Every outcome is asserted on Firestore (Admin SDK) where it is data.
+ * the trade removes the row; the first purchase of a new instrument — in the trade form the create
+ * opens (2026-11-23) — lands its fee in Tracciamento as the same locked row. Every outcome is asserted on Firestore (Admin SDK) where it is data.
  * The plan of each save belongs to Vitest (__tests__/{tradeFeeExpense,assetTransactionWriteTx}.test.ts).
  *
  * Plants its own instrument «Ornitorinco», account «Fenicottero Broker» and fee category (decoys
@@ -200,37 +199,30 @@ test('a trade’s fee becomes a locked spending row that follows the trade, out 
   expect(rows).toEqual([]);
 });
 
-test('the opening buy of a new instrument takes its fee, as a row like any trade’s', async ({ page }) => {
+test('the first purchase of a new instrument takes its fee, as a row like any trade’s', async ({ page }) => {
   const db = await admin();
-  await nameFeeCategory(db, false);
-
-  // ── 1. No fee category: the opening fee is off and links Impostazioni › Spese ──
-  await openPatrimonio(page);
-  await page.getByRole('button', { name: 'Aggiungi asset' }).click();
-  let dialog = page.getByRole('dialog');
-  await dialog.getByRole('radio', { name: /^ETF/ }).click();
-  await expect(dialog.locator('#openingFees')).toBeDisabled();
-  await expect(dialog.getByRole('link', { name: 'Impostazioni › Spese' })).toHaveAttribute('href', '/dashboard/settings?tab=spese');
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-
-  // ── 2. With the category: «Ornitorinco» opened at 10 × 100 with a fee of 5 on «Fenicottero Broker» ──
   await nameFeeCategory(db, true);
+
+  // ── 1–2. «Ornitorinco Nuovo» created empty; the trade form it opens buys 10 × 100 with a fee of 5 on
+  //    «Fenicottero Broker» (2026-11-23: one form for every purchase) ──
   const accountBefore = (await db.collection('assets').doc(ACCOUNT_ID).get()).data()!.quantity as number;
   await openPatrimonio(page);
   await page.getByRole('button', { name: 'Aggiungi asset' }).click();
-  dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog');
   await dialog.getByRole('radio', { name: /^ETF/ }).click();
   await dialog.locator('#ticker').fill(NEW_TICKER);
   await dialog.locator('#name').fill('Ornitorinco Nuovo');
-  await dialog.locator('#quantity').fill('10');
-  await dialog.locator('#averageCost').fill('100');
-  await dialog.getByRole('combobox', { name: 'Conto di regolamento' }).click();
+  await dialog.getByRole('button', { name: 'Crea e registra l’acquisto' }).click();
+  const buy = page.getByRole('dialog', { name: 'Registra operazione' });
+  await expect(buy).toBeVisible({ timeout: 90_000 });
+  await buy.locator('#trade-quantity').fill('10');
+  await buy.locator('#trade-price').fill('100');
+  await buy.getByRole('combobox', { name: 'Conto di regolamento' }).click();
   await page.getByRole('option', { name: ACCOUNT_NAME }).click();
-  await expect(dialog.locator('#openingFees')).toBeEnabled({ timeout: 30_000 });
-  await dialog.locator('#openingFees').fill('5');
-  await dialog.getByRole('button', { name: 'Crea strumento' }).click();
-  await expect(dialog).toBeHidden({ timeout: 90_000 });
+  await expect(buy.locator('#trade-fees')).toBeEnabled({ timeout: 30_000 });
+  await buy.locator('#trade-fees').fill('5');
+  await buy.getByRole('button', { name: 'Registra operazione' }).click();
+  await expect(buy).toBeHidden({ timeout: 60_000 });
 
   const [created] = (await db.collection('assets').where('userId', '==', UID).where('ticker', '==', NEW_TICKER).get()).docs;
   const trades = (await db.collection('assetTransactions').where('userId', '==', UID).where('assetId', '==', created.id).get()).docs;

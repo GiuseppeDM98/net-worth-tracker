@@ -20,6 +20,7 @@ vi.mock('@/lib/hooks/useDemoMode', () => ({ useDemoMode: () => false }));
 vi.mock('@/lib/hooks/useAssets', () => ({ useAssets: () => ({ data: [] }) }));
 vi.mock('@/lib/hooks/useSettings', () => ({ useSettings: () => ({ data: undefined, isLoading: false }) }));
 vi.mock('@/lib/hooks/useExpenses', () => ({ useExpenseCategories: () => ({ data: [], isLoading: false }) }));
+vi.mock('@/lib/hooks/useFxRate', () => ({ useFxRate: () => ({ data: undefined, isLoading: false }) }));
 vi.mock('@/lib/hooks/useAssetTransactions', () => ({
   useAssetTransactions: () => ({ data: [] }),
   useCreateAssetTransaction: () => ({ mutateAsync: createMock, isPending: false }),

@@ -1,6 +1,7 @@
 import 'server-only';
 import { getExchangeRateToEur } from '@/lib/services/currencyConversionService';
 import type { Asset } from '@/types/assets';
+import type { EcbRate } from '@/lib/utils/tradeFx';
 
 /**
  * Trade FX resolution (Registro operazioni asset).
@@ -71,7 +72,30 @@ function normalizeFxCurrency(currency: string): string {
 }
 
 /**
- * Resolve the per-unit EUR price of a trade at its execution date.
+ * The ECB rate (euro per one unit of `currency`) of the trade's Italian day, and whether it is that
+ * day's own fixing. The day's path first; a future day is answered by Frankfurter's `latest` path
+ * and is not the day's own rate (`isLatest` true — a dividend announced for a later day is converted
+ * again at its payment day because of this); then the cached latest rate, also `isLatest`. Null when
+ * nothing answers: the caller decides whether a trade can stand without it (2026-11-23: until then a
+ * missing fixing fell back to today's rate in silence).
+ */
+export async function resolveEcbRateToEur(currency: string, date: Date): Promise<EcbRate | null> {
+  const fxCurrency = normalizeFxCurrency(currency);
+  const dayRate = await fetchFrankfurterRateToEur(fxCurrency, date);
+  if (dayRate !== null) {
+    return { rate: dayRate, isLatest: formatItalyIsoDay(date) > formatItalyIsoDay(new Date()) };
+  }
+  try {
+    return { rate: await getExchangeRateToEur(fxCurrency), isLatest: true };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the per-unit EUR price of a trade at its execution date. The trade ledger calls it for a
+ * EUR instrument only (it returns the price as it is); a foreign one goes through
+ * `resolveEcbRateToEur` and `lib/utils/tradeFx.ts`, which keep the rate and its source.
  *
  * @param currency     Asset.currency (native).
  * @param pricePerUnit Native price per unit, already GBp-normalized / bond-resolved by the caller.
