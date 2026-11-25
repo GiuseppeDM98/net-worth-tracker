@@ -104,6 +104,53 @@ describe('describeSales', () => {
   });
 });
 
+/**
+ * A period that sold at a gain AND at a loss (owner, 2026-11-25): the net alone beside a tax paid
+ * on the gains read «una plusvalenza di 15 € e pagato 25 € di tasse» — a fund's gain is taxed at the
+ * sale, a stock's loss offsets nothing of it. The gains and the losses are named apart.
+ */
+describe('describeSales — gains and losses in the same period', () => {
+  const MIXED: PeriodSalesSummary = {
+    proceeds: 50000,
+    realizedGain: 100,
+    realizedGains: 1600,
+    realizedLosses: -1500,
+    estimatedTax: 250,
+    taxIsWithheld: true,
+    instruments: [
+      { id: 'fund', name: 'Fenicottero Monetario', proceeds: 30000, realizedGain: 1600, estimatedTax: 250, taxIsWithheld: true },
+      { id: 'stock', name: 'Ornitorinco', proceeds: 20000, realizedGain: -1500, estimatedTax: 0, taxIsWithheld: true },
+    ],
+    brokenLedgers: 0,
+  };
+
+  it('should name the gains with their tax, then the losses', () => {
+    expect(plain(describeSales(MIXED))).toBe(
+      'Hai venduto 2 strumenti per 50.000 €: 1600 € di plusvalenze, su cui hai pagato 250 € di tasse, e 1500 € di minusvalenze.',
+    );
+    expect(plain(describeSales({ ...MIXED, taxIsWithheld: false }))).toContain('su cui hai pagato circa 250 € di tasse');
+  });
+
+  it('should say the tax is not estimated when a rate is missing', () => {
+    expect(plain(describeSales({ ...MIXED, estimatedTax: null }))).toBe(
+      "Hai venduto 2 strumenti per 50.000 €: 1600 € di plusvalenze e 1500 € di minusvalenze; senza un'aliquota su ogni strumento le tasse non sono stimate.",
+    );
+  });
+
+  it('should close on the month without the tax, binding only the tax and that month', () => {
+    const segments = describeSales({ ...MIXED, estimatedTax: 4000 }, { delta: -5000, marketEffect: -1100, savings: null });
+    expect(plain(segments)).toContain('di minusvalenze; senza le tasse, il mese avrebbe fatto −1000 € (');
+    const bound = segments.filter((segment) => segment.binding).map(text).join('');
+    expect(bound.startsWith(', su cui hai pagato 4000 € di tasse; senza le tasse')).toBe(true);
+  });
+
+  it('should keep the net sentence on a payload without the split, or with one side alone', () => {
+    const stored: PeriodSalesSummary = { ...MIXED, realizedGains: undefined, realizedLosses: undefined };
+    expect(plain(describeSales(stored))).toBe('Hai venduto 2 strumenti per 50.000 € con una plusvalenza di 100 € e pagato 250 € di tasse.');
+    expect(plain(describeSales({ ...MIXED, realizedGain: 1600, realizedLosses: 0 }))).toContain('con una plusvalenza di 1600 €');
+  });
+});
+
 describe('describeMonthSplit', () => {
   it('should split the change into the market, the savings and the other changes, exactly', () => {
     // 4120,18 = 3980 + 1180 − 1039,82: «tuoi movimenti» was read as income − expenses, so the savings

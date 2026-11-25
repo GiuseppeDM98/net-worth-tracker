@@ -52,6 +52,14 @@ export interface PeriodSalesSummary {
   /** Net of fees, EUR, over every instrument sold in the period. */
   proceeds: number;
   realizedGain: number;
+  /**
+   * The period's gains and losses kept apart, sell by sell (2026-11-25): Σ of the positive realized
+   * P&L and Σ of the negative one (≤ 0). `realizedGain` is their sum, and a net beside a tax paid on
+   * the gains alone read as a rate past 100% (an ETF's gain is taxed at the sale, a stock's loss
+   * goes to the zainetto and offsets nothing of it). Absent on a payload computed before them.
+   */
+  realizedGains?: number;
+  realizedLosses?: number;
   /** Sum of the instruments' taxes; `null` when ANY sold instrument's is unknown. */
   estimatedTax: number | null;
   /**
@@ -106,6 +114,8 @@ export function summarizePeriodSales(
 
   const instruments: PeriodSaleInstrument[] = [];
   let brokenLedgers = 0;
+  let realizedGains = 0;
+  let realizedLosses = 0;
 
   for (const [assetId, ledger] of byAsset) {
     const sold = ledger.filter((t) => t.type === 'sell' && inRange(t.date));
@@ -126,6 +136,11 @@ export function summarizePeriodSales(
     const asset = assetsById.get(assetId);
     const proceeds = sold.reduce((sum, t) => sum + t.quantity * t.priceEur - (t.fees ?? 0), 0);
     const realizedGain = sold.reduce((sum, t) => sum + (effectsById.get(t.id) ?? 0), 0);
+    for (const t of sold) {
+      const pnl = effectsById.get(t.id) ?? 0;
+      if (pnl > 0) realizedGains += pnl;
+      else realizedLosses += pnl;
+    }
     // The withheld tax is a fact and wins sell by sell; the estimate covers only the gain of the
     // sells that carry none (netted among themselves, as before: a loss offsets a gain).
     const withTax = sold.filter((t) => t.withheldTaxEur !== undefined);
@@ -161,6 +176,8 @@ export function summarizePeriodSales(
   return {
     proceeds: instruments.reduce((sum, row) => sum + row.proceeds, 0),
     realizedGain: instruments.reduce((sum, row) => sum + row.realizedGain, 0),
+    realizedGains,
+    realizedLosses,
     estimatedTax: taxUnknown ? null : instruments.reduce((sum, row) => sum + (row.estimatedTax ?? 0), 0),
     taxIsWithheld: instruments.every((row) => row.taxIsWithheld === true),
     instruments,

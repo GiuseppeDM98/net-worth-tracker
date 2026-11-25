@@ -167,9 +167,6 @@ test('a BTP€i and a zero-coupon bond write what the pure layer promises', asyn
     await dialog.locator('#ticker').fill(ZERO_TICKER);
     await dialog.locator('#name').fill('BTP Fenicottero Zero');
     await dialog.locator('#isin').fill(ZERO_COUPON_ISIN);
-    await dialog.locator('#quantity').fill('2000');
-    await dialog.locator('#averageCost').fill('96');
-    await expect(dialog.getByText(/≈ .*per unità/)).toContainText('0,96');
     await dialog.getByRole('switch', { name: 'Dettagli cedole' }).check();
     await expect(dialog.locator('#bondCouponRate')).toBeVisible();
     await dialog.locator('#bondCouponRate').fill('0');
@@ -177,8 +174,16 @@ test('a BTP€i and a zero-coupon bond write what the pure layer promises', asyn
     await page.getByRole('option', { name: 'Annuale (1/anno)' }).click();
     await dialog.locator('#bondIssueDate').fill('2026-01-15');
     await dialog.locator('#bondMaturityDate').fill('2027-01-15');
-    await dialog.getByRole('button', { name: 'Crea strumento' }).click();
-    await expect(dialog).toBeHidden({ timeout: 90_000 });
+    // One form for every purchase (2026-11-23): the bond is created empty and «Registra operazione»
+    // opens on it; the quote is typed there, in percent, and converted the same way.
+    await dialog.getByRole('button', { name: 'Crea e registra l’acquisto' }).click();
+    const zeroBuy = page.getByRole('dialog', { name: 'Registra operazione' });
+    await expect(zeroBuy).toBeVisible({ timeout: 90_000 });
+    await zeroBuy.locator('#trade-quantity').fill('2000');
+    await zeroBuy.locator('#trade-price').fill('96');
+    await expect(zeroBuy.getByText(/≈ .*per unità/)).toContainText('0,96');
+    await zeroBuy.getByRole('button', { name: 'Registra operazione' }).click();
+    await expect(zeroBuy).toBeHidden({ timeout: 60_000 });
 
     const created = await db.collection('assets').where('userId', '==', UID).where('ticker', '==', ZERO_TICKER).get();
     expect(created.size).toBe(1);
@@ -186,7 +191,7 @@ test('a BTP€i and a zero-coupon bond write what the pure layer promises', asyn
     expect(zero.bondDetails.couponRate).toBe(0);
     expect(zero.bondDetails.maturityDate).toBeDefined();
     expect(zero.quantity).toBe(2000);
-    expect(zero.averageCost).toBeCloseTo(0.96, 10); // the opening buy: 96 % of a 1 € unit
+    expect(zero.averageCost).toBeCloseTo(0.96, 10); // the first buy: 96 % of a 1 € unit
     const zeroCoupons = await db.collection('dividends').where('userId', '==', UID).where('assetId', '==', created.docs[0].id).get();
     expect(zeroCoupons.size).toBe(0);
   } finally {
@@ -212,8 +217,6 @@ test('a bond with ONE coupon at maturity (BTP Valore Insieme) materialises it on
     await dialog.getByRole('radio', { name: /Obbligazione/ }).click();
     await dialog.locator('#ticker').fill(INSIEME_TICKER);
     await dialog.locator('#name').fill('BTP Valore Insieme Nibbio');
-    await dialog.locator('#quantity').fill('5000');
-    await dialog.locator('#averageCost').fill('1');
     await dialog.getByRole('switch', { name: 'Dettagli cedole' }).check();
     await dialog.locator('#bondCouponRate').fill('3.5');
     await dialog.getByText('Seleziona periodicità').click();
@@ -222,16 +225,23 @@ test('a bond with ONE coupon at maturity (BTP Valore Insieme) materialises it on
     await expect(dialog.locator('#showStepUp')).toHaveCount(0);
     await dialog.locator('#bondIssueDate').fill('2026-10-28');
     await dialog.locator('#bondMaturityDate').fill('2031-10-28');
-    // The preview is the compound figure the owner checks against the MEF's scheda: 1 € × (1,035^5 − 1) × 5000.
-    await expect(dialog.getByText(/Cedola unica a scadenza \(3,50% capitalizzato per 5,00 anni\)/)).toContainText(/938,4/);
-    await dialog.getByRole('button', { name: 'Crea strumento' }).click();
-    await expect(dialog).toBeHidden({ timeout: 90_000 });
+    // The bond is created empty (2026-11-23); its first purchase, in «Registra operazione», schedules
+    // the coupon on the quantity bought: 1 € × (1,035^5 − 1) × 5000, the figure of the MEF's scheda.
+    await dialog.getByRole('button', { name: 'Crea e registra l’acquisto' }).click();
+    const buy = page.getByRole('dialog', { name: 'Registra operazione' });
+    await expect(buy).toBeVisible({ timeout: 90_000 });
+    await buy.locator('#trade-quantity').fill('5000');
+    await buy.locator('#trade-price').fill('1');
+    await buy.getByRole('button', { name: 'Registra operazione' }).click();
+    await expect(buy).toBeHidden({ timeout: 60_000 });
 
     const created = await db.collection('assets').where('userId', '==', UID).where('ticker', '==', INSIEME_TICKER).get();
     expect(created.size).toBe(1);
     expect(created.docs[0].data().bondDetails).toMatchObject({ couponRate: 3.5, couponFrequency: 'maturity' });
+    await expect
+      .poll(async () => (await db.collection('dividends').where('userId', '==', UID).where('assetId', '==', created.docs[0].id).get()).size, { timeout: 30_000 })
+      .toBe(1);
     const coupons = await db.collection('dividends').where('userId', '==', UID).where('assetId', '==', created.docs[0].id).get();
-    expect(coupons.size).toBe(1);
     const coupon = coupons.docs[0].data();
     expect(coupon.paymentDate.toDate().toISOString().slice(0, 10)).toBe('2031-10-28');
     expect(coupon.dividendPerShare).toBeCloseTo(0.1876863, 6);

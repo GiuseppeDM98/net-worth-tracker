@@ -642,7 +642,7 @@ export interface AssetIntent {
   isEdit: boolean;
   /** The asset's quantity and average cost are owned by the trade ledger. */
   hasLedger: boolean;
-  /** A create that will open the position with a first buy. */
+  /** A create that hands the new instrument to «Registra operazione» for its first purchase (2026-11-23). */
   isLedgerCreate: boolean;
 }
 
@@ -670,7 +670,7 @@ export function describeAssetIntent(intent: AssetIntent): Narrative {
   return intent.isLedgerCreate
     ? [
         {
-          text: 'Alla creazione registro l’acquisto di apertura: da lì in poi quantità e prezzo medio li tiene il registro operazioni.',
+          text: 'Alla creazione si apre «Registra operazione» per il primo acquisto: da lì in poi quantità e prezzo medio li tiene il registro operazioni.',
         },
       ]
     : [{ text: 'Lo strumento entra nel patrimonio e nella classe che scegli qui sotto.' }];

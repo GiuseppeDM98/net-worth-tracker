@@ -78,6 +78,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   construction), then on the sale (`describeSales`: «Hai venduto Vanguard per 39.052 € con una plusvalenza di
   15.726 € e pagato circa 4089 € di tasse» — «pagato», never «pagherai»: the withholding is already gone; «circa»
   because it is ESTIMATED). The words live in `lib/utils/salesNarrative.ts`, SDK-free, shared by the three.
+- **Gains and losses in the same month are named apart** (owner, 2026-11-25): «Hai venduto 2 strumenti per 50.000 €:
+  1600 € di plusvalenze, su cui hai pagato 250 € di tasse, e 1500 € di minusvalenze.» — the summary carries
+  `realizedGains`/`realizedLosses` (sell by sell, payload version 27), and the net alone beside a tax paid on the
+  gains read as a rate past 100%: the broker taxes a fund's gain at the sale, a stock's loss goes to the zainetto and
+  offsets nothing of it. One side alone, or a payload without the fields, keeps the net sentence.
 - **`monthSales` is the month's sells from the trade ledger** (`summarizePeriodSales`, payload version 16): each sold
   instrument's ledger is replayed WHOLE (`replayTransactionsWithEffects`, so the realized P&L stands against the PMC
   at the sale), the sells inside the Italian month are summed (proceeds net of fees, realized gain) and the tax is

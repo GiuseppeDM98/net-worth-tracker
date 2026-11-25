@@ -44,11 +44,11 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetComposition, CouponFrequency, BondDetails, BondInflationIndexation, type AssetOwnerShare, type FamilyMember } from '@/types/assets';
 import type { PensionFundDetails } from '@/types/pension';
-import { createAsset, updateAsset, updateAssetMetadata } from '@/lib/services/assetService';
-import { isLedgerAssetType, type AssetTransactionFormData } from '@/types/assetTransactions';
+import { createAsset, getAssetById, updateAsset, updateAssetMetadata } from '@/lib/services/assetService';
+import { isLedgerAssetType } from '@/types/assetTransactions';
 import { deleteAllAssetTransactionsForAsset } from '@/lib/services/assetTransactionService';
 import { useAssets } from '@/lib/hooks/useAssets';
-import { fetchFreshLedgerMeta, useAssetLedgerMeta, useCreateAssetTransaction } from '@/lib/hooks/useAssetTransactions';
+import { fetchFreshLedgerMeta, useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -85,15 +85,10 @@ import {
   describeAssetIntent,
   describeFormRefusal,
   describeModalStatus,
-  describeSettlementTiming,
   describeWriteError,
-  describeTradeFeeField,
-  TRADE_FEE_NEEDS_CATEGORY,
-  TRADE_FEE_NOT_WRITTEN,
   type ModalStatus,
 } from '@/lib/utils/dialogNarrative';
-import { expenseFeeCategoryLabel, normalizeExpenseFee, resolveExpenseFeeCategory } from '@/lib/utils/expenseFee';
-import { useExpenseCategories } from '@/lib/hooks/useExpenses';
+import { INSTRUMENT_CURRENCIES } from '@/lib/constants/currencies';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -106,7 +101,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { toastAnnouncedDividends } from '@/components/assets/announcedDividendsToast';
 import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank, HandCoins } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
@@ -143,14 +137,16 @@ function bondQuoteBasisOf(
 
 /**
  * Fetches the current market price for an asset from either Borsa Italiana (bonds with ISIN)
- * or Yahoo Finance (all other assets). Shows toast feedback on success or failure.
+ * or Yahoo Finance (all other assets). Shows toast feedback on success or failure, unless `silent`
+ * (the currency lookup on the ticker's blur, 2026-11-23: the reader asked nothing yet).
  * Returns price=0 when the quote cannot be retrieved, signalling that a manual update is needed.
  */
 async function fetchMarketPrice(
   ticker: string,
   isin: string | undefined,
   bondQuoteBasis: BondQuoteBasis,
-  isBondWithIsin: boolean
+  isBondWithIsin: boolean,
+  options: { silent?: boolean } = {}
 ): Promise<{ price: number; currency?: string; priceEur?: number }> {
   try {
     let response: Response;
@@ -170,11 +166,11 @@ async function fetchMarketPrice(
       const price = resolveBondPrice(quote.price, bondQuoteBasis, isBondWithIsin);
       const currency: string | undefined = quote.currency?.trim() || undefined;
       const priceEur: number | undefined = quote.currentPriceEur > 0 ? quote.currentPriceEur : undefined;
-      toast.success(`Prezzo recuperato da ${source}: ${formatNumberIt(price)} ${quote.currency}`);
+      if (!options.silent) toast.success(`Prezzo recuperato da ${source}: ${formatNumberIt(price)} ${quote.currency}`);
       return { price, currency, priceEur };
     }
 
-    toast.error(
+    if (!options.silent) toast.error(
       isBondWithIsin
         ? `Impossibile recuperare il prezzo per ISIN ${isin}. Puoi inserire manualmente il prezzo nel campo apposito.`
         : `Impossibile recuperare il prezzo per ${ticker}. Puoi inserire manualmente il prezzo nel campo apposito.`
@@ -182,7 +178,7 @@ async function fetchMarketPrice(
     return { price: 0 };
   } catch (error) {
     console.error('Error fetching quote:', error);
-    toast.error('Errore nel recupero del prezzo. Puoi inserire manualmente il prezzo nel campo apposito.');
+    if (!options.silent) toast.error('Errore nel recupero del prezzo. Puoi inserire manualmente il prezzo nel campo apposito.');
     return { price: 0 };
   }
 }
@@ -418,12 +414,6 @@ const assetSchema = z.object({
   financedAssetId: z.string().optional(),
   isPrimaryResidence: z.boolean().optional(),
   allocationRole: z.enum(['tradable', 'frozen', 'excluded']).optional(),
-  // Opening-position fields (ledger create only): the first buy's date, optional settlement account and fee.
-  // The opening quantity/price reuse `quantity`/`averageCost` (the price feeds both PMC and
-  // the first buy). Ignored for non-ledger types and in edit mode.
-  openingDate: z.string().optional(),
-  openingCashAssetId: z.string().optional(),
-  openingFees: z.number().min(0, 'Le commissioni non possono essere negative').optional().or(z.nan()),
   // The cash account this instrument's dividends/coupons credit ('__none__' = the settings default).
   dividendCashAssetId: z.string().optional(),
   // Bond coupon details (optional, only shown for type=bond + assetClass=bonds)
@@ -554,7 +544,6 @@ const FIELD_LABELS: Partial<Record<keyof AssetFormValues, string>> = {
   leverageRatio: 'Leva',
   debtInterestRate: 'TAN',
   financedAssetId: 'Immobile finanziato',
-  openingDate: 'Data di acquisto',
   bondCouponRate: 'Tasso cedola',
   bondNominalValue: 'Valore nominale',
   bondFinalPremiumRate: 'Premio finale',
@@ -601,11 +590,6 @@ const ALLOCATION_ROLE_OPTIONS: { value: AllocationRole; label: string; descripti
       "Non fa parte del portafoglio investito: la casa in cui vivi. Esce del tutto dalla pagina Allocazione, denominatore incluso — tenercelo dentro terrebbe la classe Immobili fuori target per sempre, contro una vendita che non farai mai.",
   },
 ];
-
-/** Today as the `YYYY-MM-DD` an `<input type="date">` wants (UTC calendar day, as before). */
-function isoDateToday(): string {
-  return new Date().toISOString().split('T')[0];
-}
 
 const assetClasses: { value: AssetClass; label: string }[] = [
   { value: 'equity', label: 'Azioni' },
@@ -932,12 +916,6 @@ function OwnerSharesRows({
   );
 }
 
-/** When the opening purchase settles on its account, from the date typed. */
-function SettlementTimingHint({ control, todayIso }: { control: AssetFormControl; todayIso: string }) {
-  const openingDate = useWatch({ control, name: 'openingDate' });
-  return <p className="text-xs text-muted-foreground">{describeSettlementTiming(openingDate ?? '', todayIso)}</p>;
-}
-
 export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType, returnFocusTo, onExitComplete, createEmpty, onCreated }: AssetDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -951,7 +929,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // and PMC through the ledger: edit becomes metadata-only, create opens the position as a first buy.
   const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
   const { data: ledgerAllAssets = [] } = useAssets(ownerId);
-  const createTradeMutation = useCreateAssetTransaction(ownerId || '');
   // The settings document — the family members for the pensionFund «Membro famiglia» Select and
   // the allocation targets for the sub-category Select — from the ONE settings key (2026-09-29),
   // read only while the dialog is OPEN: Patrimonio mounts this dialog closed, and until
@@ -986,6 +963,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
     setValue,
     control,
     getValues,
+    getFieldState,
     formState: { errors, isSubmitting },
   } = useForm<AssetFormValues>({
     resolver: zodResolver(assetSchema),
@@ -999,8 +977,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       financedAssetId: '__none__',
       isPrimaryResidence: false,
       allocationRole: 'tradable',
-      openingCashAssetId: '__none__',
-      openingFees: undefined,
       dividendCashAssetId: NO_DIVIDEND_ACCOUNT,
       ownerShares: [],
     },
@@ -1027,36 +1003,25 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // A loan's property: one change per click, and it decides the class and the liquidity default.
   const watchFinancedAssetId = useWatch({ control, name: 'financedAssetId' });
   const watchStampDutyExempt = useWatch({ control, name: 'stampDutyExempt' });
-  const watchOpeningCashAssetId = useWatch({ control, name: 'openingCashAssetId' });
   const watchDividendCashAssetId = useWatch({ control, name: 'dividendCashAssetId' });
   const watchPensionFamilyMemberId = useWatch({ control, name: 'pensionFamilyMemberId' });
 
-  // Ledger gating (Phase C):
+  // Ledger gating:
   //  - isLedgerEdit: editing a ledger asset → quantity/PMC are read-only, submit via updateAssetMetadata.
-  //  - isLedgerCreate: creating a ledger type → the quantity/price fields become the opening position.
-  //  - ledgerCreateReady: the ledger meta doc exists, so the first-buy Admin route will accept the trade.
-  //    While meta is absent we degrade to today's behavior (write quantity/PMC directly, no ledger).
+  //  - isLedgerCreate: creating a ledger type on an account with the ledger → the instrument is created
+  //    EMPTY and «Registra operazione» opens for its first purchase (2026-11-23: one form for every
+  //    purchase), or, with createEmpty (Accumulo), it stays at 0. The form never asks the cached meta:
+  //    a restored `null` may be stale (another device migrated the account), so the submit reads it
+  //    fresh, and only an account with truly no ledger takes the classic create (at quantity 0).
   const isLedgerEdit = isEdit && !!asset && isLedgerAssetType(asset.type);
   const isLedgerCreate = !isEdit && !!selectedType && isLedgerAssetType(selectedType);
-  const ledgerCreateReady = isLedgerCreate && ledgerMeta != null;
-  // The opening buy's fee becomes a spending row like any trade's (2026-11-12): typed only once the
-  // fee category of Impostazioni › Spese is known — the derivation of TransactionDialog's field.
-  const feeCategoriesQuery = useExpenseCategories(ownerId, { enabled: open && isLedgerCreate });
-  const openingFeeReading = settingsQuery.isLoading || feeCategoriesQuery.isLoading;
-  const openingFeeCategory = openingFeeReading ? undefined : resolveExpenseFeeCategory(feeCategoriesQuery.data ?? [], settings);
-  const openingFeeHint = describeTradeFeeField({
-    reading: openingFeeReading,
-    categoryLabel: openingFeeCategory ? expenseFeeCategoryLabel(openingFeeCategory) : null,
-    hasRow: false,
-    legacyFee: false,
-  });
-  // Accumulo → Nuovo asset: the position opens at quantity 0 with no opening trade — the
-  // ledger only speaks once a real buy is registered from the Registro operazioni. Only a ledger
-  // type has an opening-position block to suppress; a non-ledger type ignores the prop.
+  // Accumulo → Nuovo asset: the position opens at quantity 0 and no trade form follows.
   const isEmptyLedgerCreate = !isEdit && !!createEmpty && isLedgerCreate;
-  // The opening purchase carries its real date, however old: a new asset has no baseline, so
-  // nothing floors it (2026-09-13). Only the future is refused.
-  const todayIso = isoDateToday();
+  // The instrument's currency is the one its trades were recorded in: locked once it has any.
+  const { data: assetTrades = [] } = useAssetTransactions(ownerId, asset?.id, { enabled: open && isLedgerEdit });
+  const isCurrencyLocked = isLedgerEdit && !!asset && (asset.quantity !== 0 || assetTrades.length > 0);
+  // The currency a silent lookup on the ticker found, shown under the select until the owner picks one.
+  const [detectedCurrency, setDetectedCurrency] = useState<string | null>(null);
   // True when the bond's prices are Borsa Italiana quotes (% of par ↔ EUR conversion): a bond with
   // an ISIN, whatever its nominal — with the field empty one unit is 1 € of nominal
   // (`lib/utils/bondPricing.ts`). Used to show the % labels and apply the conversion on save.
@@ -1188,6 +1153,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
     setOpenSubject({ open, asset });
     if (open) {
       setStatus({ phase: 'idle' });
+      setDetectedCurrency(null);
       // A caller that already knows the type (the Liquidità tile's «Aggiungi conto») lands on
       // the form; the type is set by the reset effect below, from the same prop.
       setStep(asset || initialType ? 2 : 1);
@@ -1221,7 +1187,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
     // Re-run on every open so a second "new asset" dialog starts clean.
     // Without `open` in deps, `asset` stays null between opens and the effect never re-fires.
     if (!open) return;
-    const todayIso = isoDateToday();
 
     if (asset) {
       // Legacy fallback for documents saved before `isLiquid` existed — the same
@@ -1280,9 +1245,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         allocationRole: resolveAllocationRole(asset),
         isin: asset.isin || undefined,
         dividendCashAssetId: asset.dividendCashAssetId || NO_DIVIDEND_ACCOUNT,
-        openingDate: todayIso,
-        openingCashAssetId: '__none__',
-        openingFees: undefined,
         pensionProvider: asset.pensionFundDetails?.provider || undefined,
         pensionUnlockDate: asset.pensionFundDetails?.unlockDate || undefined,
         pensionFamilyMemberId: asset.pensionFundDetails?.familyMemberId || '__none__',
@@ -1335,9 +1297,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         financedAssetId: '__none__',
         isPrimaryResidence: false,
         allocationRole: 'tradable',
-        openingDate: todayIso,
-        openingCashAssetId: '__none__',
-        openingFees: undefined,
         dividendCashAssetId: NO_DIVIDEND_ACCOUNT,
         bondCouponRate: undefined,
         bondCouponFrequency: undefined,
@@ -1564,49 +1523,27 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       const ledgerCreateFlow = !asset && !emptyCreateFlow && isLedgerAssetType(data.type) && metaNow != null;
 
       // Step 1: Resolve current price using priority chain:
-      //   Path 0 — ledger create: fetch the live market price for the asset's currentPrice (same rule
-      //            as the classic path), while the first BUY keeps the entered purchase price
-      //            (historical, what you paid). Fallback to the purchase price when no quote.
       //   Path 1 — manual entry
       //   Path 2 — fetch from Borsa Italiana / Yahoo Finance
       //   Path 3 — default 1 (cash, real estate, private equity)
-      //   An empty create (Accumulo) falls through to paths 1-3: it has no opening price to seed.
+      //   A ledger create has no purchase price here (2026-11-23): the trade form takes it.
+      // The quote's currency is the net under the select, never over a currency the owner chose or
+      // one the instrument's operations are recorded in.
+      const keepsCurrency = getFieldState('currency').isDirty || isCurrencyLocked;
       let currentPrice = 1;
       let fetchedCurrentPriceEur: number | undefined;
-      // The opening BUY's price (native), kept separate from currentPrice so a freshly created
-      // position shows a real market value + G/P instead of a flat 0% until the next refresh.
-      let ledgerOpeningPrice = 0;
 
-      if (ledgerCreateFlow) {
-        ledgerOpeningPrice =
-          data.averageCost && !isNaN(data.averageCost) && data.averageCost > 0
-            ? resolveBondPrice(data.averageCost, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin)
-            : 0;
-        if (ledgerOpeningPrice <= 0) {
-          setStatus({ phase: 'error', message: 'Serve un prezzo di acquisto maggiore di zero.' });
-          return;
-        }
-        if (shouldUpdatePrice(data.type, data.subCategory)) {
-          const fetched = await fetchMarketPrice(data.ticker, data.isin, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin);
-          if (fetched.price > 0) {
-            currentPrice = fetched.price;
-            if (fetched.currency) data.currency = fetched.currency;
-            fetchedCurrentPriceEur = fetched.priceEur;
-          } else {
-            currentPrice = ledgerOpeningPrice; // no quote → seed with the purchase price
-          }
-        } else {
-          currentPrice = ledgerOpeningPrice;
-        }
-      } else if (data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0) {
+      if (data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0) {
         currentPrice = resolveBondPrice(data.manualPrice, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin);
         toast.success(`Prezzo manuale impostato: ${formatNumberIt(currentPrice)} ${data.currency}`);
       } else if (shouldUpdatePrice(data.type, data.subCategory)) {
         const fetched = await fetchMarketPrice(data.ticker, data.isin, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin);
         currentPrice = fetched.price;
-        if (fetched.currency) data.currency = fetched.currency;
+        if (fetched.currency && !keepsCurrency) data.currency = fetched.currency;
         fetchedCurrentPriceEur = fetched.priceEur;
       }
+      // A cash account is in euro: the ledger settles only on one (2026-11-23).
+      if (data.type === 'cash') data.currency = 'EUR';
 
       // Step 2: Assemble bond details and full form payload
       const bondDetailsValue = buildBondDetailsFromForm(data, showBondDetails, showStepUp, asset?.bondDetails, new Date());
@@ -1617,6 +1554,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
 
       // Step 3: Persist asset
       let savedAssetId: string;
+      // The instrument created empty for its first purchase, handed to the trade form after the close.
+      let createdForTrade: Asset | null = null;
       if (ledgerEditFlow && asset) {
         // LEDGER EDIT — metadata only. Ledger types derive quantity/PMC from the trade ledger, so
         // this path MUST NOT go through updateAsset: its undefined→deleteField() for averageCost
@@ -1654,60 +1593,24 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         await updateAsset(asset.id, formData);
         savedAssetId = asset.id;
         toast.success('Asset aggiornato con successo');
-      } else if (emptyCreateFlow) {
-        // Accumulo → Nuovo asset: no opening trade at all — the position opens whenever the
-        // first real buy is registered from the Registro operazioni (its 409 guard only fires on
-        // a tracked quantity ≠ 0, which this asset never has until then).
-        // `createdEmpty`: with no ledger row it reads «mai comprato» (lib/utils/zeroQuantityChip.ts); no other path writes it.
+      } else if (emptyCreateFlow || ledgerCreateFlow) {
+        // A ledger type is created EMPTY (quantity 0, no PMC) whichever path: the position opens with
+        // the first purchase registered in «Registra operazione» (its 409 guard only fires on a
+        // tracked quantity ≠ 0, which this asset never has until then). One form for every
+        // purchase (2026-11-23): until then the ledger create carried its own opening purchase.
+        // `createdEmpty`: with no ledger row it reads «mai comprato» (lib/utils/zeroQuantityChip.ts).
         savedAssetId = await createAsset(ownerId, { ...formData, quantity: 0, averageCost: undefined, createdEmpty: true });
-        toast.success('Asset creato con successo');
-        onCreated?.(savedAssetId);
         // Explicit here (not left to the caller's onClose) because this dialog is also mounted
         // standalone by the Accumulo tile/dialog, which has no reason to know about this cache key.
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
-      } else if (ledgerCreateFlow) {
-        // LEDGER CREATE — the asset opens EMPTY (quantity 0, no PMC); the first buy opens the
-        // position (which writes the derived quantity/PMC back onto the asset). NON-ATOMIC by
-        // design: if the buy fails, the asset survives at quantity 0 (recoverable) and the user
-        // retries via «Registra operazione». We accept the two-step gap for a simpler create flow.
-        const openingQty = data.quantity;
-        if (isNaN(openingQty) || openingQty <= 0) {
-          setStatus({ phase: 'error', message: 'Serve una quantità maggiore di zero.' });
-          return;
+        if (emptyCreateFlow) {
+          toast.success('Asset creato con successo');
+          onCreated?.(savedAssetId);
+        } else {
+          toast.success('Strumento creato: ora registra il primo acquisto.');
+          // The stored instrument, as the trade form reads it (its id, currency and bond details).
+          createdForTrade = await getAssetById(savedAssetId);
         }
-        savedAssetId = await createAsset(ownerId, { ...formData, quantity: 0, averageCost: undefined });
-        const settlement =
-          data.openingCashAssetId && data.openingCashAssetId !== '__none__'
-            ? data.openingCashAssetId
-            : undefined;
-        const firstBuy: AssetTransactionFormData = {
-          assetId: savedAssetId,
-          type: 'buy',
-          date: data.openingDate ? new Date(data.openingDate) : new Date(),
-          quantity: openingQty,
-          pricePerUnit: ledgerOpeningPrice, // the historical purchase price (bond/GBp-resolved in Step 1)
-          linkedCashAssetId: settlement,
-          fees: normalizeExpenseFee(data.openingFees) ?? undefined,
-          // A BTP€i's opening price was scaled by the form's coefficient: the trade remembers it.
-          indexationCoefficient: isBondWithIsin ? bondQuoteBasisOf(data, knownCoefficient).indexationCoefficient : undefined,
-        };
-        let openingFeeRow: string | undefined;
-        try {
-          const firstBuyResult = await createTradeMutation.mutateAsync(firstBuy);
-          openingFeeRow = firstBuyResult.feeRow;
-          toastAnnouncedDividends(firstBuyResult.announcedDividends);
-        } catch (buyError) {
-          console.error('First-buy failed after asset creation:', buyError);
-          // Refresh so the qty-0 asset appears; keep the dialog open with the error for a retry.
-          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
-          const message = buyError instanceof Error ? buyError.message : "Registrazione dell'acquisto fallita.";
-          toast.error(`Asset creato, ma l'acquisto non è stato registrato: ${message}`);
-          return; // do NOT onClose — recoverable state
-        }
-        toast.success(
-          openingFeeRow === 'refused' ? `Asset creato con successo · ${TRADE_FEE_NOT_WRITTEN}` : 'Asset creato con successo'
-        );
       } else {
         // Classic create (non-ledger, or ledger without meta → writes quantity/PMC directly).
         savedAssetId = await createAsset(ownerId, formData);
@@ -1726,6 +1629,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       }
 
       onClose();
+      if (createdForTrade) onRegisterTrade?.(createdForTrade);
     };
 
     try {
@@ -1774,13 +1678,32 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
 
   const isTypePicker = !isEdit && step === 1;
 
+  // The select's options: the listed currencies, plus the form's own value when it is not listed.
+  const currencyOptions: string[] = watchCurrency && !(INSTRUMENT_CURRENCIES as readonly string[]).includes(watchCurrency)
+    ? [...INSTRUMENT_CURRENCIES, watchCurrency]
+    : [...INSTRUMENT_CURRENCIES];
+
+  // On a create of a ledger type, the ticker's blur asks the quote once, silently, for its currency:
+  // it sets the select unless the owner has already picked one (2026-11-23).
+  const detectCurrencyFromTicker = async () => {
+    const values = getValues();
+    if (isEdit || !isLedgerAssetType(values.type) || getFieldState('currency').isDirty) return;
+    const ticker = values.ticker?.trim();
+    if (!ticker) return;
+    const isBondWithIsin = values.type === 'bond' && values.assetClass === 'bonds' && !!values.isin?.trim();
+    const fetched = await fetchMarketPrice(ticker, values.isin, bondQuoteBasisOf(values, knownCoefficient), isBondWithIsin, { silent: true });
+    if (!fetched.currency || getFieldState('currency').isDirty) return;
+    setValue('currency', fetched.currency);
+    setDetectedCurrency(fetched.currency);
+  };
+
   // The reading IS the status line: what the form wants, what it is doing, how it went.
   const reading = describeModalStatus(
     isSubmitting || fetchingPrice ? { phase: 'submitting' } : status,
     {
       idle: isTypePicker
         ? ASSET_TYPE_PICKER_READING
-        : describeAssetIntent({ isEdit, hasLedger: isLedgerEdit, isLedgerCreate }),
+        : describeAssetIntent({ isEdit, hasLedger: isLedgerEdit, isLedgerCreate: isLedgerCreate && !isEmptyLedgerCreate }),
       submitting: fetchingPrice ? 'Sto recuperando il prezzo di mercato.' : 'Sto salvando lo strumento.',
     },
   );
@@ -1827,7 +1750,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                     ? 'Salva modifiche'
                     : createEmpty
                       ? 'Crea e aggiungi al piano'
-                      : 'Crea strumento'}
+                      : isLedgerCreate
+                        ? 'Crea e registra l’acquisto'
+                        : 'Crea strumento'}
             </Button>
           </>
         )
@@ -1916,7 +1841,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
               <Label htmlFor="ticker">Ticker *</Label>
               <Input
                 id="ticker"
-                {...register('ticker')}
+                {...register('ticker', { onBlur: () => void detectCurrencyFromTicker() })}
                 placeholder="es. VWCE.DE"
               />
               {errors.ticker && (
@@ -2146,22 +2071,49 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* The currency is one of the list (lib/constants/currencies.ts) or the value already on
+                the form (a legacy GBp, a code a lookup found). A cash account is in euro: no select. */}
+            {selectedType !== 'cash' && (
             <div className={`space-y-2${(isLedgerEdit || isLedgerCreate) ? ' sm:col-span-2' : ''}`}>
               <Label htmlFor="currency">Valuta *</Label>
-              <Input
-                id="currency"
-                {...register('currency')}
-                placeholder="EUR"
-              />
+              <Select
+                value={watchCurrency || 'EUR'}
+                onValueChange={(value) => {
+                  // Radix's hidden native select reports '' while a new code has no option yet: not a pick.
+                  if (!value) return;
+                  setValue('currency', value, { shouldDirty: true });
+                  setDetectedCurrency(null);
+                }}
+                disabled={isCurrencyLocked}
+              >
+                <SelectTrigger id="currency" aria-label="Valuta">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {currencyOptions.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isCurrencyLocked && asset ? (
+                <p className="text-xs text-muted-foreground">
+                  La valuta non cambia: le operazioni sono registrate in {asset.currency}.
+                </p>
+              ) : detectedCurrency ? (
+                <p className="text-xs text-muted-foreground">Valuta rilevata: {detectedCurrency}</p>
+              ) : null}
               {errors.currency && (
                 <p className="text-sm text-destructive">{errors.currency.message}</p>
               )}
             </div>
+            )}
 
             {/* Quantity input — hidden for ledger types: on edit it is read-only (managed by the
                 ledger), on create it moves into the "Posizione iniziale" section below. */}
             {!isLedgerEdit && !isLedgerCreate && (
-            <div className="space-y-2">
+            <div className={`space-y-2${selectedType === 'cash' ? ' sm:col-span-2' : ''}`}>
               {/* Label varies by type: cash = Saldo, realestate = Valore stimato, others = Quantità */}
               <Label htmlFor="quantity">{`${newAsset_quantityLabel} *`}</Label>
               <Input
@@ -2232,135 +2184,17 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
             </div>
           )}
 
-          {/* LEDGER CREATE — the quantity/price fields become the opening position (first buy),
-              unless createEmpty (Accumulo → Nuovo asset) asks for the position to open at 0
-              with no opening trade: quantity/date/price/settlement then give way to one notice. */}
+          {/* LEDGER CREATE — no quantity, no price: the instrument is created empty, and the first
+              purchase is registered in the trade form that opens after it (2026-11-23), or, with
+              createEmpty (Accumulo → Nuovo asset), whenever a real buy is registered. */}
           {isLedgerCreate && (
             <div className="space-y-4 rounded-lg border p-4">
-              {!isEmptyLedgerCreate && (
-                <div className="space-y-0.5">
-                  <Label>Posizione iniziale (primo acquisto)</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Registriamo questo acquisto come prima operazione del registro. Le operazioni
-                    successive si gestiscono da &laquo;Registra operazione&raquo;.
-                  </p>
-                </div>
-              )}
-
-              {isEmptyLedgerCreate ? (
-                <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-                  Nessuna quantità né acquisto d&apos;apertura: l&apos;asset nasce a 0 quote e la
-                  posizione si apre col primo acquisto registrato nel Registro operazioni.
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="quantity">Quantità *</Label>
-                      <Input
-                        id="quantity"
-                        type="number"
-                        step="0.00000001"
-                        min="0"
-                        {...register('quantity', { valueAsNumber: true })}
-                        placeholder="es. 5"
-                      />
-                      {errors.quantity && (
-                        <p className="text-sm text-destructive">{errors.quantity.message}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="averageCost">
-                        {isBondPctMode
-                          ? 'Prezzo di acquisto (quotazione Borsa Italiana) *'
-                          : `Prezzo di acquisto per unità (${watchCurrency}) *`}
-                      </Label>
-                      <Input
-                        id="averageCost"
-                        type="number"
-                        step="any"
-                        min="0"
-                        {...register('averageCost', { valueAsNumber: true })}
-                        placeholder={isBondPctMode ? 'es. 100' : 'es. 85.1234'}
-                      />
-                      {errors.averageCost && (
-                        <p className="text-sm text-destructive">{errors.averageCost.message}</p>
-                      )}
-                      {isBondPctMode && (
-                        <BondPurchasePricePreview control={control} knownCoefficient={knownCoefficient} isEuroIndexed={isEuroIndexed} />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="openingDate">Data di acquisto *</Label>
-                      <Input
-                        id="openingDate"
-                        type="date"
-                        max={todayIso}
-                        {...register('openingDate')}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="openingCashAssetId">Conto di regolamento</Label>
-                      <Select
-                        value={watchOpeningCashAssetId ?? '__none__'}
-                        onValueChange={(value) => setValue('openingCashAssetId', value)}
-                      >
-                        <SelectTrigger id="openingCashAssetId" aria-label="Conto di regolamento">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Nessuno</SelectItem>
-                          {ledgerCashAssets.map((cash) => (
-                            <SelectItem key={cash.id} value={cash.id}>
-                              {cash.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <SettlementTimingHint control={control} todayIso={todayIso} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="openingFees">Commissioni (€)</Label>
-                      <Input
-                        id="openingFees"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="es. 1.00"
-                        aria-describedby="opening-fees-hint"
-                        disabled={!ledgerCreateReady || !openingFeeCategory}
-                        {...register('openingFees', { valueAsNumber: true })}
-                      />
-                      {errors.openingFees && (
-                        <p className="text-sm text-destructive">{errors.openingFees.message}</p>
-                      )}
-                      <p id="opening-fees-hint" className="text-xs text-muted-foreground">
-                        {openingFeeHint ?? (
-                          <>
-                            {TRADE_FEE_NEEDS_CATEGORY}{' '}
-                            <Link href="/dashboard/settings?tab=spese" className="underline underline-offset-2 hover:text-foreground">
-                              Impostazioni › Spese
-                            </Link>
-                            .
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
+              <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+                {isEmptyLedgerCreate
+                  ? 'Nessuna quantità né acquisto d’apertura: l’asset nasce a 0 quote e la posizione si apre col primo acquisto registrato nel Registro operazioni.'
+                  : 'Lo strumento nasce a 0 quote: alla creazione si apre «Registra operazione» per il primo acquisto, con data, prezzo, commissione e conto.'}
+              </div>
               {newAsset_showCostBasis && renderTaxRateField()}
-              {!isEmptyLedgerCreate && !ledgerCreateReady && (
-                <p className="text-xs text-muted-foreground">
-                  Il registro operazioni si sta inizializzando: la posizione viene salvata comunque.
-                </p>
-              )}
             </div>
           )}
 
@@ -3310,7 +3144,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
             />
           </div>
 
-          {shouldUpdatePrice(selectedType, selectedSubCategory) && !isLedgerCreate && (
+          {shouldUpdatePrice(selectedType, selectedSubCategory) && (
             <div className="space-y-2">
               <Label htmlFor="manualPrice">Prezzo manuale (opzionale)</Label>
               {/* `step="any"`: on edit the field is prefilled with the stored price back-converted to a

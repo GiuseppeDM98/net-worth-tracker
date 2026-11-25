@@ -236,6 +236,8 @@ export function describeSales(sales: PeriodSalesSummary, split?: MonthSplit): Na
     figure(cachedFormatCurrencyEUR(sales.proceeds, true)),
   ];
 
+  if (hasGainsAndLosses(sales)) return describeMixedSales(narrative, sales, split);
+
   if (sales.realizedGain <= 0) {
     narrative.push(
       prose(' con una minusvalenza di '),
@@ -270,6 +272,59 @@ export function describeSales(sales: PeriodSalesSummary, split?: MonthSplit): Na
   narrative.push(
     ...binding([
       prose(': senza, il mese avrebbe fatto '),
+      signedCompactEuro(withoutTax),
+      prose(' ('),
+      ...monthSplitParts(withoutTax, split),
+      prose(').'),
+    ]),
+  );
+  return narrative;
+}
+
+/**
+ * Whether the period's sells hold BOTH a gain and a loss that print as more than zero: then the
+ * net alone, beside a tax paid on the gains only, reads as a rate past 100% (owner, 2026-11-25).
+ */
+function hasGainsAndLosses(sales: PeriodSalesSummary): boolean {
+  const gains = sales.realizedGains ?? 0;
+  const losses = sales.realizedLosses ?? 0;
+  return gains > 0 && losses < 0 && !printsAsZero(gains) && !printsAsZero(losses);
+}
+
+/**
+ * «Hai venduto 2 strumenti per 50.000 €: 160 € di plusvalenze, su cui hai pagato 25 € di tasse, e
+ * 150 € di minusvalenze.» (owner, 2026-11-25) — the gains and the losses kept apart, the tax beside
+ * the figure it was paid on: the broker taxes a fund's gain at the sale while a stock's loss goes to
+ * the zainetto fiscale, so the net (+10 €) next to 25 € of tax read as a mistake. The month without
+ * the tax follows as in `describeSales`, after a semicolon.
+ */
+function describeMixedSales(narrative: Narrative, sales: PeriodSalesSummary, split?: MonthSplit): Narrative {
+  const gains = figure(cachedFormatCurrencyEUR(sales.realizedGains ?? 0, true));
+  const losses = figure(cachedFormatCurrencyEUR(Math.abs(sales.realizedLosses ?? 0), true));
+  narrative.push(prose(': '), gains, prose(' di plusvalenze'));
+  if (sales.estimatedTax === null) {
+    const where = sales.instruments.length === 1 ? 'sullo strumento' : 'su ogni strumento';
+    narrative.push(prose(' e '), losses, prose(` di minusvalenze; senza un'aliquota ${where} le tasse non sono stimate.`));
+    return narrative;
+  }
+  narrative.push(
+    ...binding([
+      prose(sales.taxIsWithheld ? ', su cui hai pagato ' : ', su cui hai pagato circa '),
+      figure(cachedFormatCurrencyEUR(sales.estimatedTax, true)),
+      prose(' di tasse'),
+    ]),
+    prose(', e '),
+    losses,
+    prose(' di minusvalenze'),
+  );
+  if (!split || !isMaterialSalesTax(sales.estimatedTax, split.delta)) {
+    narrative.push(prose('.'));
+    return narrative;
+  }
+  const withoutTax = split.delta + sales.estimatedTax;
+  narrative.push(
+    ...binding([
+      prose('; senza le tasse, il mese avrebbe fatto '),
       signedCompactEuro(withoutTax),
       prose(' ('),
       ...monthSplitParts(withoutTax, split),

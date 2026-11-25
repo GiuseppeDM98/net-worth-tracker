@@ -460,9 +460,9 @@ describe('describeAssetIntent', () => {
     expect(text).not.toContain('registro operazioni');
   });
 
-  it('warns that a create will open the position with a first buy', () => {
+  it('says a create hands the instrument to the trade form for its first purchase', () => {
     expect(plain(describeAssetIntent({ isEdit: false, hasLedger: false, isLedgerCreate: true }))).toContain(
-      'acquisto di apertura',
+      'si apre «Registra operazione» per il primo acquisto',
     );
   });
 

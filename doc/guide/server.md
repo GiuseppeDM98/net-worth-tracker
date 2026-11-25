@@ -34,6 +34,11 @@
   and a delete carry `expectedUpdatedAt` (PUT body / DELETE query, ISO, through `tradeVersionSchema`; malformed → 400),
   the version the form or the button was drawn from; a trade changed since is 409, one deleted since 404; a trade on an
   asset that is no longer a ledger type, or settled on an account that is no longer a cash account, at commit is 422.
+- **`GET /api/fx/rate?currency=USD&date=YYYY-MM-DD` reads no account** (2026-11-23, `app/api/fx/rate/route.ts`): signed in
+  only (`requireFirebaseAuth`, no `assertCanAccessAccount` — the demo and a co-owner read it like anyone), the query
+  parsed by `fxRateQuerySchema` (`isoDateSchema` stays private to `validation.ts`), the answer `{ rate, isLatest }` from
+  `resolveEcbRateToEur` — the rate the trade's save will use — and 503 when no rate can be read. The trade form's
+  preview (`useFxRate`) is its only reader; pinned by `__tests__/fxRateRoute.test.ts`.
 - **`REGISTRATION_WHITELIST` has no `NEXT_PUBLIC_` prefix**, and `lib/constants/appConfig.ts` must stay client-safe.
 - **A Vercel Function never `require()`s an ESM-only package — whatever the Node version** (2026-10-08): Vercel starts
   Node with `--no-experimental-require-module`, so `firebase-admin@14 → jwks-rsa@4 → jose@6` (pure ESM, loaded by

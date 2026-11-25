@@ -147,6 +147,26 @@ describe('summarizePeriodSales', () => {
     expect(summarizePeriodSales([ORNI], ORNI_LEDGER, { start: new Date(2026, 9, 1), end: new Date(2026, 9, 31) })).toBeNull();
   });
 
+  it('should keep the gains and the losses apart, sell by sell, across instruments and inside one', () => {
+    const ledger = [
+      tx('a', 'buy', new Date(2026, 6, 22, 12), 100, 100, undefined, true),
+      tx('a', 'sell', new Date(2026, 8, 3, 12), 10, 150), // +500
+      tx('a', 'sell', new Date(2026, 8, 10, 12), 10, 90), // −100, the same instrument
+      tx('b', 'buy', new Date(2026, 6, 22, 12), 100, 100, undefined, true),
+      tx('b', 'sell', new Date(2026, 8, 5, 12), 10, 80), // −200
+    ];
+    const summary = summarizePeriodSales([asset('a', 'A', 26), asset('b', 'B', 26)], ledger, SEPTEMBER)!;
+    expect(summary.realizedGains).toBeCloseTo(500, 9);
+    expect(summary.realizedLosses).toBeCloseTo(-300, 9);
+    expect(summary.realizedGain).toBeCloseTo(200, 9); // the net, unchanged
+  });
+
+  it('should report zero losses when every sell gained', () => {
+    const summary = summarizePeriodSales([ORNI], ORNI_LEDGER, SEPTEMBER)!;
+    expect(summary.realizedGains).toBeCloseTo(summary.realizedGain, 9);
+    expect(summary.realizedLosses).toBe(0);
+  });
+
   it('should charge no tax on a realized loss', () => {
     const ledger = [
       tx('a', 'buy', new Date(2026, 6, 22, 12), 100, 100, undefined, true),

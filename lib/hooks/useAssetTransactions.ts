@@ -20,7 +20,7 @@ import {
   updateAssetTransaction,
   deleteAssetTransaction,
 } from '@/lib/services/assetTransactionService';
-import type { AssetTransactionFormData } from '@/types/assetTransactions';
+import type { AssetTransactionFormData, AssetTransactionUpdateData } from '@/types/assetTransactions';
 
 /**
  * List ledger trades for an owner, optionally scoped to one asset.
@@ -96,7 +96,7 @@ export function useUpdateAssetTransaction(ownerId: string) {
       expectedUpdatedAt,
     }: {
       transactionId: string;
-      updates: Partial<AssetTransactionFormData>;
+      updates: AssetTransactionUpdateData;
       expectedUpdatedAt: Date;
     }) => updateAssetTransaction(ownerId, transactionId, updates, expectedUpdatedAt),
     onSuccess: () => invalidateTradeCaches(queryClient, ownerId),

@@ -82,6 +82,10 @@ function mapAssetTransactionDoc(id: string, data: DocumentData): AssetTransactio
     withheldTaxEur: data.withheldTaxEur,
     isBaseline: data.isBaseline,
     note: data.note,
+    feesNative: data.feesNative,
+    settledTotalEur: data.settledTotalEur,
+    fxRate: data.fxRate,
+    fxSource: data.fxSource,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   } as AssetTransaction;
