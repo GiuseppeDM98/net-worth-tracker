@@ -96,6 +96,17 @@ describe('POST /api/dividends/scrape — the quantity held at the ex-date (2026-
     expect(body).toMatchObject({ created: 1, notHeld: 1 });
   });
 
+  // Red when the tax is a fixed `grossAmount * 0.26` again (S4, owner 2026-11-23).
+  it('taxes the created record at the instrument’s own rate', async () => {
+    assetData.current = { ...assetData.current, taxRate: 12.5 };
+
+    await POST(buildRequest());
+
+    const created = (createDividendMock.mock.calls[0] as unknown[])[1] as { grossAmount: number; taxAmount: number; netAmount: number };
+    expect(created.taxAmount).toBeCloseTo(created.grossAmount * 0.125, 9);
+    expect(created.netAmount).toBeCloseTo(created.grossAmount * 0.875, 9);
+  });
+
   it('cashes a dividend paid today in Italy, even stored at UTC midnight (2026-11-24)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-12-14T23:30:00.000Z')); // 00:30 of 15/12 in Italy

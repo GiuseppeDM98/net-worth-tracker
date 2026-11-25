@@ -3,6 +3,9 @@
  *
  * It grows from the row that opened it: the caller resolves `triggerOrigin` at the click
  * (`resolveCenteredModalOrigin`), so the origin is on the window from its first frame.
+ *
+ * A record with a foreign part shows the two withholdings apart; a converted one says its rate
+ * and where it came from (the statement's credit, the ECB of the payment day, the latest ECB).
  */
 'use client';
 
@@ -10,7 +13,8 @@ import type { RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
-import { toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDateIso, toDate } from '@/lib/utils/dateHelpers';
+import { describeTradeFx } from '@/lib/utils/tradeFx';
 import { Dividend } from '@/types/dividend';
 import { dividendTypeLabels } from '@/lib/constants/dividendTypes';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
@@ -44,6 +48,9 @@ export function DividendRecordDetailsDialog({
   const grossAmount = dividend.grossAmountEur ?? dividend.grossAmount;
   const taxAmount = dividend.taxAmountEur ?? dividend.taxAmount;
   const netAmount = dividend.netAmountEur ?? dividend.netAmount;
+  const foreignTax =
+    dividend.foreignTaxAmount !== undefined ? (dividend.foreignTaxAmountEur ?? dividend.foreignTaxAmount) : undefined;
+  const fxLine = describeDividendRate(dividend);
 
   return (
     <ResponsiveModal
@@ -130,6 +137,11 @@ export function DividendRecordDetailsDialog({
                   Originale <span className="font-mono tabular-nums">{formatCurrency(dividend.netAmount, dividend.currency)}</span>
                 </p>
               )}
+              {fxLine && (
+                <p className="mt-1 font-mono text-[12px] tabular-nums text-muted-foreground" data-testid="dividend-record-fx">
+                  {fxLine}
+                </p>
+              )}
             </div>
 
             <dl className="space-y-2 border-t border-border pt-4">
@@ -141,10 +153,23 @@ export function DividendRecordDetailsDialog({
                 <dt className="text-[13px] text-muted-foreground">Lordo totale</dt>
                 <dd className={FIGURE_CLASS}>{formatCurrency(grossAmount)}</dd>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-[13px] text-muted-foreground">Ritenute</dt>
-                <dd className={cn(FIGURE_CLASS, 'text-muted-foreground')}>{formatCurrency(taxAmount)}</dd>
-              </div>
+              {foreignTax !== undefined ? (
+                <>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-[13px] text-muted-foreground">Ritenuta estera</dt>
+                    <dd className={cn(FIGURE_CLASS, 'text-muted-foreground')}>{formatCurrency(foreignTax)}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-[13px] text-muted-foreground">Ritenuta italiana</dt>
+                    <dd className={cn(FIGURE_CLASS, 'text-muted-foreground')}>{formatCurrency(taxAmount - foreignTax)}</dd>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-[13px] text-muted-foreground">Ritenute</dt>
+                  <dd className={cn(FIGURE_CLASS, 'text-muted-foreground')}>{formatCurrency(taxAmount)}</dd>
+                </div>
+              )}
             </dl>
           </div>
         </div>
@@ -158,4 +183,18 @@ export function DividendRecordDetailsDialog({
 
     </ResponsiveModal>
   );
+}
+
+/**
+ * The record's rate and its source. A latest-ECB rate on a payment still to come is a placeholder
+ * the payment day replaces, and says so; a record with no source (EUR, or announced before the
+ * sources existed) has no line.
+ */
+function describeDividendRate(dividend: Dividend): string | null {
+  if (!dividend.fxSource || dividend.exchangeRate === undefined) return null;
+  const paymentDay = toDate(dividend.paymentDate);
+  if (dividend.fxSource === 'ecb-latest' && getItalyDateIso(paymentDay) > getItalyDateIso()) {
+    return 'Cambio di oggi: quello del giorno di pagamento lo applico quando arriva.';
+  }
+  return describeTradeFx(dividend.currency, dividend.exchangeRate, dividend.fxSource, paymentDay);
 }

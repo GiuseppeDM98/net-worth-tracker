@@ -34,6 +34,12 @@
   and a delete carry `expectedUpdatedAt` (PUT body / DELETE query, ISO, through `tradeVersionSchema`; malformed → 400),
   the version the form or the button was drawn from; a trade changed since is 409, one deleted since 404; a trade on an
   asset that is no longer a ledger type, or settled on an account that is no longer a cash account, at commit is 422.
+- **The dividend routes' 422** (2026-11-25, doc/guide/cashflow-dividendi.md § A dividend of a foreign issuer): `POST
+  /api/dividends` and `PUT /api/dividends/[dividendId]` answer 422 `{ error }` with the sentence of
+  `describeDividendFxRefusal` — a «Netto accreditato in euro» more than 25% away from the payment day's ECB rate, or
+  a credit on a net of zero — the `TradeFxError` the service rethrows out of its own `catch` (without the rethrow it
+  was a generic 500). The POST refuses with 400 a currency the instrument does not admit (`isCurrencyAllowed`); the
+  PUT does not check it. The PUT takes `null` for `foreignTaxAmount` and `settledNetEur` (removes them).
 - **`GET /api/fx/rate?currency=USD&date=YYYY-MM-DD` reads no account** (2026-11-23, `app/api/fx/rate/route.ts`): signed in
   only (`requireFirebaseAuth`, no `assertCanAccessAccount` — the demo and a co-owner read it like anyone), the query
   parsed by `fxRateQuerySchema` (`isoDateSchema` stays private to `validation.ts`), the answer `{ rate, isLatest }` from

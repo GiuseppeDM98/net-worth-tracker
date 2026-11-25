@@ -70,6 +70,9 @@ export const dividendDataSchema = z.object({
   assetIsin: isinSchema.optional(),
   // Server-set cost basis snapshot — validated if present in the payload.
   costPerShare: z.number().finite().optional(),
+  // The part of taxAmount withheld abroad, and the euro credited from the statement (2026-11-23).
+  foreignTaxAmount: z.number().finite().min(0).optional(),
+  settledNetEur: z.number().finite().positive().optional(),
 });
 
 /**

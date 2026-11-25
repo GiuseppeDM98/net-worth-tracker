@@ -13,6 +13,7 @@ import { DividendFormData } from '@/types/dividend';
 import { getItalyDateIso, isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { isDividendEligible, resolveDividendFloor } from '@/lib/utils/dividendEligibility';
 import { entitledQuantity } from '@/lib/utils/dividendEntitlement';
+import { computeDividendTaxes } from '@/lib/utils/dividendFx';
 import { getAssetTransactionsForAssetAdmin } from '@/lib/server/assetAdminRepository';
 import {
   assertCanAccessAccount,
@@ -172,8 +173,8 @@ export async function POST(request: NextRequest) {
         }
 
         const grossAmount = scrapedDiv.dividendPerShare * quantity;
-        const taxAmount = grossAmount * 0.26; // Italian withholding tax (26%)
-        const netAmount = grossAmount - taxAmount;
+        // The instrument's own rate, 26% when it declares none (owner, 2026-11-23); no foreign part.
+        const { taxAmount, netAmount } = computeDividendTaxes(grossAmount, 0, asset.taxRate ?? 26);
 
         // Create dividend data
         const dividendData: DividendFormData = {

@@ -112,6 +112,22 @@ describe('reconcileAnnouncedDividend', () => {
     expect(at125.netAmount).toBeCloseTo(26.25, 9);
   });
 
+  // Red when the foreign part is always 0.
+  it('scales a foreign part with the quantity, leaves a record without one without one, and reads 0 on a gross of 0', () => {
+    const halved = [trade('buy', noon('2026-03-01'), 100), trade('sell', noon('2026-03-10'), 50)];
+
+    const withForeign = reconcileAnnouncedDividend(announced({ foreignTaxAmount: 7.5 }), halved, ASOF);
+    const without = reconcileAnnouncedDividend(announced(), halved, ASOF);
+    const zeroGross = reconcileAnnouncedDividend(announced({ grossAmount: 0, taxAmount: 0, foreignTaxAmount: 2 }), halved, ASOF);
+
+    if (withForeign.kind !== 'update' || without.kind !== 'update' || zeroGross.kind !== 'update') {
+      throw new Error('expected three updates');
+    }
+    expect(withForeign.foreignTaxAmount).toBeCloseTo(3.75, 9);
+    expect(without.foreignTaxAmount).toBeUndefined();
+    expect(zeroGross.foreignTaxAmount).toBe(0);
+  });
+
   // Red when the hand-entered / cashed guard is dropped.
   it('never touches a hand-entered record nor a cashed one', () => {
     const soldOut = [trade('buy', noon('2026-03-01'), 100), trade('sell', noon('2026-03-10'), 100)];

@@ -32,9 +32,9 @@ export async function reconcileAnnouncedDividendsForAsset(
       await deleteDividend(dividend.id);
       outcome.deleted += 1;
     } else if (verdict.kind === 'update') {
-      const { quantity, grossAmount, taxAmount, netAmount } = verdict;
-      // The currency rides along: updateDividend recomputes the euro fields only when it gets one.
-      await updateDividend(dividend.id, { quantity, grossAmount, taxAmount, netAmount, currency: dividend.currency });
+      const { quantity, grossAmount, taxAmount, netAmount, foreignTaxAmount } = verdict;
+      // A changed amount makes updateDividend convert the euro fields again, at the payment day's rate.
+      await updateDividend(dividend.id, { quantity, grossAmount, taxAmount, netAmount, foreignTaxAmount, currency: dividend.currency });
       outcome.updated += 1;
     }
   }

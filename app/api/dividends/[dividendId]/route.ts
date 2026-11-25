@@ -9,13 +9,24 @@ import {
   deleteExpenseForDividend,
 } from '@/lib/services/dividendIncomeService';
 import { resolveDividendIncomeCategory } from '@/lib/server/dividendUseCase';
-import { DividendFormData } from '@/types/dividend';
 import {
   assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
 import { dividendDataSchema, parseOr400 } from '@/lib/server/validation';
+import { describeDividendFxRefusal } from '@/lib/utils/dividendFx';
+import type { DividendUpdateData } from '@/lib/services/dividendService';
+import * as z from 'zod';
+
+/**
+ * The form sends every field at every save; `null` REMOVES the two optional amounts (a cleared
+ * credit, a record back to one withholding), an absent key keeps them.
+ */
+const dividendUpdateSchema = dividendDataSchema.partial().extend({
+  foreignTaxAmount: z.number().finite().min(0).nullable().optional(),
+  settledNetEur: z.number().finite().positive().nullable().optional(),
+});
 
 /**
  * PUT /api/dividends/[dividendId]
@@ -24,7 +35,7 @@ import { dividendDataSchema, parseOr400 } from '@/lib/server/validation';
  *
  * Request Body:
  *   {
- *     updates: Partial<DividendFormData>  // Fields to update
+ *     updates: DividendUpdateData  // Fields to update; null removes foreignTaxAmount / settledNetEur
  *   }
  *
  * Expense Synchronization:
@@ -58,9 +69,9 @@ export async function PUT(
       );
     }
 
-    const updatesResult = parseOr400(dividendDataSchema.partial(), body.updates);
+    const updatesResult = parseOr400(dividendUpdateSchema, body.updates);
     if (!updatesResult.ok) return updatesResult.response;
-    const updates = updatesResult.data as Partial<DividendFormData>;
+    const updates = updatesResult.data as DividendUpdateData;
 
     // Get existing dividend to check for linked expense
     const existingDividend = await getDividendById(dividendId);
@@ -74,8 +85,15 @@ export async function PUT(
 
     await assertCanAccessAccount(decodedToken, existingDividend.userId);
 
-    // Update dividend
-    await updateDividend(dividendId, updates);
+    // Update dividend; a refused credit is a 422 with its sentence. No currency check against the
+    // instrument here: this route loads no asset, and the form's select is its door.
+    try {
+      await updateDividend(dividendId, updates);
+    } catch (error) {
+      const refusal = describeDividendFxRefusal(error, updates.currency ?? existingDividend.currency);
+      if (refusal) return NextResponse.json({ error: refusal }, { status: 422 });
+      throw error;
+    }
 
     // If dividend has linked expense, update it too
     if (existingDividend.expenseId) {
