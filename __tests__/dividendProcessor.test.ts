@@ -734,7 +734,7 @@ describe('a foreign dividend on its payment day, and the scrape at the instrumen
     expect(createExpenseFromDividendMock.mock.calls[0][0]).toMatchObject({ quantity: 5, netAmountEur: 1.49 });
   });
 
-  // Red when the scrape taxes a fixed `grossAmount * 0.26` (P2).
+  // Red when the scrape taxes a fixed `grossAmount * 0.26`.
   it('taxes a scraped dividend at the instrument’s rate: its own, else 26%, and 0 stays 0', async () => {
     const created: Array<{ grossAmount: number; taxAmount: number }> = [];
     createDividendMock.mockImplementation(async (_uid: string, data: { grossAmount: number; taxAmount: number }) => {

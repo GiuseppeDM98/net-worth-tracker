@@ -4,7 +4,7 @@
 > lascia il corpo com'è; il ritiro dell'ultima spec porta via questo file con la cartella.
 >
 > Ritiri fatti: 01 (2026-11-24, solo documenti); 02 (2026-11-24: il cron lanciato a mano dal proprietario su Vercel come
-> controllo in produzione, un commento corretto); 03 (2026-11-24: solo etichette riscritte, controllo del proprietario su Rendimenti, Previdenza e Panoramica); 04 (2026-11-24: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — Movimenti tiene modifica ed elimina mentre rilegge una copia restaurata, il 409 del rosso di `assets.trade-fee`, test visto rosso, Playwright intera; 22 etichette dei test della spec riscritte nella mutazione che li fa rossi — cinque provate a campione —, tre rimandi a sezioni nelle sorelle ripuntati al codice, C8 allineato, un angolo cieco e due suite nella guida); 05 (2026-11-25: controllo del proprietario in produzione; due commenti, una frase di guida e quattro rimandi nelle sorelle riscritti, la costante dell'orfano nominata nel suo modulo, nessun codice corretto); 06 (2026-11-25: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — lo scenario `asset` di `perf:census` ripuntato su «Fondo Pensione», perché un tipo del registro non ha più «Quantità» alla creazione —, tre commenti e tre frasi di guida con il numero di decisione riscritti, quattro commenti e due frasi rimaste sulla «Posizione iniziale» corretti, la frase della commissione nativa a 0 resa vera, la mutazione nell'intestazione di sette test, sette rimandi nelle sorelle ripuntati al codice e alle guide); le altre quindici sono `read`, nessuna implementata.
+> controllo in produzione, un commento corretto); 03 (2026-11-24: solo etichette riscritte, controllo del proprietario su Rendimenti, Previdenza e Panoramica); 04 (2026-11-24: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — Movimenti tiene modifica ed elimina mentre rilegge una copia restaurata, il 409 del rosso di `assets.trade-fee`, test visto rosso, Playwright intera; 22 etichette dei test della spec riscritte nella mutazione che li fa rossi — cinque provate a campione —, tre rimandi a sezioni nelle sorelle ripuntati al codice, C8 allineato, un angolo cieco e due suite nella guida); 05 (2026-11-25: controllo del proprietario in produzione; due commenti, una frase di guida e quattro rimandi nelle sorelle riscritti, la costante dell'orfano nominata nel suo modulo, nessun codice corretto); 06 (2026-11-25: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — lo scenario `asset` di `perf:census` ripuntato su «Fondo Pensione», perché un tipo del registro non ha più «Quantità» alla creazione —, tre commenti e tre frasi di guida con il numero di decisione riscritti, quattro commenti e due frasi rimaste sulla «Posizione iniziale» corretti, la frase della commissione nativa a 0 resa vera, la mutazione nell'intestazione di sette test, sette rimandi nelle sorelle ripuntati al codice e alle guide); 07 (2026-11-25: controllo del proprietario in produzione; solo testo, nessun codice corretto — 87 voci, 24 segnalate, 19 rette —: quattro date «prima del 2026-11-23» dove la regola vale dal deploy del 2026-11-25, tre sigle orfane nella guida («C2», due numeri di decisione), le mutazioni dei quattro test del dialog viste rosse dalla sessione e scritte nell'intestazione, quella della E2E dal commit d'implementazione, tre sigle di test incrociate tolte, la frase della proposta di ritenuta resa vera per un emittente estero, la quarta frase del cambio e `describeDividendFxRefusal` dichiarate nella guida, l'erede del rinvio sugli scaricati a 26% scritto fra gli angoli ciechi, la voce delle note di rilascio portata in testa, C8 con la nota «As built»); le altre quattordici sono `read`, nessuna implementata.
 >
 > Il prompt che il proprietario incolla per ritirare UNA spec di `doc/dati/` (`doc/dati/README.md` § 8 regola 12:
 > implementazione → ritiro → implementazione). Ogni segnaposto del corpo è sostituito con ciò che il repo diceva il
@@ -295,15 +295,15 @@ ORDINE DI LAVORO
    resta l'archivio, e ogni rimando alla cartella nel repo si riscrive verso di lui.
 
 5) AGGIORNA indici e stato — lo stato vive in PIÙ punti che possono divergere e si
-   chiude con un grep, non con una riga: la cartella è `doc/dati/` (15 spec
+   chiude con un grep, non con una riga: la cartella è `doc/dati/` (14 spec
    `DATI-NN-<slug>.md`, l'indice, questo prompt: `ls doc/dati/`); l'indice è
-   `doc/dati/README.md` (612 righe al 2026-11-25, dopo il ritiro di 06; `grep -n "^## " doc/dati/README.md`: § 1 i quindici
+   `doc/dati/README.md` (618 righe al 2026-11-25, dopo il ritiro di 07; `grep -n "^## " doc/dati/README.md`: § 1 i quindici
    punti del proprietario, § 2 il codice di partenza, § 3 le decisioni 1–96, § 4 le scelte
    adottate, una riga per spec, § 5 l'ordine — il numero È l'ordine — e le dipendenze, § 6
    la tabella di stato, § 7 i contratti condivisi C1–C8 e gli altri nomi, § 8 le sedici
    regole, § 9 la riga SPEC VIVE, § 10 ciò che non si fa). LA RIGA DI STATO è l'ultima
    colonna della tabella di § 6 (`grep -n -E "^\| \[[0-9]{2}\]\(DATI-" doc/dati/README.md`
-   → 15 righe dopo il ritiro di 06 (2026-11-25), tutte «read — riletta in modo adversariale il 2026-11-23: N
+   → 14 righe dopo il ritiro di 07 (2026-11-25), tutte «read — riletta in modo adversariale il 2026-11-23: N
    rilievi, M decisioni»): i valori sono `written` → `read` → `implemented` (in `develop`,
    in attesa del ritiro), e il ritiro TOGLIE la riga (il paragrafo sotto la tabella,
    regola 12) — nell'indice non si scrive nessun «retired on»: il ritiro sta in `git log
@@ -389,10 +389,10 @@ e 21 moderati, invariati dal 2026-11-20). Nel messaggio di commit, con i segnali
 10; la colonna «Model · effort» di § 6 finché la riga c'è).
 LIMITI: tetti e comandi, con la misura del 2026-11-24 accanto — CLAUDE.md «well under
 20.000 characters», contato in caratteri: `node -e
-"console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` → 18.102 (`wc -c` →
-18.363: conta i byte) dopo il ritiro di 06, 76 righe: restano circa 1.900 caratteri, il «Latest» si SOSTITUISCE
+"console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` → 18.028 (`wc -c` →
+18.287: conta i byte) dopo il ritiro di 07, 76 righe: restano circa 1.900 caratteri, il «Latest» si SOSTITUISCE
 e una riga d'area si riscrive a lunghezza uguale o minore; AGENTS.md ~1000 righe (§ 0):
-`wc -l AGENTS.md` → 874 (3d271323 ne ha spostate 127 nelle guide) — una regola nuova entra come RULE + DATE +
+`wc -l AGENTS.md` → 880 (3d271323 ne ha spostate 127 nelle guide) — una regola nuova entra come RULE + DATE +
 WHERE PINNED, uno stub di § 3 non cresce, una lezione di dominio va nella guida;
 WORKFLOW.md (347 righe) solo lo standard e la sua traduzione locale; README.md 467 righe
 (DATI-01 ne ha tolte 73); DESIGN.md (1481 righe) scritto a mano, senza tetto, mai
@@ -401,7 +401,7 @@ vicine al tetto con `wc -l doc/guide/*.md | sort -n | tail -10`: `consulente.md`
 OLTRE, e 15, 19 e 21 vi scrivono), `patrimonio.md` 493 (sette spec), `velocita.md` 492
 (nove), `temi.md` 486, `prima-schermata-misure.md` 473 (12 e 13), `assistente.md` 444
 (otto), `e2e-playwright.md` 428, `cashflow.md` 379, `panoramica.md` 361; le altre di
-destinazione partono da `cashflow-dividendi.md` 308, `accumulo.md` 307, `rendimenti.md`
+destinazione partono da `cashflow-dividendi.md` 415 (dopo 07), `accumulo.md` 307, `rendimenti.md`
 273, `consulente-piano.md` 268, `allocazione.md` 227, `collaudo.md` 226, `impostazioni.md`
 207, `email-pdf.md` 206, `registro-operazioni.md` 197, `assistente-registra.md` 147,
 `storico.md` 171, `grafici.md` 103, `server.md` 57. In questa serie una guida che una SPEC

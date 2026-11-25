@@ -862,6 +862,10 @@ file used to carry.
   `e2e/cashflow.transfer-fee.spec.ts`) — doc/guide/e2e-playwright.md § Browser-Driven E2E (Playwright).
 - **An assertion of ABSENCE needs a positive anchor first** (`toHaveCount(0)` passes on an unrendered page), and a
   chunk held from the first navigation keeps an absence at mount green (2026-10-07, `e2e/assets.rows.mobile.spec.ts`).
+- **«Saved before <date>» takes the day the code shipped, not the day it was decided** (2026-11-25): a record without a
+  new field exists until the deploy, so the boundary of stored data is the deploy's date and the owner's decision keeps
+  its own («owner, 2026-11-23») — four comments of the foreign dividend said the decision's (`lib/services/dividendService.ts`,
+  `reconvertAtPaymentDay`).
 
 ### Per-page blind spots
 The "looks like a bug, is not" behaviours live at the end of each `doc/guide/<page>.md` (*Per-page blind spots*,
