@@ -14,6 +14,8 @@ import {
 } from '@/lib/server/apiAuth';
 import { createDividendWithOptionalExpense } from '@/lib/server/dividendUseCase';
 import { dividendDataSchema, parseOr400 } from '@/lib/server/validation';
+import { isCurrencyAllowed } from '@/lib/constants/currencies';
+import { describeDividendFxRefusal } from '@/lib/utils/dividendFx';
 
 /**
  * GET /api/dividends
@@ -174,7 +176,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Asset does not belong to user' }, { status: 403 });
     }
 
-    const result = await createDividendWithOptionalExpense(userId, dividendData, asset);
+    // A listed currency, or the instrument's own (the one rule of the trade form, 2026-11-23).
+    if (!isCurrencyAllowed(dividendData.currency, asset.currency)) {
+      return NextResponse.json({ error: 'Valuta non ammessa per questo strumento.' }, { status: 400 });
+    }
+
+    let result: Awaited<ReturnType<typeof createDividendWithOptionalExpense>>;
+    try {
+      result = await createDividendWithOptionalExpense(userId, dividendData, asset);
+    } catch (error) {
+      // A credited euro net the day's rate refuses is the owner's typo: said, not a 500.
+      const refusal = describeDividendFxRefusal(error, dividendData.currency);
+      if (refusal) return NextResponse.json({ error: refusal }, { status: 422 });
+      throw error;
+    }
 
     if (result.skipped) {
       return NextResponse.json({ success: true, message: result.reason });

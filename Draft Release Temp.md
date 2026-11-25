@@ -6,6 +6,7 @@
 
 - **Patrimonio — operazioni in valuta** — Added to «Registra operazione» on a foreign instrument: the fee in the instrument's currency, «Totale addebitato in euro» from the broker's statement, and the rate each operation used, shown in «Movimenti».
 - **Patrimonio — un solo modulo per gli acquisti** — Changed «Nuovo asset»: a new instrument is created empty and «Registra operazione» opens for its first purchase; the currency is a list, and cash accounts are in euro only.
+- **Cashflow › Dividendi — dividendi esteri** — Added to the dividend form: the instrument's currency, «Ritenuta estera» and «Ritenuta italiana» for a foreign issuer, the ECB rate of the payment day or «Netto accreditato in euro» from the statement; a downloaded dividend is taxed at the instrument's own rate. A payment left on today's date now counts as received at once, where it showed «Attesa» until a reload.
 
 ## 🐛 Bug Fixes
 

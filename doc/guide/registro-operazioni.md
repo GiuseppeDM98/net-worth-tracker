@@ -184,6 +184,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   date, only when the price changed, and shows no rate line.
 - Pinned by `tradeFx`, `tradeFxService`, `assetTransactionUseCase.fx`, `serverValidation`, `fxRateRoute`,
   `transactionDialog.fx`, `assetMovementsDialog.fx` and `e2e/assets.fx.spec.ts`.
+- **A dividend reuses the same rate service and the same guard** (2026-11-25): its euro side is converted at the
+  PAYMENT day, «Netto accreditato in euro» plays the statement's total — doc/guide/cashflow-dividendi.md § A dividend
+  of a foreign issuer.
 
 ### UI and Rendimenti/Dividendi surfaces
 - `resolveBondPrice` lives in `lib/utils/bondPricing.ts` (since 2026-09-11; it used to be exported from

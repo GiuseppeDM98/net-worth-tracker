@@ -1,3 +1,5 @@
+import type { TradeFxSource } from '@/lib/utils/tradeFx';
+
 // WARNING: If you add a type here, also update:
 // - DividendTable.tsx (type badge map)
 // - DividendDetailsDialog.tsx (type labels + badge map)
@@ -45,6 +47,16 @@ export interface Dividend {
   taxAmountEur?: number; // Tax amount converted to EUR
   netAmountEur?: number; // Net amount converted to EUR
   exchangeRate?: number; // Exchange rate used for conversion (originalCurrency -> EUR)
+  // A foreign issuer withholds twice (2026-11-23, lib/utils/dividendFx.ts): `foreignTaxAmount` is the
+  // part of `taxAmount` withheld abroad, in the record's currency — `taxAmount` stays the TOTAL, so
+  // every reader of it is unchanged. Present on an EUR record too when the issuer is foreign.
+  foreignTaxAmount?: number;
+  foreignTaxAmountEur?: number;
+  // The euro credited, from the statement (a non-EUR record only): the euro net IS this figure.
+  settledNetEur?: number;
+  // Where `exchangeRate` came from: the credit, the payment day's ECB fixing, or the latest one —
+  // a record at 'ecb-latest' (or saved before 2026-11-23, with none) is converted again on its payment day.
+  fxSource?: TradeFxSource;
   // Historical cost basis snapshot: asset.averageCost (EUR per share) at the time of payment.
   // Used by calculateYocMetrics to compute YOC with the cost basis that was in effect when
   // the dividend was received, rather than the current (potentially different) averageCost.
@@ -73,6 +85,9 @@ export interface DividendFormData {
   isProvisional?: boolean;
   // Server-set snapshot of asset.averageCost at payment time — never from user input.
   costPerShare?: number;
+  // See Dividend.foreignTaxAmount and Dividend.settledNetEur.
+  foreignTaxAmount?: number;
+  settledNetEur?: number;
 }
 
 export interface DividendStats {

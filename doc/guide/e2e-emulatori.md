@@ -45,7 +45,10 @@
   dev:emulator`): PowerShell 5.1 eats the `--` of `npm run … -- -p 3200`.
 - **An exercise can drive the ROUTES** (`scripts/*.tmp.mts`): an ID token from the Auth emulator's
   `accounts:signInWithPassword`, the mutations over HTTP, fixtures and read-backs with the Admin SDK — the way to
-  exercise a `server-only` module, which a script cannot import.
+  exercise a `server-only` module through its route. **A script CAN import one directly** with
+  `npx tsx --conditions=react-server scripts/<x>.tmp.mts` (2026-11-25: the cron's payment-day phase,
+  `runExpenseCreation`, called on the emulator without its route, which scrapes Borsa Italiana first); without the
+  flag the import throws «This module cannot be imported from a Client Component module».
 A collection whose value is in the *wiring* gets one: the unit suites mock Firestore away, so only an exercise covers
 the rules permitting the writes, real `Timestamp` values surviving `removeUndefinedDeep` and the real atomic transaction.
 - **A throwaway is an `.mts` FILE run from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase G): a
