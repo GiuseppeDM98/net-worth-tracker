@@ -451,8 +451,8 @@ vendite non sono segnati.» (The Absence-Has-Three-Names Rule).
 
 `showDeltas` and all it gates leave (`:121` its storage key, `:319`, `:338`, `:366-370`, `:452-453`, `:554-…`, `:763`,
 the button `:669-680`, `DELTA_WINDOWS`, `DELTA_KEYS`, the sort by Δ and the table's Δ cells); the price columns are
-always shown. DATI-05's group of the instruments at zero and its stored toggle `STORAGE_KEYS.showArchived` stay as
-they are: only the Δ leaves, and the sentence DATI-05 wrote in the guide loses its «Andamento» (the toggle).
+always shown. The closed group of the instruments at zero and its stored toggle `STORAGE_KEYS.showArchived` stay as
+they are: only the Δ leaves, and the sentence on the group in `doc/guide/patrimonio-strumenti.md` loses its «Andamento» (the toggle).
 A link-styled button «Andamento» (`TrendingUp`) calls a new prop `onOpenAndamento` — the page
 switches the tab: at `desktop:` in the tile's aside beside «Raggruppa per classe»; below it — where that aside is
 not mounted (`!collapse`) — as the first line of the open panel of Strumenti, 44 px tall (a control never sits in a
@@ -572,8 +572,8 @@ the owner opens the PR `develop` → `main` (index § 8 rule 13).
 
 ## 9. Documentation
 
-- A NEW guide, `doc/guide/patrimonio-andamento.md` (doc/guide/patrimonio.md has 493 lines and DATI-05 already
-  splits Strumenti out of it: the tab does not go back in; decision 47) — C6: the two measures and why the euro
+- A NEW guide, `doc/guide/patrimonio-andamento.md` (doc/guide/patrimonio.md already had Strumenti split out of it
+  into `patrimonio-strumenti.md`: the tab does not go back in; decision 47) — C6: the two measures and why the euro
   view is uncoloured, the YTD's two bases, the month in progress, `hasNoMarketPrice`, the three absences, the
   scrollable region's rule, § Composizione mobile (the rows that open inside THE tile, the strip's two cells),
   § Files; § Per-page blind spots: the class and the name are today's; a missing snapshot empties two cells; the
@@ -583,7 +583,7 @@ the owner opens the PR `develop` → `main` (index § 8 rule 13).
   opening positions of the migration carry no mark; a deleted account or fund is not listed; the market effect
   net of trades as a third measure and a historical class per snapshot row are not there; no export.
 - `doc/guide/patrimonio.md` — the two tabs and the page's loading branch; Strumenti without its «Andamento» view
-  (in `doc/guide/patrimonio-strumenti.md` once DATI-05 is in). `AGENTS.md` § 3 — a stub for the new guide, and
+  (in `doc/guide/patrimonio-strumenti.md`). `AGENTS.md` § 3 — a stub for the new guide, and
   Patrimonio's rewritten at equal or shorter length (decision 47).
 - `doc/guide/rendimenti.md` — the heat scale's new home. `doc/guide/prima-schermata-misure.md` — the new surface,
   the widened entry and the declared exception (§ 8). `doc/guide/e2e-emulatori.md` — the seed's previous-month

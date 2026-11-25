@@ -65,9 +65,10 @@ export function isLiquidityRow(asset: Pick<Asset, 'type' | 'assetClass'>): boole
 }
 
 /**
- * A position still held. `quantity = 0` marks a sold asset (doc/guide/patrimonio.md § Asset Pricing, FX and Assets): it stays
- * in the table with its «Azzerato» badge, but it is not something the user owns — every count,
- * share and sum on the page runs over held positions only.
+ * A position still held. `quantity = 0` marks a sold asset (doc/guide/patrimonio.md § Asset Pricing, FX and Assets): with a
+ * row in the Registro it sits in Strumenti's closed group of sold-out instruments, without one it stays in the table with
+ * its «Azzerato» or «Mai comprato» chip (doc/guide/patrimonio-strumenti.md); either way it is not something the user
+ * owns — every count, share and sum on the page runs over held positions only.
  */
 export function isHeld(asset: Pick<Asset, 'quantity'>): boolean {
   return asset.quantity > 0;
