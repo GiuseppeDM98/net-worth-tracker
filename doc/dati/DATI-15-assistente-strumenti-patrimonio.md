@@ -363,8 +363,8 @@ export function instrumentDays(
 }
 ```
 
-`hasNoMarketPrice` and `snapshotUnitPrice(row)` are C6 (DATI-12 § 4.1), `DELETED_INSTRUMENT_NAME` is DATI-05's
-(`lib/utils/instrumentArchive.ts`), `settledTotalEur` is a trade's field since DATI-06: all four are in `develop`
+`hasNoMarketPrice` and `snapshotUnitPrice(row)` are C6 (DATI-12 § 4.1), `DELETED_INSTRUMENT_NAME` is the one word of a trade whose
+asset is gone (`lib/utils/deletedInstrumentName.ts`, re-exported by `lib/utils/instrumentArchive.ts`), `settledTotalEur` is a trade's field since DATI-06: all four are in `develop`
 when this spec starts (the number is the order).
 
 ### 4.2 The 30-day block — `lib/utils/dailyBlock.ts` (new, written here)

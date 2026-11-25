@@ -332,7 +332,6 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [05](DATI-05-strumenti-azzerati.md) | Sold-out instruments: a closed group, no deletion over a history | M | — | Sonnet 5.5 · medium | implemented |
 | [06](DATI-06-valuta-estera-operazioni.md) | A trade in a foreign currency | L | 04 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 22 rilievi, 4 decisioni |
 | [07](DATI-07-valuta-estera-dividendi.md) | A dividend in a foreign currency | M | 04, 06 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 4 decisioni |
 | [08](DATI-08-assistente-forma-della-risposta.md) | Assistente: one form for every answer | L | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 1 decisione |
@@ -518,7 +517,7 @@ says so; it never changes what is there. The full text of each is in the spec th
 
 ### Other names one spec creates and a later one reads
 
-- `DELETED_INSTRUMENT_NAME` (`lib/utils/instrumentArchive.ts`, DATI-05) — read by 15.
+- `DELETED_INSTRUMENT_NAME` (`lib/utils/deletedInstrumentName.ts`, re-exported by `lib/utils/instrumentArchive.ts`; DATI-05 retired) — read by 15.
 - `invalidateTradeCaches` (`lib/hooks/useAssetTransactions.ts`) — widened by DATI-04 (the dividends' keys), exported
   by DATI-16.
 - `describeProposalCardState` (`lib/utils/proposalCardState.ts`) and the exported `isCalendarDate`
@@ -578,11 +577,11 @@ says so; it never changes what is there. The full text of each is in the spec th
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
+`SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21`
 
 The adversarial reading of the specs together (prompt 07) was done on 2026-11-23, with DATI-20 and DATI-21
 written and read in it; prompt 08 (`08_CREA_RITIRO_SPEC`) ran on 2026-11-24, in a session of its own, and wrote
-`doc/dati/PROMPT-RITIRO.md`; DATI-01 to DATI-04 were implemented and retired on 2026-11-24; the next spec is DATI-05. A retirement removes its number from the line
+`doc/dati/PROMPT-RITIRO.md`; DATI-01 to DATI-05 were implemented and retired (01–04 on 2026-11-24, 05 on 2026-11-25); the next spec is DATI-06. A retirement removes its number from the line
 above; the last one deletes the line with the folder.
 
 ## 10. What NOT to do (decided on 2026-11-23)

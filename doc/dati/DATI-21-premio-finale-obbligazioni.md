@@ -522,7 +522,7 @@ register row (index § 8 rule 7). With phases A–E closed and the commit in `de
   decision 47) — one line in the bonds block: the premium fact and the strategy's sentence.
 - `doc/guide/assistente.md` § Per-page blind spots — the chat's holdings do not print the final premium: the row
   carries it for the Consulente's block alone.
-- `doc/guide/patrimonio.md` (or the guide DATI-05 moved the instruments' section to) — the form's field, one line.
+- `doc/guide/patrimonio.md` (and `doc/guide/patrimonio-strumenti.md` for the instruments' rows) — the form's field, one line.
 - `doc/guide/velocita.md` § Registro — only if a ceiling was raised.
 - AGENTS.md § 3 — the stubs of the guides touched are rewritten at equal or shorter length (decision 47).
 - `README.md` — Dividendi's feature line: the final premium on the units bought at issue.

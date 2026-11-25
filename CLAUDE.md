@@ -14,7 +14,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19 **with the React Compiler on** (since 2026-10-05), TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - Tests: Vitest in `__tests__/` (one file per pure module), held green in `Europe/Rome`, in the machine's zone AND under `TZ=UTC` (since 2026-10-08); Playwright specs in `e2e/` (the projects and the traps: doc/guide/e2e-playwright.md; the full run and its known flakes: doc/guide/e2e-suite.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, the ones beside midnight are named by the Italian clock.
-- Latest (2026-11-24): **DATI-05**: a sold-out instrument WITH operations leaves Strumenti for a closed group and is never deleted over them — 409 `has-ledger-operations`, an opening position alone goes with its instrument (doc/guide/patrimonio-strumenti.md); the guided tour is done and closed; `collaudo-finestre.mts` takes `--width` and `--chiudi` (doc/guide/collaudo.md). Open: doc/dati/ (README § 6). Next: DATI-06.
+- Latest (2026-11-25): **DATI-05** retired: a sold-out instrument WITH operations sits in a closed group of Strumenti and is never deleted over them (doc/guide/patrimonio-strumenti.md); the spec, its criteria and divergences live in `git log -- doc/dati/`. Open: doc/dati/ (README § 6). Next: DATI-06.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

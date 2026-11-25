@@ -1,6 +1,9 @@
 /**
  * The sold-out instruments (2026-11-23): who leaves the list for the closed group, the day of the last
  * sale, the rows that forbid a delete and the words. Invented ids and rounded dates.
+ *
+ * Each case was seen red with its mutation: `> 0` → `>= 0` in `isArchivedInstrument`; `operations` counted in place
+ * of `ownOperations`; the `type === 'sell'` test dropped from `lastSale`; the singular and plural swapped.
  */
 import { describe, expect, it } from 'vitest';
 import type { AssetTransaction } from '@/types/assetTransactions';

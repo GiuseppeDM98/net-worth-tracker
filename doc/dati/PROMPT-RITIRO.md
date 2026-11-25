@@ -4,7 +4,7 @@
 > lascia il corpo com'è; il ritiro dell'ultima spec porta via questo file con la cartella.
 >
 > Ritiri fatti: 01 (2026-11-24, solo documenti); 02 (2026-11-24: il cron lanciato a mano dal proprietario su Vercel come
-> controllo in produzione, un commento corretto); 03 (2026-11-24: solo etichette riscritte, controllo del proprietario su Rendimenti, Previdenza e Panoramica); 04 (2026-11-24: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — Movimenti tiene modifica ed elimina mentre rilegge una copia restaurata, il 409 del rosso di `assets.trade-fee`, test visto rosso, Playwright intera; 22 etichette dei test della spec riscritte nella mutazione che li fa rossi — cinque provate a campione —, tre rimandi a sezioni nelle sorelle ripuntati al codice, C8 allineato, un angolo cieco e due suite nella guida); le altre diciassette sono `read`, nessuna implementata.
+> controllo in produzione, un commento corretto); 03 (2026-11-24: solo etichette riscritte, controllo del proprietario su Rendimenti, Previdenza e Panoramica); 04 (2026-11-24: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — Movimenti tiene modifica ed elimina mentre rilegge una copia restaurata, il 409 del rosso di `assets.trade-fee`, test visto rosso, Playwright intera; 22 etichette dei test della spec riscritte nella mutazione che li fa rossi — cinque provate a campione —, tre rimandi a sezioni nelle sorelle ripuntati al codice, C8 allineato, un angolo cieco e due suite nella guida); 05 (2026-11-25: controllo del proprietario in produzione; due commenti, una frase di guida e quattro rimandi nelle sorelle riscritti, la costante dell'orfano nominata nel suo modulo, nessun codice corretto); le altre sedici sono `read`, nessuna implementata.
 >
 > Il prompt che il proprietario incolla per ritirare UNA spec di `doc/dati/` (`doc/dati/README.md` § 8 regola 12:
 > implementazione → ritiro → implementazione). Ogni segnaposto del corpo è sostituito con ciò che il repo diceva il
@@ -246,7 +246,7 @@ ORDINE DI LAVORO
    06, 12, 14, 17, 20, 21), `assistente-registra.md` (sei), `e2e-emulatori.md` (sei),
    `rendimenti.md`, `impostazioni.md`, `server.md` (cinque ciascuna), `cashflow-dividendi.md`
    (quattro: 04, 07, 18, 21), `consulente.md` (15, 19, 21) e `consulente-piano.md` (19, 20,
-   21); tre guide NASCONO con una spec e il 2026-11-24 non esistono: `patrimonio-strumenti.md`
+   21); due guide NASCONO con una spec e il 2026-11-25 non esistono (`patrimonio-strumenti.md` è nata con 05):
    (05), `assistente-strumenti.md` (09), `patrimonio-andamento.md` (12) — e, per ciò che
    sembra un bug e non lo è, i suoi § Per-page blind spots (`grep -ln "Per-page blind
    spots" doc/guide/*.md | wc -l` → 43 guide su 50); un RINVIO senza erede → una spec
@@ -295,15 +295,15 @@ ORDINE DI LAVORO
    resta l'archivio, e ogni rimando alla cartella nel repo si riscrive verso di lui.
 
 5) AGGIORNA indici e stato — lo stato vive in PIÙ punti che possono divergere e si
-   chiude con un grep, non con una riga: la cartella è `doc/dati/` (21 spec
+   chiude con un grep, non con una riga: la cartella è `doc/dati/` (20 spec
    `DATI-NN-<slug>.md`, l'indice, questo prompt: `ls doc/dati/`); l'indice è
-   `doc/dati/README.md` (609 righe al 2026-11-24, dopo il ritiro di 04; `grep -n "^## " doc/dati/README.md`: § 1 i quindici
+   `doc/dati/README.md` (608 righe al 2026-11-25, dopo il ritiro di 05; `grep -n "^## " doc/dati/README.md`: § 1 i quindici
    punti del proprietario, § 2 il codice di partenza, § 3 le decisioni 1–96, § 4 le scelte
    adottate, una riga per spec, § 5 l'ordine — il numero È l'ordine — e le dipendenze, § 6
    la tabella di stato, § 7 i contratti condivisi C1–C8 e gli altri nomi, § 8 le sedici
    regole, § 9 la riga SPEC VIVE, § 10 ciò che non si fa). LA RIGA DI STATO è l'ultima
    colonna della tabella di § 6 (`grep -n -E "^\| \[[0-9]{2}\]\(DATI-" doc/dati/README.md`
-   → 17 righe dopo il ritiro di 04 (2026-11-24), tutte «read — riletta in modo adversariale il 2026-11-23: N
+   → 16 righe dopo il ritiro di 05 (2026-11-25), tutte «read — riletta in modo adversariale il 2026-11-23: N
    rilievi, M decisioni»): i valori sono `written` → `read` → `implemented` (in `develop`,
    in attesa del ritiro), e il ritiro TOGLIE la riga (il paragrafo sotto la tabella,
    regola 12) — nell'indice non si scrive nessun «retired on»: il ritiro sta in `git log
@@ -389,8 +389,8 @@ e 21 moderati, invariati dal 2026-11-20). Nel messaggio di commit, con i segnali
 10; la colonna «Model · effort» di § 6 finché la riga c'è).
 LIMITI: tetti e comandi, con la misura del 2026-11-24 accanto — CLAUDE.md «well under
 20.000 characters», contato in caratteri: `node -e
-"console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` → 18.209 (`wc -c` →
-18.468: conta i byte) dopo il ritiro di 04, 76 righe: restano circa 1.800 caratteri, il «Latest» si SOSTITUISCE
+"console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` → 18.054 (`wc -c` →
+18.310: conta i byte) dopo il ritiro di 05, 77 righe: restano circa 1.900 caratteri, il «Latest» si SOSTITUISCE
 e una riga d'area si riscrive a lunghezza uguale o minore; AGENTS.md ~1000 righe (§ 0):
 `wc -l AGENTS.md` → 874 (3d271323 ne ha spostate 127 nelle guide) — una regola nuova entra come RULE + DATE +
 WHERE PINNED, uno stub di § 3 non cresce, una lezione di dominio va nella guida;
@@ -409,7 +409,7 @@ porta oltre ~500 righe si divide per sotto-tema nella sessione di quella spec (d
 47, regola 16): al ritiro si controlla che sia stato fatto; una guida che il TRAVASO del
 ritiro porta oltre NON si taglia in chiusura. Il giorno dell'ultima spec si misura PRIMA
 del travaso quanto porta l'indice — `awk '/^## 7\./,/^## 8\./' doc/dati/README.md | wc -l`
-→ 173 righe di contratti, lo stesso da `## 3.` a `## 5.` → 215 di decisioni e scelte, da
+→ 174 righe di contratti, lo stesso da `## 3.` a `## 5.` → 215 di decisioni e scelte, da
 `## 8.` a `## 9.` → 48 di regole, `awk '/^## 10\./,0' doc/dati/README.md | wc -l` → 22 di
 «non si fa» —, lo si somma alle guide di destinazione e lo si dichiara. Se sfori, NON
 tagliare in chiusura: dimmelo e proponi lo scorporo
