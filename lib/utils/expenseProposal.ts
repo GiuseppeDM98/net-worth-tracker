@@ -660,6 +660,8 @@ export interface ExpenseProposalCardState {
 }
 
 export const PROPOSAL_INTERRUPTED_LINE = 'Risposta interrotta: chiedi di riproporla';
+/** The page's reads have not answered yet: the card cannot check its ids, nor open the form on them. */
+export const PROPOSAL_READS_LOADING_LINE = 'Leggo categorie e conti…';
 /** A proposal beside a question (the contract forbids it): the answer comes first. */
 export const PROPOSAL_WAITS_FOR_ANSWER_LINE = 'Rispondi prima alla domanda';
 export const PROPOSAL_WRITTEN_BY_EDIT_LINE = 'registrata da Modifica';
@@ -688,13 +690,17 @@ function describeWritten(resolved: ResolvedExpenseProposal, persisted: Assistant
 export function describeExpenseProposalState(
   resolved: ResolvedExpenseProposal,
   persisted: AssistantProposalState | undefined,
-  local: { messageId: string; saving: boolean; readFailed: boolean; isDemo: boolean; hasQuestionBlock: boolean },
+  local: { messageId: string; saving: boolean; readFailed: boolean; isDemo: boolean; hasQuestionBlock: boolean; readsLoading?: boolean },
 ): ExpenseProposalCardState {
   const closed = { canConfirm: false, canEdit: false, canIgnore: false, waitLine: null };
   if (persisted?.status === 'written') return { status: 'written', ...describeWritten(resolved, persisted), ...closed };
   if (persisted?.status === 'ignored') return { status: 'ignored', line: 'Ignorata', feeLine: null, ...closed };
   if (local.messageId.startsWith('local-')) return { status: 'interrupted', line: PROPOSAL_INTERRUPTED_LINE, feeLine: null, ...closed };
   if (local.saving) return { status: 'saving', line: null, feeLine: null, ...closed };
+  // The card mounts with the answer's `done`, which may come before the page's reads (DATI-08: the
+  // tile no longer remounts the messages after a thread load, which used to hide this): «Modifica»
+  // would open the form on no category, «Conferma» check against empty lists.
+  if (local.readsLoading) return { status: 'idle', line: null, feeLine: null, ...closed, canIgnore: true, waitLine: PROPOSAL_READS_LOADING_LINE };
   const writable = !local.readFailed && !local.isDemo;
   return {
     status: 'idle',

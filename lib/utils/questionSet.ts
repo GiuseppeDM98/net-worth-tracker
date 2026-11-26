@@ -16,6 +16,7 @@
  */
 
 import { z } from 'zod';
+import type { AssistantMode } from '@/types/assistant';
 
 export const QUESTION_MAX_PER_ROUND = 4;
 export const QUESTION_OPTIONS_MIN = 2;
@@ -202,9 +203,13 @@ export function entityQuestionProblems(question: Question): string[] {
   return problems;
 }
 
-/** Whether the block of this rank among the message's question blocks renders: the first two only. */
-export function keepQuestionBlock(ordinal: number): boolean {
-  return ordinal < ASSISTANT_QUESTION_MAX_PER_MESSAGE;
+/**
+ * Whether the block of this rank among the message's question blocks renders: the first two on a
+ * registration, the first alone in any other mode (2026-11-25: a doubt only the reader can settle is
+ * one card).
+ */
+export function keepQuestionBlock(ordinal: number, mode: AssistantMode): boolean {
+  return ordinal < (mode === 'register' ? ASSISTANT_QUESTION_MAX_PER_MESSAGE : 1);
 }
 
 /**

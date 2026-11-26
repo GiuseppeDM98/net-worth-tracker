@@ -212,11 +212,17 @@ describe('entityQuestionProblems', () => {
 });
 
 describe('keepQuestionBlock', () => {
-  it('keeps the first two blocks of a message', () => {
+  it('keeps the first two blocks of a registration', () => {
     expect(ASSISTANT_QUESTION_MAX_PER_MESSAGE).toBe(2);
-    expect(keepQuestionBlock(0)).toBe(true);
-    expect(keepQuestionBlock(1)).toBe(true);
-    expect(keepQuestionBlock(2)).toBe(false);
+    expect(keepQuestionBlock(0, 'register')).toBe(true);
+    expect(keepQuestionBlock(1, 'register')).toBe(true);
+    expect(keepQuestionBlock(2, 'register')).toBe(false);
+  });
+
+  it('keeps the first block alone in any other mode (2026-11-25)', () => {
+    expect(keepQuestionBlock(0, 'chat')).toBe(true);
+    expect(keepQuestionBlock(1, 'chat')).toBe(false);
+    expect(keepQuestionBlock(1, 'month_analysis')).toBe(false);
   });
 });
 

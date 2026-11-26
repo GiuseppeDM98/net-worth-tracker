@@ -15,6 +15,7 @@
 
 ## 🔧 Improvements
 
+- **Assistente — la forma delle risposte** — Changed every answer: the figure first, the sums that hold it, at most two cautions; «Continua con» is written for your question; a doubt only you can settle is one card with options; a rule of law comes with its source and year, and the Assistente now runs on Opus 5.5. An answer is formatted while it arrives and the page follows it only while you stay at the bottom, «Nuova conversazione» starts at the top, and a Registra card waits for your categories and accounts before «Conferma» and «Modifica» answer.
 - **Panoramica, Patrimonio, email mensile — vendite in guadagno e in perdita** — Changed the sales sentence: when a month sells at a gain and at a loss, it names the capital gains with the tax paid on them and the losses apart, instead of a net figure beside a tax that looked larger than the gain.
 
 - **Patrimonio — gli strumenti azzerati** — Changed Strumenti: an instrument sold in full leaves the list for a closed group at the bottom, «N strumenti azzerati», with «venduto il», «Movimenti» and «Compra»; an instrument with operations in the Registro can no longer be deleted (the trash says why), and the sales of an instrument deleted before read «Strumento eliminato».

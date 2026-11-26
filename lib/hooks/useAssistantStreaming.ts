@@ -338,7 +338,14 @@ export function useAssistantStreaming({
             adoptStreamMessageId(
               current.map((message) =>
                 message.id === assistantMessageId
-                  ? { ...message, webSearchUsed: event.webSearchUsed }
+                  ? {
+                      ...message,
+                      webSearchUsed: event.webSearchUsed,
+                      // The text as saved, its tail cut off, and the questions the tail held; a `done`
+                      // without `content` (an older server) leaves the streamed text as it is.
+                      ...(event.content !== undefined ? { content: event.content } : {}),
+                      ...(event.followUps?.length ? { followUps: event.followUps } : {}),
+                    }
                   : message
               ),
               assistantMessageId,

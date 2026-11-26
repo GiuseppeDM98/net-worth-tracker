@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EXPENSE_PROPOSALS_MAX_PER_MESSAGE,
   PROPOSAL_INTERRUPTED_LINE,
+  PROPOSAL_READS_LOADING_LINE,
   PROPOSAL_NO_ACCOUNT_LABEL,
   PROPOSAL_UNLINKED_INSTALMENT_LABEL,
   PROPOSAL_WAITS_FOR_ANSWER_LINE,
@@ -352,6 +353,14 @@ describe('describeExpenseProposalState', () => {
   it('offers nothing on a message that never received its server id', () => {
     expect(describeExpenseProposalState(resolved, undefined, { ...local, messageId: 'local-assistant-1' })).toEqual({
       status: 'interrupted', line: PROPOSAL_INTERRUPTED_LINE, feeLine: null, waitLine: null, canConfirm: false, canEdit: false, canIgnore: false,
+    });
+  });
+
+  // DATI-08: the card mounts with the answer's `done`, which may come before the page's reads —
+  // «Modifica» then opened the form on no category (E2E assistant.register › «Modifica»).
+  it('waits for the reads: no «Conferma», no «Modifica», a line that says so', () => {
+    expect(describeExpenseProposalState(resolved, undefined, { ...local, readsLoading: true })).toEqual({
+      status: 'idle', line: null, feeLine: null, waitLine: PROPOSAL_READS_LOADING_LINE, canConfirm: false, canEdit: false, canIgnore: true,
     });
   });
 

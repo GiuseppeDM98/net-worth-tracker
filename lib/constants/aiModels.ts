@@ -17,7 +17,8 @@
  *
  * WARNING (Checklist Comment): every call reads content blocks by `type`; the three prose
  * surfaces send `thinking: { type: 'adaptive' }` with an `effort` (`high`, Sonnet 5.5's default,
- * kept without an effort sweep: owner's decision of 2026-10-23), the memory
+ * kept without an effort sweep: owner's decision of 2026-10-23; the Assistente on Opus 5.5 at
+ * `medium`, that model's default, since 2026-11-25), the memory
  * extraction and the Assistente's router (`lib/server/assistant/router.ts`) send neither and force
  * `tool_choice` — Haiku 5.5 accepts it and then skips
  * thinking, so its `max_tokens` holds the tool input alone; Sonnet 5.5 / Opus 5.5 refuse a forced
@@ -47,8 +48,8 @@ export const SERVER_SIDE_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 /** The performance report of Rendimenti → «Analizza con AI». */
 export const PERFORMANCE_ANALYSIS_MODEL = 'claude-sonnet-5-5';
 
-/** The conversational assistant. */
-export const ASSISTANT_MODEL = 'claude-sonnet-5-5';
+/** The conversational assistant (Opus 5.5 since 2026-11-23, owner's decision), at its default effort `medium`. */
+export const ASSISTANT_MODEL = 'claude-opus-5-5';
 
 /** The prose of the monthly and weekly emails. */
 export const EMAIL_ANALYSIS_MODEL = 'claude-sonnet-5-5';

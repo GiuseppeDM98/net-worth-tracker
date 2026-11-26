@@ -2,7 +2,8 @@
 
 > **When to open this guide** — whoever touches `app/dashboard/assistant/*`, `components/assistant/*`,
 > `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`,
-> `lib/utils/{assistantChatNarrative,assistantNarrative,assistantNetWorthDrivers,assistantPeriodOptions,assistantQuestionBlocks,assistantRegisterContext,assistantRoute,assistantStreamBuffer,cashflowBlock,expenseBreakdown,expenseProposal,goalProposal}.ts`,
+> `lib/utils/{assistantAnswerTail,assistantChatNarrative,assistantNarrative,assistantNetWorthDrivers,assistantPeriodOptions,assistantQuestionBlocks,assistantRegisterContext,assistantRoute,assistantStreamBuffer,cashflowBlock,expenseBreakdown,expenseProposal,goalProposal}.ts`,
+> `components/ui/markdown-prose.tsx`,
 > `lib/hooks/useAssistantStreaming.ts`, `app/api/ai/assistant/*`, `app/api/goals/route.ts`. In
 > `AGENTS.md` the stub with the essentials stays; here is the full rule. Modules and files: § *Files* below.
 > E2E: `e2e/assistant.chat.spec.ts` and `e2e/assistant.chat.mobile.spec.ts` (the page as a chat, 2026-11-16),
@@ -10,15 +11,16 @@
 > and `e2e/assistant.register.question.mobile.spec.ts` (Registra) — the stream always faked with `page.route`, helper
 > `e2e/assistantRegister.ts`; no spec asserts an analysis's answer.
 > **Registra** (the `register` mode: card, questions, write, outcome) has its own guide since 2026-11-16:
-> doc/guide/assistente-registra.md.
+> doc/guide/assistente-registra.md. **The form of an answer** (the one contract, the tail, a question back, the
+> renderers of generated Markdown) has its own since 2026-11-25: doc/guide/assistente-risposta.md.
 
 ## Files
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `router.ts` — the router of `mode: 'auto'` —, `store.ts` → `mergeMemoryItem`), pure `lib/utils/assistantRoute.ts` (the reading's contract), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria · Preferenze, the fields in `AssistantPreferencesFields.tsx`), the chat (2026-11-16): `components/assistant/AssistantRouteChooser.tsx` («cambia»), `AssistantWaiting.tsx` (the wait), pure `lib/utils/assistantChatNarrative.ts` (the reading line, the suggestions, the wait's phrases), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`) and `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, its rules in doc/guide/consulente.md § The run); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
+- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `router.ts` — the router of `mode: 'auto'` —, `store.ts` → `mergeMemoryItem`), pure `lib/utils/assistantRoute.ts` (the reading's contract), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria · Preferenze, the fields in `AssistantPreferencesFields.tsx`), the chat (2026-11-16): `components/assistant/AssistantRouteChooser.tsx` («cambia»), `AssistantWaiting.tsx` (the wait), pure `lib/utils/assistantChatNarrative.ts` (the reading line, the suggestions, the wait's phrases), pure `lib/utils/assistantAnswerTail.ts` (the answer's tail and the chips, 2026-11-25), `components/ui/markdown-prose.tsx` (the renderers of generated Markdown), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`) and `lib/utils/cashflowBlock.ts` (the CASHFLOW 12 MESI block, its rules in doc/guide/consulente.md § The run); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
 - **The portfolio block** (2026-10-20): pure `lib/utils/assistantPortfolioContext.ts` (`buildAssistantPortfolioContext`, `emptyAssistantPortfolioContext` for the fixtures), printed by `formatPortfolioForPrompt` in `prompts.ts`; the Italian month bounds `getItalyMonthBoundsUtc`/`getItalyMonthRangeBoundsUtc` in `lib/utils/dateHelpers.ts`. The Consulente of Allocazione is its own guide: doc/guide/consulente.md.
-- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantRouter`, `assistantRoute`, `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `dateHelpers`, `cashflowBlock`, `anthropicStream`, `assistantNetWorthDrivers` · **The page as a chat** `assistantChatNarrative`, `assistantPeriodOptions`, `assistantRouteChooser`, `assistantHeader`, `assistantCompanionScene`, `assistantStreamingResponse`, `assistantQuestionBlock`, `useAssistantStreaming` (the `.tsx` ones on the `dom` project; `AssistantWaiting` has no suite of its own) · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
+- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantRouter`, `assistantRoute`, `assistantWebSearchPolicy`, `assistantMonthContextService`, `assistantPortfolioContext`, `assistantPromptBundle`, `assistantAnswerTail`, `dateHelpers`, `cashflowBlock`, `anthropicStream`, `assistantNetWorthDrivers` · **The page as a chat** `assistantChatNarrative`, `assistantPeriodOptions`, `assistantRouteChooser`, `assistantHeader`, `assistantCompanionScene`, `assistantStreamingResponse`, `assistantQuestionBlock`, `useAssistantStreaming` (the `.tsx` ones on the `dom` project; `AssistantWaiting` has no suite of its own) · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` · **Email** `monthlyEmailService` (the same block)
 
 ## Assistant
 
@@ -38,7 +40,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `buildCashflowBlock` on its own read of the whole history (`fetchCashflowBlockInputs`) and never enters the bundle
   nor the `context` SSE event.
 - **Removing an `AssistantMode` ripples past the WARNING checklist in `types/assistant.ts`**: grep `Record<AssistantMode,
-  …>` too (`assistantFollowUps.ts`'s `CURATED_FOLLOW_UPS` is the live site).
+  …>` too (`prompts.ts`'s `PERIOD_LINES` is the live site since 2026-11-25).
 
 ### Prompt builders (`lib/server/assistant/prompts.ts`)
 - `system` is byte-identical across users and requests of that mode — **never interpolate per-request data into it**;
@@ -193,7 +195,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   mid-stream and wipes the buffer; post-stream invalidation uses a local `resolvedThreadId` updated from `meta`.
 - **`max_tokens` budgets thinking AND text together** (`ASSISTANT_CHAT_MAX_TOKENS` 64 000, `ASSISTANT_STRUCTURED_MAX_TOKENS`
   32 000 since 2026-10-20, owner's decision: a consultative question on the allocation ended on TRUNCATION_NOTICE at
-  12 000 with Sonnet 5.5 at effort `high`; the route declares `maxDuration = 300`) — re-check whenever the data block
+  12 000 with Sonnet 5.5 at effort `high`; the route declares `maxDuration = 300`; unchanged with Opus 5.5 at `medium`,
+  2026-11-25) — re-check whenever the data block
   grows. **Read `stop_reason` from the terminal `message_delta`** and append `TRUNCATION_NOTICE`: a limit either does
   not exist or announces itself.
 - **The stream runs with the server-side fallback** (2026-10-12, owner's decision): `anthropic.beta.messages.create` with
@@ -250,6 +253,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `system` is a constant; the previous turn is the thread's LAST assistant message and the user message right before it
   — a last answer without a reading (an explicit mode) gives none, and the router is never told of an older one. Faked
   by a `RouterClient` with a `vi.fn()` `create` and `vi.mock` of the module; the thread's detail is its last 100 messages.
+
+### The form of an answer, its tail, a question back (2026-11-25)
+- ONE form for every mode but Registra (`ANSWER_CONTRACT`, never in `ASSISTANT_SYSTEM_CORE`), the next questions
+  written by the model in a ```assistant-followups tail the server cuts off, ONE question card outside Registra:
+  doc/guide/assistente-risposta.md (split from this guide on 2026-11-25, past 500 lines).
 
 ### Structured goals (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts` extraction)
 - **Structure is NEVER parsed from text.** It arrives from a forced-tool-use Haiku call validated with zod. A malformed
@@ -346,9 +354,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   nothing, assets only, a cashflow —, the first bold; `?mode=registra` puts the three register rows first; four
   `Skeleton` rows while the Panoramica payload loads) and the follow-ups; a row is `min-h-11` below `desktop:`. A
   suggestion only WRITES the composer (a register row is a sentence to finish), the caret at the end, and sends
-  nothing; a follow-up acts by its `action`: absent, the last answer's mode decides (it submits, after a registration
-  it prefills the composer); `send` submits, with no route (the router reads it again); `focus-composer` empties and
-  focuses the composer («Registra un'altra», first after a written card, 2026-11).
+  nothing; a follow-up is the model's next question (§ The answer's tail, 2026-11-25) or one of Registra's starters
+  (`REGISTER_STARTER_FOLLOW_UPS`) and acts by its `action`: absent, a Registra starter prefills the composer; `send`
+  submits, with no route (the router reads it again); `focus-composer` empties and focuses the composer («Registra
+  un'altra», first after a written card, 2026-11).
 - **The page as a chat (2026-11-12)**: no period axis, no mode to enter. Every send is `mode: 'auto'`
   (`useAssistantStreaming`); the stream's `route` event sets the turn's `mode` and the answer's `routeReading`, and
   the page is shown in the LAST answer's mode (`displayMode`: verdict, companion scene, register reads). The
@@ -373,8 +382,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `COSTUME_GENERATED_FILL_CLASS` — `bg-muted/40` in every theme but Egeo, where the fill is the card so the AI accent
   stays over 4,5:1 — and their boxes, the preferences' rows and the route chooser's are frames (doc/guide/temi.md § Il costume).
 - **Messages are flat** (`AssistantStreamingResponse`): the user's in a `bg-muted/40` sub-tile, the assistant's full-width prose;
-  the proposal cards (`GoalProposalCard`, `ExpenseProposalCard`) are `not-prose` blocks with the AI accent (DESIGN.md → The
-  AI-Accent Rule), never a card in the tile; `MARKDOWN_COMPONENTS` stays module-level. The
+  the proposal cards (`GoalProposalCard`, `ExpenseProposalCard`) are blocks with the AI accent (DESIGN.md → The
+  AI-Accent Rule), never a card in the tile; `MARKDOWN_COMPONENTS` stays module-level: the shared
+  `MARKDOWN_PROSE_COMPONENTS` (`components/ui/markdown-prose.tsx`, 2026-11-25) plus the `pre` of the cards. The app has
+  no typography plugin: a `prose` class styles nothing (until 2026-11-25 a list had no bullets and a heading the body's
+  size), so every element the model writes takes its classes there; a heading keeps the body's colour. The
   streaming badge lives in the tile's aside (`role="status"`); the interruption notice is a muted row with «Rigenera».
 - **Conversazioni, Memoria and Preferenze are `ResponsiveModal`s** (`AssistantModals.tsx`, 2026-09-18 — two right-side
   `Sheet`s until then; Preferenze since 2026-11-12, a header popover before): `md`, `lg` and `sm`, eyebrow «Assistente
@@ -420,7 +432,7 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
 
 ## Per-page blind spots
 
-- **Assistente**: the analysis modes have no Playwright spec; the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`, through `meaningfulSavingsRate` (none below −100% or without income: the words then say the deficit, 2026-11-12); «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; a suggestion writes the composer and sends nothing, follow-up rows act by their `action` (after a registration they prefill, «Registra un'altra» empties); a «Continua con» row is read afresh: «e questo mese?» under an analysis of October may be read as a question on today's data — «cambia» corrects it; the thread rows and the memory rows both use `useArmedDelete` (the threads' 3 s auto-disarm went on 2026-09-18, with the sheet); a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
+- **Assistente**: the analysis modes have no Playwright spec; the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`, through `meaningfulSavingsRate` (none below −100% or without income: the words then say the deficit, 2026-11-12); «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; a suggestion writes the composer and sends nothing, follow-up rows act by their `action` (Registra's starters prefill, «Registra un'altra» empties, the model's questions send); a «Continua con» row is read afresh, like any typed message: «e a settembre?» under an analysis of October may be read as a question on today's data — «cambia» corrects it; the thread rows and the memory rows both use `useArmedDelete` (the threads' 3 s auto-disarm went on 2026-09-18, with the sheet); a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
 - **The Assistant's cashflow figures changed on 2026-07-29 and again on 2026-10-20** (the Italian month bounds, «Entrate» with the coupons inside); saved threads are prose and are not regenerated (moved here from CLAUDE.md → Known Issues on 2026-09-18: it is this page's blind spot, not a cross-cutting one).
 - **The portfolio block is TODAY's, whatever the period** (2026-10-20): the instruments, the allocation on the base, the ledger and the registers describe the portfolio at the time of the question; only the snapshot blocks and the cashflow are the period's. A question about a past month reads today's holdings beside that month's figures — the system core says so.
 - **An answer saved before 2026-11-12 has no reading**: no «Ho letto» line and no «cambia» (a «cambia» needs the
@@ -442,3 +454,5 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
 - **A card's outcome is saved on its message** (2026-11): a reload shows «Obiettivo creato» / «Registrata». The one window left: a PATCH that fails after a successful write (the toast of either card says so); a reload then shows the card idle. A thread refetch landing between the local record and the PATCH can also drop the outcome from the cache — the stream buffer still shows it for the session.
 - **A thread past 100 messages shows its LAST 100** (since 2026-11-16, `getAssistantThreadDetail` reads `orderBy createdAt desc, limit 100` and reverses the page; its oldest 100 until then): the page, the history replayed to the model and the router's previous turn all read the thread's end, and nothing before it.
 - **Memory is the account's**: the owner and a co-owner share the categorisation rules; two wordings of one subject («palestra», «la palestra») stay two rules.
+- **An answer saved before 2026-11-25 has no chips** (no `followUps` stored; the curated ones are gone). A tail that is not the last thing in the text is cut out and gives none; an answer cut by the token limit INSIDE its tail is saved up to the fence, without chips and without the truncation notice (one cut before it keeps the notice). The server-side fallback model may be the one that writes the tail: the same contract reads it.
+- **The web sources are cited in the sentence, never listed under the answer** (a list is a later spec, if ever).

@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useDeferredValue } from 'react';
 import ReactMarkdown, { type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Globe, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { MARKDOWN_PROSE_COMPONENTS } from '@/components/ui/markdown-prose';
 import { AssistantMessage, AssistantProposalState } from '@/types/assistant';
 import { ExpenseProposalCard } from '@/components/assistant/ExpenseProposalCard';
 import { GoalProposalCard } from '@/components/assistant/GoalProposalCard';
@@ -16,6 +17,7 @@ import { MessageIdProvider, useMessageBlocks } from '@/components/assistant/Mess
 import { MessageQuestionsProvider } from '@/components/assistant/MessageQuestionsContext';
 import { AI_CONTROL_ACCENT_CLASS, AI_CONTROL_ACCENT_LABEL_CLASS, AI_GENERATED_EYEBROW_CLASS } from '@/lib/constants/aiAccent';
 import { CHANGE_READING_ARIA, CHANGE_READING_LABEL, describeReadingLine, type AssistantWaitingStatus } from '@/lib/utils/assistantChatNarrative';
+import { streamingAnswerText, visibleAnswerText } from '@/lib/utils/assistantAnswerTail';
 import { isAnswerableQuestionMessage, readAssistantQuestionBlocks } from '@/lib/utils/assistantQuestionBlocks';
 import { EXPENSE_PROPOSAL_LANGUAGE, EXPENSE_PROPOSALS_MAX_PER_MESSAGE, parseExpenseProposal } from '@/lib/utils/expenseProposal';
 import { formatDate } from '@/lib/utils/formatters';
@@ -29,11 +31,9 @@ interface AssistantStreamingResponseProps {
   isInterrupted: boolean;
   onRetry: () => void;
   /**
-   * ID of the message currently being streamed.
-   * While a message is active, it renders as plain text (whitespace-pre-wrap)
-   * to avoid ReactMarkdown re-parsing partial/incomplete markdown on every chunk.
-   * Once streaming finishes (this prop is undefined or points to a different message),
-   * the message renders as full markdown.
+   * ID of the message currently being streamed. While a message is active it renders as Markdown
+   * already (2026-11-25), without its cards: the text up to the first fenced block
+   * (`streamingAnswerText`). Once streaming finishes the cards render too.
    */
   streamingMessageId?: string;
   /** The server's stream status, for the wait before the first word (the web search names itself). */
@@ -70,8 +70,9 @@ function extractCodeText(node: React.ReactNode): string {
  *
  * A ```goal-proposal block renders as a goal card and, on a message read as a registration (its own
  * `mode`, never the page's — 2026-11-12), an ```expense-proposal block as an expense card (the first
- * five of a message) and an ```assistant-question block as a question card (the first two;
- * `AssistantQuestionBlock` decides, and falls back to the code). Intercepted at `pre` rather than at `code`
+ * five of a message); an ```assistant-question block is a question card in any mode (the first two
+ * on a registration, the first elsewhere — 2026-11-25; `AssistantQuestionBlock` decides, and falls
+ * back to the code). Intercepted at `pre` rather than at `code`
  * because a card is block content and would otherwise be nested inside a <pre>, whose content
  * model does not allow it.
  *
@@ -97,7 +98,7 @@ function MarkdownPre({ children, node }: React.ComponentProps<'pre'> & ExtraProp
     </pre>
   );
 
-  // The question block reads its own entry (MessageQuestionsContext): none on a message not read as a registration.
+  // The question block reads its own entry (MessageQuestionsContext), capped by the message's mode.
   if (block?.language === ASSISTANT_QUESTION_LANGUAGE) return <AssistantQuestionBlock index={block.index} codeBlock={codeBlock} />;
 
   if (block && React.isValidElement(firstChild)) {
@@ -116,35 +117,30 @@ function MarkdownPre({ children, node }: React.ComponentProps<'pre'> & ExtraProp
 }
 
 /**
- * Custom renderers for ReactMarkdown.
+ * Custom renderers for ReactMarkdown: the shared ones of generated Markdown
+ * (components/ui/markdown-prose.tsx, 2026-11-25) plus the `pre` that turns a block into a card.
  * Defined at module level (not inline) so the object reference is stable across renders —
  * prevents ReactMarkdown from unmounting/remounting when unrelated state changes. What a
  * renderer needs from its message it reads through context (MessageIdContext).
  */
 const MARKDOWN_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>['components'] = {
+  ...MARKDOWN_PROSE_COMPONENTS,
   pre: MarkdownPre,
-  table: ({ children }) => (
-    <div className="my-3 w-full overflow-x-auto">
-      <table className="w-full border-collapse text-[13px]">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => (
-    <thead className="border-b border-border">{children}</thead>
-  ),
-  th: ({ children }) => (
-    <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'px-3 py-2 text-left')}>
-      {children}
-    </th>
-  ),
-  td: ({ children }) => (
-    <td className="px-3 py-2 text-[13px] text-foreground [&:has(>strong)]:font-mono">{children}</td>
-  ),
-  tr: ({ children }) => (
-    <tr className="border-b border-border last:border-0">{children}</tr>
-  ),
 };
 
-const NO_QUESTION_BLOCKS: ReturnType<typeof readAssistantQuestionBlocks> = [];
+/**
+ * An answer still arriving, as Markdown (2026-11-25: until then plain text that became Markdown at
+ * the end, the page jumping). The text is deferred, so a burst of chunks is parsed once; no card
+ * renders before the answer is complete.
+ */
+function StreamingMarkdown({ content }: { content: string }) {
+  const deferred = useDeferredValue(content);
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_PROSE_COMPONENTS}>
+      {streamingAnswerText(deferred)}
+    </ReactMarkdown>
+  );
+}
 
 // Shared spring-style easing for all message entrance animations.
 const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
@@ -158,7 +154,7 @@ const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
  * 9px sub-eyebrow of its role and a mono timestamp.
  *
  * User messages are always plain text.
- * Assistant messages render as plain text during streaming, switch to ReactMarkdown on completion.
+ * Assistant messages render as Markdown while they stream (no cards) and with their cards once complete.
  */
 export function AssistantStreamingResponse({
   messages,
@@ -229,20 +225,25 @@ export function AssistantStreamingResponse({
               {/* Content */}
               {!isUser ? (
                 isActiveStream ? (
-                  // Plain text during streaming — avoids ReactMarkdown re-parse on every chunk
-                  <p className="whitespace-pre-wrap text-sm leading-[1.6] text-foreground">
-                    {message.content || <AssistantWaiting reading={message.routeReading} status={streamStatus ?? null} />}
+                  // Markdown while streaming, up to the first fenced block: the tail of the next
+                  // questions, a card's JSON and a fence half typed are never shown.
+                  <div className="max-w-none text-foreground">
+                    {streamingAnswerText(message.content) ? (
+                      <StreamingMarkdown content={message.content} />
+                    ) : (
+                      <AssistantWaiting reading={message.routeReading} status={streamStatus ?? null} />
+                    )}
                     {/* An answer already begun can stand still while the server searches the web
                         (owner, 2026-11-16: a minute on the first sentence): the wait comes back under it. */}
-                    {message.content && streamStatus === 'searching' && (
-                      <span className="mt-2 flex">
+                    {streamingAnswerText(message.content) && streamStatus === 'searching' && (
+                      <div className="mt-2 flex">
                         <AssistantWaiting reading={message.routeReading} status="searching" />
-                      </span>
+                      </div>
                     )}
-                  </p>
+                  </div>
                 ) : (
                   // Full markdown once the stream is complete
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground">
+                  <div className="max-w-none text-foreground">
                     {message.content ? (
                       <MessageIdProvider
                         message={message}
@@ -252,15 +253,17 @@ export function AssistantStreamingResponse({
                         }
                       >
                         <MessageQuestionsProvider
-                          // The MESSAGE's mode, as the expense card's gate: a question is a card on a registration alone.
-                          blocks={message.mode === 'register' ? readAssistantQuestionBlocks(message.content) : NO_QUESTION_BLOCKS}
+                          // The MESSAGE's mode, as the expense card's gate: two cards on a registration, one elsewhere.
+                          blocks={readAssistantQuestionBlocks(message.content, message.mode)}
                           answerable={isAnswerableQuestionMessage(message, lastAssistantMessageId, streamingMessageId)}
                         >
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             components={MARKDOWN_COMPONENTS}
                           >
-                            {message.content}
+                            {/* An answer that never got its `done` (interrupted, or ended on an error) keeps
+                                its local id and the raw text: its tail is hidden here. */}
+                            {message.id.startsWith('local-') ? visibleAnswerText(message.content) : message.content}
                           </ReactMarkdown>
                         </MessageQuestionsProvider>
                       </MessageIdProvider>

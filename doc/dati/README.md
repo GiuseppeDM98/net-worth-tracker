@@ -332,7 +332,7 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [08](DATI-08-assistente-forma-della-risposta.md) | Assistente: one form for every answer | L | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 1 decisione |
+| [08](DATI-08-assistente-forma-della-risposta.md) | Assistente: one form for every answer | L | — | Opus 5.5 · medium | implemented — 2026-11-25 |
 | [09](DATI-09-assistente-strumenti-cashflow.md) | Assistente: tools on the cashflow, the budget, the centres | L | 08 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 3 decisioni |
 | [10](DATI-10-email-tenute-e-giorno-dopo.md) | Periodic emails: two kept, sent the day after, once | M | 08 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 20 rilievi, 2 decisioni |
 | [11](DATI-11-email-revisione-delle-spese.md) | The «Revisione delle spese» email | L | 09, 10 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 2 decisioni |
@@ -443,21 +443,24 @@ says so; it never changes what is there. The full text of each is in the spec th
   `dividendi_cedole`.
 - Registra and the emails receive no tool.
 
-### C4 — the answer's tail and the system core (created by DATI-08; read by 09, 10, 15, 16, 17)
+### C4 — the answer's tail and the system core (created by DATI-08, built 2026-11-25; read by 09, 10, 15, 16, 17)
 
 - `lib/utils/assistantAnswerTail.ts`: `FOLLOW_UPS_LANGUAGE = 'assistant-followups'`, `FOLLOW_UPS_MAX = 3`,
   `FOLLOW_UP_MAX_LENGTH = 90`, `REGISTER_STARTER_FOLLOW_UPS`, `parseFollowUps(raw): string[]`,
   `visibleAnswerText(content): string`, `splitAnswerTail(text): { body: string; followUps: string[] }`,
-  `answerFollowUps`.
-- `AssistantMessage.followUps?: string[]`; the stream's `done` event carries `content` and `followUps`.
+  `answerFollowUps(last: FollowUpSource)` (`{ mode, followUps?, hasQuestionCard, hasWrittenCard }`), `AssistantFollowUp`,
+  `REGISTER_ANOTHER_FOLLOW_UP` (both moved from the deleted `assistantFollowUps.ts`).
+- `AssistantMessage.followUps?: string[]` (stored only outside Registra, only when non-empty); the stream's `done`
+  event carries `content` (the saved text, the tail cut by `splitAnswerTail` in `stream/route.ts`) and `followUps`.
 - `lib/server/assistant/prompts.ts`: the rewritten `ASSISTANT_SYSTEM_CORE`, `ANSWER_CONTRACT` (the answer's form:
-  Registra and the emails do not read it), `PERIOD_LINES`, and `buildAssistantSystem(mode)`; the system is STATIC
-  and byte-identical across users.
+  Registra and the emails do not read it), `PERIOD_LINES`, `buildAssistantSystem(mode: Exclude<AssistantMode,
+  'register'>)` and `WEB_OFF_LINE`; the system is STATIC and byte-identical across users.
 - `ASSISTANT_MODEL = 'claude-opus-5-5'`, `output_config.effort: 'medium'`.
 - `components/ui/markdown-prose.tsx`: `MARKDOWN_PROSE_COMPONENTS`.
-- One question card per chat message outside Registra (`keepQuestionBlock(ordinal, mode)`); an email writes
-  neither block.
-- The E2E fake stream's reply is `{ text, reading, followUps?, statuses? }`.
+- One question card per message outside Registra (`keepQuestionBlock(ordinal, mode)`; an entity question is not kept
+  there, `readAssistantQuestionBlocks(content, mode)`); an email writes neither block.
+- The E2E fake stream's reply is `{ text, reading, followUps?, statuses? }` (`FakeAnswer`, `e2e/assistantRegister.ts`;
+  `statuses` are `status` events before the text).
 
 ### C5 — the email schedule and the ledger of sends (created by DATI-10; extended by 11)
 

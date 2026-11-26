@@ -7,7 +7,7 @@
 
 ## Files
 
-- **Registra** (2026-11): pure `lib/utils/{expenseProposal,assistantRegisterContext,assistantStreamBuffer,assistantQuestionBlocks}.ts` (the question helpers in `lib/utils/questionSet.ts`), `components/assistant/{ExpenseProposalCard,MessageIdContext,RegisterRefsContext,AssistantQuestionBlock,MessageQuestionsContext}.tsx`, `components/assistant/tiles/RegistraContestoTile.tsx`, `app/api/ai/assistant/threads/[threadId]/messages/[messageId]/route.ts` (the PATCH of a card's outcome), `fetchRegisterInputs` in `assistantMonthContextService.ts`, `ExpenseDialog`'s `initialValues` (doc/guide/dialog.md), `parseCashflowMonthParam` in `lib/utils/period.ts`. Suites: `expenseProposal`, `assistantRegisterContext`, `assistantStreamBuffer`, `assistantQuestionBlocks`, `questionSet`, `assistantQuestionBlock` (`.test.tsx`), `assistantFollowUps`, `assistantMessageRoute`, `expenseProposalCard`, `goalProposalCard`, `assistantStreamingResponse`, `assistantComposer`, `useAssistantStreaming`, `expenseDialogInitialValues`, `assistantCompanionScene`, `assistantHeader` (the last eight `.test.tsx`), and the five E2E specs with the emulators up.
+- **Registra** (2026-11): pure `lib/utils/{expenseProposal,assistantRegisterContext,assistantStreamBuffer,assistantQuestionBlocks}.ts` (the question helpers in `lib/utils/questionSet.ts`), `components/assistant/{ExpenseProposalCard,MessageIdContext,RegisterRefsContext,AssistantQuestionBlock,MessageQuestionsContext}.tsx`, `components/assistant/tiles/RegistraContestoTile.tsx`, `app/api/ai/assistant/threads/[threadId]/messages/[messageId]/route.ts` (the PATCH of a card's outcome), `fetchRegisterInputs` in `assistantMonthContextService.ts`, `ExpenseDialog`'s `initialValues` (doc/guide/dialog.md), `parseCashflowMonthParam` in `lib/utils/period.ts`. Suites: `expenseProposal`, `assistantRegisterContext`, `assistantStreamBuffer`, `assistantQuestionBlocks`, `questionSet`, `assistantQuestionBlock` (`.test.tsx`), `assistantAnswerTail` (the starters), `assistantMessageRoute`, `expenseProposalCard`, `goalProposalCard`, `assistantStreamingResponse`, `assistantComposer`, `useAssistantStreaming`, `expenseDialogInitialValues`, `assistantCompanionScene`, `assistantHeader` (the last eight `.test.tsx`), and the five E2E specs with the emulators up.
 
 ## Registra (2026-11)
 
@@ -30,7 +30,9 @@ and the Assistente asks what it needs with options before proposing.
   level. The two reads of the month are settled apart: a failed one prints its sentence, the core reads failing is a 500
   before any event. The CASHFLOW 12 MESI block follows, as in every mode.
 - **The protocol** lives ONLY in `buildRegisterPrompt` (`REGISTER_CONTRACT`; `ASSISTANT_SYSTEM_CORE` is untouched and the
-  mode's `system` is byte-identical between users — held by `not.toContain` and `toBe`): up to five
+  mode's `system` is byte-identical between users — held by `not.toContain` and `toBe`; it never reads the form of an
+  answer of the other modes, `ANSWER_CONTRACT`, nor writes a tail: its text is saved as it came and its chips are the
+  three starters, doc/guide/assistente-risposta.md): up to five
   ```expense-proposal blocks a message (`EXPENSE_PROPOSALS_MAX_PER_MESSAGE`; a sixth renders as code), `expenseProposal.ts`
   the ONE schema. A block's key is `expense:N`, N its rank among the message's blocks of that language, DERIVED from the
   markdown (`listFencedBlocks`, matched by the `pre` node's offset) — never counted in render.
@@ -55,7 +57,8 @@ and the Assistente asks what it needs with options before proposing.
   failed row reuses what it created (`createdRef`).
 - **Questions** (2026-11-11, DESIGN.md → The Question-Card Rule): a ```assistant-question block holds ONE question
   object, read by `parseQuestionsLenient([obj])` (the one parser) plus `entityQuestionProblems`; at most
-  `ASSISTANT_QUESTION_MAX_PER_MESSAGE` (2) a message, never beside a proposal of the same message (a card in a message
+  `ASSISTANT_QUESTION_MAX_PER_MESSAGE` (2) a message on a registration — ONE in any other mode, never on an entity
+  there (`keepQuestionBlock(ordinal, mode)`, 2026-11-25) —, never beside a proposal of the same message (a card in a message
   with a question reads «Rispondi prima alla domanda», «Conferma» closed). An entity question (`account:`, `center:`,
   `member:`, `loan:`, `category:` before the first «:») takes `allowOther: true`, three options at most (a category
   more), no «Preferisco non dire»; its «Altro…» is a `Select` of the page's own items (the houses as «X (immobile)» on
@@ -84,7 +87,10 @@ and the Assistente asks what it needs with options before proposing.
   (`CHAT_COMPOSER_PLACEHOLDER`), and «Registra un movimento.» is only the register verdict's headline.
 - **The card** (`ExpenseProposalCard`): `resolveExpenseProposal` checks every id against the browser's own reads
   (`RegisterRefsContext`: categories, assets, settings, centres) and names what it cannot find — a problem closes
-  «Conferma», never «Modifica»; a failed read closes all writing. States (`describeExpenseProposalState`): idle ·
+  «Conferma», never «Modifica»; a failed read closes all writing; reads not yet answered (`readsLoading`) close
+  «Conferma» and «Modifica» under «Leggo categorie e conti…» and hide the problems, which would all be false (2026-11-26,
+  DATI-08: the tile no longer remounts the messages after a thread load, so a card can mount before the reads, and
+  «Modifica» opened the form on no category — E2E `assistant.register` › «Modifica»). States (`describeExpenseProposalState`): idle ·
   saving (the first click closes the button: a double click writes one row) · «Registrata · apri in Cashflow»
   (`/dashboard/cashflow?tab=tracking&month=YYYY-MM&row=<id>`: the ROW's month and the row itself, on which Tracciamento
   lands — doc/guide/cashflow-tracciamento.md § Files; the month is the one the row was SAVED in, kept on the outcome

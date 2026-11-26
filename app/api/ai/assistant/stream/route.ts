@@ -38,6 +38,7 @@ import {
   summarizeRegisterContext,
 } from '@/lib/utils/assistantRegisterContext';
 import { stripFencedBlocks } from '@/lib/utils/expenseProposal';
+import { splitAnswerTail } from '@/lib/utils/assistantAnswerTail';
 import { assistantStreamRequestSchema, parseOr400 } from '@/lib/server/validation';
 import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import { createRouterClient, routeAssistantMessage } from '@/lib/server/assistant/router';
@@ -367,8 +368,6 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
-        let assistantText = '';
-
         try {
           controller.enqueue(
             encodeAssistantEvent({
@@ -413,15 +412,19 @@ export async function POST(request: NextRequest) {
               controller.enqueue(encodeAssistantEvent({ type: 'status', status }));
             },
             onText: (text) => {
-              assistantText += text;
               controller.enqueue(encodeAssistantEvent({ type: 'text', text }));
             },
           });
 
+          // The next questions the model wrote close the answer in a fenced block: cut off the saved
+          // text and kept on the message (2026-11-25). Registra writes none — its system never asks.
+          const { body: answerBody, followUps } = selection.mode === 'register' ? { body: result.text, followUps: [] } : splitAnswerTail(result.text);
+
           const assistantMessage = await appendAssistantMessage(thread.id, {
             userId: body.userId,
             role: 'assistant',
-            content: result.text,
+            content: answerBody,
+            ...(followUps.length ? { followUps } : {}),
             mode: selection.mode,
             monthContext: selection.month ?? null,
             webSearchUsed: result.webSearchUsed,
@@ -435,7 +438,7 @@ export async function POST(request: NextRequest) {
             thread.id,
             assistantMessage.id,
             body.prompt.trim(),
-            result.text
+            answerBody
           ).catch((err) => console.error('[stream] extractAndSaveMemory uncaught:', err));
 
           await updateAssistantThreadMetadata(thread.id, {
@@ -444,7 +447,7 @@ export async function POST(request: NextRequest) {
               ? (existingThread?.title ?? thread.title)
               : buildThreadTitleFromPrompt(body.prompt, selection.mode, now),
             // A JSON block is not a preview: an answer that is only a card shows the user's sentence.
-            lastMessagePreview: stripFencedBlocks(assistantText) || userMessage.content,
+            lastMessagePreview: stripFencedBlocks(answerBody) || userMessage.content,
             mode: selection.mode,
             pinnedMonth: selection.month ?? existingThread?.pinnedMonth ?? null,
             pinnedYear: selection.year ?? existingThread?.pinnedYear ?? null,
@@ -456,6 +459,9 @@ export async function POST(request: NextRequest) {
               threadId: thread.id,
               messageId: assistantMessage.id,
               webSearchUsed: result.webSearchUsed,
+              // The text as saved: the browser swaps it in for what it streamed (the tail gone).
+              content: answerBody,
+              followUps,
             })
           );
           controller.close();
