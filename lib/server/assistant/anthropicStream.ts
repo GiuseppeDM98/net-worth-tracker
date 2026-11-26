@@ -226,7 +226,8 @@ export async function streamAssistantResponse({
     // registers. Note the ceiling is not purely free headroom: unused tokens are never
     // billed, but a larger budget also lets adaptive thinking reason longer, which is
     // billed and adds latency. Both values sit inside the model's 128K output limit; the
-    // route declares `maxDuration = 300` so a long answer is not cut by the platform.
+    // route declares `maxDuration = 300` so a long answer is not cut by the platform. Opus 5.5
+    // since 2026-11-23 (owner's decision), at its default effort `medium`: the budgets are unchanged.
     const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
     const chatMaxTokens = mode === 'register' ? ASSISTANT_REGISTER_MAX_TOKENS : ASSISTANT_CHAT_MAX_TOKENS;
     const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, todayContext, cashflowBlock, registerBlock);
@@ -243,7 +244,7 @@ export async function streamAssistantResponse({
       // cache TTL, so caching would pay the 1.25x write premium without recouping it.
       system: system,
       thinking: { type: 'adaptive' },
-      output_config: { effort: 'high' },
+      output_config: { effort: 'medium' },
       // Registra never searches the web: the policy already answers false for it, and the request
       // itself sends no tool whatever flag reaches it (2026-11-11).
       ...(enableWebSearch && mode !== 'register'

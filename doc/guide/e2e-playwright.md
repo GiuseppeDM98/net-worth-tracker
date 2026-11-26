@@ -318,7 +318,10 @@
   `e2e/assistantRegister.ts`): the Assistente's stream route stores the thread and the two messages before it answers,
   and the card's PATCH and the reload read them — so the fake writes them with the Admin SDK and answers `done` with
   the id it wrote; the real PATCH and thread routes then run against real documents. Since 2026-11-12 the
-  fake also emits the router's `route` event (`reply(prompt, body)` returns the text or `{ text, reading }`; a body
+  fake also emits the router's `route` event (`reply(prompt, body)` returns the text or `{ text, reading, followUps?,
+  statuses? }` — `FakeAnswer`, 2026-11-25: the `followUps` are streamed as a ```assistant-followups tail after the text,
+  stored WITHOUT it and with `followUps` on the message, and the `done` carries `content` and `followUps` as the
+  route's; `statuses` go out as `status` events before the text; a body
   `route` comes back as the reading, `'carried'` or `'override'`), `plantExchange(user, assistant, reading)` writes
   the reading (`null`: a message saved before the router), and `enterRegister`/`registerAction` are gone — a
   sentence is read as a registration with no mode to enter. Two things the fake does NOT do: it emits no `context`

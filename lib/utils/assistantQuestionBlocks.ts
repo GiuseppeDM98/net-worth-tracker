@@ -7,9 +7,9 @@
  * among the message's question blocks as `listFencedBlocks` finds them — never a counter kept while
  * rendering — so a card's outcome key (`proposalKey('question', index)`) is the same on every render.
  */
-import type { AssistantMessage } from '@/types/assistant';
+import type { AssistantMessage, AssistantMode } from '@/types/assistant';
 import { listFencedBlocks } from '@/lib/utils/expenseProposal';
-import { ASSISTANT_QUESTION_LANGUAGE, entityQuestionProblems, keepQuestionBlock, parseQuestionsLenient, type Question } from '@/lib/utils/questionSet';
+import { ASSISTANT_QUESTION_LANGUAGE, entityQuestionProblems, isEntityQuestion, keepQuestionBlock, parseQuestionsLenient, type Question } from '@/lib/utils/questionSet';
 
 export interface QuestionBlockEntry {
   /** The block's rank among the message's question blocks. */
@@ -18,7 +18,11 @@ export interface QuestionBlockEntry {
   question: Question | null;
   /** Why the block renders as its code instead of a card; empty for a card. */
   problems: string[];
-  /** Within the per-message cap (`keepQuestionBlock`): a block past it renders as nothing. */
+  /**
+   * Within the per-message cap of the message's mode (`keepQuestionBlock`) and, outside Registra,
+   * not on an entity — there is no list of accounts or categories to show (2026-11-25). A block not
+   * kept renders as nothing.
+   */
   kept: boolean;
 }
 
@@ -35,25 +39,28 @@ function readQuestionBody(body: string): { question: Question | null; problems: 
   return { question, problems: question ? [...refused, ...entityQuestionProblems(question)] : refused };
 }
 
-/** Every ```assistant-question block of a message, in order, read and capped. */
-export function readAssistantQuestionBlocks(content: string): QuestionBlockEntry[] {
+/** Every ```assistant-question block of a message, in order, read and capped by the message's mode. */
+export function readAssistantQuestionBlocks(content: string, mode: AssistantMode): QuestionBlockEntry[] {
   return listFencedBlocks(content)
     .filter((block) => block.language === ASSISTANT_QUESTION_LANGUAGE)
-    .map((block, index) => ({ index, ...readQuestionBody(content.slice(block.bodyStart, block.bodyEnd)), kept: keepQuestionBlock(index) }));
+    .map((block, index) => {
+      const read = readQuestionBody(content.slice(block.bodyStart, block.bodyEnd));
+      const onEntity = read.question !== null && isEntityQuestion(read.question) !== null;
+      return { index, ...read, kept: keepQuestionBlock(index, mode) && (mode === 'register' || !onEntity) };
+    });
 }
 
 /**
- * Whether a message's question cards may still be answered: a register message, the thread's
- * LAST assistant message, saved on the server (a `local-` id has nowhere to keep the answers) and
+ * Whether a message's question cards may still be answered: the thread's LAST assistant message,
+ * in any mode (2026-11-25), saved on the server (a `local-` id has nowhere to keep the answers) and
  * nothing streaming. An older question is not answered in place: the conversation moved on.
  */
 export function isAnswerableQuestionMessage(
-  message: Pick<AssistantMessage, 'id' | 'mode'>,
+  message: Pick<AssistantMessage, 'id'>,
   lastAssistantMessageId: string | undefined,
   streamingMessageId: string | undefined,
 ): boolean {
   return (
-    message.mode === 'register' &&
     message.id === lastAssistantMessageId &&
     !message.id.startsWith('local-') &&
     streamingMessageId === undefined

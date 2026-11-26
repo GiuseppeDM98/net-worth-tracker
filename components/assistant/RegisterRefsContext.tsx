@@ -90,6 +90,8 @@ export function useRegisterReads(ownerId: string | undefined, enabled: boolean):
 
 type RegisterRefsValue = ExpenseProposalRefs & {
   readFailed: boolean;
+  /** The reads have not answered yet: a card waits, its buttons off. */
+  readsLoading: boolean;
   /** Sends a message in the open conversation (a card that answers in prose). */
   submitAnswer: (text: string) => Promise<void>;
 };
@@ -106,18 +108,20 @@ const RegisterRefsContext = createContext<RegisterRefsValue>({
   settings: { costCentersEnabled: false, expenseSplitEnabled: false },
   // Without a provider nothing was read: a card must not write on empty lists.
   readFailed: true,
+  readsLoading: false,
   submitAnswer: async () => {},
 });
 
 interface RegisterRefsProviderProps {
   refs: ExpenseProposalRefs;
   readFailed: boolean;
+  readsLoading?: boolean;
   submitAnswer: (text: string) => Promise<void>;
   children: ReactNode;
 }
 
-export function RegisterRefsProvider({ refs, readFailed, submitAnswer, children }: RegisterRefsProviderProps) {
-  const value: RegisterRefsValue = { ...refs, readFailed, submitAnswer };
+export function RegisterRefsProvider({ refs, readFailed, readsLoading = false, submitAnswer, children }: RegisterRefsProviderProps) {
+  const value: RegisterRefsValue = { ...refs, readFailed, readsLoading, submitAnswer };
   return <RegisterRefsContext.Provider value={value}>{children}</RegisterRefsContext.Provider>;
 }
 

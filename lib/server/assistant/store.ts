@@ -95,7 +95,15 @@ function mapMessage(threadId: string, docId: string, data: DocumentData): Assist
     webSearchUsed: data.webSearchUsed,
     ...(data.proposals ? { proposals: mapProposals(data.proposals) } : {}),
     ...readRouteReading(data.routeReading),
+    ...readFollowUps(data.followUps),
   };
+}
+
+/** The next questions stored on an answer (2026-11-25): strings only, or none. */
+function readFollowUps(raw: unknown): { followUps?: string[] } {
+  if (!Array.isArray(raw)) return {};
+  const followUps = raw.filter((item): item is string => typeof item === 'string');
+  return followUps.length ? { followUps } : {};
 }
 
 /**
@@ -376,6 +384,7 @@ export async function appendAssistantMessage(
     createdAt: now,
     // Deep-cleaned: a reading without a `reason` must not carry an `undefined` field to Firestore.
     ...(message.routeReading ? { routeReading: removeUndefinedDeep(message.routeReading) } : {}),
+    ...(message.followUps?.length ? { followUps: message.followUps } : {}),
   };
 
   // Persist the message and atomically increment the thread's messageCount

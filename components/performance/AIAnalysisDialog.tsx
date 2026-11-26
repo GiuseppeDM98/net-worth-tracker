@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { MARKDOWN_PROSE_COMPONENTS } from '@/components/ui/markdown-prose';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cachedFormatCurrencyEUR, formatTimePeriodLabel } from '@/lib/utils/formatters';
@@ -393,17 +394,8 @@ export function AIAnalysisDialog({
           )}
 
           {!loading && analysis && (
-            <div className="prose prose-sm mt-2.5 max-w-[72ch] dark:prose-invert">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  strong: ({ children }) => (
-                    <strong className="font-semibold text-foreground">{children}</strong>
-                  ),
-                  ul: ({ children }) => <ul className="list-inside list-disc space-y-1">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-inside list-decimal space-y-1">{children}</ol>,
-                }}
-              >
+            <div className="mt-2.5 max-w-[72ch]">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_PROSE_COMPONENTS}>
                 {analysis}
               </ReactMarkdown>
             </div>

@@ -6,7 +6,7 @@ import { AssistantPromptRows, type PromptRow } from '@/components/assistant/Assi
 import { Skeleton } from '@/components/ui/skeleton';
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
-import type { AssistantFollowUp } from '@/lib/utils/assistantFollowUps';
+import type { AssistantFollowUp } from '@/lib/utils/assistantAnswerTail';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { AssistantMessage, AssistantProposalState } from '@/types/assistant';
 import { COSTUME_FRAME_RADIUS_CLASS } from '@/lib/constants/themeCostume';
@@ -127,7 +127,10 @@ export function AssistantConversazioneTile({
             </div>
           )}
         </div>
-      ) : loadingThreadDetail ? (
+      ) : loadingThreadDetail && renderedMessages.length === 0 ? (
+        // Only a thread opened with nothing to show yet: a new conversation reads its saved thread
+        // while the answer streams (the id arrives with `meta`), and the skeleton there was a flash
+        // that mounted the messages again (owner, phase F of 2026-11-25).
         <div className="mt-4 space-y-2" role="status" aria-label="Caricamento conversazione">
           <Skeleton className={cn('ml-auto h-10 w-2/3', COSTUME_FRAME_RADIUS_CLASS)} />
           <Skeleton className="h-3.5 w-full" />
@@ -169,8 +172,9 @@ export function AssistantConversazioneTile({
           )}
         </div>
       )}
-      {/* Anchor for auto-scroll to latest message */}
-      <div ref={conversationEndRef} />
+      {/* Anchor for auto-scroll to latest message; its scroll margin clears the sticky composer
+          (and, on a phone in portrait, the bottom pill) when the page brings it into view. */}
+      <div ref={conversationEndRef} className="scroll-mb-36 max-desktop:portrait:scroll-mb-56" />
     </Tile>
   );
 }

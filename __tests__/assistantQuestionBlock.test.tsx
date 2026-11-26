@@ -75,7 +75,7 @@ function renderBlocks(options: HostOptions = {}) {
     id: 'msg-1', threadId: 'thread-1', userId: 'owner-1', role: 'assistant', content, createdAt: NOW, mode: 'register',
     ...(options.proposals ? { proposals: options.proposals } : {}),
   };
-  const blocks = readAssistantQuestionBlocks(content);
+  const blocks = readAssistantQuestionBlocks(content, 'register');
   const tree = (current: AssistantMessage): ReactNode => (
     <RegisterRefsProvider refs={REFS} readFailed={options.readFailed ?? false} submitAnswer={submitAnswer}>
       <MessageIdProvider message={current} mode="register" recordProposal={recordProposal}>
@@ -195,13 +195,18 @@ describe('AssistantQuestionBlock — read-only and fallbacks', () => {
     expect(screen.queryByRole('button', { name: 'Rispondi' })).toBeNull();
   });
 
-  // The gate is the MESSAGE's mode, never the page's (2026-11-12): a register message's blocks are
-  // cards, a chat message's are code, in one conversation. Seen RED reading a constant page mode.
-  it('makes a question a card on a register message and code on a chat message', () => {
+  // The cap is the MESSAGE's mode, never the page's (2026-11-12): a register message shows two
+  // cards; since 2026-11-25 a chat message shows ONE, answerable, and its second block nothing.
+  it('makes two questions cards on a register message and one on a chat message', () => {
     const later = new Date(NOW.getTime() + 1000);
+    const chatQuestions = [
+      'Dipende da una cosa.',
+      fence(question('periodo', 'Quale anno confronto?', [['2025', '2025'], ['2024', '2024']])),
+      fence(question('dettaglio', 'Includo la mensa?', [['si', 'Sì'], ['no', 'No']])),
+    ].join('\n\n');
     const messages: AssistantMessage[] = [
-      { id: 'msg-chat', threadId: 'thread-1', userId: 'owner-1', role: 'assistant', content: TWO_QUESTIONS, createdAt: NOW, mode: 'chat' },
-      { id: 'msg-register', threadId: 'thread-1', userId: 'owner-1', role: 'assistant', content: TWO_QUESTIONS, createdAt: later, mode: 'register' },
+      { id: 'msg-register', threadId: 'thread-1', userId: 'owner-1', role: 'assistant', content: TWO_QUESTIONS, createdAt: NOW, mode: 'register' },
+      { id: 'msg-chat', threadId: 'thread-1', userId: 'owner-1', role: 'assistant', content: chatQuestions, createdAt: later, mode: 'chat' },
     ];
     const { container } = render(
       <RegisterRefsProvider refs={REFS} readFailed={false} submitAnswer={async () => {}}>
@@ -209,12 +214,14 @@ describe('AssistantQuestionBlock — read-only and fallbacks', () => {
           changeableMessageId={undefined} onChangeReading={() => {}} />
       </RegisterRefsProvider>,
     );
-    const [chatMessage, registerMessage] = Array.from(container.querySelectorAll<HTMLElement>('[data-generated]'));
-    expect(chatMessage.querySelectorAll('pre')).toHaveLength(2);
-    expect(within(chatMessage).queryByRole('radio')).toBeNull();
+    const [registerMessage, chatMessage] = Array.from(container.querySelectorAll<HTMLElement>('[data-generated]'));
     expect(registerMessage.querySelectorAll('pre')).toHaveLength(0);
     expect(within(registerMessage).getByText('Da quale conto?')).not.toBeNull();
-    expect(within(registerMessage).getByRole('button', { name: 'Rispondi' })).not.toBeNull();
+    expect(within(registerMessage).getByText('È una spesa abituale?')).not.toBeNull();
+    expect(chatMessage.querySelectorAll('pre')).toHaveLength(0);
+    expect(within(chatMessage).getByText('Quale anno confronto?')).not.toBeNull();
+    expect(within(chatMessage).queryByText('Includo la mensa?')).toBeNull();
+    expect(within(chatMessage).getByRole('button', { name: 'Rispondi' })).not.toBeNull();
   });
 
   it('gives a broken block back as code, a block past the cap as nothing, and a block with no entry as code', () => {

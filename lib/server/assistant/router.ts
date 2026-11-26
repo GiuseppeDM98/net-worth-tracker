@@ -73,8 +73,9 @@ Il periodo (periodKind, year, month):
 - Un seguito breve («e a settembre?», «e l'anno prima?») riprende l'intento della lettura precedente e cambia solo
   il periodo.
 
-La ricerca web (webSearch): true solo se la risposta richiede fatti esterni e recenti — mercati, tassi, inflazione,
-notizie, quotazioni, norme — o se l'utente la chiede. Sempre false per register.
+La ricerca web (webSearch): true se la risposta richiede fatti esterni e recenti — mercati, tassi, inflazione,
+notizie, quotazioni — o tocca una norma fiscale, previdenziale o legale (detrazioni, deduzioni, familiari a carico,
+aliquote, bonus, ISEE, successioni, mutui e interessi detraibili), o se l'utente la chiede. Sempre false per register.
 
 La confidenza (confidence, da 0 a 1): quanto sei sicuro della lettura intera. Sotto 0.6 se il messaggio è ambiguo,
 senza senso o fuori tema.

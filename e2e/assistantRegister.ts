@@ -8,8 +8,9 @@
  * the SSE body — `meta` with the thread, `route` with the router's reading (a registration by
  * default, 2026-11-12: the page is only a chat and every message goes as `mode: 'auto'`),
  * `register` with a summary of 4 rows read, one `text` with the answer, `done` with the id of
- * the assistant message it wrote. So the card's PATCH and
- * the thread's reload go through the REAL routes against real documents.
+ * the assistant message it wrote and, as the route's, the saved text and the next questions
+ * (2026-11-25: the ```assistant-followups tail is cut off the saved text outside Registra). So the
+ * card's PATCH and the thread's reload go through the REAL routes against real documents.
  *
  * The fixture lives on the base account (`test@example.com`) under ids prefixed `e2e-reg-`, absent
  * from the seed: the categories «Cibo» › «Spesa» (variable) and «Salute» › «Farmacia» (fixed), the
@@ -203,12 +204,28 @@ export const REGISTER_READING: FakeReading = {
 // The intents are the modes' own names (lib/utils/assistantRoute.ts).
 const modeOf = (reading: FakeReading | null) => reading?.route.intent ?? 'register';
 
+// The tail of an answer, as `BLOCK` in lib/utils/assistantAnswerTail.ts reads it (a helper cannot import `lib/`).
+const FOLLOW_UPS_BLOCK = new RegExp('(?:^|\\n)```assistant-followups[ \\t]*\\n([\\s\\S]*?)\\n?```[ \\t]*(?=\\n|$)');
+
+/** The text the route saves: the tail block cut out, Registra's text as it came. */
+export function withoutTail(text: string, mode: string): string {
+  if (mode === 'register') return text;
+  const match = FOLLOW_UPS_BLOCK.exec(text);
+  return match ? (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim() : text;
+}
+
+/** The block the model writes after an answer, holding its next questions. */
+export function followUpsBlock(followUps: string[]): string {
+  return ['```assistant-followups', JSON.stringify(followUps), '```'].join('\n');
+}
+
 /**
  * Writes the thread and one exchange in it, as the route does; returns the assistant message's id.
  * The answer stores `routeReading` like the route; `reading: null` plants a message saved before
- * the router (no reading, the register mode).
+ * the router (no reading, the register mode). Outside Registra the text is stored without its
+ * tail block and `followUps` on the message, as the route stores them.
  */
-export async function plantExchange(userContent: string, assistantContent: string, reading: FakeReading | null = REGISTER_READING): Promise<string> {
+export async function plantExchange(userContent: string, assistantContent: string, reading: FakeReading | null = REGISTER_READING, followUps: string[] = []): Promise<string> {
   const db = await admin();
   const now = new Date();
   messageSerial += 1;
@@ -226,8 +243,9 @@ export async function plantExchange(userContent: string, assistantContent: strin
   const mode = modeOf(reading);
   await thread.collection('messages').doc(`e2e-reg-user-${messageSerial}`).set({ userId: UID, role: 'user', content: userContent, mode, monthContext: null, webSearchUsed: false, createdAt: new Date(now.getTime() - 1000) });
   await thread.collection('messages').doc(assistantId).set({
-    userId: UID, role: 'assistant', content: assistantContent, mode, monthContext: null, webSearchUsed: false, createdAt: now,
+    userId: UID, role: 'assistant', content: withoutTail(assistantContent, mode), mode, monthContext: null, webSearchUsed: false, createdAt: now,
     ...(reading ? { routeReading: reading } : {}),
+    ...(followUps.length && mode !== 'register' ? { followUps } : {}),
   });
   return assistantId;
 }
@@ -242,27 +260,41 @@ export interface StreamRecorder {
   messageIds: string[];
 }
 
+/** An answer of the fake: its text, how the router read it, its next questions, the statuses before it. */
+export interface FakeAnswer {
+  text: string;
+  reading: FakeReading;
+  /** Written as the model writes them, a tail block after the text (unless the text holds one). */
+  followUps?: string[];
+  /** `status` events sent before the text ('searching', 'writing', 'saving'). */
+  statuses?: string[];
+}
+
 /**
  * Fakes the stream route: `reply` turns the user's prompt into the assistant's answer — a text,
- * read as a registration, or `{ text, reading }`. A request that carries a `route` (the chooser's
+ * read as a registration, or a `FakeAnswer`. A request that carries a `route` (the chooser's
  * «Rileggi», a question card's answer) is read as that route, as the server does. Installed
  * BEFORE the first message is sent; no request ever reaches the model.
  */
 export async function installFakeStream(
   page: Page,
-  reply: (prompt: string, body: StreamRecorder['requests'][number]) => string | { text: string; reading: FakeReading },
+  reply: (prompt: string, body: StreamRecorder['requests'][number]) => string | FakeAnswer,
 ): Promise<StreamRecorder> {
   const recorder: StreamRecorder = { requests: [], messageIds: [] };
   await page.route('**/api/ai/assistant/stream', async (route) => {
     const body = route.request().postDataJSON() as StreamRecorder['requests'][number];
     recorder.requests.push(body);
     const answer = reply(body.prompt, body);
-    const content = typeof answer === 'string' ? answer : answer.text;
+    const followUps = typeof answer === 'string' ? [] : answer.followUps ?? [];
+    const written = typeof answer === 'string' ? answer : answer.text;
+    const content = followUps.length && !FOLLOW_UPS_BLOCK.test(written) ? `${written}\n\n${followUpsBlock(followUps)}` : written;
     const reading: FakeReading = body.route
       ? { route: { ...body.route, confidence: 1 }, source: body.routeCarried ? 'carried' : 'override' }
       : typeof answer === 'string' ? REGISTER_READING : answer.reading;
-    const messageId = await plantExchange(body.prompt, content, reading);
+    const messageId = await plantExchange(body.prompt, content, reading, followUps);
     recorder.messageIds.push(messageId);
+    const mode = modeOf(reading);
+    const statuses = typeof answer === 'string' ? [] : answer.statuses ?? [];
     const events = [
       { type: 'meta', threadId: THREAD_ID, title: 'Registrazioni · e2e' },
       { type: 'route', reading },
@@ -273,8 +305,12 @@ export async function installFakeStream(
           categories: 5, costCentersEnabled: false, membersEnabled: false, recent: { rows: 4, cut: 0 },
         },
       },
+      ...statuses.map((status) => ({ type: 'status', status })),
       { type: 'text', text: content },
-      { type: 'done', threadId: THREAD_ID, messageId, webSearchUsed: false },
+      {
+        type: 'done', threadId: THREAD_ID, messageId, webSearchUsed: false,
+        content: withoutTail(content, mode), followUps: mode === 'register' ? [] : followUps,
+      },
     ];
     await route.fulfill({
       status: 200,

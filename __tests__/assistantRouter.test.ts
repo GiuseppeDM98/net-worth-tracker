@@ -60,6 +60,12 @@ describe('the router\'s request', () => {
     }
   });
 
+  it('turns the web on for a rule of law: the system names fiscal norms and dependants', () => {
+    // A tax or pension question needs a dated source (owner, 2026-11-23): the router asks for it.
+    expect(ASSISTANT_ROUTER_SYSTEM).toContain('norma fiscale');
+    expect(ASSISTANT_ROUTER_SYSTEM).toContain('familiari a carico');
+  });
+
   it('R2: Haiku, 256 tokens, one tool forced, nothing else; the call takes 4 s and no retry', async () => {
     const request = buildRouterRequest(input());
     expect(request.model).toBe(ASSISTANT_ROUTER_MODEL);

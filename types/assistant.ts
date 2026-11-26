@@ -6,7 +6,6 @@
 //   buildMessagesArray's history cap)
 // - webSearchPolicy.ts (STRUCTURED_ANALYSIS_MODES, resolveAssistantWebSearchPolicy)
 // - store.ts (getDefaultThreadTitle, buildThreadTitleFromPrompt)
-// - assistantFollowUps.ts (CURATED_FOLLOW_UPS, a Record<AssistantMode, …>)
 // - assistantPeriodOptions.ts (getActivePeriodLabel, getModeBadgeLabel)
 // - lib/utils/assistantChatNarrative.ts (describeRoute)
 // - useAssistantStreaming.ts (buildStreamRequestBody) and useAssistantPeriodContext.ts (the period preview)
@@ -92,6 +91,9 @@ export interface AssistantMessage {
   // How the server read the message this one answers (2026-11): only on an assistant message of a
   // request sent with `mode: 'auto'`; absent on every older message and on an explicit mode's.
   routeReading?: AssistantRouteReading;
+  // The next questions the model wrote at the end of its answer (lib/utils/assistantAnswerTail.ts);
+  // absent on a user message, on Registra and on every answer saved before 2026-11-25.
+  followUps?: string[];
 }
 
 /**
@@ -434,5 +436,7 @@ export type AssistantStreamEvent =
   | { type: 'register'; summary: AssistantRegisterSummary }
   | { type: 'text'; text: string }
   | { type: 'status'; status: 'searching' | 'writing' | 'saving' }
-  | { type: 'done'; threadId?: string; messageId?: string; webSearchUsed: boolean }
+  // `content` is the text as saved (the tail cut off) and `followUps` the questions it held; both
+  // absent from a server older than 2026-11-25, when the streamed text stays as it is.
+  | { type: 'done'; threadId?: string; messageId?: string; webSearchUsed: boolean; content?: string; followUps?: string[] }
   | { type: 'error'; error: string; retryable?: boolean };
