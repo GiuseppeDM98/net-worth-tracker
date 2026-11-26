@@ -21,9 +21,10 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
 const DECOY_AMOUNT = 123;
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 
 /** The saved budget items of the base account, read from the emulator (not from the page). */
 async function savedBudgetAmounts(): Promise<number[]> {

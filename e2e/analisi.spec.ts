@@ -15,6 +15,8 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { expectRingFiguresInside } from './ringFit';
+import { FIRESTORE_DOCUMENTS } from './emulator';
+import { atRest } from './atRest';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const PREVIOUS_YEAR = CURRENT_YEAR - 1;
@@ -221,7 +223,7 @@ test('reaches a zero-spend entity through the search — one interaction, honest
   await expect(scheda(page)).toContainText(`Nessuna transazione registrata per Skipass dal ${PREVIOUS_YEAR}.`);
   // The landing is the LAST scroll: until 2026-10-20 the modal's focus restore (after its exit
   // animation) pulled the page back up to the trigger a moment after the Scheda had scrolled in.
-  await page.waitForTimeout(1000);
+  await atRest(page);
   await expect(scheda(page)).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Vai a categoria' })).not.toBeInViewport();
 });
@@ -346,7 +348,7 @@ test('offers no subcategory breakdown once the focus IS a subcategory', async ({
 // how every other test in this file sees the page. This block turns the flag on through the
 // emulator and back off, whatever happens in between.
 
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 
 async function setSpendingRolesEnabled(enabled: boolean): Promise<void> {
   const res = await fetch(`${FIRESTORE}/assetAllocationTargets/test-user-analisi?updateMask.fieldPaths=spendingRolesEnabled`, {

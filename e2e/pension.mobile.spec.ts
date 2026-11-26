@@ -16,6 +16,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { atRest } from './atRest';
 
 /** `Intl` puts a non-breaking space before the €; anchoring avoids a partial match too. */
 const FUND_VALUE = /^29\.800,00[\s ]*€$/;
@@ -88,7 +89,7 @@ test('with one contributor measured: title only, three causes in the strip, the 
 
 test('never lets the page scroll sideways, measured on the elements, rows open', async ({ page }) => {
   await page.getByRole('button', { name: 'Apri tutte' }).click();
-  await page.waitForTimeout(600);
+  await atRest(page);
   // `main` is the horizontal scroll container of the shell; and a width total alone hides the
   // culprit, so every offender is named (AGENTS.md → Tailwind Breakpoints and Responsive Layout).
   const result = await page.evaluate(() => {

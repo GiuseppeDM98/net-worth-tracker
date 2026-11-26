@@ -38,8 +38,9 @@
  * assertion is a regression guard on the focus, not a proof of the prop.
  */
 
-import { spawnSync } from 'node:child_process';
 import { test, expect, type Page, type Route } from '@playwright/test';
+import { runSeedSync } from './emulator';
+import { atRest } from './atRest';
 
 /** The house floor for a touch target (PRODUCT.md → Accessibility & Inclusion). */
 const TOUCH_FLOOR = 44;
@@ -47,12 +48,12 @@ const STORAGE_KEY = 'mobile-sections:performance';
 /** The rows of the fixture, in DOM order: no ledger, so no Plusvalenze. */
 const ROW_IDS = ['rend-benchmark', 'rend-contributi', 'rend-attribuzione', 'rend-capitale', 'rend-rischio', 'rend-consistenza'] as const;
 
-/** Rewrites the scenario; synchronous because the suite runs with `workers: 1`. */
+/**
+ * Rewrites the scenario — the script of `npm run e2e:seed`, run on this worker's project. Synchronous:
+ * the tests of a file run one after the other in one worker, and no other worker reads these documents.
+ */
 function seedPerformanceScenario(): void {
-  const result = spawnSync('npm', ['run', 'e2e:seed', '--', 'performance'], { stdio: 'pipe', shell: true });
-  if (result.status !== 0) {
-    throw new Error(`Seed dello scenario «performance» fallito:\n${result.stderr?.toString() ?? ''}`);
-  }
+  runSeedSync('scripts/seedPensionE2E.mts', ['performance'], 'Seed dello scenario «performance» fallito');
 }
 
 /** Every month of last year and this one — the fixture's window is inside, whatever the day. */
@@ -292,7 +293,7 @@ test.describe('Rendimenti, composed for a phone', () => {
 
     await page.getByRole('button', { name: 'Apri tutte' }).click();
     for (const id of ROW_IDS) await expect(trigger(page, id)).toHaveAttribute('aria-expanded', 'true');
-    await page.waitForTimeout(600);
+    await atRest(page);
     const open = await readOrder();
     expect(isSorted(open.map((s) => s.top)), JSON.stringify(open)).toBe(true);
 

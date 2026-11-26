@@ -12,6 +12,7 @@
 import { test as setup, expect } from '@playwright/test';
 import { STORAGE_STATE } from '../playwright.config';
 import { stripPersistedQueryCache } from './persistedCache';
+import { shareSessionWithWorkers } from './emulator';
 
 /** Matches `scripts/seedEmulator.ts` / `scripts/seedPensionE2E.mts`. */
 const TEST_EMAIL = 'test@example.com';
@@ -40,4 +41,6 @@ setup('authenticate', async ({ page }) => {
   // The capture also took the persisted React Query cache: out of the state file, so
   // every spec starts with an empty cache and shows what a first visit shows (e2e/persistedCache.ts).
   stripPersistedQueryCache(STORAGE_STATE);
+  // One login, every worker: the same session parked on each worker's origin (e2e/emulator.ts).
+  shareSessionWithWorkers(STORAGE_STATE);
 });

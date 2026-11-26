@@ -4,7 +4,7 @@
 
 ## Files
 
-- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`, `seedSplitE2E`, `seedHallOfFameE2E`, `seedInstrumentProfilesE2E` + `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp, `seedCensusE2E` — the first-screen census's account `census@example.com`, not a Playwright fixture: `npm run mobile:census` re-seeds it on the `perf:serve` build at :3200 — the port it shares with `perf:*`, never with :3100 — and writes `.mobile-census/` (gitignored), doc/guide/prima-schermata.md), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked), the tour's windows `scripts/collaudo-finestre.mts` (visible, signed in, self-closing; WORKFLOW.md § 3 Obligation 5); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
+- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, `e2e/emulator.ts` (the ONE place that names the emulator project, the ports and the session paths, per Playwright worker — with `lib/firebase/emulatorProject.ts`, the rule the app reads, 2026-11-26), `e2e/atRest.ts` (the conditions a fixed wait stood for), `e2e/worker.isolation.spec.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`, `seedSplitE2E`, `seedHallOfFameE2E`, `seedInstrumentProfilesE2E` + `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp, `seedCensusE2E` — the first-screen census's account `census@example.com`, not a Playwright fixture: `npm run mobile:census` re-seeds it on the `perf:serve` build at :3200 — the port it shares with `perf:*`, never with :3100 — and writes `.mobile-census/` (gitignored), doc/guide/prima-schermata.md), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked), the tour's windows `scripts/collaudo-finestre.mts` (visible, signed in, self-closing; WORKFLOW.md § 3 Obligation 5); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
 
 ## Proving a refactor changed no number
 - **Measure the noise floor BEFORE interpreting a diff**: anything downstream of `new Date()` drifts (cents at two
@@ -140,7 +140,17 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   `playwright.config.ts`; 2026-10-08 and 2026-10-12, the owner's other project on `next start --port 3100`): the suite
   would run against the wrong app. Before a suite, read the command line of :3100's PID; if it is not this repo's
   `dev:e2e`, the owner stops it — the agent never does. Since 2026-11-16 this holds for an AREA run only: the whole
-  run (`npm run test:e2e`, on the production build) never reuses a server and stops with «already used».
+  run (`npm run test:e2e`, on the production build) never reuses a server and stops with «already used» — and since
+  2026-11-26 it needs FOUR ports, :3100–3103, one server per worker (that day another repo's `next dev -p 3100`,
+  started by a preview in another session, stopped the run 40 s in, before its first test).
+- **One Firestore project per Playwright worker** (2026-11-26): the emulators hold `demo-net-worth` (worker 0, an area
+  run, the tour, the mirror, every `npm run e2e:seed*`) and `demo-net-worth-w1` … `-w3`, the whole run's other
+  workers, seeded by `global-setup` with the same fixtures; Auth lives in the base project alone. `firebase.json` has
+  `singleProjectMode: false` for it. Whether a worker's project survives an export and a restart was not checked, and
+  nothing depends on it: a project without its stamp (`e2eSeedStamps/base`) is seeded whole by the next run. The JVM
+  grows with the projects: restart the emulators past ~3 GB (the entry below). A worker's project is emptied with `DELETE
+  /emulator/v1/projects/demo-net-worth-wN/databases/(default)/documents`; the next whole run seeds it again. What
+  names them: `e2e/emulator.ts`; the measures: doc/guide/e2e-suite.md § The suite's speed.
 - **After a long session the Firestore emulator can refuse every gRPC WRITE while REST still answers** (2026-09-29,
   Windows machine: two full suites, six partial runs, four benchmarks and a mirror seed in one evening, the JVM at
   2,5 GB): `global-setup` died on the Centri seed's `WriteBatch.commit` with `4 DEADLINE_EXCEEDED … after 60.0s`, the

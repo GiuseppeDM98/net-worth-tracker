@@ -15,9 +15,9 @@
  */
 
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { pointAdminAtEmulator } from './emulator';
 
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
+pointAdminAtEmulator();
 
 const UID = 'test-user-1';
 const PELLICANO = { id: 'e2e-composite-pellicano', name: 'Fondo Pellicano Bilanciato', ticker: 'PELLICANO' };

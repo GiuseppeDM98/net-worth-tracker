@@ -21,9 +21,10 @@
  */
 
 import { test, expect, type Locator } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
 const DECOY_NOTE = 'cedola ornitorinco';
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const AUTH = { Authorization: 'Bearer owner' };
 
 async function decoyDividendIds(): Promise<string[]> {

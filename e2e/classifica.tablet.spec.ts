@@ -9,8 +9,9 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { expectRingFiguresInside } from './ringFit';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
 const PLANTED = [

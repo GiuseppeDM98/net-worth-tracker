@@ -14,6 +14,8 @@
 
 - **Patrimonio › Movimenti — eliminare un'operazione appena modificata** — Fixed: right after editing an operation and reloading the page, deleting it could be refused as «cambiata nel frattempo» and the operation stayed. Movimenti now waits the instant it takes to reread the list before its edit and delete buttons answer.
 
+- **Cashflow — la commissione di una voce modificata più volte** — Fixed: after changing a row's «Commissione» and reloading the page, reopening the row could say «La commissione di questa voce non è stata letta» and leave the field disabled at every reopening. The form now finds the fee the row has — or none — and the field takes a new amount.
+
 ## 🔧 Improvements
 
 - **Assistente — la forma delle risposte** — Changed every answer: the figure first, the sums that hold it, at most two cautions; «Continua con» is written for your question; a doubt only you can settle is one card with options; a rule of law comes with its source and year, and the Assistente now runs on Opus 5.5. An answer is formatted while it arrives and the page follows it only while you stay at the bottom, «Nuova conversazione» starts at the top, and a Registra card waits for your categories and accounts before «Conferma» and «Modifica» answer.

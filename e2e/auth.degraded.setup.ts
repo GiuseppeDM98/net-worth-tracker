@@ -12,6 +12,7 @@
 import { test as setup, expect } from '@playwright/test';
 import { DEGRADED_STORAGE_STATE } from '../playwright.config';
 import { stripPersistedQueryCache } from './persistedCache';
+import { shareSessionWithWorkers } from './emulator';
 
 /** Matches `scripts/seedPensionE2E.mts` → DEGRADED_EMAIL. */
 const DEGRADED_EMAIL = 'degraded@example.com';
@@ -35,4 +36,6 @@ setup('authenticate degraded account', async ({ page }) => {
   await page.context().storageState({ path: DEGRADED_STORAGE_STATE, indexedDB: true });
   // The persisted React Query cache out of the state file (see auth.setup.ts).
   stripPersistedQueryCache(DEGRADED_STORAGE_STATE);
+  // One login, every worker: the same session parked on each worker's origin (e2e/emulator.ts).
+  shareSessionWithWorkers(DEGRADED_STORAGE_STATE);
 });

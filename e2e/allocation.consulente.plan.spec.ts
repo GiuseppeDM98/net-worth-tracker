@@ -18,9 +18,9 @@ import { test, expect, type Page } from '@playwright/test';
 import { reconcileOperatingPlan } from '../lib/utils/operatingPlan';
 import { bookCard, expectPage, openReport, plant, rememberHeld, restoreHeld } from './consulenteReport';
 import { removeOwnerPlans, seedAccumuloFixture } from './accumuloFixture';
+import { pointAdminAtEmulator } from './emulator';
 
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
+pointAdminAtEmulator();
 
 const UID = 'test-user-1';
 const NEW_ISIN = 'IE000AIRO001';

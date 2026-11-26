@@ -3,9 +3,10 @@
  * a ranking is a pill — round in Egeo, square under Orbita — and the header draws the page's own Egeo emblem.
  *
  * The FILENAME picks the project: `…hof.spec.ts` runs on the Hall of Fame fixture account, the only one with
- * records, AFTER `hall-of-fame.hof.spec.ts` (alphabetical, one worker), whose first test builds the document. Run
- * alone on a fresh seed, this file presses «Aggiorna i record» itself — and that spec's first test, which expects
- * the empty page, then needs a new seed. The theme is written on THAT account's preferences and put back.
+ * records. Where `hall-of-fame.hof.spec.ts` ran first in this worker, its first test built the document; in a
+ * worker it did not run in — every worker has its own Firestore project — or alone on a fresh seed, this file
+ * presses «Aggiorna i record» itself. Alone, that leaves the document behind: that spec's first test, which
+ * expects the empty page, then needs a new seed (the next run's `global-setup`). The theme is written on THAT account's preferences and put back.
  *
  * Seen red with `RecordRows` back to `rounded-full` on its track.
  */

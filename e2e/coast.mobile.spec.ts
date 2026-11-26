@@ -16,6 +16,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { atRest } from './atRest';
 
 const DISCLOSURES = [/^Ipotesi/, /^Dettaglio/] as const;
 
@@ -36,7 +37,7 @@ test('il tab Coast FIRE non scorre in orizzontale a 390px', async ({ page }) => 
     const trigger = page.getByRole('button', { name: label });
     if ((await trigger.count()) > 0 && (await trigger.first().getAttribute('data-state')) === 'closed') {
       await trigger.first().click();
-      await page.waitForTimeout(500);
+      await atRest(page);
     }
   }
 
@@ -57,7 +58,7 @@ test('il tab Coast FIRE non scorre in orizzontale a 390px', async ({ page }) => 
   expect(ipotesi.orderClasses).toEqual([]);
 
   // I grafici e i count-up si assestano tardi: una misura presa prima leggerebbe larghezze intermedie.
-  await page.waitForTimeout(2000);
+  await atRest(page);
 
   const measurement = await page.evaluate(() => {
     const main = document.querySelector('main');

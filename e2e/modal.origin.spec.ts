@@ -14,6 +14,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { atRest } from './atRest';
 
 test('Rendimenti: the custom-period modal keeps ONE origin, the button’s centre, through open and close', async ({ page }) => {
   await page.goto('/dashboard/performance');
@@ -23,16 +24,10 @@ test('Rendimenti: the custom-period modal keeps ONE origin, the button’s centr
   // on its entrance glide (4px, measured frame by frame on 2026-10-04: y 26 → 22): a box read then
   // is up to 4px off the centre the click will see — the 3,3–3,5px this spec failed by in two full
   // runs that day. So the page's verdict first (the data, or its absence, has landed: no later
-  // reflow), then a box that two reads 100 ms apart agree on.
+  // reflow), then the button at rest — its box still, no animation on it or on the header that
+  // carries it (e2e/atRest.ts).
   await expect(page.getByRole('region', { name: 'Verdetto sui rendimenti' })).toBeVisible({ timeout: 30_000 });
-  await expect
-    .poll(async () => {
-      const first = await button.boundingBox();
-      await page.waitForTimeout(100);
-      const second = await button.boundingBox();
-      return first && second ? Math.abs(first.x - second.x) + Math.abs(first.y - second.y) : Number.NaN;
-    })
-    .toBe(0);
+  await atRest(button);
   const box = (await button.boundingBox())!;
 
   await page.evaluate(() => {
@@ -50,7 +45,7 @@ test('Rendimenti: the custom-period modal keeps ONE origin, the button’s centr
   await button.click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  await page.waitForTimeout(900);
+  await atRest(dialog);
   // The geometry is read while the panel is open and settled: a closing panel is at scale 0.95
   // and its painted box is displaced by 0.05 × its distance from the pivot.
   const dialogBox = (await dialog.boundingBox())!;

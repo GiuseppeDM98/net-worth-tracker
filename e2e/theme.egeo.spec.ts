@@ -13,6 +13,7 @@
  * on `/login` (the old «not loaded» check passed it; «every face unloaded» is red).
  */
 import { expect, test, type Page } from '@playwright/test';
+import { STORAGE_STATE } from '../playwright.config';
 import { restoreColorTheme, settle, setAccountColorTheme, startWith, styleOf } from './themeEgeo';
 
 const MODES = ['light', 'dark'] as const;
@@ -123,7 +124,7 @@ test.describe('Egeo, signed out: the palette alone', () => {
     for (const path of ['/', '/login']) {
       test(`${path} · ${mode}: no frieze, no temple, headings in Geist, the palette applied`, async ({ page, browser }) => {
         // What `/dashboard`'s `html` paints in the same mode, read signed in on a second context.
-        const signedIn = await browser.newContext({ storageState: 'e2e/.auth/user.json', viewport: { width: 1440, height: 900 } });
+        const signedIn = await browser.newContext({ storageState: STORAGE_STATE, viewport: { width: 1440, height: 900 } });
         const reference = await signedIn.newPage();
         await setAccountColorTheme('egeo');
         await startWith(reference, 'egeo', mode);

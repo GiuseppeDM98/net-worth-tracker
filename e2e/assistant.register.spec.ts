@@ -20,6 +20,7 @@ import {
   openAssistant, outcomeSaved, plantExchange, plantFillers, plantFixture, previousMonthFifteenthIso, proposalBlock, quantityOf,
   removeFixture, resetFixture, send, storedProposals, writtenRows,
 } from './assistantRegister';
+import { atRest } from './atRest';
 
 const MONTH_NAMES = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
 
@@ -121,7 +122,7 @@ test('two rows in one sentence are two cards with two outcomes, and a reload on 
   await first.scrollIntoViewIfNeeded();
   await expect(page.getByText('Nota 30 in coda alla risposta.')).not.toBeInViewport();
   const firstTop = async () => Math.round((await first.boundingBox())!.y);
-  await expect.poll(async () => { const a = await firstTop(); await page.waitForTimeout(250); return (await firstTop()) === a; }).toBe(true);
+  await atRest(page);
   const topBefore = await firstTop();
 
   const confirmed = outcomeSaved(page);
@@ -135,7 +136,7 @@ test('two rows in one sentence are two cards with two outcomes, and a reload on 
   await expect(second.getByText('Ignorata')).toBeVisible();
   expect((await ignored).status()).toBe(200);
   // Long enough for a smooth scroll to have started and ended.
-  await page.waitForTimeout(1200);
+  await atRest(page);
   expect(await firstTop()).toBe(topBefore);
   await expect(page.getByText('Nota 30 in coda alla risposta.')).not.toBeInViewport();
 

@@ -15,6 +15,8 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { atRest } from './atRest';
+import { readPersistedQuery } from './persistedCache';
 import {
   addFixtureRevisionRow,
   clearPlanPathDraft,
@@ -74,7 +76,14 @@ test('dalla tessera vuota, otto schermate e «Conferma»: UN piano attivo di 12 
   await expect.poll(readModel, { timeout: 15_000 }).not.toBeNull();
   expect(await page.evaluate(() => Object.keys(localStorage).some((key) => key.startsWith('plan-path-draft')))).toBe(false);
   // The refetched plans find the plan active: the done card stays, never «Hai già un piano» (found on the mirror tour).
-  await page.waitForTimeout(3000);
+  // The refetch has no request to wait for; what it brought is in the persisted cache once the
+  // persister has written it — the list with the active plan — and the page is then read at rest.
+  await expect
+    .poll(async () => ((await readPersistedQuery(page, ['accumulation-plans'])) as Array<{ status?: string }> | null)?.some((plan) => plan.status === 'active') ?? false, {
+      timeout: 15_000,
+    })
+    .toBe(true);
+  await atRest(page);
   await expect(done).toBeVisible();
   await expect(page.getByText('Hai già un piano di accumulo attivo.')).toHaveCount(0);
 });

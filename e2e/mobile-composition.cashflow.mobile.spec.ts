@@ -33,11 +33,13 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
+import { atRest } from './atRest';
 
 /** The house floor for a touch target (PRODUCT.md → Accessibility & Inclusion). */
 const TOUCH_FLOOR = 44;
 const USER_ID = 'test-user-1';
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
 /** Every decoy row carries this word in its note: the sweep before and after each test finds them by it. */
@@ -274,13 +276,12 @@ test.describe('Cashflow › Tracciamento, composed for a phone', () => {
     await dialog.locator('#notes').fill(SAVED_DECOY_NOTE);
     await dialog.getByRole('button', { name: 'Crea voce' }).click();
     await expect(dialog).toBeHidden({ timeout: 15_000 });
-    const closedAt = Date.now();
 
-    // Movimenti opens on the row it wrote; one second after the close the focus is on its button.
+    // Movimenti opens on the row it wrote; one second after the close the focus is on its button —
+    // the assertion on `:focus` retries until it is (the locator is resolved again at every try).
     await expect(trigger(page, 'trk-movimenti')).toHaveAttribute('aria-expanded', 'true');
     const row = panel(page, 'trk-movimenti').locator('[data-expense-id]').filter({ hasText: SAVED_DECOY_NOTE });
     await expect(row).toBeVisible({ timeout: 15_000 });
-    await page.waitForTimeout(Math.max(0, 1000 - (Date.now() - closedAt)));
     const focused = page.locator(':focus');
     await expect(focused).toHaveAttribute('data-expense-id', /.+/);
     await expect(focused).toHaveAccessibleName(new RegExp(`^${SAVED_DECOY_NOTE}, `));
@@ -298,7 +299,7 @@ test.describe('Cashflow › Tracciamento, composed for a phone', () => {
     await page.getByRole('tabpanel', { name: 'Tracciamento' }).getByRole('button', { name: 'Apri tutte' }).click();
     for (const id of TRACKING_ROWS) await expect(trigger(page, id)).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByRole('region', { name: 'Movimenti' }).getByRole('combobox', { name: /^Periodo dei movimenti:/ })).toBeVisible();
-    await page.waitForTimeout(600);
+    await atRest(page);
 
     const measurement = await page.evaluate(() => {
       const main = document.querySelector('main')!;

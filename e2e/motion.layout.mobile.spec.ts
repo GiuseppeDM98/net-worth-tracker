@@ -17,6 +17,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { atRest } from './atRest';
 
 const bottomNav = (page: Page) => page.locator('nav[data-nav="pill"]');
 
@@ -26,7 +27,7 @@ async function openPanoramica(page: Page) {
   await expect(page.locator('main [data-slot="skeleton"]')).toHaveCount(0, { timeout: 30_000 });
   await expect(bottomNav(page)).toBeVisible();
   // Past hydration (the media query's real value) and the page's entrance.
-  await page.waitForTimeout(1_000);
+  await atRest(page);
 }
 
 test('the pill glides aside when the «+» of Tracciamento appears', async ({ page }) => {
@@ -54,7 +55,8 @@ test('the pill glides aside when the «+» of Tracciamento appears', async ({ pa
   await bottomNav(page).getByRole('link', { name: 'Cashflow' }).click();
   await page.waitForURL('**/dashboard/cashflow');
   await expect(page.getByRole('button', { name: 'Aggiungi nuova voce' })).toBeVisible();
-  await page.waitForTimeout(2_600);
+  // The glide is over when the pill is at rest: the frames sampled so far hold the whole of it.
+  await atRest(bottomNav(page));
 
   const lefts = await page.evaluate(() => (window as unknown as { __lefts: number[] }).__lefts);
   const first = lefts[0];
@@ -82,7 +84,7 @@ test('a client navigation measures the visible nav — the control of the 0 at 1
   await bottomNav(page).getByRole('link', { name: 'Patrimonio' }).click();
   await page.waitForURL('**/dashboard/assets');
   await expect(page.locator('main h1').filter({ visible: true }).first()).toHaveText(/./, { timeout: 30_000 });
-  await page.waitForTimeout(800);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __perf14: { bottomNavMeasures: number } }).__perf14.bottomNavMeasures)).toBeGreaterThan(0);
 
   const { bottomNavMeasures } = await page.evaluate(() => ({ ...(window as unknown as { __perf14: { bottomNavMeasures: number } }).__perf14 }));
   expect(bottomNavMeasures).toBeGreaterThan(0);
@@ -110,7 +112,11 @@ test('a page scene keeps the pill above the page: its own view-transition group,
   await bottomNav(page).getByRole('link', { name: 'Patrimonio' }).click();
   await page.waitForURL('**/dashboard/assets');
   await expect(page.locator('main h1').filter({ visible: true }).first()).toHaveText(/./, { timeout: 30_000 });
-  await page.waitForTimeout(800);
+  // The scene has been seen running, and is over: `data-vt` leaves with the transition (lib/utils/viewTransition.ts).
+  await expect
+    .poll(() => page.evaluate(() => [...(window as unknown as { __scene: { groups: Set<string> } }).__scene.groups]))
+    .toContain('::view-transition-new(page-main)');
+  await page.waitForFunction(() => document.documentElement.dataset.vt !== 'page');
   const scene = await page.evaluate(() => {
     const seen = (window as unknown as { __scene: { groups: Set<string>; containerNames: Set<string> } }).__scene;
     return { groups: [...seen.groups], containerNames: [...seen.containerNames] };

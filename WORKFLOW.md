@@ -218,7 +218,14 @@ changes from repo to repo and is the only part to rewrite when the tooling chang
 | Unit tests | `TZ=Europe/Rome npx vitest run` (or `npm test -- <file>`) |
 | Lint | `npm run lint` (flat ESLint config, `eslint.config.mjs`) |
 | Build | `npm run build` |
-| Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) — the whole suite once, before the commit is asked for, on a production build it makes first when the code changed (since 2026-11-16); while working, the touched area's specs on `next dev`: `npx playwright test e2e/<area>` (Obligation 4, below) |
+| Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) — the whole suite once, before the commit is asked for, on a production build it makes first when the code changed (since 2026-11-16), on four workers (since 2026-11-26); while working, the touched area's specs on `next dev`, one worker: `npx playwright test e2e/<area>` (Obligation 4, below) |
+
+Browser tests: workers 4 · isolation one Firestore emulator project, one server and one set of parked sessions per worker (Auth shared) · whole run 8,6 min on 2026-11-26 (585 tests)
+
+The whole run wants :3100–3103 free and NOTHING else running on the machine (no type-check, build or second suite: a
+contended run produces reds that are not the code's); a red is run once more by Playwright with the trace on, and a
+test green only at that retry — «flaky» in the report — is named and read like a red. The wiring and the measures:
+`doc/guide/e2e-suite.md` § The suite's speed.
 
 npm is the package manager (`package-lock.json`; there is no Makefile, no pnpm/yarn lockfile).
 **Phantom `tsc` errors** clustered in `e2e/` and `lib/utils/expenseImport.ts` after a branch switch
@@ -236,7 +243,9 @@ npm run dev:emulator     # the app on :3000 pointed at the emulators
 
 Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 is the Playwright server — `npm run dev:e2e`
 (isolated `.next-e2e` build dir) for an area run, the `.next-e2e-build` production build for the whole run (since
-2026-11-16, SETUP.md → Step 7); keep it separate from the tour server on :3000. Port
+2026-11-16, SETUP.md → Step 7), which serves it on :3100–3103, one server per worker, each on its own Firestore
+project of the emulators (`demo-net-worth-wN`, since 2026-11-26; the base seed is laid by the run itself); keep them
+separate from the tour server on :3000. Port
 3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's and the first-screen census's
 (`npm run mobile:census`, `doc/guide/prima-schermata.md`).
 
@@ -298,7 +307,8 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
   <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden`), stopped by PID at the end.
 - **Throwaway fixtures** follow the seed pattern (`scripts/seedEmulator.ts`, `scripts/seed*E2E.mts`) or live as an
   untracked `scripts/*.tmp.mts` inside the repo — never in the scratchpad; `.mts`, never `.ts`.
-- **The authenticated browser already exists**: `e2e/.auth/<account>.json`, minted by the six `auth*.setup.ts`;
+- **The authenticated browser already exists**: `e2e/.auth/<account>.json` (the base project's, on :3100; a whole
+  run's other workers park theirs in `e2e/.auth/wN/`), minted by the six `auth*.setup.ts`;
   `npx playwright test --project=<name>`, one of the fourteen projects (doc/guide/e2e-playwright.md); a throwaway spec
   matches its project's `testMatch` and is deleted at the end.
 - **Automated suites are yours to run, always**, in two levels (2026-11-13): while working, the specs of the area

@@ -22,9 +22,9 @@
 
 import { expect, type Page } from '@playwright/test';
 import { reconcileOperatingPlan, type OperatingPlan } from '../lib/utils/operatingPlan';
+import { pointAdminAtEmulator } from './emulator';
 
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
+pointAdminAtEmulator();
 
 const UID = 'test-user-1';
 

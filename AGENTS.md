@@ -815,8 +815,15 @@ file used to carry.
   another app — in `doc/guide/e2e-emulatori.md`.
 
 ### Browser-Driven E2E (Playwright) → `doc/guide/e2e-playwright.md`
-- **What belongs in a browser test**: only what needs a real layout; the arithmetic stays with Vitest. **`workers: 1`**,
-  each suite its OWN fixture (`npm run e2e:seed:*` + one `runSeed` in `e2e/global-setup.ts`).
+- **What belongs in a browser test**: only what needs a real layout; the arithmetic stays with Vitest. Each suite
+  its OWN fixture (`npm run e2e:seed:*` + one `runSeed` in `e2e/global-setup.ts`).
+- **Four workers on the whole run, each its own universe** (2026-11-26): a Firestore emulator project
+  (`demo-net-worth-wN`), a server (:3100+N) and the parked sessions per worker, Auth shared; an area run is one worker
+  on the base project. **Nothing in `e2e/` names the project, a port or a session path outside `e2e/emulator.ts`**
+  (`grep -rnE "demo-net-worth|\.auth/|localhost:31" e2e --include=*.ts` hits that file alone), no spec reads what
+  another file wrote, and a fixed sleep is a condition of `e2e/atRest.ts`. The app's override lives behind the emulator
+  flag and host only (`lib/firebase/emulatorProject.ts`, `__tests__/emulatorProject.test.ts`). The trace is recorded
+  at the one retry of a red; a test green only there is «flaky» in the report and read like a red.
 - **The whole run is a production build, an area run `next dev`** (2026-11-16); a chunk is known by a STRING its module
   carries (`CHUNK_SIGNATURES`), never a name a minifier drops.
 - **The FILENAME chooses the project** (`*.mobile`, `*.tablet`, `*.degraded`, `*.degraded.mobile`); **`localhost`, never

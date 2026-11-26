@@ -21,8 +21,9 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
-const DOCUMENTS = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const DOCUMENTS = FIRESTORE_DOCUMENTS;
 const SETTINGS_DOC = `${DOCUMENTS}/assetAllocationTargets/test-user-1`;
 const FOOD_DOC = `${DOCUMENTS}/expenseCategories/seed-cat-food`;
 const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };

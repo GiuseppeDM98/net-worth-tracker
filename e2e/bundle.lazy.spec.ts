@@ -20,6 +20,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { FLUSSO_TILE_SIGNATURE, PDF_ENGINE_SIGNATURE, SANKEY_SIGNATURE, UNDERWATER_CHART_SIGNATURE, holdChunks, layoutShiftSince, probeChunks, recordLayoutShifts } from './chunkProbe';
+import { afterIdle } from './atRest';
 
 test('Storico downloads the PDF engine when «Esporta PDF» is pressed, not with the page', async ({ page }) => {
   test.setTimeout(150_000); // the engine's first compile in `next dev` is the long wait below
@@ -46,7 +47,7 @@ test('Rendimenti preloads the Dettaglio\'s plots while idle, so opening it draws
 
   // Nothing opened yet, and the chart's chunk arrives anyway: the idle preload (`usePreloadWhenIdle`).
   await expect.poll(async () => (await underwater.matching()).length, { timeout: 60_000 }).toBeGreaterThan(0);
-  await page.waitForTimeout(500); // the chunk evaluated, not only received
+  await afterIdle(page); // the chunk evaluated, not only received
 
   // Watch from before the press whether a placeholder EVER appears in the underwater tile: read after
   // the chart is visible, a count of skeletons is 0 whether or not one was shown first.
@@ -79,7 +80,7 @@ test('Analisi keeps the Flusso out of its first JavaScript, preloads it while id
   await expect.poll(async () => (await flussoTile.matching()).length, { timeout: 60_000 }).toBeGreaterThan(0);
   const initial = await page.evaluate(() => (window as unknown as { __initialScripts: string[] }).__initialScripts ?? []);
   expect((await flussoTile.matching()).filter((url) => initial.includes(url))).toEqual([]);
-  await page.waitForTimeout(500); // the chunk evaluated, not only received
+  await afterIdle(page); // the chunk evaluated, not only received
 
   // Watch from before the press whether the Flusso's fallback EVER appears in «Dettaglio».
   await page.evaluate(() => {

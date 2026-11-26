@@ -26,6 +26,7 @@ import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { COLOR_THEME_META, COLOR_THEMES, COLOR_THEME_STORAGE_KEY, DEFAULT_COLOR_THEME } from '../lib/constants/colorTheme';
 import { cssColorToOklch } from '../lib/utils/colorParse';
+import { atRest } from './atRest';
 
 export const BASELINE_PATH = resolve(__dirname, 'themeNeutral.baseline.json');
 export type ViewportKey = '1440' | '390';
@@ -151,7 +152,7 @@ async function readSignature(page: Page, probes: Record<string, string>): Promis
 async function settle(page: Page): Promise<void> {
   await expect(page.locator('main h1').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('main [data-slot="skeleton"]')).toHaveCount(0, { timeout: 30_000 });
-  await page.waitForTimeout(600);
+  await atRest(page);
 }
 
 function readBaseline(): Baseline {
@@ -197,7 +198,7 @@ export function describeThemeNeutrality(viewport: ViewportKey): void {
             await page.locator('[data-sidebar="footer"] [aria-haspopup="menu"]').click();
             const menu = page.locator('[data-slot="dropdown-menu-content"]');
             await expect(menu).toBeVisible();
-            await page.waitForTimeout(400);
+            await atRest(page);
             Object.assign(signature, await readSignature(page, { accountMenu: '[data-slot="dropdown-menu-content"]' }));
             await page.keyboard.press('Escape');
             await expect(menu).toBeHidden();
@@ -207,7 +208,7 @@ export function describeThemeNeutrality(viewport: ViewportKey): void {
             await page.getByRole('button', { name: 'Nuova Spesa', exact: true }).click();
             const dialog = page.getByRole('dialog');
             await expect(dialog).toBeVisible();
-            await page.waitForTimeout(600);
+            await atRest(page);
             Object.assign(
               signature,
               await readSignature(page, { dialog: '[role="dialog"]', dialogTitle: '[role="dialog"] [data-slot="dialog-title"]' }),
@@ -220,7 +221,7 @@ export function describeThemeNeutrality(viewport: ViewportKey): void {
             await page.getByRole('button', { name: 'Aggiungi nuova voce' }).click();
             const drawer = page.locator('[data-slot="drawer-content"]');
             await expect(drawer).toBeVisible();
-            await page.waitForTimeout(800);
+            await atRest(page);
             Object.assign(
               signature,
               await readSignature(page, { drawer: '[data-slot="drawer-content"]', drawerTitle: '[data-slot="drawer-content"] [data-slot="drawer-title"]' }),
