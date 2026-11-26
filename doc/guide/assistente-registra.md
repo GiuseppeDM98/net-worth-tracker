@@ -29,7 +29,7 @@ and the Assistente asks what it needs with options before proposing.
   Necessarie») come from the window's rows through the Budget's pure
   level. The two reads of the month are settled apart: a failed one prints its sentence, the core reads failing is a 500
   before any event. The CASHFLOW 12 MESI block follows, as in every mode.
-- **The protocol** lives ONLY in `buildRegisterPrompt` (`REGISTER_CONTRACT`; `ASSISTANT_SYSTEM_CORE` is untouched and the
+- **The protocol** lives ONLY in `buildRegisterPrompt` (`REGISTER_CONTRACT`; `ASSISTANT_SYSTEM_CORE` carries none of it and the
   mode's `system` is byte-identical between users — held by `not.toContain` and `toBe`; it never reads the form of an
   answer of the other modes, `ANSWER_CONTRACT`, nor writes a tail: its text is saved as it came and its chips are the
   three starters, doc/guide/assistente-risposta.md): up to five
@@ -88,8 +88,8 @@ and the Assistente asks what it needs with options before proposing.
 - **The card** (`ExpenseProposalCard`): `resolveExpenseProposal` checks every id against the browser's own reads
   (`RegisterRefsContext`: categories, assets, settings, centres) and names what it cannot find — a problem closes
   «Conferma», never «Modifica»; a failed read closes all writing; reads not yet answered (`readsLoading`) close
-  «Conferma» and «Modifica» under «Leggo categorie e conti…» and hide the problems, which would all be false (2026-11-26,
-  DATI-08: the tile no longer remounts the messages after a thread load, so a card can mount before the reads, and
+  «Conferma» and «Modifica» under «Leggo categorie e conti…» and hide the problems, which would all be false (2026-11-26:
+  the tile no longer remounts the messages after a thread load, so a card can mount before the reads, and
   «Modifica» opened the form on no category — E2E `assistant.register` › «Modifica»). States (`describeExpenseProposalState`): idle ·
   saving (the first click closes the button: a double click writes one row) · «Registrata · apri in Cashflow»
   (`/dashboard/cashflow?tab=tracking&month=YYYY-MM&row=<id>`: the ROW's month and the row itself, on which Tracciamento

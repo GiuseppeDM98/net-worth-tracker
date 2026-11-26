@@ -693,7 +693,7 @@ describe('assistant prompt data block', () => {
       const block = formatTodayContextForPrompt(todayContext());
       expect(block).toContain('=== DATI FINANZIARI: PORTAFOGLIO DI OGGI (nessun periodo selezionato) ===');
       // What the block lacks, said as a fact (2026-11-25): never how the user should ask, which the
-      // answer used to repeat to him («nominalo nella domanda»).
+      // answer used to repeat to him («nominalo nella domanda»). Seen RED with the old sentence restored.
       expect(block).toContain('niente entrate, uscite, snapshot o confronto tra date in questo blocco');
       expect(block).not.toContain('nominarlo nella domanda');
       expect(block).not.toContain('«cambia»');
@@ -989,6 +989,10 @@ describe('the analysis data block — income subcategories, the funds by class, 
 });
 
 // ── One form for every answer (2026-11-25) ──────────────────────────────────────────────
+// Seen RED: the verdict-first test with the core's old «non calcolarli» line restored; the
+// same-string test with today's date interpolated into the system; the period-line test with
+// one line reused for every mode; the Registra-and-emails test with the form put back in the
+// core; the web-off test with one old «Non cercare…» sentence kept.
 describe('the answer contract: one form for every mode but Registra', () => {
   const REGISTER_BLOCK = '--- REGISTRA ---\nOggi: domenica 1 novembre 2026 (2026-11-01)';
   const bundle = makeBundle();

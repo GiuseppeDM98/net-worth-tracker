@@ -6,7 +6,7 @@
  * emulators knows is the page at rest — eleven controls in `main`, no axis —, that «cambia» →
  * «Rileggi» re-sends the last prompt with the chosen route as a new turn, that a suggestion only
  * fills the composer, that «⋯» → «Preferenze» returns the focus to «⋯», and that a thread saved
- * before the router opens by `?thread=` with its card; and (DATI-08) that an answer's list has
+ * before the router opens by `?thread=` with its card; and (2026-11-25) that an answer's list has
  * bullets and its next questions come as chips, no fence on screen, after a reload too.
  *
  * The stream is ALWAYS faked (`e2e/assistantRegister.ts`): no request reaches a model. One memory
@@ -134,7 +134,7 @@ test('E5 — a thread saved before the router opens by `?thread=` with its card,
 });
 
 
-// DATI-08 (2026-11-25): an answer's Markdown is styled by its own renderers (a list has bullets) and
+// 2026-11-25: an answer's Markdown is styled by its own renderers (a list has bullets) and
 // its next questions are the model's, cut off the saved text — never a fence on screen, before or
 // after a reload. Seen RED dropping the `ul` renderer, and with the helper storing the raw text.
 test('E6 — an answer with a heading, a list and its tail: bullets, three chips, no fence, after a reload too', async ({ page }) => {

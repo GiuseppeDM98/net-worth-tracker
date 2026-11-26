@@ -1,15 +1,17 @@
 'use client';
 
 /**
- * A question the Assistente asks inside its message, in Registra (2026-11; DESIGN.md § 5 → The
- * Question-Card Rule): ONE ```assistant-question block is ONE card, and ONE «Rispondi» under the
- * message's last card sends every answer as one user message, one line per question.
+ * A question the Assistente asks inside its message, in any mode (Registra since 2026-11, every
+ * other mode since 2026-11-25; DESIGN.md § 5 → The Question-Card Rule): ONE ```assistant-question
+ * block is ONE card, and ONE «Rispondi» under the message's last card sends every answer as one
+ * user message, one line per question.
  *
  * Rendered by the `pre` interceptor with the block's rank among the message's question blocks
  * (`readAssistantQuestionBlocks`, never a render counter), so its outcome key
  * `proposalKey('question', index)` is the same after a reload. In order:
- * - no entry for it (a message outside Registra) → the plain code block;
- * - past the per-message cap → nothing;
+ * - no entry for it (the block was not read from the message) → the plain code block;
+ * - past the cap of the message's mode (two in Registra, one elsewhere), or a question on an
+ *   entity outside Registra → nothing;
  * - a block with problems (bad JSON, a refused question, an entity rule broken) → the code block;
  * - answered (`status: 'answered'` on the message) → the read-only card, «Risposta: …»;
  * - not answerable (an older message, one not yet saved, a stream running) → the read-only card, «Non risposta qui»;
@@ -143,7 +145,9 @@ export function AssistantQuestionBlock({ index, codeBlock }: AssistantQuestionBl
   };
 
   return (
-    <div className="not-prose my-3">
+    // `data-question-block`: the block's wrapper, card and «Rispondi» together (the E2E's hook since
+    // 2026-11-26, when the dead `not-prose` class it used to read was removed).
+    <div className="my-3" data-question-block={question.id}>
       {answeredLine !== null ? (
         <div className={cn('border p-4 desktop:p-5', COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)} data-question-card={question.id}>
           <p className={cn(TILE_SUB_EYEBROW_CLASS, AI_GENERATED_EYEBROW_CLASS)}>{QUESTION_EYEBROW}</p>

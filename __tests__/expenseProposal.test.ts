@@ -356,7 +356,7 @@ describe('describeExpenseProposalState', () => {
     });
   });
 
-  // DATI-08: the card mounts with the answer's `done`, which may come before the page's reads —
+  // 2026-11-25: the card mounts with the answer's `done`, which may come before the page's reads —
   // «Modifica» then opened the form on no category (E2E assistant.register › «Modifica»).
   it('waits for the reads: no «Conferma», no «Modifica», a line that says so', () => {
     expect(describeExpenseProposalState(resolved, undefined, { ...local, readsLoading: true })).toEqual({

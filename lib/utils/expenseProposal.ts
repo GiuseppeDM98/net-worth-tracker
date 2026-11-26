@@ -697,7 +697,7 @@ export function describeExpenseProposalState(
   if (persisted?.status === 'ignored') return { status: 'ignored', line: 'Ignorata', feeLine: null, ...closed };
   if (local.messageId.startsWith('local-')) return { status: 'interrupted', line: PROPOSAL_INTERRUPTED_LINE, feeLine: null, ...closed };
   if (local.saving) return { status: 'saving', line: null, feeLine: null, ...closed };
-  // The card mounts with the answer's `done`, which may come before the page's reads (DATI-08: the
+  // The card mounts with the answer's `done`, which may come before the page's reads (2026-11-25: the
   // tile no longer remounts the messages after a thread load, which used to hide this): «Modifica»
   // would open the form on no category, «Conferma» check against empty lists.
   if (local.readsLoading) return { status: 'idle', line: null, feeLine: null, ...closed, canIgnore: true, waitLine: PROPOSAL_READS_LOADING_LINE };
