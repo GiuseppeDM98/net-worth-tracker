@@ -123,6 +123,28 @@ describe('streamAssistantResponse server-side fallback', () => {
       stream: true,
     });
   });
+
+  it('runs on Opus 5.5 at effort medium, with the fallback and no forced tool', async () => {
+    // Opus 5.5 since 2026-11-23 (owner's decision); the model refuses a forced `tool_choice`.
+    async function* empty() {}
+    const create = vi
+      .spyOn(Anthropic.Beta.Messages.prototype, 'create')
+      .mockResolvedValue(empty() as never);
+
+    await streamAssistantResponse({
+      mode: 'chat',
+      prompt: 'Quanto costa l’asilo?',
+      contextBundle: null,
+      preferences,
+      enableWebSearch: true,
+      onStatus: vi.fn(),
+      onText: vi.fn(),
+    });
+
+    const request = create.mock.calls[0][0] as unknown as Record<string, unknown>;
+    expect(request).toMatchObject({ model: 'claude-opus-5-5', output_config: { effort: 'medium' }, fallbacks: 'default' });
+    expect(request).not.toHaveProperty('tool_choice');
+  });
 });
 
 describe('streamAssistantResponse — the CASHFLOW 12 MESI block (2026-11)', () => {

@@ -7,9 +7,12 @@
  * the real entry point still reads just as well and covers the wiring too.)
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ASSISTANT_SYSTEM_CORE,
+  WEB_OFF_LINE,
+  buildAssistantSystem,
+  buildEmailPeriodicFormatContract,
   REGISTER_CONTRACT,
   buildChatPrompt,
   buildRegisterPrompt,
@@ -689,10 +692,11 @@ describe('assistant prompt data block', () => {
     it('prints the instruments, the allocation and the goals under a header that names what is missing', () => {
       const block = formatTodayContextForPrompt(todayContext());
       expect(block).toContain('=== DATI FINANZIARI: PORTAFOGLIO DI OGGI (nessun periodo selezionato) ===');
-      expect(block).toContain('niente entrate, uscite, snapshot o confronto tra date');
-      // The page has no period to select since 2026-11-12: the period is named in the question, or «cambia».
-      expect(block).toContain('nominarlo nella domanda');
-      expect(block).toContain('«cambia» sotto la risposta');
+      // What the block lacks, said as a fact (2026-11-25): never how the user should ask, which the
+      // answer used to repeat to him («nominalo nella domanda»).
+      expect(block).toContain('niente entrate, uscite, snapshot o confronto tra date in questo blocco');
+      expect(block).not.toContain('nominarlo nella domanda');
+      expect(block).not.toContain('«cambia»');
       expect(block).not.toContain('selezionarlo');
       expect(block).toContain('--- STRUMENTI IN PORTAFOGLIO OGGI');
       expect(block).toContain('ETF Mondo');
@@ -980,6 +984,85 @@ describe('the analysis data block — income subcategories, the funds by class, 
 
   it('should never let the model call a search it ran unavailable', () => {
     const { system } = buildMonthAnalysisPrompt(makeBundle(), 'Come va?', PREFERENCES);
-    expect(system).toContain("Se la ricerca non trova eventi datati del periodo, scrivi che la ricerca non li ha trovati: non scrivere mai che la ricerca web non era disponibile quando l'hai usata.");
+    expect(system).toContain("Se la ricerca non trova nulla di datato, scrivi che non l'ha trovato: non scrivere mai che la ricerca web non era disponibile quando l'hai usata.");
+  });
+});
+
+// ── One form for every answer (2026-11-25) ──────────────────────────────────────────────
+describe('the answer contract: one form for every mode but Registra', () => {
+  const REGISTER_BLOCK = '--- REGISTRA ---\nOggi: domenica 1 novembre 2026 (2026-11-01)';
+  const bundle = makeBundle();
+  const systems = {
+    chat: buildChatPrompt('Quanto ho speso?', PREFERENCES, undefined).system,
+    month_analysis: buildMonthAnalysisPrompt(bundle, 'Come va?', PREFERENCES).system,
+    year_analysis: buildYearAnalysisPrompt(bundle, 'Come va?', PREFERENCES).system,
+    ytd_analysis: buildYtdAnalysisPrompt(bundle, 'Come va?', PREFERENCES).system,
+    history_analysis: buildHistoryAnalysisPrompt(bundle, 'Come va?', PREFERENCES).system,
+  };
+  const registerSystem = buildRegisterPrompt('ho speso 5 euro', PREFERENCES, [], REGISTER_BLOCK, null).system;
+  const emailSystem = `${ASSISTANT_SYSTEM_CORE}\n\n${buildEmailPeriodicFormatContract('monthly')}`;
+
+  it('asks every mode but Registra for the verdict first, lets it compute and marks an unconfirmed threshold', () => {
+    for (const system of Object.values(systems)) {
+      expect(system).toContain('La prima riga è il verdetto');
+      expect(system).toContain('il conto è lavoro tuo');
+      expect(system).toContain('da verificare');
+      // The owner, phase F of 2026-11-25: «Ipotesi:», «Mensa:» and the table's totals were bold too.
+      expect(system).toContain('Il grassetto va SOLO sulla cifra o sul sì/no della prima riga');
+      for (const old of ['non calcolarli', 'ESCLUSIVAMENTE', 'In sintesi', 'Trend storici principali']) {
+        expect(system).not.toContain(old);
+      }
+    }
+  });
+
+  it('is the same string twice, for two users on two days', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-24T12:00:00Z'));
+      const first = buildAssistantSystem('chat');
+      const memory = [{ id: 'm1', userId: 'u2', category: 'preference' as const, text: 'Persona A', createdAt: new Date(), updatedAt: new Date(), status: 'active' as const }];
+      vi.setSystemTime(new Date('2026-11-25T12:00:00Z'));
+      const second = buildChatPrompt('Altro?', { ...PREFERENCES, memoryEnabled: true, responseStyle: 'deep' }, 'ottobre 2026', memory).system;
+      expect(buildAssistantSystem('chat')).toBe(first);
+      expect(second).toBe(first);
+      expect(buildAssistantSystem('month_analysis')).toBe(buildAssistantSystem('month_analysis'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('differs between a period mode and the chat by exactly the period line', () => {
+    const lines = new Set<string>();
+    for (const mode of ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'] as const) {
+      const system = systems[mode];
+      expect(system.startsWith(`${systems.chat}\n\n`)).toBe(true);
+      const line = system.slice(systems.chat.length + 2);
+      expect(line.length).toBeGreaterThan(0);
+      expect(line).not.toContain('\n');
+      lines.add(line);
+    }
+    expect(lines.size).toBe(4);
+  });
+
+  it('leaves the form out of Registra and the emails, which still read the shared core', () => {
+    for (const system of [registerSystem, emailSystem]) {
+      expect(system).toContain('il conto è lavoro tuo');
+      for (const form of ['Forma della risposta', 'assistant-followups', 'Una sola, come scheda']) {
+        expect(system).not.toContain(form);
+      }
+    }
+  });
+
+  it('says only that the web is off when the macro preference is, in every period mode', () => {
+    const contents = [
+      buildMonthAnalysisPrompt(bundle, 'Come va?', PREFERENCES).userContent,
+      buildYearAnalysisPrompt(bundle, 'Come va?', PREFERENCES).userContent,
+      buildYtdAnalysisPrompt(bundle, 'Come va?', PREFERENCES).userContent,
+      buildHistoryAnalysisPrompt(bundle, 'Come va?', PREFERENCES).userContent,
+    ];
+    for (const userContent of contents) {
+      expect(userContent).toContain(WEB_OFF_LINE);
+      expect(userContent).not.toContain('Non cercare');
+    }
   });
 });

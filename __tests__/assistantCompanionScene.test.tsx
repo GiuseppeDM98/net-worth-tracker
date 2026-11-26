@@ -490,7 +490,7 @@ describe('the Assistente page — the route an answer carries', () => {
   it('sends a «Continua con» row with neither', async () => {
     plantThread('t-chat', [
       { id: 'u-1', role: 'user', content: 'ciao', mode: 'chat' },
-      { id: 'a-1', role: 'assistant', content: 'Ciao.', mode: 'chat', routeReading: FREE },
+      { id: 'a-1', role: 'assistant', content: 'Ciao.', mode: 'chat', routeReading: FREE, followUps: ['Approfondisci il punto'] },
     ]);
     searchParamsMock.value = new URLSearchParams('thread=t-chat');
     const user = userEvent.setup();
@@ -499,6 +499,53 @@ describe('the Assistente page — the route an answer carries', () => {
     await waitFor(() => expect(streamCalls()).toHaveLength(1));
     expect(bodies()[0]).not.toHaveProperty('route');
     expect(bodies()[0]).not.toHaveProperty('routeCarried');
+  });
+});
+
+// The next questions are the model's, written for THAT answer (2026-11-25): stored on the message,
+// shown under the last answer alone, none beside a question card.
+describe('the Assistente page — «Continua con» written by the model', () => {
+  const CHAT_QUESTION = ['Dipende da una cosa.', '```assistant-question', JSON.stringify({ id: 'anno', kind: 'single', text: 'Quale anno confronto?', options: [{ value: '2025', label: '2025' }, { value: '2024', label: '2024' }], allowOther: true }), '```'].join('\n');
+
+  it('shows the last answer’s questions, not an older one’s, and a click sends the label', async () => {
+    plantThread('t-fu', [
+      { id: 'u-1', role: 'user', content: 'Quanto costa l’asilo?', mode: 'chat' },
+      { id: 'a-1', role: 'assistant', content: '**300 €** al mese.', mode: 'chat', routeReading: FREE, followUps: ['Domanda vecchia'] },
+      { id: 'u-2', role: 'user', content: 'E la mensa?', mode: 'chat' },
+      { id: 'a-2', role: 'assistant', content: '**80 €** al mese.', mode: 'chat', routeReading: FREE, followUps: ['E nel 2025?', 'Quanto in un anno?'] },
+    ]);
+    searchParamsMock.value = new URLSearchParams('thread=t-fu');
+    const user = userEvent.setup();
+    renderPage();
+    const chips = within(await screen.findByRole('list', { name: 'Continua con' })).getAllByRole('button');
+    expect(chips.map((chip) => chip.textContent)).toEqual(['E nel 2025?', 'Quanto in un anno?']);
+    expect(screen.queryByRole('button', { name: /Domanda vecchia/ })).toBeNull();
+    await user.click(chips[1]);
+    await waitFor(() => expect(streamCalls()).toHaveLength(1));
+    expect(bodies()[0]).toMatchObject({ prompt: 'Quanto in un anno?' });
+  });
+
+  it('shows no «Continua con» under an answer that stored none', async () => {
+    plantThread('t-none', [
+      { id: 'u-1', role: 'user', content: 'ornitorinco', mode: 'chat' },
+      { id: 'a-1', role: 'assistant', content: 'Risposta di prima.', mode: 'chat', routeReading: FREE },
+    ]);
+    searchParamsMock.value = new URLSearchParams('thread=t-none');
+    renderPage();
+    expect(await screen.findByText('Risposta di prima.')).not.toBeNull();
+    expect(screen.queryByRole('list', { name: 'Continua con' })).toBeNull();
+  });
+
+  it('shows none beside a question card of a chat answer', async () => {
+    plantThread('t-ask', [
+      { id: 'u-1', role: 'user', content: 'La spesa è salita?', mode: 'chat' },
+      { id: 'a-1', role: 'assistant', content: CHAT_QUESTION, mode: 'chat', routeReading: FREE, followUps: ['E nel 2025?'] },
+    ]);
+    searchParamsMock.value = new URLSearchParams('thread=t-ask');
+    renderPage();
+    expect(await screen.findByText('Quale anno confronto?')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Rispondi' })).not.toBeNull();
+    expect(screen.queryByRole('list', { name: 'Continua con' })).toBeNull();
   });
 });
 

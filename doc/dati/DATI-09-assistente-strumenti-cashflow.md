@@ -14,7 +14,11 @@ the model is never given:
 - **Categories exist for the twelve full months only**, the monthly series by TYPE only, and no single row ever
   reaches the model: `lib/utils/cashflowBlock.ts` — caps `:53-58` (40 commitments, 20 sources, 60 subcategories), the
   series `:258-287`, the printer `:826-856`. A period block lists categories for its own period; nothing compares two
-  periods by category, nothing lists the rows behind a figure.
+  periods by category, nothing lists the rows behind a figure. Seen in DATI-08's phase F (2026-11-26) on the third
+  question: to compare January–October by category the model set the previous calendar year beside the last twelve
+  months and subtracted (the two months in both cancel). The differences held, the columns read as neither period,
+  and the owner could not follow the table. `comparePeriods` (§ 4.1) is the answer; the same question is a good
+  check for § 7.
 - **There is no tool loop.** The one request (`lib/server/assistant/anthropicStream.ts:233-262`) declares at most the
   server-side web search; the event loop (`:264-307`) knows no `tool_use`.
 - The whole expense history is already read at every message (`fetchCashflowBlockInputs`,

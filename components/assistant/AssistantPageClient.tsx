@@ -42,7 +42,10 @@ import {
   formatPeriodInSentence,
   toNoContextVerdictInput,
 } from '@/lib/utils/assistantNarrative';
-import { buildFollowUpSuggestions, type AssistantFollowUp } from '@/lib/utils/assistantFollowUps';
+import { answerFollowUps, type AssistantFollowUp } from '@/lib/utils/assistantAnswerTail';
+import { nextStreamFollow } from '@/lib/utils/streamFollow';
+import { readAssistantQuestionBlocks } from '@/lib/utils/assistantQuestionBlocks';
+import { isValidQuestionBlock } from '@/components/assistant/MessageQuestionsContext';
 import { getAssistantPeriodLabel } from '@/lib/utils/assistantPeriodLabel';
 import { buildEmptyChatSuggestions, describeRoute, EMPTY_CHAT_QUESTION } from '@/lib/utils/assistantChatNarrative';
 import { getActivePeriodLabel } from '@/lib/utils/assistantPeriodOptions';
@@ -120,6 +123,21 @@ function readingToRoute(reading: AssistantRouteReading): AssistantRouteOverride 
 }
 
 const REGISTER_ROUTE: AssistantRouteOverride = { intent: 'register', period: { kind: 'none' }, webSearch: false };
+
+/**
+ * The route of a message asked in an explicit mode (no reading): its own mode and period, so the
+ * reply to its question card is never read from scratch by the router (2026-11-25). Undefined when
+ * the message does not say its period.
+ */
+function modeToRoute({ mode, monthContext }: Pick<AssistantMessage, 'mode' | 'monthContext'>): AssistantRouteOverride | undefined {
+  if (mode === 'register') return REGISTER_ROUTE;
+  if (mode === 'chat') return { intent: 'chat', period: { kind: 'none' }, webSearch: false };
+  if (mode === 'ytd_analysis') return { intent: mode, period: { kind: 'ytd' }, webSearch: false };
+  if (mode === 'history_analysis') return { intent: mode, period: { kind: 'history' }, webSearch: false };
+  if (!monthContext) return undefined;
+  if (mode === 'year_analysis') return { intent: mode, period: { kind: 'year', year: monthContext.year }, webSearch: false };
+  return { intent: mode, period: { kind: 'month', year: monthContext.year, month: monthContext.month }, webSearch: false };
+}
 
 export function AssistantPageClient({ assistantConfigured }: AssistantPageClientProps) {
   const { ownerId } = useActiveAccount();
@@ -274,8 +292,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     }
   }, [fetchedContextBundle]);
 
-  // Follow-up chips: shown after a completed assistant answer, derived purely
-  // from the answer's mode + the period bundle. Hidden while streaming.
+  // Follow-up chips: shown after a completed assistant answer — the next questions the model wrote
+  // for it (2026-11-25), Registra's starters on a registration, none beside a question card. Hidden
+  // while streaming.
   const followUps = useMemo(() => {
     const last = renderedMessages[renderedMessages.length - 1];
     const isComplete = !isStreaming && streamingMessageId === undefined && !isInterrupted;
@@ -284,8 +303,13 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     }
     // A card of the last answer wrote its row: the next one starts from an empty composer.
     const afterWrittenCard = Object.values(last.proposals ?? {}).some((state) => state.status === 'written');
-    return buildFollowUpSuggestions(last.mode, contextBundle, { afterWrittenCard });
-  }, [renderedMessages, isStreaming, streamingMessageId, isInterrupted, contextBundle]);
+    return answerFollowUps({
+      mode: last.mode,
+      followUps: last.followUps,
+      hasQuestionCard: readAssistantQuestionBlocks(last.content, last.mode).some(isValidQuestionBlock),
+      hasWrittenCard: afterWrittenCard,
+    });
+  }, [renderedMessages, isStreaming, streamingMessageId, isInterrupted]);
 
   // Scroll to the bottom when messages are available, but not while the thread
   // is still loading — scrolling to an empty area before content arrives feels jarring.
@@ -293,17 +317,49 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // smooth scroll on every token triggers continuous CSS animation on slow devices.
   // The signal leaves out a card's outcome: «Conferma» and «Ignora» never move the page.
   const scrollSignal = conversationScrollSignal(renderedMessages);
+
+  // The page follows the conversation only while the reader stays at its end (owner, 2026-11-25:
+  // every chunk, the stream's start and its end brought the page back down). A scroll up of the
+  // page's scroll container stops it, a scroll back down to the end starts it again
+  // (`nextStreamFollow`); a message the reader SENDS starts it (the count of user messages — never
+  // the whole count, which changes when the stream buffer gives way to the saved thread), and so
+  // does opening a thread.
+  const followStreamRef = useRef(true);
+  const userMessageCount = renderedMessages.filter((message) => message.role === 'user').length;
+  const userMessageCountRef = useRef(userMessageCount);
+  useEffect(() => {
+    // Captured on the document: the conversation (and its scroll container, the layout's `main`)
+    // may mount after the page, while a thread loads.
+    let previousTop: number | null = null;
+    const onScroll = (event: Event) => {
+      const end = conversationEndRef.current;
+      const container = end?.closest('main');
+      if (!end || !container || event.target !== container) return;
+      const top = container.scrollTop;
+      const endVisible = end.getBoundingClientRect().top <= container.getBoundingClientRect().bottom;
+      followStreamRef.current = nextStreamFollow(previousTop ?? top, top, endVisible, followStreamRef.current);
+      previousTop = top;
+    };
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', onScroll, { capture: true });
+  }, []);
+
+  useEffect(() => {
+    if (loadingThreadDetail && !isStreaming) followStreamRef.current = true;
+  }, [loadingThreadDetail, isStreaming]);
+
   useEffect(() => {
     if (scrollSignal === '') return;
     if (loadingThreadDetail && !isStreaming) return;
     const el = conversationEndRef.current;
     if (!el) return;
-    if (isStreaming) {
-      el.scrollIntoView({ behavior: 'instant' });
-    } else {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [scrollSignal, loadingThreadDetail, isStreaming]);
+    if (userMessageCount > userMessageCountRef.current) followStreamRef.current = true;
+    userMessageCountRef.current = userMessageCount;
+    if (!followStreamRef.current) return;
+    // `nearest`: only as far as the end needs to come into view (its scroll margin clears the
+    // sticky composer) — never the end aligned to the top, which threw the page down.
+    el.scrollIntoView({ behavior: isStreaming ? 'instant' : 'smooth', block: 'nearest' });
+  }, [scrollSignal, loadingThreadDetail, isStreaming, userMessageCount]);
 
   const canSubmit = draft.trim().length > 0 && !isStreaming;
 
@@ -356,11 +412,11 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // The one answer whose reading may change: the last, complete, with a reading, outside the demo.
   const changeableMessageId = !isStreaming && !isDemo && lastAssistant?.routeReading ? lastAssistant.id : undefined;
 
-  // The route a question card's answer is sent with: the asking message's reading, or Registra for
-  // a registration saved before the router (a question card renders on a registration alone).
+  // The route a question card's answer is sent with: the asking message's reading, or, for a
+  // message asked in an explicit mode or saved before the router, the route of its own mode.
   const askingRoute: AssistantRouteOverride | undefined = lastAssistant?.routeReading
     ? readingToRoute(lastAssistant.routeReading)
-    : lastAssistant?.mode === 'register' ? REGISTER_ROUTE : undefined;
+    : lastAssistant ? modeToRoute(lastAssistant) : undefined;
 
   // ── Handlers ──
   // A suggestion fills the composer — a register row is the start of a sentence to finish — and
@@ -415,6 +471,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Deselects the current thread so the empty state reappears and the next
   // submit creates a fresh thread server-side (threadId omitted from the request).
   const handleNewThread = () => {
+    // A new conversation starts at the top of the page, wherever the last one was read (owner,
+    // phase F of 2026-11-25); the page's scroll container is the layout's `main`.
+    conversationEndRef.current?.closest('main')?.scrollTo({ top: 0 });
     setSelectedThreadId(undefined);
     writeThreadParam(undefined);
     streaming.resetStream();
@@ -594,7 +653,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             message="La pagina resta accessibile, ma per usare l'assistente serve la chiave ANTHROPIC_API_KEY nell'ambiente."
           />
         ) : (
-          <RegisterRefsProvider refs={registerReads.refs} readFailed={registerReads.readFailed} submitAnswer={(text) => streaming.submit(text, askingRoute ? { route: askingRoute, routeCarried: true } : {})}
+          <RegisterRefsProvider refs={registerReads.refs} readFailed={registerReads.readFailed} readsLoading={registerReads.loading} submitAnswer={(text) => streaming.submit(text, askingRoute ? { route: askingRoute, routeCarried: true } : {})}
           >
             {/* The verdict is the context. */}
             <div className="flex flex-col gap-4 pt-1 desktop:flex-row desktop:items-start desktop:justify-between desktop:gap-6">

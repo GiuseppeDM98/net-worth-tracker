@@ -168,7 +168,7 @@ export function ExpenseProposalCard({ proposal, index }: ExpenseProposalCardProp
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const refs = useRegisterRefs();
-  const { readFailed } = refs;
+  const { readFailed, readsLoading } = refs;
   const { messageId, threadId, proposals, recordProposal } = useMessageId();
   const { hasQuestionBlock } = useMessageQuestions();
 
@@ -189,7 +189,7 @@ export function ExpenseProposalCard({ proposal, index }: ExpenseProposalCardProp
 
   const key = proposalKey('expense', index);
   const resolved = resolveExpenseProposal(proposal, refs, now);
-  const cardState = describeExpenseProposalState(resolved, proposals[key], { messageId, saving, readFailed, isDemo, hasQuestionBlock });
+  const cardState = describeExpenseProposalState(resolved, proposals[key], { messageId, saving, readFailed, isDemo, hasQuestionBlock, readsLoading });
 
   useEffect(() => {
     if (focusLineRef.current && cardState.line !== null) {
@@ -242,8 +242,8 @@ export function ExpenseProposalCard({ proposal, index }: ExpenseProposalCardProp
   };
 
   const { labels } = resolved;
-  // A failed read makes every id look unknown: the notice says so, the resolution's problems would lie.
-  const problems = readFailed ? [] : resolved.problems;
+  // A failed or pending read makes every id look unknown: the notice or the wait says so, the problems would lie.
+  const problems = readFailed || readsLoading ? [] : resolved.problems;
   // The lines of the newer kinds, each its own: the property's value, the loan, the series, the fee.
   const kindLines = [labels.property, labels.debt, labels.series, labels.fee].filter((line): line is string => Boolean(line));
   const detail = [labels.costCenter && `Centro ${labels.costCenter}`, labels.member && `Di ${labels.member}`].filter(Boolean);

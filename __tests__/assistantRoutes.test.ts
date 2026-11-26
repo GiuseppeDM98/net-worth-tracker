@@ -983,6 +983,42 @@ describe('Assistant private API routes', () => {
       expect(updateAssistantThreadMetadataMock).toHaveBeenLastCalledWith('thread-1', expect.objectContaining({ lastMessagePreview: 'ho fatto spesa per 103 euro' }));
     });
 
+    // The answer's tail (2026-11-25): the next questions are cut off the saved text, kept on the
+    // message and sent on `done`; Registra's text is saved as it came.
+    it('saves a chat answer without its tail, keeps the questions and sends both on done', async () => {
+      const tail = '```assistant-followups\n["E nel 2025?", "E il mutuo A?"]\n```';
+      appendAssistantMessageMock.mockReset().mockResolvedValue({ id: 'm', threadId: 'thread-1', userId: 'user-1', role: 'assistant', content: 'x', createdAt: new Date(2026, 10, 1), mode: 'chat' });
+      streamAssistantResponseMock.mockImplementationOnce(async ({ onText }: Parameters<typeof streamAssistantResponse>[0]) => {
+        onText(`**2.400 €.**\n\n${tail}`);
+        return { text: `**2.400 €.**\n\n${tail}`, webSearchUsed: false };
+      });
+      const response = await streamRoute(
+        createJsonRequest('http://localhost/api/ai/assistant/stream', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid-token' },
+          body: { userId: 'user-1', mode: 'chat', chatContext: 'none', prompt: 'Quanto costa l’asilo?' },
+        })
+      );
+      const streamText = await response.text();
+      const saved = appendAssistantMessageMock.mock.calls.at(-1)![1];
+      expect(saved).toMatchObject({ role: 'assistant', content: '**2.400 €.**', followUps: ['E nel 2025?', 'E il mutuo A?'] });
+      expect(saved.content).not.toContain('```');
+      const done = streamText.split('\n').filter((line) => line.startsWith('data: ')).map((line) => JSON.parse(line.slice(6))).find((event) => event.type === 'done');
+      expect(done).toMatchObject({ content: '**2.400 €.**', followUps: ['E nel 2025?', 'E il mutuo A?'] });
+    });
+
+    it('saves a Registra answer as it came, a block of that language included', async () => {
+      const text = 'Ti propongo questa riga.\n\n```assistant-followups\n["Altro?"]\n```';
+      streamAssistantResponseMock.mockImplementationOnce(async ({ onText }: Parameters<typeof streamAssistantResponse>[0]) => {
+        onText(text);
+        return { text, webSearchUsed: false };
+      });
+      await (await registerRequest()).text();
+      const saved = appendAssistantMessageMock.mock.calls.filter((call) => call[1].role === 'assistant').at(-1)![1];
+      expect(saved.content).toBe(text);
+      expect(saved).not.toHaveProperty('followUps');
+    });
+
     it('a failed read of the register inputs answers the 500 before any event', async () => {
       fetchRegisterInputsMock.mockRejectedValue(new Error('read failed'));
       vi.spyOn(console, 'error').mockImplementation(() => undefined);

@@ -116,10 +116,20 @@ describe('AssistantStreamingResponse — the cards of a message', () => {
     expect(code[0].textContent).toContain('"amount":100');
   });
 
-  it('shows the message being streamed as plain text: no card until the stream ends', () => {
-    const { container } = renderMessages([assistant(expenseBlock(100), { id: 'local-assistant-1' })], { streamingMessageId: 'local-assistant-1' });
+  // Rewritten 2026-11-25 (owner, phase F): the raw block was on screen while the answer arrived.
+  it('shows the message being streamed without its block: no card and no JSON until the stream ends', () => {
+    const { container } = renderMessages([assistant(`Ecco la riga.\n\n${expenseBlock(100)}`, { id: 'local-assistant-1' })], { streamingMessageId: 'local-assistant-1' });
     expect(keys(container)).toEqual([]);
-    expect(container.textContent).toContain('expense-proposal');
+    expect(container.textContent).toContain('Ecco la riga.');
+    expect(container.textContent).not.toContain('expense-proposal');
+    expect(container.textContent).not.toContain('amount');
+  });
+
+  it('renders a streaming answer as Markdown already: a heading and a list', () => {
+    const { container } = renderMessages([assistant('## Asilo\n\n- Retta 300 €\n- Mensa 80 €', { id: 'local-assistant-1', mode: 'chat' })], { streamingMessageId: 'local-assistant-1' });
+    expect(container.querySelector('h2')?.textContent).toBe('Asilo');
+    expect(container.querySelector('ul')?.className).toContain('list-disc');
+    expect(container.textContent).not.toContain('##');
   });
 });
 
@@ -255,5 +265,37 @@ describe('AssistantStreamingResponse — a pause after the first words', () => {
   it('shows nothing under the text while it is being written', () => {
     const { container } = renderMessages([assistant('Cerco il contesto.', { id: STREAMING })], { streamingMessageId: STREAMING, streamStatus: 'writing' });
     expect(waiting(container)).toBeNull();
+  });
+});
+
+// Generated Markdown is styled by its own renderers (components/ui/markdown-prose.tsx, 2026-11-25):
+// the app has no typography plugin, so a `prose` class styled nothing and a list had no bullets.
+describe('AssistantStreamingResponse — the Markdown of an answer', () => {
+  const STREAMING = 'local-assistant-1';
+
+  it('renders a heading, a bulleted and a numbered list with their own classes, and no prose class', () => {
+    const { container } = renderMessages([
+      assistant('## Titolo\n\n- Asilo 300 €\n- Mensa 80 €\n\n1. Mutuo A\n2. Mutuo B', { mode: 'chat' }),
+    ]);
+    const heading = container.querySelector('h2');
+    expect(heading?.textContent).toBe('Titolo');
+    expect(heading?.className).toContain('text-[15px]');
+    expect(heading?.className).toContain('font-semibold');
+    expect(container.querySelector('ul')?.className).toContain('list-disc');
+    expect(container.querySelector('ol')?.className).toContain('list-decimal');
+    expect(container.querySelector('[class*="prose"]')).toBeNull();
+  });
+
+  it('never shows a fence half typed while the answer streams', () => {
+    const { container } = renderMessages([assistant('**300 €.**\n\n```assist', { id: STREAMING, mode: 'chat' })], { streamingMessageId: STREAMING, streamStatus: 'writing' });
+    expect(container.textContent).toContain('300 €.');
+    expect(container.textContent).not.toContain('`');
+  });
+
+  it('hides the half-typed tail of an interrupted answer, which never got its server id', () => {
+    const { container } = renderMessages([assistant('**300 €.**\n\n```assistant-followups\n["E nel', { id: 'local-assistant-1', mode: 'chat' })]);
+    expect(container.textContent).toContain('300 €.');
+    expect(container.textContent).not.toContain('`');
+    expect(container.textContent).not.toContain('E nel');
   });
 });
