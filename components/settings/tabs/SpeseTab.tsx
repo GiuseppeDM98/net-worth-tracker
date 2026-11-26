@@ -39,6 +39,7 @@ import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 import ExpenseImportSection from '@/components/settings/ExpenseImportSection';
 import { RealEstateDefaultsTile } from '@/components/settings/RealEstateDefaultsTile';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { deleteCategory, getCategoryById } from '@/lib/services/expenseCategoryService';
@@ -89,6 +90,8 @@ interface CategoryRowProps {
  * prints what the second press does (AGENTS.md → Accessibility).
  */
 function CategoryRow({ category, onEdit, onMove, onRequestDelete, onConfirmDelete, announce, spendingRolesEnabled }: CategoryRowProps) {
+  // The three actions wait while the categories on screen are a restored copy being reread.
+  const held = useRowActionsHeld();
   const deleteRef = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick: onArmedClick, onBlur } = useArmedDelete(deleteRef, () => onConfirmDelete(category.id));
   const wasArmed = useRef(false);
@@ -153,7 +156,7 @@ function CategoryRow({ category, onEdit, onMove, onRequestDelete, onConfirmDelet
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <Button variant="ghost" size="icon" className={iconButtonClass} aria-label={`Modifica ${category.name}`} onClick={() => onEdit(category)}>
+        <Button variant="ghost" size="icon" className={iconButtonClass} aria-label={`Modifica ${category.name}`} disabled={held} onClick={() => onEdit(category)}>
           <Edit className="h-4 w-4" />
         </Button>
         <Button
@@ -161,6 +164,7 @@ function CategoryRow({ category, onEdit, onMove, onRequestDelete, onConfirmDelet
           size="icon"
           className={iconButtonClass}
           aria-label={`Sposta tutte le transazioni di ${category.name}`}
+          disabled={held}
           onClick={(event) => onMove(category, resolveCenteredModalOrigin(event.currentTarget.getBoundingClientRect()))}
         >
           <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
@@ -173,6 +177,7 @@ function CategoryRow({ category, onEdit, onMove, onRequestDelete, onConfirmDelet
           className={cn('h-11 min-w-11 desktop:h-8 desktop:min-w-8', armed && 'text-destructive hover:bg-destructive/10 hover:text-destructive')}
           onClick={handleDeleteClick}
           onBlur={onBlur}
+          disabled={held}
         >
           <Trash2 className={cn('h-4 w-4', !armed && 'text-muted-foreground')} />
           {armed && <span className="text-xs">Conferma</span>}

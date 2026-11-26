@@ -50,6 +50,7 @@ import { useExpensesInRange, useExpenseBounds, useExpenseCategories } from '@/li
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useFreshness } from '@/lib/hooks/useFreshness';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { dividendStatsQueryKey, useDividendRegistry } from '@/lib/hooks/useDividendStats';
 import { listExpenseYears, trackingWindow } from '@/lib/utils/expenseWindows';
@@ -258,6 +259,7 @@ export function CashflowPageClient({ assistantConfigured }: { assistantConfigure
 
   return (
     <PageContainer>
+      <RowActionsHold queries={[expensesQuery]}>
       <PageHeader
         label="Operatività"
         emblem="cashflow"
@@ -523,6 +525,7 @@ export function CashflowPageClient({ assistantConfigured }: { assistantConfigure
           </TabsContent>
         )}
       </PageTabs>
+      </RowActionsHold>
     </PageContainer>
   );
 }

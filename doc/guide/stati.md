@@ -107,6 +107,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   restored figures and read NOTHING for five minutes (the full suite found it on 2026-09-29: an Admin write between
   two `goto` stayed invisible), and an F5 asked to refresh would have refreshed nothing — the one behaviour the
   in-memory cache never had.
+- **While the sentence is up, the rows' write actions wait** (2026-11-26): «Modifica», «Elimina» and every other
+  control that writes from a row of that list are `disabled` on the same reading, so nothing is edited from a copy
+  about to be replaced — `components/ui/row-actions-hold.tsx`, doc/guide/cache-persistita.md § Every load rereads what
+  it restored. No sentence of its own: the header already says why, and the wait is the reread's.
 - **The decision is `resolveFreshness`** (`lib/utils/freshness.ts`): a query is «old» when it is REFETCHING a figure
   it already has (`isFetching` and not `isLoading`) AND that figure was either read BEFORE this page load
   (`dataUpdatedAt < performance.timeOrigin`: it came out of the persisted cache, another load's reading of the world,

@@ -20,6 +20,7 @@ import { formatQuotaUnits } from '@/lib/utils/goalsNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 
@@ -73,6 +74,8 @@ function GroupHead({ group, onAdd, disabled }: { group: GoalAssignmentGroup; onA
 }
 
 export function AssegnazioniTile({ reading, aside, view, onAdd, onRemove, footer, isDemo, collapse, asideWhenClosed, className }: AssegnazioniTileProps) {
+  // Every save rewrites the WHOLE goals document from the list in memory: none starts from a copy being reread.
+  const held = useRowActionsHeld();
   const removeLabel = (asset: string, goal: string) => `Rimuovi ${asset} da ${goal}`;
 
   return (
@@ -99,7 +102,7 @@ export function AssegnazioniTile({ reading, aside, view, onAdd, onRemove, footer
                   </span>
                 </th>
                 <td className="pb-1.5 pt-3 text-right">
-                  <button type="button" onClick={() => onAdd(group.goalId)} disabled={isDemo} className={ADD_CLASS} aria-label={`Aggiungi uno strumento a ${group.name}`}>
+                  <button type="button" onClick={() => onAdd(group.goalId)} disabled={isDemo || held} className={ADD_CLASS} aria-label={`Aggiungi uno strumento a ${group.name}`}>
                     <Plus className="h-3 w-3" aria-hidden="true" />
                     Aggiungi
                   </button>
@@ -118,7 +121,7 @@ export function AssegnazioniTile({ reading, aside, view, onAdd, onRemove, footer
                     <td className="py-2 text-right font-mono tabular-nums text-foreground">{quota(row)}</td>
                     <td className="py-2 text-right font-mono tabular-nums text-foreground">{money(row.value)}</td>
                     <td className="py-1 text-right">
-                      <button type="button" onClick={() => onRemove(group.goalId, row.assetId)} disabled={isDemo} className={REMOVE_CLASS} aria-label={removeLabel(row.name, group.name)}>
+                      <button type="button" onClick={() => onRemove(group.goalId, row.assetId)} disabled={isDemo || held} className={REMOVE_CLASS} aria-label={removeLabel(row.name, group.name)}>
                         <X className="h-3 w-3" aria-hidden="true" />
                       </button>
                     </td>
@@ -161,7 +164,7 @@ export function AssegnazioniTile({ reading, aside, view, onAdd, onRemove, footer
         {view.groups.map((group) => (
           <div key={group.goalId} className="border-t border-border first:border-t-0">
             <div className="flex items-center justify-between gap-2 pb-1 pt-3">
-              <GroupHead group={group} onAdd={() => onAdd(group.goalId)} disabled={isDemo} />
+              <GroupHead group={group} onAdd={() => onAdd(group.goalId)} disabled={isDemo || held} />
             </div>
             {group.rows.length === 0 ? (
               <p className="pb-3 text-[12px] italic text-muted-foreground">Nessuna quota assegnata a questo obiettivo.</p>
@@ -174,7 +177,7 @@ export function AssegnazioniTile({ reading, aside, view, onAdd, onRemove, footer
                       <span>{money(row.value)}</span>
                       <span className="text-[11px] text-muted-foreground">{quota(row)}</span>
                     </span>
-                    <button type="button" onClick={() => onRemove(group.goalId, row.assetId)} disabled={isDemo} className={REMOVE_CLASS} aria-label={removeLabel(row.name, group.name)}>
+                    <button type="button" onClick={() => onRemove(group.goalId, row.assetId)} disabled={isDemo || held} className={REMOVE_CLASS} aria-label={removeLabel(row.name, group.name)}>
                       <X className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </li>

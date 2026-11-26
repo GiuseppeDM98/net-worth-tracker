@@ -17,6 +17,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { TraiettoriaChip } from '@/lib/utils/goalsNarrative';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
@@ -86,6 +87,8 @@ function DeleteButton({ onDelete, disabled }: { onDelete: () => void; disabled: 
 }
 
 export function TraiettoriaTile({ reading, name, hero, chips, notes, chart, footer, onEdit, onDelete, isDemo, collapse, asideWhenClosed, className }: TraiettoriaTileProps) {
+  // Every save rewrites the WHOLE goals document from the list in memory: none starts from a copy being reread.
+  const held = useRowActionsHeld();
   return (
     <Tile
       eyebrow="Traiettoria"
@@ -100,11 +103,11 @@ export function TraiettoriaTile({ reading, name, hero, chips, notes, chart, foot
           </span>
           {/* Below desktop the two actions take a full-width row of 44px targets; from desktop they are the aside's ghost buttons. */}
           <div className="flex w-full gap-2 [&>button]:flex-1 desktop:w-auto desktop:[&>button]:flex-none">
-            <button type="button" onClick={onEdit} disabled={isDemo} className={ACTION_CLASS}>
+            <button type="button" onClick={onEdit} disabled={isDemo || held} className={ACTION_CLASS}>
               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
               Modifica
             </button>
-            <DeleteButton onDelete={onDelete} disabled={isDemo} />
+            <DeleteButton onDelete={onDelete} disabled={isDemo || held} />
           </div>
         </div>
       }

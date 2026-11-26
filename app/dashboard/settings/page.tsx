@@ -62,6 +62,7 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useFreshness } from '@/lib/hooks/useFreshness';
 import { Button } from '@/components/ui/button';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageTabs } from '@/components/layout/PageTabs';
@@ -412,6 +413,7 @@ export default function SettingsPage() {
         />
 
         {mountedTabs.has('spese') && (
+          <RowActionsHold queries={[categoriesQuery]}>
           <SpeseTab
             slice={spese}
             onChange={setSpese}
@@ -424,6 +426,7 @@ export default function SettingsPage() {
             onRetryAccounts={() => void loadCashAccounts()}
             onExpenseImported={handleExpenseImported}
           />
+          </RowActionsHold>
         )}
 
         {mountedTabs.has('dividendi') && (

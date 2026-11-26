@@ -19,6 +19,7 @@ import { compareAllocations } from '@/lib/services/assetAllocationService';
 import { installmentLineLabel, liveClassEntries, monthIndexOf, onlyTargetedClasses, projectClassTrajectory, toMonthKey } from '@/lib/utils/accumulationPlanUtils';
 import { useSetInstallmentLine } from '@/lib/hooks/useAccumulationPlan';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +71,7 @@ function installmentTotalEur(installment: Installment): number {
 
 export function AccumulationCalendarDialog({ open, onClose, plan, ownerId, allAssets, targets, band, initialExpandedIndex }: AccumulationCalendarDialogProps) {
   const isDemo = useDemoMode();
+  const held = useRowActionsHeld();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(initialExpandedIndex ?? null);
   const [manualLine, setManualLine] = useState<{ index: number; positionId: string; qty: string; amount: string } | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -205,13 +207,13 @@ export function AccumulationCalendarDialog({ open, onClose, plan, ownerId, allAs
                                 >
                                   {ACCUMULO_ACTION_MARK_EXECUTED}
                                 </Button>
-                                <Button variant="outline" className="h-11 px-2 text-[11px] desktop:h-7" onClick={() => void setStatus(installment.index, line.positionId, 'skipped')}>
+                                <Button variant="outline" className="h-11 px-2 text-[11px] desktop:h-7" disabled={held} onClick={() => void setStatus(installment.index, line.positionId, 'skipped')}>
                                   {ACCUMULO_ACTION_SKIP}
                                 </Button>
                               </span>
                             )}
                             {!isDemo && status === 'executed' && !line.transactionIds?.length && (
-                              <Button variant="outline" className="h-11 shrink-0 px-2 text-[11px] desktop:h-7" onClick={() => void setStatus(installment.index, line.positionId, 'planned')}>
+                              <Button variant="outline" className="h-11 shrink-0 px-2 text-[11px] desktop:h-7" disabled={held} onClick={() => void setStatus(installment.index, line.positionId, 'planned')}>
                                 {ACCUMULO_ACTION_UNDO_EXECUTED}
                               </Button>
                             )}
@@ -239,7 +241,7 @@ export function AccumulationCalendarDialog({ open, onClose, plan, ownerId, allAs
                               <Button variant="ghost" className="h-8 px-2 text-[11px]" onClick={() => setManualLine(null)}>
                                 {ACCUMULO_ACTION_CANCEL}
                               </Button>
-                              <Button className="h-8 px-2 text-[11px]" onClick={() => void saveManual()}>
+                              <Button className="h-8 px-2 text-[11px]" disabled={held} onClick={() => void saveManual()}>
                                 {ACCUMULO_ACTION_SAVE}
                               </Button>
                             </div>

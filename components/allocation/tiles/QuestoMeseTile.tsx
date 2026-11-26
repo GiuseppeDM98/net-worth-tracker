@@ -129,6 +129,7 @@ import {
 import { comparePlanToModel } from '@/lib/utils/modelPortfolio';
 import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 
 interface QuestoMeseTileProps {
   ownerId: string;
@@ -181,6 +182,8 @@ export function QuestoMeseTile({
   today,
 }: QuestoMeseTileProps) {
   const isDemo = useDemoMode();
+  // Every write on a line, a sale or the plan waits while the plans on screen are a restored copy being reread.
+  const held = useRowActionsHeld();
   const pastReviewNote = reviewByIso && planEndsAfterReview(plan, reviewByIso) ? (
     <p className="mt-2 text-[12px] text-warning-foreground">{describePlanPastReview(reviewByIso)}</p>
   ) : null;
@@ -424,7 +427,7 @@ export function QuestoMeseTile({
               ref={deleteDraftRef}
               variant="outline"
               className={TILE_ACTION_CLASS}
-              disabled={isDemo}
+              disabled={isDemo || held}
               onClick={deleteDraftArmed.onClick}
               onBlur={deleteDraftArmed.onBlur}
             >
@@ -440,7 +443,7 @@ export function QuestoMeseTile({
                 <Link href={PLAN_PATH_HREF}>{ACCUMULO_ACTION_CONTINUE}</Link>
               </Button>
             )}
-            <Button className={TILE_ACTION_CLASS} disabled={isDemo || draftIssues.length > 0} onClick={() => void handleActivate()}>
+            <Button className={TILE_ACTION_CLASS} disabled={isDemo || held || draftIssues.length > 0} onClick={() => void handleActivate()}>
               {ACCUMULO_ACTION_ACTIVATE}
             </Button>
           </div>
@@ -476,7 +479,7 @@ export function QuestoMeseTile({
             <Button
               ref={closeRef}
               className={TILE_ACTION_CLASS}
-              disabled={isDemo}
+              disabled={isDemo || held}
               onClick={closeArmed.onClick}
               onBlur={closeArmed.onBlur}
             >
@@ -538,7 +541,7 @@ export function QuestoMeseTile({
                         >
                           {ACCUMULO_ACTION_IGNORE_MATCH}
                         </Button>
-                        <Button className={ROW_ACTION_CLASS} onClick={() => void confirmMatch(installmentIndex, line.positionId, match)}>
+                        <Button className={ROW_ACTION_CLASS} disabled={held} onClick={() => void confirmMatch(installmentIndex, line.positionId, match)}>
                           {ACCUMULO_ACTION_CONFIRM}
                         </Button>
                       </span>
@@ -546,6 +549,7 @@ export function QuestoMeseTile({
                     {!isDemo && (status === 'todo' || status === 'late') && (
                       <Button
                         className={ROW_ACTION_CLASS}
+                        disabled={held}
                         onClick={() => setRegisterTarget({ kind: 'line', installmentIndex, positionId: line.positionId })}
                       >
                         {ACCUMULO_ACTION_REGISTER}
@@ -567,18 +571,18 @@ export function QuestoMeseTile({
                         >
                           {ACCUMULO_ACTION_MARK_EXECUTED}
                         </Button>
-                        <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => void setStatus(installmentIndex, line.positionId, 'skipped')}>
+                        <Button variant="outline" className={ROW_ACTION_CLASS} disabled={held} onClick={() => void setStatus(installmentIndex, line.positionId, 'skipped')}>
                           {ACCUMULO_ACTION_SKIP}
                         </Button>
                       </span>
                     )}
                     {!isDemo && status === 'executed' && !!line.transactionIds?.length && (
-                      <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void unlinkLine(installmentIndex, line.positionId)}>
+                      <Button variant="ghost" className={ROW_UNDO_CLASS} disabled={held} onClick={() => void unlinkLine(installmentIndex, line.positionId)}>
                         {ACCUMULO_ACTION_UNLINK}
                       </Button>
                     )}
                     {!isDemo && status === 'executed' && !line.transactionIds?.length && (
-                      <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void setStatus(installmentIndex, line.positionId, 'planned')}>
+                      <Button variant="ghost" className={ROW_UNDO_CLASS} disabled={held} onClick={() => void setStatus(installmentIndex, line.positionId, 'planned')}>
                         {ACCUMULO_ACTION_UNDO_EXECUTED}
                       </Button>
                     )}
@@ -605,7 +609,7 @@ export function QuestoMeseTile({
                       <Button variant="ghost" className={ROW_ACTION_CLASS} onClick={() => setManualLine(null)}>
                         {ACCUMULO_ACTION_CANCEL}
                       </Button>
-                      <Button className={ROW_ACTION_CLASS} onClick={() => void saveManual()}>
+                      <Button className={ROW_ACTION_CLASS} disabled={held} onClick={() => void saveManual()}>
                         {ACCUMULO_ACTION_SAVE}
                       </Button>
                     </div>
@@ -715,10 +719,10 @@ export function QuestoMeseTile({
             <NarrativeText segments={proposal.reading} className="text-[12px] leading-[1.5] text-warning-foreground" />
             {!isDemo && (
               <div className="mt-2 flex flex-wrap gap-2">
-                <Button className={ROW_ACTION_CLASS} disabled={applyRecalibrationMutation.isPending} onClick={() => void applyProposal()}>
+                <Button className={ROW_ACTION_CLASS} disabled={held || applyRecalibrationMutation.isPending} onClick={() => void applyProposal()}>
                   {ACCUMULO_ACTION_APPLY}
                 </Button>
-                <Button variant="outline" className={ROW_ACTION_CLASS} disabled={dismissRecalibrationMutation.isPending} onClick={() => void dismissProposal()}>
+                <Button variant="outline" className={ROW_ACTION_CLASS} disabled={held || dismissRecalibrationMutation.isPending} onClick={() => void dismissProposal()}>
                   {ACCUMULO_ACTION_KEEP_AS_IS}
                 </Button>
               </div>
@@ -781,13 +785,13 @@ export function QuestoMeseTile({
                           >
                             {ACCUMULO_ACTION_IGNORE_MATCH}
                           </Button>
-                          <Button className={ROW_ACTION_CLASS} onClick={() => void confirmDisposalMatch(disposal.assetId, match)}>
+                          <Button className={ROW_ACTION_CLASS} disabled={held} onClick={() => void confirmDisposalMatch(disposal.assetId, match)}>
                             {ACCUMULO_ACTION_CONFIRM}
                           </Button>
                         </span>
                       )}
                       {!isDemo && (status === 'todo' || status === 'late') && (
-                        <Button className={ROW_ACTION_CLASS} onClick={() => setRegisterTarget({ kind: 'disposal', assetId: disposal.assetId })}>
+                        <Button className={ROW_ACTION_CLASS} disabled={held} onClick={() => setRegisterTarget({ kind: 'disposal', assetId: disposal.assetId })}>
                           {ACCUMULO_ACTION_REGISTER}
                         </Button>
                       )}
@@ -800,24 +804,24 @@ export function QuestoMeseTile({
                           >
                             {ACCUMULO_ACTION_MARK_EXECUTED}
                           </Button>
-                          <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => void setDisposalStatus(disposal.assetId, 'skipped')}>
+                          <Button variant="outline" className={ROW_ACTION_CLASS} disabled={held} onClick={() => void setDisposalStatus(disposal.assetId, 'skipped')}>
                             {ACCUMULO_ACTION_SKIP}
                           </Button>
                         </span>
                       )}
                       {!isDemo && status === 'executed' && !!disposal.transactionIds?.length && (
-                        <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void unlinkDisposal(disposal.assetId)}>
+                        <Button variant="ghost" className={ROW_UNDO_CLASS} disabled={held} onClick={() => void unlinkDisposal(disposal.assetId)}>
                           {ACCUMULO_ACTION_UNLINK}
                         </Button>
                       )}
                       {!isDemo && status === 'executed' && !disposal.transactionIds?.length && (
-                        <Button variant="ghost" className={ROW_UNDO_CLASS} onClick={() => void setDisposalStatus(disposal.assetId, 'planned')}>
+                        <Button variant="ghost" className={ROW_UNDO_CLASS} disabled={held} onClick={() => void setDisposalStatus(disposal.assetId, 'planned')}>
                           {ACCUMULO_ACTION_UNDO_EXECUTED}
                         </Button>
                       )}
                       {/* lostLink: no Calendario surface for disposals — the only recovery is unlinking. */}
                       {!isDemo && status === 'lostLink' && (
-                        <Button variant="outline" className={ROW_ACTION_CLASS} onClick={() => void unlinkDisposal(disposal.assetId)}>
+                        <Button variant="outline" className={ROW_ACTION_CLASS} disabled={held} onClick={() => void unlinkDisposal(disposal.assetId)}>
                           {ACCUMULO_ACTION_UNLINK}
                         </Button>
                       )}
@@ -840,7 +844,7 @@ export function QuestoMeseTile({
                         <Button variant="ghost" className={ROW_ACTION_CLASS} onClick={() => setManualDisposal(null)}>
                           {ACCUMULO_ACTION_CANCEL}
                         </Button>
-                        <Button className={ROW_ACTION_CLASS} onClick={() => void saveManualDisposal()}>
+                        <Button className={ROW_ACTION_CLASS} disabled={held} onClick={() => void saveManualDisposal()}>
                           {ACCUMULO_ACTION_SAVE}
                         </Button>
                       </div>
@@ -896,7 +900,7 @@ export function QuestoMeseTile({
               ref={stopRef}
               variant="outline"
               className={TILE_ACTION_CLASS}
-              disabled={isDemo}
+              disabled={isDemo || held}
               onClick={stopArmed.onClick}
               onBlur={stopArmed.onBlur}
             >

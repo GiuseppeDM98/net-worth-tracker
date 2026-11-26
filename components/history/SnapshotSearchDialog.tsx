@@ -24,6 +24,7 @@ import { MonthlySnapshot } from '@/types/assets';
 import { armedActionLabel, describeWriteError, type ModalReading } from '@/lib/utils/dialogNarrative';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -66,6 +67,8 @@ export function SnapshotSearchDialog({
   snapshots,
   onSave
 }: SnapshotSearchDialogProps) {
+  // The note is prefilled from the snapshot in memory: neither write starts from a restored copy being reread.
+  const held = useRowActionsHeld();
   const [selectedSnapshotId, setSelectedSnapshotId] = useState('');
   const [noteText, setNoteText] = useState('');
   const [saving, setSaving] = useState(false);
@@ -178,7 +181,7 @@ export function SnapshotSearchDialog({
       width="md"
       footer={
         <>
-          {selectedSnapshot?.note && <ArmedDeleteNoteButton disabled={saving} onConfirm={handleDelete} />}
+          {selectedSnapshot?.note && <ArmedDeleteNoteButton disabled={saving || held} onConfirm={handleDelete} />}
           <Button
             type="button"
             variant="outline"
@@ -193,7 +196,7 @@ export function SnapshotSearchDialog({
           <Button
             type="button"
             onClick={handleSave}
-            disabled={saving || !selectedSnapshot || isOverLimit}
+            disabled={saving || held || !selectedSnapshot || isOverLimit}
           >
             {saving ? 'Salvataggio…' : 'Salva'}
           </Button>

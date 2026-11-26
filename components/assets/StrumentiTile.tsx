@@ -83,6 +83,7 @@ import { computeTopWeightShare, computeUnrealizedGain, hasCostBasis, isHeld } fr
 import { describeInstruments } from '@/lib/utils/patrimonioNarrative';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -219,6 +220,7 @@ interface DeleteButtonProps {
  * (a toast, not a disabled button — a disabled control explains nothing on touch).
  */
 function DeleteButton({ asset, onDelete, operations, disabled, announce }: DeleteButtonProps) {
+  const held = useRowActionsHeld();
   const ref = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick: onArmedClick, onBlur } = useArmedDelete(ref, () => onDelete(asset.id));
   const onClick = () => {
@@ -250,7 +252,7 @@ function DeleteButton({ asset, onDelete, operations, disabled, announce }: Delet
       className={armed ? 'h-8' : ICON_BUTTON_CLASS}
       onClick={onClick}
       onBlur={onBlur}
-      disabled={disabled}
+      disabled={disabled || held}
       aria-pressed={armed}
       aria-label={armed ? `Premi di nuovo per eliminare ${asset.name}` : `Elimina ${asset.name}`}
       title={disabled ? 'Non disponibile in modalità demo' : undefined}
@@ -330,6 +332,8 @@ export function StrumentiTile({
   ledgerFootprints = null,
   className,
 }: StrumentiTileProps) {
+  // The rows' «Modifica» waits while the assets on screen are a restored copy being reread.
+  const actionsHeld = useRowActionsHeld();
   const deleteAssetMutation = useDeleteAsset(ownerId || '');
   // The «Intestatario» filter (session-only: a lens, not a view the reader keeps): the options are
   // the Movimenti filter's — «Tutti · In comune · {members}», «Senza intestatario» when such an
@@ -655,7 +659,7 @@ export function StrumentiTile({
               size="sm"
               className={ICON_BUTTON_CLASS}
               onClick={(event) => onEdit(asset, event.currentTarget)}
-              disabled={isDemo}
+              disabled={isDemo || actionsHeld}
               aria-label={`Modifica ${asset.name}`}
               title={isDemo ? 'Non disponibile in modalità demo' : undefined}
             >

@@ -101,6 +101,7 @@ import { buildMonthAssetBreakdown, buildSelectedAssetTrend, getAvailableSnapshot
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -478,7 +479,9 @@ export default function HistoryPage() {
   const dialogs = (
     <>
       <CreateManualSnapshotModal open={showManualSnapshotModal} onOpenChange={setShowManualSnapshotModal} userId={ownerId || ''} onSuccess={reloadData} />
-      <SnapshotSearchDialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen} snapshots={snapshots} onSave={handleSaveNote} />
+      <RowActionsHold queries={[snapshotsQuery]}>
+        <SnapshotSearchDialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen} snapshots={snapshots} onSave={handleSaveNote} />
+      </RowActionsHold>
     </>
   );
 

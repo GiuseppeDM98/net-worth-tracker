@@ -4,6 +4,7 @@ import type { RefObject } from 'react';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import type { HallOfFameNote } from '@/types/hall-of-fame';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { SECTION_SUBJECTS, MONTHLY_SECTION_KEYS, YEARLY_SECTION_KEYS } from '@/lib/constants/hallOfFame';
@@ -33,6 +34,8 @@ export function HallOfFameNoteViewDialog({
   triggerOrigin,
   returnFocusTo,
 }: HallOfFameNoteViewDialogProps) {
+  // «Modifica» waits while the notes on screen are a restored copy being reread: the form would start from it.
+  const held = useRowActionsHeld();
   if (!note) return null;
 
   const periodText = note.month
@@ -58,7 +61,7 @@ export function HallOfFameNoteViewDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Chiudi
           </Button>
-          <Button type="button" onClick={onEditClick}>
+          <Button type="button" onClick={onEditClick} disabled={held}>
             Modifica
           </Button>
         </>
