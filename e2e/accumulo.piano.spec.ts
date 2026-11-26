@@ -75,7 +75,9 @@ test('dalla tessera vuota, otto schermate e «Conferma»: UN piano attivo di 12 
   expect(plans[0].instalmentEur).toHaveLength(12);
   await expect.poll(readModel, { timeout: 15_000 }).not.toBeNull();
   expect(await page.evaluate(() => Object.keys(localStorage).some((key) => key.startsWith('plan-path-draft')))).toBe(false);
-  // The refetched plans find the plan active: the done card stays, never «Hai già un piano» (found on the mirror tour).
+  // The refetched plans find the plan active: the done card stays, and the page never turns into the REVISION of the
+  // plan it just wrote (found on the mirror tour as «Hai già un piano», the sentence of a path that could not revise;
+  // since 2026-11-21 an active plan opens the revision, which is what a lost `created` would show now).
   // The refetch has no request to wait for; what it brought is in the persisted cache once the
   // persister has written it — the list with the active plan — and the page is then read at rest.
   await expect
@@ -85,7 +87,8 @@ test('dalla tessera vuota, otto schermate e «Conferma»: UN piano attivo di 12 
     .toBe(true);
   await atRest(page);
   await expect(done).toBeVisible();
-  await expect(page.getByText('Hai già un piano di accumulo attivo.')).toHaveCount(0);
+  await expect(page.getByText('Rivedi il piano: le rate chiuse restano come sono.')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: /^Passo \d di 8/ })).toHaveCount(0);
 });
 
 test('una vendita di 5 quote al 3° mese: la frase del riepilogo e le tasse; il piano la scrive, la 3ª rata è più grande', async ({ page }) => {

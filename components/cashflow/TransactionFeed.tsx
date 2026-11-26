@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { getItalyDate } from '@/lib/utils/dateHelpers';
@@ -164,6 +165,8 @@ function TransactionDetailModal({
   houseNames,
   loanHouses,
 }: Readonly<TransactionDetailModalProps>) {
+  // «Modifica» and «Elimina» wait while the rows on screen are a restored copy being reread.
+  const held = useRowActionsHeld();
   const deleteRef = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick: onArmedClick, onBlur } = useArmedDelete(deleteRef, () => onDelete(expense));
 
@@ -271,7 +274,7 @@ function TransactionDetailModal({
             onClick={isSeries ? () => onDelete(expense) : onArmedClick}
             onBlur={isSeries ? undefined : onBlur}
             // A trade's fee row leaves with its trade, in Patrimonio (2026-11-12).
-            disabled={isDemo || isTradeFeeRow(expense)}
+            disabled={isDemo || held || isTradeFeeRow(expense)}
             aria-pressed={isSeries ? undefined : armed}
             aria-label={
               isDemo
@@ -293,7 +296,7 @@ function TransactionDetailModal({
           <Button
             type="button"
             onClick={() => onEdit(expense)}
-            disabled={isDemo}
+            disabled={isDemo || held}
             aria-label={isDemo ? 'Modifica — non disponibile in modalità demo' : `Modifica ${rowName}`}
           >
             <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />

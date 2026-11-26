@@ -85,6 +85,7 @@ import {
 } from '@/lib/utils/hallOfFameNarrative';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -371,7 +372,7 @@ export default function HallOfFamePage() {
   );
 
   const dialogs = (
-    <>
+    <RowActionsHold queries={[hallOfFameQuery]}>
       <HallOfFameNoteViewDialog
         open={noteViewOpen}
         onOpenChange={(open) => {
@@ -406,7 +407,7 @@ export default function HallOfFamePage() {
           returnFocusTo={noteOpenerRef}
         />
       )}
-    </>
+    </RowActionsHold>
   );
 
   // ─── Loading and empty states ───────────────────────────────────────────────

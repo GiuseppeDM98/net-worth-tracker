@@ -11,6 +11,7 @@ import { calculateAssetValue } from '@/lib/services/assetService';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { describeCashAccountReading } from '@/lib/utils/dialogNarrative';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 
 const ITALIAN_DATE = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -60,6 +61,7 @@ export function CashAccountDialog({
   const value = calculateAssetValue(asset);
   const currencyCode = (asset.currency || 'EUR').toUpperCase();
   const foreignCurrency = currencyCode === 'EUR' ? null : currencyCode;
+  const held = useRowActionsHeld();
   const deleteRef = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick, onBlur } = useArmedDelete(deleteRef, () => onDelete(asset.id));
   const reading = describeCashAccountReading({ name: asset.name, balanceEur: value, armed, isDemo });
@@ -80,7 +82,7 @@ export function CashAccountDialog({
             type="button"
             variant="outline"
             onClick={() => onEdit(asset)}
-            disabled={isDemo}
+            disabled={isDemo || held}
             className="flex-1"
           >
             <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -93,7 +95,7 @@ export function CashAccountDialog({
             className={cn('flex-1', !armed && 'text-destructive hover:text-destructive')}
             onClick={onClick}
             onBlur={onBlur}
-            disabled={isDemo}
+            disabled={isDemo || held}
             aria-pressed={armed}
             aria-label={armed ? `Premi di nuovo per eliminare ${asset.name}` : `Elimina ${asset.name}`}
           >

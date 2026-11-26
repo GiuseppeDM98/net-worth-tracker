@@ -14,6 +14,7 @@ import { canReactivatePlan, summarizeClosedPlan } from '@/lib/utils/accumuloSumm
 import { useReactivatePlan } from '@/lib/hooks/useAccumulationPlan';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { armedActionLabel, describeWriteError } from '@/lib/utils/dialogNarrative';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,6 +49,7 @@ interface PianiConclusiTileProps {
 /** The row's armed «Riattiva»: one click arms, the second reactivates; the row says why it failed. */
 function ReactivateButton({ ownerId, plan }: { ownerId: string; plan: AccumulationPlan }) {
   const isDemo = useDemoMode();
+  const held = useRowActionsHeld();
   const ref = useRef<HTMLButtonElement>(null);
   const mutation = useReactivatePlan(ownerId);
   const armed = useArmedDelete(ref, () => {
@@ -59,7 +61,7 @@ function ReactivateButton({ ownerId, plan }: { ownerId: string; plan: Accumulati
         ref={ref}
         variant="outline"
         className="h-11 desktop:h-7"
-        disabled={isDemo || mutation.isPending}
+        disabled={isDemo || held || mutation.isPending}
         onClick={armed.onClick}
         onBlur={armed.onBlur}
       >

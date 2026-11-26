@@ -279,6 +279,9 @@ holds it): how it was learned is `git log`'s.
   (`dashboardOverviewSummaries/{userId}`, 2026-10-03): a new writer owes its invalidation in the same commit; fresh = no
   `invalidatedAt`, same `sourceVersion`, same Italian day, ≤ 6 h; rebuilt in `after()` under a precondition —
   doc/guide/panoramica.md § The materialized summary.
+- **A control that edits or deletes a ROW of a persisted list reads `useRowActionsHeld()`** (2026-11-26,
+  `components/ui/row-actions-hold.tsx`): it waits while the list on screen is a restored copy being reread, under the
+  `RowActionsHold` its area mounts on the queries — `doc/guide/cache-persistita.md` § Every load rereads what it restored.
 - **The React Query cache is persisted to IndexedDB** (2026-09-29) → `doc/guide/cache-persistita.md`: only the
   `PERSISTED_QUERY_PREFIXES` keys (`lib/constants/persistCache.ts`), only successful reads, never the demo uid; `gcTime`
   per prefix (`applyPersistedQueryDefaults`). **Bump `PERSIST_CACHE_VERSION` when a persisted payload's field is
@@ -750,7 +753,8 @@ file used to carry.
   (2026-11-08, `__tests__/questionCard.test.tsx`).
 - **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, no new
   `eslint-disable`; a local named `module` is refused by `@next/next/no-assign-module-variable` (2026-09-28). The config
-  ignores `.agents/**` and the `.next-*/**` dist dirs.
+  ignores `.agents/**`, the `.next-*/**` dist dirs and `.claude/**` (a session's worktree is a second checkout: 74.980
+  problems with one on disk, none of this repo's, 2026-11-26).
 - **A heavy module graph is a FIXTURE**: hoist a slow `await import()` into `beforeAll` with an explicit timeout (after
   checking nothing is read at module scope); inside a test its one-time cost lands on whichever case runs first.
 - **Generated `.next*` type files that break `tsc` or `next build` are deleted, never edited**: a TS1109 in

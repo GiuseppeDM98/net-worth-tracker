@@ -82,9 +82,28 @@ Three traps, each paid for on 2026-09-29:
 - **The restore INVALIDATES what it restored** (`onSuccess`, `refetchType: 'none'`): every load rereads,
   stale-while-revalidate — without it a reload within `staleTime` painted the restored figures and read nothing for
   five minutes (an Admin write between two `goto` stayed invisible to four specs).
-- **A write that carries a version never starts from a restored copy still being reread** (2026-11-24): the copy
-  may predate the last save, and its `updatedAt` is refused (409). The control waits for the reread —
-  `resolveFreshness(...).stale` with `openedAt` — as Movimenti does (doc/guide/registro-operazioni.md § Concurrency).
+- **No write starts from a row of a restored copy still being reread** (2026-11-26; Movimenti alone since
+  2026-11-24). The copy may predate the last save — another device's, a co-owner's, this browser's own last second
+  (the persister writes at most once a second) — and what starts from it goes wrong in four ways: a dialog keeps the
+  old values and saves them over the newer ones (an expense, an asset, a cost centre, a category: last writer wins);
+  FIRE › Obiettivi rewrites its WHOLE document from the list in memory, erasing a goal saved elsewhere; a pointer on
+  the row names a document that is gone (the fee of a transfer, doc/guide/cashflow.md); a write that carries a
+  version is refused (409, doc/guide/registro-operazioni.md § Concurrency). So every control that writes from a row
+  is `disabled` exactly while the header says «Aggiornato alle…, sto rileggendo…»: the SAME reading,
+  `resolveFreshness(...).stale` with `openedAt`, never `isFetching` alone — a refetch of a list read in this load (the
+  invalidation after a save) holds nothing. ONE place, `components/ui/row-actions-hold.tsx`: the area that owns the
+  queries mounts `<RowActionsHold queries={[…]}>` (or hands it the reading it took with `useRestoredCopyReread`), and a
+  control anywhere below — a row, a tile, a dialog: a portal keeps React's tree — adds `useRowActionsHeld()` to its
+  `disabled`. Mounted on Patrimonio (the assets), Cashflow (the window of expenses; Centri di Costo adds the centres
+  and the whole expenses), Previdenza (the contributions), FIRE › Obiettivi (the goals: «Nuovo obiettivo» too),
+  Allocazione › Accumulo (the plans), Hall of Fame and Storico (a note's «Modifica», the snapshot note's «Salva»),
+  Impostazioni › Spese (the categories). Not held, on purpose: a control that writes nothing («Ignora», «Annulla», a
+  link to the path, which rereads on mount), a create form that reads no row, and Impostazioni's draft, which is
+  reseeded by a fresher read while no tab is dirty. **A new control that edits or deletes a row of a persisted list
+  reads `useRowActionsHeld()`**; a new persisted list with such rows mounts the provider. Held by
+  `__tests__/rowActionsHold.test.tsx` (the rule, and the controls a test mounts alone), a case in
+  `strumentiTile.test.tsx` and `questoMeseTile.test.tsx`, `assetMovementsDialogReread.test.tsx`, and in the browser
+  by `e2e/cashflow.reread-hold.spec.ts`, which holds Firestore's channel behind a gate.
 
 ### The freshness reading
 

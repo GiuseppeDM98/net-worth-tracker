@@ -81,6 +81,7 @@ import { resolveCostCenterColor } from '@/lib/utils/costCenterColors';
 import { isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { Button } from '@/components/ui/button';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -149,6 +150,8 @@ export function CostCenterDetail({
   isDemo = false,
   active,
 }: CostCenterDetailProps) {
+  // Every write from this centre or from one of its rows waits while the copy on screen is being reread.
+  const held = useRowActionsHeld();
   const { ownerId } = useActiveAccount();
   const chartColors = useChartColors();
   const queryClient = useQueryClient();
@@ -329,7 +332,7 @@ export function CostCenterDetail({
                 size="sm"
                 className="basis-full desktop:basis-auto"
                 onClick={() => setLinkOpen(true)}
-                disabled={isDemo || isArchived}
+                disabled={isDemo || held || isArchived}
                 aria-label={isDemo ? 'Collega spese — non disponibile in modalità demo' : isArchived ? 'Collega spese — il centro è archiviato' : 'Collega spese'}
               >
                 <Link2 className="h-3.5 w-3.5" />
@@ -339,7 +342,7 @@ export function CostCenterDetail({
                 variant="outline"
                 size="sm"
                 onClick={() => onEdit(costCenter)}
-                disabled={isDemo}
+                disabled={isDemo || held}
                 aria-label={isDemo ? 'Modifica — non disponibile in modalità demo' : 'Modifica centro di costo'}
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -349,7 +352,7 @@ export function CostCenterDetail({
                 variant="outline"
                 size="sm"
                 onClick={() => onArchiveToggle(costCenter)}
-                disabled={isDemo}
+                disabled={isDemo || held}
                 aria-label={isDemo ? 'Archivia — non disponibile in modalità demo' : isArchived ? 'Ripristina il centro di costo' : 'Archivia il centro di costo'}
               >
                 {isArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
@@ -360,7 +363,7 @@ export function CostCenterDetail({
                 variant="outline"
                 size="sm"
                 className={cn(deletion.armed && 'border-destructive text-destructive hover:text-destructive')}
-                disabled={isDemo}
+                disabled={isDemo || held}
                 aria-pressed={deletion.armed}
                 aria-label={deleteLabel}
                 onClick={deletion.onClick}
@@ -468,7 +471,7 @@ export function CostCenterDetail({
               onOpen={setEditingExpense}
               onUnlink={(expense) => handleUnlink([expense])}
               onUnlinkSeries={askUnlinkSeries}
-              disabled={isDemo}
+              disabled={isDemo || held}
             />
           </div>
           </div>

@@ -32,6 +32,7 @@ import type { Narrative } from '@/lib/utils/narrative';
 import { NATURE_LABELS, type LedgerRow } from '@/lib/utils/pensionSummary';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { Tile, TILE_SUB_EYEBROW_CLASS, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
@@ -129,6 +130,7 @@ interface DeleteButtonProps {
 }
 
 function DeleteButton({ row, onDelete, disabled, announce, onArmedChange }: DeleteButtonProps) {
+  const held = useRowActionsHeld();
   const ref = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick, onBlur } = useArmedDelete(ref, () => onDelete(row));
   // Each transition is announced once, after the render where the state flipped; the disarm
@@ -156,7 +158,7 @@ function DeleteButton({ row, onDelete, disabled, announce, onArmedChange }: Dele
       type="button"
       onClick={onClick}
       onBlur={onBlur}
-      disabled={disabled}
+      disabled={disabled || held}
       aria-pressed={armed}
       aria-label={label}
       className={cn(

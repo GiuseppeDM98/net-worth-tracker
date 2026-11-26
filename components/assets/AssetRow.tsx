@@ -24,6 +24,7 @@ import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import type { AssetPerformanceData } from '@/lib/utils/assetPerformanceDeltas';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { lazyComponent } from '@/components/ui/lazy-component';
 
@@ -267,6 +268,8 @@ export function AssetRow({
   tradedAssetIds = null,
   deleteOperations = null,
 }: AssetRowProps) {
+  // «Modifica» and «Elimina» wait while the assets on screen are a restored copy being reread.
+  const held = useRowActionsHeld();
   const [open, setOpen] = useState(false);
   // The sparkline is born at the first opening and stays: unmounting it on close would empty the
   // panel while it collapses, and a reopened row would draw it again for nothing.
@@ -479,7 +482,7 @@ export function AssetRow({
                 variant="outline"
                 className="h-11"
                 onClick={(event) => onEdit(asset, event.currentTarget)}
-                disabled={isDemo}
+                disabled={isDemo || held}
                 title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               >
                 <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -492,7 +495,7 @@ export function AssetRow({
                 className={cn('h-11', deleteSpansRow && 'col-span-2', !armed && 'text-destructive hover:text-destructive')}
                 onClick={onDeleteClick}
                 onBlur={onDeleteBlur}
-                disabled={isDemo}
+                disabled={isDemo || held}
                 title={isDemo ? 'Non disponibile in modalità demo' : undefined}
                 aria-pressed={armed}
                 aria-label={armed ? `Premi di nuovo per eliminare ${asset.name}` : `Elimina ${asset.name}`}

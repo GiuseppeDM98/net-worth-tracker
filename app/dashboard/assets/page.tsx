@@ -51,6 +51,7 @@ import { migrateAssetLedger, backfillAverageCostEur } from '@/lib/services/asset
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { DASHBOARD_OVERVIEW_STALE_TIME_MS, useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
 import { useFreshness } from '@/lib/hooks/useFreshness';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -667,6 +668,7 @@ export default function AssetsPage() {
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <PageContainer>
+      <RowActionsHold queries={[assetsQuery]}>
       <div className="space-y-4">
         <PageHeader
           label="Patrimonio"
@@ -966,6 +968,7 @@ export default function AssetsPage() {
       {movementsAsset && <AssetMovementsDialog open onClose={() => setMovementsAsset(null)} asset={movementsAsset} />}
 
       {taxAsset && <TaxCalculatorModal open onClose={() => setTaxAsset(null)} asset={taxAsset} />}
+      </RowActionsHold>
     </PageContainer>
   );
 }

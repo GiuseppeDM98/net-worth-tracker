@@ -37,6 +37,7 @@ vi.mock('@/components/assets/TransactionDialog', () => ({ TransactionDialog: () 
 import { AdvisorNotes, QuestoMeseTile } from '@/components/allocation/tiles/QuestoMeseTile';
 import {
   ACCUMULO_ACTION_ACTIVATE,
+  ACCUMULO_ACTION_CONFIRM,
   ACCUMULO_ACTION_IGNORE_MATCH,
   ACCUMULO_ACTION_REGISTER,
   ACCUMULO_ACTION_REVIEW_FROM_MODEL,
@@ -49,6 +50,7 @@ import type { LineUiState } from '@/lib/utils/accumulationPlanMatching';
 import type { AccumulationPlan } from '@/types/accumulationPlan';
 import type { Asset } from '@/types/assets';
 import type { ModelPortfolio } from '@/types/modelPortfolio';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 
 const asset = (id: string, name: string, extra: Partial<Asset> = {}): Asset =>
   ({ id, userId: 'owner-1', ticker: id.toUpperCase(), name, type: 'etf', assetClass: 'equity', currency: 'EUR', quantity: 0, currentPrice: 1,
@@ -80,11 +82,12 @@ function activePlan(overrides: Partial<AccumulationPlan> = {}): AccumulationPlan
   } as AccumulationPlan;
 }
 
-function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcoming' as LineUiState, today = new Date('2027-02-12T12:00:00'), assets = ASSETS, model = null as ModelPortfolio | null } = {}) {
+function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcoming' as LineUiState, today = new Date('2027-02-12T12:00:00'), assets = ASSETS, model = null as ModelPortfolio | null, rereading = false } = {}) {
   const matches = saleState === 'toConfirm'
     ? [{ kind: 'disposal' as const, assetId: 'fondo-y', transactionIds: ['tx-1'], quantity: 10, amountEur: 6000 }]
     : [];
   return render(
+    <RowActionsHold held={rereading}>
     <QuestoMeseTile
       ownerId="owner-1"
       plan={plan}
@@ -96,7 +99,8 @@ function renderTile({ plan = activePlan(), currentIndex = 2, saleState = 'upcomi
       model={model}
       reviewByIso={null}
       today={today}
-    />,
+    />
+    </RowActionsHold>,
   );
 }
 
@@ -119,6 +123,23 @@ describe('QuestoMeseTile — a sale before its month', () => {
     const row = within(saleRow());
     expect(row.getByText('In programma')).toBeTruthy();
     expect(row.queryByRole('button', { name: ACCUMULO_ACTION_REGISTER })).toBeNull();
+  });
+});
+
+describe('QuestoMeseTile — the plans on screen are a restored copy being reread', () => {
+  // The hold of components/ui/row-actions-hold.tsx (2026-11-26). Mutation that turns it red: `disabled={held}` dropped
+  // from a writer of the sale row or of the plan.
+  it('holds every write on a line, a sale and the plan; «Ignora» writes nothing and stays', () => {
+    const { unmount } = renderTile({ saleState: 'toConfirm', rereading: true });
+    const confirm = () => within(saleRow()).getByRole('button', { name: ACCUMULO_ACTION_CONFIRM }) as HTMLButtonElement;
+    const writers = () => screen.getAllByRole('button', { name: /^(Conferma|Salta|Registra|Interrompi|Chiudi piano)/ }) as HTMLButtonElement[];
+    expect(confirm().disabled).toBe(true);
+    expect(writers().length).toBeGreaterThan(1);
+    for (const button of writers()) expect(button.disabled).toBe(true);
+    expect((within(saleRow()).getByRole('button', { name: ACCUMULO_ACTION_IGNORE_MATCH }) as HTMLButtonElement).disabled).toBe(false);
+    unmount();
+    renderTile({ saleState: 'toConfirm' });
+    for (const button of writers()) expect(button.disabled).toBe(false);
   });
 });
 
