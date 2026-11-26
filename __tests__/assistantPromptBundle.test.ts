@@ -1019,6 +1019,12 @@ describe('the answer contract: one form for every mode but Registra', () => {
     }
   });
 
+  it('tells every mode but Registra of the tools on the data; Registra and the emails have none (DATI-09, P1)', () => {
+    for (const system of Object.values(systems)) expect(system).toContain('# Gli strumenti sui tuoi dati');
+    expect(registerSystem).not.toContain('# Gli strumenti sui tuoi dati');
+    expect(emailSystem).not.toContain('# Gli strumenti sui tuoi dati');
+  });
+
   it('is the same string twice, for two users on two days', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {

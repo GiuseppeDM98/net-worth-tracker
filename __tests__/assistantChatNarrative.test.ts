@@ -166,6 +166,12 @@ describe('buildWaitingPhrases', () => {
     expect(buildWaitingPhrases(reading('router'), 'searching')).toEqual(['Sto cercando sul web…', 'Leggo i risultati…']);
   });
 
+  it('should say the sums while the tools run, whatever the reading (DATI-09, D1b)', () => {
+    const phrases = ['Faccio i conti sui tuoi dati…', 'Controllo le cifre…'];
+    expect(buildWaitingPhrases(undefined, 'computing')).toEqual(phrases);
+    expect(buildWaitingPhrases(reading('router'), 'computing')).toEqual(phrases);
+  });
+
   it('should name the period of an analysis, in its words', () => {
     expect(buildWaitingPhrases(reading('router'), null)[0]).toBe('Apro ottobre 2026…');
     expect(buildWaitingPhrases(reading('router', route('year_analysis', { kind: 'year', year: 2025 })), null)[0]).toBe('Apro il 2025…');

@@ -41,6 +41,8 @@ import { stripFencedBlocks } from '@/lib/utils/expenseProposal';
 import { splitAnswerTail } from '@/lib/utils/assistantAnswerTail';
 import { assistantStreamRequestSchema, parseOr400 } from '@/lib/server/validation';
 import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
+import { readAssistantTurnData } from '@/lib/server/assistant/tools/context';
+import type { AssistantToolContext } from '@/lib/server/assistant/tools/registry';
 import { createRouterClient, routeAssistantMessage } from '@/lib/server/assistant/router';
 import {
   checkRouteConsistency,
@@ -334,8 +336,16 @@ export async function POST(request: NextRequest) {
     }
 
     // The CASHFLOW 12 MESI block in every mode, a chat with no context included (since
-    // 2026-11-07); a rejection reaches the catch below — a 500, never a silent empty block.
-    const cashflowBlock = await readCashflowBlockForPrompt(body.userId, now);
+    // 2026-11-07); a rejection reaches the catch below — a 500, never a silent empty block. Every
+    // mode but Registra also gets the tools' context, built on the SAME expense read (2026-11-26):
+    // one expense query a message; Registra has no tools and reads neither budget nor centres.
+    let cashflowBlock: string;
+    let toolContext: AssistantToolContext | undefined;
+    if (selection.mode === 'register') {
+      cashflowBlock = await readCashflowBlockForPrompt(body.userId, now);
+    } else {
+      ({ cashflowBlock, toolContext } = await readAssistantTurnData(body.userId, now));
+    }
 
     // Load active memory items to inject into the prompt.
     // Errors are non-fatal: if memory fetch fails we proceed without items
@@ -396,6 +406,7 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encodeAssistantEvent({ type: 'register', summary: registerSummary }));
           }
 
+          const answerStartedAt = Date.now();
           const result = await streamAssistantResponse({
             mode: selection.mode,
             prompt: body.prompt.trim(),
@@ -403,6 +414,7 @@ export async function POST(request: NextRequest) {
             todayContext,
             cashflowBlock,
             registerBlock,
+            toolContext,
             month: selection.month ?? null,
             preferences: promptPreferences,
             memoryItems: activeMemoryItems,
@@ -415,6 +427,10 @@ export async function POST(request: NextRequest) {
               controller.enqueue(encodeAssistantEvent({ type: 'text', text }));
             },
           });
+          // The measure of the tools in the first weeks: every answer that could call them, zero included.
+          if (toolContext) {
+            console.info(`[assistant] tools: ${result.toolCalls} calls, ${result.toolRounds} rounds, ${((Date.now() - answerStartedAt) / 1000).toFixed(1)} s`);
+          }
 
           // The next questions the model wrote close the answer in a fenced block: cut off the saved
           // text and kept on the message (2026-11-25). Registra writes none — its system never asks.

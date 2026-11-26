@@ -10,6 +10,7 @@ import {
   buildYearAnalysisPrompt,
   buildYtdAnalysisPrompt,
 } from './prompts';
+import { ASSISTANT_TOOL_DEFINITIONS, runAssistantTool, type AssistantToolContext } from './tools/registry';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -24,6 +25,16 @@ export const ASSISTANT_STRUCTURED_MAX_TOKENS = 32000;
 // Registra (2026-11): a sentence and up to five small JSON blocks, with room to reason on the
 // category — far below the chat's budget, so adaptive thinking cannot linger on a receipt.
 export const ASSISTANT_REGISTER_MAX_TOKENS = 16000;
+
+/** Rounds of tool calls one answer may run (DATI-09): past them the tools answer «stop». */
+export const ASSISTANT_TOOL_ROUNDS_MAX = 8;
+/** Measured from the first request: past it the tools answer «stop». The function dies at 300 s (owner, 2026-11-23). */
+export const ASSISTANT_TOOL_DEADLINE_MS = 200_000;
+/** Requests the model gets after the limit: one to close, one more if it asks again. */
+const CLOSING_REQUESTS_MAX = 2;
+/** Times a paused server-side search is sent back before the loop gives up. */
+const PAUSE_RESUMES_MAX = 3;
+const TOOL_LIMIT_RESULT = 'Limite di calcoli raggiunto: rispondi adesso con i dati che hai, senza chiedere altri strumenti.';
 
 interface StreamAssistantResponseArgs {
   mode: AssistantMode;
@@ -46,7 +57,9 @@ interface StreamAssistantResponseArgs {
   // Prior messages in the thread, loaded before the new user message is appended.
   // Injected as a multi-turn history so Claude can follow-up coherently.
   conversationHistory?: AssistantMessage[];
-  onStatus: (status: 'searching' | 'writing' | 'saving') => void;
+  // Every mode but Registra (DATI-09): what the tools read, read once by the route. Absent → no tool.
+  toolContext?: AssistantToolContext;
+  onStatus: (status: 'searching' | 'writing' | 'computing' | 'saving') => void;
   onText: (text: string) => void;
 }
 
@@ -146,6 +159,9 @@ function buildMessagesArray(
 const TRUNCATION_NOTICE =
   '\n\n_(Risposta interrotta: ho raggiunto il limite di lunghezza. Chiedimi di continuare o restringi la domanda.)_';
 
+/** The whole answer when the tool loop ended on its limit with nothing written (DATI-09). */
+const TOOL_LIMIT_NOTICE = '*Non sono riuscito a chiudere i conti: riprova con una domanda più stretta.*';
+
 /**
  * The whole answer when the model declined (`stop_reason: 'refusal'`, an HTTP 200 with no
  * text): the Sonnet 5.x generation declines in more categories than before, and an empty
@@ -196,16 +212,20 @@ export async function streamAssistantResponse({
   memoryItems = [],
   enableWebSearch,
   conversationHistory = [],
+  toolContext,
   onStatus,
   onText,
-}: StreamAssistantResponseArgs): Promise<{ text: string; webSearchUsed: boolean }> {
+}: StreamAssistantResponseArgs): Promise<{ text: string; webSearchUsed: boolean; toolCalls: number; toolRounds: number }> {
   let aggregatedText = '';
   let webSearchUsed = false;
   let stopReason: string | null = null;
   // The status says what the server is doing NOW (owner, 2026-11-16: an answer stood still for a
   // minute on its first sentence while the model searched, and the status never came back to
   // writing): 'searching' only from a search's start, 'writing' again at the text that follows it.
-  let status: 'searching' | 'writing' = 'writing';
+  // 'computing' while the tools run (DATI-09): the text that follows them says 'writing' again.
+  let status: 'searching' | 'writing' | 'computing' = 'writing';
+  let toolCalls = 0;
+  let toolRounds = 0;
   // A search between two text blocks: the text that resumes is a new paragraph, or the two sentences
   // run into each other («materie prime.**In sintesi**»).
   let breakBeforeText = false;
@@ -231,79 +251,138 @@ export async function streamAssistantResponse({
     const isStructuredAnalysis = ['month_analysis', 'year_analysis', 'ytd_analysis', 'history_analysis'].includes(mode);
     const chatMaxTokens = mode === 'register' ? ASSISTANT_REGISTER_MAX_TOKENS : ASSISTANT_CHAT_MAX_TOKENS;
     const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems, todayContext, cashflowBlock, registerBlock);
-    const stream = await anthropic.beta.messages.create({
-      model: ASSISTANT_MODEL,
-      // A policy decline is re-run on the fallback model inside this stream (aiModels.ts). The
-      // history replayed below is text only, so a fallback turn needs no block stripping.
-      betas: [SERVER_SIDE_FALLBACK_BETA],
-      fallbacks: 'default',
-      max_tokens: isStructuredAnalysis ? ASSISTANT_STRUCTURED_MAX_TOKENS : chatMaxTokens,
-      // Static role/domain/guardrail/format instructions, identical for every user and
-      // every request of this mode. No cache_control: this app's traffic pattern
-      // (sporadic single-user requests) rarely lands two calls within the 5-minute
-      // cache TTL, so caching would pay the 1.25x write premium without recouping it.
-      system: system,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: 'medium' },
-      // Registra never searches the web: the policy already answers false for it, and the request
-      // itself sends no tool whatever flag reaches it (2026-11-11).
-      ...(enableWebSearch && mode !== 'register'
-        ? {
-            tools: [
-              {
-                type: 'web_search_20260209',
-                name: 'web_search',
-                max_uses: isStructuredAnalysis ? 2 : 3,
-              } satisfies Anthropic.Beta.BetaWebSearchTool20260209,
-            ],
-          }
-        : {}),
-      messages: buildMessagesArray(mode, userContent, conversationHistory),
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'server_tool_use') {
-        webSearchUsed = true;
-        status = 'searching';
-        onStatus('searching');
-        if (aggregatedText.length > 0) breakBeforeText = true;
-      }
-
-      // What the search returned, in the server log: an answer that says «la ricerca web non era
-      // disponibile» is otherwise impossible to tell from one that never searched.
-      if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'web_search_tool_result') {
-        const content = chunk.content_block.content;
-        if (Array.isArray(content)) console.info(`[assistant] web search returned ${content.length} results`);
-        else console.warn(`[assistant] web search failed: ${content.error_code}`);
-      }
-
-      // The switch point of a server-side fallback: the answer goes on, written by another model.
-      if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'fallback') {
-        console.info(
-          `[assistant] ${chunk.content_block.from.model} declined; ${chunk.content_block.to.model} continued`
-        );
-      }
-
-      // The terminal message_delta carries why generation stopped. Without reading it a
-      // truncated answer is indistinguishable from a finished one.
-      if (chunk.type === 'message_delta' && chunk.delta?.stop_reason) {
-        stopReason = chunk.delta.stop_reason;
-      }
-
-      if (
-        chunk.type === 'content_block_delta' &&
-        chunk.delta.type === 'text_delta'
-      ) {
-        if (status !== 'writing') {
-          status = 'writing';
-          onStatus('writing');
+    // One chunk of the stream, the same on both paths: status, web search, fallback, stop reason, text.
+    const handleEvent = (chunk: Anthropic.Beta.BetaRawMessageStreamEvent): void => {
+        if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'server_tool_use') {
+          webSearchUsed = true;
+          status = 'searching';
+          onStatus('searching');
+          if (aggregatedText.length > 0) breakBeforeText = true;
         }
 
-        const piece = breakBeforeText && !/\n\s*$/.test(aggregatedText) ? `\n\n${chunk.delta.text}` : chunk.delta.text;
-        breakBeforeText = false;
-        aggregatedText += piece;
-        onText(piece);
+        // What the search returned, in the server log: an answer that says «la ricerca web non era
+        // disponibile» is otherwise impossible to tell from one that never searched.
+        if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'web_search_tool_result') {
+          const content = chunk.content_block.content;
+          if (Array.isArray(content)) console.info(`[assistant] web search returned ${content.length} results`);
+          else console.warn(`[assistant] web search failed: ${content.error_code}`);
+        }
+
+        // The switch point of a server-side fallback: the answer goes on, written by another model.
+        if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'fallback') {
+          console.info(
+            `[assistant] ${chunk.content_block.from.model} declined; ${chunk.content_block.to.model} continued`
+          );
+        }
+
+        // The terminal message_delta carries why generation stopped. Without reading it a
+        // truncated answer is indistinguishable from a finished one.
+        if (chunk.type === 'message_delta' && chunk.delta?.stop_reason) {
+          stopReason = chunk.delta.stop_reason;
+        }
+
+        if (
+          chunk.type === 'content_block_delta' &&
+          chunk.delta.type === 'text_delta'
+        ) {
+          if (status !== 'writing') {
+            status = 'writing';
+            onStatus('writing');
+          }
+
+          const piece = breakBeforeText && !/\n\s*$/.test(aggregatedText) ? `\n\n${chunk.delta.text}` : chunk.delta.text;
+          breakBeforeText = false;
+          aggregatedText += piece;
+          onText(piece);
+        }
+    };
+
+    const maxTokens = isStructuredAnalysis ? ASSISTANT_STRUCTURED_MAX_TOKENS : chatMaxTokens;
+    const webSearchTool = {
+      type: 'web_search_20260209',
+      name: 'web_search',
+      max_uses: isStructuredAnalysis ? 2 : 3,
+    } satisfies Anthropic.Beta.BetaWebSearchTool20260209;
+
+    if (!toolContext || mode === 'register') {
+      const stream = await anthropic.beta.messages.create({
+        model: ASSISTANT_MODEL,
+        // A policy decline is re-run on the fallback model inside this stream (aiModels.ts). The
+        // history replayed below is text only, so a fallback turn needs no block stripping.
+        betas: [SERVER_SIDE_FALLBACK_BETA],
+        fallbacks: 'default',
+        max_tokens: maxTokens,
+        // Static role/domain/guardrail/format instructions, identical for every user and
+        // every request of this mode. No cache_control: this app's traffic pattern
+        // (sporadic single-user requests) rarely lands two calls within the 5-minute
+        // cache TTL, so caching would pay the 1.25x write premium without recouping it.
+        system: system,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'medium' },
+        // Registra never searches the web: the policy already answers false for it, and the request
+        // itself sends no tool whatever flag reaches it (2026-11-11).
+        ...(enableWebSearch && mode !== 'register' ? { tools: [webSearchTool] } : {}),
+        messages: buildMessagesArray(mode, userContent, conversationHistory),
+        stream: true,
+      });
+
+      for await (const chunk of stream) handleEvent(chunk);
+    } else {
+      // The tool loop (DATI-09, doc/guide/assistente.md § The tools): each round is a full request —
+      // the model asks, the code answers — until it writes. No tool_choice (a 400 on Opus 5.5), no strict.
+      const messages: Anthropic.Beta.BetaMessageParam[] = buildMessagesArray(mode, userContent, conversationHistory);
+      // ONE list for every request of the answer: a thinking block already in `messages` was written against it.
+      const tools = [...(enableWebSearch ? [webSearchTool] : []), ...ASSISTANT_TOOL_DEFINITIONS];
+      const startedAt = Date.now();
+      let closingRequests = 0;
+      let pauses = 0;
+      for (;;) {
+        const stream = anthropic.beta.messages.stream({
+          model: ASSISTANT_MODEL,
+          betas: [SERVER_SIDE_FALLBACK_BETA],
+          fallbacks: 'default',
+          max_tokens: maxTokens,
+          system,
+          thinking: { type: 'adaptive' },
+          output_config: { effort: 'medium' },
+          tools,
+          messages,
+        });
+        stream.on('streamEvent', handleEvent);
+        const message = await stream.finalMessage();
+        stopReason = message.stop_reason;
+
+        // The server's own search loop paused: send the turn back and it resumes.
+        if (message.stop_reason === 'pause_turn') {
+          if (++pauses > PAUSE_RESUMES_MAX) break;
+          messages.push({ role: 'assistant', content: message.content });
+          continue;
+        }
+        const calls = message.content.filter((block): block is Anthropic.Beta.BetaToolUseBlock => block.type === 'tool_use');
+        // A truncated or refused turn can hold a half-written call: never run it.
+        if (message.stop_reason !== 'tool_use' || calls.length === 0) break;
+        const limitReached = toolRounds >= ASSISTANT_TOOL_ROUNDS_MAX || Date.now() - startedAt >= ASSISTANT_TOOL_DEADLINE_MS;
+        if (limitReached && closingRequests >= CLOSING_REQUESTS_MAX) break;
+
+        status = 'computing';
+        onStatus('computing');
+        // The whole content goes back, thinking blocks included and unchanged.
+        messages.push({ role: 'assistant', content: message.content });
+        const results: Anthropic.Beta.BetaToolResultBlockParam[] = limitReached
+          ? calls.map((call) => ({ type: 'tool_result' as const, tool_use_id: call.id, content: TOOL_LIMIT_RESULT, is_error: true }))
+          : await Promise.all(
+              calls.map(async (call) => {
+                const { content, isError } = await runAssistantTool(call.name, call.input, toolContext);
+                return { type: 'tool_result' as const, tool_use_id: call.id, content, ...(isError ? { is_error: true } : {}) };
+              }),
+            );
+        if (limitReached) closingRequests += 1;
+        else {
+          toolRounds += 1;
+          toolCalls += calls.length;
+        }
+        messages.push({ role: 'user', content: results });
+        if (aggregatedText.length > 0) breakBeforeText = true;
       }
     }
 
@@ -312,9 +391,17 @@ export async function streamAssistantResponse({
     // reason the prompt's subcategory valve announces itself instead of truncating
     // quietly (doc/guide/assistente.md § Assistant, the silent-cap rule).
     let text = aggregatedText.trim();
-    if (stopReason === 'max_tokens' && text.length > 0) {
+    if ((stopReason === 'tool_use' || stopReason === 'pause_turn') && text.length === 0) {
+      // The loop stopped on its limit before the model wrote a word.
+      onText(TOOL_LIMIT_NOTICE);
+      text = TOOL_LIMIT_NOTICE;
+    } else if (stopReason === 'max_tokens' && text.length > 0) {
       onText(TRUNCATION_NOTICE);
       text += TRUNCATION_NOTICE;
+    } else if (stopReason === 'max_tokens') {
+      // Cut inside its thinking or a call: the notice alone, never an empty bubble (DATI-09).
+      onText(TRUNCATION_NOTICE.trim());
+      text = TRUNCATION_NOTICE.trim();
     } else if (stopReason === 'refusal' && text.length === 0) {
       onText(REFUSAL_NOTICE);
       text = REFUSAL_NOTICE;
@@ -324,6 +411,8 @@ export async function streamAssistantResponse({
     return {
       text,
       webSearchUsed,
+      toolCalls,
+      toolRounds,
     };
   } catch (error: unknown) {
     if (readAnthropicErrorType(error) === 'overloaded_error') {

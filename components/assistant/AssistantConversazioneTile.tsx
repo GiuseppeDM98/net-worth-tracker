@@ -1,6 +1,6 @@
 'use client';
 
-import { CornerDownRight, Globe } from 'lucide-react';
+import { Calculator, CornerDownRight, Globe } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { AssistantPromptRows, type PromptRow } from '@/components/assistant/AssistantPromptRows';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +27,7 @@ interface AssistantConversazioneTileProps {
   /** A thread is selected but still empty → «no messages yet». */
   hasSelectedThread: boolean;
   isStreaming: boolean;
-  streamStatus: 'searching' | 'writing' | 'saving' | null;
+  streamStatus: 'searching' | 'writing' | 'computing' | 'saving' | null;
   isInterrupted: boolean;
   streamingMessageId: string | undefined;
   followUps: AssistantFollowUp[];
@@ -53,9 +53,11 @@ export function StreamStatusChip({
   streamStatus,
 }: Pick<AssistantConversazioneTileProps, 'isStreaming' | 'streamStatus'>) {
   const prefersReducedMotion = useReducedMotion();
-  if (!isStreaming || streamStatus !== 'searching') return null;
+  if (!isStreaming || (streamStatus !== 'searching' && streamStatus !== 'computing')) return null;
 
-  const label = 'Sto cercando sul web…';
+  // The tools on the data (DATI-09) say their own words and icon, never the web's.
+  const label = streamStatus === 'computing' ? 'Faccio i conti sui tuoi dati…' : 'Sto cercando sul web…';
+  const Icon = streamStatus === 'computing' ? Calculator : Globe;
 
   return (
     <motion.span
@@ -67,7 +69,7 @@ export function StreamStatusChip({
       transition={{ duration: prefersReducedMotion ? 0 : 0.18 }}
       className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-[11px] text-foreground"
     >
-      <Globe
+      <Icon
         className="h-3 w-3 motion-safe:animate-pulse"
         aria-hidden="true"
       />

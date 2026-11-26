@@ -74,6 +74,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   income `--positive` only once reached). The ceiling's track takes a second fill (`scheduledRatio`, same colour at
   40%) for the rows still to come, and every track speaks its real share through `valueText` → `aria-valuetext`
   («231%, oltre di 1963 €»): `aria-valuenow` clamps at 100 and used to announce an exceeded budget as full.
+- **At 1440 the Tetto is one row high and Budget annuali spans the grid** (2026-11-26): the Tetto (5) sits beside
+  Categorie a rischio (4) and Avvisi (3) only; Budget annuali takes the 12 columns with its rows two by two in reading
+  order, then Per categoria. Until that day the Tetto spanned two rows beside a 7-column Annuali, and a dozen annual
+  budgets drew it ~1600px high with six ~600px bars. The bars stop at 220px (`SpendingBarsChart`'s `maxHeight`, as
+  `GrowthOfHundredChart` does): a tall Avvisi still stretches the row, and the spare height falls under the labels.
+  `BUDGET_SKELETON_CELLS` follows (5 · 4 · 3, then 12 · 12).
 - **Settings live below the grid** (`BudgetImpostazioni`, a Radix `Collapsible` open only while no ceiling is set);
   the phone's 44px shortcut under the verdict scrolls to `#budget-impostazioni`. Without a ceiling the hero's cell is a
   hidden spacer, never a faked tile, and the verdict passes the question to the category budgets.
@@ -128,6 +134,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `dialogNarrative.ts`. Pinned by `__tests__/budgetUtils.test.ts` (seen red with the gate reading `type` alone).
 - **GOTCHA**: never reconcile items against `categories` while `categories.length === 0` (they load async) — every
   category budget is dropped as an orphan and a later edit can persist the empty set.
+- **The Assistente's `budget_stato` tool measures with this page's functions** (2026-11-26): the same
+  `countsTowardBudget` gate, ceilings and pace; doc/guide/assistente-strumenti.md.
 
 ## Composizione mobile
 

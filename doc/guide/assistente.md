@@ -12,7 +12,9 @@
 > `e2e/assistantRegister.ts`; no spec asserts an analysis's answer.
 > **Registra** (the `register` mode: card, questions, write, outcome) has its own guide since 2026-11-16:
 > doc/guide/assistente-registra.md. **The form of an answer** (the one contract, the tail, a question back, the
-> renderers of generated Markdown) has its own since 2026-11-25: doc/guide/assistente-risposta.md.
+> renderers of generated Markdown) has its own since 2026-11-25: doc/guide/assistente-risposta.md. **The tools on
+> the data** (the five tools, the one read of a turn, the loop with its cap and deadline, `computing`) have their own
+> since 2026-11-26: doc/guide/assistente-strumenti.md.
 
 ## Files
 
@@ -259,6 +261,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   written by the model in a ```assistant-followups tail the server cuts off, ONE question card outside Registra:
   doc/guide/assistente-risposta.md (split from this guide on 2026-11-25, past 500 lines).
 
+### The tools on the data (2026-11-26)
+- Every mode but Registra sends five tools that query the recorded cashflow, the budget and the centres, computed
+  by code over ONE read per message shared with the CASHFLOW block; a loop of at most 8 rounds or 200 s:
+  doc/guide/assistente-strumenti.md (split from this guide on 2026-11-26, past 500 lines).
+
 ### Structured goals (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts` extraction)
 - **Structure is NEVER parsed from text.** It arrives from a forced-tool-use Haiku call validated with zod. A malformed
   payload discards the **structure**, not the goal — an un-trackable goal is a legitimate state the panel states out
@@ -447,7 +454,8 @@ No composition, by design: the page's content is a conversation (DESIGN.md → T
   the answer was streaming, and what dedupes against an item added from the panel meanwhile; it runs in the
   background, off the reader's wait. Do not hand the first read down to it.
 - **Every message reads the whole cashflow history** (owner, 2026-11-07): the route's
-  `readCashflowBlockForPrompt` reads every expense row up to the Italian end of the month 12 ahead, in every mode,
+  `readCashflowBlockForPrompt` (every mode but Registra: `readAssistantTurnData`, the same read shared with the tools
+  since 2026-11-26) reads every expense row up to the Italian end of the month 12 ahead, in every mode,
   apart from the period's own read — a period's rows are read twice, and the read grows with the history. Accepted:
   one Admin query per message, off the browser; the block is never cached across messages, so a row confirmed a
   minute ago is in the next answer.

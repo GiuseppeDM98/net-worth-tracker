@@ -306,6 +306,19 @@ describe('generateEmailAiComment', () => {
     expect(params.system).not.toContain('CASHFLOW 12 MESI');
   });
 
+  it('sends none of the Assistente\'s tools: the comment has the web search alone, as before (DATI-09, P1b)', async () => {
+    anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
+
+    await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
+
+    const params = anthropicCreateMock.mock.calls[0][0] as { system: string; tools?: { name: string }[] };
+    for (const name of ['cashflow_totali', 'cashflow_confronto', 'cashflow_righe', 'budget_stato', 'centri_di_costo']) {
+      expect(JSON.stringify(params)).not.toContain(name);
+    }
+    expect((params.tools ?? []).every((tool) => tool.name === 'web_search')).toBe(true);
+    expect(params.system).not.toContain('# Gli strumenti sui tuoi dati');
+  });
+
   it('a failed read of the block sends no comment and spends no call', async () => {
     readCashflowBlockMock.mockRejectedValue(new Error('read failed'));
     vi.spyOn(console, 'error').mockImplementation(() => undefined);

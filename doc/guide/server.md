@@ -24,6 +24,11 @@
   A whole-module `vi.mock` factory hides every export it does not list: once the code under test imports one more
   (2026-11-07, `formatCashflowBlockSection` in `__tests__/allocationAdviceRun.test.ts`), make it partial with
   `importOriginal`, or ten unrelated cases fail on an undefined function.
+- **A tool input is the model's output, i.e. untrusted** (2026-11-26, the Assistente's tools,
+  doc/guide/assistente-strumenti.md): every input goes through its zod schema, a name is only ever compared, never a
+  path or a query, and the account is the route's checked `body.userId`, never an input. The tool loop's deadline
+  (200 s from the first request) sits under the stream route's `maxDuration = 300`: one model request can take
+  minutes, the round cap alone does not bound the time.
 - **A route's latency is a `Server-Timing` header** (`lib/server/serverTiming.ts`; five routes since 2026-10-05: overview,
   yields, dividend stats, instrument profiles, assistant threads): `startTiming()` at the handler's top, `mark('auth')`
   after `assertCanAccessAccount`, `mark('db')` after ONE round of reads, `mark('compute')` before the response; a service

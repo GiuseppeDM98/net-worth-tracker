@@ -248,6 +248,11 @@ describe('StreamStatusChip — the corner of the tile', () => {
     rerender(<StreamStatusChip isStreaming={false} streamStatus="searching" />);
     expect(screen.queryByRole('status')).toBeNull();
   });
+
+  it('says the sums while the tools run, never the web (DATI-09)', () => {
+    render(<StreamStatusChip isStreaming streamStatus="computing" />);
+    expect(screen.getByRole('status').textContent).toBe('Faccio i conti sui tuoi dati…');
+  });
 });
 
 // An answer already begun can stand still for a minute while the server searches the web (owner,
@@ -255,6 +260,11 @@ describe('StreamStatusChip — the corner of the tile', () => {
 describe('AssistantStreamingResponse — a pause after the first words', () => {
   const STREAMING = 'local-assistant-1';
   const waiting = (container: HTMLElement) => container.querySelector('[data-assistant-waiting]');
+
+  it('shows the sums under the text while the tools run (DATI-09)', () => {
+    const { container } = renderMessages([assistant('Cerco i totali.', { id: STREAMING })], { streamingMessageId: STREAMING, streamStatus: 'computing' });
+    expect(waiting(container)?.textContent).toContain('Faccio i conti sui tuoi dati…');
+  });
 
   it('shows the web search under the text while the server searches', () => {
     const { container } = renderMessages([assistant('Cerco il contesto.', { id: STREAMING })], { streamingMessageId: STREAMING, streamStatus: 'searching' });

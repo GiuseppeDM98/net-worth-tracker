@@ -233,11 +233,11 @@ export function AssistantStreamingResponse({
                     ) : (
                       <AssistantWaiting reading={message.routeReading} status={streamStatus ?? null} />
                     )}
-                    {/* An answer already begun can stand still while the server searches the web
+                    {/* An answer already begun can stand still while the server searches the web or runs the tools
                         (owner, 2026-11-16: a minute on the first sentence): the wait comes back under it. */}
-                    {streamingAnswerText(message.content) && streamStatus === 'searching' && (
+                    {streamingAnswerText(message.content) && (streamStatus === 'searching' || streamStatus === 'computing') && (
                       <div className="mt-2 flex">
-                        <AssistantWaiting reading={message.routeReading} status="searching" />
+                        <AssistantWaiting reading={message.routeReading} status={streamStatus} />
                       </div>
                     )}
                   </div>

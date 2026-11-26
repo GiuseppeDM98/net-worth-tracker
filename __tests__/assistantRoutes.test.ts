@@ -27,6 +27,8 @@ const {
   accountAccessDocGetMock,
   fetchCashflowBlockInputsMock,
   fetchRegisterInputsMock,
+  fetchCostCentersMock,
+  fetchBudgetConfigMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   buildAssistantMonthContextMock: vi.fn(),
@@ -51,6 +53,8 @@ const {
   accountAccessDocGetMock: vi.fn(),
   fetchCashflowBlockInputsMock: vi.fn(),
   fetchRegisterInputsMock: vi.fn(),
+  fetchCostCentersMock: vi.fn(),
+  fetchBudgetConfigMock: vi.fn(),
 }));
 
 // The router (2026-11) is never called for real: `mode: 'auto'` reads whatever the test hands it.
@@ -99,6 +103,8 @@ vi.mock('@/lib/services/assistantMonthContextService', () => ({
   buildAssistantTodayContext: buildAssistantTodayContextMock,
   fetchCashflowBlockInputs: fetchCashflowBlockInputsMock,
   fetchRegisterInputs: fetchRegisterInputsMock,
+  fetchCostCenters: fetchCostCentersMock,
+  fetchBudgetConfig: fetchBudgetConfigMock,
 }));
 
 vi.mock('@/lib/server/assistant/store', () => ({
@@ -179,6 +185,9 @@ describe('Assistant private API routes', () => {
     fetchCashflowBlockInputsMock.mockResolvedValue({
       expenses: [], todayIso: '2026-10-20', categories: [], assets: [], settings: null, assetValueOf: () => 0,
     });
+    // The tools' side reads (DATI-09): no centre, no budget.
+    fetchCostCentersMock.mockResolvedValue([]);
+    fetchBudgetConfigMock.mockResolvedValue(null);
     // What Registra reads: one category, no account, no row, the month unread.
     fetchRegisterInputsMock.mockImplementation(async (_userId: string, now: Date) => ({
       now,
@@ -861,6 +870,32 @@ describe('Assistant private API routes', () => {
       await expect(response.json()).resolves.toEqual({ error: "Impossibile avviare lo stream dell'assistente" });
       expect(streamAssistantResponseMock).not.toHaveBeenCalled();
     });
+
+    // DATI-09: the tools and the block share one expense read; the budget and the centres are read beside it.
+    it('a chat reads the expenses ONCE and hands the stream the tools context and the block of that read (S1)', async () => {
+      const response = await streamRequest({ mode: 'chat', chatContext: 'none' });
+      expect(response.status).toBe(200);
+      await response.text();
+      expect(fetchCashflowBlockInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchCostCentersMock).toHaveBeenCalledWith('user-1');
+      expect(fetchBudgetConfigMock).toHaveBeenCalledWith('user-1');
+      const args = streamAssistantResponseMock.mock.calls[0][0] as Parameters<typeof streamAssistantResponse>[0];
+      expect(args.cashflowBlock).toContain('--- CASHFLOW 12 MESI');
+      expect(args.toolContext).toMatchObject({ userId: 'user-1', costCenters: [], budgetConfig: null });
+      // The same array the block was built on: one read, not two.
+      expect(args.toolContext?.expenses).toBe((await fetchCashflowBlockInputsMock.mock.results[0].value).expenses);
+    });
+
+    it('a failed budget read still streams, the budget unreadable for its tool alone (S2)', async () => {
+      fetchBudgetConfigMock.mockRejectedValue(new Error('budget down'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const response = await streamRequest({ mode: 'chat', chatContext: 'none' });
+      expect(response.status).toBe(200);
+      await response.text();
+      const args = streamAssistantResponseMock.mock.calls[0][0] as Parameters<typeof streamAssistantResponse>[0];
+      expect(args.toolContext?.budgetConfig).toBe('unreadable');
+      expect(args.toolContext?.costCenters).toEqual([]);
+    });
   });
 
   // ── The body is validated before anything is read (2026-11) ──────────────────────────────
@@ -945,6 +980,10 @@ describe('Assistant private API routes', () => {
       expect(fetchCashflowBlockInputsMock.mock.calls[0][0]).toBe('user-1');
       const args = streamAssistantResponseMock.mock.calls[0][0] as { cashflowBlock: string | null };
       expect(args.cashflowBlock).toContain('--- CASHFLOW 12 MESI');
+      // Registra runs no tool (S1): no context, neither the budget nor the centres read.
+      expect((args as { toolContext?: unknown }).toolContext).toBeUndefined();
+      expect(fetchCostCentersMock).not.toHaveBeenCalled();
+      expect(fetchBudgetConfigMock).not.toHaveBeenCalled();
     });
 
     it('titles a new thread by the mode, and never retitles the day’s thread', async () => {

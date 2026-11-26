@@ -66,7 +66,7 @@ function Kpi({ label, value, valueClass, caption, className }: { label: string; 
  * ceiling (the hero), the rows still in the calendar beside it as their own figure, the two
  * on one 3px track with today's mark (booked full, scheduled lighter), the three KPIs (where
  * the month lands at the current pace, what is left, what that is per day), the trailing
- * months against today's ceiling (the element that stretches when the tile spans two rows),
+ * months against today's ceiling (the element that stretches with the tile, up to a cap),
  * and the month's income targets as the footer. Every figure is the `CeilingSummary`'s; the
  * tile computes nothing. The hero used to print `spent` (scheduled rows included) over the
  * word «speso» — say 1500 € for 500 € actually spent (seen live, 2026-09-14).

@@ -133,6 +133,35 @@ describe('useAssistantStreaming — a register stream', () => {
 // `route` event and sets the turn's mode, and a re-send carries the reading it inherits. Seen RED
 // with `chatContext: 'none'` kept in the body, with the `route` handler leaving the retry's ref
 // alone, and with the placeholders born `'chat'`.
+describe('useAssistantStreaming — the status of the tools (DATI-09)', () => {
+  it('a `status: computing` event is the hook\'s `streamStatus` while the stream is open (D1a)', async () => {
+    const encoder = new TextEncoder();
+    let finish: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { finish = resolve; });
+    const frame = (event: AssistantStreamEvent) => encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+    authenticatedFetchMock.mockImplementation(async () => new Response(new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(frame({ type: 'meta', threadId: 'thread-1', title: 'x' }));
+        controller.enqueue(frame({ type: 'status', status: 'computing' }));
+        await held;
+        controller.enqueue(frame({ type: 'text', text: 'Fatto.' }));
+        controller.enqueue(frame({ type: 'done', threadId: 'thread-1', messageId: 'msg-1', webSearchUsed: false }));
+        controller.close();
+      },
+    }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+    const { result } = setup();
+    let submitted: Promise<void> = Promise.resolve();
+    act(() => {
+      submitted = result.current.submit('quanto ho speso a novembre?');
+    });
+    await waitFor(() => expect(result.current.streamStatus).toBe('computing'));
+    finish();
+    await act(async () => {
+      await submitted;
+    });
+  });
+});
+
 describe('useAssistantStreaming — the reading of a turn', () => {
   const ROUTER: AssistantRouteReading = { route: { intent: 'month_analysis', period: { kind: 'month', year: 2026, month: 10 }, webSearch: false, confidence: 0.9 }, source: 'router' };
   const FALLBACK: AssistantRouteReading = { route: { intent: 'chat', period: { kind: 'none' }, webSearch: false, confidence: 0 }, source: 'fallback', reason: 'timeout' };

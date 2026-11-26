@@ -847,6 +847,17 @@ const ANSWER_CONTRACT = [
   "Se la risposta cambia secondo un fatto che solo l'utente conosce (un familiare fiscalmente a carico, chi paga una rata, l'intenzione di vendere), rispondi comunque con l'ipotesi più probabile dichiarata in una riga e poi fai UNA domanda con un blocco di codice di linguaggio `assistant-question` che contiene SOLO un oggetto JSON: { \"id\": string, \"kind\": \"single\" | \"multiple\", \"text\": string, \"why\"?: string, \"options\": [ { \"value\": string, \"label\": string } ] (da 2 a 4), \"allowOther\": boolean }. Mai più di una, mai una domanda in prosa. Con la scheda non scrivere il blocco assistant-followups.",
 ].join('\n');
 
+/**
+ * The tools on the user's data (DATI-09): every mode but Registra sends them, so the section sits
+ * here and not in ASSISTANT_SYSTEM_CORE, which Registra and the emails read and which have none.
+ * Static — no date, no name — like the rest of the system: it is the request's prefix.
+ */
+const TOOLS_SECTION = [
+  '# Gli strumenti sui tuoi dati',
+  "Hai strumenti che interrogano il cashflow registrato, il budget e i centri di costo: i conti sulle righe li fa il codice e tu li chiedi. Usali ogni volta che la risposta ha bisogno di una cifra che non è già scritta nei dati del messaggio — un totale per categoria su un periodo qualunque, una serie mensile, il confronto tra due periodi, le righe dietro un numero. Sulle cifre già scritte nel messaggio o tornate da uno strumento il conto resta tuo; una cifra che richiede righe che non hai la chiedi, non la stimi. Chiedi in una volta sola tutto quello che ti serve (più chiamate nello stesso turno), poi rispondi: non nominare mai gli strumenti nella risposta.",
+  "Se uno strumento risponde con un errore su un nome, correggi il nome con quelli che ti elenca; se non trova righe, la cifra è zero e lo dici come «nessuna spesa registrata». Se un risultato dice che alcune righe sono rimaste fuori perché precedenti all'inizio dello storico, dillo in mezza riga. Se uno strumento ti dice di chiudere, rispondi con quello che hai.",
+].join('\n');
+
 const PERIOD_LINES: Partial<Record<AssistantMode, string>> = {
   month_analysis: "È il giudizio su un mese: il verdetto è la variazione del patrimonio nel mese, i conti sono i tre o quattro movimenti che la spiegano.",
   year_analysis: "È il giudizio su un anno: il verdetto è la variazione del patrimonio nell'anno, i conti sono i tre o quattro movimenti che la spiegano; se l'anno è in corso, dillo nel verdetto.",
@@ -854,10 +865,10 @@ const PERIOD_LINES: Partial<Record<AssistantMode, string>> = {
   history_analysis: "È tutta la storia: il verdetto è di quanto è cresciuto il patrimonio e in quanti anni; privilegia il lungo periodo sul singolo mese.",
 };
 
-/** The static system of one mode: the core, the one contract and, for a period mode, its line. */
+/** The static system of one mode: the core, the one contract, the tools and, for a period mode, its line. */
 export function buildAssistantSystem(mode: Exclude<AssistantMode, 'register'>): string {
   const line = PERIOD_LINES[mode];
-  return [ASSISTANT_SYSTEM_CORE, ANSWER_CONTRACT, ...(line ? [line] : [])].join('\n\n');
+  return [ASSISTANT_SYSTEM_CORE, ANSWER_CONTRACT, TOOLS_SECTION, ...(line ? [line] : [])].join('\n\n');
 }
 
 /**
