@@ -54,6 +54,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useRowActionsHeld } from '@/components/ui/row-actions-hold';
 import { COSTUME_PILL_RADIUS_CLASS } from '@/lib/constants/themeCostume';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
@@ -141,7 +142,9 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
   const consequence = armed
     ? describeExpenseDeleteConsequence({ type: expense.type, amount: expense.amount, hasAccount: !!expense.linkedCashAssetId, hasFee: !!expense.transferFeeExpenseId })
     : null;
-  const disabled = isDemo || busy;
+  // Held too while the rows on screen are a restored copy being reread (components/ui/row-actions-hold.tsx).
+  const held = useRowActionsHeld();
+  const disabled = isDemo || busy || held;
   // A LOOKUP in the module-level map, never a call: a component obtained from a call during
   // render is a new type every render (`react-hooks/static-components`).
   const CatIcon = categoryMeta?.icon ? LAZY_CATEGORY_ICONS[categoryMeta.icon] : undefined;

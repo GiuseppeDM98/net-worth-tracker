@@ -71,6 +71,7 @@ import { useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
 import { resolveSurfaceState, describeReadFailure } from '@/lib/utils/statesNarrative';
 import { describeAccumulationReadFailure, ACCUMULO_TILE_EYEBROW } from '@/lib/utils/accumulationNarrative';
 import { cn } from '@/lib/utils';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS, TILE_ROW_CELL_CLASS } from '@/components/ui/tile';
 import { VerdictStrip } from '@/components/ui/verdict-strip';
@@ -258,6 +259,7 @@ export function AccumuloTab({ ownerId, allAssets, targets, hasTargets, band, tar
   const modelRow = 'desktop:row-start-2';
 
   return (
+    <RowActionsHold queries={[plansQuery]}>
     <div className="mt-4 flex flex-col gap-3">
       {/* The stage: the verdict over the grid; on a tablet in landscape the answer on the left (verdict and
           THE tile) and the index on the right (lib/utils/tabletComposition.ts). */}
@@ -415,5 +417,6 @@ export function AccumuloTab({ ownerId, allAssets, targets, hasTargets, band, tar
       )}
 
     </div>
+    </RowActionsHold>
   );
 }

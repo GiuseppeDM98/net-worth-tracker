@@ -224,8 +224,9 @@ transactions and gates chosen calls.
   version the form or the button was drawn from (PUT body / DELETE query, ISO; absent from an older client = the
   server's own read), so a form left open in another tab on an older version gets the same 409 (owner, 2026-11-12).
   An edit on a changed trade is refused, never merged. **So Movimenti holds a row's edit and delete while its trades
-  are a copy restored from before this load and still being reread** (2026-11-24, `resolveFreshness` in
-  `AssetMovementsDialog`; `__tests__/assetMovementsDialogReread.test.tsx`): a reload right after an edit painted the
+  are a copy restored from before this load and still being reread** (2026-11-24; since 2026-11-26 the app's one
+  rule, `useRestoredCopyReread` of `components/ui/row-actions-hold.tsx`, read here on the ledger — doc/guide/cache-persistita.md
+  § Every load rereads what it restored; `__tests__/assetMovementsDialogReread.test.tsx`): a reload right after an edit painted the
   pre-edit copy from the persisted cache, and a delete pressed on it was a 409 that left the trade — the intermittent
   red of `e2e/assets.trade-fee.spec.ts`, traced in its trace. A refetch of a list read in this load holds nothing.
 - **The asset's type and the settlement account are checked at commit**: a trade on an asset that left the ledger

@@ -59,7 +59,7 @@ import { cn } from '@/lib/utils';
 import { Info, Pencil, Plus, Trash2, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastAnnouncedDividends } from '@/components/assets/announcedDividendsToast';
-import { resolveFreshness } from '@/lib/utils/freshness';
+import { useRestoredCopyReread } from '@/components/ui/row-actions-hold';
 import type { Asset } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
 import { describeTradeFx } from '@/lib/utils/tradeFx';
@@ -82,9 +82,8 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
   // possibly from before the last edit — and rereads them behind: a delete pressed on that copy was
   // refused and the trade stayed (2026-11-24). The actions wait for the reread; a refetch of a list
   // read in this load (the invalidation after a save) holds nothing.
-  const rereadingRestoredCopy = resolveFreshness([ledgerQuery], new Date().getTime(), {
-    openedAt: typeof performance !== 'undefined' ? performance.timeOrigin : undefined,
-  }).stale;
+  // The rule is the app's one (components/ui/row-actions-hold.tsx), read here on the ledger.
+  const rereadingRestoredCopy = useRestoredCopyReread([ledgerQuery]);
   const rowActionsDisabled = isDemo || rereadingRestoredCopy;
   const deleteMutation = useDeleteAssetTransaction(ownerId || '');
 

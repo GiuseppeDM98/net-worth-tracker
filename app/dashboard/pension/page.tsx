@@ -24,12 +24,14 @@ import { PensionOverview } from '@/components/pension/PensionOverview';
 import { PensionHeaderAction } from '@/components/pension/PensionHeaderAction';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 
 export default function PensionPage() {
   const { ownerId } = useActiveAccount();
+  const contributionsQuery = usePensionContributions(ownerId);
   const freshness = useFreshness([
     useAssets(ownerId),
-    usePensionContributions(ownerId),
+    contributionsQuery,
     useSettings(ownerId),
     useSnapshots(ownerId),
   ]);
@@ -44,7 +46,10 @@ export default function PensionPage() {
         actions={<PensionHeaderAction />}
         freshness={freshness}
       />
-      <PensionOverview />
+      {/* A contribution's «Elimina» waits while the list on screen is a restored copy being reread. */}
+      <RowActionsHold queries={[contributionsQuery]}>
+        <PensionOverview />
+      </RowActionsHold>
     </PageContainer>
   );
 }

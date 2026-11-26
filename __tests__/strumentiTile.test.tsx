@@ -34,6 +34,7 @@ vi.mock('@/components/ui/select', () => ({
 }));
 
 import { StrumentiTile } from '@/components/assets/StrumentiTile';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 import { AssetDeleteRefusedError } from '@/lib/services/assetService';
 import { ALL_ARCHIVED_SENTENCE, describeDeleteRefusal, summarizeLedgerFootprints } from '@/lib/utils/instrumentArchive';
 import type { AssetTransaction } from '@/types/assetTransactions';
@@ -115,9 +116,10 @@ const footprints = summarizeLedgerFootprints([
   trade('etf-a', 'sell', '2026-02-20'),
 ]);
 
-function renderTile(assets: Asset[], overrides: Partial<React.ComponentProps<typeof StrumentiTile>> = {}) {
+function renderTile(assets: Asset[], overrides: Partial<React.ComponentProps<typeof StrumentiTile>> = {}, rereading = false) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
+      <RowActionsHold held={rereading}>
       <StrumentiTile
         assets={assets}
         totalValue={1000}
@@ -136,6 +138,7 @@ function renderTile(assets: Asset[], overrides: Partial<React.ComponentProps<typ
         ledgerFootprints={footprints}
         {...overrides}
       />
+      </RowActionsHold>
     </QueryClientProvider>,
   );
 }
@@ -207,6 +210,19 @@ describe.each([
     unmount();
     renderTile([alfa, zeta, held], { ledgerFootprints: both, members });
     expect(screen.getByRole('button', { name: '2 strumenti azzerati' }).getAttribute('aria-expanded')).toBe('true');
+  });
+
+  // The hold of components/ui/row-actions-hold.tsx (2026-11-26). Mutation that turns it red: `held` dropped from
+  // the row's «Modifica», from the tile's `DeleteButton` or from `AssetRow`'s two buttons.
+  it('holds «Modifica» and «Elimina» of a row while the assets on screen are a restored copy being reread', () => {
+    const lone = etf({ id: 'lone', name: 'Solitario', quantity: 5 });
+    const { unmount } = renderTile([lone], { ledgerFootprints: summarizeLedgerFootprints([]) }, true);
+    const actions = () => [...screen.getAllByRole('button', { name: /^Modifica/ }), ...screen.getAllByRole('button', { name: 'Elimina Solitario' })] as HTMLButtonElement[];
+    expect(actions().length).toBeGreaterThanOrEqual(2);
+    for (const button of actions()) expect(button.disabled).toBe(true);
+    unmount();
+    renderTile([lone], { ledgerFootprints: summarizeLedgerFootprints([]) });
+    for (const button of actions()) expect(button.disabled).toBe(false);
   });
 
   // R4

@@ -90,6 +90,7 @@ import {
 } from '@/lib/utils/goalsNarrative';
 import { GOALS_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
+import { RowActionsHold, useRestoredCopyReread } from '@/components/ui/row-actions-hold';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { PageRest } from '@/components/ui/page-rest';
 import { Tile, TILE_CELL_CLASS, TILE_ROW_CELL_CLASS } from '@/components/ui/tile';
@@ -146,7 +147,11 @@ export function GoalBasedInvestingTab() {
   // ─── Queries (the keys every page shares, 2026-09-29) ───────────────────────────
   const { data: settings, isLoading: loadingSettings, isError: settingsError } = useSettings(ownerId);
   const { data: assets = EMPTY_ASSETS, isLoading: loadingAssets, isError: assetsError } = useAssets(ownerId);
-  const { data: goalData, isLoading: loadingGoals, isError: goalsError } = useGoalData(ownerId);
+  const goalsQuery = useGoalData(ownerId);
+  const { data: goalData, isLoading: loadingGoals, isError: goalsError } = goalsQuery;
+  // Every save here rewrites the WHOLE document from `goals` and the assignments in memory: started from a
+  // restored copy still being reread it would erase what another device saved since (components/ui/row-actions-hold.tsx).
+  const held = useRestoredCopyReread([goalsQuery]);
 
   // Invalidates `goals.all`, which Allocazione reads too (goal-driven targets).
   const saveMutation = useSaveGoalData(ownerId || '');
@@ -319,7 +324,7 @@ export function GoalBasedInvestingTab() {
   const newGoalButton = (
     <span className="flex items-center gap-2">
       {isDemo && <span>non disponibile in demo</span>}
-      <button type="button" onClick={handleCreateGoal} disabled={isDemo} className={ASIDE_BUTTON_CLASS}>
+      <button type="button" onClick={handleCreateGoal} disabled={isDemo || held} className={ASIDE_BUTTON_CLASS}>
         <Plus className="h-3 w-3" aria-hidden="true" />
         Nuovo obiettivo
       </button>
@@ -437,6 +442,7 @@ export function GoalBasedInvestingTab() {
   );
 
   return (
+    <RowActionsHold held={held}>
     <div className="space-y-4">
       {/* The stage: the verdict over the grid; on a tablet in landscape, with goals, the answer on
           the left (verdict and Obiettivi) and the index on the right (lib/utils/tabletComposition.ts).
@@ -469,5 +475,6 @@ export function GoalBasedInvestingTab() {
         <AssetAssignmentDialog open onClose={() => setAssignmentGoalId(null)} onSave={handleSaveAssignment} goalId={assignmentGoalId} goals={goals} assets={assets} assignments={cleanedAssignments} />
       )}
     </div>
+    </RowActionsHold>
   );
 }

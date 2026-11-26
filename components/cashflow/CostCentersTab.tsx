@@ -69,6 +69,7 @@ import {
   describeTrailingCaption,
 } from '@/lib/utils/costCenterNarrative';
 import { cn } from '@/lib/utils';
+import { RowActionsHold } from '@/components/ui/row-actions-hold';
 import { Button } from '@/components/ui/button';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS, TILE_ROW_CELL_CLASS } from '@/components/ui/tile';
@@ -132,8 +133,10 @@ export function CostCentersTab({ active }: CostCentersTabProps) {
   // list — one query per center (N+1) until then. Whole by declared need: a center is lifetime (no
   // period axis), so unlike the other Cashflow tabs this one has no window to read
   // (lib/utils/expenseWindows.ts). The tab gates on both.
-  const { data: centersData, isLoading: centersLoading, isError: centersError } = useCostCenters(ownerId);
-  const { data: allExpenses, isLoading: expensesLoading, isError: expensesError } = useExpenses(ownerId);
+  const centersQuery = useCostCenters(ownerId);
+  const expensesQuery = useExpenses(ownerId);
+  const { data: centersData, isLoading: centersLoading, isError: centersError } = centersQuery;
+  const { data: allExpenses, isLoading: expensesLoading, isError: expensesError } = expensesQuery;
   const loading = centersLoading || expensesLoading;
   const isError = centersError || expensesError;
 
@@ -276,7 +279,8 @@ export function CostCentersTab({ active }: CostCentersTabProps) {
   // --- Detail view ---
   if (selectedCenter) {
     return (
-      <>
+      // A centre's actions and its rows wait while the centres or the expenses on screen are a restored copy being reread.
+      <RowActionsHold queries={[centersQuery, expensesQuery]}>
         <CostCenterDetail
           costCenter={selectedCenter}
           linkedExpenseCount={byCenter[selectedCenter.id]?.linkedCount ?? 0}
@@ -289,7 +293,7 @@ export function CostCentersTab({ active }: CostCentersTabProps) {
           active={active}
         />
         <CostCenterDialog open={dialogOpen} onClose={() => setDialogOpen(false)} costCenter={editingCenter} centers={centers} returnFocusTo={dialogOpenerRef} onSuccess={handleDialogSuccess} />
-      </>
+      </RowActionsHold>
     );
   }
 

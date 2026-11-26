@@ -12,6 +12,8 @@
 
 ## 🐛 Bug Fixes
 
+- **Tutte le liste — modificare una riga appena riaperta la pagina** — Fixed: for the instant a reloaded page shows the saved copy of a list while it reads it again («Aggiornato alle…, sto rileggendo…»), «Modifica», «Elimina» and the other actions of a row now wait, on Patrimonio, Cashflow, Centri di Costo, Previdenza, FIRE › Obiettivi, Allocazione › Accumulo, Hall of Fame, Storico and the categories in Impostazioni. Before, a change made from that copy could overwrite a newer one saved from another device.
+
 - **Patrimonio › Movimenti — eliminare un'operazione appena modificata** — Fixed: right after editing an operation and reloading the page, deleting it could be refused as «cambiata nel frattempo» and the operation stayed. Movimenti now waits the instant it takes to reread the list before its edit and delete buttons answer.
 
 - **Cashflow — la commissione di una voce modificata più volte** — Fixed: after changing a row's «Commissione» and reloading the page, reopening the row could say «La commissione di questa voce non è stata letta» and leave the field disabled at every reopening. The form now finds the fee the row has — or none — and the field takes a new amount.
