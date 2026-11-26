@@ -259,7 +259,7 @@ export function ExpenseProposalCard({ proposal, index }: ExpenseProposalCardProp
       animate="center"
       data-generated
       data-proposal={key}
-      className={cn('not-prose my-3 border p-4', COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)}
+      className={cn('my-3 border p-4', COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)}
     >
       <p className={cn(TILE_EYEBROW_CLASS, AI_GENERATED_EYEBROW_CLASS)}>L&apos;Assistente propone</p>
 

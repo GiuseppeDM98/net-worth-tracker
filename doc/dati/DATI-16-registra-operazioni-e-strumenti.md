@@ -539,7 +539,7 @@ async function writeTradeProposal(
 
 ### 4.6 The fake stream — `e2e/assistantRegister.ts`
 
-`proposalBlock` (`:178`) gains a sibling `tradeBlock(proposal)`; `installFakeStream` is the one DATI-08 extended
+`proposalBlock` (`:178`) gains a sibling `tradeBlock(proposal)`; `installFakeStream` is the one whose reply is `FakeAnswer` (`e2e/assistantRegister.ts`, with `followUps` and `statuses`)
 (its reply `{ text, reading, followUps?, statuses? }`) and is not changed here. The fixture plants — and
 `removeFixture` removes — the ledger's meta document `assetTransactionsMeta/{UID}` when it is absent (the
 precedent: `e2e/assets.trade-fee.spec.ts`) and an instrument «Azione Alfa» (ALFA, EUR, quantity 10) with an
@@ -553,7 +553,7 @@ precedent: `e2e/assets.trade-fee.spec.ts`) and an instrument «Azione Alfa» (AL
 - **C2 is used as the index § 7 states it**: `feesNative`, `settledTotalEur`, `nativeTotal`, `resolveTradeFx`,
   `describeTradeFx`, `describeTotalOff`, `useFxRate`, `normalizeCurrencyAmount`, `isListedCurrency`; the server is
   the authority on the euro price — the card only previews.
-- **C4**: the question card is DATI-08's; Registra has its own protocol (no `ANSWER_CONTRACT`, no follow-ups
+- **C4**: the question card is the Assistente's (`keepQuestionBlock(ordinal, mode)` in `lib/utils/questionSet.ts`; doc/guide/assistente-risposta.md § A question back); Registra has its own protocol (no `ANSWER_CONTRACT`, no follow-ups
   block: its chips are `REGISTER_STARTER_FOLLOW_UPS` and, after a written card, `REGISTER_ANOTHER_FOLLOW_UP` — a
   written trade card counts as one). `QUESTION_OPTIONS_MIN` is 2 (`lib/utils/questionSet.ts`): a question with one
   option does not parse and prints as code.

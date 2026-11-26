@@ -48,7 +48,7 @@ export const SERVER_SIDE_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 /** The performance report of Rendimenti → «Analizza con AI». */
 export const PERFORMANCE_ANALYSIS_MODEL = 'claude-sonnet-5-5';
 
-/** The conversational assistant (Opus 5.5 since 2026-11-23, owner's decision), at its default effort `medium`. */
+/** The conversational assistant (Opus 5.5 since 2026-11-25, the owner's decision of 2026-11-23), at its default effort `medium`. */
 export const ASSISTANT_MODEL = 'claude-opus-5-5';
 
 /** The prose of the monthly and weekly emails. */

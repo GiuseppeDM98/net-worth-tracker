@@ -503,7 +503,8 @@ describe('the Assistente page — the route an answer carries', () => {
 });
 
 // The next questions are the model's, written for THAT answer (2026-11-25): stored on the message,
-// shown under the last answer alone, none beside a question card.
+// shown under the last answer alone, none beside a question card. Seen RED reading the first
+// message in place of the last.
 describe('the Assistente page — «Continua con» written by the model', () => {
   const CHAT_QUESTION = ['Dipende da una cosa.', '```assistant-question', JSON.stringify({ id: 'anno', kind: 'single', text: 'Quale anno confronto?', options: [{ value: '2025', label: '2025' }, { value: '2024', label: '2024' }], allowOther: true }), '```'].join('\n');
 

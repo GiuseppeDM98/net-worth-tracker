@@ -719,7 +719,7 @@ for (;;) {
 
 ### 4.4 The prompt — `lib/server/assistant/prompts.ts`
 
-One constant, `TOOLS_SECTION`, joined by `buildAssistantSystem` (DATI-08) after `ANSWER_CONTRACT` and before the
+One constant, `TOOLS_SECTION`, joined by `buildAssistantSystem` (`lib/server/assistant/prompts.ts`) after `ANSWER_CONTRACT` and before the
 period line — NOT in `ASSISTANT_SYSTEM_CORE`, which Registra and the emails read and which have no tools:
 
 ```
@@ -832,7 +832,7 @@ read in the first week. With phase F closed and the commit in `develop`, the own
   rows; the web search's `max_uses` is per request, so an answer of several rounds may search more than three
   times; between two tool rounds the model may write nothing, and the wait line is all the user sees; the rows
   ahead are read up to twelve months, `includeScheduled` sees no further; a request in flight is never cut by the
-  deadline; prompt caching across the rounds is off. DATI-08 leaves the guide near 450 lines: past ~500 this
+  deadline; prompt caching across the rounds is off. doc/guide/assistente.md has 458 lines on 2026-11-26 (the form of the answer lives in doc/guide/assistente-risposta.md): past ~500 this
   session splits «The tools» into `doc/guide/assistente-strumenti.md` (decision 47).
 - `doc/guide/cashflow.md` — § «Expenses by window»: the Assistente's server read is whole and shared by the block and
   the tools; § Expense Grouping: the Assistente's queries are one more reader of the rule.
@@ -871,7 +871,7 @@ Contesto, prima di toccare qualsiasi file (le regole del repo cambiano il modo d
 - CLAUDE.md (l'indice: che cos'è e dove sta ogni cosa, lo stato corrente) è già nel
   contesto: usalo per trovare la guida giusta
 - Leggi la spec per intero e l'indice della serie doc/dati/README.md (decisioni, contratti
-  condivisi — qui C3, e C4 da DATI-08 —, regole della serie)
+  condivisi — qui C3, e C4 (README § 7; doc/guide/assistente-risposta.md) —, regole della serie)
 - Leggi doc/guide/assistente.md, doc/guide/cashflow.md (§ Expense Sign Convention, § Expenses by
   window, § Expense Grouping: key by id, label by name), doc/guide/cashflow-budget.md,
   doc/guide/centri-di-costo.md, doc/guide/server.md e doc/guide/e2e-emulatori.md PRIMA di scrivere

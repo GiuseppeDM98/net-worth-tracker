@@ -92,7 +92,7 @@ export interface AssistantMessage {
   // request sent with `mode: 'auto'`; absent on every older message and on an explicit mode's.
   routeReading?: AssistantRouteReading;
   // The next questions the model wrote at the end of its answer (lib/utils/assistantAnswerTail.ts);
-  // absent on a user message, on Registra and on every answer saved before 2026-11-25.
+  // absent on a user message, on Registra and on every answer saved before the deploy of 2026-11-26.
   followUps?: string[];
 }
 
@@ -437,6 +437,6 @@ export type AssistantStreamEvent =
   | { type: 'text'; text: string }
   | { type: 'status'; status: 'searching' | 'writing' | 'saving' }
   // `content` is the text as saved (the tail cut off) and `followUps` the questions it held; both
-  // absent from a server older than 2026-11-25, when the streamed text stays as it is.
+  // absent from a server older than the deploy of 2026-11-26, when the streamed text stays as it is.
   | { type: 'done'; threadId?: string; messageId?: string; webSearchUsed: boolean; content?: string; followUps?: string[] }
   | { type: 'error'; error: string; retryable?: boolean };

@@ -4,15 +4,15 @@
 > `buildAssistantSystem` and the core's data, web and style rules in `lib/server/assistant/prompts.ts`, the tail
 > (`lib/utils/assistantAnswerTail.ts`, its cut in `app/api/ai/assistant/stream/route.ts`), the chips of
 > `AssistantPageClient`, the question cap of `lib/utils/{questionSet,assistantQuestionBlocks}.ts` and the renderers of
-> generated Markdown (`components/ui/markdown-prose.tsx`). Split from doc/guide/assistente.md on 2026-11-25 (DATI-08);
+> generated Markdown (`components/ui/markdown-prose.tsx`). Split from doc/guide/assistente.md on 2026-11-25;
 > the page, the router and the stream stay there, Registra in doc/guide/assistente-registra.md.
 
 ## Files
 
 - `lib/server/assistant/prompts.ts` (`ANSWER_CONTRACT`, `PERIOD_LINES`, `buildAssistantSystem`, `WEB_OFF_LINE`), `lib/server/assistant/router.ts` (the web for a rule of law), pure `lib/utils/assistantAnswerTail.ts`, `components/ui/markdown-prose.tsx`, `components/assistant/{AssistantStreamingResponse,AssistantPageClient}.tsx`.
-- Suites: `assistantAnswerTail`, `streamFollow`, `assistantPromptBundle`, `assistantRouter`, `assistantRoutes`, `anthropicStream`, `assistantQuestionBlocks`, `questionSet`, and on the `dom` project `assistantStreamingResponse`, `assistantQuestionBlock`, `assistantCompanionScene`; E2E `e2e/assistant.chat.spec.ts` › E6, E8–E10 (the slow stream), E11 (the new conversation) and `e2e/assistant.chat.mobile.spec.ts` › E7 (the fake stream with `followUps`).
+- Suites: `assistantAnswerTail`, `streamFollow`, `assistantPromptBundle`, `assistantRouter`, `assistantRoutes`, `anthropicStream`, `assistantQuestionBlocks`, `questionSet`, `markdownProseClasses` (no `prose` class in a source string, 2026-11-26), and on the `dom` project `assistantStreamingResponse`, `assistantQuestionBlock`, `assistantCompanionScene`; E2E `e2e/assistant.chat.spec.ts` › E6, E8–E10 (the slow stream), E11 (the new conversation) and `e2e/assistant.chat.mobile.spec.ts` › E7 (the fake stream with `followUps`).
 
-## The form of an answer (2026-11-25, DATI-08)
+## The form of an answer (2026-11-25)
 - **ONE form for every mode but Registra**: `ANSWER_CONTRACT` (`prompts.ts`), which `buildAssistantSystem(mode)`
   appends to `ASSISTANT_SYSTEM_CORE` with the mode's period line (`PERIOD_LINES`: month, year, ytd, history; the chat
   has none). The first line is the verdict — ONE figure with its unit and period, or sì/no —; then the sums that hold
@@ -22,11 +22,11 @@
   2026-11-25, owner: the spec's «Grassetto solo sul verdetto» left all three bold) —, a heading only past one screen.
   A section the question needs beyond the three steps (an allowance received beside the cost it offsets) is welcome:
   the owner kept it. The five per-mode format contracts (and their «In sintesi», «Trend storici
-  principali» sections) are gone. The emails keep their six sections (DATI-10).
+  principali» sections) are gone. The emails keep their six sections (`buildEmailPeriodicFormatContract`).
 - **The form is NEVER in the core**: `ASSISTANT_SYSTEM_CORE` is read by Registra and by the emails
   (`buildEmailAiPrompt`), which must meet neither the form, nor the tail, nor the one-question rule. Pinned by
-  `assistantPromptBundle` (P3: Registra's and the email's systems hold «il conto è lavoro tuo» and none of the form).
-- **`buildAssistantSystem` takes the mode and NOTHING else** (P2: two days, two users, one string).
+  `assistantPromptBundle` › «leaves the form out of Registra and the emails» (their systems hold «il conto è lavoro tuo» and none of the form).
+- **`buildAssistantSystem` takes the mode and NOTHING else** (`assistantPromptBundle` › «is the same string twice, for two users on two days»).
 - **Arithmetic is the model's job** (the core's «Regole sui dati», rewritten): on the numbers of the message and of its
   tools it adds, subtracts, averages and gives the result without announcing it. Until 2026-11-25 the core said «non
   calcolarli» and the answers refused the sums the owner asked for. What it may not write is a figure that does not
@@ -34,14 +34,14 @@
 - **The web has two uses** (the core's «Ricerca web»): the market context of the net worth, and every claim on an
   Italian fiscal, pension or legal rule, cited with its year in one line («art. 15 TUIR, redditi 2026»). Never a
   threshold from memory: without the search, «da verificare» beside it and the sum on its data. The router turns the
-  web on for a question on a rule of law (`router.ts`, R1). An analysis with the macro preference off carries
+  web on for a question on a rule of law (`router.ts`; `assistantRouter` › «turns the web on for a rule of law»). An analysis with the macro preference off carries
   `WEB_OFF_LINE` («In questa richiesta non hai la ricerca web.»), which forbids nothing. The sources are cited in the
   sentence, never listed under the answer.
 - **The model**: Opus 5.5 at its default effort `medium` (`ASSISTANT_MODEL`, owner's decision of 2026-11-23), the same
   request otherwise: adaptive thinking, the server-side fallback, `web_search_20260209`, no `tool_choice` (Opus 5.5
-  refuses a forced one: the router stays on Haiku 5.5). Pinned by `anthropicStream` (A1).
+  refuses a forced one: the router stays on Haiku 5.5). Pinned by `anthropicStream` › «runs on Opus 5.5 at effort medium».
 
-## The answer's tail (2026-11-25, C4)
+## The answer's tail (2026-11-25)
 - **«Continua con» is written by the model for THAT answer**: the answer ends with a ```assistant-followups block holding
   ONLY a JSON array of at most three questions (`lib/utils/assistantAnswerTail.ts`: `FOLLOW_UPS_MAX`, under
   `FOLLOW_UP_MAX_LENGTH` = 90 characters, no repeat, strings only — `parseFollowUps`). The curated, static follow-ups
@@ -88,13 +88,13 @@
   message with no reading (an explicit mode) gives the route of its own `mode` and period (`modeToRoute`), so the
   router never reads the reply from scratch. Registra's reads (`useRegisterReads`) stay off outside Registra.
 
-## Blind spots — what phase F of DATI-08 showed (2026-11-25/26, the real model on the mirror)
+## Blind spots — what the guided tour of the answer's form showed (2026-11-25/26, the real model on the mirror)
 - **Bold strays beyond the rule**: on section labels, a figure inside a list, the cautions' first words, sometimes
   the whole first sentence. The table totals did lose it after the tightening. The owner accepted it as it is: not a
   bug to chase with the prompt.
 - **Categories across two periods**: asked «rispetto all'anno scorso», the model set the previous calendar year beside
   the last twelve months and subtracted. The differences are right, the columns are neither period. The cashflow
-  block has no category totals for an arbitrary window: DATI-09's `comparePeriods` closes it (its § 1).
+  block has no category totals for an arbitrary window: the cashflow tools' comparison of two periods (`comparePeriods`, planned) closes it.
 - **A rule with its year may stay hedged** («1 o 2 anni, da verificare») although the web search ran, and the router
   can ask for the web on a question the cashflow alone answers. The model's choices, not the form's.
 - **A question back works across turns**: one card, then the reply carried with its route, then a new message read

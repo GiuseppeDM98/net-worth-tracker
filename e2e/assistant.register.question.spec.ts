@@ -101,7 +101,7 @@ test('two questions, one «Rispondi»; the answer is one request of two lines, k
   await expect(questionCard(page, 'account:to')).toContainText(`Risposta: ${ACCOUNTS[5].name}`);
   // One «Rispondi» only, under the LAST message's question; the older message has none.
   await expect(page.getByRole('button', { name: 'Rispondi' })).toHaveCount(1);
-  const blockOf = (id: string) => page.locator('div.not-prose', { has: questionCard(page, id) });
+  const blockOf = (id: string) => page.locator('div[data-question-block]', { has: questionCard(page, id) });
   await expect(blockOf('account:to').getByRole('button', { name: 'Rispondi' })).toHaveCount(0);
   await expect(blockOf('abitudine').getByRole('button', { name: 'Rispondi' })).toHaveCount(1);
 });
