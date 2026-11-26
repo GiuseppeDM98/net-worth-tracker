@@ -15,8 +15,9 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
 const ADMIN = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 const PASSWORD = 'test1234';

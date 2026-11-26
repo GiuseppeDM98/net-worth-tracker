@@ -192,7 +192,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (`getFeesOf`, one `in` query per 30 parents — both the tab and the table do it, 2026-10-10: the table's own series
   delete left a fee's debit behind until the spec found it) and `deleteSeriesDocuments` removes each occurrence's fee.
   Without a category the field is disabled and LINKS the setting; the edit form refuses to save while the saved fee is
-  unread (it could only guess: a duplicate, or an orphan).
+  unread (it could only guess: a duplicate, or an orphan). **The fee is looked up by a QUERY on its back-pointer, never
+  by `getDoc` on the parent's pointer** (2026-11-26, `getFeeOf`: `userId` + `feeOfTransferId == parent.id`): the rule on
+  `expenses` reads `resource.data.userId`, and of a document that is gone there is no `resource` — a `get` of it is
+  `permission-denied`, not «not found», while a query that matches nothing is an empty answer. A parent can point at
+  a fee that is gone (deleted by a save the list on screen has not read yet — the list a reload restores from the
+  persisted cache): the form then said «non è stata letta» and kept
+  «Commissione» disabled at every reopening; now it reads «no fee» and the field takes a new one. Among several fees
+  of one parent the pointed one wins (`__tests__/expenseFeeLookup.test.ts`; `e2e/cashflow.transfer-fee.spec.ts`).
 - **A trade's fee is a row too, written by the ledger** (owner, 2026-11-12; `Expense.feeOfTradeId`,
   `lib/utils/tradeFeeExpense.ts`, doc/guide/registro-operazioni.md § The fee as a spending row): in the same fee
   category, on the trade's date, with NO account (the trade's settlement already debited it). Its trade owns amount,

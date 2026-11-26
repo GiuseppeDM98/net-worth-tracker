@@ -15,6 +15,7 @@
 import { expect, test } from '@playwright/test';
 import { restoreColorTheme, settle, setAccountColorTheme, startWith, styleOf } from './themeEgeo';
 import { COSTUMES, COSTUME_FACE, MODES, cornerOf, expectNoHorizontalOverflow, isRoundPill, tokenColorIn, type Costume } from './themeCostume';
+import { atRest } from './atRest';
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
@@ -38,7 +39,7 @@ for (const theme of ['default', ...COSTUMES] as const) {
     await page.getByRole('button', { name: 'Aggiungi nuova voce' }).click();
     const drawer = page.locator(DRAWER);
     await expect(drawer).toBeVisible();
-    await page.waitForTimeout(800);
+    await atRest(page);
 
     const surface = await styleOf(page, DRAWER, ['border-top-left-radius', 'border-top-right-radius', 'border-bottom-left-radius', 'background-image']);
     expect([surface?.['border-top-left-radius'], surface?.['border-top-right-radius']]).toEqual([DRAWER_RADIUS[theme], DRAWER_RADIUS[theme]]);

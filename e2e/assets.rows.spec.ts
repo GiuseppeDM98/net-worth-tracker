@@ -27,9 +27,10 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { SPARKLINE_SIGNATURE, probeChunks } from './chunkProbe';
+import { afterIdle } from './atRest';
+import { pointAdminAtEmulator } from './emulator';
 
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
+pointAdminAtEmulator();
 
 const UID = 'test-user-1';
 
@@ -78,8 +79,11 @@ test('Strumenti at 1440 is the table alone: one row per instrument, no phone row
   await expect(strumenti.locator('button[aria-controls^="asset-row-"]')).toHaveCount(0);
   await expect(strumenti.locator('svg.recharts-surface')).toHaveCount(0);
 
-  // Past the idle preload's 4 s ceiling (`usePreloadWhenIdle`): had the desktop asked for the chunk, it is in.
-  await page.waitForTimeout(5_000);
+  // Past the idle preload (`usePreloadWhenIdle`, 4 s at most): an idle callback registered after the
+  // page's has fired, so the page's own has too — and nothing it asked for is still on the wire. Had
+  // the desktop asked for the chunk, it is in.
+  await afterIdle(page);
+  await expect.poll(() => sparklineChunks.pending(), { timeout: 30_000 }).toBe(0);
   expect(await sparklineChunks.matching()).toEqual([]);
 });
 

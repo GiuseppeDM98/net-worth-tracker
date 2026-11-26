@@ -21,9 +21,10 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { SPARKLINE_SIGNATURE, holdChunks, probeChunks } from './chunkProbe';
+import { pointAdminAtEmulator } from './emulator';
+import { afterIdle, settledBox } from './atRest';
 
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
+pointAdminAtEmulator();
 
 const UID = 'test-user-1';
 /** The base seed's VWCE: monthly snapshots give it a unit-price series, so its row has a line. */
@@ -59,7 +60,7 @@ test('Strumenti at 390 is the rows alone, and no row draws its sparkline until i
 
   // The idle preload has brought the chart's code: a row that mounted its sparkline would draw it now.
   await expect.poll(() => sparklineChunks.matching().then((urls) => urls.length), { timeout: 15_000 }).toBeGreaterThan(0);
-  await page.waitForTimeout(500);
+  await afterIdle(page);
   await expect(strumenti.locator('svg.recharts-surface')).toHaveCount(0);
 
   await page.locator(`button[aria-controls="asset-row-${VWCE_ID}"]`).click();
@@ -77,17 +78,10 @@ test('an opened row holds the sparkline 32px before its code arrives: the line l
   const panel = page.locator(`#asset-row-${VWCE_ID}`);
   await row.click();
   await expect(row).toHaveAttribute('aria-expanded', 'true');
-  // The panel's height settles after its 200 ms `grid-template-rows` transition: two readings 250 ms
-  // apart that agree (doc/guide/e2e-playwright.md — never a first reading beside the previous one).
-  const settledHeight = async () => {
-    let previous = -1;
-    for (;;) {
-      const height = (await panel.boundingBox())!.height;
-      if (height === previous) return height;
-      previous = height;
-      await page.waitForTimeout(250);
-    }
-  };
+  // The panel's height settles after its 200 ms `grid-template-rows` transition: read at rest
+  // (e2e/atRest.ts — no transition running on the panel or on the row that carries it, its box still).
+  // The slot's placeholder is on screen on purpose while the chunk is held.
+  const settledHeight = async () => (await settledBox(panel, { skeletons: false })).height;
   const withSlot = await settledHeight();
   await expect(strumenti.locator('svg.recharts-surface')).toHaveCount(0);
 

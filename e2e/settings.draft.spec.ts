@@ -20,8 +20,9 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
-const DOCUMENTS = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const DOCUMENTS = FIRESTORE_DOCUMENTS;
 const SETTINGS_DOC = `${DOCUMENTS}/assetAllocationTargets/test-user-1`;
 const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
@@ -111,9 +112,9 @@ test('a save from Preferenze keeps every other tab’s fields — read back afte
 
   // A Dividendi and a Spese field planted through the emulator, so the save has something of
   // theirs to lose: the seed's first cash account and a flag the base seed leaves off.
-  const cashAccountId = await page.evaluate(async () => {
+  const cashAccountId = await page.evaluate(async (documents) => {
     const res = await fetch(
-      'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents:runQuery',
+      `${documents}:runQuery`,
       {
         method: 'POST',
         headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
@@ -135,7 +136,7 @@ test('a save from Preferenze keeps every other tab’s fields — read back afte
     );
     const rows = (await res.json()) as Array<{ document?: { name: string } }>;
     return rows.find((row) => row.document)?.document?.name.split('/').pop() ?? null;
-  });
+  }, FIRESTORE_DOCUMENTS);
   expect(cashAccountId).not.toBeNull();
   const plant = await fetch(`${SETTINGS_DOC}?updateMask.fieldPaths=dividendCashAssetId&updateMask.fieldPaths=spendingRolesEnabled`, {
     method: 'PATCH',

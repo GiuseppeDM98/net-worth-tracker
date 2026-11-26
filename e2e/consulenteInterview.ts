@@ -147,6 +147,11 @@ export interface FakeRunRecorder {
   strategy: StrategyBody[];
   revise: ReviseBody[];
   plan: { stage: 'plan' }[];
+  /**
+   * How many `interview` requests the fake is done with — answered, or found aborted when it came
+   * to answer. The positive anchor of «a late round lands on nothing»: the round HAS been delivered.
+   */
+  roundsSettled: number;
   /** What the next plan request writes; a test may change it between two requests. */
   planOutcome: 'ready' | 'failed';
 }
@@ -158,7 +163,7 @@ export interface FakeRunRecorder {
  * a `plan` request writes the plan (`options.plan`, default `ready`) and answers it.
  */
 export async function installFakeRun(page: Page, options: { delayRoundMs?: (round: number) => number; plan?: 'ready' | 'failed' } = {}): Promise<FakeRunRecorder> {
-  const recorder: FakeRunRecorder = { interview: [], strategy: [], revise: [], plan: [], planOutcome: options.plan ?? 'ready' };
+  const recorder: FakeRunRecorder = { interview: [], strategy: [], revise: [], plan: [], roundsSettled: 0, planOutcome: options.plan ?? 'ready' };
   await page.route('**/api/allocation-advice/run', async (route) => {
     const body = route.request().postDataJSON() as InterviewBody | StrategyBody | ReviseBody;
     if (body.stage === 'interview') {
@@ -172,6 +177,7 @@ export async function installFakeRun(page: Page, options: { delayRoundMs?: (roun
       } catch {
         // «Salta il colloquio» aborted the request: nothing to answer.
       }
+      recorder.roundsSettled++;
       return;
     }
     if (body.stage === 'strategy') {

@@ -8,6 +8,7 @@
 import { test as setup, expect } from '@playwright/test';
 import { SPLIT_STORAGE_STATE } from '../playwright.config';
 import { stripPersistedQueryCache } from './persistedCache';
+import { shareSessionWithWorkers } from './emulator';
 
 /** Matches `scripts/seedSplitE2E.mts`. */
 const EMAIL = 'split@example.com';
@@ -29,4 +30,6 @@ setup('authenticate split user', async ({ page }) => {
   await page.context().storageState({ path: SPLIT_STORAGE_STATE, indexedDB: true });
   // The persisted React Query cache out of the state file (see auth.setup.ts).
   stripPersistedQueryCache(SPLIT_STORAGE_STATE);
+  // One login, every worker: the same session parked on each worker's origin (e2e/emulator.ts).
+  shareSessionWithWorkers(SPLIT_STORAGE_STATE);
 });

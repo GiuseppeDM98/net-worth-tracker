@@ -9,10 +9,11 @@
  * another fixture account (Analisi's) passes its uid to both.
  */
 import { expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
+import { atRest } from './atRest';
 
 const BASE_UID = 'test-user-1';
-const preferencesDoc = (uid: string) =>
-  `http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/userPreferences/${uid}`;
+const preferencesDoc = (uid: string) => `${FIRESTORE_DOCUMENTS}/userPreferences/${uid}`;
 const HEADERS = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 /** `COLOR_THEME_STORAGE_KEY` in lib/constants/colorTheme.ts (a spec cannot import `lib/`). */
 const COLOR_THEME_STORAGE_KEY = 'color-theme';
@@ -71,7 +72,7 @@ export async function startWith(page: Page, theme: string, mode: 'light' | 'dark
 export async function settle(page: Page): Promise<void> {
   await expect(page.locator('main h1').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('main [data-slot="skeleton"]')).toHaveCount(0, { timeout: 30_000 });
-  await page.waitForTimeout(600);
+  await atRest(page);
 }
 
 /** The computed style of the first element matching `selector`, as plain strings. */

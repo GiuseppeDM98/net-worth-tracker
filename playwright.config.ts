@@ -10,23 +10,33 @@
  *
  * PREREQUISITE — the emulators must already be running:
  *   npm run emulators        (leave it running; it persists to .emulator-data)
- *   npm run emulators:seed   (once, for the base account)
  * `globalSetup` checks this and fails with that instruction rather than a connection stack trace,
- * then layers the Previdenza fixture on top.
+ * then lays down every fixture, the base seed included, in the project of every worker.
  *
  * Port 3100, not 3000: a dev server on the real account is usually already running on 3000 while
  * working, and these tests must never point at production data.
+ *
+ * TWO RUNS, ONE CONFIG
+ * - `npm run test:e2e`, the WHOLE run: the production build, served once per worker on :3100+N, and
+ *   WORKER_COUNT workers (four, measured — e2e/emulator.ts). Each worker has its own Firestore
+ *   project, `demo-net-worth-wN`, seeded like the base one, and its own copy of the six parked
+ *   sessions; Auth is shared (the Auth emulator signs every login into its default project).
+ * - `npx playwright test e2e/<area>`, an area run: `next dev` on :3100, ONE worker, the base project.
+ *
+ * This file is loaded again inside every worker process, where Playwright has already set
+ * TEST_PARALLEL_INDEX: `baseURL` and the session paths below are that worker's, with no fixture and
+ * no import changed in any spec (`e2e/worker.isolation.spec.ts` holds that this stays true). What
+ * names the project, the port and the paths is `e2e/emulator.ts`, the one place that does.
+ * The measures behind all of it: doc/guide/e2e-suite.md § The suite's speed.
  */
 
 import { defineConfig, devices } from '@playwright/test';
+import { BASE_URL, E2E_ON_BUILD, WORKER_COUNT, baseUrlOf, projectIdOf, sessionPath } from './e2e/emulator';
 
-const BASE_URL = 'http://localhost:3100';
-
-/** Set by `npm run test:e2e` (the whole run): serve the production build instead of `next dev`. */
-export const E2E_ON_BUILD = process.env.E2E_SERVER === 'build';
+export { E2E_ON_BUILD };
 
 /** Where auth.setup.ts parks the signed-in storage state so specs don't each log in. */
-export const STORAGE_STATE = 'e2e/.auth/user.json';
+export const STORAGE_STATE = sessionPath('user');
 
 /**
  * Sessione del secondo account, quello degli scenari degradati.
@@ -35,7 +45,7 @@ export const STORAGE_STATE = 'e2e/.auth/user.json';
  * snapshot e versamenti, e farlo sull'account condiviso renderebbe ogni altra spec dipendente
  * dall'ordine di esecuzione — il modo più rapido di ottenere una suite che fallisce solo in CI.
  */
-export const DEGRADED_STORAGE_STATE = 'e2e/.auth/degraded.json';
+export const DEGRADED_STORAGE_STATE = sessionPath('degraded');
 
 /**
  * Sessione dell'account fixture di Analisi. Account separato per lo stesso motivo
@@ -44,24 +54,24 @@ export const DEGRADED_STORAGE_STATE = 'e2e/.auth/degraded.json';
  * esecuzione. La fixture (scripts/seedAnalisiE2E.mts) data tutto a gennaio, così ogni
  * finestra year-to-date la contiene in qualunque mese giri la suite.
  */
-export const ANALISI_STORAGE_STATE = 'e2e/.auth/analisi.json';
+export const ANALISI_STORAGE_STATE = sessionPath('analisi');
 /**
  * Session of the Centri di Costo fixture account (scripts/seedCostCentersE2E.mts): the tab is
  * opt-in and a linked expense is an ordinary expense, so its data lives on an account of its own.
  */
-export const CENTRI_STORAGE_STATE = 'e2e/.auth/centri.json';
+export const CENTRI_STORAGE_STATE = sessionPath('centri');
 /**
  * Session of the Divisione fixture account (scripts/seedSplitE2E.mts). Its own account for the
  * same reason as Centri di Costo: the tab is opt-in, and a row carrying `personalMemberId` is an
  * ordinary row that would move every figure the other Cashflow specs assert.
  */
-export const SPLIT_STORAGE_STATE = 'e2e/.auth/split.json';
+export const SPLIT_STORAGE_STATE = sessionPath('split');
 /**
  * Session of the Hall of Fame fixture account (scripts/seedHallOfFameE2E.mts): 47 monthly
  * snapshots since 2022, because a ranking needs a history behind it — and a history on the base
  * account would move every figure the other specs assert.
  */
-export const HOF_STORAGE_STATE = 'e2e/.auth/hof.json';
+export const HOF_STORAGE_STATE = sessionPath('hof');
 
 /** The `desktop:` width, where the sidebar — and the profile the setups wait for — is a fixed column. */
 const SETUP_VIEWPORT = { viewport: { width: 1440, height: 900 } };
@@ -69,19 +79,22 @@ const SETUP_VIEWPORT = { viewport: { width: 1440, height: 900 } };
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
-  // The suite mutates one shared emulator account; parallel specs would race on it.
-  workers: 1,
+  // One universe per worker (the header): the files are spread over the workers, the tests of a
+  // file stay in order in one worker — a spec still owns the documents it plants while it runs.
+  workers: WORKER_COUNT,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // A red is run once more, and THAT attempt records the trace (2026-11-26): a trace kept for every
+  // test cancels what the workers gain from three workers up, and without one a red that only a
+  // whole run produces would leave nothing to read. A test green at its second attempt is not
+  // green: the report lists it as «flaky», and a flaky test is named and traced like a red
+  // (doc/guide/e2e-suite.md § The full run and its known flakes).
+  retries: 1,
   reporter: process.env.CI ? 'github' : 'list',
 
   use: {
     baseURL: BASE_URL,
-    // Kept (2026-11-16): switched off, two whole runs gained nothing past the run-to-run noise
-    // (doc/guide/e2e-suite.md § The suite's speed), and a red that only a whole run produces
-    // would leave no trace to read. `--trace=off` on the command line still turns it off for one run.
-    trace: 'retain-on-failure',
+    trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
 
@@ -105,9 +118,9 @@ export default defineConfig({
       testIgnore: [/\.(mobile|degraded|tablet)\.spec\.ts/, /analisi\./, /centri\./, /split\./, /hof\./],
     },
     {
-      // Hall of Fame on its own fixture account. Listed BEFORE its mobile twin: with `workers: 1`
-      // the projects run in this order, and the desktop spec is the one that presses «Aggiorna i
-      // record» to build the document the phone spec then reads.
+      // Hall of Fame on its own fixture account. No order is owed to its mobile twin: the phone
+      // specs press «Aggiorna i record» themselves when the rankings document is missing, which is
+      // the case whenever they run in a worker — a project — the desktop spec did not run in.
       name: 'hof',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, storageState: HOF_STORAGE_STATE },
       dependencies: ['setup-hof'],
@@ -259,21 +272,30 @@ export default defineConfig({
     },
   ],
 
-  // Two servers on the one port (2026-11-16, doc/guide/e2e-suite.md § The suite's speed):
+  // Two kinds of server (2026-11-16, doc/guide/e2e-suite.md § The suite's speed):
   // `npm run test:e2e`, the WHOLE run, builds first (`e2e:build`, skipped when the code has not
   // changed) and serves that production build — about a third faster, and no route compiled on its
   // first visit; `npx playwright test e2e/<area>` keeps `next dev`, which a code change needs no build for.
-  // The production server is never reused: one already on :3100 is either a `next dev` or a build of
+  // The build is served ONCE PER WORKER (2026-11-26): the same files on :3100+N, each server's Admin
+  // SDK on its worker's Firestore project. Only the first copies `static` and `public` beside
+  // `server.js`, before it listens; no test starts until every server answers, so the copy is there.
+  // A production server is never reused: one already on its port is either a `next dev` or a build of
   // other code, and `--fresh` refuses a build older than the tree — a stale build runs green in silence.
   webServer: E2E_ON_BUILD
-    ? {
-        command: `node scripts/perfServe.mjs --port=3100 --dist=.next-e2e-build --env-local --fresh`,
-        url: BASE_URL,
+    ? Array.from({ length: WORKER_COUNT }, (_, index) => ({
+        command: [
+          'node scripts/perfServe.mjs',
+          `--port=${new URL(baseUrlOf(index)).port}`,
+          '--dist=.next-e2e-build --env-local --fresh',
+          `--firestore-project=${projectIdOf(index)}`,
+          ...(index > 0 ? ['--skip-copy'] : []),
+        ].join(' '),
+        url: baseUrlOf(index),
         reuseExistingServer: false,
         timeout: 60_000,
-        stdout: 'ignore',
-        stderr: 'pipe',
-      }
+        stdout: 'ignore' as const,
+        stderr: 'pipe' as const,
+      }))
     : {
         command: 'npm run dev:e2e',
         url: BASE_URL,

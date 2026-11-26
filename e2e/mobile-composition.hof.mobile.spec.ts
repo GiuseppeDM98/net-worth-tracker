@@ -37,6 +37,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { atRest } from './atRest';
 
 /** The house floor for a touch target (PRODUCT.md → Accessibility & Inclusion). */
 const TOUCH_FLOOR = 44;
@@ -140,7 +141,7 @@ test.describe('Hall of Fame, composed for a phone', () => {
 
     await anni.click();
     await expect(anni).toHaveAttribute('aria-expanded', 'false');
-    await page.waitForTimeout(400);
+    await atRest(page);
     expect(await panelHeight(page, 'hof-anni')).toBe(0);
     // Closed, the content stays mounted (opened once in this visit) but out of reach.
     await expect(panel(page, 'hof-anni')).toHaveAttribute('inert', '');
@@ -176,7 +177,7 @@ test.describe('Hall of Fame, composed for a phone', () => {
     await expect(panel(page, 'hof-anni')).toHaveAttribute('inert', '');
     expect(await panel(page, 'hof-anni').evaluate((el) => el.children.length)).toBeGreaterThan(0);
     expect(await panel(page, 'hof-entrate').evaluate((el) => el.children.length)).toBeGreaterThan(0);
-    await page.waitForTimeout(400);
+    await atRest(page);
     expect(await panelHeight(page, 'hof-anni')).toBe(0);
   });
 
@@ -267,7 +268,7 @@ test.describe('Hall of Fame, composed for a phone', () => {
   test('nothing runs off the side of main, rows closed and open', async ({ page }) => {
     await openPage(page);
     await page.getByRole('button', { name: 'Apri tutte' }).click();
-    await page.waitForTimeout(600);
+    await atRest(page);
 
     const measurement = await page.evaluate(() => {
       const main = document.querySelector('main');

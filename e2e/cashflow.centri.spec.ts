@@ -21,8 +21,9 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const LIST_URL = /\/dashboard\/cashflow\?tab=cost-centers$/;
 const DETAIL_URL = /\/dashboard\/cashflow\?tab=cost-centers&center=e2e-cc-fenicottero$/;
 

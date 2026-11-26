@@ -372,8 +372,8 @@ di SOLO TESTO (una frase, un commento, una guida) si corregge nel ritiro con `ts
 Vitest, senza Playwright (WORKFLOW.md § 3); un difetto a RUNTIME si corregge solo su mia
 decisione — tutti i trovati in UNA domanda a scelta multipla —, con la suite d'area su
 `next dev` (`npx playwright test e2e/<area>`) e `npm run test:e2e` INTERO sulla sua build
-di produzione (Java ≥ 21, emulatori accesi, :3100 libera o tenuta dal server di questo
-repo, `workers: 1`; 114 file `*.spec.ts`, 581 test — 580 passati, 1 saltato — al
+di produzione (Java ≥ 21, emulatori accesi, :3100–3103 libere — quattro worker dal
+2026-11-26, un server per worker, nient'altro in esecuzione sulla macchina; 114 file `*.spec.ts`, 581 test — 580 passati, 1 saltato — al
 2026-11-26 (2b35d65b); la rotta del modello sempre finta: un passo che spende me lo chiedi prima,
 decisione 48; emulatori e server avviati staccati su Windows, WORKFLOW.md § 3; un rosso fra
 i flake noti di doc/guide/e2e-suite.md si ripete da solo con `--repeat-each=3`, un secondo

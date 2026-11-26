@@ -30,10 +30,11 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { BASE_EXPENSE_STATS, openOverview, patchOverview } from './overviewFixture';
 import { expectRingFiguresInside } from './ringFit';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
 const NBSP = ' ';
 const USER_ID = 'test-user-1';
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
 /** The shape of `PieChartData` (types/assets.ts), each name the one `getAssetClassName` gives. */

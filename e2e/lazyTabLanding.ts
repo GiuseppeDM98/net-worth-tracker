@@ -17,6 +17,7 @@
  */
 import { expect, type Locator, type Page } from '@playwright/test';
 import { ACCUMULO_TAB_SIGNATURE, DIVIDENDS_TAB_SIGNATURE, SPLIT_TAB_SIGNATURE, holdChunks, holdRequests } from './chunkProbe';
+import { atRest } from './atRest';
 
 /** The first cell of the tile grid inside the panel's loading state (`TileGridSkeleton`). */
 function firstSkeletonCell(panel: Locator): Locator {
@@ -34,16 +35,11 @@ async function topOf(locator: Locator): Promise<number> {
  * and a reading taken during it differs from a settled one by a few pixels (2,4 seen 2026-10-06).
  */
 async function settledTopOf(locator: Locator): Promise<number> {
-  // Two readings 250ms apart (longer than the whole entrance) that agree. `expect.poll` would take
-  // its first reading at once, beside the one before it, and call a moving cell still.
-  let previous = await topOf(locator);
-  for (let attempt = 0; attempt < 20; attempt++) {
-    await locator.page().waitForTimeout(250);
-    const current = await topOf(locator);
-    if (Math.abs(current - previous) < 0.1) return current;
-    previous = current;
-  }
-  throw new Error('the cell never stopped moving');
+  // At rest frame by frame (e2e/atRest.ts): no animation on the cell or on what carries it, its box
+  // still for the quiet window. The skeletons are on screen on purpose here — the chunk or the read
+  // is held — so they are not «content still due».
+  await atRest(locator, { skeletons: false });
+  return topOf(locator);
 }
 
 /**
@@ -93,13 +89,16 @@ export async function expectDividendsTabLandsInPlace(page: Page): Promise<void> 
   // The cell measured is the PAGE's placeholder only while the tab's chunk is stopped: since the tab's
   // own loading state is that same element, nothing else here would tell a held chunk from none.
   expect(tabChunk.held(), 'the Dividendi tab\'s chunk is held while the placeholder is measured').toBeGreaterThan(0);
+  const placeholderCell = await cell.elementHandle();
 
   tabChunk.release();
-  // The chunk is fulfilled at once; evaluating it and mounting the tab is well inside this wait,
-  // and the tab cannot leave its loading state while the stats are held.
-  // Not the browser's layout-shift score: the tab REPLACES the fallback's nodes, and a node that
-  // appears is no shift — the score stayed 0 with the old fallback. The position of the cell is the check.
-  await page.waitForTimeout(1500);
+  // The tab REPLACES the fallback's nodes: it is mounted once the cell measured above has left the
+  // document, and it cannot leave its loading state while the stats are held — the cell the locator
+  // finds now is the TAB's. (Not «the stats were asked»: the page asks for them before the tab's
+  // code lands — seen 2026-11-26, one request held with the chunk still stopped.)
+  // Not the browser's layout-shift score either: a node that appears is no shift — the score stayed
+  // 0 with the old fallback. The position of the cell is the check.
+  await expect.poll(() => placeholderCell!.evaluate((node) => node.isConnected), { timeout: 30_000 }).toBe(false);
   expect(Math.abs((await settledTopOf(cell)) - placeholderTop)).toBeLessThan(1);
 
   await stats.release();

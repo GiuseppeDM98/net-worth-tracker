@@ -29,6 +29,7 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { openOverview, patchOverview, sale } from './overviewFixture';
+import { atRest } from './atRest';
 
 /** The house floor for a touch target (PRODUCT.md → Accessibility & Inclusion). */
 const TOUCH_FLOOR = 44;
@@ -263,7 +264,7 @@ test.describe('Panoramica, composed for a phone', () => {
     expect(restTop, 'before the first row').toBeLessThanOrEqual(firstRowTop);
     await page.getByRole('button', { name: 'Apri tutte' }).click();
     for (const id of ROW_IDS) await expect(trigger(page, id)).toHaveAttribute('aria-expanded', 'true');
-    await page.waitForTimeout(600);
+    await atRest(page);
 
     const measurement = await page.evaluate(() => {
       const main = document.querySelector('main');

@@ -15,6 +15,7 @@
 
 import { test, expect } from '@playwright/test';
 import { clearDraft, openConsulente, walkToSummary } from './consulentePath';
+import { atRest } from './atRest';
 import { FAKE_RUN_ERROR, ROUND_1, ROUND_2, ROUND_3, installFakeRun, interviewScene, questionCard } from './consulenteInterview';
 
 test.beforeEach(async ({ page }) => {
@@ -219,8 +220,10 @@ test('a delayed round shows the skeleton under the previous note, and «Salta il
     { questionId: 'reddito', value: 'meta' },
     { questionId: 'riserva', value: '__decline__' },
   ]);
-  // The late round lands on nothing: the run screen stays.
-  await page.waitForTimeout(3_500);
+  // The late round lands on nothing: the run screen stays. Round 2 was held 3 s; once the fake has
+  // delivered it (both requests settled) and the page is at rest, a round that landed would show.
+  await expect.poll(() => recorder.roundsSettled, { timeout: 15_000 }).toBe(2);
+  await atRest(page);
   await expect(page.getByRole('region', { name: 'Corsa del Consulente' })).toBeVisible();
   expect(recorder.strategy).toHaveLength(1);
 });

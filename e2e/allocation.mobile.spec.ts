@@ -32,6 +32,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { afterIdle, atRest } from './atRest';
 
 const TOUCH_FLOOR = 44;
 const STORAGE_KEY = 'mobile-sections:allocation';
@@ -155,7 +156,7 @@ test.describe('Allocazione, composta per un telefono', () => {
     await openAllocazione(page);
     // La pagina è assestata (Per classe è nel DOM, il verdetto letto): un'attesa positiva prima dell'assenza.
     await expect(trigger(page, 'alloc-esposizione')).toHaveAttribute('aria-expanded', 'false');
-    await page.waitForTimeout(1500);
+    await afterIdle(page);
     expect(requests).toEqual([]);
 
     await trigger(page, 'alloc-esposizione').click();
@@ -252,7 +253,7 @@ test.describe('Allocazione, composta per un telefono', () => {
     expect(await orderClasses()).toEqual([]);
 
     await page.getByRole('button', { name: 'Apri tutte' }).click();
-    await page.waitForTimeout(600);
+    await atRest(page);
     const open = await measureOverflow(page);
     expect(open.offenders, `elementi oltre il bordo destro di main (${open.clientWidth}px)`).toEqual([]);
     expect(open.scrollWidth).toBe(open.clientWidth);

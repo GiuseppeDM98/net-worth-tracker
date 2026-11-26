@@ -38,6 +38,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { atRest } from './atRest';
 
 /** Le disclosure del tab: contenuto che l'owner aprirà, quindi contenuto da misurare. */
 const DISCLOSURES = [/^Parametri/, /^Dettaglio/] as const;
@@ -79,7 +80,7 @@ test('il tab Calcolatore FIRE non scorre in orizzontale a 390px, righe e disclos
     const trigger = page.getByRole('button', { name: label });
     if ((await trigger.count()) > 0 && (await trigger.first().getAttribute('data-state')) === 'closed') {
       await trigger.first().click();
-      await page.waitForTimeout(500);
+      await atRest(page);
     }
   }
 
@@ -100,7 +101,7 @@ test('il tab Calcolatore FIRE non scorre in orizzontale a 390px, righe e disclos
 
   // I grafici e i count-up si assestano tardi: una misura presa prima leggerebbe larghezze
   // intermedie.
-  await page.waitForTimeout(2000);
+  await atRest(page);
 
   const measurement = await page.evaluate(() => {
     const main = document.querySelector('main');

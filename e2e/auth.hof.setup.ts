@@ -8,6 +8,7 @@
 import { test as setup, expect } from '@playwright/test';
 import { HOF_STORAGE_STATE } from '../playwright.config';
 import { stripPersistedQueryCache } from './persistedCache';
+import { shareSessionWithWorkers } from './emulator';
 
 /** Matches `scripts/seedHallOfFameE2E.mts`. */
 const EMAIL = 'hof@example.com';
@@ -29,4 +30,6 @@ setup('authenticate hof user', async ({ page }) => {
   await page.context().storageState({ path: HOF_STORAGE_STATE, indexedDB: true });
   // The persisted React Query cache out of the state file (see auth.setup.ts).
   stripPersistedQueryCache(HOF_STORAGE_STATE);
+  // One login, every worker: the same session parked on each worker's origin (e2e/emulator.ts).
+  shareSessionWithWorkers(HOF_STORAGE_STATE);
 });

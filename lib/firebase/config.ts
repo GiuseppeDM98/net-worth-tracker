@@ -8,11 +8,21 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
 } from 'firebase/firestore';
+import { clientProjectId } from './emulatorProject';
+
+// On the emulators a page served on :3100+N belongs to Playwright worker N and reads that worker's
+// Firestore project (lib/firebase/emulatorProject.ts). The flag is compared HERE, as a literal the
+// bundler inlines: a production build keeps the baked project whatever port serves it.
+const USES_EMULATOR = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  projectId: clientProjectId(
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    USES_EMULATOR,
+    typeof window === 'undefined' ? undefined : window.location.port,
+  ),
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
@@ -55,7 +65,7 @@ export const db = createFirestoreInstance();
 // and Firestore to the local emulators instead of the cloud project. This keeps development and
 // manual testing entirely off production data. Ports match firebase.json. The globalThis guard
 // prevents a double-connect on Fast Refresh (connect* throws once the SDK has issued a request).
-if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+if (USES_EMULATOR) {
   const globalWithFlag = globalThis as typeof globalThis & { __firebaseEmulatorsConnected?: boolean };
   if (!globalWithFlag.__firebaseEmulatorsConnected) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });

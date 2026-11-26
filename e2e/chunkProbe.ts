@@ -53,11 +53,22 @@ const CHUNK_URL = /\/_next\/static\/chunks\/.+\.js(\?|$)/;
 export interface ChunkProbe {
   /** The chunk URLs received so far whose body carries the signature, once every body has been read. */
   matching(): Promise<string[]>;
+  /**
+   * How many chunks have been asked for and not yet answered. An ABSENCE reads `matching()` only
+   * once this is 0: a chunk still on the wire has no body to match.
+   */
+  pending(): number;
 }
 
 /** Start listening BEFORE the navigation: a chunk that arrived earlier is invisible to the probe. */
 export function probeChunks(page: Page, signature: string): ChunkProbe {
   const bodies: Promise<string | null>[] = [];
+  const onTheWire = new Set<unknown>();
+  page.on('request', (request) => {
+    if (CHUNK_URL.test(request.url())) onTheWire.add(request);
+  });
+  page.on('requestfinished', (request) => onTheWire.delete(request));
+  page.on('requestfailed', (request) => onTheWire.delete(request));
   page.on('response', (response) => {
     const url = response.url();
     if (!CHUNK_URL.test(url)) return;
@@ -68,6 +79,7 @@ export function probeChunks(page: Page, signature: string): ChunkProbe {
       const urls = await Promise.all(bodies);
       return urls.filter((url): url is string => url !== null);
     },
+    pending: () => onTheWire.size,
   };
 }
 

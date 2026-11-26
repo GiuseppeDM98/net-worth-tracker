@@ -25,10 +25,11 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
 test.setTimeout(90_000);
 
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 const CURRENT_YEAR = new Date().getFullYear();
 /** A row still in the calendar this year: the 28th of December, at noon UTC (the same Italian day). */

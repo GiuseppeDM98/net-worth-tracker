@@ -39,9 +39,10 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
+import { afterIdle, atRest } from './atRest';
 
-const PREFERENCES_DOC =
-  'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/userPreferences/test-user-1';
+const PREFERENCES_DOC = `${FIRESTORE_DOCUMENTS}/userPreferences/test-user-1`;
 /** `COLOR_THEME_STORAGE_KEY` in lib/constants/colorTheme.ts (a spec cannot import `lib/`). */
 const COLOR_THEME_STORAGE_KEY = 'color-theme';
 /** The colour theme the account keeps in Firestore, or null for the default (read once, below). */
@@ -123,7 +124,7 @@ test('the Panoramica period switch shifts nothing — and the observer does coun
   await expect(periods).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('main [data-slot="skeleton"]')).toHaveCount(0, { timeout: 30_000 });
   // Past the entrance: the tiles' stagger and the hero's count-up settle in about a second.
-  await page.waitForTimeout(1_500);
+  await atRest(page);
 
   // Positive anchor: a shift induced by hand is counted by this very observer.
   await page.evaluate(() => ((window as unknown as { __shifts: number }).__shifts = 0));
@@ -136,7 +137,7 @@ test('the Panoramica period switch shifts nothing — and the observer does coun
     const heroTile = document.querySelector('[aria-label="Periodo del grafico"]')?.closest<HTMLElement>('section');
     if (heroTile) heroTile.style.marginTop = '';
   });
-  await page.waitForTimeout(300);
+  await atRest(page);
 
   // The test: switch to every other period, one after the other — no shift at all.
   await page.evaluate(() => ((window as unknown as { __shifts: number }).__shifts = 0));
@@ -148,7 +149,7 @@ test('the Panoramica period switch shifts nothing — and the observer does coun
     if ((await option.getAttribute('aria-checked')) === 'true') continue;
     await option.click();
     await expect(option).toHaveAttribute('aria-checked', 'true');
-    await page.waitForTimeout(600);
+    await atRest(page);
   }
   expect(await page.evaluate(() => (window as unknown as { __shifts: number }).__shifts)).toBe(0);
 });
@@ -184,12 +185,12 @@ test('the chart palette is read once per theme: a client navigation to Storico a
   // Storico draws its charts with the palette (Composizione at least): give the old per-host
   // rAF a frame to happen if it were still there.
   await expect(page.locator('main svg.recharts-surface').first()).toBeVisible({ timeout: 30_000 });
-  await page.waitForTimeout(500);
+  await afterIdle(page);
 
   await page.getByRole('link', { name: 'FIRE e Simulazioni', exact: true }).filter({ visible: true }).first().click();
   await page.waitForURL('**/dashboard/fire-simulations');
   await waitForPage(page, /./);
-  await page.waitForTimeout(500);
+  await afterIdle(page);
 
   expect((await readSpies(page)).paletteTokenReads).toBe(0);
 });
@@ -216,7 +217,7 @@ test('the tile cascade plays on the first opening of the session only', async ({
   // First opening: the cells start transparent and cascade in.
   await page.goto('/dashboard');
   await expect(periods).toBeVisible({ timeout: 30_000 });
-  await page.waitForTimeout(1_500);
+  await atRest(page);
   expect(await minOpacity()).toBeLessThan(0.5);
 
   // Away and back through the sidebar: the same JS session, the cells opaque from their first frame.
@@ -226,7 +227,7 @@ test('the tile cascade plays on the first opening of the session only', async ({
   await page.evaluate(() => ((window as unknown as { __cascade: { minOpacity: number | null } }).__cascade.minOpacity = null));
   await page.getByRole('link', { name: 'Panoramica', exact: true }).filter({ visible: true }).first().click();
   await expect(periods).toBeVisible({ timeout: 30_000 });
-  await page.waitForTimeout(1_500);
+  await atRest(page);
   expect(await minOpacity()).toBe(1);
 });
 
@@ -252,7 +253,9 @@ test('the light/dark circle covers the whole page: no named region during a them
   await page.locator('[data-sidebar="footer"] button').filter({ visible: true }).first().click();
   const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
   await page.locator(`button[title="${isDark ? 'Chiaro' : 'Scuro'}"]`).filter({ visible: true }).first().click();
-  await page.waitForTimeout(1_000);
+  // The circle has been seen running, and is over: `data-vt` leaves with the transition (lib/utils/viewTransition.ts).
+  await expect.poll(() => page.evaluate(() => [...(window as unknown as { __vtGroups: Set<string> }).__vtGroups])).toContain('::view-transition-new(root)');
+  await page.waitForFunction(() => document.documentElement.dataset.vt !== 'theme');
   const groups = await page.evaluate(() => [...(window as unknown as { __vtGroups: Set<string> }).__vtGroups]);
   // Anchor: the circle itself ran.
   expect(groups).toContain('::view-transition-new(root)');

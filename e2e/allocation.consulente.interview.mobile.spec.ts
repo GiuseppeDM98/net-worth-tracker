@@ -10,6 +10,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { clearDraft, openConsulente, walkToSummary } from './consulentePath';
 import { installFakeRun, interviewScene, questionCard } from './consulenteInterview';
+import { atRest } from './atRest';
 
 /** The repo's overflow guard: nothing past the right edge of `main`, no horizontal scroll. */
 async function expectNoOverflow(page: Page) {
@@ -39,7 +40,7 @@ test('round 1 on a phone: 44px rows and buttons, «Altro…» opens its field, n
   await installFakeRun(page);
   await openConsulente(page);
   await walkToSummary(page);
-  await page.waitForTimeout(400);
+  await atRest(page);
   await expectNoOverflow(page);
   await page.getByRole('button', { name: 'Avvia il colloquio' }).click();
 
@@ -52,7 +53,7 @@ test('round 1 on a phone: 44px rows and buttons, «Altro…» opens its field, n
   const railBox = (await rail.boundingBox())!;
   const cardBox = (await scene.boundingBox())!;
   expect(railBox.y + railBox.height).toBeLessThanOrEqual(cardBox.y);
-  await page.waitForTimeout(400);
+  await atRest(page);
   await expectNoOverflow(page);
 
   // Every choice row of both cards, and every footer button, at least 44px.

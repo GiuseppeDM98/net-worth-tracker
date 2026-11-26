@@ -21,11 +21,12 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { expectRingFiguresInside } from './ringFit';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const PREVIOUS_YEAR = CURRENT_YEAR - 1;
 
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
 /** The Sankey's accessible name (CashflowSankeyChart): its absence is what «no Sankey» means. */

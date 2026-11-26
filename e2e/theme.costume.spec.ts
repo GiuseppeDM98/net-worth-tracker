@@ -39,6 +39,7 @@ import {
   type Costume,
 } from './themeCostume';
 import { openReport, plant, rememberHeld, restoreHeld } from './consulenteReport';
+import { atRest } from './atRest';
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
@@ -167,7 +168,7 @@ test.describe('a modal is a tile lifted off the page', () => {
       await page.getByRole('button', { name: 'Nuova Spesa', exact: true }).click();
       const dialog = page.locator(MODAL);
       await expect(dialog).toBeVisible();
-      await page.waitForTimeout(400);
+      await atRest(page);
 
       // One frame per open modal, and never a tile: `data-tile` would trade the Float for the tile's shadow.
       expect(await page.locator('[data-costume-frame]').count()).toBe(1);
@@ -224,7 +225,7 @@ for (const costume of COSTUMES) {
       await page.goto('/dashboard/assets/compravendita', { waitUntil: 'load' });
       const scene = page.getByRole('region', { name: /^Passo 1 di \d+: / });
       await expect(scene).toBeVisible({ timeout: 60_000 });
-      await page.waitForTimeout(600);
+      await atRest(page);
 
       const card = await scene.evaluate((node) => {
         const style = getComputedStyle(node);
@@ -273,7 +274,7 @@ test.describe('the Consulente on a planted document', () => {
       await page.goto('/dashboard/allocation/consulente?rivedi=1', { waitUntil: 'load' });
       const scene = page.getByRole('region', { name: /^Passo 1 di 8: / });
       await expect(scene).toBeVisible({ timeout: 60_000 });
-      await page.waitForTimeout(600);
+      await atRest(page);
       await expectEmblemArt(page, costume, MEANDER);
 
       const card = await scene.evaluate((node) => {
@@ -310,7 +311,7 @@ test.describe('the Consulente on a planted document', () => {
     await setAccountColorTheme('egeo');
     await startWith(page, 'egeo', 'light');
     await openReport(page);
-    await page.waitForTimeout(600);
+    await atRest(page);
     // On screen the costume is on: the band has its height and the header draws the meander.
     expect(await computedOf(page, '.costume-header-band', 'height')).toBe('7px');
     await expectEmblemArt(page, 'egeo', MEANDER);
@@ -346,7 +347,7 @@ test.describe('the drawdown’s red is the token', () => {
     await page.locator('[data-slot="dropdown-menu-content"]').getByTitle('Scuro').click();
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(600);
+    await atRest(page);
     const dark = await red();
     expect(dark).not.toBe(light);
     expect(await painted()).toBe(dark);

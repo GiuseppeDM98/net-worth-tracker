@@ -277,8 +277,8 @@ npm run emulators      # Start Auth + Firestore emulators (data persists across 
 npm run emulators:seed # Seed a synthetic test account (once) — test@example.com / test1234
 npm run dev:emulator   # Run the app against the local emulators
 
-# Browser tests (needs the emulators above running; app served on :3100, so your dev server can stay up)
-npm run test:e2e       # Playwright, the whole suite on a production build: desktop 1440px, mobile 390px, tablet 768×1024 and 1024×768, degraded-state scenarios
+# Browser tests (needs the emulators above running; app served on :3100–3103, so your dev server can stay up)
+npm run test:e2e       # Playwright, the whole suite on a production build, four workers: desktop 1440px, mobile 390px, tablet 768×1024 and 1024×768, degraded-state scenarios
 npx playwright test e2e/<area>   # Some specs, on `next dev` (no build after a change)
 npm run test:e2e:ui    # Interactive runner, on `next dev`
 

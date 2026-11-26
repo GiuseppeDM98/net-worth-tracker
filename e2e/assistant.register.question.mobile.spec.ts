@@ -15,6 +15,7 @@ import {
   expectDecoyUntouched, installFakeStream, openAssistant, plantFixture, questionBlock, questionCard, removeFixture,
   resetFixture, send,
 } from './assistantRegister';
+import { atRest } from './atRest';
 
 const QUESTIONS = [
   'Mi servono due dettagli.',
@@ -42,7 +43,7 @@ test('the cards’ rows and «Rispondi» are 44px targets, and nothing overflows
   await expect(questionCard(page, 'abitudine')).toBeVisible();
   await expect(questionCard(page, 'nota')).toBeVisible();
   // The cards' entrance is a translate: measure once it has settled.
-  await page.waitForTimeout(1500);
+  await atRest(page);
 
   for (const id of ['abitudine', 'nota']) {
     // The row is the label around the radio: the radio itself is its 16px dot.

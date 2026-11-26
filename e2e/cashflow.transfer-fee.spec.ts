@@ -19,9 +19,9 @@
  * and on 2026-09-25 restoring only the two fee fields left Allocazione's spec with no class to open.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { pointAdminAtEmulator } from './emulator';
 
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
+pointAdminAtEmulator();
 
 const UID = 'test-user-1';
 const ORIGIN_ID = 'seed-cash';
@@ -248,6 +248,36 @@ test('the fee is edited from its transfer: changed, cleared, then typed again', 
   await dialog.locator('button[type=submit]').click();
   await expect(dialog).toBeHidden({ timeout: 30_000 });
   const recreated = await plantedPair(db);
+  expect(recreated.fee!.data()).toMatchObject({ amount: -3, feeOfTransferId: recreated.transfer!.id, linkedCashAssetId: ORIGIN_ID });
+  expect(await quantityOf(db, ORIGIN_ID)).toBeCloseTo(originStart - AMOUNT - 3, 2);
+});
+
+// The cause of this file's only red under load (five 150 s timeouts in the probe of 2026-11-26, never
+// at one worker): the test above opened «Modifica» a third time on the list the persisted cache had
+// restored — the row still pointing at the fee the second save had deleted — before the server's list
+// replaced it. The rules deny a `get` of a document that is gone (`resource.data` of nothing), so the
+// form called the fee unread and kept «Commissione» disabled; `fill` then waited for it until the
+// test's own timeout. Planted here, so the case does not hang on the timing: a pointer to a fee that
+// is gone is «no fee», the field on. Seen red with `getFeeOf` reading the pointed document by id.
+test('a transfer still pointing at a fee that is gone takes a new one: the field is on, not unread', async ({ page }) => {
+  test.setTimeout(120_000);
+  const db = await admin();
+  const before = await plantedPair(db);
+  expect(before.fee, 'the test above left a fee of 3').not.toBeNull();
+  // The fee row gone and its 3 € given back, the pointer left where it was.
+  await before.fee!.ref.delete();
+  await db.collection('assets').doc(ORIGIN_ID).update({ quantity: (await quantityOf(db, ORIGIN_ID)) + 3 });
+  expect((await plantedPair(db)).feeId).toBe(before.feeId);
+
+  const dialog = await editPlanted(page);
+  await expect(dialog.locator('#fee')).toBeEnabled();
+  await expect(dialog.locator('#fee')).toHaveValue('');
+  await expect(dialog.locator('#fee-hint')).not.toHaveText(/non è stata letta/);
+  await dialog.locator('#fee').fill('3');
+  await dialog.locator('button[type=submit]').click();
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
+  const recreated = await plantedPair(db);
+  expect(recreated.feeId).not.toBe(before.feeId);
   expect(recreated.fee!.data()).toMatchObject({ amount: -3, feeOfTransferId: recreated.transfer!.id, linkedCashAssetId: ORIGIN_ID });
   expect(await quantityOf(db, ORIGIN_ID)).toBeCloseTo(originStart - AMOUNT - 3, 2);
 });

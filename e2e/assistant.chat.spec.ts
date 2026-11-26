@@ -18,6 +18,7 @@ import {
   THREAD_ID, UID, admin, card, composer, expectDecoyUntouched, installFakeStream, openAssistant, plantExchange, plantFixture,
   proposalBlock, removeFixture, resetFixture, send,
 } from './assistantRegister';
+import { afterIdle, atRest, settledScrollTop } from './atRest';
 
 const FREE_READING = { route: { intent: 'chat', period: { kind: 'none' }, webSearch: false, confidence: 0.9 }, source: 'router' as const };
 const ANSWER = '## Asilo\n\n- Retta: 300 € al mese\n- Mensa: 80 € al mese\n\n**380 €** al mese: 300 + 80.';
@@ -104,7 +105,7 @@ test('E3 — a suggestion fills the composer and sends nothing', async ({ page }
   await rows.filter({ hasText: 'Oggi ho speso…' }).click();
   await expect(composer(page)).toBeFocused();
   await expect(composer(page)).toHaveValue('Oggi ho speso ');
-  await page.waitForTimeout(500);
+  await afterIdle(page);
   expect(recorder.requests).toHaveLength(0);
 });
 
@@ -209,18 +210,24 @@ test('E8 — a slow stream: Markdown while it arrives, and a scroll up is not un
   expect(followed, 'the page followed the stream').toBeGreaterThan(200);
   await main.hover();
   await page.mouse.wheel(0, -600);
-  await page.waitForTimeout(400);
-  const afterUp = await main.evaluate((node) => node.scrollTop);
+  // The wheel has landed and the offset holds, while the stream goes on writing under it.
+  await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBeLessThan(followed);
+  const afterUp = await settledScrollTop(main);
   expect(afterUp).toBeLessThan(followed);
-  await page.waitForTimeout(2500);
+  // Twenty more lines of the stream (one every 80 ms): each of them was a chance to pull the page down.
+  const linesAtScroll = await answer.locator('li').count();
+  await expect(answer.locator('li').nth(linesAtScroll + 20)).toBeAttached({ timeout: 30_000 });
   const later = await main.evaluate((node) => node.scrollTop);
   console.log('[scroll]', { followed, afterUp, later });
   expect(Math.abs(later - afterUp), 'the stream did not bring the page back down').toBeLessThan(5);
 
   await page.mouse.wheel(0, 20_000);
-  await page.waitForTimeout(1500);
+  // The stream is the clock (a line every 80 ms): ten lines after the wheel its own motion is over…
+  const linesAtWheel = await answer.locator('li').count();
+  await expect(answer.locator('li').nth(linesAtWheel + 10)).toBeAttached({ timeout: 30_000 });
   const back = await main.evaluate((node) => node.scrollTop);
-  await page.waitForTimeout(1500);
+  // …and ten lines later the page has gone down with them: a page that stopped following is still at `back`.
+  await expect(answer.locator('li').nth(linesAtWheel + 20)).toBeAttached({ timeout: 30_000 });
   const followingAgain = await main.evaluate((node) => node.scrollTop);
   console.log('[scroll]', { back, followingAgain });
   expect(followingAgain, 'back at the end, the page follows again').toBeGreaterThan(back);
@@ -268,11 +275,16 @@ test('E9 — a scroll up as the stream starts holds through its end', async ({ p
   await expect(page.getByRole('heading', { name: 'Nuovi conti' })).toBeVisible({ timeout: 30_000 });
   const main = page.locator('main');
   await main.hover();
+  const beforeWheel = await main.evaluate((node) => node.scrollTop);
   await page.mouse.wheel(0, -900);
-  await page.waitForTimeout(300);
-  const held = await main.evaluate((node) => node.scrollTop);
+  // The wheel has landed and the offset holds, while the stream goes on writing under it.
+  await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBeLessThan(beforeWheel);
+  const held = await settledScrollTop(main);
+  // «Interrompi risposta» leaves only after the saved thread has been read again
+  // (`useAssistantStreaming` awaits the invalidation before it stops streaming): the buffer has been
+  // replaced, and a jump it caused is over once the page is at rest.
   await expect(page.getByRole('button', { name: 'Interrompi risposta' })).toHaveCount(0, { timeout: 30_000 });
-  await page.waitForTimeout(1500);
+  await atRest(page);
   const after = await main.evaluate((node) => node.scrollTop);
   console.log('[scroll E9]', { held, after });
   expect(Math.abs(after - held), 'neither the stream nor its end brought the page back down').toBeLessThan(5);
@@ -323,7 +335,7 @@ test('E10 — a new conversation: no skeleton and no remount while the answer ar
   const handle = await bubble.elementHandle();
   await expect(page.getByText('al mese.')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Interrompi risposta' })).toHaveCount(0, { timeout: 30_000 });
-  await page.waitForTimeout(1000);
+  await atRest(page);
   const flags = await page.evaluate(() => (window as unknown as { __e2eFlags: { skeleton: boolean } }).__e2eFlags);
   const connected = await handle!.evaluate((node) => node.isConnected);
   console.log('[flash E10]', { ...flags, connected });

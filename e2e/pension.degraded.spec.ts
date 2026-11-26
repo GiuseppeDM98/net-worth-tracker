@@ -12,20 +12,18 @@
  * sessione giusta.
  */
 
-import { spawnSync } from 'node:child_process';
 import { test, expect, type Page } from '@playwright/test';
+import { runSeedSync } from './emulator';
 
 /**
  * Riscrive lo scenario dell'account degradato.
  *
- * Sincrono, e va bene: la suite gira con `workers: 1`, quindi non c'è nessun altro test a metà
- * navigazione mentre Firestore viene riscritto.
+ * Sincrono, e va bene: i test di un file girano in fila in UN worker, e ogni worker ha il suo
+ * progetto Firestore (e2e/emulator.ts) — nessun altro test è a metà navigazione su questi documenti
+ * mentre vengono riscritti. Lo script è quello di `npm run e2e:seed`, lanciato sul progetto del worker.
  */
 function seedScenario(scenario: 'suspicious' | 'idle' | 'fresh'): void {
-  const result = spawnSync('npm', ['run', 'e2e:seed', '--', scenario], { stdio: 'pipe', shell: true });
-  if (result.status !== 0) {
-    throw new Error(`Seed dello scenario «${scenario}» fallito:\n${result.stderr?.toString() ?? ''}`);
-  }
+  runSeedSync('scripts/seedPensionE2E.mts', [scenario], `Seed dello scenario «${scenario}» fallito`);
 }
 
 /** La tessera del rendimento — la stessa in tutti e tre gli stati, ma senza numeri. */

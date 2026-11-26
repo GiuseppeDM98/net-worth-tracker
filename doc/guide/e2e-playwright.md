@@ -1,10 +1,10 @@
 # E2E — Playwright
 
-> **When to open this guide** — anyone writing or changing a Playwright spec in `e2e/`, `playwright.config.ts`, `e2e/global-setup.ts`, an `e2e/auth*.setup.ts` or a helper no project collects (`e2e/*Fixture.ts`, `e2e/shellBoot.ts`, `e2e/chunkProbe.ts`, `e2e/assistantRegister.ts`), or reading a red of one; a red of the full run, the known flakes and the suite's speed are `doc/guide/e2e-suite.md` (since 2026-11-17). `AGENTS.md` keeps the stub with the essentials (`AGENTS.md § Browser-Driven E2E (Playwright)`); here is the full rule, moved whole from `doc/guide/e2e-emulatori.md` on 2026-11-11 (its history before that day: `git log -- doc/guide/e2e-emulatori.md`). The files, the seeds, the emulators' start and stop, the mirror, the throwaway exercises and «proving a refactor changed no number» stay in `doc/guide/e2e-emulatori.md` (§ Files, § Emulator Exercise Scripts); the environment in `SETUP.md` → Steps 6-7.
+> **When to open this guide** — anyone writing or changing a Playwright spec in `e2e/`, `playwright.config.ts`, `e2e/global-setup.ts`, an `e2e/auth*.setup.ts` or a helper no project collects (`e2e/emulator.ts` — the one place that names the project, the ports and the session paths —, `e2e/atRest.ts`, `e2e/*Fixture.ts`, `e2e/shellBoot.ts`, `e2e/chunkProbe.ts`, `e2e/assistantRegister.ts`), or reading a red of one; a red of the full run, the known flakes and the suite's speed are `doc/guide/e2e-suite.md` (since 2026-11-17). `AGENTS.md` keeps the stub with the essentials (`AGENTS.md § Browser-Driven E2E (Playwright)`); here is the full rule, moved whole from `doc/guide/e2e-emulatori.md` on 2026-11-11 (its history before that day: `git log -- doc/guide/e2e-emulatori.md`). The files, the seeds, the emulators' start and stop, the mirror, the throwaway exercises and «proving a refactor changed no number» stay in `doc/guide/e2e-emulatori.md` (§ Files, § Emulator Exercise Scripts); the environment in `SETUP.md` → Steps 6-7.
 
 ## Browser-Driven E2E (Playwright)
 - **`e2e/tileColumns.ts`** (2026-11-23, a helper no project collects): `expectColumnsEndTogether(page, scope)` reads the bottom edge of the last tile of every `[data-tile-column]` in a scope (≤ 1 px apart), `forceColumnTaller(page, scope, index)` stretches that column's first tile to 900 px with a style tag and FAILS unless that column is the taller by the natural height of its tiles (a forced tile that did not would leave the mutation green for the wrong reason), `expectLastFooterOnEdge` holds the grown tile's `p.mt-auto` within 32 px of its bottom. Used by `performance.degraded.spec.ts` (E1, a PLANTED closed sale), `coast.spec.ts` (E2, «Ipotesi» opened) and `settings.spec.ts` (E3).
-- **The Egeo specs** (2026-11-22): `e2e/theme.egeo{,.mobile}.spec.ts` on the helper `e2e/themeEgeo.ts` — `setAccountColorTheme` reads `userPreferences/test-user-1.colorTheme` once through the emulator REST, writes `egeo` (or `default`) and `restoreColorTheme` puts it back in `afterAll` (the account's preference overrides `localStorage` after sign-in, `e2e/motion.layout.spec.ts`); `workers: 1` is what makes the write safe. Traps: signed out, `/login` has NO `h1` and `/` draws the header's `h1` twice (the phone's hidden at 1440) — wait for the first VISIBLE `h1, h2, h3`; a serial `describe` stops at the first red, so a mutation shows one failure, not all. Signed out on `/login` the check is «every `document.fonts` face of Marcellus is `unloaded`» and the headings are Geist Sans (2026-11-22): «not `loaded`» passed a face in `error`, seen red with the `.woff2` aborted and the font loaded by hand.
+- **The Egeo specs** (2026-11-22): `e2e/theme.egeo{,.mobile}.spec.ts` on the helper `e2e/themeEgeo.ts` — `setAccountColorTheme` reads `userPreferences/test-user-1.colorTheme` once through the emulator REST, writes `egeo` (or `default`) and `restoreColorTheme` puts it back in `afterAll` (the account's preference overrides `localStorage` after sign-in, `e2e/motion.layout.spec.ts`); what makes the write safe is that the document is the worker's own (one Firestore project per worker since 2026-11-26, the tests of a file in order in one worker) and that both files restore it; the session path is `STORAGE_STATE`, never written out. Traps: signed out, `/login` has NO `h1` and `/` draws the header's `h1` twice (the phone's hidden at 1440) — wait for the first VISIBLE `h1, h2, h3`; a serial `describe` stops at the first red, so a mutation shows one failure, not all. Signed out on `/login` the check is «every `document.fonts` face of Marcellus is `unloaded`» and the headings are Geist Sans (2026-11-22): «not `loaded`» passed a face in `error`, seen red with the `.woff2` aborted and the font loaded by hand.
 - **A costume spec on another fixture account** (2026-11-23): the FILENAME picks the account, so the Analisi flow under
   a costume is `e2e/theme.costume.analisi.spec.ts` and the Hall of Fame bar `e2e/theme.costume.hof.spec.ts` (the base
   account has no records and Analisi's has no snapshots: the drawdown and the Consulente's book stay in
@@ -152,8 +152,9 @@
   its OWN loading state (its stats request held; Firestore's channel held behind a period never read), the grid's
   first cell at the same place — seen red at 52, 56 and 4 px with the old fallbacks. **A layout-shift score cannot see
   a node that REPLACES another**: the tab remounts the fallback's nodes, and the score stayed 0 while the grid
-  jumped 52 px — measure the position, and only once the panel's entrance (`tabPanelSwitch`, 6 px) has settled: two
-  readings 250 ms apart, not `expect.poll`, whose first reading sits beside the previous one. Budget and Centri di
+  jumped 52 px — measure the position, and only once the panel's entrance (`tabPanelSwitch`, 6 px) has settled: `atRest`
+  on the cell (`e2e/atRest.ts`, since 2026-11-26; two readings 250 ms apart before), not `expect.poll`, whose first
+  reading sits beside the previous one. Budget and Centri di
   Costo are not held: their fallback and their loading state are the same cells of one constant.
   Analisi's three disclosures and its Scheda and the four lazy FIRE tabs measured `layout-shift` 0 ONCE, on the mirror at
   1440 and 390; no spec holds them, so a placeholder that loses its height there goes unseen by the suite. If one of
@@ -205,10 +206,13 @@
   persists across sessions, so the base seed DRIFTS: `seed-btp` had lost its `taxRate` a week earlier and the two
   Dividendi specs proposed the 26% fallback instead of the instrument's 12,5% — it read as a regression of the
   session's change. `curl` the document (`Bearer owner`), and `npm run emulators:seed` restores the base account
-  without touching the other fixtures. **It also drifts by CALENDAR** (2026-10-03): `scripts/seedEmulator.ts` dates its
-  rows on the month it ran and `global-setup` never re-runs it, so the first suite of a new month finds no
-  current-month row — nine Tracciamento, freshness, owner and mobile specs red with «Nessun movimento registrato ad
-  ottobre» / «the seed has no current-month row». After a month change, re-seed before the full run. **The seed dates its three expenses `min(5, today)`**:
+  without touching the other fixtures — of the BASE project; a worker's (`demo-net-worth-wN`) is restored by deleting
+  its stamp `e2eSeedStamps/base`, which the next run's `global-setup` answers with the seed. **It also drifts by
+  CALENDAR** (2026-10-03): `scripts/seedEmulator.ts` dates its rows on the month it ran, so the first suite of a new
+  month found no current-month row — nine Tracciamento, freshness, owner and mobile specs red with «Nessun movimento
+  registrato ad ottobre» / «the seed has no current-month row». Since 2026-11-26 `global-setup` lays the base seed
+  itself, in every worker's project, when the project's stamp is missing or names another month (`ensureBaseSeed`); a
+  tour's base account seeded by hand still wants its re-seed after a month change. **The seed dates its three expenses `min(5, today)`**:
   on a fixed 5th, a re-seed in the first four days of a month writes FUTURE rows — FIRE says «servono spese
   registrate», Coast loses its pace sentence, Storico's Driver has nothing to open (five specs red).
 - **What belongs here**: only what needs a real layout — the `desktop:` switch at 1440px, a collapsible, a state flash,
@@ -222,12 +226,22 @@
   followed by a full `npm run test:e2e`, never by the one spec that needed it. Check first what else writes to the
   document: the other fixtures `merge` into `assetAllocationTargets` for `familyMembers` and the flags, and none of
   them reads the `targets` map.
-- **`workers: 1`, non-negotiable** (the specs share emulator accounts). **Give the suite its OWN fixture**, tuned so the
+- **Each worker its own universe; inside one, the specs still share the accounts** (2026-11-26; `workers: 1` was
+  non-negotiable until then). The whole run has four workers, each with its own Firestore project, server and parked
+  sessions, all seeded alike; an area run on `next dev` has one. So a spec names NO backend by literal — the project,
+  the documents URL, the base URL, the session path and the seed command come from `e2e/emulator.ts`
+  (`pointAdminAtEmulator()` before the first `firebase-admin` call, `FIRESTORE_DOCUMENTS`, `PROJECT_ID`, `BASE_URL`,
+  `runSeedSync` for a spec that rewrites its scenario) —, reads nothing another spec FILE wrote (the files of an
+  account run in any order, on any worker), and plants and removes its own rows as before (the tests of a file run in
+  order in one worker: `fullyParallel` is off). A fixed sleep is not a wait: `e2e/atRest.ts` has the conditions
+  (`atRest`, `afterIdle`, `settledScrollTop`, `settledBox`), and a `waitForTimeout` that IS the gesture under test
+  says so where it stands. The measures and the wiring: doc/guide/e2e-suite.md § The suite's speed. **Give the suite its OWN fixture**, tuned so the
   thing under test is on screen at all (Analisi dates every expense to January so its figures are exact in any month;
   Coast picks the RITA long-unemployment variant because the ordinary unlock falls past the projection) and say so in
-  the file. `e2e/global-setup.ts` runs every seed on EVERY invocation, side by side since 2026-11-16 (each writes its
-  own account; Previdenza → Coast stay a chain, Coast's inflow needs the fund): a new fixture is an `npm run e2e:seed:*`
-  script plus one `runSeed` in that `Promise.all` — after another one only if it reads what that one writes —, and a test that patches
+  the file. `e2e/global-setup.ts` runs every seed on EVERY invocation, in every worker's project, side by side since
+  2026-11-16 (each writes its own account; Previdenza → Coast stay a chain, Coast's inflow needs the fund): a new
+  fixture is an `npm run e2e:seed:*` script — reading its project from `GCLOUD_PROJECT`, never a literal — plus one
+  `runSeed` in that `Promise.all` — after another one only if it reads what that one writes —, and a test that patches
   Firestore does it inside the test. **Re-seeding an account mid-suite logs it out** (`auth.updateUser(uid, { password })`
   revokes the refresh tokens and the parked `storageState`): creation once from `global-setup`, data-only per test.
 - **`storageState` does NOT capture IndexedDB unless asked** (`{ path, indexedDB: true }`) — the Firebase session lives
@@ -403,10 +417,14 @@ The core's summary of this guide, moved here whole from AGENTS.md (§ 5 → Brow
 - **What belongs in a browser test**: only what needs a real layout (the `desktop:` switch at 1440px, a collapsible, a
   state flash, computed sizes, bounding boxes, overflow); the arithmetic stays with Vitest. A query race and an error
   branch reached by cutting the network are NOT reproducible locally.
-- **`workers: 1`, non-negotiable**, and **each suite its OWN fixture** (an `npm run e2e:seed:*` script plus one
-  `runSeed` in `e2e/global-setup.ts`, the seeds side by side since 2026-11-16). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
+- **Four workers on the whole run, each its own universe** (2026-11-26: a Firestore project, a server and the parked
+  sessions per worker; one worker on an area run): nothing in `e2e/` names the project, a port or a session path
+  outside `e2e/emulator.ts`, no spec reads what another file wrote, no fixed sleep (`e2e/atRest.ts`). **Each suite its
+  OWN fixture** (an `npm run e2e:seed:*` script plus one `runSeed` in `e2e/global-setup.ts`, the seeds side by side
+  since 2026-11-16, in every worker's project). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
 - **The whole run is a production build, an area run `next dev`** (2026-11-16): `npm run test:e2e` builds `.next-e2e-build`
-  when the code changed, refuses a stale one or a server on :3100; a chunk is known by a STRING its module carries
+  when the code changed, refuses a stale one or a server on :3100–3103; a red is run once more with the trace on, and
+  a test green only at that retry is «flaky» in the report, read like a red; a chunk is known by a STRING its module carries
   (`CHUNK_SIGNATURES`, unique per `__tests__/chunkSignatures.test.ts`), never a name or path a minifier drops.
 - **The FILENAME chooses the account**: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` → `mobile`, `*.degraded.spec.ts` →
   degraded, `*.degraded.mobile.spec.ts` → `degraded-mobile` (2026-10-14), `*.tablet.spec.ts` → `tablet` (768×1024, two
