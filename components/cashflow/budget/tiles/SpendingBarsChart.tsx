@@ -8,8 +8,11 @@ import { ChartHoverTip, useChartHover } from '@/components/ui/chart-hover';
 interface SpendingBarsChartProps {
   /** Each month carries the ceiling it reads against (its own when recorded, today's otherwise). */
   months: SpendingHistoryMonth[];
-  /** Minimum height of the plot; the tile's flex column lets it stretch past it. */
+  /** Minimum height of the plot; the tile's flex column lets it stretch past it, up to `maxHeight`. */
   minHeight?: number;
+  /** The stretch stops here: past it six bars read as towers (1440, 2026-11-26: a tall Avvisi
+   *  beside the Tetto drew them ~600px high). The tile's spare height falls under the labels. */
+  maxHeight?: number;
   className?: string;
 }
 
@@ -19,13 +22,13 @@ const BAR_SHARE = 0.68;
 
 /**
  * Total spending per month against today's ceiling — the element that stretches when the
- * Tetto tile spans two rows. Hand-written SVG, the In-tile Bars pattern: spending in the
+ * Tetto tile is taller than its content, up to `maxHeight`. Hand-written SVG, the In-tile Bars pattern: spending in the
  * slot the category tiles use for it (`--chart-1`), the ceiling as a dashed `--foreground`
  * line with no label (the caption beside the sub-eyebrow says what it is), the running
  * month at reduced fill AND outlined (real data, not comparable with the closed months),
  * the axis labels outside the SVG so they never stretch with it.
  */
-export function SpendingBarsChart({ months, minHeight = 110, className }: SpendingBarsChartProps) {
+export function SpendingBarsChart({ months, minHeight = 110, maxHeight = 220, className }: SpendingBarsChartProps) {
   const max = Math.max(...months.map((m) => Math.max(m.total, m.ceiling ?? 0)), 1) * 1.08;
   const slot = VIEW_W / months.length;
   const barWidth = slot * BAR_SHARE;
@@ -40,7 +43,7 @@ export function SpendingBarsChart({ months, minHeight = 110, className }: Spendi
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="relative flex-1" style={{ minHeight }} {...(hover.enabled ? hover.handlers : {})}>
+      <div className="relative flex-1" style={{ minHeight, maxHeight }} {...(hover.enabled ? hover.handlers : {})}>
         <svg
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           preserveAspectRatio="none"

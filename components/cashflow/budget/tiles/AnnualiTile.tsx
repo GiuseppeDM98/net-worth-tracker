@@ -55,7 +55,7 @@ function AnnualRow({
   const overBy = cachedFormatCurrencyEUR(row.spent - row.budget, true);
 
   return (
-    <li className="flex flex-col gap-2 py-[10px]">
+    <li className="flex min-w-0 flex-col gap-2 border-t border-border py-[10px] first:border-t-0 desktop:nth-2:border-t-0">
       <div className="flex items-center justify-between gap-3">
         <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{row.label}</span>
         <span className="shrink-0 font-mono text-[13px] tabular-nums text-foreground">
@@ -137,7 +137,10 @@ export function AnnualiTile({ summary, aside, reading, footer, isDemo, onEdit, o
 
   return (
     <Tile eyebrow="Budget annuali" aside={<NarrativeText segments={aside} figureClassName="font-medium" />} reading={reading} collapse={collapse} asideWhenClosed={asideWhenClosed} className={className}>
-      <ul className="mt-2 flex flex-col divide-y divide-border">
+      {/* At 1440 the tile spans the grid (2026-11-26: a dozen rows on 7 columns stretched the
+          Tetto beside them): the rows run two by two in reading order, each under its own
+          hairline but the first of each column. Below `desktop:` one column, as before. */}
+      <ul className={cn('mt-2 grid grid-cols-1', summary.rows.length > 1 && 'desktop:grid-cols-2 desktop:gap-x-8')}>
         {summary.rows.map((row) => (
           <AnnualRow
             key={row.key}

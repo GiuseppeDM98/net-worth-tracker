@@ -332,7 +332,7 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [09](DATI-09-assistente-strumenti-cashflow.md) | Assistente: tools on the cashflow, the budget, the centres | L | 08 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 3 decisioni |
+| [09](DATI-09-assistente-strumenti-cashflow.md) | Assistente: tools on the cashflow, the budget, the centres | L | 08 | Opus 5.5 · medium | implemented — 2026-11-26 |
 | [10](DATI-10-email-tenute-e-giorno-dopo.md) | Periodic emails: two kept, sent the day after, once | M | 08 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 20 rilievi, 2 decisioni |
 | [11](DATI-11-email-revisione-delle-spese.md) | The «Revisione delle spese» email | L | 09, 10 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 2 decisioni |
 | [12](DATI-12-andamento-strumenti.md) | Patrimonio › Andamento: the instruments | L | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 29 rilievi, 5 decisioni |
@@ -421,7 +421,9 @@ says so; it never changes what is there. The full text of each is in the spec th
   `comparePeriods(expenses, filters, periodA, periodB, by, clock)`,
   `listRows(expenses, query, order, limit, clock, maxRows = ROWS_CAP)`, `unknownNames(asked, existing)` — the last
   argument of the three queries is the CLOCK, read so by DATI-11.
-- `lib/server/assistant/tools/registry.ts`: `AssistantToolContext { userId; todayIso; now; clock; expenses;
+- `lib/server/assistant/tools/registry.ts` (as built: the types and `defineAssistantTool` live in
+  `tools/define.ts`, which the registry re-exports, so the tool files and the registry form no import cycle — import
+  them from `registry.ts`): `AssistantToolContext { userId; todayIso; now; clock; expenses;
   categories; costCenters; budgetConfig; costCentersEnabled }` (a failed read of the centres or the budget is
   `'unreadable'`), `AssistantTool`, `class AssistantToolError`, `defineAssistantTool({ name, description, input,
   run })`, `ASSISTANT_TOOLS`, `ASSISTANT_TOOL_DEFINITIONS` (ONE array, the same for every request of a turn),

@@ -158,6 +158,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   in place of its bar; an excluded row keeps an empty swatch box, so the names keep one left edge. The toggle, «Reimposta»,
   the reading and the footer are unchanged. Tests `costCenterSummary.test.ts` (K3), `__tests__/sottocategorieTile.test.tsx`
   (K4); browser `e2e/ring-chart.centri.spec.ts` («Airone», planted and removed by the test, «300 €»).
+- **The Assistente's `centri_di_costo` tool reads this page's own grouping** (2026-11-26):
+  `groupExpensesByCostCenter` by the centre's id, a refund in no figure; doc/guide/assistente-strumenti.md.
 
 ## Composizione mobile
 

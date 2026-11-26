@@ -394,7 +394,7 @@ export function BudgetTab({ categories, categoriesLoading, categoriesFailed, his
       <div className={hasItems ? COMPACT_GRID_WRAPPER_CLASS : undefined}>
       <div className={hasItems ? COMPACT_GRID_CLASS : PLAIN_GRID_CLASS}>
         {ceiling ? (
-          <div data-stage="lead" className={cn(TILE_CELL_CLASS, leadCellClass(hasItems), 'desktop:col-span-5 desktop:row-span-2')}>
+          <div data-stage="lead" className={cn(TILE_CELL_CLASS, leadCellClass(hasItems), 'desktop:col-span-5')}>
             <TettoTile
               id={BUDGET_SECTION_IDS.tetto}
               summary={ceiling}
@@ -410,7 +410,7 @@ export function BudgetTab({ categories, categoriesLoading, categoriesFailed, his
         ) : (
           // No ceiling: the hero's place stays empty rather than faked, and the settings
           // below the fold are open to fill it.
-          <div className="hidden desktop:col-span-5 desktop:row-span-2 desktop:block" aria-hidden="true" />
+          <div className="hidden desktop:col-span-5 desktop:block" aria-hidden="true" />
         )}
         {/* Without a ceiling Categorie a rischio is THE tile, before «Il resto». */}
         {!ceiling && rischioCell}
@@ -438,7 +438,7 @@ export function BudgetTab({ categories, categoriesLoading, categoriesFailed, his
         </div>
 
         {hasAnnual ? (
-          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(BUDGET_SECTION_IDS.annuali), 'desktop:col-span-7')}>
+          <div className={cn(TILE_ROW_CELL_CLASS, tablet.cellClass(BUDGET_SECTION_IDS.annuali), 'desktop:col-span-12')}>
             <AnnualiTile
               summary={annual}
               aside={describeAnnualAside(annual)}
@@ -451,9 +451,7 @@ export function BudgetTab({ categories, categoriesLoading, categoriesFailed, his
               asideWhenClosed={closedAsides[BUDGET_SECTION_IDS.annuali]}
             />
           </div>
-        ) : (
-          <div className="hidden desktop:col-span-7 desktop:block" aria-hidden="true" />
-        )}
+        ) : null}
 
         {/* The save status is ONE stable live node, a sibling of the tile in its cell (`sr-only`,
             so a closed row keeps it in the DOM); the aside shows the same words, `aria-hidden`,

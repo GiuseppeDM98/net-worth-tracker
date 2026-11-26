@@ -435,7 +435,7 @@ export type AssistantStreamEvent =
   // Registra only, after `meta` and before the text: what the server read for the register block.
   | { type: 'register'; summary: AssistantRegisterSummary }
   | { type: 'text'; text: string }
-  | { type: 'status'; status: 'searching' | 'writing' | 'saving' }
+  | { type: 'status'; status: 'searching' | 'writing' | 'computing' | 'saving' }
   // `content` is the text as saved (the tail cut off) and `followUps` the questions it held; both
   // absent from a server older than the deploy of 2026-11-26, when the streamed text stays as it is.
   | { type: 'done'; threadId?: string; messageId?: string; webSearchUsed: boolean; content?: string; followUps?: string[] }

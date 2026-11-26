@@ -215,8 +215,8 @@ export async function fetchSettings(userId: string): Promise<AssetAllocationSett
   } as AssetAllocationSettings;
 }
 
-/** Every cost centre of the user; the register context keeps those not archived. */
-async function fetchCostCenters(userId: string): Promise<CostCenter[]> {
+/** Every cost centre of the user; the register context keeps those not archived, the Assistente's tool all of them. */
+export async function fetchCostCenters(userId: string): Promise<CostCenter[]> {
   const snap = await adminDb.collection('costCenters').where('userId', '==', userId).get();
   return snap.docs.map((doc) => {
     const data = doc.data();
@@ -231,7 +231,7 @@ async function fetchCostCenters(userId: string): Promise<CostCenter[]> {
 }
 
 /** `budgets/{uid}`, its items back-filled as the Budget tab reads them; null when the user has none. */
-async function fetchBudgetConfig(userId: string): Promise<BudgetConfig | null> {
+export async function fetchBudgetConfig(userId: string): Promise<BudgetConfig | null> {
   const doc = await adminDb.collection('budgets').doc(userId).get();
   const data = doc.data();
   if (!doc.exists || !data) return null;
@@ -446,11 +446,13 @@ async function fetchExpenseCategories(userId: string): Promise<ExpenseCategory[]
  * row and never before `cashflowHistoryStartYear`) plus the rows ahead that give the commitments their
  * next date. The end crosses years, so it is a `getItalyMonthBoundsUtc` call on month arithmetic, and
  * the current month is the ITALIAN one: at 23:30 UTC on 31 October it is already November in Rome.
+ * The settings come back whole (`fetchSettings`): the Assistente's tools read `costCentersEnabled`
+ * from the same read (lib/server/assistant/tools/context.ts).
  */
 export async function fetchCashflowBlockInputs(
   userId: string,
   now: Date
-): Promise<CashflowBlockInput & { expenses: Expense[] }> {
+): Promise<CashflowBlockInput & { expenses: Expense[]; settings: AssetAllocationSettings | null }> {
   const { year, month } = getItalyMonthYear(now);
   const current = year * 12 + (month - 1);
   const last = current + CASHFLOW_BLOCK_FUTURE_MONTHS;
