@@ -1,8 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Anthropic from '@anthropic-ai/sdk';
 import type { AssistantPreferences } from '@/types/assistant';
+import type { AssistantToolContext } from '@/lib/server/assistant/tools/registry';
+import { queryClockOf } from '@/lib/utils/assistantExpenseQueries';
 
 vi.mock('server-only', () => ({}));
+
+// The real tools, watched: the loop's tests count what ran (DATI-09).
+vi.mock('@/lib/server/assistant/tools/registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/server/assistant/tools/registry')>();
+  return { ...actual, runAssistantTool: vi.fn(actual.runAssistantTool) };
+});
 
 // The four analysis builders: what each receives is what the route handed over.
 const { analysisPromptMocks } = vi.hoisted(() => ({
@@ -21,6 +29,7 @@ vi.mock('@/lib/server/assistant/prompts', async (importOriginal) => {
 
 import { ASSISTANT_REGISTER_MAX_TOKENS, streamAssistantResponse } from '@/lib/server/assistant/anthropicStream';
 import { buildRegisterPrompt } from '@/lib/server/assistant/prompts';
+import { ASSISTANT_TOOL_DEFINITIONS, runAssistantTool } from '@/lib/server/assistant/tools/registry';
 import { ASSISTANT_MODEL, SERVER_SIDE_FALLBACK_BETA } from '@/lib/constants/aiModels';
 
 const OVERLOADED_MESSAGE = 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.';
@@ -277,5 +286,176 @@ describe('streamAssistantResponse — the status follows the stream', () => {
 
   it('comes back to writing when the text resumes after a search', async () => {
     expect(await run([text('Cerco il contesto. '), search, text('Ecco ottobre.'), text(' Fine.')])).toEqual(['writing', 'searching', 'writing', 'saving']);
+  });
+});
+
+// ── The tool loop (DATI-09) ─────────────────────────────────────────────────────────────────
+// The SDK's real `stream()` cannot be fed through the `create` mock above (it reads `withResponse()`
+// and the controller): each request gets a fake `{ on, finalMessage }` that replays its text as
+// `streamEvent`s, then resolves the recorded message. The requests are cloned when sent, because the
+// loop goes on appending to the same `messages` array.
+describe('streamAssistantResponse — the tool loop (DATI-09)', () => {
+  const TOOL_NAMES = ['cashflow_totali', 'cashflow_confronto', 'cashflow_righe', 'budget_stato', 'centri_di_costo'];
+  const TOOL_LIMIT_RESULT = 'Limite di calcoli raggiunto: rispondi adesso con i dati che hai, senza chiedere altri strumenti.';
+  const TOOL_LIMIT_NOTICE = '*Non sono riuscito a chiudere i conti: riprova con una domanda più stretta.*';
+  const TODAY = '2026-11-15';
+
+  type Block = Record<string, unknown>;
+  type SentRequest = { tools: { name: string }[]; toolsRef: unknown[]; messages: { role: string; content: unknown }[] };
+
+  const toolContext: AssistantToolContext = {
+    userId: 'user-1',
+    todayIso: TODAY,
+    now: new Date(`${TODAY}T11:00:00Z`),
+    clock: queryClockOf(TODAY, undefined),
+    expenses: [],
+    categories: [],
+    costCenters: [],
+    budgetConfig: null,
+    costCentersEnabled: false,
+  };
+  const call = (id: string): Block => ({
+    type: 'tool_use', id, name: 'cashflow_totali',
+    input: { kind: 'spending', from: '2026-11-01', to: '2026-11-30', groupBy: 'category' },
+  });
+  const thinking: Block = { type: 'thinking', thinking: 'Mi serve il totale di novembre.', signature: 'sig-1' };
+  const text = (value: string): Block => ({ type: 'text', text: value, citations: null });
+  const turn = (stop_reason: string, content: Block[], onDone?: () => void) => ({ stop_reason, content, onDone });
+
+  let sent: SentRequest[] = [];
+
+  /** Spies `stream` with one recorded turn per request; a request past the script fails the test. */
+  function script(turns: ReturnType<typeof turn>[]) {
+    sent = [];
+    vi.spyOn(Anthropic.Beta.Messages.prototype, 'stream').mockImplementation(((params: { tools: { name: string }[]; messages: unknown[] }) => {
+      const recorded = turns[sent.length];
+      sent.push({ ...structuredClone(params), toolsRef: params.tools } as unknown as SentRequest);
+      if (!recorded) throw new Error(`request ${sent.length} was not expected`);
+      let listener: ((event: unknown) => void) | undefined;
+      const fake = {
+        on(event: string, handler: (event: unknown) => void) {
+          if (event === 'streamEvent') listener = handler;
+          return fake;
+        },
+        async finalMessage() {
+          recorded.content.forEach((block, index) => {
+            if (block.type === 'text') listener?.({ type: 'content_block_delta', index, delta: { type: 'text_delta', text: block.text } });
+          });
+          recorded.onDone?.();
+          return { id: 'msg', type: 'message', role: 'assistant', model: ASSISTANT_MODEL, content: recorded.content, stop_reason: recorded.stop_reason, stop_sequence: null, usage: {} };
+        },
+      };
+      return fake;
+    }) as never);
+  }
+
+  function answer(extra: Partial<Parameters<typeof streamAssistantResponse>[0]> = {}) {
+    const onStatus = vi.fn();
+    const onText = vi.fn();
+    const result = streamAssistantResponse({
+      mode: 'chat', prompt: 'Quanto ho speso a novembre?', contextBundle: null, preferences, enableWebSearch: false,
+      toolContext, onStatus, onText, ...extra,
+    });
+    return { result, onStatus, onText };
+  }
+
+  const toolResults = (request: SentRequest) => request.messages.at(-1)!.content as { type: string; tool_use_id: string; content: string; is_error?: boolean }[];
+
+  beforeEach(() => {
+    vi.mocked(runAssistantTool).mockClear();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('a chat with a context sends the five tools, beside the web when it is on; Registra sends none (L1)', async () => {
+    script([turn('end_turn', [text('Uno.')]), turn('end_turn', [text('Due.')])]);
+    await answer().result;
+    await answer({ enableWebSearch: true }).result;
+    expect(sent[0].tools.map((tool) => tool.name)).toEqual(TOOL_NAMES);
+    expect(sent[1].tools.map((tool) => tool.name)).toEqual(['web_search', ...TOOL_NAMES]);
+    // The definitions are one module constant: the same objects in every request.
+    sent[0].toolsRef.forEach((definition, index) => expect(sent[1].toolsRef[index + 1]).toBe(definition));
+    expect(sent[0].toolsRef).toEqual(ASSISTANT_TOOL_DEFINITIONS);
+
+    async function* empty() {}
+    const create = vi.spyOn(Anthropic.Beta.Messages.prototype, 'create').mockResolvedValue(empty() as never);
+    await answer({ mode: 'register', registerBlock: 'BLOCCO REGISTRA', enableWebSearch: true }).result;
+    expect(sent).toHaveLength(2);
+    expect((create.mock.calls[0][0] as { tools?: unknown }).tools).toBeUndefined();
+  });
+
+  it('runs both calls of a round and answers them in ONE user message, the assistant turn pushed back whole (L2)', async () => {
+    script([turn('tool_use', [thinking, call('c1'), call('c2')]), turn('end_turn', [text('Hai speso zero euro.')])]);
+    const { result } = answer();
+    const done = await result;
+    expect(runAssistantTool).toHaveBeenCalledTimes(2);
+    expect(sent).toHaveLength(2);
+    const [assistantTurn, userTurn] = sent[1].messages.slice(-2);
+    expect(assistantTurn).toEqual({ role: 'assistant', content: [thinking, call('c1'), call('c2')] });
+    expect(userTurn.role).toBe('user');
+    expect(toolResults(sent[1]).map((block) => [block.type, block.tool_use_id, block.is_error])).toEqual([
+      ['tool_result', 'c1', undefined],
+      ['tool_result', 'c2', undefined],
+    ]);
+    expect(JSON.parse(toolResults(sent[1])[0].content)).toMatchObject({ period: { from: '2026-11-01', to: '2026-11-30' } });
+    expect(done).toMatchObject({ text: 'Hai speso zero euro.', toolCalls: 2, toolRounds: 1 });
+  });
+
+  it('caps the rounds at eight: two closing requests answered «stop», then the notice, the tools never dropped (L3)', async () => {
+    script(Array.from({ length: 11 }, (_, index) => turn('tool_use', [call(`c${index + 1}`)])));
+    const { result } = answer();
+    const done = await result;
+    // Requests 1–8 run their call; the calls of 9 and 10 are answered «stop»; 11 asks again and the loop ends.
+    expect(sent).toHaveLength(11);
+    expect(runAssistantTool).toHaveBeenCalledTimes(8);
+    for (const request of sent.slice(1, 9)) expect(toolResults(request)[0].is_error).toBeUndefined();
+    for (const request of sent.slice(9)) expect(toolResults(request)).toEqual([expect.objectContaining({ content: TOOL_LIMIT_RESULT, is_error: true })]);
+    for (const request of sent) expect(request.tools.map((tool) => tool.name)).toEqual(TOOL_NAMES);
+    expect(done).toMatchObject({ text: TOOL_LIMIT_NOTICE, toolCalls: 8, toolRounds: 8 });
+  });
+
+  it('never runs the call of a truncated or refused turn (L4)', async () => {
+    script([turn('max_tokens', [thinking, call('c1')])]);
+    const truncated = answer();
+    expect((await truncated.result).text).toBe('_(Risposta interrotta: ho raggiunto il limite di lunghezza. Chiedimi di continuare o restringi la domanda.)_');
+    expect(truncated.onText).toHaveBeenCalledTimes(1);
+
+    script([turn('refusal', [call('c1')])]);
+    expect((await answer().result).text).toBe('_(Non posso rispondere a questa richiesta. Riformula la domanda sui tuoi dati finanziari.)_');
+    expect(runAssistantTool).not.toHaveBeenCalled();
+  });
+
+  it('sends a paused turn back as it is, three times at most (L5)', async () => {
+    const paused = [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'BCE' } }];
+    script([turn('pause_turn', paused), turn('end_turn', [text('Ripreso.')])]);
+    expect((await answer({ enableWebSearch: true }).result).text).toBe('Ripreso.');
+    expect(sent[1].messages).toHaveLength(sent[0].messages.length + 1);
+    expect(sent[1].messages.at(-1)).toEqual({ role: 'assistant', content: paused });
+
+    script(Array.from({ length: 4 }, () => turn('pause_turn', paused)));
+    expect((await answer({ enableWebSearch: true }).result).text).toBe(TOOL_LIMIT_NOTICE);
+    expect(sent).toHaveLength(4);
+  });
+
+  it('says computing while the tools run and writing at the text that follows (L6)', async () => {
+    script([turn('tool_use', [call('c1')]), turn('end_turn', [text('Fatto.')])]);
+    const { result, onStatus } = answer();
+    await result;
+    expect(onStatus.mock.calls.map((args) => args[0])).toEqual(['writing', 'computing', 'writing', 'saving']);
+  });
+
+  it('past 200 s from the start the call is answered «stop» and the next text is the answer (L7)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-15T10:00:00Z'));
+    script([
+      turn('tool_use', [call('c1')], () => vi.setSystemTime(new Date('2026-11-15T10:03:21Z'))),
+      turn('end_turn', [text('Chiudo con quello che ho.')]),
+    ]);
+    const done = await answer().result;
+    expect(runAssistantTool).not.toHaveBeenCalled();
+    expect(toolResults(sent[1])).toEqual([expect.objectContaining({ tool_use_id: 'c1', content: TOOL_LIMIT_RESULT, is_error: true })]);
+    expect(done).toMatchObject({ text: 'Chiudo con quello che ho.', toolCalls: 0, toolRounds: 0 });
   });
 });

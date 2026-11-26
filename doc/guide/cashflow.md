@@ -42,7 +42,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (lib/services/assistantMonthContextService.ts) reads every row up to the Italian end of the month 12 ahead, no
   lower bound, for the CASHFLOW 12 MESI block of every Assistente mode, of the Consulente's interview and strategy and of the
   emails' AI comments (doc/guide/assistente.md § Prompt builders). It is an Admin read off the browser, not a page
-  window: no hook and no key here.
+  window: no hook and no key here. Since 2026-11-26 the Assistente's tools read the SAME rows: one read per message,
+  shared by the block and the tools (`readAssistantTurnData`, doc/guide/assistente-strumenti.md).
 - **The windows, and the ONE module that defines them**: `trackingWindow(period)` — from the first day of the month
   twelve months before the period starts to the end of the MONTH it ends in (Tracciamento; Divisione on its own
   period); `budgetWindow(now)` — from the older of January and the first of the six trailing months, to December;
@@ -112,6 +113,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **`resolveDisplayLabels` qualifies ONLY where the rendered surface actually collides**: ambiguity is measured over the
   set of KEYS per name, not a row count. `selectExpensesForDrillDown` matches the type **EXACTLY** — `type !== 'income'` would lump
   fixed+variable+debt together and let transfers through.
+- **The Assistente's tools are one more reader of the rule** (2026-11-26, `lib/utils/assistantExpenseQueries.ts`):
+  they group through `getCategoryKey`/`getSubCategoryKey` and label through `resolveDisplayLabels`, so two «Casa»
+  of two types stay two groups, «Casa (Spese Necessarie)» and «Casa (Spese Non Necessarie)».
 
 ## Expense Sign Convention and Type Changes
 - **The two spending types mean NECESSITY, not cadence** (owner, 2026-10-20): `fixed` is labelled «Spese Necessarie»

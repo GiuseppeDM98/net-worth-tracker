@@ -4,6 +4,7 @@
 
 ## ✨ New Features
 
+- **Assistente — i conti esatti sulle tue spese** — Added tools the Assistente calls to total, compare and list the recorded cashflow over any period, category or single expense, and to read the budget and the cost centres: the figures are computed by code.
 - **Cashflow › Dividendi — dividendi esteri** — Added to the dividend form: the instrument's currency, «Ritenuta estera» and «Ritenuta italiana» for a foreign issuer, the ECB rate of the payment day or «Netto accreditato in euro» from the statement; a downloaded dividend is taxed at the instrument's own rate. A payment left on today's date now counts as received at once, where it showed «Attesa» until a reload.
 
 - **Patrimonio — operazioni in valuta** — Added to «Registra operazione» on a foreign instrument: the fee in the instrument's currency, «Totale addebitato in euro» from the broker's statement, and the rate each operation used, shown in «Movimenti».
@@ -19,5 +20,7 @@
 - **Panoramica, Patrimonio, email mensile — vendite in guadagno e in perdita** — Changed the sales sentence: when a month sells at a gain and at a loss, it names the capital gains with the tax paid on them and the losses apart, instead of a net figure beside a tax that looked larger than the gain.
 
 - **Patrimonio — gli strumenti azzerati** — Changed Strumenti: an instrument sold in full leaves the list for a closed group at the bottom, «N strumenti azzerati», with «venduto il», «Movimenti» and «Compra»; an instrument with operations in the Registro can no longer be deleted (the trash says why), and the sales of an instrument deleted before read «Strumento eliminato».
+
+- **Cashflow › Budget — molti budget annuali** — Improved the wide layout: «Budget annuali» spans the page with its budgets two by two, and «Tetto del mese» no longer stretches beside it, so its six-month bars keep a readable height.
 
 ## 📚 Documentation

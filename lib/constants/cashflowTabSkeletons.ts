@@ -21,10 +21,10 @@ export const DIVIDENDS_SKELETON_CELLS: TileSkeletonCell[] = [
 ];
 
 export const BUDGET_SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 8 },
+  { span: 5, lines: 8 },
   { span: 4, lines: 4 },
   { span: 3, lines: 4 },
-  { span: 7, lines: 4 },
+  { span: 12, lines: 4 },
   { span: 12, lines: 6 },
 ];
 

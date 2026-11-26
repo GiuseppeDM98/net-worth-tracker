@@ -167,9 +167,9 @@ export function useAssistantStreaming({
   const [streamingMessageId, setStreamingMessageId] = useState<string | undefined>();
   const [isStreaming, setIsStreaming] = useState(false);
   const [isInterrupted, setIsInterrupted] = useState(false);
-  // Mirrors the server's SSE status event (searching | writing | saving). Drives the
+  // Mirrors the server's SSE status event (searching | writing | computing | saving). Drives the
   // distinct "Sto cercando sul web…" badge instead of the generic slow-response nudge.
-  const [streamStatus, setStreamStatus] = useState<'searching' | 'writing' | 'saving' | null>(null);
+  const [streamStatus, setStreamStatus] = useState<'searching' | 'writing' | 'computing' | 'saving' | null>(null);
   // Context bundle is populated from the SSE 'context' event sent before text streaming,
   // or (when idle) from the period-preview fetch the page performs.
   const [contextBundle, setContextBundle] = useState<AssistantMonthContextBundle | null>(null);
