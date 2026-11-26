@@ -9,6 +9,7 @@
 
 import { test, expect } from '@playwright/test';
 import { expectRingFiguresInside } from './ringFit';
+import { pointAdminAtEmulator } from './emulator';
 
 /** On December 31st the instalment is booked: fixed and one-off, a ring (the guard of cashflow.centri.spec.ts). */
 const isLastDayOfYear = new Date().getMonth() === 11 && new Date().getDate() === 31;
@@ -38,11 +39,10 @@ test('Fenicottero: nothing booked as fixed, so the footer keeps its sentence and
 // «Carburante» — and removed after it: «300 €» inside the hole; one row pressed out leaves one part, so no ring
 // (the «al netto» hole is Vitest's, sottocategorieTile.test.tsx K4); pressed back, the ring again.
 test('Airone: «Per sottocategoria» is a ring, «300 €» inside its hole; one row left counted, no ring', async ({ page }) => {
-  process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-  process.env.GCLOUD_PROJECT = 'demo-net-worth';
+  pointAdminAtEmulator();
   const { initializeApp, getApps } = await import('firebase-admin/app');
   const { getFirestore } = await import('firebase-admin/firestore');
-  const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-net-worth' }));
+  const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: process.env.GCLOUD_PROJECT }));
   const now = new Date();
   const day = new Date(now.getFullYear(), now.getMonth(), Math.max(1, now.getDate() - 1), 12);
   const ids = { center: 'e2e-cc-airone', a: 'e2e-cc-airone-man', b: 'e2e-cc-airone-car' };

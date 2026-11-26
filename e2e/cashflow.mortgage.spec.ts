@@ -22,11 +22,12 @@
  * category «Mutuo Fenicottero» and every row are decoys absent from the seed.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { PERSISTED_CACHE_DB_NAME, PERSISTED_CACHE_RECORD_KEY, PERSISTED_CACHE_STORE_NAME } from './persistedCache';
+import { PERSISTED_CACHE_DB_NAME, PERSISTED_CACHE_RECORD_KEY, PERSISTED_CACHE_STORE_NAME, readPersistedQuery } from './persistedCache';
+import { afterIdle } from './atRest';
 import { expectRingFiguresInside } from './ringFit';
+import { pointAdminAtEmulator } from './emulator';
 
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
+pointAdminAtEmulator();
 
 const UID = 'test-user-1';
 const HOME_ID = 'seed-home';
@@ -464,8 +465,21 @@ test('a restored list still showing the debt writes no second loan', async ({ pa
 
   await page.reload({ waitUntil: 'load' });
   await expect(page.getByRole('row').filter({ hasText: 'Mutuo Abitazione principale' })).toHaveCount(1, { timeout: 90_000 });
-  // Nothing on the page marks «the migration decided»: the wait gives its writes room to land.
-  await page.waitForTimeout(4000);
+  // Nothing on the page marks «the migration decided», but the persisted cache marks what it decided
+  // ON: once the planted debt is gone from the record, the page holds the server's list and the
+  // persister has written it (its throttle after the read) — the migration has had the true list,
+  // and the idle main thread after that has run whatever it meant to write.
+  await expect
+    .poll(
+      async () => {
+        const rows = (await readPersistedQuery(page, ['assets', UID])) as Array<{ id: string; outstandingDebt?: number }> | null;
+        const home = rows?.find((row) => row.id === HOME_ID);
+        return home ? (home.outstandingDebt ?? null) : 'not persisted yet';
+      },
+      { timeout: 30_000 },
+    )
+    .toBeNull();
+  await afterIdle(page);
   expect((await db.collection('assets').where('userId', '==', UID).where('financedAssetId', '==', HOME_ID).get()).size).toBe(loansBefore);
   expect((await asset(db, HOME_ID)).outstandingDebt).toBeUndefined();
 });

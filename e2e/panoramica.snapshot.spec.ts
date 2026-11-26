@@ -17,6 +17,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { atRest } from './atRest';
 
 test('«Crea snapshot» does not squish, and its confirm grows from ONE origin — the button', async ({ page }) => {
   await page.route('**/api/dashboard/overview*', async (route) => {
@@ -49,13 +50,16 @@ test('«Crea snapshot» does not squish, and its confirm grows from ONE origin �
   const box = (await button.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
+  // The ONE fixed wait kept on purpose in this file: a press held for 100 ms IS the gesture under
+  // test — the frames sampled while the button is down are the ones that must not show it squish.
+  // No condition stands behind it; it is the length of a finger's press.
   await page.waitForTimeout(100);
   await page.mouse.up();
 
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: /^Sovrascrivi lo snapshot di \p{Ll}+$/u })).toBeVisible();
   // Read the geometry while the panel is open and settled, then close INSIDE the sampling window.
-  await page.waitForTimeout(900);
+  await atRest(dialog);
   const dialogBox = (await dialog.boundingBox())!;
   await dialog.getByRole('button', { name: 'Annulla' }).click();
   await expect(dialog).toBeHidden();

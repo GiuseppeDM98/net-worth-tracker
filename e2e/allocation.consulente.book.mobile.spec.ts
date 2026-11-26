@@ -12,6 +12,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { installFakeRun } from './consulenteInterview';
 import { bookCard, expectPage, openReport, plant, rememberHeld, restoreHeld } from './consulenteReport';
+import { atRest } from './atRest';
 
 declare global {
   interface Window {
@@ -69,7 +70,7 @@ test('a turn slides inside the card, nothing overflows, and a long page brings t
   await page.locator('#page-main').evaluate((main) => main.scrollBy(0, 400));
   await next.click();
   await expectPage(page, /^Pagina 4 di 10/, 'obiettivi');
-  await page.waitForTimeout(600);
+  await atRest(page);
   const probe = await readProbe(page);
   expect(probe.transforms.some((transform) => transform !== 'none')).toBe(true);
   expect(Math.max(...probe.overflow)).toBe(0);
@@ -105,7 +106,7 @@ test('two taps on «Avanti» in the same frame turn one page, and the leaving pa
     });
   expect(await leftInert).toBe(true);
   await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
-  await page.waitForTimeout(600);
+  await atRest(page);
   await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
 });
 
@@ -131,6 +132,10 @@ test('the footer stacks the page’s buttons full width above «Indietro» · «
   await plant('ready');
   await openReport(page, '?pagina=strumenti');
   await expectPage(page, /^Pagina 3 di 10/, 'strumenti');
+  // The boxes below are read one round trip at a time: taken while the page still enters or scrolls
+  // they are not of the same instant, and a slow machine spreads them further (red once at 6 workers,
+  // 2026-11-26). So the page at rest first.
+  await atRest(page);
   const box = await contentBox(page);
   const card = bookCard(page);
   const next = (await card.getByRole('button', { name: 'Avanti' }).boundingBox())!;
@@ -144,7 +149,9 @@ test('the footer stacks the page’s buttons full width above «Indietro» · «
   await card.getByRole('button', { name: 'Indice' }).click();
   await page.getByRole('dialog', { name: 'Vai a una pagina' }).getByRole('button', { name: '10 · Applica' }).click();
   await expectPage(page, 'Pagina 10 di 10 · Applica', 'applica');
-  const apply = (await card.getByRole('button', { name: 'Applica alle impostazioni' }).boundingBox())!;
+  // The turn slides and the drawer leaves: at rest again before the second set of boxes.
+  await atRest(page);
+  const apply =(await card.getByRole('button', { name: 'Applica alle impostazioni' }).boundingBox())!;
   const redo = (await card.getByRole('button', { name: 'Rifai il percorso' }).boundingBox())!;
   expect(Math.abs(apply.width - box.width)).toBeLessThanOrEqual(1);
   expect(apply.y + apply.height).toBeLessThanOrEqual(redo.y);

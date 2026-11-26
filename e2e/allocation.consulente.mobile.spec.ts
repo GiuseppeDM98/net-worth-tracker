@@ -10,6 +10,7 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { clearDraft, next, openConsulente, walkGoals } from './consulentePath';
+import { atRest } from './atRest';
 
 declare global {
   interface Window {
@@ -65,10 +66,10 @@ test.beforeEach(async ({ page }) => {
 test('the scene slides inside the card, the strip above it, nothing overflowing', async ({ page }) => {
   await openConsulente(page);
   // The first screen of a mount is drawn in place.
-  await page.waitForTimeout(400);
-  const atRest = await readProbe(page);
-  expect(atRest.transforms.length).toBeGreaterThan(0);
-  expect(atRest.transforms.every((transform) => transform === 'none')).toBe(true);
+  await atRest(page);
+  const drawnInPlace = await readProbe(page);
+  expect(drawnInPlace.transforms.length).toBeGreaterThan(0);
+  expect(drawnInPlace.transforms.every((transform) => transform === 'none')).toBe(true);
   await expectNoOverflow(page);
 
   const rail = page.getByRole('list', { name: 'Il percorso' });
@@ -82,7 +83,7 @@ test('the scene slides inside the card, the strip above it, nothing overflowing'
   await next(page);
   await expect(page.getByRole('heading', { name: /Passo 2 di 8/ })).toBeVisible();
   await expect(page.locator('[data-scene] > p[tabindex="-1"]')).toBeFocused();
-  await page.waitForTimeout(400);
+  await atRest(page);
   const sliding = await readProbe(page);
   expect(sliding.transforms.some((transform) => transform !== 'none')).toBe(true);
   expect(sliding.overflow.every((overflow) => overflow === 0)).toBe(true);
@@ -101,7 +102,7 @@ test('the goals’ screens keep their 44px rows and overflow nothing', async ({ 
   await next(page);
   await expect(page.getByRole('heading', { name: /Passo 5 di 8/ })).toBeVisible();
   await walkGoals(page);
-  await page.waitForTimeout(400);
+  await atRest(page);
   await expectNoOverflow(page);
 
   await page.getByRole('button', { name: 'Aggiungi un obiettivo' }).click();
@@ -126,7 +127,7 @@ test.describe('under reduced motion', () => {
     await next(page);
     await expect(page.getByRole('heading', { name: /Passo 2 di 8/ })).toBeVisible();
     await expect(page.locator('[data-scene] > p[tabindex="-1"]')).toBeFocused();
-    await page.waitForTimeout(400);
+    await atRest(page);
     const probe = await readProbe(page);
     expect(probe.transforms.length).toBeGreaterThan(0);
     expect(probe.transforms.every((transform) => transform === 'none')).toBe(true);

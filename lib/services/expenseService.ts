@@ -840,13 +840,24 @@ function expenseFromSnapshot(snapshot: DocumentSnapshot): Expense {
 
 /**
  * The fee row a row created (lib/utils/expenseFee.ts), as stored, or null — the row has no fee,
- * or the fee was deleted by hand since. Read before an edit (the form shows its amount) and
- * before a delete (the fee goes with its parent).
+ * or the fee it points at is gone: deleted by hand, or by a save the list on screen has not read
+ * yet (a reload paints the list the persisted cache restored, which can still carry the pointer).
+ * Read before an edit (the form shows its amount) and before a delete (the fee goes with its parent).
+ *
+ * By QUERY on the fee's own back-pointer (`feeOfTransferId`), never by `getDoc` on the parent's
+ * pointer (2026-11-26): the rule reads `resource.data.userId`, and of a document that is gone there
+ * is no `resource` — the get is `permission-denied`, not «not found». The edit form then called the
+ * fee unread and kept «Commissione» disabled at every reopening (the row still pointed at nothing).
+ * A query that matches no document is an empty answer; and it finds the fee the row has NOW when
+ * the pointer in hand is a stale one. Among several (never written by the app), the pointed one.
  */
-export async function getFeeOf(expense: Pick<Expense, 'transferFeeExpenseId'>): Promise<Expense | null> {
+export async function getFeeOf(expense: Pick<Expense, 'id' | 'userId' | 'transferFeeExpenseId'>): Promise<Expense | null> {
   if (!expense.transferFeeExpenseId) return null;
-  const snapshot = await getDoc(doc(db, EXPENSES_COLLECTION, expense.transferFeeExpenseId));
-  return snapshot.exists() ? expenseFromSnapshot(snapshot) : null;
+  const snapshot = await getDocs(
+    query(collection(db, EXPENSES_COLLECTION), where('userId', '==', expense.userId), where('feeOfTransferId', '==', expense.id)),
+  );
+  const fee = snapshot.docs.find((docSnapshot) => docSnapshot.id === expense.transferFeeExpenseId) ?? snapshot.docs[0];
+  return fee ? expenseFromSnapshot(fee) : null;
 }
 
 /**

@@ -6,8 +6,9 @@
  * can a thumb hit the markers and the pills, and does the table that is wider than the tile say
  * so. The note markers measured 28×28 on 2026-09-24, the pills 25px tall at 1440.
  *
- * Account and arithmetic: `scripts/seedHallOfFameE2E.mts`. The `hof` project runs first and
- * builds the document; if this project runs alone, the first navigation builds it itself.
+ * Account and arithmetic: `scripts/seedHallOfFameE2E.mts`. Where the `hof` project ran first in this
+ * worker it built the document; alone, or in a worker `hof` did not run in (every worker has its own
+ * Firestore project), the first navigation builds it itself.
  *
  * Since 2026-10-10 the page is composed for a phone: «Il resto della pagina»
  * is a second level-2 heading, so the verdict is `.first()`, and every tile but Record del
@@ -16,6 +17,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { atRest } from './atRest';
 
 /** The house floor for a touch target (PRODUCT.md → Accessibility & Inclusion). */
 const TOUCH_FLOOR = 44;
@@ -35,7 +37,7 @@ test.describe('Hall of Fame (phone)', () => {
     await openPage(page);
     await page.getByRole('button', { name: /^Dettaglio/ }).click();
     await expect(page.getByRole('region', { name: 'Classifica completa' })).toBeVisible();
-    await page.waitForTimeout(1500);
+    await atRest(page);
 
     const measurement = await page.evaluate(() => {
       const main = document.querySelector('main');

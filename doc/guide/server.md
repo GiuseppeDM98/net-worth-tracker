@@ -65,6 +65,13 @@
   client page type-checks and dies in the browser as a Next build error («You're importing a module that depends on
   "server-only"») — the browser is the check (2026-09-06). A client page reads such a registry through a client
   reader: `lib/services/dividendReceiptsService.ts` is the worked example.
+- **`lib/firebase/admin.ts` can open a SECOND Admin app, on the emulators only** (2026-11-26): the whole E2E run gives
+  each Playwright worker a Firestore project, so `adminDb` is `getFirestore` of an app named `e2e-worker-firestore` on
+  `E2E_FIRESTORE_PROJECT` while `adminAuth` stays on the default app (the tokens keep the base project's audience).
+  The variable is read only under `FIRESTORE_EMULATOR_HOST` (`adminFirestoreProjectOverride`,
+  `lib/firebase/emulatorProject.ts`): with real credentials it is inert, and `__tests__/emulatorProject.test.ts`
+  holds it — as it holds the browser's half, the project read from the page's port only with
+  `NEXT_PUBLIC_USE_FIREBASE_EMULATOR` on (doc/guide/e2e-suite.md § The suite's speed).
 
 ## Per-page blind spots
 

@@ -12,6 +12,7 @@
 import { expect, test } from '@playwright/test';
 import { restoreColorTheme, settle, setAccountColorTheme, startWith } from './themeEgeo';
 import { COSTUMES, cornerOf, expectNoHorizontalOverflow, type Costume } from './themeCostume';
+import { atRest } from './atRest';
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
@@ -51,7 +52,7 @@ for (const costume of COSTUMES) {
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('cashflow:add-expense')));
     const modal = page.locator(`[data-slot="${slot}"]`);
     await expect(modal).toBeVisible();
-    await page.waitForTimeout(800);
+    await atRest(page);
 
     const style = await modal.evaluate((node) => {
       const computed = getComputedStyle(node);

@@ -13,6 +13,7 @@ import {
   ACCOUNT_ID, ACCOUNT_START, FOOD_ID, admin, card, expectDecoyUntouched, installFakeStream, openAssistant,
   plantFixture, proposalBlock, quantityOf, removeFixture, resetFixture, send, writtenRows,
 } from './assistantRegister';
+import { atRest } from './atRest';
 
 test.beforeAll(async () => {
   await plantFixture();
@@ -37,7 +38,7 @@ test('the card’s three buttons are 44px targets inside the card, nothing overf
   const proposed = card(page, 'expense:0');
   await expect(proposed).toContainText(/Spesa · 103,00\s€ · Cibo › Spesa · oggi · Conto principale/);
   // The card's entrance is a translate: measure once it has settled.
-  await page.waitForTimeout(600);
+  await atRest(page);
 
   const cardBox = (await proposed.boundingBox())!;
   for (const name of ['Conferma', 'Modifica', 'Ignora']) {

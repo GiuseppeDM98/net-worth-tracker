@@ -19,6 +19,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { atRest } from './atRest';
 
 const TILE = 'section[aria-label="Valore per strumento"]';
 
@@ -57,7 +58,7 @@ test('la tabella degli strumenti mostra le colonne del Δ senza scorrere, con e 
   // neighbours, the two columns the reading is about stay.
   await page.locator(`${TILE} tbody [data-roving-item]`).first().click();
   await expect(page.locator(TILE).getByText(/^Selezione/)).toBeVisible();
-  await page.waitForTimeout(600);
+  await atRest(page);
 
   const narrow = await measureTable(page);
   expect(narrow.clientWidth).toBeLessThan(wide.clientWidth);

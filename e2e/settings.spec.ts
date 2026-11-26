@@ -25,9 +25,9 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { expectColumnsEndTogether, forceColumnTaller } from './tileColumns';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
-const SETTINGS_DOC =
-  'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/assetAllocationTargets/test-user-1';
+const SETTINGS_DOC = `${FIRESTORE_DOCUMENTS}/assetAllocationTargets/test-user-1`;
 
 /** When the settings document was last written — read from the emulator, not from the page. */
 async function settingsUpdateTime(): Promise<string> {

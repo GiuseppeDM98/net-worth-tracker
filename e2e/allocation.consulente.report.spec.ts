@@ -16,6 +16,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { REVISION_ROUND, installFakeRun, type FakeRunRecorder } from './consulenteInterview';
 import { FAKE_PLAN_ERROR, PRINTABLE_TITLES, bookCard, expectPage, openReport, plant, rememberHeld, restoreHeld } from './consulenteReport';
+import { atRest } from './atRest';
 
 declare global {
   interface Window {
@@ -72,7 +73,7 @@ test('the cover cascades once, does not slide, and the proposal page counts up o
   await openReport(page);
   await expectPage(page, 'Pagina 1 di 10 · In una frase', 'copertina');
   await expect(page.locator('[data-generated]')).toHaveCount(1);
-  await page.waitForTimeout(800);
+  await atRest(page);
   const opened = await readProbe(page);
   expect(opened.minOpacity).toBeLessThan(0.5);
   expect(opened.transforms.every((transform) => transform === 'none')).toBe(true);
@@ -83,7 +84,7 @@ test('the cover cascades once, does not slide, and the proposal page counts up o
   await forward(page);
   await expectPage(page, "Pagina 2 di 10 · L'allocazione proposta", 'allocazione');
   await expect(bookCard(page).locator('[data-proposed-pct]').first()).toHaveText('70,0%');
-  await page.waitForTimeout(800);
+  await atRest(page);
   const counted = await readProbe(page);
   expect(counted.pcts.length).toBeGreaterThan(1);
   expect(counted.pcts[counted.pcts.length - 1]).toBe('70,0%');
@@ -93,7 +94,7 @@ test('the cover cascades once, does not slide, and the proposal page counts up o
   await resetProbe(page);
   await back(page);
   await expectPage(page, "Pagina 2 di 10 · L'allocazione proposta", 'allocazione');
-  await page.waitForTimeout(800);
+  await atRest(page);
   const again = await readProbe(page);
   expect(again.pcts).toEqual(['70,0%']);
   expect(again.minOpacity).toBe(1);
@@ -106,7 +107,7 @@ test('the cover cascades once, does not slide, and the proposal page counts up o
   await resetProbe(page);
   await forward(page);
   await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
-  await page.waitForTimeout(800);
+  await atRest(page);
   const returned = await readProbe(page);
   expect(returned.pcts).toEqual(['70,0%']);
   expect(returned.minOpacity).toBe(1);
@@ -119,7 +120,7 @@ test('a session opened on «Gli strumenti» still counts up when it turns back t
   await resetProbe(page);
   await back(page);
   await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
-  await page.waitForTimeout(800);
+  await atRest(page);
   const probe = await readProbe(page);
   expect(probe.pcts.length).toBeGreaterThan(1);
   expect(probe.pcts[probe.pcts.length - 1]).toBe('70,0%');
@@ -332,7 +333,10 @@ test('«Salta le domande» while the round is still asked sends the revision wit
   await expect(page.locator('#consulente-revision')).toHaveValue('', { timeout: 15_000 });
   expect(recorder.revise).toHaveLength(1);
   expect(recorder.revise[0]).toMatchObject({ stage: 'revise', request: 'niente ornitorinchi', interview: { rounds: [], skipped: true } });
-  await page.waitForTimeout(1_500);
+  // The round asked for was held 1 s: once the fake has delivered it to the request «Salta le
+  // domande» left behind, and the page is at rest, a round that landed would be on the card.
+  await expect.poll(() => recorder.roundsSettled, { timeout: 15_000 }).toBe(1);
+  await atRest(page);
   await expect(card.locator('[data-revision-round]')).toHaveCount(0);
   expect(recorder.revise).toHaveLength(1);
 });
@@ -394,13 +398,13 @@ test.describe('under reduced motion', () => {
     await plant('ready');
     await openReport(page);
     await expectPage(page, /^Pagina 1 di 10/, 'copertina');
-    await page.waitForTimeout(800);
+    await atRest(page);
     expect((await readProbe(page)).minOpacity).toBe(1);
     await resetProbe(page);
     await forward(page);
     await expectPage(page, /^Pagina 2 di 10/, 'allocazione');
     await expect(bookCard(page).locator('[data-proposed-pct]').first()).toHaveText('70,0%');
-    await page.waitForTimeout(800);
+    await atRest(page);
     const probe = await readProbe(page);
     expect(probe.pcts).toEqual(['70,0%']);
   });

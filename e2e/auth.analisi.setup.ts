@@ -9,6 +9,7 @@
 import { test as setup, expect } from '@playwright/test';
 import { ANALISI_STORAGE_STATE } from '../playwright.config';
 import { stripPersistedQueryCache } from './persistedCache';
+import { shareSessionWithWorkers } from './emulator';
 
 /** Matches `scripts/seedAnalisiE2E.mts`. */
 const EMAIL = 'analisi@example.com';
@@ -30,4 +31,6 @@ setup('authenticate analisi user', async ({ page }) => {
   await page.context().storageState({ path: ANALISI_STORAGE_STATE, indexedDB: true });
   // The persisted React Query cache out of the state file (see auth.setup.ts).
   stripPersistedQueryCache(ANALISI_STORAGE_STATE);
+  // One login, every worker: the same session parked on each worker's origin (e2e/emulator.ts).
+  shareSessionWithWorkers(ANALISI_STORAGE_STATE);
 });

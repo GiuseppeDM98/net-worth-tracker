@@ -15,9 +15,10 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
 const UID = 'hof-user';
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 /** Without this header the emulator answers as an anonymous client and every read is silently empty. */
 const OWNER_HEADERS = { Authorization: 'Bearer owner' };
 

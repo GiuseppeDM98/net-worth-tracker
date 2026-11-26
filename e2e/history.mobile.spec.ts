@@ -18,6 +18,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { atRest } from './atRest';
 
 test('Storico non scorre in orizzontale a 390px, Dettaglio aperto', async ({ page }) => {
   await page.goto('/dashboard/history', { waitUntil: 'load' });
@@ -30,7 +31,7 @@ test('Storico non scorre in orizzontale a 390px, Dettaglio aperto', async ({ pag
   await trigger.click();
   await expect(page.getByRole('region', { name: 'Variazione anno su anno' })).toBeVisible();
   // Charts settle late: an early measure reads intermediate widths.
-  await page.waitForTimeout(2000);
+  await atRest(page);
 
   const measurement = await page.evaluate(() => {
     const main = document.querySelector('main');

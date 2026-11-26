@@ -21,6 +21,7 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { patchOverview } from './overviewFixture';
+import { atRest } from './atRest';
 
 const TOUCH_FLOOR = 44;
 const STORAGE_KEY = 'mobile-sections:assets';
@@ -144,7 +145,7 @@ test.describe('Patrimonio, composed for a phone', () => {
 
     await page.getByRole('button', { name: 'Apri tutte' }).click();
     for (const id of ROW_IDS) await expect(trigger(page, id)).toHaveAttribute('aria-expanded', 'true');
-    await page.waitForTimeout(600);
+    await atRest(page);
     const measurement = await page.evaluate(() => {
       const main = document.querySelector('main')!;
       const limit = main.getBoundingClientRect().left + main.clientWidth;

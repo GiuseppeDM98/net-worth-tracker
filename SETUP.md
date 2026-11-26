@@ -305,12 +305,15 @@ keeps its logic. What it cannot see is anything that only exists once a browser 
 the `desktop:` layout switch at 1440px, an animated collapsible, or a loading state that briefly
 shows the wrong content. That is what the Playwright suite is for.
 
-**Prerequisite — the emulators from Step 6 must already be running**, seeded once:
+**Prerequisite — the emulators from Step 6 must already be running:**
 
 ```bash
 npm run emulators        # terminal 1, leave running
-npm run emulators:seed   # once, the base test account
 ```
+
+The base test account no longer has to be seeded by hand for the suite (since 2026-11-26 the global
+setup lays it, and lays it again on the first run of a new month); `npm run emulators:seed` is still
+what gives the app on :3000 its data.
 
 Then install the browser (first time only) and run the suite:
 
@@ -320,18 +323,28 @@ npm run test:e2e                      # the WHOLE suite, on a production build
 npx playwright test e2e/<area>        # some specs, on `next dev` (or: npm run test:e2e:ui)
 ```
 
-Playwright starts its own app server on **port 3100** and seeds its fixture automatically — no third
-terminal needed. If the emulators are not up it fails immediately with the two commands above
+Playwright starts its own app server from **port 3100** and seeds its fixtures automatically — no
+third terminal needed. If the emulators are not up it fails immediately with the command above
 rather than a connection stack trace.
 
-**Two servers, one port** (since 2026-11-16): `npm run test:e2e` first runs `npm run e2e:build` — a
+**Two kinds of server** (since 2026-11-16): `npm run test:e2e` first runs `npm run e2e:build` — a
 production build in `.next-e2e-build`, skipped when the code has not changed since the last one
-(`--force` rebuilds) — and serves it with `scripts/perfServe.mjs --port=3100`, which loads
-`.env.local` after the emulator variables. A plain `npx playwright test …` keeps `next dev`, which
-needs no build after a change. On the build, nothing already on :3100 is reused (stop a `dev:e2e`
-first) and a build older than the code is refused with the command that rebuilds it. A red of the
-whole run is re-run on its own with `npx playwright test <file> -g "<title>"`, on `next dev`; to
-re-run it on the build, prefix `E2E_SERVER=build` after `npm run e2e:build`.
+(`--force` rebuilds) — and serves it with `scripts/perfServe.mjs`, which loads `.env.local` after
+the emulator variables. A plain `npx playwright test …` keeps `next dev` on :3100, which needs no
+build after a change. On the build, nothing already on its ports is reused (stop a `dev:e2e` first)
+and a build older than the code is refused with the command that rebuilds it.
+
+**Four workers on the whole run** (since 2026-11-26): the build is served four times, on
+**:3100–3103**, and each Playwright worker has its own Firestore project in the emulators
+(`demo-net-worth`, `demo-net-worth-w1` … `-w3`, all seeded alike by the global setup) and its own
+copy of the parked sessions, so four spec files run side by side without sharing a document. All
+four ports must be free, and nothing else should be running on the machine: a contended run produces
+reds that are not the code's. Four is what was measured fastest and green on the reference machine
+(4 fast cores); `E2E_WORKERS=<n>` sets another count. A plain `npx playwright test …` is one worker
+on the base project. A red is run once more by Playwright itself, with the trace on; a test that
+passes only at that retry is listed as «flaky» and is read like a red. To re-run one on its own:
+`npx playwright test <file> -g "<title>"` on `next dev`, or prefix `E2E_SERVER=build` after `npm run
+e2e:build` for the build.
 
 **Why port 3100 and a separate build directory:** Next refuses to start a second `next dev` for the
 same project directory whatever the port, because the lock lives inside the build dir. `npm run
@@ -382,8 +395,10 @@ throwaway synthetic account.
 - Authentication happens once in `e2e/auth.setup.ts` and is reused by every spec via
   `storageState`. It is captured with `indexedDB: true` because the Firebase Web SDK stores its
   session there — without that flag the state file looks fine but every spec lands on the login page.
-- The suite runs with `workers: 1`: all specs share one emulator account, so parallel runs would
-  race on it.
+- The specs of one account still share it, so what runs side by side is never two workers on the
+  same data: each worker has its own Firestore project (above), and the tests of a file run in order
+  in one worker. No spec names the project, a port or a session file by literal — `e2e/emulator.ts`
+  gives them for the worker it runs in.
 - Chromium only, for every project. The mobile projects are a 390px viewport on Chromium rather than
   the WebKit-backed iPhone descriptor (the two tablet projects likewise, at 768 and 1024) — one
   browser to install, and what is under test is the layout at a width, not an engine difference.

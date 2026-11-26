@@ -5,6 +5,7 @@
  * run's server (`playwright.config.ts`, doc/guide/e2e-suite.md § The suite's speed):
  *
  *   node scripts/perfServe.mjs [--port=3200] [--dist=.next-perf] [--env-local] [--fresh]
+ *                              [--firestore-project=<id>] [--skip-copy]
  *
  * - `--env-local` loads `.env.local` the way `next dev` does: a standalone `server.js` reads no env
  *   file, so without it a dynamic page reads no key (the Consulente's). The emulator variables are set
@@ -12,6 +13,11 @@
  *   emulators whatever the file holds.
  * - `--fresh` refuses a build whose fingerprint is not the code's as it stands (`buildFingerprint.mjs`):
  *   a server that runs a stale build answers green on code that no longer exists.
+ * - `--firestore-project=<id>` and `--skip-copy` are the whole Playwright run's (2026-11-26): the one
+ *   build is served once per worker, each server's Admin SDK reading Firestore in its worker's
+ *   project (`E2E_FIRESTORE_PROJECT`, honoured by lib/firebase/admin.ts on the emulators only; Auth
+ *   stays on the base project), and only the first server copies `static` and `public` — the others
+ *   share the directory it copied into.
  *
  * `next start` refuses a `output: "standalone"` build, so this is SETUP.md's recipe («`npm run
  * start` refuses to serve the build») as a script: copy `static` and `public` next to the
@@ -44,6 +50,9 @@ const DIST = option('dist', '.next-perf');
 const PORT = option('port', '3200');
 const LOAD_ENV_LOCAL = process.argv.includes('--env-local');
 const REQUIRE_FRESH = process.argv.includes('--fresh');
+const SKIP_COPY = process.argv.includes('--skip-copy');
+const BASE_PROJECT = 'demo-net-worth';
+const FIRESTORE_PROJECT = option('firestore-project', BASE_PROJECT);
 const STANDALONE = join(DIST, 'standalone');
 const TAG = `[serve ${DIST} :${PORT}]`;
 
@@ -77,8 +86,11 @@ if (!serverDir) {
 }
 
 // The two copies Next leaves to us. The static dir follows the dist dir's NAME inside the app dir.
-cpSync(join(DIST, 'static'), join(serverDir, DIST, 'static'), { recursive: true, force: true });
-cpSync('public', join(serverDir, 'public'), { recursive: true, force: true });
+// Skipped by every server of a build but the first: a second copy would rewrite files the first is serving.
+if (!SKIP_COPY) {
+  cpSync(join(DIST, 'static'), join(serverDir, DIST, 'static'), { recursive: true, force: true });
+  cpSync('public', join(serverDir, 'public'), { recursive: true, force: true });
+}
 
 // The client side was pointed at the emulators when the build baked NEXT_PUBLIC_USE_FIREBASE_EMULATOR;
 // these route the SERVER side (the Admin SDK of every /api route) there too. Set before `.env.local`
@@ -89,11 +101,13 @@ Object.assign(process.env, {
   HOSTNAME: 'localhost',
   FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080',
   FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099',
-  GCLOUD_PROJECT: 'demo-net-worth',
+  GCLOUD_PROJECT: BASE_PROJECT,
+  // Set even when it is the base project: a value inherited from the shell must not pick another.
+  E2E_FIRESTORE_PROJECT: FIRESTORE_PROJECT,
 });
 if (LOAD_ENV_LOCAL) loadEnvConfig(process.cwd(), false, { info: () => {}, error: console.error });
 
-console.info(`${TAG} ${relative('.', join(serverDir, 'server.js'))} on http://localhost:${PORT} (emulators: Auth :9099, Firestore :8080)`);
+console.info(`${TAG} ${relative('.', join(serverDir, 'server.js'))} on http://localhost:${PORT} (emulators: Auth :9099, Firestore :8080 › ${FIRESTORE_PROJECT})`);
 const child = spawn(process.execPath, ['server.js'], { cwd: serverDir, stdio: 'inherit', env: process.env });
 child.on('exit', (code) => process.exit(code ?? 0));
 // Playwright stops its web server with a signal: pass it on, or the standalone server outlives the run.

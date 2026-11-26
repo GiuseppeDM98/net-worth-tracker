@@ -12,9 +12,10 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { expectRingFiguresInside } from './ringFit';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
 const DECOY_NOTE = 'dividendo ornitorinco';
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const DIVIDENDS = [
   { search: 'VWCE', option: /^VWCE\.DE - Vanguard/, grossPerUnit: '15' },
   { search: 'BTP', option: /BTP - BTP Valore 2030/, grossPerUnit: '40' },

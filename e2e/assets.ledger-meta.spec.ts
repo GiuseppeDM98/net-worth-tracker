@@ -16,9 +16,9 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { pointAdminAtEmulator } from './emulator';
 
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-process.env.GCLOUD_PROJECT = 'demo-net-worth';
+pointAdminAtEmulator();
 
 const UID = 'test-user-1';
 const TICKER = 'ORNITORINCO-META';

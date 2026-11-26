@@ -18,6 +18,7 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { plantCriteria, plantTaxRates, removeAccumuloFixture, removeTaxRates, restoreCriteria, seedAccumuloFixture } from './accumuloFixture';
+import { atRest } from './atRest';
 
 const TOUCH_FLOOR = 44;
 const STORAGE_KEY = 'mobile-sections:allocation:accumulo';
@@ -151,7 +152,7 @@ test.describe('Accumulo, composto per un telefono', () => {
     expect(names.every((s, i) => i === 0 || s.top >= names[i - 1].top - 1), JSON.stringify(names)).toBe(true);
 
     await page.getByRole('button', { name: 'Apri tutte' }).click();
-    await page.waitForTimeout(600);
+    await atRest(page);
     const open = await measureOverflow(page);
     expect(open.offenders, `elementi oltre il bordo destro di main (${open.clientWidth}px)`).toEqual([]);
     expect(open.scrollWidth).toBe(open.clientWidth);

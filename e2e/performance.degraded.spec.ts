@@ -19,22 +19,23 @@
  * the code it replaced.
  */
 
-import { spawnSync } from 'node:child_process';
 import { test, expect, type Page } from '@playwright/test';
 import { expectColumnsEndTogether, expectLastFooterOnEdge, forceColumnTaller } from './tileColumns';
 import { persistedQueryKeys, readPersistedRecord, readRecording, recordLoad } from './freshnessProbe';
+import { FIRESTORE_DOCUMENTS, pointAdminAtEmulator, runSeedSync } from './emulator';
+import { afterIdle } from './atRest';
 
 const UID = 'test-user-degraded';
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 /** Without this header the emulator answers as an anonymous client and every read is silently empty. */
 const OWNER_HEADERS = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 
-/** Rewrites the scenario; synchronous because the suite runs with `workers: 1`. */
+/**
+ * Rewrites the scenario — the script of `npm run e2e:seed`, run on this worker's project. Synchronous:
+ * the tests of a file run one after the other in one worker, and no other worker reads these documents.
+ */
 function seedPerformanceScenario(): void {
-  const result = spawnSync('npm', ['run', 'e2e:seed', '--', 'performance'], { stdio: 'pipe', shell: true });
-  if (result.status !== 0) {
-    throw new Error(`Seed dello scenario «performance» fallito:\n${result.stderr?.toString() ?? ''}`);
-  }
+  runSeedSync('scripts/seedPensionE2E.mts', ['performance'], 'Seed dello scenario «performance» fallito');
 }
 
 /** Flip «Includi i fondi pensione» on the settings document, the way Impostazioni would save it. */
@@ -245,8 +246,9 @@ test('the dividend yields of every period leave in ONE call, and nothing else is
   expect(Object.keys(await response.json())).toEqual(asked.periods.map((period) => period.key));
 
   // The figures are on screen (the caption waits for every query, the yields included): a second
-  // call would have left by now. An absence has no event to wait for, hence the one fixed wait.
-  await page.waitForTimeout(1_000);
+  // call would have left by now. An absence has no event to wait for: the page's own idle turn is
+  // the anchor (`afterIdle`, e2e/atRest.ts) — whatever the render scheduled has been sent by then.
+  await afterIdle(page);
   expect(performanceCalls).toEqual(['POST /api/performance/yields']);
 });
 
@@ -352,8 +354,7 @@ test('a refused report says so, with «Rigenera» beside it even when no text wa
 const SALE_ASSET_ID = 'e2e-columns-ornitorinco';
 
 async function adminDb() {
-  process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-  process.env.GCLOUD_PROJECT = 'demo-net-worth';
+  pointAdminAtEmulator();
   const { initializeApp, getApps } = await import('firebase-admin/app');
   const { getFirestore } = await import('firebase-admin/firestore');
   return getFirestore(getApps()[0] ?? initializeApp({ projectId: process.env.GCLOUD_PROJECT }));

@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { adminFirestoreProjectOverride } from './emulatorProject';
 
 let adminApp: App;
 
@@ -60,7 +61,23 @@ if (getApps().length === 0) {
   adminApp = getApps()[0];
 }
 
+// One Playwright worker, one Firestore project (lib/firebase/emulatorProject.ts): the server of worker
+// N reads and writes `<base>-wN`, while the tokens it verifies keep the base project's audience — the
+// Auth emulator signs every client login into its default project. So Auth stays on the default app
+// and a second app carries the Firestore project alone. The variable is read only under
+// FIRESTORE_EMULATOR_HOST: with real credentials it is inert (__tests__/emulatorProject.test.ts).
+const WORKER_FIRESTORE_APP = 'e2e-worker-firestore';
+const workerFirestoreProject = adminFirestoreProjectOverride(
+  process.env.FIRESTORE_EMULATOR_HOST,
+  process.env.E2E_FIRESTORE_PROJECT,
+  adminApp.options.projectId,
+);
+const firestoreApp = workerFirestoreProject
+  ? (getApps().find((candidate) => candidate.name === WORKER_FIRESTORE_APP) ??
+    initializeApp({ projectId: workerFirestoreProject }, WORKER_FIRESTORE_APP))
+  : adminApp;
+
 export const adminAuth = getAuth(adminApp);
-export const adminDb = getFirestore(adminApp);
+export const adminDb = getFirestore(firestoreApp);
 
 export default adminApp;

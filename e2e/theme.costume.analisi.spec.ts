@@ -16,6 +16,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { colorToHex } from '../lib/utils/cssColorToHex';
 import { restoreColorThemeOf, setAccountColorTheme, startWith } from './themeEgeo';
 import { tokenColorIn } from './themeCostume';
+import { atRest } from './atRest';
 
 const UID = 'test-user-analisi';
 /** The fixed type's hex in every palette theme (`TYPE_COLORS.fixed`, lib/utils/cashflowSankey.ts). */
@@ -35,7 +36,7 @@ async function flowFills(page: Page): Promise<string[]> {
   const chart = page.getByRole('region', { name: 'Flusso', exact: true }).getByRole('img');
   await expect(chart.locator('text').filter({ hasText: /^Spese Necessarie$/ })).toHaveCount(1, { timeout: 30_000 });
   // The nodes' colours are animated in.
-  await page.waitForTimeout(1_500);
+  await atRest(page);
   const fills = await chart.locator('rect').evaluateAll((rects) => rects.map((rect) => rect.getAttribute('fill') ?? ''));
   return fills.filter(Boolean).map((fill) => (colorToHex(fill) ?? fill).toLowerCase());
 }

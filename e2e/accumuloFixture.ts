@@ -24,8 +24,9 @@
  */
 
 import { expect, type Page } from '@playwright/test';
+import { FIRESTORE_DOCUMENTS } from './emulator';
 
-const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
+const FIRESTORE = FIRESTORE_DOCUMENTS;
 const HEADERS = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 const OWNER = 'test-user-1';
 const PLAN_ID = 'e2e-accumulo-plan';
