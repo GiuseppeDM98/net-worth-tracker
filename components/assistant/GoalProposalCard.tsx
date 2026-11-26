@@ -211,7 +211,7 @@ export function GoalProposalCard({ proposal, index }: GoalProposalCardProps) {
       animate="center"
       data-generated
       data-proposal={key}
-      className={cn('not-prose my-3 border p-4', COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)}
+      className={cn('my-3 border p-4', COSTUME_GENERATED_FILL_CLASS, COSTUME_FRAME_RADIUS_CLASS, AI_GENERATED_SURFACE_CLASS)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

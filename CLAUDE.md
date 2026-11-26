@@ -14,7 +14,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19 **with the React Compiler on** (since 2026-10-05), TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - Tests: Vitest in `__tests__/` (one file per pure module), held green in `Europe/Rome`, in the machine's zone AND under `TZ=UTC` (since 2026-10-08); Playwright specs in `e2e/` (the projects and the traps: doc/guide/e2e-playwright.md; the full run and its known flakes: doc/guide/e2e-suite.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, the ones beside midnight are named by the Italian clock.
-- Latest (2026-11-26): **DATI-08** implemented (the Assistente answers in one form — the figure, its sums, two cautions —, writes its own next questions and runs on Opus 5.5; the answer streams as Markdown and the page follows it only from its end: doc/guide/assistente-risposta.md). Collaudo done and closed; it left to DATI-09 the categories compared across two periods (its § 1). Open: doc/dati/ (README § 6). Next: DATI-09.
+- Latest (2026-11-26): **DATI-08** retired (the answer's form, its tail and the one question back now live in doc/guide/assistente-risposta.md); the retirement removed three dead `not-prose` classes from the Assistente's cards (`__tests__/markdownProseClasses.test.ts`), so its signals are to be redone after the deploy. Open: doc/dati/ (README § 6). Next: DATI-09.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

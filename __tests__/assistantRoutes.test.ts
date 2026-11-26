@@ -984,7 +984,7 @@ describe('Assistant private API routes', () => {
     });
 
     // The answer's tail (2026-11-25): the next questions are cut off the saved text, kept on the
-    // message and sent on `done`; Registra's text is saved as it came.
+    // message and sent on `done`; Registra's text is saved as it came. Seen RED saving `result.text`.
     it('saves a chat answer without its tail, keeps the questions and sends both on done', async () => {
       const tail = '```assistant-followups\n["E nel 2025?", "E il mutuo A?"]\n```';
       appendAssistantMessageMock.mockReset().mockResolvedValue({ id: 'm', threadId: 'thread-1', userId: 'user-1', role: 'assistant', content: 'x', createdAt: new Date(2026, 10, 1), mode: 'chat' });

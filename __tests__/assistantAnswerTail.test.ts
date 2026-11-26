@@ -1,3 +1,12 @@
+/**
+ * The answer's tail (2026-11-25): the next questions the model writes as a fenced JSON array at
+ * the end of its text, cut by the server and hidden by the browser while the answer streams.
+ *
+ * Seen RED: splitAnswerTail keeping the block in the body, accepting a block anywhere, and falling
+ * back to visibleAnswerText when there is no block; parseFollowUps with no cap; visibleAnswerText
+ * hiding only a closed block, and without the count of the fences above; answerFollowUps reading
+ * the starters for every mode.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   REGISTER_ANOTHER_FOLLOW_UP,

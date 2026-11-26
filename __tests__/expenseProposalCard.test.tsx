@@ -158,7 +158,7 @@ describe('ExpenseProposalCard — the row', () => {
     expect(root.getAttribute('data-proposal')).toBe('expense:0');
     expect(root.hasAttribute('data-generated')).toBe(true);
     // The frame radius and the generated fill through the costume contract (2026-11-23): today's values in a palette theme.
-    for (const cls of ['not-prose', COSTUME_FRAME_RADIUS_CLASS, COSTUME_GENERATED_FILL_CLASS, ...AI_GENERATED_SURFACE_CLASS.split(' ')]) expect(root.className).toContain(cls);
+    for (const cls of [COSTUME_FRAME_RADIUS_CLASS, COSTUME_GENERATED_FILL_CLASS, ...AI_GENERATED_SURFACE_CLASS.split(' ')]) expect(root.className).toContain(cls);
     const eyebrow = screen.getByText("L'Assistente propone");
     for (const cls of AI_GENERATED_EYEBROW_CLASS.split(' ')) expect(eyebrow.className).toContain(cls);
     expect(root.textContent?.replace(/ /g, ' ')).toContain('Spesa · 103,00 € · Cibo › Spesa · oggi · Conto principale');

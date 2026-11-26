@@ -27,6 +27,7 @@ describe('readAssistantQuestionBlocks', () => {
   });
 
   // Outside Registra a doubt is ONE card, never on an entity: there is no list to show (2026-11-25).
+  // Seen RED keeping two blocks in a chat.
   it('keeps the first block alone in a chat, and no question on an entity', () => {
     const content = [1, 2].map((n) => fence('assistant-question', question(`q${n}`))).join('\n\n');
     expect(readAssistantQuestionBlocks(content, 'chat').map((block) => block.kept)).toEqual([true, false]);

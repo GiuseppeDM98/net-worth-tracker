@@ -866,6 +866,10 @@ file used to carry.
   new field exists until the deploy, so the boundary of stored data is the deploy's date and the owner's decision keeps
   its own («owner, 2026-11-23») — four comments of the foreign dividend said the decision's (`lib/services/dividendService.ts`,
   `reconvertAtPaymentDay`).
+- **A class that styles nothing may still be read** (2026-11-26): before removing one, grep `e2e/` and `__tests__/` for
+  it as a selector or an expected class — the dead `not-prose` of the Assistente's cards was the hook of
+  `e2e/assistant.register.question.spec.ts` (now `data-question-block`) and an expectation of
+  `__tests__/expenseProposalCard.test.tsx`; `__tests__/markdownProseClasses.test.ts` keeps it out.
 
 ### Per-page blind spots
 The "looks like a bug, is not" behaviours live at the end of each `doc/guide/<page>.md` (*Per-page blind spots*,

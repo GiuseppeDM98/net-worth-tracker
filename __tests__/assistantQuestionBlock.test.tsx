@@ -197,6 +197,7 @@ describe('AssistantQuestionBlock — read-only and fallbacks', () => {
 
   // The cap is the MESSAGE's mode, never the page's (2026-11-12): a register message shows two
   // cards; since 2026-11-25 a chat message shows ONE, answerable, and its second block nothing.
+  // Seen RED with the card rendered for Registra only.
   it('makes two questions cards on a register message and one on a chat message', () => {
     const later = new Date(NOW.getTime() + 1000);
     const chatQuestions = [

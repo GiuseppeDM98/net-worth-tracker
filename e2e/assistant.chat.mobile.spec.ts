@@ -5,7 +5,7 @@
  * WHY IT EXISTS: what only a layout engine knows on a phone — the header is two 44px targets, «⋯»
  * opens a bottom sheet, «cambia» is a 44px target inside its wrapping line, and nothing in `main`
  * crosses its right edge with an answer on screen; the next questions under an answer are 44px
- * targets (DATI-08, 2026-11-25).
+ * targets (2026-11-25).
  *
  * The stream is ALWAYS faked (`e2e/assistantRegister.ts`): no request reaches a model.
  */
@@ -61,7 +61,7 @@ test('E6 — two 44px header targets, «⋯» as a bottom sheet, «cambia» a 44
 });
 
 
-// DATI-08 (2026-11-25): the model's next questions at 390 — each chip a thumb target, nothing overflows.
+// 2026-11-25: the model's next questions at 390 — each chip a thumb target, nothing overflows.
 test('E7 — the three chips of an answer are 44px targets and nothing overflows', async ({ page }) => {
   test.setTimeout(120_000);
   await installFakeStream(page, () => ({

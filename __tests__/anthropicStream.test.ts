@@ -125,7 +125,8 @@ describe('streamAssistantResponse server-side fallback', () => {
   });
 
   it('runs on Opus 5.5 at effort medium, with the fallback and no forced tool', async () => {
-    // Opus 5.5 since 2026-11-23 (owner's decision); the model refuses a forced `tool_choice`.
+    // Opus 5.5 since 2026-11-25 (the owner's decision of 2026-11-23); the model refuses a forced
+    // `tool_choice`. Seen RED with the effort left at `high`.
     async function* empty() {}
     const create = vi
       .spyOn(Anthropic.Beta.Messages.prototype, 'create')

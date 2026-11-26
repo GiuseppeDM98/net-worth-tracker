@@ -270,6 +270,7 @@ describe('AssistantStreamingResponse — a pause after the first words', () => {
 
 // Generated Markdown is styled by its own renderers (components/ui/markdown-prose.tsx, 2026-11-25):
 // the app has no typography plugin, so a `prose` class styled nothing and a list had no bullets.
+// Seen RED dropping the `ul` renderer, and (the half-typed fence) rendering `message.content`.
 describe('AssistantStreamingResponse — the Markdown of an answer', () => {
   const STREAMING = 'local-assistant-1';
 

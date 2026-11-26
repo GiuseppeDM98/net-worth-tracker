@@ -171,7 +171,7 @@ export function formatQuestionAnswersForPrompt(
 
 /** The fenced language of a question in an Assistente message: ONE question object per block. */
 export const ASSISTANT_QUESTION_LANGUAGE = 'assistant-question';
-/** The question blocks one message may carry: a block past the second renders as nothing (the prompt says so too). */
+/** The question blocks a Registra message may carry, past which a block renders as nothing (its prompt says so too); every other mode keeps one (`keepQuestionBlock`, 2026-11-25). */
 export const ASSISTANT_QUESTION_MAX_PER_MESSAGE = 2;
 /** At most three options on a question about an account, a centre, a member or a loan; «Altro…» lists the rest. */
 const ENTITY_QUESTION_OPTIONS_MAX = 3;

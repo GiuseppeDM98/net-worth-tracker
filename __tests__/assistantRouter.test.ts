@@ -62,6 +62,7 @@ describe('the router\'s request', () => {
 
   it('turns the web on for a rule of law: the system names fiscal norms and dependants', () => {
     // A tax or pension question needs a dated source (owner, 2026-11-23): the router asks for it.
+    // Seen RED with the clause on fiscal norms dropped from the system.
     expect(ASSISTANT_ROUTER_SYSTEM).toContain('norma fiscale');
     expect(ASSISTANT_ROUTER_SYSTEM).toContain('familiari a carico');
   });
