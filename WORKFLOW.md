@@ -228,14 +228,12 @@ changes from repo to repo and is the only part to rewrite when the tooling chang
 
 Browser tests: workers 4 · isolation one Firestore emulator project, one server and one set of parked sessions per worker (Auth shared) · whole run 8,6 min on 2026-11-26 (585 tests)
 
-The whole run wants :3100–3103 free and NOTHING else running on the machine (no type-check, build or second suite: a
-contended run produces reds that are not the code's); a red is run once more by Playwright with the trace on, and a
-test green only at that retry — «flaky» in the report — is named and read like a red. The wiring and the measures:
-`doc/guide/e2e-suite.md` § The suite's speed.
+The whole run wants :3100–3103 free and NOTHING else running on the machine (a contended run's reds are not the
+code's); a test green only at its one retry — «flaky» in the report — is named and read like a red. The wiring and
+the measures: `doc/guide/e2e-suite.md` § The suite's speed.
 
 npm is the package manager (`package-lock.json`; there is no Makefile, no pnpm/yarn lockfile).
-**Phantom `tsc` errors** clustered in `e2e/` and `lib/utils/expenseImport.ts` after a branch switch
-mean stale artifacts: run `npm install` first (AGENTS.md → *Commands*).
+**Phantom `tsc` errors** after a branch switch mean stale artifacts: `npm install` first (AGENTS.md → *Commands*).
 
 ### The isolated environment (there is one — never verify against production Firebase)
 
@@ -247,13 +245,11 @@ npm run emulators:seed   # once: creates test-user-1 and its data (scripts/seedE
 npm run dev:emulator     # the app on :3000 pointed at the emulators
 ```
 
-Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 is the Playwright server — `npm run dev:e2e`
-(isolated `.next-e2e` build dir) for an area run, the `.next-e2e-build` production build for the whole run (since
-2026-11-16, SETUP.md → Step 7), which serves it on :3100–3103, one server per worker, each on its own Firestore
-project of the emulators (`demo-net-worth-wN`, since 2026-11-26; the base seed is laid by the run itself); keep them
-separate from the tour server on :3000. Port
-3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's and the first-screen census's
-(`npm run mobile:census`, `doc/guide/prima-schermata.md`).
+Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Ports :3100–3103 are Playwright's (SETUP.md → Step 7):
+`npm run dev:e2e` on :3100 for an area run; for the whole run the `.next-e2e-build` production build (since
+2026-11-16), one server per worker, each on its own Firestore project (`demo-net-worth-wN`, since 2026-11-26). Keep
+them apart from the tour server on :3000. Port 3200 (`npm run perf:serve`) is the speed benchmark's and the
+first-screen census's (`npm run mobile:census`, `doc/guide/prima-schermata.md`).
 
 ### Obligation 5 — how to hand the owner an app already authenticated
 
@@ -313,8 +309,8 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
   <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden`), stopped by PID at the end.
 - **Throwaway fixtures** follow the seed pattern (`scripts/seedEmulator.ts`, `scripts/seed*E2E.mts`) or live as an
   untracked `scripts/*.tmp.mts` inside the repo — never in the scratchpad; `.mts`, never `.ts`.
-- **The authenticated browser already exists**: `e2e/.auth/<account>.json` (the base project's, on :3100; a whole
-  run's other workers park theirs in `e2e/.auth/wN/`), minted by the six `auth*.setup.ts`;
+- **The authenticated browser already exists**: `e2e/.auth/<account>.json` (a whole run's other workers:
+  `e2e/.auth/wN/`), minted by the six `auth*.setup.ts`;
   `npx playwright test --project=<name>`, one of the fourteen projects (doc/guide/e2e-playwright.md); a throwaway spec
   matches its project's `testMatch` and is deleted at the end.
 - **Automated suites are yours to run, always**, in two levels (2026-11-13): while working, the specs of the area
@@ -349,10 +345,8 @@ The why and the measures of each rule: `doc/guide/collaudo.md` § Obligation 4.
 - **`Draft Release Temp.md`** carries user-visible changes only (owner, 2026-10-10), never «spec retired» (owner,
   2026-10-08) and no private data (owner, 2026-09-20). It **ACCUMULATES until a release is tagged**: a session PREPENDS
   its entries to the existing sections and never rewrites the file from scratch (2026-09-11); **the owner DELETES the
-  file when cutting the tag** (2026-09-26). A missing file is recreated from this template: a `# Draft release notes`
-  title, a quote line («Accumulates until the next tag (WORKFLOW.md § Where things are recorded). Grouped by area; one
-  entry per surface, rewritten to its final state.»), then `## ✨ New Features`, `## 🐛 Bug Fixes`, `## 🔧 Improvements`,
-  `## 📚 Documentation`, one blank line between the entries of different areas.
+  file when cutting the tag** (2026-09-26). A missing file is recreated from the template in
+  `doc/guide/collaudo.md` § Where things are recorded.
 - **Impeccable critiques are committed** (since 2026-09-12), written on the fixture, never on the mirror (2026-10-15);
   a snapshot closes only through `polish` (2026-09-13), with `critique-storage close <target> <snapshot-file>` on the
   Windows machine (owner, 2026-10-17). The machines never named (2026-10-19) and the traps of `latest` and `close`:
