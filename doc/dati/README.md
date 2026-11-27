@@ -332,7 +332,6 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [09](DATI-09-assistente-strumenti-cashflow.md) | Assistente: tools on the cashflow, the budget, the centres | L | 08 | Opus 5.5 · medium | implemented — 2026-11-26 |
 | [10](DATI-10-email-tenute-e-giorno-dopo.md) | Periodic emails: two kept, sent the day after, once | M | 08 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 20 rilievi, 2 decisioni |
 | [11](DATI-11-email-revisione-delle-spese.md) | The «Revisione delle spese» email | L | 09, 10 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 2 decisioni |
 | [12](DATI-12-andamento-strumenti.md) | Patrimonio › Andamento: the instruments | L | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 29 rilievi, 5 decisioni |
@@ -351,7 +350,9 @@ retirement) → the row is removed by the retirement.
 
 Still to be seen in production after a retirement (the calendar's, never waited for): 04 — the stale pending records
 written before the deploy, corrected one by one on their payment day or at their asset's next trade; 07 — a foreign
-record announced before the deploy (no `fxSource`), converted again at the ECB rate of its payment day by the cron.
+record announced before the deploy (no `fxSource`), converted again at the ECB rate of its payment day by the cron;
+09 — the server log line `[assistant] tools: N calls, R rounds, S s`, to read in the first week after the deploy of
+2026-11-26.
 
 ## 7. Shared contracts (name, signature, file — as this section states them, in every spec that reads them)
 
@@ -435,6 +436,13 @@ says so; it never changes what is there. The full text of each is in the spec th
   `ASSISTANT_TOOL_DEADLINE_MS = 200_000`; the status `'computing'`; the return carries `toolCalls` and
   `toolRounds`.
 - Tools of DATI-09: `cashflow_totali`, `cashflow_confronto`, `cashflow_righe`, `budget_stato`, `centri_di_costo`.
+- As built (2026-11-26), every name and signature above unchanged (read against the code at the retirement,
+  2026-11-27). Beside them: `UNREADABLE` and the types live in `tools/define.ts`; `BudgetStateLine` and
+  `BudgetStateResult` are exported by `tools/budgetState.ts`; `TOOLS_SECTION` is a module constant of
+  `lib/server/assistant/prompts.ts`, joined by `buildAssistantSystem` — a later spec edits it there; the loop makes
+  at most ELEVEN requests (eight rounds, two closing requests, the last answer); the rules of the queries — the
+  history's floor, a refund counted as spending by its absolute value, filters by name and groups by id — are in the
+  header of `lib/utils/assistantExpenseQueries.ts`. The guide: doc/guide/assistente-strumenti.md.
 - **Added by DATI-15**: the context's `portfolio: () => Promise<AssistantPortfolioReads>`,
   `daily: (fromIso, toIso) => Promise<DailyPoint[]>` and `includeDummySnapshots`; an `options` argument at the
   end of `readAssistantTurnData` and `buildAssistantToolContext`; `toolNames` in the loop's return; the tools
@@ -595,11 +603,11 @@ says so; it never changes what is there. The full text of each is in the spec th
 
 ## 9. The line for prompt 07 and prompt 08
 
-`SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 09 10 11 12 13 14 15 16 17 18 19 20 21`
+`SERIE: doc/dati/ · INDICE: doc/dati/README.md · SPEC VIVE: 10 11 12 13 14 15 16 17 18 19 20 21`
 
 The adversarial reading of the specs together (prompt 07) was done on 2026-11-23, with DATI-20 and DATI-21
 written and read in it; prompt 08 (`08_CREA_RITIRO_SPEC`) ran on 2026-11-24, in a session of its own, and wrote
-`doc/dati/PROMPT-RITIRO.md`; DATI-01 to DATI-08 were implemented and retired (01–04 on 2026-11-24, 05 to 07 on 2026-11-25, 08 on 2026-11-26); the next spec is DATI-09. A retirement removes its number from the line
+`doc/dati/PROMPT-RITIRO.md`; DATI-01 to DATI-09 were implemented and retired (01–04 on 2026-11-24, 05 to 07 on 2026-11-25, 08 on 2026-11-26, 09 on 2026-11-27); the next spec is DATI-10. A retirement removes its number from the line
 above; the last one deletes the line with the folder.
 
 ## 10. What NOT to do (decided on 2026-11-23)

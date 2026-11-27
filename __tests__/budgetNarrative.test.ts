@@ -340,8 +340,8 @@ describe('describeAlerts', () => {
 describe('describeAnnualBudgets', () => {
   const summary = (rows: AnnualBudgetSummary['rows'], aheadCount = 0): AnnualBudgetSummary => ({ rows, year: 2026, yearElapsedPct: 64.1, monthsLeft: 4, aheadCount });
   const annualItem = (id: string): BudgetItem => ({ id, kind: 'expense', scope: 'category', period: 'annual', categoryId: id, amount: 0, order: 0 });
-  const vac = { item: annualItem('v'), key: 'v', label: 'Vacanze', budget: 2500, spent: 1400, usedPct: 56, remaining: 1100, ahead: false, exceeded: false };
-  const gifts = { item: annualItem('g'), key: 'g', label: 'Regali', budget: 600, spent: 180, usedPct: 30, remaining: 420, ahead: false, exceeded: false };
+  const vac = { item: annualItem('v'), key: 'v', label: 'Vacanze', budget: 2500, spent: 1400, scheduled: 0, usedPct: 56, remaining: 1100, ahead: false, exceeded: false };
+  const gifts = { item: annualItem('g'), key: 'g', label: 'Regali', budget: 600, spent: 180, scheduled: 0, usedPct: 30, remaining: 420, ahead: false, exceeded: false };
 
   it('reads the year against the calendar', () => {
     expect(plain(describeAnnualBudgets(summary([vac, gifts])))).toBe('Nessuno dei 2 budget è avanti al calendario dell\'anno; il più usato è Vacanze (56%).');
@@ -542,6 +542,7 @@ describe('describeBudgetClosedAnswers', () => {
     label,
     budget: 1000,
     spent: usedPct * 10,
+    scheduled: 0,
     usedPct,
     remaining: 1000 - usedPct * 10,
     ahead: false,

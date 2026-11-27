@@ -306,7 +306,7 @@ describe('generateEmailAiComment', () => {
     expect(params.system).not.toContain('CASHFLOW 12 MESI');
   });
 
-  it('sends none of the Assistente\'s tools: the comment has the web search alone, as before (DATI-09, P1b)', async () => {
+  it('sends none of the Assistente\'s tools: the comment has the web search alone, as before (2026-11-26)', async () => {
     anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
 
     await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());

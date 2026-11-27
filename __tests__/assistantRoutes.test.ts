@@ -185,7 +185,7 @@ describe('Assistant private API routes', () => {
     fetchCashflowBlockInputsMock.mockResolvedValue({
       expenses: [], todayIso: '2026-10-20', categories: [], assets: [], settings: null, assetValueOf: () => 0,
     });
-    // The tools' side reads (DATI-09): no centre, no budget.
+    // The tools' side reads (2026-11-26): no centre, no budget.
     fetchCostCentersMock.mockResolvedValue([]);
     fetchBudgetConfigMock.mockResolvedValue(null);
     // What Registra reads: one category, no account, no row, the month unread.
@@ -871,8 +871,8 @@ describe('Assistant private API routes', () => {
       expect(streamAssistantResponseMock).not.toHaveBeenCalled();
     });
 
-    // DATI-09: the tools and the block share one expense read; the budget and the centres are read beside it.
-    it('a chat reads the expenses ONCE and hands the stream the tools context and the block of that read (S1)', async () => {
+    // Since 2026-11-26 the tools and the block share one expense read; the budget and the centres are read beside it.
+    it('a chat reads the expenses ONCE and hands the stream the tools context and the block of that read', async () => {
       const response = await streamRequest({ mode: 'chat', chatContext: 'none' });
       expect(response.status).toBe(200);
       await response.text();
@@ -886,7 +886,7 @@ describe('Assistant private API routes', () => {
       expect(args.toolContext?.expenses).toBe((await fetchCashflowBlockInputsMock.mock.results[0].value).expenses);
     });
 
-    it('a failed budget read still streams, the budget unreadable for its tool alone (S2)', async () => {
+    it('a failed budget read still streams, the budget unreadable for its tool alone', async () => {
       fetchBudgetConfigMock.mockRejectedValue(new Error('budget down'));
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const response = await streamRequest({ mode: 'chat', chatContext: 'none' });
@@ -980,7 +980,7 @@ describe('Assistant private API routes', () => {
       expect(fetchCashflowBlockInputsMock.mock.calls[0][0]).toBe('user-1');
       const args = streamAssistantResponseMock.mock.calls[0][0] as { cashflowBlock: string | null };
       expect(args.cashflowBlock).toContain('--- CASHFLOW 12 MESI');
-      // Registra runs no tool (S1): no context, neither the budget nor the centres read.
+      // Registra runs no tool: no context, neither the budget nor the centres read.
       expect((args as { toolContext?: unknown }).toolContext).toBeUndefined();
       expect(fetchCostCentersMock).not.toHaveBeenCalled();
       expect(fetchBudgetConfigMock).not.toHaveBeenCalled();

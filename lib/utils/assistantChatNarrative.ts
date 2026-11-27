@@ -109,14 +109,14 @@ function openedPeriod({ intent, period }: AssistantRouteOverride): string | null
 /**
  * What the answer's place says while no text has arrived (owner, 2026-11-16), one phrase at a time:
  * the question being read until the router's `route` event, the web while the server searches it,
- * then what the server is doing for THIS reading — the period opened, the row prepared. Never an
- * operation the server is not doing: the web only on its `searching` status, the sums only on its
- * `computing` status (the tools, DATI-09), where a search can
- * last a minute and two true phrases take turns (owner, 2026-11-16).
+ * the sums while its tools compute, then what the server is doing for THIS reading — the period
+ * opened, the row prepared. Never an operation the server is not doing: the web only on its
+ * `searching` status, where a search can last a minute and two true phrases take turns (owner,
+ * 2026-11-16); the sums only on its `computing` status (the tools, 2026-11-26).
  */
 export function buildWaitingPhrases(reading: AssistantRouteReading | null | undefined, status: AssistantWaitingStatus): string[] {
   if (status === 'searching') return ['Sto cercando sul web…', 'Leggo i risultati…'];
-  // The tools at work on the user's data (DATI-09): true whatever the reading.
+  // The tools at work on the user's data (2026-11-26): true whatever the reading.
   if (status === 'computing') return ['Faccio i conti sui tuoi dati…', 'Controllo le cifre…'];
   if (!reading) return ['Sto leggendo la domanda…'];
   if (reading.route.intent === 'register') return ['Cerco la categoria giusta…', 'Controllo i conti…', 'Preparo la riga…'];

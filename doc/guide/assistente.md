@@ -150,13 +150,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (`.assistant-waiting-phrase` in `app/globals.css`, only under `prefers-reduced-motion: no-preference`; under reduce the
   mark and the shimmer stand still and the phrases still turn). The phrases are `buildWaitingPhrases(reading, status)`
   (`lib/utils/assistantChatNarrative.ts`): «Sto leggendo la domanda…» until the `route` event, «Sto cercando sul web…»
-  on the `searching` status, then by the reading — «Apro ottobre 2026…» and the analysis's two steps, «Cerco la
+  on the `searching` status, «Faccio i conti sui tuoi dati…» / «Controllo le cifre…» on `computing` (the tools,
+  2026-11-26), then by the reading — «Apro ottobre 2026…» and the analysis's two steps, «Cerco la
   categoria giusta…» for a registration, «Ci sto ragionando…» for a free question. Never an operation the server is
   not doing. A new list remounts by its key and starts from its first phrase. The phrases are `aria-hidden`: the
   message list is a live region, and a screen reader hears one sr-only «L'assistente sta preparando la risposta.»
   instead of a phrase every 3 s; a search, which can last a minute, alternates «Sto cercando sul web…» and «Leggo i
-  risultati…». `StreamStatusChip` in the tile's aside now shows the web search only. An answer
-  already begun that stops for a search shows the wait again UNDER its text while the status is `searching`.
+  risultati…». `StreamStatusChip` in the tile's aside shows the web search and the tools' sums, nothing
+  else. An answer already begun that stops for a search or for its tools shows the wait again UNDER its text while the
+  status is `searching` or `computing`.
 - **The companion column is clipped** (2026-11-16, `overflow-clip [overflow-clip-margin:4px]` in `AssistantPageClient`):
   every routed answer can change the scene, and its sideways slide pushed a phone's `main` 8px wide until it
   ended (`assistant.chat.mobile.spec.ts` red 3 runs in 4); the margin keeps the tiles' shadow.
@@ -375,7 +377,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   page's `changeOpenerRef`, Safari's click included) and «Rileggi» re-sends the
   last prompt as a new turn with the chosen route (no `routeCarried`), the focus on «Interrompi risposta». A question
   card's answer and «Rigenera» carry the reading (`routeCarried: true`). The open thread is `?thread=<id>`, written
-  with `history.replaceState` at a new thread's `meta` and removed by «Nuova conversazione». Testing the page
+  with `history.replaceState` at a new thread's `meta` and removed by «Nuova conversazione», which brings `<main>` to the top TWICE — before the state change and in the
+  next frame: while the old thread leaves, the browser can re-anchor the scroll a few pixels down (E11 of
+  `e2e/assistant.chat.spec.ts` red one run in three without the second, 2026-11-27). Testing the page
   (`__tests__/assistantCompanionScene.test.tsx`): `AnimatePresence mode="wait"` keeps the exiting scene in the DOM, so
   a scene is proven by the verdict's text after the exit (400 ms), never by the companion alone; a question card's
   answer also PATCHes its message, so the stream calls are counted by URL.
