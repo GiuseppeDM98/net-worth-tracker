@@ -17,6 +17,9 @@
 - **Patrimonio › Movimenti — eliminare un'operazione appena modificata** — Fixed: right after editing an operation and reloading the page, deleting it could be refused as «cambiata nel frattempo» and the operation stayed. Movimenti now waits the instant it takes to reread the list before its edit and delete buttons answer.
 
 - **Cashflow — la commissione di una voce modificata più volte** — Fixed: after changing a row's «Commissione» and reloading the page, reopening the row could say «La commissione di questa voce non è stata letta» and leave the field disabled at every reopening. The form now finds the fee the row has — or none — and the field takes a new amount.
+- **Cashflow › Budget — una sola cifra «speso» per budget** — Fixed «Budget annuali» and «Per categoria» printing a different spent figure from «Avvisi» for the same budget: all three now show what is spent up to today, and the expenses already in the calendar appear beside it as «+ N € in calendario».
+
+- **Analisi — la Scheda non sparisce più aprendo una sottocategoria** — Fixed the page going empty for a moment when a subcategory was opened inside a category's Scheda.
 
 ## 🔧 Improvements
 

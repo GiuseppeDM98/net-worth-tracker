@@ -6,7 +6,7 @@ import { queryClockOf } from '@/lib/utils/assistantExpenseQueries';
 
 vi.mock('server-only', () => ({}));
 
-// The real tools, watched: the loop's tests count what ran (DATI-09).
+// The real tools, watched: the loop's tests count what ran (2026-11-26).
 vi.mock('@/lib/server/assistant/tools/registry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/server/assistant/tools/registry')>();
   return { ...actual, runAssistantTool: vi.fn(actual.runAssistantTool) };
@@ -289,12 +289,16 @@ describe('streamAssistantResponse — the status follows the stream', () => {
   });
 });
 
-// ── The tool loop (DATI-09) ─────────────────────────────────────────────────────────────────
+// ── The tool loop (2026-11-26) ──────────────────────────────────────────────────────────────
 // The SDK's real `stream()` cannot be fed through the `create` mock above (it reads `withResponse()`
 // and the controller): each request gets a fake `{ on, finalMessage }` that replays its text as
 // `streamEvent`s, then resolves the recorded message. The requests are cloned when sent, because the
 // loop goes on appending to the same `messages` array.
-describe('streamAssistantResponse — the tool loop (DATI-09)', () => {
+// Each case was seen red by the session that wrote the loop (2026-11-26): the tools sent to Registra;
+// one user message per result; no cap, and the client tools dropped on the closing request; a tool
+// run on any `tool_use` block of a truncated turn; a «continua» pushed after a pause, and no cap on
+// the pauses; `status = 'computing'` dropped (re-seen red on 2026-11-27); the deadline unread.
+describe('streamAssistantResponse — the tool loop', () => {
   const TOOL_NAMES = ['cashflow_totali', 'cashflow_confronto', 'cashflow_righe', 'budget_stato', 'centri_di_costo'];
   const TOOL_LIMIT_RESULT = 'Limite di calcoli raggiunto: rispondi adesso con i dati che hai, senza chiedere altri strumenti.';
   const TOOL_LIMIT_NOTICE = '*Non sono riuscito a chiudere i conti: riprova con una domanda più stretta.*';
@@ -369,7 +373,7 @@ describe('streamAssistantResponse — the tool loop (DATI-09)', () => {
     vi.restoreAllMocks();
   });
 
-  it('a chat with a context sends the five tools, beside the web when it is on; Registra sends none (L1)', async () => {
+  it('a chat with a context sends the five tools, beside the web when it is on; Registra sends none', async () => {
     script([turn('end_turn', [text('Uno.')]), turn('end_turn', [text('Due.')])]);
     await answer().result;
     await answer({ enableWebSearch: true }).result;
@@ -386,7 +390,7 @@ describe('streamAssistantResponse — the tool loop (DATI-09)', () => {
     expect((create.mock.calls[0][0] as { tools?: unknown }).tools).toBeUndefined();
   });
 
-  it('runs both calls of a round and answers them in ONE user message, the assistant turn pushed back whole (L2)', async () => {
+  it('runs both calls of a round and answers them in ONE user message, the assistant turn pushed back whole', async () => {
     script([turn('tool_use', [thinking, call('c1'), call('c2')]), turn('end_turn', [text('Hai speso zero euro.')])]);
     const { result } = answer();
     const done = await result;
@@ -403,7 +407,7 @@ describe('streamAssistantResponse — the tool loop (DATI-09)', () => {
     expect(done).toMatchObject({ text: 'Hai speso zero euro.', toolCalls: 2, toolRounds: 1 });
   });
 
-  it('caps the rounds at eight: two closing requests answered «stop», then the notice, the tools never dropped (L3)', async () => {
+  it('caps the rounds at eight: two closing requests answered «stop», then the notice, the tools never dropped', async () => {
     script(Array.from({ length: 11 }, (_, index) => turn('tool_use', [call(`c${index + 1}`)])));
     const { result } = answer();
     const done = await result;
@@ -416,7 +420,7 @@ describe('streamAssistantResponse — the tool loop (DATI-09)', () => {
     expect(done).toMatchObject({ text: TOOL_LIMIT_NOTICE, toolCalls: 8, toolRounds: 8 });
   });
 
-  it('never runs the call of a truncated or refused turn (L4)', async () => {
+  it('never runs the call of a truncated or refused turn', async () => {
     script([turn('max_tokens', [thinking, call('c1')])]);
     const truncated = answer();
     expect((await truncated.result).text).toBe('_(Risposta interrotta: ho raggiunto il limite di lunghezza. Chiedimi di continuare o restringi la domanda.)_');
@@ -427,7 +431,7 @@ describe('streamAssistantResponse — the tool loop (DATI-09)', () => {
     expect(runAssistantTool).not.toHaveBeenCalled();
   });
 
-  it('sends a paused turn back as it is, three times at most (L5)', async () => {
+  it('sends a paused turn back as it is, three times at most', async () => {
     const paused = [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'BCE' } }];
     script([turn('pause_turn', paused), turn('end_turn', [text('Ripreso.')])]);
     expect((await answer({ enableWebSearch: true }).result).text).toBe('Ripreso.');
@@ -439,14 +443,14 @@ describe('streamAssistantResponse — the tool loop (DATI-09)', () => {
     expect(sent).toHaveLength(4);
   });
 
-  it('says computing while the tools run and writing at the text that follows (L6)', async () => {
+  it('says computing while the tools run and writing at the text that follows', async () => {
     script([turn('tool_use', [call('c1')]), turn('end_turn', [text('Fatto.')])]);
     const { result, onStatus } = answer();
     await result;
     expect(onStatus.mock.calls.map((args) => args[0])).toEqual(['writing', 'computing', 'writing', 'saving']);
   });
 
-  it('past 200 s from the start the call is answered «stop» and the next text is the answer (L7)', async () => {
+  it('past 200 s from the start the call is answered «stop» and the next text is the answer', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-15T10:00:00Z'));
     script([

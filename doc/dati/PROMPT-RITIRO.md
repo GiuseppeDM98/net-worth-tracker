@@ -4,7 +4,7 @@
 > lascia il corpo com'è; il ritiro dell'ultima spec porta via questo file con la cartella.
 >
 > Ritiri fatti: 01 (2026-11-24, solo documenti); 02 (2026-11-24: il cron lanciato a mano dal proprietario su Vercel come
-> controllo in produzione, un commento corretto); 03 (2026-11-24: solo etichette riscritte, controllo del proprietario su Rendimenti, Previdenza e Panoramica); 04 (2026-11-24: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — Movimenti tiene modifica ed elimina mentre rilegge una copia restaurata, il 409 del rosso di `assets.trade-fee`, test visto rosso, Playwright intera; 22 etichette dei test della spec riscritte nella mutazione che li fa rossi — cinque provate a campione —, tre rimandi a sezioni nelle sorelle ripuntati al codice, C8 allineato, un angolo cieco e due suite nella guida); 05 (2026-11-25: controllo del proprietario in produzione; due commenti, una frase di guida e quattro rimandi nelle sorelle riscritti, la costante dell'orfano nominata nel suo modulo, nessun codice corretto); 06 (2026-11-25: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — lo scenario `asset` di `perf:census` ripuntato su «Fondo Pensione», perché un tipo del registro non ha più «Quantità» alla creazione —, tre commenti e tre frasi di guida con il numero di decisione riscritti, quattro commenti e due frasi rimaste sulla «Posizione iniziale» corretti, la frase della commissione nativa a 0 resa vera, la mutazione nell'intestazione di sette test, sette rimandi nelle sorelle ripuntati al codice e alle guide); 07 (2026-11-25: controllo del proprietario in produzione; solo testo, nessun codice corretto — 87 voci, 24 segnalate, 19 rette —: quattro date «prima del 2026-11-23» dove la regola vale dal deploy del 2026-11-25, tre sigle orfane nella guida («C2», due numeri di decisione), le mutazioni dei quattro test del dialog viste rosse dalla sessione e scritte nell'intestazione, quella della E2E dal commit d'implementazione, tre sigle di test incrociate tolte, la frase della proposta di ritenuta resa vera per un emittente estero, la quarta frase del cambio e `describeDividendFxRefusal` dichiarate nella guida, l'erede del rinvio sugli scaricati a 26% scritto fra gli angoli ciechi, la voce delle note di rilascio portata in testa, C8 con la nota «As built»); 08 (2026-11-26: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — tre classi `not-prose` morte tolte dalle schede dell'Assistente, fissate da `__tests__/markdownProseClasses.test.ts`, che legge le stringhe dei sorgenti perché il test del messaggio non vedeva le schede, visto rosso; la classe morta era il gancio di `e2e/assistant.register.question.spec.ts` (ora `data-question-block`) e un'attesa di `expenseProposalCard.test.tsx`, trovati dal Vitest intero: la regola in AGENTS.md § Audit habits; Playwright intera —; 125 voci, 31 segnalate, tutte di testo tranne quella: sei etichette «DATI-08» nel codice, nei test e nelle E2E e sette nelle guide e in DESIGN.md riscritte in data, le sigle di test della spec (P2, P3, R1 — che puntava al test sbagliato —, A1) e «C4» nella guida rese nomi di test, due commenti rimasti al tetto di Registra (`ASSISTANT_QUESTION_MAX_PER_MESSAGE`, l'intestazione di `AssistantQuestionBlock`) resi veri, la data «salvata prima del 2026-11-25» portata al deploy del 2026-11-26, le mutazioni del § 6 scritte nell'intestazione dei test unitari — tre provate a campione —, cinque rimandi nelle sorelle 09 e 16 ripuntati al codice e alla guida, C4 con la nota «As built»); le altre tredici sono `read`, nessuna implementata.
+> controllo in produzione, un commento corretto); 03 (2026-11-24: solo etichette riscritte, controllo del proprietario su Rendimenti, Previdenza e Panoramica); 04 (2026-11-24: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — Movimenti tiene modifica ed elimina mentre rilegge una copia restaurata, il 409 del rosso di `assets.trade-fee`, test visto rosso, Playwright intera; 22 etichette dei test della spec riscritte nella mutazione che li fa rossi — cinque provate a campione —, tre rimandi a sezioni nelle sorelle ripuntati al codice, C8 allineato, un angolo cieco e due suite nella guida); 05 (2026-11-25: controllo del proprietario in produzione; due commenti, una frase di guida e quattro rimandi nelle sorelle riscritti, la costante dell'orfano nominata nel suo modulo, nessun codice corretto); 06 (2026-11-25: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — lo scenario `asset` di `perf:census` ripuntato su «Fondo Pensione», perché un tipo del registro non ha più «Quantità» alla creazione —, tre commenti e tre frasi di guida con il numero di decisione riscritti, quattro commenti e due frasi rimaste sulla «Posizione iniziale» corretti, la frase della commissione nativa a 0 resa vera, la mutazione nell'intestazione di sette test, sette rimandi nelle sorelle ripuntati al codice e alle guide); 07 (2026-11-25: controllo del proprietario in produzione; solo testo, nessun codice corretto — 87 voci, 24 segnalate, 19 rette —: quattro date «prima del 2026-11-23» dove la regola vale dal deploy del 2026-11-25, tre sigle orfane nella guida («C2», due numeri di decisione), le mutazioni dei quattro test del dialog viste rosse dalla sessione e scritte nell'intestazione, quella della E2E dal commit d'implementazione, tre sigle di test incrociate tolte, la frase della proposta di ritenuta resa vera per un emittente estero, la quarta frase del cambio e `describeDividendFxRefusal` dichiarate nella guida, l'erede del rinvio sugli scaricati a 26% scritto fra gli angoli ciechi, la voce delle note di rilascio portata in testa, C8 con la nota «As built»); 08 (2026-11-26: controllo del proprietario in produzione; CORRETTO CODICE su sua decisione — tre classi `not-prose` morte tolte dalle schede dell'Assistente, fissate da `__tests__/markdownProseClasses.test.ts`, che legge le stringhe dei sorgenti perché il test del messaggio non vedeva le schede, visto rosso; la classe morta era il gancio di `e2e/assistant.register.question.spec.ts` (ora `data-question-block`) e un'attesa di `expenseProposalCard.test.tsx`, trovati dal Vitest intero: la regola in AGENTS.md § Audit habits; Playwright intera —; 125 voci, 31 segnalate, tutte di testo tranne quella: sei etichette «DATI-08» nel codice, nei test e nelle E2E e sette nelle guide e in DESIGN.md riscritte in data, le sigle di test della spec (P2, P3, R1 — che puntava al test sbagliato —, A1) e «C4» nella guida rese nomi di test, due commenti rimasti al tetto di Registra (`ASSISTANT_QUESTION_MAX_PER_MESSAGE`, l'intestazione di `AssistantQuestionBlock`) resi veri, la data «salvata prima del 2026-11-25» portata al deploy del 2026-11-26, le mutazioni del § 6 scritte nell'intestazione dei test unitari — tre provate a campione —, cinque rimandi nelle sorelle 09 e 16 ripuntati al codice e alla guida, C4 con la nota «As built»); 09 (2026-11-27: controllo del proprietario in produzione; 150 voci, 16 segnalate, tutte di testo — ventuno etichette «DATI-09» nel codice e nei test e quattro nelle guide riscritte in data, undici sigle di test (L1–L7, S1, S2, D1a) e «C3» tolte dai nomi dei test e dalla guida, cinque commenti e due frasi di guida rimasti a «solo la ricerca web» dopo lo stato `computing` resi veri, il rimando del ciclo alla guida scorporata, l'erede del rinvio sul tetto dei token in ingresso scritto fra gli angoli ciechi, le mutazioni del § 6 scritte nell'intestazione dei test — tre riviste rosse —, la riga Assistente di CLAUDE.md riportata sotto la lunghezza di prima, tre rimandi nelle sorelle 11 e 15 ripuntati al codice, C3 con la nota «As built» —; CORRETTO CODICE su richiesta e decisione del proprietario, fuori dalla spec: in Analisi la Scheda già aperta non rifà l'ingresso quando vi si sceglie una sottocategoria (`e2e/analisi.spec.ts`, visto rosso), in Cashflow › Budget «Budget annuali» e «Per categoria» stampano la cifra di «Avvisi», lo speso fino a oggi, con «+ N € in calendario» (`__tests__/budgetSummary.test.ts`, due casi visti rossi; riprodotto sul mirror con uno script indipendente); Playwright intera); le altre dodici sono `read`, nessuna implementata.
 >
 > Il prompt che il proprietario incolla per ritirare UNA spec di `doc/dati/` (`doc/dati/README.md` § 8 regola 12:
 > implementazione → ritiro → implementazione). Ogni segnaposto del corpo è sostituito con ciò che il repo diceva il
@@ -246,8 +246,8 @@ ORDINE DI LAVORO
    06, 12, 14, 17, 20, 21), `assistente-registra.md` (sei), `e2e-emulatori.md` (sei),
    `rendimenti.md`, `impostazioni.md`, `server.md` (cinque ciascuna), `cashflow-dividendi.md`
    (quattro: 04, 07, 18, 21), `consulente.md` (15, 19, 21) e `consulente-piano.md` (19, 20,
-   21); due guide NASCONO con una spec e il 2026-11-25 non esistono (`patrimonio-strumenti.md` è nata con 05):
-   (05), `assistente-strumenti.md` (09), `patrimonio-andamento.md` (12) — e, per ciò che
+   21); una guida NASCE con una spec e il 2026-11-27 non esiste (`patrimonio-strumenti.md` è nata con 05,
+   `assistente-strumenti.md` con 09): `patrimonio-andamento.md` (12) — e, per ciò che
    sembra un bug e non lo è, i suoi § Per-page blind spots (`grep -ln "Per-page blind
    spots" doc/guide/*.md | wc -l` → 43 guide su 50); un RINVIO senza erede → una spec
    successiva per numero o i blind spots della guida nominata (regola 10: mai «later»),
@@ -295,15 +295,15 @@ ORDINE DI LAVORO
    resta l'archivio, e ogni rimando alla cartella nel repo si riscrive verso di lui.
 
 5) AGGIORNA indici e stato — lo stato vive in PIÙ punti che possono divergere e si
-   chiude con un grep, non con una riga: la cartella è `doc/dati/` (13 spec
+   chiude con un grep, non con una riga: la cartella è `doc/dati/` (12 spec
    `DATI-NN-<slug>.md`, l'indice, questo prompt: `ls doc/dati/`); l'indice è
-   `doc/dati/README.md` (624 righe al 2026-11-26, dopo il ritiro di 08; `grep -n "^## " doc/dati/README.md`: § 1 i quindici
+   `doc/dati/README.md` (634 righe al 2026-11-27, dopo il ritiro di 09; `grep -n "^## " doc/dati/README.md`: § 1 i quindici
    punti del proprietario, § 2 il codice di partenza, § 3 le decisioni 1–96, § 4 le scelte
    adottate, una riga per spec, § 5 l'ordine — il numero È l'ordine — e le dipendenze, § 6
    la tabella di stato, § 7 i contratti condivisi C1–C8 e gli altri nomi, § 8 le sedici
    regole, § 9 la riga SPEC VIVE, § 10 ciò che non si fa). LA RIGA DI STATO è l'ultima
    colonna della tabella di § 6 (`grep -n -E "^\| \[[0-9]{2}\]\(DATI-" doc/dati/README.md`
-   → 13 righe dopo il ritiro di 08 (2026-11-26), tutte «read — riletta in modo adversariale il 2026-11-23: N
+   → 12 righe dopo il ritiro di 09 (2026-11-27), tutte «read — riletta in modo adversariale il 2026-11-23: N
    rilievi, M decisioni»): i valori sono `written` → `read` → `implemented` (in `develop`,
    in attesa del ritiro), e il ritiro TOGLIE la riga (il paragrafo sotto la tabella,
    regola 12) — nell'indice non si scrive nessun «retired on»: il ritiro sta in `git log
@@ -352,7 +352,7 @@ zero script di collaudo e servizi vivi (emulatori Firebase, server Next), o i ca
 partono (WORKFLOW.md § 2; 0 il 2026-11-24); (1) `node -v` → v24 (`package.json` `engines`
 «24.x»; v24.18.0 il 2026-11-24); (2) `npx tsc --noEmit` pulito, rifatto DOPO aver scritto
 i test; (3) `TZ=Europe/Rome npx vitest run` E `TZ=UTC npx vitest run` verdi, i due progetti
-`node` e `dom` letti entrambi (427 file / 8318 test, 2 saltati, al ritiro di 08 del 2026-11-26;
+`node` e `dom` letti entrambi (432 file / 8407 test, 2 saltati, al ritiro di 09 del 2026-11-27;
 400 / 8064 al ritiro del 2026-11-23, 9b1a937b), i totali nel messaggio di commit e mai in CLAUDE.md; (4) `npm run lint` a zero;
 (5) `npm run build`, poi `npm run perf:budget` (17 rotte più il condiviso, 18 voci: `node
 -e "console.log(require('./perf/budget.json').routes.length)"`) — REGOLA DEL BUILD DI
@@ -373,8 +373,8 @@ Vitest, senza Playwright (WORKFLOW.md § 3); un difetto a RUNTIME si corregge so
 decisione — tutti i trovati in UNA domanda a scelta multipla —, con la suite d'area su
 `next dev` (`npx playwright test e2e/<area>`) e `npm run test:e2e` INTERO sulla sua build
 di produzione (Java ≥ 21, emulatori accesi, :3100–3103 libere — quattro worker dal
-2026-11-26, un server per worker, nient'altro in esecuzione sulla macchina; 114 file `*.spec.ts`, 581 test — 580 passati, 1 saltato — al
-2026-11-26 (2b35d65b); la rotta del modello sempre finta: un passo che spende me lo chiedi prima,
+2026-11-26, un server per worker, nient'altro in esecuzione sulla macchina; 116 file `*.spec.ts`, 587 test raccolti con i setup (`npx playwright test --list`) al
+2026-11-27; la rotta del modello sempre finta: un passo che spende me lo chiedi prima,
 decisione 48; emulatori e server avviati staccati su Windows, WORKFLOW.md § 3; un rosso fra
 i flake noti di doc/guide/e2e-suite.md si ripete da solo con `--repeat-each=3`, un secondo
 rosso dello stesso test ferma), e si scrive in CLAUDE.md § Latest che i segnali vanno
@@ -389,18 +389,17 @@ e 21 moderati, invariati dal 2026-11-20). Nel messaggio di commit, con i segnali
 10; la colonna «Model · effort» di § 6 finché la riga c'è).
 LIMITI: tetti e comandi, con la misura del 2026-11-24 accanto — CLAUDE.md «well under
 20.000 characters», contato in caratteri: `node -e
-"console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` → 18.165 (`wc -c` →
-18.421: conta i byte) dopo il ritiro di 08, 76 righe: restano circa 1.800 caratteri, il «Latest» si SOSTITUISCE
+"console.log(require('fs').readFileSync('CLAUDE.md','utf8').length)"` → 18.555 (`wc -c` →
+18.826: conta i byte) dopo il ritiro di 09, 76 righe: restano circa 1.400 caratteri, il «Latest» si SOSTITUISCE
 e una riga d'area si riscrive a lunghezza uguale o minore; AGENTS.md ~1000 righe (§ 0):
-`wc -l AGENTS.md` → 888 al 2026-11-26 (3d271323 ne ha spostate 127 nelle guide) — una regola nuova entra come RULE + DATE +
+`wc -l AGENTS.md` → 900 al 2026-11-27 (3d271323 ne ha spostate 127 nelle guide) — una regola nuova entra come RULE + DATE +
 WHERE PINNED, uno stub di § 3 non cresce, una lezione di dominio va nella guida;
 WORKFLOW.md (347 righe) solo lo standard e la sua traduzione locale; README.md 467 righe
 (DATI-01 ne ha tolte 73); DESIGN.md (1481 righe) scritto a mano, senza tetto, mai
 rigenerato; le guide ~500 righe ciascuna, 50 file (`ls doc/guide/*.md | wc -l`), le più
-vicine al tetto con `wc -l doc/guide/*.md | sort -n | tail -10`: `consulente.md` 507 (GIÀ
-OLTRE, e 15, 19 e 21 vi scrivono), `patrimonio.md` 493 (sette spec), `velocita.md` 492
-(nove), `temi.md` 486, `prima-schermata-misure.md` 473 (12 e 13), `assistente.md` 458
-(otto; la forma della risposta vive da DATI-08 in `assistente-risposta.md`, 102), `e2e-playwright.md` 428, `cashflow.md` 379, `panoramica.md` 361; le altre di
+vicine al tetto con `wc -l doc/guide/*.md | sort -n | tail -10`: `velocita.md` 500 (nove spec), `consulente.md` 499
+(15, 19 e 21 vi scrivono), `temi.md` 486, `prima-schermata-misure.md` 473 (12 e 13), `assistente.md` 470
+(otto; la forma della risposta vive in `assistente-risposta.md`, gli strumenti in `assistente-strumenti.md`, 87), `e2e-playwright.md` 428, `cashflow.md` 379, `panoramica.md` 361; le altre di
 destinazione partono da `cashflow-dividendi.md` 415 (dopo 07), `accumulo.md` 307, `rendimenti.md`
 273, `consulente-piano.md` 268, `allocazione.md` 227, `collaudo.md` 226, `impostazioni.md`
 207, `email-pdf.md` 206, `registro-operazioni.md` 197, `assistente-registra.md` 147,

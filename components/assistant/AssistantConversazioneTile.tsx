@@ -45,8 +45,9 @@ interface AssistantConversazioneTileProps {
 }
 
 /**
- * The web search as an 11px chip in the aside, so a slow lookup does not read as a generic delay.
- * Only the web: the wait itself speaks in the answer's place (`AssistantWaiting`, 2026-11-16).
+ * What the server is doing beside writing — the web search, the tools' sums (2026-11-26) — as an
+ * 11px chip in the aside, so a slow lookup does not read as a generic delay. Nothing else: the wait
+ * itself speaks in the answer's place (`AssistantWaiting`, 2026-11-16).
  */
 export function StreamStatusChip({
   isStreaming,
@@ -55,7 +56,7 @@ export function StreamStatusChip({
   const prefersReducedMotion = useReducedMotion();
   if (!isStreaming || (streamStatus !== 'searching' && streamStatus !== 'computing')) return null;
 
-  // The tools on the data (DATI-09) say their own words and icon, never the web's.
+  // The tools on the data (2026-11-26) say their own words and icon, never the web's.
   const label = streamStatus === 'computing' ? 'Faccio i conti sui tuoi dati…' : 'Sto cercando sul web…';
   const Icon = streamStatus === 'computing' ? Calculator : Globe;
 

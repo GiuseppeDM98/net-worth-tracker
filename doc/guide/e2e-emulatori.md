@@ -49,7 +49,7 @@
   `npx tsx --conditions=react-server scripts/<x>.tmp.mts` (2026-11-25: the cron's payment-day phase,
   `runExpenseCreation`, called on the emulator without its route, which scrapes Borsa Italiana first); without the
   flag the import throws «This module cannot be imported from a Client Component module».
-  **A throwaway that fakes the Anthropic SDK patches the copy the APP loads** (2026-11-26, DATI-09): the app's modules
+  **A throwaway that fakes the Anthropic SDK patches the copy the APP loads** (2026-11-26): the app's modules
   run as CJS under tsx, so `await import('@anthropic-ai/sdk')` in the `.mts` is ANOTHER copy and a patch of its prototype
   leaves the app's client real — one request left with a dummy key (401, nothing spent). Take the class through
   `createRequire(import.meta.url)('@anthropic-ai/sdk').default`, set `ANTHROPIC_API_KEY` to a dummy AND

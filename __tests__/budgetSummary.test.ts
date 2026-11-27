@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Expense, ExpenseCategory } from '@/types/expenses';
 import type { BudgetAlert, BudgetItem } from '@/types/budget';
+import { evaluateBudgetAlerts } from '@/lib/utils/budgetUtils';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { narrativeToText } from '@/lib/utils/narrative';
 import { VERDICT_REST_SECTION } from '@/lib/utils/mobileSections';
@@ -197,6 +198,20 @@ describe('summarizeAnnualBudgets', () => {
     expect(over.rows[0].remaining).toBe(0);
   });
 
+  // ONE measure for the page's two readings of an annual budget (2026-11-27): the row of «Budget
+  // annuali» and the alert of «Avvisi» print the same «da gennaio» figure — what is booked up to
+  // today — and the rows already in the calendar are a figure of their own. Until then the row
+  // summed the whole year and the two tiles disagreed by the rows still to come. Seen red by
+  // summing the year in the row again (spent 1720 against the alert's 1400).
+  it('prints the figure of its alert: booked up to today, the rows in the calendar beside it', () => {
+    const withCalendar = [...year, expense({ amount: -320, categoryId: 'c-hol', date: new Date(2026, 11, 28, 12) })];
+    const row = summarizeAnnualBudgets([holidays], withCalendar, NOW).rows[0];
+    const alert = evaluateBudgetAlerts([holidays], undefined, withCalendar, [50], NOW)[0];
+    expect(row).toMatchObject({ spent: 1400, scheduled: 320, remaining: 1100, exceeded: false });
+    expect(row.usedPct).toBeCloseTo(56);
+    expect(alert.spent).toBe(row.spent);
+  });
+
   it('leaves income targets out: annual income is not a spending budget', () => {
     const s = summarizeAnnualBudgets([{ ...holidays, kind: 'income' }], year, NOW);
     expect(s.rows).toEqual([]);
@@ -228,6 +243,19 @@ describe('buildCategoryRows', () => {
     expect(casa.usedPct).toBeCloseTo(92);
     expect(alimentari.pace).toBe('variable');
     expect(alimentari.projection).toBeCloseTo((450 / 22) * 31);
+  });
+
+  // The monthly twin of the annual rule above (2026-11-27): «Per categoria» prints what «Avvisi»
+  // prints for the same budget. The month-end figure still counts the calendar, as it is. Seen red
+  // by reading `spentSoFar` in the row again (spent 550 against the alert's 450).
+  it('prints the figure of its alert: booked up to today, the calendar in the month-end figure', () => {
+    const withCalendar = [...august, expense({ amount: -100, date: new Date(2026, 7, 28, 12) })];
+    const row = buildCategoryRows([food], categories, withCalendar, NOW).expense[0];
+    const alert = evaluateBudgetAlerts([food], undefined, withCalendar, [50], NOW, categories).find((a) => a.key === row.key);
+    expect(row).toMatchObject({ spent: 450, scheduled: 100 });
+    expect(row.usedPct).toBeCloseTo(75);
+    expect(alert?.spent).toBe(row.spent);
+    expect(row.projection).toBeCloseTo((450 / 22) * 31 + 100);
   });
 
   it('has no projection for a category with nothing spent, nor before the fourth day', () => {

@@ -848,7 +848,7 @@ const ANSWER_CONTRACT = [
 ].join('\n');
 
 /**
- * The tools on the user's data (DATI-09): every mode but Registra sends them, so the section sits
+ * The tools on the user's data (2026-11-26): every mode but Registra sends them, so the section sits
  * here and not in ASSISTANT_SYSTEM_CORE, which Registra and the emails read and which have none.
  * Static — no date, no name — like the rest of the system: it is the request's prefix.
  */

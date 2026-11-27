@@ -108,6 +108,13 @@ function AnnualRow({
                 restano <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(row.remaining, true)}</span>
               </>
             )}
+            {/* The rows of the year still to come: beside the figure, never inside it. */}
+            {row.scheduled > 0 && (
+              <>
+                {' · + '}
+                <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(row.scheduled, true)}</span> in calendario
+              </>
+            )}
           </span>
         )}
       </div>
@@ -116,7 +123,8 @@ function AnnualRow({
 }
 
 /**
- * "Come vanno i budget annuali?" — the budgets measured year-to-date, on a window the rest
+ * "Come vanno i budget annuali?" — the budgets measured from January up to today (the rows
+ * already in the calendar are «+ N € in calendario» beside «restano»), on a window the rest
  * of the page does not use (the Off-Axis Tile Rule): the aside names it («2026, da gennaio ·
  * anno al 64%») and every row carries the year's mark on its track, so «56% used» is read
  * against «64% of the year gone» without leaving the row. Each row keeps the pencil and the

@@ -168,7 +168,8 @@ export function useAssistantStreaming({
   const [isStreaming, setIsStreaming] = useState(false);
   const [isInterrupted, setIsInterrupted] = useState(false);
   // Mirrors the server's SSE status event (searching | writing | computing | saving). Drives the
-  // distinct "Sto cercando sul web…" badge instead of the generic slow-response nudge.
+  // badge that names the operation («Sto cercando sul web…», «Faccio i conti sui tuoi dati…»)
+  // instead of the generic slow-response nudge.
   const [streamStatus, setStreamStatus] = useState<'searching' | 'writing' | 'computing' | 'saving' | null>(null);
   // Context bundle is populated from the SSE 'context' event sent before text streaming,
   // or (when idle) from the period-preview fetch the page performs.

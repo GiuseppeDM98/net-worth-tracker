@@ -3,8 +3,8 @@
 > **When to open this guide** — whoever touches the tools the Assistente calls on the user's data:
 > `lib/server/assistant/tools/*`, the pure queries `lib/utils/assistantExpenseQueries.ts`, the tool loop of
 > `streamAssistantResponse` (`lib/server/assistant/anthropicStream.ts`), `TOOLS_SECTION` in
-> `lib/server/assistant/prompts.ts`, the `computing` status. Split from doc/guide/assistente.md on 2026-11-26
-> (DATI-09), past 500 lines; the page, the router and the stream stay there, the form of the answer in
+> `lib/server/assistant/prompts.ts`, the `computing` status. Split from doc/guide/assistente.md on 2026-11-26,
+> past 500 lines; the page, the router and the stream stay there, the form of the answer in
 > doc/guide/assistente-risposta.md, Registra in doc/guide/assistente-registra.md.
 
 ## Files
@@ -20,9 +20,9 @@
   `assistantRoutes`, `assistantPromptBundle`, `monthlyEmailService` (the email has no tools), `assistantChatNarrative`,
   and on the `dom` project `useAssistantStreaming`.
 
-## The tools (2026-11-26, DATI-09)
+## The tools (2026-11-26)
 
-- **Five tools, one registry** (contract C3): `cashflow_totali` (sums by category, subcategory, type, month or
+- **Five tools, one registry**: `cashflow_totali` (sums by category, subcategory, type, month or
   centre over any period), `cashflow_confronto` (two periods side by side), `cashflow_righe` (the rows behind a
   figure), `budget_stato` (the Budget page's measure for a year or a month), `centri_di_costo` (the centres as their
   page reads them). A tool is a `defineAssistantTool({ name, description, input, run })` in its own file: the zod
@@ -76,6 +76,12 @@
 - **No history floor set → no floor** for the tools, as for the CASHFLOW block, while Cashflow › Analisi starts at
   `DEFAULT_HISTORY_START_YEAR`: on such an account a tool total may include years Analisi does not show.
 - **The cap's count**: eight rounds run their tools, the next two requests get «stop» — eleven requests at most.
+- **No ceiling on the input tokens of one answer**: a long thread replayed through eleven requests is sent eleven
+  times, each with the tool results gathered so far; nothing counts or cuts it. The log line is the measure.
+- **`budget_stato` counts the rows in the calendar inside `spent` and names them in `scheduled`** — the tool's
+  description says so — while Cashflow › Budget prints what is booked up to today with «+ N € in calendario» beside
+  it (2026-11-27): the page's figure is the tool's `spent` − `scheduled`. An annual line asked for a MONTH is
+  summed by `getMonthlyActualsForItem`, a function of `budgetUtils.ts` the page itself does not call.
 - **The figure is the code's, the words around it the model's** (the owner's tour, 2026-11-26: four answers right to
   the cent): the model may still paraphrase a window or a row's date loosely — «up to today» for a total that
   includes the rows still scheduled, a row's day read one off. The tool result is right; the prompt does not police it.

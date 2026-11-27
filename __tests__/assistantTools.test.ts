@@ -3,6 +3,11 @@
  * measures it, the cost centres as their page reads them, the definitions generated from zod, and
  * every way a call fails — each an error result, never a throw. Pure over a hand-built context:
  * no Firestore, no model. Fixtures at Italian noon, figures invented and round.
+ *
+ * Each rule was seen red by the session that wrote it (2026-11-26): the Budget's gate dropped
+ * (re-seen red on 2026-11-27) and `ceilingToDate` equal to `ceiling`; the centres grouped by name
+ * through the cashflow query; the period not echoed and a `.describe()` dropped; a tool's throw
+ * rethrown.
  */
 
 import { describe, expect, it, vi } from 'vitest';

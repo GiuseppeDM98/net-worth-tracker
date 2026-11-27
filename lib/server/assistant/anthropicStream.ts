@@ -26,7 +26,7 @@ export const ASSISTANT_STRUCTURED_MAX_TOKENS = 32000;
 // category — far below the chat's budget, so adaptive thinking cannot linger on a receipt.
 export const ASSISTANT_REGISTER_MAX_TOKENS = 16000;
 
-/** Rounds of tool calls one answer may run (DATI-09): past them the tools answer «stop». */
+/** Rounds of tool calls one answer may run (2026-11-26): past them the tools answer «stop». */
 export const ASSISTANT_TOOL_ROUNDS_MAX = 8;
 /** Measured from the first request: past it the tools answer «stop». The function dies at 300 s (owner, 2026-11-23). */
 export const ASSISTANT_TOOL_DEADLINE_MS = 200_000;
@@ -57,7 +57,7 @@ interface StreamAssistantResponseArgs {
   // Prior messages in the thread, loaded before the new user message is appended.
   // Injected as a multi-turn history so Claude can follow-up coherently.
   conversationHistory?: AssistantMessage[];
-  // Every mode but Registra (DATI-09): what the tools read, read once by the route. Absent → no tool.
+  // Every mode but Registra (2026-11-26): what the tools read, read once by the route. Absent → no tool.
   toolContext?: AssistantToolContext;
   onStatus: (status: 'searching' | 'writing' | 'computing' | 'saving') => void;
   onText: (text: string) => void;
@@ -159,7 +159,7 @@ function buildMessagesArray(
 const TRUNCATION_NOTICE =
   '\n\n_(Risposta interrotta: ho raggiunto il limite di lunghezza. Chiedimi di continuare o restringi la domanda.)_';
 
-/** The whole answer when the tool loop ended on its limit with nothing written (DATI-09). */
+/** The whole answer when the tool loop ended on its limit with nothing written (2026-11-26). */
 const TOOL_LIMIT_NOTICE = '*Non sono riuscito a chiudere i conti: riprova con una domanda più stretta.*';
 
 /**
@@ -222,7 +222,7 @@ export async function streamAssistantResponse({
   // The status says what the server is doing NOW (owner, 2026-11-16: an answer stood still for a
   // minute on its first sentence while the model searched, and the status never came back to
   // writing): 'searching' only from a search's start, 'writing' again at the text that follows it.
-  // 'computing' while the tools run (DATI-09): the text that follows them says 'writing' again.
+  // 'computing' while the tools run (2026-11-26): the text that follows them says 'writing' again.
   let status: 'searching' | 'writing' | 'computing' = 'writing';
   let toolCalls = 0;
   let toolRounds = 0;
@@ -328,7 +328,7 @@ export async function streamAssistantResponse({
 
       for await (const chunk of stream) handleEvent(chunk);
     } else {
-      // The tool loop (DATI-09, doc/guide/assistente.md § The tools): each round is a full request —
+      // The tool loop (2026-11-26, doc/guide/assistente-strumenti.md § The tools): each round is a full request —
       // the model asks, the code answers — until it writes. No tool_choice (a 400 on Opus 5.5), no strict.
       const messages: Anthropic.Beta.BetaMessageParam[] = buildMessagesArray(mode, userContent, conversationHistory);
       // ONE list for every request of the answer: a thinking block already in `messages` was written against it.
@@ -399,7 +399,7 @@ export async function streamAssistantResponse({
       onText(TRUNCATION_NOTICE);
       text += TRUNCATION_NOTICE;
     } else if (stopReason === 'max_tokens') {
-      // Cut inside its thinking or a call: the notice alone, never an empty bubble (DATI-09).
+      // Cut inside its thinking or a call: the notice alone, never an empty bubble (2026-11-26).
       onText(TRUNCATION_NOTICE.trim());
       text = TRUNCATION_NOTICE.trim();
     } else if (stopReason === 'refusal' && text.length === 0) {

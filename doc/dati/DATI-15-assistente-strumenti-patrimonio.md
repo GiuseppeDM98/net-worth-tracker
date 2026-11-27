@@ -490,7 +490,7 @@ grouped: `[assistant] tools: N calls, R rounds, S s (operazioni_registro×1, cas
 
 ### 4.4 The prompt — `lib/server/assistant/prompts.ts`
 
-`TOOLS_SECTION` («# Gli strumenti sui tuoi dati», DATI-09 § 4.4) changes in four places; the rest is unchanged:
+`TOOLS_SECTION` («# Gli strumenti sui tuoi dati», a module constant of `lib/server/assistant/prompts.ts`) changes in four places; the rest is unchanged:
 
 - its first sentence becomes «Hai strumenti che interrogano il cashflow registrato, il budget, i centri di costo,
   il registro delle operazioni, i dividendi e la storia del patrimonio (a fine mese e giorno per giorno): i conti

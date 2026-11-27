@@ -188,6 +188,37 @@ test('drills category → Scheda → subcategory transactions, writing the focus
   await expect(page).not.toHaveURL(/focusCat/);
 });
 
+// The Scheda rises in (8px, opacity 0 → 1) only when it OPENS. Until 2026-11-27 a subcategory picked
+// inside it ran the entry again, and its backwards fill held the cell at opacity 0 for 250 ms: the
+// page went empty and came back. Seen red by rising in on every landing (the minimum read 0).
+test('a subcategory picked inside the open Scheda never hides it', async ({ page }) => {
+  await gotoAnalisi(page);
+  await page.getByRole('region', { name: 'Dove vanno i soldi' }).getByRole('button', { name: /^Casa, / }).click();
+  await expect(scheda(page)).toBeVisible();
+  // The cell that lands: the tile's parent. Its own entry has to be over before the second pick.
+  const cell = scheda(page).locator('xpath=..');
+  await expect.poll(() => cell.evaluate((el) => el.getAnimations().length)).toBe(0);
+
+  // The lowest opacity the cell shows from now to 800 ms on, read at every frame.
+  await cell.evaluate((el) => {
+    const sample = { min: 1, done: false };
+    (window as unknown as { schedaSample: typeof sample }).schedaSample = sample;
+    const start = performance.now();
+    const step = () => {
+      sample.min = Math.min(sample.min, parseFloat(getComputedStyle(el).opacity));
+      if (performance.now() - start < 800) requestAnimationFrame(step);
+      else sample.done = true;
+    };
+    requestAnimationFrame(step);
+  });
+  await scheda(page).getByRole('button', { name: /^Condominio, / }).click();
+  await expect(page.getByText(`Transazioni · ${CURRENT_YEAR}`)).toBeVisible();
+
+  const readSample = () => page.evaluate(() => (window as unknown as { schedaSample: { min: number; done: boolean } }).schedaSample);
+  await expect.poll(async () => (await readSample()).done).toBe(true);
+  expect((await readSample()).min).toBe(1);
+});
+
 test('cold-loads a bookmarked focus URL straight into the open Scheda', async ({ page }) => {
   await gotoAnalisi(page, '?focusType=fixed&focusCat=e2e-cat-casa&focusSub=e2e-sub-cond');
 
