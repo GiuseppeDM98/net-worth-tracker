@@ -17,7 +17,7 @@ import {
   findCrossingDay,
   forecastMonthlyItem,
   projectCrossingDay,
-  getActualForItem,
+  splitYearActualForItem,
   getMonthlyTotalExpenses,
   getPeriodActual,
   resolveBudgetCalendar,
@@ -202,8 +202,15 @@ export interface AnnualBudgetRow {
   key: string;
   label: string;
   budget: number;
-  /** Year-to-date. */
+  /**
+   * Booked from January up to today — the figure the row's alert prints (`evaluateBudgetAlerts`):
+   * one budget, one «da gennaio» figure on the page (2026-11-27; until then the row summed the
+   * whole year, the rows still to come included, and the two tiles disagreed by them).
+   */
   spent: number;
+  /** The year's rows dated after today: their own clause, never in `spent` (The Scheduled-Is-Not-Spent Rule). */
+  scheduled: number;
+  /** `spent` / budget, 0-100. */
   usedPct: number;
   remaining: number;
   /** Used share above the year's elapsed share. */
@@ -234,7 +241,7 @@ export function summarizeAnnualBudgets(items: BudgetItem[], expenses: Expense[],
     .filter((item) => item.kind === 'expense' && item.period === 'annual' && item.amount > 0)
     .sort((a, b) => a.order - b.order)
     .map((item): AnnualBudgetRow => {
-      const spent = getActualForItem(item, expenses, year);
+      const { spentToDate: spent, scheduled } = splitYearActualForItem(item, expenses, year, now);
       const usedPct = (spent / item.amount) * 100;
       return {
         item,
@@ -242,6 +249,7 @@ export function summarizeAnnualBudgets(items: BudgetItem[], expenses: Expense[],
         label: budgetItemLabel(item),
         budget: item.amount,
         spent,
+        scheduled,
         usedPct,
         remaining: Math.max(0, item.amount - spent),
         ahead: usedPct > yearElapsedPct,
@@ -265,8 +273,14 @@ export interface CategoryBudgetRow {
   label: string;
   kind: BudgetKind;
   budget: number;
-  /** Everything booked in the month. */
+  /**
+   * Booked in the month up to today — the figure the row's alert prints (2026-11-27, the monthly
+   * twin of `AnnualBudgetRow.spent`); for an income target, what was received.
+   */
   spent: number;
+  /** The month's rows dated after today: in `projection`, never in `spent`. */
+  scheduled: number;
+  /** `spent` / budget, 0-100. */
   usedPct: number;
   /** Month-end figure; null for an income target, with nothing spent, or before the 4th. */
   projection: number | null;
@@ -302,8 +316,9 @@ export function buildCategoryRows(items: BudgetItem[], categories: ExpenseCatego
         label: budgetItemLabel(item),
         kind: item.kind,
         budget: item.amount,
-        spent: forecast.spentSoFar,
-        usedPct: item.amount > 0 ? (forecast.spentSoFar / item.amount) * 100 : 0,
+        spent: forecast.spentToDate,
+        scheduled: forecast.scheduled,
+        usedPct: item.amount > 0 ? (forecast.spentToDate / item.amount) * 100 : 0,
         projection: !isIncome && canForecast && forecast.spentSoFar > 0 ? forecast.projectedTotal : null,
         pace: isIncome ? 'variable' : resolveItemPace(item, categories),
       };

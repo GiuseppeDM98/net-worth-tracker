@@ -346,7 +346,8 @@ test('E10 — a new conversation: no skeleton and no remount while the answer ar
 // The owner, phase F of 2026-11-25: «Nuova conversazione» left the page where the last thread had
 // been read, at its bottom. The click is dispatched, so Playwright does not scroll to the button; a
 // low window, so the empty page still scrolls (on a tall one it fits, and goes back to 0 by itself).
-// Seen RED without the scroll in `handleNewThread`.
+// Seen RED without the scroll in `handleNewThread`, and one run in three (8–34px) without its
+// second scroll in the next frame (2026-11-27; ten runs green with it).
 test('E11 — «Nuova conversazione» brings the page back to the top', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 420 });

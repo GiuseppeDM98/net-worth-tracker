@@ -134,8 +134,17 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `dialogNarrative.ts`. Pinned by `__tests__/budgetUtils.test.ts` (seen red with the gate reading `type` alone).
 - **GOTCHA**: never reconcile items against `categories` while `categories.length === 0` (they load async) — every
   category budget is dropped as an orphan and a later edit can persist the empty set.
-- **The Assistente's `budget_stato` tool measures with this page's functions** (2026-11-26): the same
-  `countsTowardBudget` gate, ceilings and pace; doc/guide/assistente-strumenti.md.
+- **The Assistente's `budget_stato` tool measures with the functions of `budgetUtils.ts`** (2026-11-26): the same
+  `countsTowardBudget` gate, ceilings and pace; its `spent` includes the rows in the calendar, named in
+  `scheduled` (doc/guide/assistente-strumenti.md § Per-page blind spots).
+- **One budget, one «speso» on the page** (owner, 2026-11-27): the row of «Budget annuali»
+  (`AnnualBudgetRow.spent`, `splitYearActualForItem`), the row of «Per categoria» (`CategoryBudgetRow.spent`,
+  the forecast's `spentToDate`) and the budget's alert in «Avvisi» print the SAME figure — what is booked up to
+  today — and the share, the track, «restano» and «oltre» are read on it; the rows dated after today are
+  `scheduled`, printed as «+ N € in calendario» beside the figure and counted, as they are, in «Fine mese». Until
+  then the two rows summed the whole period and disagreed with the alert by the rows still to come (an annual
+  budget with two instalments ahead read two figures «da gennaio»). Held by the two cases «prints the figure of its
+  alert» of `__tests__/budgetSummary.test.ts`, which compare the row with `evaluateBudgetAlerts`.
 
 ## Composizione mobile
 
@@ -158,6 +167,10 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 
 ## Per-page blind spots
 
+- **Off the page a budget's «speso» still counts the rows in the calendar** (2026-11-27): the budget email and
+  Registra's context read `getPeriodActual` (the whole month, the whole year), and the Assistente's `budget_stato`
+  names them in `scheduled`. The page alone prints «booked up to today» beside «+ N € in calendario»; an email
+  read the same morning may say a few euro more for a budget with instalments ahead.
 - **Without a budget the phone shows Per categoria alone** (2026-10-12): Categorie a rischio and Avvisi are hidden below `desktop:` (they would repeat its empty state), so the first budget is added from that tile or the settings under it. The base fixture has no ceiling: its Budget has no strip, and the census's `firstClosedRowAbovePill` for this tab is read without one.
 - **The fee of a row «fuori dal budget» stays IN the budget** (2026-10-17): the flag is the row's alone, and a fee is a
   row of its own (doc/guide/cashflow.md) — a bank charge for a purchase made for someone else is still a cost of

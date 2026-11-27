@@ -71,8 +71,8 @@ much it saves a month and a year, and the rows that show it.
     plan (`RowLine.recurring`), whatever their type. Taxes and medical rows are kept out by the prompt only.
   - (f) «Invia ora» for this email too, on the last closed month.
   - (g) effort `high`, `max_tokens` 16.000: a batch with no reader waiting, as the periodic emails (DATI-10 (e)).
-  - (h) the history's floor (`cashflowHistoryStartYear`) applies, as in every cashflow query (DATI-09, decision 73).
-  - (i) a refund — a spending row with a positive amount — counts as spending, as in the queries (DATI-09 (h)).
+  - (h) the history's floor (`cashflowHistoryStartYear`) applies, as in every cashflow query (decision 73; `selectRows` in `lib/utils/assistantExpenseQueries.ts`).
+  - (i) a refund — a spending row with a positive amount — counts as spending, as in the queries (`Math.abs` in `selectRows`, `lib/utils/assistantExpenseQueries.ts`).
 
 ## 4. Solution
 

@@ -282,7 +282,12 @@ Composed for a small screen on 2026-10-14 (its spec, retired on 2026-10-15, is i
 - **The specs**: `e2e/mobile-composition.analisi.mobile.spec.ts` (`analisi-mobile`; a decoy row on the 28th of December carries the scope), the scope at 1440 in `e2e/analisi.spec.ts`; `analisi.mobile.spec.ts` and `bundle.lazy.mobile.spec.ts` open their rows (and «Dettaglio» for the Flusso) first; the rings' fit in the last `describe` of `analisi{,.mobile}.spec.ts` (one planted income row) and in `classifica.tablet.spec.ts` — `ringCenterMaxChars` forced to 12 leaves them green (the fixture's «780 €», «1420 €» fit whole): the falsification that turns them red at 390, 768, 1024 and 1440 is the centre's font drawn ×2,5 (2026-11-15); `__tests__/analisiSummary.test.ts` (`selectAnalisiStrip`, the cell's identity) and `__tests__/analisiNarrative.test.ts` (`describeAnalisiClosedAnswers`); `npm run mobile:budget` holds the surface `analisi` of `perf/mobile-budget.json`.
 
 ## Per-page blind spots
-- **A pick in «Vai a categoria…» lands AFTER the modal has closed** (2026-10-20): `EntitySearch` parks the target in a ref and calls
+- **The Scheda rises in only when it OPENS** (owner, 2026-11-27): `landOnScheda(reveal, alreadyOpen)` glides in both
+  cases, and runs `riseIn` only when the cell was not on the page when the entity was chosen (`schedaRef.current`
+  read by `handleEntitySelect` before the state change). The entry's backwards fill holds the cell at opacity 0
+  until the glide lands: on a Scheda already under the reader's eyes — a subcategory picked inside it — that was
+  250 ms of empty page. Held by «a subcategory picked inside the open Scheda never hides it» in
+  `e2e/analisi.spec.ts`, which reads the cell's lowest opacity frame by frame.- **A pick in «Vai a categoria…» lands AFTER the modal has closed** (2026-10-20): `EntitySearch` parks the target in a ref and calls
   `onSelect` from `ResponsiveModal`'s `onExitComplete`. Fired at once, `landOnScheda` scrolled the Scheda in at 50 ms and the
   modal's focus restore — `trigger.focus()` after the exit animation, and a focus scrolls — pulled the page back up to the
   header a moment later (the owner saw the one-second jump on the mirror). The order also hands the Scheda the focus last,

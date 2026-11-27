@@ -249,7 +249,7 @@ describe('StreamStatusChip — the corner of the tile', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 
-  it('says the sums while the tools run, never the web (DATI-09)', () => {
+  it('says the sums while the tools run, never the web (2026-11-26)', () => {
     render(<StreamStatusChip isStreaming streamStatus="computing" />);
     expect(screen.getByRole('status').textContent).toBe('Faccio i conti sui tuoi dati…');
   });
@@ -261,7 +261,7 @@ describe('AssistantStreamingResponse — a pause after the first words', () => {
   const STREAMING = 'local-assistant-1';
   const waiting = (container: HTMLElement) => container.querySelector('[data-assistant-waiting]');
 
-  it('shows the sums under the text while the tools run (DATI-09)', () => {
+  it('shows the sums under the text while the tools run (2026-11-26)', () => {
     const { container } = renderMessages([assistant('Cerco i totali.', { id: STREAMING })], { streamingMessageId: STREAMING, streamStatus: 'computing' });
     expect(waiting(container)?.textContent).toContain('Faccio i conti sui tuoi dati…');
   });

@@ -103,7 +103,11 @@ function TableRow({
         {armed && <span className="mt-0.5 block text-[11px] leading-[1.35] text-destructive">{describeBudgetDeleteConsequence(row.kind, row.label)}</span>}
       </th>
       <td className="py-2 pr-3 text-right font-mono text-[13px] tabular-nums text-foreground">{cachedFormatCurrencyEUR(row.budget, true)}</td>
-      <td className="py-2 pr-3 text-right font-mono text-[13px] tabular-nums text-foreground">{cachedFormatCurrencyEUR(row.spent, true)}</td>
+      <td className="py-2 pr-3 text-right font-mono text-[13px] tabular-nums text-foreground">
+        {cachedFormatCurrencyEUR(row.spent, true)}
+        {/* The month's rows still to come: under the figure, never inside it. */}
+        {row.scheduled > 0 && <span className="block font-sans text-[11px] leading-[1.35] text-muted-foreground">+ {cachedFormatCurrencyEUR(row.scheduled, true)} in calendario</span>}
+      </td>
       <td className="min-w-[80px] py-2 pr-3">
         <BudgetTrack
           ratio={ratio}
@@ -270,11 +274,19 @@ function MobileRow({
           valueText={trackValueText(row)}
         />
         <span className="flex justify-between text-[11px] text-muted-foreground">
-          <span className={cn('font-mono tabular-nums', progressTextClass(ratio, inverted))}>{formatPercentage(row.usedPct, 0)}</span>
+          <span>
+            <span className={cn('font-mono tabular-nums', progressTextClass(ratio, inverted))}>{formatPercentage(row.usedPct, 0)}</span>
+            {row.scheduled > 0 && (
+              <>
+                {' · + '}
+                <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(row.scheduled, true)}</span> in calendario
+              </>
+            )}
+          </span>
           {projection && (
             <span>
               {row.projection === null ? (
-                row.spent === 0 ? 'nessuna spesa' : 'proiezione dal quarto giorno'
+                row.spent + row.scheduled === 0 ? 'nessuna spesa' : 'proiezione dal quarto giorno'
               ) : (
                 <>
                   a fine mese <span className={cn('font-mono tabular-nums', projection.className)}>{projection.text}</span>

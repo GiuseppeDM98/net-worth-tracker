@@ -36,7 +36,7 @@ interface AssistantStreamingResponseProps {
    * (`streamingAnswerText`). Once streaming finishes the cards render too.
    */
   streamingMessageId?: string;
-  /** The server's stream status, for the wait before the first word (the web search names itself). */
+  /** The server's stream status, for the wait before the first word (the web search and the tools' sums name themselves). */
   streamStatus?: AssistantWaitingStatus;
   /** The open thread, for a message streamed into a thread that did not exist when it was born. */
   threadId: string | undefined;

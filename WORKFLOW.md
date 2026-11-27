@@ -226,7 +226,7 @@ changes from repo to repo and is the only part to rewrite when the tooling chang
 | Build | `npm run build` |
 | Browser tests | `npm run test:e2e` (Playwright; needs Java ≥ 21 and the emulators up) — the whole suite once, before the commit is asked for, on a production build it makes first when the code changed (since 2026-11-16), on four workers (since 2026-11-26); while working, the touched area's specs on `next dev`, one worker: `npx playwright test e2e/<area>` (Obligation 4, below) |
 
-Browser tests: workers 4 · isolation one Firestore emulator project, one server and one set of parked sessions per worker (Auth shared) · whole run 8,6 min on 2026-11-26 (585 tests)
+Browser tests: workers 4 · isolation one Firestore emulator project, one server and one set of parked sessions per worker (Auth shared) · whole run 6,8 min on 2026-11-27 (587 tests)
 
 The whole run wants :3100–3103 free and NOTHING else running on the machine (a contended run's reds are not the
 code's); a test green only at its one retry — «flaky» in the report — is named and read like a red. The wiring and

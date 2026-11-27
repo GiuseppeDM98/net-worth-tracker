@@ -133,8 +133,8 @@ describe('useAssistantStreaming — a register stream', () => {
 // `route` event and sets the turn's mode, and a re-send carries the reading it inherits. Seen RED
 // with `chatContext: 'none'` kept in the body, with the `route` handler leaving the retry's ref
 // alone, and with the placeholders born `'chat'`.
-describe('useAssistantStreaming — the status of the tools (DATI-09)', () => {
-  it('a `status: computing` event is the hook\'s `streamStatus` while the stream is open (D1a)', async () => {
+describe('useAssistantStreaming — the status of the tools (2026-11-26)', () => {
+  it('a `status: computing` event is the hook\'s `streamStatus` while the stream is open', async () => {
     const encoder = new TextEncoder();
     let finish: () => void = () => undefined;
     const held = new Promise<void>((resolve) => { finish = resolve; });

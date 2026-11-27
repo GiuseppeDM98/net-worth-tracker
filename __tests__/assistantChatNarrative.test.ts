@@ -166,7 +166,7 @@ describe('buildWaitingPhrases', () => {
     expect(buildWaitingPhrases(reading('router'), 'searching')).toEqual(['Sto cercando sul web…', 'Leggo i risultati…']);
   });
 
-  it('should say the sums while the tools run, whatever the reading (DATI-09, D1b)', () => {
+  it('should say the sums while the tools run, whatever the reading (2026-11-26)', () => {
     const phrases = ['Faccio i conti sui tuoi dati…', 'Controllo le cifre…'];
     expect(buildWaitingPhrases(undefined, 'computing')).toEqual(phrases);
     expect(buildWaitingPhrases(reading('router'), 'computing')).toEqual(phrases);

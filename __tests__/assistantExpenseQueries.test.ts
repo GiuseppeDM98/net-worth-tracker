@@ -5,6 +5,11 @@
  * the comparison of two periods, the rows behind a figure and their cap. Pure: no `vi.mock`; green in
  * `Europe/Rome` and `TZ=UTC`. Every fixture sits at Italian noon except the one beside midnight, which
  * is named by the Italian clock. Figures invented and round.
+ *
+ * Each rule was seen red by the session that wrote it (2026-11-26): the day read with
+ * `toISOString()`; `Math.abs` on income (re-seen red on 2026-11-27); no fill of the empty months and
+ * the series started at the asked day; an exact string match for a name; the floor test dropped; a
+ * group keyed by its folded name; the comparison sorted by label; the total of the shown rows.
  */
 
 import { describe, expect, it } from 'vitest';

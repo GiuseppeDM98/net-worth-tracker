@@ -473,12 +473,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const handleNewThread = () => {
     // A new conversation starts at the top of the page, wherever the last one was read (owner,
     // phase F of 2026-11-25); the page's scroll container is the layout's `main`.
-    conversationEndRef.current?.closest('main')?.scrollTo({ top: 0 });
+    const main = conversationEndRef.current?.closest('main');
+    main?.scrollTo({ top: 0 });
     setSelectedThreadId(undefined);
     writeThreadParam(undefined);
     streaming.resetStream();
     setContextBundle(null);
     setDraft('');
+    // And once more when the empty page is laid out: while the old thread leaves, the browser can
+    // re-anchor the scroll a few pixels down (seen at 8–34px in one run out of three, 2026-11-27).
+    requestAnimationFrame(() => main?.scrollTo({ top: 0 }));
   };
 
   // A follow-up of a registration is the start of a sentence («Oggi ho speso »): it fills the

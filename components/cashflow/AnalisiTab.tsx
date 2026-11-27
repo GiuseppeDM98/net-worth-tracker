@@ -363,7 +363,11 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   // (it reads the memory from the store and `#analisi-scheda` from the DOM when the timer fires),
   // and the timer is the effect's async callback, never a `setState` in an effect's body. The width
   // is read at that moment too: a restore can run before the first render after hydration knows it.
-  const landOnScheda = useCallback((reveal: (id: string) => void) => {
+  // `alreadyOpen`: the Scheda was on the page when the entity was chosen (a subcategory picked inside
+  // it, another category picked beside it). It still glides, but it does not rise in again: the
+  // entry holds the cell at opacity 0 until the glide lands, and on a Scheda already under the
+  // reader's eyes that was 250 ms of empty page (owner, 2026-11-27).
+  const landOnScheda = useCallback((reveal: (id: string) => void, alreadyOpen = false) => {
     setTimeout(() => {
       if (document.getElementById(sectionTriggerId(ANALISI_SECTION_IDS.scheda)) || window.matchMedia(COMPACT_QUERY).matches) {
         reveal(ANALISI_SECTION_IDS.scheda);
@@ -373,7 +377,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
       if (!cell) return;
       // A glide of 450 ms and the Scheda rising in as it lands (owner, 2026-11-15); a jump under reduced motion.
       glideIntoView(cell);
-      riseIn(cell);
+      if (!alreadyOpen) riseIn(cell);
       // Keyboard and screen-reader focus follow the visual move.
       cell.focus({ preventScroll: true });
     }, 50);
@@ -648,7 +652,8 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
         selectedCategory: { expenseType: target.expenseType, key: target.categoryKey, label: resolved.categoryLabel },
         selectedSubCategory: resolved.subCategory,
       });
-      landOnScheda(sections.reveal);
+      // Read before the state change: the cell exists only while a Scheda is open.
+      landOnScheda(sections.reveal, schedaRef.current !== null);
     },
     [baseExpenses, categories, landOnScheda, sections.reveal],
   );
