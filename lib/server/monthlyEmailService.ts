@@ -1,11 +1,13 @@
 /**
- * Periodic email summary service (monthly, quarterly, yearly)
+ * Periodic email summary service (monthly and yearly)
  *
  * Responsibilities:
- *   - Detect end-of-period dates in Italy timezone
  *   - Query Admin SDK for snapshot, expense, and dividend data
  *   - Build self-contained HTML emails summarizing the period
  *   - Send emails via Resend
+ *
+ * WHEN an email is due is not decided here: the periods are always CLOSED ones, picked by
+ * `lib/utils/emailSchedule.ts` (the cron) or by «Invia ora» (the last closed period).
  *
  * This module is server-only: it imports firebase-admin and the Resend SDK.
  * Never import it from client components.
@@ -28,6 +30,8 @@ import {
   emailComparisonTable,
   emailAlertRows,
   emailProse,
+  emailMarkdownToHtml,
+  emailAppLink,
   type EmailKeyFigure,
   type EmailRankedRow,
 } from '@/lib/server/emailHtml';
@@ -54,9 +58,9 @@ import {
   type EmailPeriod,
   type PeriodEmailVerdictInput,
 } from '@/lib/utils/emailNarrative';
-import { printChartHexForAssetClass, PRINT_COLORS } from '@/lib/constants/printTokens';
+import { printChartHexForAssetClass } from '@/lib/constants/printTokens';
 import { cachedFormatCurrencyEUR, formatPercentageIt } from '@/lib/utils/formatters';
-import { getItalyDate } from '@/lib/utils/dateHelpers';
+import { getItalyMonthBoundsUtc } from '@/lib/utils/dateHelpers';
 import { AssetAllocationSettings, isLoanAsset } from '@/types/assets';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { getDefaultAssistantPreferences } from '@/lib/server/assistant/webSearchPolicy';
@@ -110,7 +114,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type EmailPeriodType = 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
+export type EmailPeriodType = 'monthly' | 'yearly';
 
 interface AssetClassEntry {
   name: string;
@@ -128,9 +132,7 @@ export interface AssetClassPerformers {
 export interface MonthlyEmailData {
   periodType: EmailPeriodType;
   year: number;
-  month: number;   // for monthly: 1-12; for quarterly: last month of quarter; for semiannual: 6 or 12; for yearly: 12
-  quarter?: number; // 1-4, only set for quarterly
-  semester?: number; // 1 (Jan-Jun) or 2 (Jul-Dec), only set for semiannual
+  month: number;   // for monthly: 1-12; for yearly: 12
   currentNetWorth: number;
   previousNetWorth: number;
   netWorthDelta: number;
@@ -175,169 +177,6 @@ export interface MonthlyEmailData {
   periodFlows?: MonthFlows | null;
 }
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
-
-/**
- * Returns true when the Italy-local date of `now` is the last calendar day of its month.
- * Exported for testing.
- */
-export function isLastDayOfMonthItaly(now: Date): boolean {
-  const italyDate = getItalyDate(now);
-  const lastDay = new Date(
-    italyDate.getFullYear(),
-    italyDate.getMonth() + 1,
-    0
-  ).getDate();
-  return italyDate.getDate() === lastDay;
-}
-
-/**
- * Returns true when the Italy-local date of `now` is the last day of a calendar quarter.
- * Quarter-end months: March (3), June (6), September (9), December (12).
- * Exported for testing.
- */
-export function isLastDayOfQuarterItaly(now: Date): boolean {
-  const italyDate = getItalyDate(now);
-  const month = italyDate.getMonth() + 1;
-  if (![3, 6, 9, 12].includes(month)) return false;
-  const lastDay = new Date(italyDate.getFullYear(), italyDate.getMonth() + 1, 0).getDate();
-  return italyDate.getDate() === lastDay;
-}
-
-/**
- * Returns true when the Italy-local date of `now` is December 31.
- * Exported for testing.
- */
-export function isLastDayOfYearItaly(now: Date): boolean {
-  const italyDate = getItalyDate(now);
-  return italyDate.getMonth() === 11 && italyDate.getDate() === 31;
-}
-
-/**
- * Returns the quarter number (1-4) for a given month (1-12).
- * Exported for testing.
- */
-export function monthToQuarter(month: number): number {
-  return Math.ceil(month / 3);
-}
-
-/**
- * Returns the first month of the quarter that ends at `endMonth`.
- * e.g. 3→1, 6→4, 9→7, 12→10.
- * Exported for testing.
- */
-export function getQuarterStartMonth(endMonth: number): number {
-  return endMonth - 2;
-}
-
-/**
- * Returns the end-of-quarter {year, month} for the quarter immediately preceding
- * the given quarter-end month. Handles year wrap: Q1 → Q4 of the previous year.
- * Exported for testing.
- */
-export function getPreviousQuarterEnd(
-  year: number,
-  month: number
-): { year: number; month: number } {
-  // month is always a quarter-end month (3, 6, 9, 12)
-  if (month === 3) return { year: year - 1, month: 12 };
-  return { year, month: month - 3 };
-}
-
-/**
- * Returns {year, month} of the most recently completed quarter end strictly before `now`.
- * e.g. April 19 2026 → { year: 2026, month: 3 }
- *      January 5 2026 → { year: 2025, month: 12 }
- * Exported for testing.
- */
-export function getMostRecentCompletedQuarterEnd(now: Date): { year: number; month: number } {
-  const italyDate = getItalyDate(now);
-  const year = italyDate.getFullYear();
-  // Quarter-end months in reverse order
-  const quarterEndMonths = [12, 9, 6, 3];
-  for (const qMonth of quarterEndMonths) {
-    const lastDayOfQ = new Date(year, qMonth, 0).getDate();
-    const qEnd = new Date(year, qMonth - 1, lastDayOfQ);
-    if (italyDate > qEnd) {
-      return { year, month: qMonth };
-    }
-  }
-  // Before March 31 of the current year → Q4 of the previous year
-  return { year: year - 1, month: 12 };
-}
-
-/**
- * Returns {year, month: 12} of the most recently completed year (Dec 31 must be in the past).
- * e.g. April 19 2026 → { year: 2025, month: 12 }
- * Exported for testing.
- */
-export function getMostRecentCompletedYearEnd(now: Date): { year: number; month: number } {
-  const italyDate = getItalyDate(now);
-  // Dec 31 of the current year is still "this year", so always use year - 1
-  return { year: italyDate.getFullYear() - 1, month: 12 };
-}
-
-/**
- * Returns true when the Italy-local date of `now` is the last day of a calendar half-year.
- * Half-year-end months: June (6) and December (12).
- * Exported for testing.
- */
-export function isLastDayOfHalfYearItaly(now: Date): boolean {
-  const italyDate = getItalyDate(now);
-  const month = italyDate.getMonth() + 1;
-  if (![6, 12].includes(month)) return false;
-  const lastDay = new Date(italyDate.getFullYear(), italyDate.getMonth() + 1, 0).getDate();
-  return italyDate.getDate() === lastDay;
-}
-
-/**
- * Returns the semester number (1 = Jan-Jun, 2 = Jul-Dec) for a half-year-end month (6 or 12).
- * Exported for testing.
- */
-export function monthToSemester(endMonth: number): number {
-  return endMonth === 6 ? 1 : 2;
-}
-
-/**
- * Returns the first month of the half-year that ends at `endMonth`.
- * 6 → 1 (H1 starts in January), 12 → 7 (H2 starts in July).
- * Exported for testing.
- */
-export function getSemesterStartMonth(endMonth: number): number {
-  return endMonth === 6 ? 1 : 7;
-}
-
-/**
- * Returns the end-of-half-year {year, month} immediately preceding the given half-year end.
- * H1 (June) → H2 of the previous year (Dec); H2 (Dec) → H1 of the same year (June).
- * Exported for testing.
- */
-export function getPreviousHalfEnd(
-  year: number,
-  endMonth: number
-): { year: number; month: number } {
-  // endMonth is always a half-year-end month (6 or 12)
-  if (endMonth === 6) return { year: year - 1, month: 12 };
-  return { year, month: 6 };
-}
-
-/**
- * Returns {year, month} of the most recently completed half-year end strictly before `now`.
- * e.g. July 1 2026 → { year: 2026, month: 6 }
- *      February 2 2026 → { year: 2025, month: 12 }
- * Exported for testing.
- */
-export function getMostRecentCompletedHalfYearEnd(now: Date): { year: number; month: number } {
-  const italyDate = getItalyDate(now);
-  const year = italyDate.getFullYear();
-  // June 30 of the current year (if already past) → H1 this year; otherwise H2 of the previous year
-  const juneEnd = new Date(year, 5, 30);
-  if (italyDate > juneEnd) {
-    return { year, month: 6 };
-  }
-  return { year: year - 1, month: 12 };
-}
-
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
 /** The app's one EUR formatter, in its whole-euro form. */
@@ -370,7 +209,7 @@ function formatDelta(delta: MetricDelta | null): string {
 // screen that shows them.
 
 /**
- * The email's period as the narrative layer sees it. `MonthlyEmailData` carries the same four
+ * The email's period as the narrative layer sees it. `MonthlyEmailData` carries the same
  * fields under different names, and this is the ONE place the two shapes meet.
  */
 function emailPeriodOf(data: MonthlyEmailData): EmailPeriod {
@@ -378,24 +217,19 @@ function emailPeriodOf(data: MonthlyEmailData): EmailPeriod {
     kind: data.periodType,
     year: data.year,
     month: data.month,
-    quarter: data.quarter,
-    semester: data.semester,
   };
 }
 
-/** "Agosto 2026", "Q3 2026" — the subject line and the header's scope. */
+/** "Agosto 2026", "Anno 2026" — the subject line and the header's scope. */
 function periodTitle(data: MonthlyEmailData): string {
   return periodTitleOf(emailPeriodOf(data));
 }
 
 /**
  * First month of the window a period ending at `endMonth` covers.
- * Monthly windows are one month long; the others open at the start of their quarter,
- * semester or year.
+ * A monthly window is one month long; a yearly one opens in January.
  */
 export function getPeriodWindowStartMonth(periodType: EmailPeriodType, endMonth: number): number {
-  if (periodType === 'quarterly') return getQuarterStartMonth(endMonth);
-  if (periodType === 'semiannual') return getSemesterStartMonth(endMonth);
   if (periodType === 'yearly') return 1;
   return endMonth;
 }
@@ -419,76 +253,6 @@ export function resolveEmailPeriodRange(data: MonthlyEmailData): AssistantPeriod
 }
 
 // ─── AI comment generation ────────────────────────────────────────────────────
-
-/**
- * Converts Claude's markdown output to email-safe HTML.
- *
- * Handles the subset Claude produces in structured analysis responses:
- * bold, any-level headings, bullet lists, horizontal rules, and paragraph breaks.
- * --- separators are removed (section headings already provide visual separation).
- * Avoids adding a `marked` dependency — the output format is predictable and narrow.
- */
-function simpleMarkdownToHtml(text: string): string {
-  // Ordered list items use a placeholder so they can be collapsed and wrapped independently
-  // from unordered items before the final <br/> conversion runs.
-  const OLI_OPEN = '§OLI§';
-  const OLI_CLOSE = '§/OLI§';
-
-  return (
-    text
-      // Strip <details>/<summary> blocks — AI occasionally wraps content in collapsible HTML
-      // which email clients render as interactive elements, breaking the static email layout
-      .replace(/<summary[^>]*>[\s\S]*?<\/summary>/gi, '')
-      .replace(/<\/?details[^>]*>/gi, '')
-      // Remove horizontal rules (--- or ***) — headings already separate sections
-      .replace(/^[-*]{3,}\s*$/gm, '')
-      // Bold (must run before single-asterisk italic to avoid conflict)
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      // Italic — single asterisk emphasis (e.g. *Limite del dato*)
-      .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
-      // Any-level headings (# ## ###) → compact bold paragraph
-      .replace(
-        /^#{1,3}\s+(.+)$/gm,
-        `<p style="margin:16px 0 2px;font-size:13px;font-weight:600;color:${PRINT_COLORS.foreground};">$1</p>`
-      )
-      // Ordered list items (1. 2. 3.) — must run before bullet items to avoid conflicts
-      .replace(/^\d+\. (.+)$/gm, `${OLI_OPEN}$1${OLI_CLOSE}`)
-      // Collapse blank lines between consecutive ordered items so they group into one <ol>
-      .replace(new RegExp(`(${OLI_CLOSE})\\n\\n(${OLI_OPEN})`, 'g'), `$1\n$2`)
-      // Wrap consecutive ordered item runs in <ol>, expand placeholders into <li>
-      .replace(
-        new RegExp(`(${OLI_OPEN}[\\s\\S]*?${OLI_CLOSE}\\n?)+`, 'g'),
-        (match) =>
-          `<ol style="margin:4px 0 4px 16px;padding:0;list-style:decimal;">${match
-            .replace(new RegExp(OLI_OPEN, 'g'), '<li style="margin:5px 0;padding-left:0;">')
-            .replace(new RegExp(OLI_CLOSE, 'g'), '</li>')}</ol>`
-      )
-      // Unordered bullet items
-      .replace(/^- (.+)$/gm, '<li style="margin:1px 0;padding-left:0;">$1</li>')
-      // Collapse blank lines between consecutive unordered items so they merge into one <ul>
-      // (AI often emits blank lines between bullets, which would otherwise create separate <ul>s)
-      .replace(/(<\/li>)\n\n(<li)/g, '$1\n$2')
-      // Wrap consecutive <li> runs in a <ul>
-      .replace(
-        /(<li[^>]*>[\s\S]*?<\/li>\n?)+/g,
-        '<ul style="margin:4px 0 4px 16px;padding:0;list-style:disc;">$&</ul>'
-      )
-      // Collapse 3+ newlines to 2 (avoid giant gaps left by removed ---)
-      .replace(/\n{3,}/g, '\n\n')
-      // Double newline → two line breaks (paragraph-like spacing without block-level margins)
-      .replace(/\n\n/g, '<br/><br/>')
-      // Single remaining newlines → line break
-      .replace(/\n/g, '<br/>')
-      // Tighten spacing around headings: heading <p> tags already carry their own margin,
-      // so extra <br/> before/after them would double up the visual gap
-      .replace(/(<br\/>)+(<p style="margin:\d+px)/g, '$2')
-      .replace(/<\/p>(<br\/>)+/g, '</p>')
-      // Reduce double <br/> around list blocks to single — lists already have their own margin,
-      // so 2 × line-height gap is excessive before/after list groups
-      .replace(/<\/(ul|ol)>(<br\/>){2}/g, '</$1><br/>')
-      .replace(/(<br\/>){2}(<(ul|ol))/g, '<br/>$2')
-  );
-}
 
 /**
  * Renders one comparison axis (NW / entrate / uscite / risparmio) as prompt lines.
@@ -604,7 +368,7 @@ function formatHallOfFameForPrompt(emailData: MonthlyEmailData): string[] {
  *
  * Monthly only, because the alerts themselves are (`buildBudgetAlertsForMonth` runs for
  * that period alone): gating on the period type rather than on the array keeps a future
- * caller from quietly attaching month alerts to a quarterly email.
+ * caller from quietly attaching month alerts to a yearly email.
  */
 function formatBudgetAlertsForPrompt(emailData: MonthlyEmailData): string[] {
   if (emailData.periodType !== 'monthly') return [];
@@ -629,7 +393,7 @@ function formatBudgetAlertsForPrompt(emailData: MonthlyEmailData): string[] {
  *
  * The window is NAMED in the header, as every figure in this prompt must be: the split is
  * measured over the email's own period, not over the month, and a model handed a bare
- * percentage next to a quarterly total will describe it as a monthly one.
+ * percentage next to a yearly total will describe it as a monthly one.
  *
  * It also states what the residual is made of. «Restano 754 €» is a subtraction with two
  * subtrahends, and a model that does not know which ones will explain it wrong.
@@ -747,13 +511,12 @@ export function buildEmailAiPrompt(
 /**
  * Output budget per period, thinking included (`max_tokens` covers thinking AND text).
  * It scales with the period because the causes to explain do: an annual recap on the
- * monthly budget would be cut off mid-section.
+ * monthly budget would be cut off mid-section. The model at effort `high` thinks inside the
+ * same budget, and a batch has no reader waiting (2026-11-23).
  */
 const EMAIL_AI_MAX_TOKENS: Record<EmailPeriodType, number> = {
-  monthly: 6000,
-  quarterly: 8000,
-  semiannual: 8000,
-  yearly: 10000,
+  monthly: 16000,
+  yearly: 24000,
 };
 
 /**
@@ -821,31 +584,35 @@ export async function generateEmailAiComment(
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
-    const message = await anthropic.beta.messages.create({
-      model: EMAIL_ANALYSIS_MODEL,
-      // A policy decline is re-run on the fallback model inside this call (aiModels.ts).
-      betas: [SERVER_SIDE_FALLBACK_BETA],
-      fallbacks: 'default',
-      max_tokens: EMAIL_AI_MAX_TOKENS[emailData.periodType],
-      system: system,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: 'high' },
-      // Macro context is the only thing the search is for (the system core scopes it to
-      // market movements), so the preference that governs it governs the tool. The version
-      // with dynamic filtering, as on the assistant and Rendimenti's analysis (2026-10-12).
-      ...(preferences.includeMacroContext
-        ? {
-            tools: [
-              {
-                type: 'web_search_20260209',
-                name: 'web_search',
-                max_uses: 3,
-              } satisfies Anthropic.Beta.BetaWebSearchTool20260209,
-            ],
-          }
-        : {}),
-      messages: [{ role: 'user', content: userContent }],
-    });
+    // Streamed, read whole: the SDK refuses a NON-streamed request above 21.333 `max_tokens`
+    // («Streaming is required»), so at 24.000 the yearly would always leave without its comment.
+    const message = await anthropic.beta.messages
+      .stream({
+        model: EMAIL_ANALYSIS_MODEL,
+        // A policy decline is re-run on the fallback model inside this call (aiModels.ts).
+        betas: [SERVER_SIDE_FALLBACK_BETA],
+        fallbacks: 'default',
+        max_tokens: EMAIL_AI_MAX_TOKENS[emailData.periodType],
+        system: system,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'high' },
+        // Macro context is the only thing the search is for (the system core scopes it to
+        // market movements), so the preference that governs it governs the tool. The version
+        // with dynamic filtering, as on the assistant and Rendimenti's analysis (2026-10-12).
+        ...(preferences.includeMacroContext
+          ? {
+              tools: [
+                {
+                  type: 'web_search_20260209',
+                  name: 'web_search',
+                  max_uses: 3,
+                } satisfies Anthropic.Beta.BetaWebSearchTool20260209,
+              ],
+            }
+          : {}),
+        messages: [{ role: 'user', content: userContent }],
+      })
+      .finalMessage();
 
     // A refusal or a cut leaves a fragment: the email goes out without the comment.
     return readCompleteEmailComment(message, EMAIL_ANALYSIS_MODEL, 'emailAiComment');
@@ -870,10 +637,7 @@ export async function getSettingsAdmin(
   const data = doc.data()!;
   return {
     monthlyEmailEnabled: data.monthlyEmailEnabled,
-    quarterlyEmailEnabled: data.quarterlyEmailEnabled,
-    semiAnnualEmailEnabled: data.semiAnnualEmailEnabled,
     yearlyEmailEnabled: data.yearlyEmailEnabled,
-    weeklyBudgetEmailEnabled: data.weeklyBudgetEmailEnabled,
     monthlyEmailRecipients: data.monthlyEmailRecipients,
     // Read by the Divisione section below. This mapper is an INDEPENDENT re-listing of the
     // settings document (getSettings on the client is the other one): a field missing here is
@@ -1132,7 +896,7 @@ async function buildBudgetAlertsForMonth(
 /**
  * Computes the Hall of Fame standing of a period's net-worth change, matching the
  * in-app ranking definition (same pure layer). Only monthly and yearly periods are
- * ranked — the Hall of Fame tracks months and years, not quarters/semesters.
+ * ranked — the Hall of Fame tracks months and years.
  *
  * Reads all of the user's real snapshots once; ranking needs only net-worth deltas,
  * so expenses are not fetched here (passed empty to the record builders). Returns
@@ -1171,8 +935,10 @@ async function computeHallOfFameRank(
  * Fetches all data required for an email summary covering the given {year, month} period.
  *
  * - Monthly: compares against the previous month; expense window = that month.
- * - Quarterly: compares against the previous quarter end; expense window = full quarter.
  * - Yearly: compares against the previous December; expense window = full year.
+ *
+ * The window is the ITALIAN one (`getItalyMonthBoundsUtc`), never the server's zone: a row at
+ * Italian midnight of the 1st belongs to its own month, under UTC on Vercel as in Rome.
  *
  * Returns null when no snapshot exists for the current period end.
  */
@@ -1186,15 +952,7 @@ export async function buildPeriodEmailData(
   let prevYear: number;
   let prevMonth: number;
 
-  if (periodType === 'quarterly') {
-    const prev = getPreviousQuarterEnd(year, month);
-    prevYear = prev.year;
-    prevMonth = prev.month;
-  } else if (periodType === 'semiannual') {
-    const prev = getPreviousHalfEnd(year, month);
-    prevYear = prev.year;
-    prevMonth = prev.month;
-  } else if (periodType === 'yearly') {
+  if (periodType === 'yearly') {
     prevYear = year - 1;
     prevMonth = 12;
   } else {
@@ -1204,9 +962,8 @@ export async function buildPeriodEmailData(
   }
 
   const windowStartMonth = getPeriodWindowStartMonth(periodType, month);
-  const windowStart = new Date(year, windowStartMonth - 1, 1);
-  // Last day of the period end month
-  const windowEnd = new Date(year, month, 0, 23, 59, 59);
+  const windowStart = getItalyMonthBoundsUtc(year, windowStartMonth).start;
+  const windowEnd = getItalyMonthBoundsUtc(year, month).end;
 
   const [currentSnap, prevSnap, expensesSnap, dividendsSnap] = await Promise.all([
     // isDummy filter omitted from query — handled in code to stay within 3 Firestore conditions
@@ -1288,8 +1045,6 @@ export async function buildPeriodEmailData(
     periodType,
     year,
     month,
-    quarter: periodType === 'quarterly' ? monthToQuarter(month) : undefined,
-    semester: periodType === 'semiannual' ? monthToSemester(month) : undefined,
     currentNetWorth,
     previousNetWorth,
     netWorthDelta,
@@ -1677,9 +1432,9 @@ export function buildExpenseSplitTile(data: MonthlyEmailData): string {
 }
 
 /**
- * Renders one periodic email — monthly, quarterly, semiannual or yearly.
+ * Renders one periodic email — monthly or yearly.
  *
- * There is ONE template for the four: they differ in their labels (which the narrative layer
+ * There is ONE template for the two: they differ in their labels (which the narrative layer
  * resolves from the period) and in which tiles exist at all — Budget and the Hall of Fame
  * standing are monthly, the income Top 10 is yearly, and «Rispetto a un anno fa» disappears on
  * a yearly email because there the two baselines coincide.
@@ -1711,6 +1466,9 @@ export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: Perio
       verdict,
     }),
   ];
+  // The one way back to the app, right under the verdict ('' without an https:// app URL).
+  const appLink = emailAppLink(process.env.NEXT_PUBLIC_APP_URL);
+  if (appLink) tiles.push(appLink);
 
   // The AI comment is prose and sits SECOND: it can be absent (generation is non-blocking),
   // and an email whose first words can vanish has no opening at all.
@@ -1719,7 +1477,7 @@ export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: Perio
       emailTile({
         eyebrow: 'Commento AI',
         scope: title,
-        body: emailProse(simpleMarkdownToHtml(data.aiComment)),
+        body: emailProse(emailMarkdownToHtml(data.aiComment)),
         footer: 'Generato da Assistente AI — verifica sempre le informazioni prima di agire.',
         muted: true,
       }),
@@ -1901,17 +1659,11 @@ export async function sendMonthlyEmail(
 ): Promise<void> {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  const title = periodTitle(data);
-  const subjectPrefix =
-    data.periodType === 'quarterly'
-      ? 'Riepilogo Trimestrale'
-      : data.periodType === 'semiannual'
-      ? 'Riepilogo Semestrale'
-      : data.periodType === 'yearly'
-      ? 'Riepilogo Annuale'
-      : 'Riepilogo';
-
-  const subject = `${subjectPrefix} ${title} — Net Worth Tracker`;
+  // «Riepilogo annuale 2025», never «Riepilogo Annuale Anno 2025» (owner, phase F, 2026-11-28).
+  const subject =
+    data.periodType === 'yearly'
+      ? `Riepilogo annuale ${data.year} — Net Worth Tracker`
+      : `Riepilogo ${periodTitle(data)} — Net Worth Tracker`;
 
   const { error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL ?? 'noreply@example.com',
@@ -1963,34 +1715,4 @@ export async function buildAndSendForPeriod(
 
   await sendMonthlyEmail(recipients, emailData, comparison);
   return true;
-}
-
-/** Build and send quarterly/yearly convenience aliases used by the cron handler. */
-export async function buildAndSendQuarterly(
-  userId: string,
-  recipients: string[],
-  year: number,
-  quarter: number
-): Promise<boolean> {
-  const lastMonth = quarter * 3;
-  return buildAndSendForPeriod(userId, recipients, 'quarterly', year, lastMonth);
-}
-
-export async function buildAndSendSemiAnnual(
-  userId: string,
-  recipients: string[],
-  year: number,
-  half: number
-): Promise<boolean> {
-  // half 1 → June (end month 6); half 2 → December (end month 12)
-  const lastMonth = half === 1 ? 6 : 12;
-  return buildAndSendForPeriod(userId, recipients, 'semiannual', year, lastMonth);
-}
-
-export async function buildAndSendYearly(
-  userId: string,
-  recipients: string[],
-  year: number
-): Promise<boolean> {
-  return buildAndSendForPeriod(userId, recipients, 'yearly', year, 12);
 }

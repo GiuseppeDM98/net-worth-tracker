@@ -1,29 +1,24 @@
 /**
  * POST /api/user/monthly-email/send
  *
- * Allows an authenticated user to trigger a periodic summary email immediately.
- * Accepts an optional JSON body with `periodType` ('monthly' | 'quarterly' | 'semiannual' | 'yearly').
- * When omitted, defaults to 'monthly'. Resolves the most recently completed period
- * automatically (e.g. April 19 2026 → March for quarterly, H2 2025 for semiannual, 2025 for yearly).
- * `periodType: 'weekly-budget'` sends the weekly budget status email for the current state instead.
+ * «Invia ora»: sends the summary of the LAST CLOSED period now, even if the cron already sent it — the
+ * month just closed (`lastClosedMonth`) or the year just closed (`lastClosedYear`), on the Italian day;
+ * never the month in progress. A send that went out is recorded in the ledger with `manual: true`, so
+ * the cron does not send the same period again; a failed record is logged and the email still counts as
+ * sent.
  *
- * Auth: Firebase ID token via Authorization: Bearer <token>
- * Body: { periodType?: 'monthly' | 'quarterly' | 'semiannual' | 'yearly' | 'weekly-budget' }
+ * Auth: Firebase ID token via Authorization: Bearer <token>; the route answers for the token's own uid
+ * (a co-owner's «Invia ora» reads the co-owner's settings). The demo account is refused.
+ * Body: { periodType?: 'monthly' | 'yearly' } — absent means monthly, any other value is a 400.
  * Returns: { success: true } or error JSON
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase/admin';
-import {
-  getSettingsAdmin,
-  buildAndSendForPeriod,
-  getMostRecentCompletedQuarterEnd,
-  getMostRecentCompletedHalfYearEnd,
-  getMostRecentCompletedYearEnd,
-  type EmailPeriodType,
-} from '@/lib/server/monthlyEmailService';
-import { buildAndSendWeeklyBudget } from '@/lib/server/weeklyBudgetEmailService';
-import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { getSettingsAdmin, buildAndSendForPeriod } from '@/lib/server/monthlyEmailService';
+import { confirmEmailDelivery } from '@/lib/server/emailDeliveries';
+import { lastClosedMonth, lastClosedYear, monthPeriodKey, type PeriodicEmailKind } from '@/lib/utils/emailSchedule';
+import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,86 +31,64 @@ export async function POST(request: NextRequest) {
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    // Parse optional body — default to monthly
-    const body = await request.json().catch(() => ({})) as { periodType?: string };
-
-    // Weekly budget email is a separate builder (not a snapshot-based period summary).
-    if (body.periodType === 'weekly-budget') {
-      const settings = await getSettingsAdmin(userId);
-      if (!settings?.weeklyBudgetEmailEnabled) {
-        return NextResponse.json({ error: 'weekly budget email is not enabled for this account' }, { status: 400 });
-      }
-      if (!settings.monthlyEmailRecipients?.length) {
-        return NextResponse.json({ error: 'No recipients configured' }, { status: 400 });
-      }
-      const sent = await buildAndSendWeeklyBudget(userId, settings.monthlyEmailRecipients, new Date());
-      if (!sent) {
-        return NextResponse.json({ error: 'No budgets configured — create a budget first' }, { status: 404 });
-      }
-      return NextResponse.json({ success: true });
+    if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
+      return NextResponse.json({ error: 'Non disponibile in demo' }, { status: 403 });
     }
 
-    const periodType: EmailPeriodType =
-      body.periodType === 'quarterly' ||
-      body.periodType === 'semiannual' ||
-      body.periodType === 'yearly'
-        ? body.periodType
-        : 'monthly';
-
-    // Auto-resolve the most recently completed period for each type
-    let year: number;
-    let month: number;
-    if (periodType === 'quarterly') {
-      ({ year, month } = getMostRecentCompletedQuarterEnd(new Date()));
-    } else if (periodType === 'semiannual') {
-      ({ year, month } = getMostRecentCompletedHalfYearEnd(new Date()));
-    } else if (periodType === 'yearly') {
-      ({ year, month } = getMostRecentCompletedYearEnd(new Date()));
-    } else {
-      ({ year, month } = getItalyMonthYear(new Date()));
+    const body = (await request.json().catch(() => ({}))) as { periodType?: unknown };
+    const periodType = body.periodType ?? 'monthly';
+    if (periodType !== 'monthly' && periodType !== 'yearly') {
+      return NextResponse.json({ error: 'periodType non valido' }, { status: 400 });
     }
+    const kind: PeriodicEmailKind = periodType;
+
+    const now = new Date();
+    const todayIso = getItalyDateIso(now);
+    const closed = lastClosedMonth(todayIso);
+    const closedYear = lastClosedYear(todayIso);
+    const period =
+      kind === 'yearly'
+        ? { year: closedYear, month: 12, periodKey: String(closedYear) }
+        : { ...closed, periodKey: monthPeriodKey(closed.year, closed.month) };
 
     const settings = await getSettingsAdmin(userId);
-
-    // Check the correct toggle per period type
-    const enabledKey =
-      periodType === 'quarterly'
-        ? 'quarterlyEmailEnabled'
-        : periodType === 'semiannual'
-        ? 'semiAnnualEmailEnabled'
-        : periodType === 'yearly'
-        ? 'yearlyEmailEnabled'
-        : 'monthlyEmailEnabled';
-
-    if (!settings?.[enabledKey]) {
+    const enabled = kind === 'yearly' ? settings?.yearlyEmailEnabled : settings?.monthlyEmailEnabled;
+    if (!enabled) {
       return NextResponse.json(
-        { error: `${periodType} email is not enabled for this account` },
+        { error: kind === 'yearly' ? "L'email annuale non è attiva" : "L'email mensile non è attiva" },
         { status: 400 }
       );
     }
-    if (!settings.monthlyEmailRecipients?.length) {
-      return NextResponse.json({ error: 'No recipients configured' }, { status: 400 });
+    if (!settings?.monthlyEmailRecipients?.length) {
+      return NextResponse.json({ error: 'Nessun destinatario configurato' }, { status: 400 });
     }
 
     const sent = await buildAndSendForPeriod(
       userId,
       settings.monthlyEmailRecipients,
-      periodType,
-      year,
-      month
+      kind,
+      period.year,
+      period.month
     );
     if (!sent) {
       return NextResponse.json(
-        { error: 'No snapshot found for the requested period — save a snapshot first' },
+        { error: 'Nessuno snapshot per questo periodo: salvane uno prima' },
         { status: 404 }
       );
+    }
+
+    // The email is out: a record that fails is logged, never turned into an error for the user.
+    try {
+      await confirmEmailDelivery(userId, kind, period.periodKey, new Date(), true);
+    } catch (confirmError) {
+      console.error(`Manual ${kind} send: ledger confirm failed for user ${userId}:`, confirmError);
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error sending periodic email:', error);
     return NextResponse.json(
-      { error: 'Failed to send email', details: (error as Error).message },
+      { error: 'Invio non riuscito', details: (error as Error).message },
       { status: 500 }
     );
   }

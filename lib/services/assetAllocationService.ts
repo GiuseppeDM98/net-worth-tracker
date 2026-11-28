@@ -164,10 +164,7 @@ export async function getSettings(
       expenseSplitEnabled: data.expenseSplitEnabled,
       spendingRolesEnabled: data.spendingRolesEnabled,
       monthlyEmailEnabled: data.monthlyEmailEnabled,
-      quarterlyEmailEnabled: data.quarterlyEmailEnabled,
-      semiAnnualEmailEnabled: data.semiAnnualEmailEnabled,
       yearlyEmailEnabled: data.yearlyEmailEnabled,
-      weeklyBudgetEmailEnabled: data.weeklyBudgetEmailEnabled,
       monthlyEmailRecipients: data.monthlyEmailRecipients,
       familyMembers: data.familyMembers,
       performanceIncludesPensionFunds: data.performanceIncludesPensionFunds,
@@ -400,17 +397,8 @@ export async function setSettings(
       if (settings.monthlyEmailEnabled !== undefined) {
         docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
       }
-      if (settings.quarterlyEmailEnabled !== undefined) {
-        docData.quarterlyEmailEnabled = settings.quarterlyEmailEnabled;
-      }
-      if (settings.semiAnnualEmailEnabled !== undefined) {
-        docData.semiAnnualEmailEnabled = settings.semiAnnualEmailEnabled;
-      }
       if (settings.yearlyEmailEnabled !== undefined) {
         docData.yearlyEmailEnabled = settings.yearlyEmailEnabled;
-      }
-      if (settings.weeklyBudgetEmailEnabled !== undefined) {
-        docData.weeklyBudgetEmailEnabled = settings.weeklyBudgetEmailEnabled;
       }
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
@@ -603,17 +591,8 @@ export async function setSettings(
       if (settings.monthlyEmailEnabled !== undefined) {
         docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
       }
-      if (settings.quarterlyEmailEnabled !== undefined) {
-        docData.quarterlyEmailEnabled = settings.quarterlyEmailEnabled;
-      }
-      if (settings.semiAnnualEmailEnabled !== undefined) {
-        docData.semiAnnualEmailEnabled = settings.semiAnnualEmailEnabled;
-      }
       if (settings.yearlyEmailEnabled !== undefined) {
         docData.yearlyEmailEnabled = settings.yearlyEmailEnabled;
-      }
-      if (settings.weeklyBudgetEmailEnabled !== undefined) {
-        docData.weeklyBudgetEmailEnabled = settings.weeklyBudgetEmailEnabled;
       }
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;

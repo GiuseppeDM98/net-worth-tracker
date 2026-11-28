@@ -63,14 +63,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Every builder takes the CASHFLOW 12 MESI block** (2026-11; every surface since 2026-11-07): the
   four analyses as their fifth argument, printed after the numeric block and before «Domanda dell'utente»; the chat
   as its seventh, right before «Richiesta utente» with or without a period; `buildEmailAiPrompt` as its sixth, at
-  the end of the user turn; `generateWeeklyBudgetComment` as its second, under the budgets; `buildRegisterPrompt` as its fifth
+  the end of the user turn; `buildRegisterPrompt` as its fifth
   (`string | null`), after the register block and right before «Richiesta utente»; the Consulente's
   strategy after its data block (doc/guide/consulente.md § The run). ONE note over it everywhere
   (`formatCashflowBlockSection`): the block is the whole recorded history whatever the period, a
-  period's figures stay its bundle's. `system` is the same with or without it. The route, the periodic comment and
-  the weekly one read it through `readCashflowBlockForPrompt` (lib/server/assistant/cashflowBlockPrompt.ts): a
+  period's figures stay its bundle's. `system` is the same with or without it. The route and the periodic comment
+  read it through `readCashflowBlockForPrompt` (lib/server/assistant/cashflowBlockPrompt.ts): a
   failed read answers 500 on the stream and sends an email without its AI comment — never a silent empty block.
-  The weekly email with no API key reads no block (2026-11-07): there is no comment for it to serve.
 
 ### The portfolio block — the assistant sees everything (2026-10-20)
 - **`bundle.portfolio` is REQUIRED and built by ONE pure function**, `buildAssistantPortfolioContext`

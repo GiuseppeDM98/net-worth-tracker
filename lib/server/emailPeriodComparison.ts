@@ -3,28 +3,23 @@
  *
  * Computes, for a given email period, how net worth / income / expenses / savings changed
  * relative to:
- *   1. the previous period (mese/trimestre/semestre/anno precedente), and
+ *   1. the previous period (mese/anno precedente), and
  *   2. the same period one year earlier (year-over-year, "YoY").
  *
  * All deltas are computed in plain TypeScript — never by the AI — so the figures shown in
  * the email are authoritative. The AI commentary only *interprets* these numbers.
  *
  * Layer note: this module is server-only (Firebase Admin SDK + Resend-adjacent flow).
- * It reuses the pure period-coordinate helpers and `aggregateExpenses` from
- * monthlyEmailService.ts to stay consistent with how the main email data is built.
+ * It reuses `aggregateExpenses` from monthlyEmailService.ts and reads every window between its
+ * ITALIAN bounds (`getItalyMonthBoundsUtc`), as the main email data does.
  */
 
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { MONTH_NAMES } from '@/lib/constants/months';
+import { getItalyMonthBoundsUtc } from '@/lib/utils/dateHelpers';
 import {
   aggregateExpenses,
-  getQuarterStartMonth,
-  getSemesterStartMonth,
-  getPreviousQuarterEnd,
-  getPreviousHalfEnd,
-  monthToQuarter,
-  monthToSemester,
   type EmailPeriodType,
   type MonthlyEmailData,
 } from '@/lib/server/monthlyEmailService';
@@ -105,14 +100,6 @@ function previousPeriodCoords(
   year: number,
   endMonth: number
 ): PeriodCoords {
-  if (periodType === 'quarterly') {
-    const prev = getPreviousQuarterEnd(year, endMonth);
-    return { year: prev.year, endMonth: prev.month };
-  }
-  if (periodType === 'semiannual') {
-    const prev = getPreviousHalfEnd(year, endMonth);
-    return { year: prev.year, endMonth: prev.month };
-  }
   if (periodType === 'yearly') {
     return { year: year - 1, endMonth: 12 };
   }
@@ -133,8 +120,6 @@ function yoyPeriodCoords(
 
 /** Returns the expense-window start month for a period ending at `endMonth`. */
 function windowStartMonthFor(periodType: EmailPeriodType, endMonth: number): number {
-  if (periodType === 'quarterly') return getQuarterStartMonth(endMonth);
-  if (periodType === 'semiannual') return getSemesterStartMonth(endMonth);
   if (periodType === 'yearly') return 1;
   return endMonth; // monthly
 }
@@ -151,8 +136,8 @@ async function fetchPeriodMetrics(
   coords: PeriodCoords
 ): Promise<CashflowMetrics> {
   const startMonth = windowStartMonthFor(periodType, coords.endMonth);
-  const windowStart = new Date(coords.year, startMonth - 1, 1);
-  const windowEnd = new Date(coords.year, coords.endMonth, 0, 23, 59, 59);
+  const windowStart = getItalyMonthBoundsUtc(coords.year, startMonth).start;
+  const windowEnd = getItalyMonthBoundsUtc(coords.year, coords.endMonth).end;
 
   const [snapSnap, expensesSnap] = await Promise.all([
     adminDb
@@ -219,25 +204,21 @@ function buildComparisonSet(
   };
 }
 
-/** Previous-period baseline label, e.g. "mese precedente", "Q1 2026", "1° Semestre 2026", "2025". */
+/** Previous-period baseline label, e.g. "mese precedente", "2025". */
 function previousBaselineLabel(
   periodType: EmailPeriodType,
   prev: PeriodCoords
 ): string {
   if (periodType === 'monthly') return 'mese precedente';
-  if (periodType === 'quarterly') return `Q${monthToQuarter(prev.endMonth)} ${prev.year}`;
-  if (periodType === 'semiannual') return `${monthToSemester(prev.endMonth)}° Semestre ${prev.year}`;
   return `${prev.year}`; // yearly
 }
 
-/** YoY baseline label, e.g. "Marzo 2025", "Q1 2025", "1° Semestre 2025", "2025". */
+/** YoY baseline label, e.g. "Marzo 2025", "2025". */
 function yoyBaselineLabel(
   periodType: EmailPeriodType,
   yoy: PeriodCoords
 ): string {
   if (periodType === 'monthly') return `${MONTH_NAMES[yoy.endMonth - 1]} ${yoy.year}`;
-  if (periodType === 'quarterly') return `Q${monthToQuarter(yoy.endMonth)} ${yoy.year}`;
-  if (periodType === 'semiannual') return `${monthToSemester(yoy.endMonth)}° Semestre ${yoy.year}`;
   return `${yoy.year}`; // yearly
 }
 

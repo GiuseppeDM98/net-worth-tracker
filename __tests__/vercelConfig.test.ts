@@ -3,7 +3,7 @@
  *
  * A stray comma in this file breaks the deploy silently, and the Hobby plan
  * rejects more than one region, so the file is held here: valid JSON, ONE
- * European region next to Firestore (eur3), and the two crons intact.
+ * European region next to Firestore (eur3), and the three crons intact.
  *
  * The region is pinned by name on purpose: moving or removing it (the
  * rollback) is a deliberate change, and this expectation changes in the same
@@ -50,10 +50,25 @@ describe('vercel.json', () => {
     expect(config.regions).toEqual(['fra1']);
   });
 
-  it('keeps the two crons', () => {
+  /**
+   * The periodic emails leave from a cron of their own an hour after the snapshots (2026-11-28): Vercel
+   * fires a daily cron anywhere inside its hour, and 19:00 UTC is still the same Italian day.
+   */
+  it('keeps the three crons, the emails an hour after the snapshots', () => {
     expect(config.crons).toEqual([
       { path: '/api/cron/monthly-snapshot', schedule: '0 18 * * *' },
       { path: '/api/cron/daily-dividend-processing', schedule: '0 18 * * *' },
+      { path: '/api/cron/periodic-emails', schedule: '0 19 * * *' },
     ]);
+  });
+
+  /**
+   * A cron route without `maxDuration` stops at the plan's default; an email with its comment written
+   * at effort high takes minutes. Read from the SOURCE: importing a cron route drags its whole module
+   * graph. Seen red with the line removed from either route.
+   */
+  it.each(['monthly-snapshot', 'periodic-emails'])('gives the %s cron 300 seconds', (route) => {
+    const source = readFileSync(path.resolve(__dirname, `../app/api/cron/${route}/route.ts`), 'utf8');
+    expect(source).toContain('export const maxDuration = 300;');
   });
 });

@@ -10,7 +10,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Cashflow › Budget**: Budget `components/cashflow/BudgetTab.tsx` + `components/cashflow/budget/*` (`BudgetTrack`, `BudgetDeleteButton`, `BudgetItemDialog`), pure `lib/utils/{budgetSummary,budgetNarrative,budgetUtils,budgetHistory}.ts`, specs `e2e/cashflow.budget{,.mobile}.spec.ts`, `lib/hooks/{useBudgetConfig,useBudgetHistory}.ts`, `lib/server/budgetHistoryService.ts` (cron phase 8), collections `budgets/{userId}`, `budgetHistory/{userId}/months/{YYYY-MM}`
-- **Suites to run after a change here — Cashflow › Budget** (moved from `AGENTS.md` § Commands on 2026-09-30): `budgetUtils`, `budgetSummary`, `budgetNarrative` (with `describeBudgetClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles, `weeklyBudgetEmailService`, `monthlyEmailService`)
+- **Suites to run after a change here — Cashflow › Budget** (moved from `AGENTS.md` § Commands on 2026-09-30): `budgetUtils`, `budgetSummary`, `budgetNarrative` (with `describeBudgetClosedAnswers`, the landscape index), `tabletComposition` (+ `patrimonioNarrative` for the articles, `monthlyEmailService`)
 
 ## Cashflow › Budget (`components/cashflow/BudgetTab.tsx`, `components/cashflow/budget/*`, `lib/utils/{budgetUtils,budgetSummary,budgetNarrative}.ts`, `lib/hooks/useBudgetConfig.ts`)
 - **Opt-in**: `reconcileBudgetItems` only refreshes denormalized names and drops orphans, never auto-creates.
@@ -42,8 +42,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **A FIXED category never follows the pace** (`resolveItemPace`: a `type`-scope item's own type, a category item's
   live category type, `fixed`/`debt` → `'fixed'`, unknown → `'variable'`): rent paid on the 1st, extrapolated by the
   day, reads «a rischio» all month. A fixed item's «Fine mese» is what is booked (no tilde) and the row carries a
-  «fissa» chip. Every server caller passes categories (`weeklyBudgetEmailService` loads `expenseCategories` as
-  `CategoryTypeRef[]`); the monthly email evaluates at month end, where pace is irrelevant.
+  «fissa» chip. The monthly email evaluates at month end, where pace is irrelevant.
 - **Risk vs fact** (`rankCategoriesAtRisk` / `evaluateBudgetAlerts` + `summarizeAlerts`): «Categorie a rischio» lists
   monthly budgets whose projection exceeds their amount AND that are not over yet; a budget already over is a fact for
   «Avvisi» («Superato»). The evaluator still emits forecast-only alerts for the email, flagged `thresholdCrossed: false`;
@@ -126,8 +125,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   instalment plan carrying it): a purchase made for someone else and refunded later — the refund is income the
   ceiling never sees, so the purchase must not weigh on it. ONE gate, `countsTowardBudget` (`budgetUtils.ts`; a
   transfer fails it too): the ceiling, the per-category and annual items, `splitMonthlyTotalExpenses`, the dated rows
-  of the crossing day, `getPeriodExpensesForItem` (the weekly email's overspend list) and `evaluateBudgetAlerts` (the
-  monthly email) all read it — the two server readers spread the document, so the flag reaches them. Tracciamento,
+  of the crossing day and `evaluateBudgetAlerts` (the monthly email) all read it — the server reader spreads the
+  document, so the flag reaches it. Tracciamento,
   Analisi, Panoramica, Storico and FIRE keep the row (the refund compensates it there). A trade's fee row
   (`feeOfTradeId`, 2026-11-12) passes the gate like any spending row: it counts in the budget of its category. The feed and the table print
   a «fuori budget» chip, the detail a «Budget» line; the words are `EXPENSE_BUDGET_EXCLUSION_*` in
@@ -167,10 +166,10 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 
 ## Per-page blind spots
 
-- **Off the page a budget's «speso» still counts the rows in the calendar** (2026-11-27): the budget email and
-  Registra's context read `getPeriodActual` (the whole month, the whole year), and the Assistente's `budget_stato`
-  names them in `scheduled`. The page alone prints «booked up to today» beside «+ N € in calendario»; an email
-  read the same morning may say a few euro more for a budget with instalments ahead.
+- **Off the page a budget's «speso» still counts the rows in the calendar** (2026-11-27): Registra's context reads
+  `getPeriodActual` (the whole month, the whole year), and the Assistente's `budget_stato`
+  names them in `scheduled`. The page alone prints «booked up to today» beside «+ N € in calendario»; Registra's
+  context, the same morning, may say a few euro more for a budget with instalments ahead.
 - **Without a budget the phone shows Per categoria alone** (2026-10-12): Categorie a rischio and Avvisi are hidden below `desktop:` (they would repeat its empty state), so the first budget is added from that tile or the settings under it. The base fixture has no ceiling: its Budget has no strip, and the census's `firstClosedRowAbovePill` for this tab is read without one.
 - **The fee of a row «fuori dal budget» stays IN the budget** (2026-10-17): the flag is the row's alone, and a fee is a
   row of its own (doc/guide/cashflow.md) — a bank charge for a purchase made for someone else is still a cost of

@@ -51,7 +51,11 @@ export const PERFORMANCE_ANALYSIS_MODEL = 'claude-sonnet-5-5';
 /** The conversational assistant (Opus 5.5 since 2026-11-25, the owner's decision of 2026-11-23), at its default effort `medium`. */
 export const ASSISTANT_MODEL = 'claude-opus-5-5';
 
-/** The prose of the monthly and weekly emails. */
+/**
+ * The prose of the periodic emails: Sonnet 5.5 at effort `high` since 2026-11-28 (owner's decision, Opus 5.5 from
+ * 2026-11-23). On Opus a monthly took 168–204 s and a yearly 174 s, and on 1 January the cron sends both in one
+ * call under Vercel's 300 s.
+ */
 export const EMAIL_ANALYSIS_MODEL = 'claude-sonnet-5-5';
 
 /** Structured extraction (assistant memory): a small, fast model on purpose. */

@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/daily-dividend-processing",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/periodic-emails",
+      "schedule": "0 19 * * *"
     }
   ]
 }

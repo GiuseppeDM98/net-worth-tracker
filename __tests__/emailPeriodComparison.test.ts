@@ -18,19 +18,24 @@ vi.mock('resend', () => {
 // the same docs regardless of the where() filters, which is sufficient: for non-yearly periods
 // the previous-period and YoY queries hit the same mock, so their deltas come out identical.
 const collectionMocks: Record<string, unknown> = {};
+// Every `where(field, op, value)` sent on the expenses, one list per query (a query opens on `collection().where`).
+const expenseQueries: unknown[][][] = [];
 
 /** The chainable shape the mocked adminDb query exposes; every node resolves to the same result. */
 interface QueryChainMock {
-  where: () => QueryChainMock;
+  where: (...args: unknown[]) => QueryChainMock;
   limit: () => { get: () => Promise<unknown> };
   get: () => Promise<unknown>;
 }
 
-function buildQueryMock(name: string) {
+function buildQueryMock(name: string, wheres: unknown[][]) {
   const result = () => Promise.resolve(collectionMocks[name] ?? { empty: true, docs: [] });
   function chainNode(): QueryChainMock {
     return {
-      where: () => chainNode(),
+      where: (...args: unknown[]) => {
+        wheres.push(args);
+        return chainNode();
+      },
       limit: () => ({ get: vi.fn().mockImplementation(result) }),
       get: vi.fn().mockImplementation(result),
     };
@@ -42,7 +47,11 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: (name: string) => ({
       doc: () => ({ get: vi.fn() }),
-      where: () => buildQueryMock(name),
+      where: (...args: unknown[]) => {
+        const wheres = [args];
+        if (name === 'expenses') expenseQueries.push(wheres);
+        return buildQueryMock(name, wheres);
+      },
     }),
   },
   adminAuth: { verifyIdToken: vi.fn() },
@@ -50,6 +59,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 
 import { computeDelta, buildPeriodComparison } from '@/lib/server/emailPeriodComparison';
 import type { MonthlyEmailData } from '@/lib/server/monthlyEmailService';
+import { getItalyMonthBoundsUtc } from '@/lib/utils/dateHelpers';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -106,6 +116,35 @@ function seedBaselinePeriod() {
 
 beforeEach(() => {
   for (const key of Object.keys(collectionMocks)) delete collectionMocks[key];
+  expenseQueries.length = 0;
+});
+
+/** The `>=` and `<=` instants of each expenses query, in the order they were sent. */
+function expenseWindows(): { start: number; end: number }[] {
+  const at = (wheres: unknown[][], op: string) =>
+    (wheres.find((args) => args[1] === op)?.[2] as { toDate(): Date }).toDate().getTime();
+  return expenseQueries.map((wheres) => ({ start: at(wheres, '>='), end: at(wheres, '<=') }));
+}
+
+const italianMonth = (year: number, month: number) => {
+  const bounds = getItalyMonthBoundsUtc(year, month);
+  return { start: bounds.start.getTime(), end: bounds.end.getTime() };
+};
+
+describe('each compared period is read between its own Italian bounds', () => {
+  it('March 2026: February 2026 and March 2025, each from its 1st 00:00 to its last day 23:59:59.999 in Rome', async () => {
+    seedBaselinePeriod();
+    await buildPeriodComparison('user1', makeEmailData());
+    expect(expenseWindows()).toEqual([italianMonth(2026, 2), italianMonth(2025, 3)]);
+  });
+
+  it('the year 2026: 2025 from 1 January to 31 December, Italian', async () => {
+    seedBaselinePeriod();
+    await buildPeriodComparison('user1', makeEmailData({ periodType: 'yearly', month: 12 }));
+    expect(expenseWindows()).toEqual([
+      { start: italianMonth(2025, 1).start, end: italianMonth(2025, 12).end },
+    ]);
+  });
 });
 
 // ─── computeDelta ─────────────────────────────────────────────────────────────

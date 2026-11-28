@@ -16,7 +16,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildPeriodEmailVerdict,
-  buildBudgetEmailVerdict,
   describeNetWorthTile,
   describeMarketSplit,
   describeCompositionTile,
@@ -29,9 +28,6 @@ import {
   describeDividendsTile,
   describeYearOverYearTile,
   describeBudgetAlertsTile,
-  describeOverallCeiling,
-  describeMonthlyBudgetsTile,
-  describeAnnualBudgetsTile,
   periodSubject,
   periodTitle,
   periodKindLabel,
@@ -39,10 +35,8 @@ import {
   periodBaselineLabel,
   periodBaselineHeading,
   yearEarlierHeading,
-  budgetWindowLabel,
   type EmailPeriod,
   type PeriodEmailVerdictInput,
-  type BudgetEmailVerdictInput,
 } from '@/lib/utils/emailNarrative';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
 
@@ -50,8 +44,6 @@ const plain = (narrative: Narrative | null) =>
   narrative === null ? null : narrativeToText(narrative).replace(/ /g, ' ');
 
 const AUGUST: EmailPeriod = { kind: 'monthly', year: 2026, month: 8 };
-const Q3: EmailPeriod = { kind: 'quarterly', year: 2026, month: 9, quarter: 3 };
-const H1: EmailPeriod = { kind: 'semiannual', year: 2026, month: 6, semester: 1 };
 const YEAR: EmailPeriod = { kind: 'yearly', year: 2026, month: 12 };
 
 const GROWING: PeriodEmailVerdictInput = {
@@ -69,37 +61,28 @@ const GROWING: PeriodEmailVerdictInput = {
 // ─── Period vocabulary ────────────────────────────────────────────────────────
 
 describe('the period, in words', () => {
-  it('names every kind as a masculine singular subject, so one verb agreement serves all', () => {
+  it('names both kinds as a masculine singular subject, so one verb agreement serves both', () => {
     expect(periodSubject(AUGUST)).toBe('Agosto');
-    expect(periodSubject(Q3)).toBe('Il terzo trimestre');
-    expect(periodSubject(H1)).toBe('Il primo semestre');
     expect(periodSubject(YEAR)).toBe('Il 2026');
   });
 
   it('titles the email', () => {
     expect(periodTitle(AUGUST)).toBe('Agosto 2026');
-    expect(periodTitle(Q3)).toBe('Q3 2026');
-    expect(periodTitle(H1)).toBe('1° Semestre 2026');
     expect(periodTitle(YEAR)).toBe('Anno 2026');
   });
 
   it('labels the kind of report in the eyebrow', () => {
     expect(periodKindLabel('monthly')).toBe('Riepilogo mensile');
-    expect(periodKindLabel('quarterly')).toBe('Riepilogo trimestrale');
-    expect(periodKindLabel('semiannual')).toBe('Riepilogo semestrale');
     expect(periodKindLabel('yearly')).toBe('Riepilogo annuale');
   });
 
   it('gives every flow tile a scope, because an email has no period picker', () => {
     expect(periodScopeLabel(AUGUST)).toBe('agosto 2026');
-    expect(periodScopeLabel(Q3)).toBe('lug–set 2026');
-    expect(periodScopeLabel(H1)).toBe('gen–giu 2026');
     expect(periodScopeLabel(YEAR)).toBe('2026');
   });
 
   it('names the baseline inside a sentence', () => {
     expect(periodBaselineLabel(AUGUST)).toBe('luglio');
-    expect(periodBaselineLabel(Q3)).toBe('il trimestre precedente');
     expect(periodBaselineLabel(YEAR)).toBe('il 2025');
   });
 
@@ -109,14 +92,8 @@ describe('the period, in words', () => {
     expect(periodBaselineHeading(january)).toBe('Dicembre 2025');
   });
 
-  it('wraps the year on a Q1 email too', () => {
-    expect(periodBaselineHeading({ kind: 'quarterly', year: 2026, month: 3, quarter: 1 })).toBe('Q4 2025');
-    expect(periodBaselineHeading(Q3)).toBe('Q2 2026');
-  });
-
   it('names the same period one year earlier', () => {
     expect(yearEarlierHeading(AUGUST)).toBe('Agosto 2025');
-    expect(yearEarlierHeading(Q3)).toBe('Q3 2025');
     expect(yearEarlierHeading(YEAR)).toBe('2025');
   });
 });
@@ -251,18 +228,6 @@ describe('buildPeriodEmailVerdict', () => {
     expect(flat.tone).toBe('warning');
     expect(plain(flat.sentence)).toContain('pagato circa 4160 € di tasse. Nello stesso mese hai comprato 6 strumenti per 34.000 €.');
 
-    const quarter = buildPeriodEmailVerdict({
-      ...GROWING,
-      period: { kind: 'quarterly', year: 2026, month: 9, quarter: 3 },
-      netWorthDelta: 3000,
-      netWorthDeltaPct: 1.2,
-      sales,
-      rank: null,
-    });
-    expect(quarter.headline).toBe(
-      'Il terzo trimestre è cresciuto, ma le tasse sulla vendita di ORNI si sono prese più di metà della crescita.',
-    );
-    expect(plain(quarter.sentence)).toContain('Nello stesso trimestre hai comprato 6 strumenti');
   });
 
   it('keeps the two-part split when the sale carried no tax', () => {
@@ -306,11 +271,6 @@ describe('buildPeriodEmailVerdict', () => {
     expect(plain(verdict.sentence)).toBe('Il patrimonio vale 312.480 €.');
   });
 
-  it('speaks about a quarter in the quarter’s own words', () => {
-    const verdict = buildPeriodEmailVerdict({ ...GROWING, period: Q3, rank: null });
-    expect(verdict.headline).toBe('Il terzo trimestre è cresciuto: il mercato ha spinto.');
-    expect(plain(verdict.sentence)).toContain('su il trimestre precedente');
-  });
 });
 
 // ─── Tile readings ────────────────────────────────────────────────────────────
@@ -320,6 +280,13 @@ describe('describeNetWorthTile', () => {
     expect(
       plain(describeNetWorthTile({ period: AUGUST, previousNetWorth: 308170, netWorthDelta: 4310, netWorthDeltaPct: 1.4 })),
     ).toBe('Rispetto a luglio è salito di +4310 €, il +1,40%.');
+  });
+
+  it('puts the article on a year: «Rispetto al 2025», never «a il 2025»', () => {
+    expect(
+      plain(describeNetWorthTile({ period: YEAR, previousNetWorth: 90000, netWorthDelta: 14000, netWorthDeltaPct: 15.56 })),
+    ).toBe('Rispetto al 2025 è salito di +14.000 €, il +15,56%.');
+    expect(plain(buildPeriodEmailVerdict({ ...GROWING, period: YEAR, rank: null }).sentence)).toContain('(+1,40%) sul 2025.');
   });
 
   it('uses the falling verb when it fell', () => {
@@ -629,132 +596,6 @@ describe('describeBudgetAlertsTile', () => {
 
   it('is absent when no budget raised an alert', () => {
     expect(describeBudgetAlertsTile([], 9)).toBeNull();
-  });
-});
-
-// ─── The budget email ─────────────────────────────────────────────────────────
-
-const SUNDAY: BudgetEmailVerdictInput = {
-  onTrackCount: 7,
-  atRiskCount: 2,
-  exceededCount: 1,
-  overall: { spent: 2870, limit: 3000, projected: 2965 },
-  dayOfMonth: 30,
-  daysInMonth: 31,
-};
-
-describe('buildBudgetEmailVerdict', () => {
-  it('opens on how many hold and whether the ceiling does', () => {
-    const verdict = buildBudgetEmailVerdict(SUNDAY);
-    expect(verdict.headline).toBe('Sette budget su nove sono in linea, il tetto del mese regge.');
-    expect(verdict.tone).toBe('negative');
-  });
-
-  it('judges the ceiling on the projection, not on what is spent so far', () => {
-    expect(buildBudgetEmailVerdict({ ...SUNDAY, overall: { spent: 2870, limit: 3000, projected: 3240 } }).headline).toBe(
-      'Sette budget su nove sono in linea, e il tetto del mese non regge.',
-    );
-  });
-
-  it('names the month’s position, and never the week', () => {
-    const sentence = plain(buildBudgetEmailVerdict(SUNDAY).sentence);
-    expect(sentence).toBe(
-      'Al giorno 30 di 31 hai speso 2870 € del tetto mensile di 3000 €; ' +
-        'al ritmo attuale la proiezione a fine mese è 2965 €. Uno è già oltre il limite, uno è vicino.',
-    );
-    expect(sentence).not.toMatch(/settiman/i);
-  });
-
-  it('is warning, not negative, when nothing has actually been exceeded', () => {
-    expect(buildBudgetEmailVerdict({ ...SUNDAY, exceededCount: 0 }).tone).toBe('warning');
-  });
-
-  it('is positive when everything holds', () => {
-    const verdict = buildBudgetEmailVerdict({ ...SUNDAY, onTrackCount: 9, atRiskCount: 0, exceededCount: 0 });
-    expect(verdict.headline).toBe('Tutti i nove budget sono in linea, e il tetto regge.');
-    expect(verdict.tone).toBe('positive');
-  });
-
-  it('says plainly when there are no budgets at all', () => {
-    expect(
-      buildBudgetEmailVerdict({ onTrackCount: 0, atRiskCount: 0, exceededCount: 0, overall: null, dayOfMonth: 30, daysInMonth: 31 })
-        .headline,
-    ).toBe('Non hai budget configurati.');
-  });
-});
-
-describe('describeOverallCeiling', () => {
-  it('puts the two percentages side by side, which is the only way either means anything', () => {
-    expect(plain(describeOverallCeiling({ spent: 2870, limit: 3000, dayOfMonth: 30, daysInMonth: 31 }))).toBe(
-      'Hai usato il 96% del tetto al 97% del mese: il passo è giusto.',
-    );
-  });
-
-  it('calls out spending faster than the calendar', () => {
-    expect(plain(describeOverallCeiling({ spent: 2400, limit: 3000, dayOfMonth: 10, daysInMonth: 31 }))).toContain(
-      'stai spendendo più in fretta del tempo che passa',
-    );
-  });
-
-  it('is absent without a ceiling', () => {
-    expect(describeOverallCeiling({ spent: 900, limit: 0, dayOfMonth: 10, daysInMonth: 31 })).toBeNull();
-  });
-});
-
-describe('describeMonthlyBudgetsTile', () => {
-  const ROWS = [
-    { label: 'Alimentari', ratio: 1.11, status: 'over' as const, isIncome: false },
-    { label: 'Tempo libero', ratio: 0.9, status: 'warning' as const, isIncome: false },
-    { label: 'Casa', ratio: 0.93, status: 'ok' as const, isIncome: false },
-    { label: 'Stipendio', ratio: 1.03, status: 'ok' as const, isIncome: true },
-  ];
-
-  it('names what sfondò and what is close', () => {
-    expect(plain(describeMonthlyBudgetsTile(ROWS))).toBe(
-      'Alimentari ha sfondato il limite; Tempo libero chiuderà al limite se non cambia passo.',
-    );
-  });
-
-  it('says plainly when nothing needs attention', () => {
-    expect(
-      plain(describeMonthlyBudgetsTile([{ label: 'Casa', ratio: 0.5, status: 'ok', isIncome: false }])),
-    ).toBe('Un budget del mese è sotto il limite.');
-  });
-
-  it('ignores income targets when counting expense budgets', () => {
-    expect(plain(describeMonthlyBudgetsTile([{ label: 'Stipendio', ratio: 1.03, status: 'ok', isIncome: true }]))).toBeNull();
-  });
-});
-
-describe('describeAnnualBudgetsTile', () => {
-  const ROWS = [
-    { label: 'Vacanze', ratio: 0.747, status: 'ok' as const, isIncome: false },
-    { label: 'Regali', ratio: 0.388, status: 'ok' as const, isIncome: false },
-  ];
-
-  it('compares the share consumed with the share of the YEAR gone', () => {
-    expect(plain(describeAnnualBudgetsTile(ROWS, 66.3))).toBe(
-      'Vacanze ha già consumato il 75% del suo budget con il 66% dell’anno alle spalle.',
-    );
-  });
-
-  it('states pace, not a verdict: a row ahead of the calendar is still "ok"', () => {
-    // `rowStatus` alone decides over/warning/ok, on the 80% threshold. The reading may say a
-    // budget is ahead of the calendar without promoting it to a risk.
-    expect(plain(describeAnnualBudgetsTile(ROWS, 66.3))).not.toMatch(/superat|oltre il limite/);
-  });
-
-  it('says so when every annual budget is behind the calendar', () => {
-    expect(plain(describeAnnualBudgetsTile([{ label: 'Regali', ratio: 0.2, status: 'ok', isIncome: false }], 66.3))).toBe(
-      'Tutti i budget dell’anno sono sotto il 66% di calendario già trascorso.',
-    );
-  });
-});
-
-describe('budgetWindowLabel', () => {
-  it('never says "settimana", because no figure in that email is weekly', () => {
-    expect(budgetWindowLabel('monthly', 'agosto')).toBe('dal 1° agosto a oggi');
-    expect(budgetWindowLabel('annual', 'agosto')).toBe('da inizio anno a oggi');
   });
 });
 

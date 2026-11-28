@@ -484,12 +484,9 @@ export interface AssetAllocationSettings {
   // (ExpenseCategory.spendingRole), so turning this off hides them without erasing them. Read only
   // client-side: not in the server settings mappers.
   spendingRolesEnabled?: boolean;
-  monthlyEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each month
-  quarterlyEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each quarter (Mar/Jun/Sep/Dec)
-  semiAnnualEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each half-year (Jun 30 / Dec 31)
-  yearlyEmailEnabled?: boolean; // When true, a summary email is sent on December 31
-  weeklyBudgetEmailEnabled?: boolean; // When true, a budget status email is sent every Sunday
-  monthlyEmailRecipients?: string[]; // Recipient list shared by all periodic summary emails (monthly/quarterly/semiannual/yearly/weekly-budget)
+  monthlyEmailEnabled?: boolean; // When true, the summary of the month just closed is sent on the 1st of the next (2nd and 3rd as catch-up)
+  yearlyEmailEnabled?: boolean; // When true, the summary of the year just closed is sent on 1 January (2nd and 3rd as catch-up)
+  monthlyEmailRecipients?: string[]; // Recipient list shared by the monthly and the yearly summary emails
   // Fondo pensione — household members, one RAL/eligibility per taxpayer (see FamilyMember). Feeds
   // computePensionTaxRecap in the Previdenza view, once per member with ≥1 linked fund. Editable
   // from Impostazioni → Preferenze → Famiglia, not part of the FIRE Coast tax params above.

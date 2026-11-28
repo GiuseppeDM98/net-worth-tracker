@@ -171,7 +171,7 @@ FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"...","priva
 # Cron Job Security
 CRON_SECRET=your_secure_random_string_here
 
-# App URL (for cron jobs and redirects)
+# App URL (for cron jobs and redirects; also the emails' «Apri Net Worth Tracker» link, printed only for an https:// URL)
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Registration Control (optional - for restricting signups)
@@ -548,7 +548,7 @@ git push -u origin main
 1. In the **"Configure Project"** section, expand **"Environment Variables"**
 2. Add all the variables from your `.env.local` (see [Local Development Setup](#step-3-configure-environment-variables))
 3. **IMPORTANT**: Set environment to **Production**, **Preview**, and **Development**
-4. For `NEXT_PUBLIC_APP_URL`, use your Vercel deployment URL (e.g., `https://your-app.vercel.app`)
+4. For `NEXT_PUBLIC_APP_URL`, use your Vercel deployment URL (e.g., `https://your-app.vercel.app`) — the periodic emails link back to `{NEXT_PUBLIC_APP_URL}/dashboard`, and print no link without `https://`
 
 **Recommended approach for Firebase Admin SDK:**
 - Use `FIREBASE_SERVICE_ACCOUNT_KEY` with the full JSON content (see [VERCEL_SETUP.md](./VERCEL_SETUP.md) for details)

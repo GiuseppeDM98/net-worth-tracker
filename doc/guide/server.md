@@ -4,7 +4,7 @@
 
 ## Files
 
-- **Server layer**: `app/api/**/route.ts` (the cron routes `app/api/cron/monthly-snapshot/route.ts` and `app/api/cron/daily-dividend-processing/route.ts`, `/api/portfolio/snapshot`), `lib/server/*` (server-only: `apiAuth.ts` with `assertCanAccessAccount`, `validation.ts` with the reusable schemas, `isoDateSchema` and `parseOr400`, `serverTiming.ts` with `startTiming()` and `ServerTimingRecorder`), `lib/firebase/admin.ts` (the Admin SDK), `vercel.json`, `package.json` (`overrides`, `engines.node`); tests `__tests__/vercelConfig.test.ts`, `__tests__/serverCashSettlement.test.ts`, `__tests__/serverValidation.test.ts`, `__tests__/serverTiming.test.ts`, `__tests__/apiAuthRoutes.test.ts` and the route tests (`__tests__/{performanceYieldsRoute,dividendStatsRoute,instrumentProfilesRoute}.test.ts`), plus the throwaway emulator exercises `scripts/*.tmp.mts` of doc/guide/e2e-emulatori.md
+- **Server layer**: `app/api/**/route.ts` (the cron routes `app/api/cron/{monthly-snapshot,daily-dividend-processing,periodic-emails}/route.ts`, `/api/portfolio/snapshot`), `lib/server/*` (server-only: `apiAuth.ts` with `assertCanAccessAccount`, `validation.ts` with the reusable schemas, `isoDateSchema` and `parseOr400`, `serverTiming.ts` with `startTiming()` and `ServerTimingRecorder`), `lib/firebase/admin.ts` (the Admin SDK), `vercel.json`, `package.json` (`overrides`, `engines.node`); tests `__tests__/vercelConfig.test.ts`, `__tests__/serverCashSettlement.test.ts`, `__tests__/serverValidation.test.ts`, `__tests__/serverTiming.test.ts`, `__tests__/apiAuthRoutes.test.ts` and the route tests (`__tests__/{performanceYieldsRoute,dividendStatsRoute,instrumentProfilesRoute}.test.ts`), plus the throwaway emulator exercises `scripts/*.tmp.mts` of doc/guide/e2e-emulatori.md
 
 ## Server Layer and API Authorization
 - Route = auth → validate → fetch → ownership check → delegate → return; no Firestore queries or business logic in the
@@ -13,6 +13,11 @@
   `decodedToken.uid`; viewer-scoped routes (sharing management) just read the token uid.
 - Server-owned materialized docs are mutated only via a private authenticated route; cron routes use `CRON_SECRET`, and
   `/api/portfolio/snapshot` must keep accepting `cronSecret`.
+- **Three crons** (`vercel.json`, held by `__tests__/vercelConfig.test.ts`): `/api/cron/monthly-snapshot` and
+  `/api/cron/daily-dividend-processing` at `0 18 * * *` UTC, `/api/cron/periodic-emails` at `0 19 * * *` (2026-11-28,
+  an hour later, the same Italian day; doc/guide/email-pdf.md). The snapshot and the emails' routes declare
+  `export const maxDuration = 300;`, read from their SOURCE by the test (importing a cron route drags its whole module
+  graph). The snapshot cron sends no email since that day.
 - **Validation**: `lib/server/validation.ts` owns the reusable schemas and `parseOr400` — never cast with `as { … }`
   first, coerce dates with `z.coerce.date()` (behind a string when they come from a request, below), and validate
   **Firestore-originated** inputs at the service entry point too.
@@ -75,6 +80,9 @@
 
 ## Per-page blind spots
 
+- **The emails' cron walks the accounts one after the other** (2026-11-28): inside 300 s, for the accounts there are;
+  only one account's two comments of 1 January run side by side. Parallel per account is out of scope until the
+  accounts outgrow the minutes.
 - **The ESM-only trap and the audit count are in `CLAUDE.md` § Known Issues, the Vercel region in § Data & Integrations**: the functions
   in `fra1` beside Firestore in `eur3` (held by `__tests__/vercelConfig.test.ts`), the `ERR_REQUIRE_ESM` of PR #436
   and its `overrides`, and the `npm audit` count; the advisories and their decisions are in `doc/guide/dipendenze.md`.

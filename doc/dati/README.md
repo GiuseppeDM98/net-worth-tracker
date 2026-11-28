@@ -332,7 +332,7 @@ The number is the order. A spec is implemented only when the ones it depends on 
 
 | Spec | Title | Size | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [10](DATI-10-email-tenute-e-giorno-dopo.md) | Periodic emails: two kept, sent the day after, once | M | 08 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 20 rilievi, 2 decisioni |
+| [10](DATI-10-email-tenute-e-giorno-dopo.md) | Periodic emails: two kept, sent the day after, once | M | 08 | Opus 5.5 · medium | implemented — 2026-11-28, branch `feat/dati-10-email-tenute` |
 | [11](DATI-11-email-revisione-delle-spese.md) | The «Revisione delle spese» email | L | 09, 10 | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 25 rilievi, 2 decisioni |
 | [12](DATI-12-andamento-strumenti.md) | Patrimonio › Andamento: the instruments | L | — | Opus 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 29 rilievi, 5 decisioni |
 | [13](DATI-13-andamento-classi-e-giornaliero.md) | Andamento: the classes by weight, the daily line | M | 12, 02 | Sonnet 5.5 · medium | read — riletta in modo adversariale il 2026-11-23: 28 rilievi, 3 decisioni |
@@ -476,6 +476,8 @@ says so; it never changes what is there. The full text of each is in the spec th
   `statuses` are `status` events before the text).
 
 ### C5 — the email schedule and the ledger of sends (created by DATI-10; extended by 11)
+
+Built by DATI-10 on 2026-11-28 exactly as below; «Invia ora» confirms its send with `manual: true`.
 
 - `lib/utils/emailSchedule.ts`: `type PeriodicEmailKind = 'monthly' | 'yearly'`, `interface DueEmail`,
   `EMAIL_CATCH_UP_DAYS = 3`, `monthPeriodKey(year, month)`, `lastClosedMonth(todayIso)`, `lastClosedYear(todayIso)`,

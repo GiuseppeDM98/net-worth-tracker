@@ -35,20 +35,17 @@ export type { Narrative, PageVerdictModel, VerdictTone } from '@/lib/utils/narra
 
 // ─── The period ───────────────────────────────────────────────────────────────
 
-export type EmailPeriodKind = 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
+export type EmailPeriodKind = 'monthly' | 'yearly';
 
 export interface EmailPeriod {
   kind: EmailPeriodKind;
   year: number;
   /** The period's LAST month, 1-12. For a monthly email, the month itself. */
   month: number;
-  /** 1-4, quarterly only. */
-  quarter?: number;
-  /** 1 (Jan-Jun) or 2 (Jul-Dec), semiannual only. */
-  semester?: number;
 }
 
-const ORDINALS = ['primo', 'secondo', 'terzo', 'quarto'] as const;
+/** The label of the email's one link back to the app (`emailAppLink`, lib/server/emailHtml.ts). */
+export const EMAIL_APP_LINK_LABEL = 'Apri Net Worth Tracker';
 
 const SHORT_MONTHS = [
   'gen', 'feb', 'mar', 'apr', 'mag', 'giu',
@@ -56,17 +53,13 @@ const SHORT_MONTHS = [
 ] as const;
 
 /**
- * The period as the SUBJECT of the verdict headline — "Agosto", "Il terzo trimestre".
+ * The period as the SUBJECT of the verdict headline — "Agosto", "Il 2026".
  *
- * All four forms are masculine singular, which is what lets the headline templates below use
- * one verb agreement ("è cresciuto", "è in calo") instead of four.
+ * Both forms are masculine singular, which is what lets the headline templates below use
+ * one verb agreement ("è cresciuto", "è in calo").
  */
 export function periodSubject(period: EmailPeriod): string {
   switch (period.kind) {
-    case 'quarterly':
-      return `Il ${ORDINALS[(period.quarter ?? 1) - 1]} trimestre`;
-    case 'semiannual':
-      return `Il ${ORDINALS[(period.semester ?? 1) - 1]} semestre`;
     case 'yearly':
       return `Il ${period.year}`;
     default:
@@ -74,21 +67,15 @@ export function periodSubject(period: EmailPeriod): string {
   }
 }
 
-/** «Nello stesso trimestre hai comprato …» — the period as a noun after «stesso». */
+/** «Nello stesso mese hai comprato …» — the period as a noun after «stesso». */
 const PERIOD_NOUNS: Record<EmailPeriodKind, string> = {
   monthly: 'mese',
-  quarterly: 'trimestre',
-  semiannual: 'semestre',
   yearly: 'anno',
 };
 
-/** The email's subject line and header title: "Agosto 2026", "Q3 2026", "Anno 2026". */
+/** The email's subject line and header title: "Agosto 2026", "Anno 2026". */
 export function periodTitle(period: EmailPeriod): string {
   switch (period.kind) {
-    case 'quarterly':
-      return `Q${period.quarter} ${period.year}`;
-    case 'semiannual':
-      return `${period.semester}° Semestre ${period.year}`;
     case 'yearly':
       return `Anno ${period.year}`;
     default:
@@ -99,10 +86,6 @@ export function periodTitle(period: EmailPeriod): string {
 /** The eyebrow above the verdict: what kind of report this is. */
 export function periodKindLabel(kind: EmailPeriodKind): string {
   switch (kind) {
-    case 'quarterly':
-      return 'Riepilogo trimestrale';
-    case 'semiannual':
-      return 'Riepilogo semestrale';
     case 'yearly':
       return 'Riepilogo annuale';
     default:
@@ -110,32 +93,15 @@ export function periodKindLabel(kind: EmailPeriodKind): string {
   }
 }
 
-/** The first month of the period, 1-12. */
-function periodStartMonth(period: EmailPeriod): number {
-  switch (period.kind) {
-    case 'quarterly':
-      return period.month - 2;
-    case 'semiannual':
-      return period.semester === 1 ? 1 : 7;
-    case 'yearly':
-      return 1;
-    default:
-      return period.month;
-  }
-}
-
 /**
- * A tile's scope — the window its figures are measured over: "agosto 2026", "lug–set 2026".
+ * A tile's scope — the window its figures are measured over: "agosto 2026", "2026".
  * Every flow tile carries one, because in an email there is no period picker to look at.
  */
 export function periodScopeLabel(period: EmailPeriod): string {
   if (period.kind === 'monthly') {
     return `${MONTH_NAMES[period.month - 1].toLowerCase()} ${period.year}`;
   }
-  if (period.kind === 'yearly') return `${period.year}`;
-  const start = SHORT_MONTHS[periodStartMonth(period) - 1];
-  const end = SHORT_MONTHS[period.month - 1];
-  return `${start}–${end} ${period.year}`;
+  return `${period.year}`;
 }
 
 /** The period's closing DAY, for a tile that states a point in time: "31 ago 2026". */
@@ -144,13 +110,18 @@ export function periodEndLabel(period: EmailPeriod): string {
   return `${lastDay} ${SHORT_MONTHS[period.month - 1]} ${period.year}`;
 }
 
+/**
+ * The baseline after a preposition, with its article where Italian wants one: "su luglio" / "sul 2025",
+ * "a luglio" / "al 2025". A month takes none, a year does — «su il 2025» is never Italian.
+ */
+export function periodBaselineAfter(preposition: 'su' | 'a', period: EmailPeriod): string {
+  if (period.kind === 'yearly') return `${preposition === 'su' ? 'sul' : 'al'} ${period.year - 1}`;
+  return `${preposition} ${periodBaselineLabel(period)}`;
+}
+
 /** What the period is compared against, as it reads inside a sentence: "luglio", "il 2025". */
 export function periodBaselineLabel(period: EmailPeriod): string {
   switch (period.kind) {
-    case 'quarterly':
-      return 'il trimestre precedente';
-    case 'semiannual':
-      return 'il semestre precedente';
     case 'yearly':
       return `il ${period.year - 1}`;
     default: {
@@ -163,10 +134,6 @@ export function periodBaselineLabel(period: EmailPeriod): string {
 /** The same baseline as a COLUMN heading, capitalised and standalone: "Luglio 2026". */
 export function periodBaselineHeading(period: EmailPeriod): string {
   switch (period.kind) {
-    case 'quarterly':
-      return `Q${(period.quarter ?? 1) === 1 ? 4 : (period.quarter ?? 1) - 1} ${(period.quarter ?? 1) === 1 ? period.year - 1 : period.year}`;
-    case 'semiannual':
-      return period.semester === 1 ? `2° Semestre ${period.year - 1}` : `1° Semestre ${period.year}`;
     case 'yearly':
       return `${period.year - 1}`;
     default: {
@@ -180,10 +147,6 @@ export function periodBaselineHeading(period: EmailPeriod): string {
 /** The same period, one year earlier, as a heading: "Agosto 2025". */
 export function yearEarlierHeading(period: EmailPeriod): string {
   switch (period.kind) {
-    case 'quarterly':
-      return `Q${period.quarter} ${period.year - 1}`;
-    case 'semiannual':
-      return `${period.semester}° Semestre ${period.year - 1}`;
     case 'yearly':
       return `${period.year - 1}`;
     default:
@@ -367,7 +330,7 @@ export function buildPeriodEmailVerdict(input: PeriodEmailVerdictInput): PageVer
       signedEuro(input.netWorthDelta),
       prose(' ('),
       signedPercent(input.netWorthDeltaPct),
-      prose(`) su ${periodBaselineLabel(input.period)}`),
+      prose(`) ${periodBaselineAfter('su', input.period)}`),
     );
   }
   sentence.push(prose('.'));
@@ -434,7 +397,7 @@ export function describeNetWorthTile(input: {
   }
   const verb = input.netWorthDelta >= 0 ? 'è salito' : 'è sceso';
   return [
-    prose(`Rispetto a ${periodBaselineLabel(input.period)} ${verb} di `),
+    prose(`Rispetto ${periodBaselineAfter('a', input.period)} ${verb} di `),
     signedEuro(input.netWorthDelta),
     prose(', il '),
     signedPercent(input.netWorthDeltaPct),
@@ -776,211 +739,4 @@ export function describeBudgetAlertsTile(
     narrative.push(prose('.'));
   }
   return narrative;
-}
-
-// ─── The budget email ─────────────────────────────────────────────────────────
-
-export interface BudgetEmailVerdictInput {
-  /** Expense budgets that are neither over nor near their limit. */
-  onTrackCount: number;
-  /** Expense budgets that are over or near. */
-  atRiskCount: number;
-  exceededCount: number;
-  /** The overall monthly ceiling, when one is configured. */
-  overall: { spent: number; limit: number; projected: number | null } | null;
-  /** Day of the current month, and how many days it has — the ceiling's window. */
-  dayOfMonth: number;
-  daysInMonth: number;
-}
-
-/**
- * The budget email's verdict.
- *
- * Nothing in this email is weekly. It is SENT on Sunday, but the ceiling and the monthly
- * budgets are month-to-date and the annual ones year-to-date — a distinction that once reached
- * production as "a fine anno" on a monthly projection. The verdict therefore names the month's
- * position explicitly, and the word "settimana" appears nowhere in this module.
- */
-export function buildBudgetEmailVerdict(input: BudgetEmailVerdictInput): PageVerdictModel {
-  const total = input.onTrackCount + input.atRiskCount;
-
-  const headline = resolveBudgetHeadline(input, total);
-
-  const sentence: Narrative = [
-    prose('Al giorno '),
-    figure(`${input.dayOfMonth}`),
-    prose(' di '),
-    figure(`${input.daysInMonth}`),
-  ];
-
-  if (input.overall && input.overall.limit > 0) {
-    sentence.push(
-      prose(' hai speso '),
-      euro(input.overall.spent),
-      prose(' del tetto mensile di '),
-      euro(input.overall.limit),
-    );
-    if (input.overall.projected !== null) {
-      sentence.push(
-        prose('; al ritmo attuale la proiezione a fine mese è '),
-        euro(input.overall.projected),
-      );
-    }
-    sentence.push(prose('.'));
-  } else {
-    sentence.push(prose(', questo è lo stato dei tuoi budget.'));
-  }
-
-  if (input.atRiskCount > 0) {
-    const near = input.atRiskCount - input.exceededCount;
-    const clauses: string[] = [];
-    if (input.exceededCount > 0) {
-      clauses.push(`${numberWord(input.exceededCount, 'pronoun')} ${pluralise(input.exceededCount, 'è già oltre il limite', 'sono già oltre il limite')}`);
-    }
-    if (near > 0) {
-      clauses.push(`${numberWord(near, 'pronoun')} ${pluralise(near, 'è vicino', 'sono vicini')}`);
-    }
-    sentence.push(prose(` ${capitalise(clauses.join(', '))}.`));
-  }
-
-  return { headline, tone: resolveBudgetTone(input), sentence };
-}
-
-function resolveBudgetHeadline(input: BudgetEmailVerdictInput, total: number): string {
-  if (total === 0 && !input.overall) return 'Non hai budget configurati.';
-
-  // The ceiling is judged on the projection when there is one: a ceiling at 80% on the 10th of
-  // the month is not "holding", and the projection is the only figure that knows that.
-  const ceilingHolds =
-    input.overall === null ||
-    input.overall.limit <= 0 ||
-    (input.overall.projected ?? input.overall.spent) <= input.overall.limit;
-
-  const ceilingClause = ceilingHolds ? 'il tetto del mese regge' : 'il tetto del mese non regge';
-
-  if (total === 0) {
-    return `${capitalise(ceilingClause)}.`;
-  }
-
-  if (input.atRiskCount === 0) {
-    const allInLine =
-      total === 1 ? 'L’unico budget è in linea' : `Tutti i ${numberWord(total, 'masculine')} budget sono in linea`;
-    return ceilingHolds ? `${allInLine}, e il tetto regge.` : `${allInLine}, ma il tetto del mese non regge.`;
-  }
-
-  const inLine = `${capitalise(numberWord(input.onTrackCount, 'masculine'))} budget su ${numberWord(total, 'masculine')} ${pluralise(input.onTrackCount, 'è in linea', 'sono in linea')}`;
-  return ceilingHolds ? `${inLine}, ${ceilingClause}.` : `${inLine}, e ${ceilingClause}.`;
-}
-
-function resolveBudgetTone(input: BudgetEmailVerdictInput): VerdictTone {
-  if (input.exceededCount > 0) return 'negative';
-  if (input.atRiskCount > 0) return 'warning';
-  return 'positive';
-}
-
-/**
- * The overall ceiling's reading: the two percentages that only mean something together —
- * how much of the ceiling is used, and how much of the month has passed.
- */
-export function describeOverallCeiling(input: {
-  spent: number;
-  limit: number;
-  dayOfMonth: number;
-  daysInMonth: number;
-}): Narrative | null {
-  if (input.limit <= 0) return null;
-  const usedPct = (input.spent / input.limit) * 100;
-  const elapsedPct = (input.dayOfMonth / input.daysInMonth) * 100;
-  const pace = usedPct <= elapsedPct ? 'il passo è giusto' : 'stai spendendo più in fretta del tempo che passa';
-
-  return [
-    prose('Hai usato il '),
-    figure(formatPercentage(usedPct, 0)),
-    prose(' del tetto al '),
-    figure(formatPercentage(elapsedPct, 0)),
-    prose(` del mese: ${pace}.`),
-  ];
-}
-
-export interface BudgetRowSummary {
-  label: string;
-  ratio: number;
-  status: 'ok' | 'warning' | 'over';
-  isIncome: boolean;
-}
-
-/** Budget mensili. Names the ones that need attention, or says plainly that none do. */
-export function describeMonthlyBudgetsTile(rows: BudgetRowSummary[]): Narrative | null {
-  const expenses = rows.filter((row) => !row.isIncome);
-  if (expenses.length === 0) return null;
-
-  const over = expenses.filter((row) => row.status === 'over');
-  const near = expenses.filter((row) => row.status === 'warning');
-
-  if (over.length === 0 && near.length === 0) {
-    return [
-      prose(`${capitalise(numberWord(expenses.length, 'masculine'))} ${pluralise(expenses.length, 'budget del mese è sotto il limite', 'budget del mese sono sotto il limite')}.`),
-    ];
-  }
-
-  const narrative: Narrative = [];
-  if (over.length > 0) {
-    narrative.push(
-      prose(over.length === 1 && near.length === 0 ? 'Solo ' : ''),
-      figure(over.map((row) => row.label).join(', ')),
-      prose(pluralise(over.length, ' ha sfondato il limite', ' hanno sfondato il limite')),
-    );
-  }
-  if (near.length > 0) {
-    narrative.push(
-      prose(over.length > 0 ? '; ' : ''),
-      figure(near.map((row) => row.label).join(', ')),
-      prose(
-        pluralise(
-          near.length,
-          ' chiuderà al limite se non cambia passo',
-          ' chiuderanno al limite se non cambiano passo',
-        ),
-      ),
-    );
-  }
-  narrative.push(prose('.'));
-  return narrative;
-}
-
-/**
- * Budget annuali. The pace clause compares the share consumed with the share of the YEAR that
- * has passed — the only comparison that means anything on a twelve-month window — and it is a
- * statement of pace, never a verdict: the status thresholds stay the ones `rowStatus` applies.
- */
-export function describeAnnualBudgetsTile(
-  rows: BudgetRowSummary[],
-  yearElapsedPct: number,
-): Narrative | null {
-  const expenses = rows.filter((row) => !row.isIncome);
-  if (expenses.length === 0) return null;
-
-  const ahead = expenses.filter((row) => row.ratio * 100 > yearElapsedPct);
-  if (ahead.length === 0) {
-    return [
-      prose('Tutti i budget dell’anno sono sotto il '),
-      figure(formatPercentage(yearElapsedPct, 0)),
-      prose(' di calendario già trascorso.'),
-    ];
-  }
-
-  const leader = [...ahead].sort((a, b) => b.ratio - a.ratio)[0];
-  return [
-    figure(leader.label),
-    prose(' ha già consumato il '),
-    figure(formatPercentage(leader.ratio * 100, 0)),
-    prose(' del suo budget con il '),
-    figure(formatPercentage(yearElapsedPct, 0)),
-    prose(' dell’anno alle spalle.'),
-  ];
-}
-
-/** The window a budget row is measured over, as its own caption. Never "questa settimana". */
-export function budgetWindowLabel(period: 'monthly' | 'annual', monthName: string): string {
-  return period === 'annual' ? 'da inizio anno a oggi' : `dal 1° ${monthName} a oggi`;
 }
