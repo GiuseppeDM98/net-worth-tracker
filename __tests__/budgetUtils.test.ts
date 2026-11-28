@@ -18,7 +18,6 @@ import {
   getMonthActualForItem,
   getMonthlyTotalExpenses,
   getPeriodActual,
-  getPeriodExpensesForItem,
   getDefaultAmount,
   buildBudgetComparison,
   reconcileBudgetItems,
@@ -208,7 +207,6 @@ describe('a row marked excludeFromBudget', () => {
     expect(splitMonthActualForItem(CAT_ITEM, expenses, 2025, 1, now)).toEqual(splitMonthActualForItem(CAT_ITEM, EXPENSES, 2025, 1, now));
     expect(collectMonthSpending(expenses, 2025, 1).some((row) => row.amount === 120)).toBe(false);
     expect(collectMonthItemSpending(CAT_ITEM, expenses, 2025, 1).some((row) => row.amount === 120)).toBe(false);
-    expect(getPeriodExpensesForItem(CAT_ITEM, expenses, now)).not.toContain(amazonForAFriend);
   });
 });
 
@@ -222,47 +220,6 @@ describe('getPeriodActual', () => {
   it('uses the whole year (YTD) for an annual budget', () => {
     const annual = makeItem({ id: 'a', categoryId: 'cat1', period: 'annual' });
     expect(getPeriodActual(annual, EXPENSES, new Date(2025, 5, 15, 12))).toBeCloseTo(950); // full 2025
-  });
-});
-
-// ---------------------------------------------------------------------------
-describe('getPeriodExpensesForItem', () => {
-  it('returns the current-month matching expenses for a monthly budget, sorted by amount desc', () => {
-    const monthly = makeItem({ id: 'm', categoryId: 'cat1', period: 'monthly' });
-    const result = getPeriodExpensesForItem(monthly, EXPENSES, new Date(2025, 0, 15, 12)); // Jan
-    expect(result.map((e) => Math.abs(e.amount))).toEqual([500, 300, 150]);
-  });
-
-  it('returns no expenses for a month with no matching spend', () => {
-    const monthly = makeItem({ id: 'm', categoryId: 'cat1', period: 'monthly' });
-    expect(getPeriodExpensesForItem(monthly, EXPENSES, new Date(2025, 5, 15, 12))).toEqual([]); // June
-  });
-
-  it('returns the whole year (YTD) matching expenses for an annual budget', () => {
-    const annual = makeItem({ id: 'a', categoryId: 'cat1', period: 'annual' });
-    const result = getPeriodExpensesForItem(annual, EXPENSES, new Date(2025, 5, 15, 12));
-    expect(result.map((e) => Math.abs(e.amount))).toEqual([500, 300, 150]);
-  });
-
-  it('reconciles exactly with getPeriodActual for the same item and date', () => {
-    const annual = makeItem({ id: 'a', categoryId: 'cat1', period: 'annual' });
-    const now = new Date(2025, 5, 15, 12);
-    const listed = getPeriodExpensesForItem(annual, EXPENSES, now).reduce(
-      (sum, e) => sum + Math.abs(e.amount),
-      0
-    );
-    expect(listed).toBeCloseTo(getPeriodActual(annual, EXPENSES, now));
-  });
-
-  it('excludes transfers', () => {
-    const monthly = makeItem({ id: 'm', categoryId: 'cat1', period: 'monthly' });
-    const withTransfer = [
-      ...EXPENSES,
-      makeExpense({ type: 'transfer', categoryId: 'cat1', amount: -999, date: new Date(2025, 0, 8) }),
-    ];
-    const result = getPeriodExpensesForItem(monthly, withTransfer, new Date(2025, 0, 15, 12));
-    expect(result.some((e) => e.type === 'transfer')).toBe(false);
-    expect(result.map((e) => Math.abs(e.amount))).toEqual([500, 300, 150]);
   });
 });
 

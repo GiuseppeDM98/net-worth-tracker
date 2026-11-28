@@ -14,7 +14,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19 **with the React Compiler on** (since 2026-10-05), TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - Tests: Vitest in `__tests__/` (one file per pure module), held green in `Europe/Rome`, in the machine's zone AND under `TZ=UTC` (since 2026-10-08); Playwright specs in `e2e/` (the projects and the traps: doc/guide/e2e-playwright.md; the full run and its known flakes: doc/guide/e2e-suite.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, the ones beside midnight are named by the Italian clock.
-- Latest (2026-11-27): **DATI-09** retired (the Assistente's tools: doc/guide/assistente-strumenti.md). Its retirement corrected code: in Analisi a subcategory picked inside the open Scheda no longer hides it (doc/guide/cashflow-analisi.md), and in Cashflow › Budget «Budget annuali» and «Per categoria» print the alert's figure, booked up to today, with «+ N € in calendario» (doc/guide/cashflow-budget.md) — the signals are to be redone after the deploy. Open: doc/dati/ (README § 6). Next: DATI-10.
+- Latest (2026-11-28): **DATI-10** implemented — the monthly and yearly emails leave the day after their period closes, once, from their own cron and ledger, with the whole Italian period and a link back to the app; the quarterly, half-yearly and weekly budget emails removed (doc/guide/email-pdf.md). Guided tour done and closed on the mirror: the AI comment moved to Sonnet 5.5 for the 300 s of the 1 January call, its markdown now renders tables and nested lists. Open: doc/dati/ (README § 6). Next: DATI-11.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -47,7 +47,7 @@ One line per area: the question it answers, then where it is described (README.m
 - **Impostazioni**: six tabs, six controlled views of ONE draft (`useReducer` + `lib/utils/settingsDraft.ts`), one Save per page. doc/guide/impostazioni.md (§ Settings — the FIVE places).
 - **States**: loading · nothing recorded · measured zero · failed read, and «old but present» (2026-09-29), during which a row's write actions wait (`components/ui/row-actions-hold.tsx`, 2026-11-26). doc/guide/stati.md; DESIGN → The Absence-Has-Three-Names Rule.
 - **Dialogs and forms**: 48 modals on `ResponsiveModal` (2026-11-21). doc/guide/dialog.md; DESIGN → The Modal-Is-A-Tile Rule.
-- **Periodic emails · budget email · PDF export**: verdict first, AI comment second. doc/guide/email-pdf.md; DESIGN → The Out-Of-DOM Token Rule.
+- **Periodic emails · PDF export**: monthly and yearly, sent the day after the period closes, once; verdict first, AI comment second. doc/guide/email-pdf.md; DESIGN → The Out-Of-DOM Token Rule.
 - **Themes**: sixteen theme blocks × nine chart slots (Egeo, 2026-11-22, the first costume: Marcellus, frieze, an emblem per page; Orbita, 2026-11-22: starry ground, Chakra Petch, planet, the Panoramica's resource bar at ≥ 1440); a theme is a palette or a costume (`COLOR_THEME_META`, `data-costume` + `data-costume-scope`, the dashboard, its dialogs — a modal is a tile, 2026-11-23 — and its portalled surfaces only). doc/guide/temi.md (§ Il costume).
 
 ## Testing
@@ -57,7 +57,7 @@ One line per area: the question it answers, then where it is described (README.m
 - **Performance**: `npm run perf:budget`, `perf:bench`, `perf:census` — doc/guide/velocita.md (the budget, the benchmark, the census, the baselines and the register of raised ceilings; the fourteen PERF specs of 2026-09-26 were all implemented and retired by 2026-10-08). **First screen (mobile composition)**: `npm run mobile:census -- --email=census@example.com` and `npm run mobile:budget` on the same :3200 build, against `perf/mobile-budget.json` (doc/guide/prima-schermata.md; the baselines, the fixture table and the register of widened entries in doc/guide/prima-schermata-misure.md); a change to what a composed page shows first closes on both green. The nine MOB specs (2026-09-26 → 2026-10-17) are history: `git log -- doc/mobile/`.
 
 ## Data & Integrations
-Firestore client + admin (production in `eur3`; the Vercel functions in `fra1`, held by `__tests__/vercelConfig.test.ts`) · Yahoo Finance · Borsa Italiana scraping · Frankfurter (FX) · FRED (`FRED_API_KEY`, ECBDFR) · Anthropic (the model ids in `lib/constants/aiModels.ts`: Opus 5.5 for the Assistente, Sonnet 5.5 for the emails' and Rendimenti's prose, Haiku 5.5 for the extraction and the router, Opus 5.5 + Sonnet 5.5 for the Consulente).
+Firestore client + admin (production in `eur3`; the Vercel functions in `fra1`, held by `__tests__/vercelConfig.test.ts`) · Yahoo Finance · Borsa Italiana scraping · Frankfurter (FX) · FRED (`FRED_API_KEY`, ECBDFR) · Anthropic (the model ids in `lib/constants/aiModels.ts`: Opus 5.5 for the Assistente, Sonnet 5.5 for the emails and Rendimenti's prose, Haiku 5.5 for the extraction and the router, Opus 5.5 + Sonnet 5.5 for the Consulente).
 
 ## Known Issues (Active)
 Only what crosses areas; an area's blind spots — behaviours that look like bugs and are not — close its `doc/guide/<tema>.md` (§ Per-page blind spots). The demo account's setup is in README.md → Known Issues, the shared account's in SETUP.md → Step 5b.

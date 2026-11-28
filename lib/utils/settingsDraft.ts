@@ -168,10 +168,7 @@ export interface GeneraleSlice {
   performanceExcludesCash: boolean;
   pensionReturnStartMonth: string;
   monthlyEmailEnabled: boolean;
-  quarterlyEmailEnabled: boolean;
-  semiAnnualEmailEnabled: boolean;
   yearlyEmailEnabled: boolean;
-  weeklyBudgetEmailEnabled: boolean;
   monthlyEmailRecipients: string[];
   familyMembers: FamilyMemberDraft[];
 }
@@ -408,10 +405,7 @@ export function sliceSettings(
     performanceExcludesCash: data.performanceExcludesCash ?? false,
     pensionReturnStartMonth: data.pensionReturnStartMonth ?? '',
     monthlyEmailEnabled: data.monthlyEmailEnabled ?? false,
-    quarterlyEmailEnabled: data.quarterlyEmailEnabled ?? false,
-    semiAnnualEmailEnabled: data.semiAnnualEmailEnabled ?? false,
     yearlyEmailEnabled: data.yearlyEmailEnabled ?? false,
-    weeklyBudgetEmailEnabled: data.weeklyBudgetEmailEnabled ?? false,
     monthlyEmailRecipients: data.monthlyEmailRecipients ?? [],
     familyMembers: toFamilyMemberDrafts(data.familyMembers),
   };
@@ -564,10 +558,7 @@ export function composeSettingsDocument(
     // '' = «no month set»: saved as undefined, or pensionReturn would parse it as a date.
     pensionReturnStartMonth: generale.pensionReturnStartMonth || undefined,
     monthlyEmailEnabled: generale.monthlyEmailEnabled,
-    quarterlyEmailEnabled: generale.quarterlyEmailEnabled,
-    semiAnnualEmailEnabled: generale.semiAnnualEmailEnabled,
     yearlyEmailEnabled: generale.yearlyEmailEnabled,
-    weeklyBudgetEmailEnabled: generale.weeklyBudgetEmailEnabled,
     monthlyEmailRecipients: generale.monthlyEmailRecipients,
     familyMembers: parseFamilyMemberDrafts(generale.familyMembers),
   };

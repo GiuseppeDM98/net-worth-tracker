@@ -350,10 +350,7 @@ export function describeFamily({ members }: FamilyInput): Narrative {
 
 export interface EmailsInput {
   monthly: boolean;
-  quarterly: boolean;
-  semiAnnual: boolean;
   yearly: boolean;
-  weeklyBudget: boolean;
   recipientCount: number;
 }
 
@@ -361,10 +358,7 @@ export interface EmailsInput {
 export function describeEmails(input: EmailsInput): Narrative {
   const active: string[] = [];
   if (input.monthly) active.push('mensile');
-  if (input.quarterly) active.push('trimestrale');
-  if (input.semiAnnual) active.push('semestrale');
   if (input.yearly) active.push('annuale');
-  if (input.weeklyBudget) active.push('budget settimanale');
   if (active.length === 0) {
     return [prose('Nessun report attivo: nessuna email in partenza.')];
   }

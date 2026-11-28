@@ -466,9 +466,7 @@ other). None is declared; a linter that flags them is right.
 after must say so, in the surface's own scope line. The canonical case is the PDF's Cashflow
 section: a "Totale" export floors the expenses at `cashflowHistoryStartYear` while Storico,
 Rendimenti and FIRE stay unbounded, so a reader told "Totale" reads the missing years as years
-without spending. The budget email is the second: it is sent weekly and contains nothing weekly,
-so each tile names its window («dal 1° agosto a oggi», «da inizio anno a oggi») and the word
-"settimana" appears once, to deny itself. A scope line is not decoration; it is the difference
+without spending. A scope line is not decoration; it is the difference
 between a number and a claim.
 
 **The Comma Rule.** Every percentage the user reads is formatted for `it-IT` — `+1,01%`, `72,8%` — through chartService's `formatPercentage`, never `toFixed` (which prints `1.01%`, a dot the rest of the screen never uses). Currency comes from `cachedFormatCurrencyEUR`, which puts a no-break space before `€` and leaves four-digit amounts ungrouped (`4120,18 €`): tests flatten the nbsp and expect the real output. Signs are typographic: `+` and the true minus `−` (U+2212), never a hyphen. Rendimenti retired the last `toFixed` chips on 2026-08-25 (Patrimonio and Tracciamento theirs on 2026-08-22; a ratio such as «1,67×» or a Sharpe «1,08» goes through `formatNumber`, with the true minus swapped in). A sign is decided on the PRINTED figure: `−0,04%` prints as `0,0%`, unsigned and uncoloured, and a gap under a tenth of a point is «in linea». So is the ARTICLE in front of it: Italian takes «allo 0,1%», «all'8,5%», «al 12%» from the figure as printed and never from the underlying value, so the article is resolved by the shared helpers in the pure layer and never written by hand — «carry al 0,1%» reached the Panoramica because one sentence wrote «al » itself.

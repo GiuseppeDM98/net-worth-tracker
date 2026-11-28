@@ -877,42 +877,55 @@ export function buildAssistantSystem(mode: Exclude<AssistantMode, 'register'>): 
  */
 export const WEB_OFF_LINE = 'In questa richiesta non hai la ricerca web.';
 
-// The period named in the length line. A quarter carries three months of causes to explain
-// and a year twelve, against the same six sections, so the length follows the period.
+// The period named in the length line. A year carries twelve months of causes to explain
+// against the same six sections as a month, so the length follows the period.
 // WARNING: the keys must stay in step with `EmailPeriodType` in monthlyEmailService.ts —
 // the two unions are structurally identical and nothing but this comment says so
 // (prompts.ts must not import that module, which pulls firebase-admin and Resend).
-export type EmailPeriodicPeriodType = 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
+export type EmailPeriodicPeriodType = 'monthly' | 'yearly';
 
 const EMAIL_PERIOD_SCOPE: Record<EmailPeriodicPeriodType, string> = {
   monthly: 'un mese',
-  quarterly: 'un trimestre',
-  semiannual: 'un semestre',
   yearly: 'un anno',
 };
 
 /**
- * Format contract for the periodic summary email (monthly/quarterly/semiannual/yearly
+ * Format contract for the periodic summary email (monthly/yearly
  * AI comment). Exported so monthlyEmailService.ts can compose it with ASSISTANT_SYSTEM_CORE
  * without duplicating the shared role/domain/guardrail text.
  *
  * Parametric in the period type ONLY, so the returned string is still byte-identical
  * across every user and every run of a given period — the same property the mode
- * contracts have. Everything genuinely per-request (baseline labels, whether the YoY
- * comparison coincides with the previous-period one, which blocks are present) lives in
- * the numeric data block instead, which is why the sections below are worded to cover
- * both shapes without branching.
+ * contracts have. Everything genuinely per-request (baseline labels, which blocks are
+ * present) lives in the numeric data block instead.
+ *
+ * A year has ONE comparison section: its previous period IS the previous year, and with
+ * two sections both models wrote two paragraphs saying the same thing (owner, phase F,
+ * 2026-11-28). The email rule closes the contract for the same tour: no offer to act
+ * («se vuoi, preparo…») and no name of the app's own blocks («Dati sulla Hall of Fame non
+ * ce ne sono»), which a reader of an email cannot answer or place.
  */
 export function buildEmailPeriodicFormatContract(periodType: EmailPeriodicPeriodType): string {
+  const comparisons =
+    periodType === 'yearly'
+      ? [
+          "3. **Rispetto all'anno precedente** — cosa è cambiato rispetto all'anno prima, citando i numeri del blocco di confronto fornito; se l'anno prima manca, dillo in una frase e passa oltre",
+        ]
+      : [
+          '3. **Rispetto al periodo precedente** — cosa è cambiato rispetto al mese prima, citando i numeri del blocco di confronto fornito',
+          "4. **Confronto con l'anno precedente** — confronto con lo stesso mese dell'anno prima, citando i numeri forniti",
+        ];
+  const last = comparisons.length + 3;
   return [
     '# Formato della risposta',
     'Struttura la risposta in markdown con queste sezioni, in questo ordine:',
-    '1. **In sintesi** — 2-3 frasi sul risultato complessivo del periodo; se i dati includono un piazzamento Hall of Fame, citalo (non inventare la posizione)',
+    '1. **In sintesi** — 2-3 frasi sul risultato complessivo del periodo; se i dati includono un piazzamento Hall of Fame, citalo (non inventare la posizione), altrimenti non parlarne',
     "2. **Patrimonio e investimenti** — come si è mosso il patrimonio: usa la riga EFFETTO MERCATO già calcolata per separare quanto viene dal risparmio e quanto dalla variazione di mercato, commenta l'allocazione corrente e il suo scostamento dai target quando sono configurati, e cita gli obiettivi di investimento solo se il blocco relativo ne contiene",
-    '3. **Rispetto al periodo precedente** — cosa è cambiato rispetto al periodo precedente, citando i numeri del blocco di confronto fornito',
-    "4. **Confronto con l'anno precedente** — confronto anno su anno citando i numeri forniti; se il periodo è annuale e questo confronto coincide con quello del punto 3 (i dati te lo segnalano esplicitamente), unisci le due sezioni e dillo",
-    "5. **Entrate e spese: di quanto e perché** — quantifica l'aumento o la diminuzione di entrate e spese e ipotizza le cause più probabili basandoti sui dati per categoria e sottocategoria; commenta il mix per tipo (Spese Necessarie/Spese Non Necessarie/Debiti) quando rilevante",
-    "6. **Azioni o attenzioni** — 1-2 osservazioni pratiche per l'investitore",
+    ...comparisons,
+    `${last}. **Entrate e spese: di quanto e perché** — quantifica l'aumento o la diminuzione di entrate e spese e ipotizza le cause più probabili basandoti sui dati per categoria e sottocategoria; commenta il mix per tipo (Spese Necessarie/Spese Non Necessarie/Debiti) quando rilevante`,
+    `${last + 1}. **Azioni o attenzioni** — 1-2 osservazioni pratiche per l'investitore`,
+    '',
+    "È un'email: chi legge non può risponderti. Non offrire di fare qualcosa (\"se vuoi, preparo…\", \"posso calcolare…\"): scrivi l'osservazione e basta. Non nominare i blocchi di dati, le pagine o il sistema (\"il sistema non fornisce\", \"dati sulla Hall of Fame non ce ne sono\", \"N/D\"): quando un dato manca, di' in una frase cosa non si può sapere, oppure taci. Chiama obiettivi, strumenti, categorie e conti con il nome esatto dei dati, senza accorciarlo (\"Fondo auto nuova\", non \"Fondo auto\").",
     '',
     "I blocchi delle spese per categoria e sottocategoria e delle entrate per categoria sono ESAUSTIVI: una voce che non c'è ha avuto importo zero nel periodo — dillo come \"nessuna spesa registrata\", non come dato mancante. L'unica eccezione sono le righe di omissione dichiarate esplicitamente nel testo dei dati.",
     '',

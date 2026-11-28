@@ -10,9 +10,11 @@
  *  4. «Salva» con un gruppo di sottocategorie che non somma 100 rispondeva con un toast e lasciava lì;
  *  5. cinque `aria-controls` puntavano a pannelli mai montati.
  *
- * NESSUN test qui SCRIVE: si modifica il modulo e si annulla, o si preme «Salva» su un albero che la
- * validazione rifiuta. Che nulla sia stato scritto si verifica sull'emulatore (l'`updateTime` del
- * documento delle impostazioni), non sull'aspetto della pagina.
+ * Un solo test qui SCRIVE, «Email periodiche» (2026-11-28): accende «Annuale», salva, rilegge il campo
+ * sull'emulatore e alla fine rimette il documento delle impostazioni INTERO com'era (un «Salva» della
+ * pagina normalizza anche i sotto-target del seed, che i test di questo worker leggono). Gli altri modificano il modulo e annullano, o premono «Salva» su
+ * un albero che la validazione rifiuta: che nulla sia stato scritto si verifica sull'emulatore
+ * (l'`updateTime` del documento delle impostazioni), non sull'aspetto della pagina.
  *
  * Account base (`test@example.com`): target 60/30/10 su azioni, obbligazioni e criptovalute, due
  * sotto-target su equity (World 80 / Single Stock 20) con le sottocategorie SPENTE, età impostata e
@@ -28,6 +30,14 @@ import { expectColumnsEndTogether, forceColumnTaller } from './tileColumns';
 import { FIRESTORE_DOCUMENTS } from './emulator';
 
 const SETTINGS_DOC = `${FIRESTORE_DOCUMENTS}/assetAllocationTargets/test-user-1`;
+const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
+
+/** One boolean field of the settings document, as the emulator holds it (absent → undefined). */
+async function settingsBoolean(field: string): Promise<boolean | undefined> {
+  const res = await fetch(SETTINGS_DOC, { headers: { Authorization: 'Bearer owner' } });
+  const doc = (await res.json()) as { fields?: Record<string, { booleanValue?: boolean }> };
+  return doc.fields?.[field]?.booleanValue;
+}
 
 /** When the settings document was last written — read from the emulator, not from the page. */
 async function settingsUpdateTime(): Promise<string> {
@@ -164,4 +174,35 @@ test('Spese: the left column ends where the import tile ends (E3)', async ({ pag
   const undo = await forceColumnTaller(page, scope, 1);
   await expectColumnsEndTogether(page, scope, 'Spese, import più alto');
   await undo();
+});
+
+// Impostazioni › Preferenze › «Email periodiche» (2026-11-28): two periods, the email of the 1st about
+// the period just closed. The yearly switch saved reaches the document; the three removed rows are gone.
+test('Email periodiche: «Annuale» salvato arriva al documento, e non c\'è nessun altro periodo', async ({ page }) => {
+  await openSettings(page, 'generale');
+  const emails = page.locator('section[aria-label="Email periodiche"]');
+  await expect(emails.getByRole('switch')).toHaveCount(2);
+  await expect(emails.getByRole('switch', { name: 'Mensile' })).toBeVisible();
+  for (const gone of [/Trimestrale/i, /Semestrale/i, /Budget/i]) {
+    await expect(emails.getByText(gone)).toHaveCount(0);
+  }
+
+  const yearly = emails.getByRole('switch', { name: 'Annuale' });
+  const initially = (await yearly.getAttribute('aria-checked')) === 'true';
+  // The whole document, read before the save: a page «Salva» rewrites every field and drops the seed's
+  // sub-targets of a disabled group, which the other specs of this worker read.
+  const before = await fetch(SETTINGS_DOC, { headers: OWNER });
+  expect(before.ok).toBe(true);
+  const savedFields = ((await before.json()) as { fields: Record<string, unknown> }).fields;
+
+  try {
+    await yearly.click();
+    await page.locator('button:visible', { hasText: /^Salva$/ }).first().click();
+    await expect(unsavedBar(page)).toHaveCount(0, { timeout: 15_000 });
+    await expect.poll(() => settingsBoolean('yearlyEmailEnabled')).toBe(!initially);
+  } finally {
+    // No update mask: the whole document is replaced by the one read before the save.
+    const res = await fetch(SETTINGS_DOC, { method: 'PATCH', headers: OWNER, body: JSON.stringify({ fields: savedFields }) });
+    expect(res.ok).toBe(true);
+  }
 });

@@ -1,22 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
-import {
-  isLastDayOfMonthItaly,
-  isLastDayOfQuarterItaly,
-  isLastDayOfHalfYearItaly,
-  isLastDayOfYearItaly,
-  monthToQuarter,
-  monthToSemester,
-  getSettingsAdmin,
-  buildAndSendForPeriod,
-  buildAndSendQuarterly,
-  buildAndSendSemiAnnual,
-  buildAndSendYearly,
-} from '@/lib/server/monthlyEmailService';
-import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { refreshEcbRatesIfStale } from '@/lib/server/ecbRatesService';
-import { isWeeklyBudgetDayItaly, buildAndSendWeeklyBudget } from '@/lib/server/weeklyBudgetEmailService';
 import { evaluateActiveGoals } from '@/lib/server/assistant/goalEvaluationService';
 import { captureBudgetHistory } from '@/lib/server/budgetHistoryService';
 import { verifyCronSecret } from '@/lib/server/apiAuth';
@@ -33,8 +18,8 @@ import { verifyCronSecret } from '@/lib/server/apiAuth';
  * day's row in dailySnapshots/{userId}/months/{YYYY-MM} (since 2026-11-23,
  * lib/server/dailySnapshotStore.ts), so every evening is kept there; an account
  * with no asset gets neither.
- * Emails are guarded by isLastDayOfMonthItaly / isLastDayOfQuarterItaly /
- * isLastDayOfYearItaly and are only sent once on the appropriate day. The
+ * This route sends no email: the periodic emails have their own cron an hour later
+ * (/api/cron/periodic-emails, since 2026-11-28). The
  * assistant's goal re-evaluation (phase 7) runs every day, like the snapshot, and so
  * does the budget history capture (phase 8): budgetHistory/{userId}/months/{YYYY-MM}
  * is overwritten daily, so a month's record is its last captured configuration — the
@@ -64,6 +49,8 @@ import { verifyCronSecret } from '@/lib/server/apiAuth';
  *   - portfolio/snapshot/route.ts: Called internally for each user
  *   - hallOfFameService.server.ts: Ranking updates after snapshots
  */
+export const maxDuration = 300;
+
 export async function GET(request: NextRequest) {
   try {
     // Verify cron secret
@@ -151,190 +138,8 @@ export async function GET(request: NextRequest) {
       console.error('[cron] ECB rate cache refresh failed (non-blocking):', ecbError);
     }
 
-    // Phase 2: Send monthly summary emails (only on the last day of the month)
+    // The goals and the budget history (phases 7 and 8) read the same instant.
     const now = new Date();
-    const emailResults = { sent: 0, skipped: 0, errors: 0 };
-    if (isLastDayOfMonthItaly(now)) {
-      const { year, month } = getItalyMonthYear(now);
-      console.log(`Last day of month detected — sending summary emails for ${month}/${year}`);
-
-      for (const userDoc of usersSnapshot.docs) {
-        const userId = userDoc.id;
-
-        // Skip demo user — its data is synthetic
-        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
-          emailResults.skipped++;
-          continue;
-        }
-
-        try {
-          const settings = await getSettingsAdmin(userId);
-          if (!settings?.monthlyEmailEnabled || !settings.monthlyEmailRecipients?.length) {
-            emailResults.skipped++;
-            continue;
-          }
-
-          const sent = await buildAndSendForPeriod(userId, settings.monthlyEmailRecipients, 'monthly', year, month);
-          if (!sent) {
-            console.warn(`No snapshot found for user ${userId} — skipping monthly email`);
-            emailResults.skipped++;
-          } else {
-            emailResults.sent++;
-            console.log(`Monthly email sent for user ${userId}`);
-          }
-        } catch (emailError) {
-          console.error(`Monthly email failed for user ${userId}:`, emailError);
-          emailResults.errors++;
-        }
-      }
-    }
-
-    // Phase 3: Send quarterly summary emails (only on the last day of a quarter)
-    const quarterlyEmailResults = { sent: 0, skipped: 0, errors: 0 };
-    if (isLastDayOfQuarterItaly(now)) {
-      const { year, month } = getItalyMonthYear(now);
-      const quarter = monthToQuarter(month);
-      console.log(`Last day of Q${quarter} detected — sending quarterly emails for Q${quarter}/${year}`);
-
-      for (const userDoc of usersSnapshot.docs) {
-        const userId = userDoc.id;
-
-        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
-          quarterlyEmailResults.skipped++;
-          continue;
-        }
-
-        try {
-          const settings = await getSettingsAdmin(userId);
-          if (!settings?.quarterlyEmailEnabled || !settings.monthlyEmailRecipients?.length) {
-            quarterlyEmailResults.skipped++;
-            continue;
-          }
-
-          const sent = await buildAndSendQuarterly(userId, settings.monthlyEmailRecipients, year, quarter);
-          if (!sent) {
-            console.warn(`No Q${quarter} snapshot found for user ${userId} — skipping quarterly email`);
-            quarterlyEmailResults.skipped++;
-          } else {
-            quarterlyEmailResults.sent++;
-            console.log(`Quarterly email sent for user ${userId}`);
-          }
-        } catch (emailError) {
-          console.error(`Quarterly email failed for user ${userId}:`, emailError);
-          quarterlyEmailResults.errors++;
-        }
-      }
-    }
-
-    // Phase 4: Send semi-annual summary emails (only on June 30 / December 31).
-    // Note: a half-year-end coincides with a quarter-end (Q2/Q4) and, on Dec 31, with the
-    // year-end too — these are independent opt-in emails, so a user enabling several toggles
-    // can receive more than one summary on the same day. That is intentional.
-    const semiAnnualEmailResults = { sent: 0, skipped: 0, errors: 0 };
-    if (isLastDayOfHalfYearItaly(now)) {
-      const { year, month } = getItalyMonthYear(now);
-      const semester = monthToSemester(month);
-      console.log(`Last day of H${semester} detected — sending semi-annual emails for H${semester}/${year}`);
-
-      for (const userDoc of usersSnapshot.docs) {
-        const userId = userDoc.id;
-
-        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
-          semiAnnualEmailResults.skipped++;
-          continue;
-        }
-
-        try {
-          const settings = await getSettingsAdmin(userId);
-          if (!settings?.semiAnnualEmailEnabled || !settings.monthlyEmailRecipients?.length) {
-            semiAnnualEmailResults.skipped++;
-            continue;
-          }
-
-          const sent = await buildAndSendSemiAnnual(userId, settings.monthlyEmailRecipients, year, semester);
-          if (!sent) {
-            console.warn(`No H${semester} snapshot found for user ${userId} — skipping semi-annual email`);
-            semiAnnualEmailResults.skipped++;
-          } else {
-            semiAnnualEmailResults.sent++;
-            console.log(`Semi-annual email sent for user ${userId}`);
-          }
-        } catch (emailError) {
-          console.error(`Semi-annual email failed for user ${userId}:`, emailError);
-          semiAnnualEmailResults.errors++;
-        }
-      }
-    }
-
-    // Phase 5: Send yearly summary emails (only on December 31)
-    const yearlyEmailResults = { sent: 0, skipped: 0, errors: 0 };
-    if (isLastDayOfYearItaly(now)) {
-      const { year } = getItalyMonthYear(now);
-      console.log(`December 31 detected — sending yearly emails for ${year}`);
-
-      for (const userDoc of usersSnapshot.docs) {
-        const userId = userDoc.id;
-
-        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
-          yearlyEmailResults.skipped++;
-          continue;
-        }
-
-        try {
-          const settings = await getSettingsAdmin(userId);
-          if (!settings?.yearlyEmailEnabled || !settings.monthlyEmailRecipients?.length) {
-            yearlyEmailResults.skipped++;
-            continue;
-          }
-
-          const sent = await buildAndSendYearly(userId, settings.monthlyEmailRecipients, year);
-          if (!sent) {
-            console.warn(`No December snapshot found for user ${userId} — skipping yearly email`);
-            yearlyEmailResults.skipped++;
-          } else {
-            yearlyEmailResults.sent++;
-            console.log(`Yearly email sent for user ${userId}`);
-          }
-        } catch (emailError) {
-          console.error(`Yearly email failed for user ${userId}:`, emailError);
-          yearlyEmailResults.errors++;
-        }
-      }
-    }
-
-    // Phase 6: Send weekly budget status emails (every Sunday)
-    const weeklyBudgetEmailResults = { sent: 0, skipped: 0, errors: 0 };
-    if (isWeeklyBudgetDayItaly(now)) {
-      console.log('Sunday detected — sending weekly budget emails');
-
-      for (const userDoc of usersSnapshot.docs) {
-        const userId = userDoc.id;
-
-        if (userId === process.env.NEXT_PUBLIC_DEMO_USER_ID) {
-          weeklyBudgetEmailResults.skipped++;
-          continue;
-        }
-
-        try {
-          const settings = await getSettingsAdmin(userId);
-          if (!settings?.weeklyBudgetEmailEnabled || !settings.monthlyEmailRecipients?.length) {
-            weeklyBudgetEmailResults.skipped++;
-            continue;
-          }
-
-          const sent = await buildAndSendWeeklyBudget(userId, settings.monthlyEmailRecipients, now);
-          if (!sent) {
-            weeklyBudgetEmailResults.skipped++;
-          } else {
-            weeklyBudgetEmailResults.sent++;
-            console.log(`Weekly budget email sent for user ${userId}`);
-          }
-        } catch (emailError) {
-          console.error(`Weekly budget email failed for user ${userId}:`, emailError);
-          weeklyBudgetEmailResults.errors++;
-        }
-      }
-    }
 
     // Phase 7: Re-evaluate the assistant's structured goals (every day).
     // Runs after Phase 1 so it reads the snapshot written for the current month a
@@ -382,11 +187,6 @@ export async function GET(request: NextRequest) {
       errors: errors.length,
       results,
       errorDetails: errors,
-      emailSummary: emailResults,
-      quarterlyEmailSummary: quarterlyEmailResults,
-      semiAnnualEmailSummary: semiAnnualEmailResults,
-      yearlyEmailSummary: yearlyEmailResults,
-      weeklyBudgetEmailSummary: weeklyBudgetEmailResults,
       goalEvaluationSummary: goalEvaluationResults,
       budgetHistorySummary,
     });

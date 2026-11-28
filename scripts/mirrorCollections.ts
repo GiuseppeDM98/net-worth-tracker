@@ -4,7 +4,7 @@
  */
 
 /** Collections whose rows carry `userId`. */
-export const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'assistantThreads', 'accumulationPlans'];
+export const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'assistantThreads', 'accumulationPlans', 'emailDeliveries'];
 
 /** One document per account, keyed by uid, copied from production. */
 export const PER_USER_DOCS = ['users', 'assetAllocationTargets', 'assetTransactionsMeta', 'budgets', 'hall-of-fame', 'performance-cache', 'dashboardOverviewSummaries', 'goalBasedInvesting', 'accumulationPlanLocks', 'modelPortfolios'];

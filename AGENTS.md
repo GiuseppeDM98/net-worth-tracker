@@ -535,9 +535,9 @@ file used to carry.
 
 ### Periodic Emails · PDF Export → `doc/guide/email-pdf.md`
 - Both render OUTSIDE the DOM: every hex comes from `lib/constants/printTokens.ts` and nothing else; every email layout is a nested table (Outlook = Word). Verify by RENDERING — no check is in the suite.
-- A verdict over tiles: the email opens on a RULE-generated verdict (also the preheader), the AI comment is a tile in SECOND position and non-blocking. ONE template for the four periods; «Rispetto a un anno fa» is ABSENT on a yearly email (`previousEqualsYoy`). The «mercato» residual is `Δ − risparmio + tasse stimate sulle vendite` (`periodSales` from the ledger): a broker's withholding has no cashflow row and used to read as a market loss.
+- A verdict over tiles: the email opens on a RULE-generated verdict (also the preheader), the AI comment is a tile in SECOND position and non-blocking. ONE template for the two periods; «Rispetto a un anno fa» is ABSENT on a yearly email (`previousEqualsYoy`). The «mercato» residual is `Δ − risparmio + tasse stimate sulle vendite` (`periodSales` from the ledger): a broker's withholding has no cashflow row and used to read as a market loss.
 - PDF: the cover IS the verdict; on Cashflow, Export Totale applies `cashflowHistoryStartYear` as a floor and DECLARES it; the Rendimenti section measures the page's base (`resolvePerformanceBase`, `baseLabel` on its scope line), never the raw snapshots. No monospace, no typographic minus — `pdfSafeText` converts U+2212 at the boundary (react-pdf drops unencodable chars silently).
-- The weekly budget email is a SEPARATE module and nothing in it is weekly (month-to-date + year-to-date); name every figure's window.
+- Monthly and yearly only, sent the day after the period closes, once: their cron `/api/cron/periodic-emails`, the ledger `emailDeliveries`, the window in Italian bounds.
 - Il resto — `PDF_RAMP`, the class labels, `signedPct`/`signedEur` it-IT, the deterministic-comparison rule, the AI-prompt body — in `doc/guide/email-pdf.md`.
 
 ### Impostazioni — tessere senza verdetto → `doc/guide/impostazioni.md`

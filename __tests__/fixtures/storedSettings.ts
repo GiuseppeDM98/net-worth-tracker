@@ -124,10 +124,7 @@ export const FULL_PAGE_SETTINGS: AssetAllocationSettings = {
   performanceExcludesCash: true,
   pensionReturnStartMonth: '2026-07',
   monthlyEmailEnabled: true,
-  quarterlyEmailEnabled: true,
-  semiAnnualEmailEnabled: true,
   yearlyEmailEnabled: true,
-  weeklyBudgetEmailEnabled: true,
   monthlyEmailRecipients: ['a@example.com', 'b@example.com'],
   familyMembers: [
     { id: 'm1', name: 'Paolo', grossAnnualIncome: 42000, isFirstEmploymentPost2007: true, firstEmploymentYear: 2015 },

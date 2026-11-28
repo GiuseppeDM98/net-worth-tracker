@@ -28,6 +28,9 @@ import { cn } from '@/lib/utils';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { resolveRitaUnlockAge, DEFAULT_INPS_RETIREMENT_AGE } from '@/lib/utils/pensionUnlock';
+import { getItalyDateIso } from '@/lib/utils/dateHelpers';
+import { MONTH_NAMES } from '@/lib/constants/months';
+import { lastClosedMonth, lastClosedYear, type PeriodicEmailKind } from '@/lib/utils/emailSchedule';
 import type { SurfaceState } from '@/lib/utils/statesNarrative';
 import {
   describeAssistantPreferences,
@@ -60,7 +63,7 @@ const ASSISTANT_STYLE_LABELS: Record<'balanced' | 'concise' | 'deep', string> = 
   deep: 'Approfondito',
 };
 
-type TestEmailType = 'monthly' | 'quarterly' | 'semiannual' | 'yearly' | 'weekly-budget';
+type TestEmailType = PeriodicEmailKind;
 
 // Famiglia — a local id for a member row. CoastFireTab.tsx has an identical `createLocalId`, not
 // exported; duplicated here rather than introducing a cross-module import for a one-line helper.
@@ -99,8 +102,7 @@ export function GeneraleTab({
     includePrimaryResidenceInFIRE, goalBasedInvestingEnabled, goalDrivenAllocationEnabled, stampDutyEnabled,
     stampDutyRate, checkingAccountSubCategory, cashflowHistoryStartYear, laborIncomeCategoryIds, costCentersEnabled,
     expenseSplitEnabled, performanceIncludesPensionFunds, performanceIncludesExcludedAssets, performanceExcludesCash,
-    pensionReturnStartMonth, monthlyEmailEnabled, quarterlyEmailEnabled, semiAnnualEmailEnabled, yearlyEmailEnabled,
-    weeklyBudgetEmailEnabled, monthlyEmailRecipients, familyMembers,
+    pensionReturnStartMonth, monthlyEmailEnabled, yearlyEmailEnabled, monthlyEmailRecipients, familyMembers,
   } = slice;
   const { planParams, assistantPrefs } = declarations;
 
@@ -116,7 +118,11 @@ export function GeneraleTab({
   const familyMembersForReading = parseFamilyMemberDrafts(familyMembers);
   const inpsAgeShown = planParams.pensionInpsRetirementAge ?? DEFAULT_INPS_RETIREMENT_AGE;
   const ritaAgeShown = resolveRitaUnlockAge(planParams);
-  const anyEmailEnabled = monthlyEmailEnabled || quarterlyEmailEnabled || semiAnnualEmailEnabled || yearlyEmailEnabled || weeklyBudgetEmailEnabled;
+  const anyEmailEnabled = monthlyEmailEnabled || yearlyEmailEnabled;
+  // «Invia ora» sends the last CLOSED period, the one the email of the 1st was about (the Italian day).
+  const emailToday = getItalyDateIso(new Date());
+  const lastMonth = lastClosedMonth(emailToday);
+  const lastYear = lastClosedYear(emailToday);
 
   // Famiglia — add/update/remove a member row, each a patch of the slice.
   const addFamilyMemberRow = () => {
@@ -605,36 +611,73 @@ export function GeneraleTab({
           aside={monthlyEmailRecipients.length === 1 ? '1 destinatario' : `${monthlyEmailRecipients.length} destinatari`}
           reading={describeEmails({
             monthly: monthlyEmailEnabled,
-            quarterly: quarterlyEmailEnabled,
-            semiAnnual: semiAnnualEmailEnabled,
             yearly: yearlyEmailEnabled,
-            weeklyBudget: weeklyBudgetEmailEnabled,
             recipientCount: monthlyEmailRecipients.length,
           })}
         >
           <div className="mt-1 grid grid-cols-1 gap-x-10 desktop:grid-cols-2">
             <div className="flex flex-col divide-y divide-border">
               {([
-                { id: 'monthlyEmailEnabled', label: 'Report mensile', help: "L'ultimo giorno del mese", checked: monthlyEmailEnabled },
-                { id: 'quarterlyEmailEnabled', label: 'Report trimestrale', help: 'Marzo, giugno, settembre e dicembre', checked: quarterlyEmailEnabled },
-                { id: 'semiAnnualEmailEnabled', label: 'Report semestrale', help: '30 giugno e 31 dicembre', checked: semiAnnualEmailEnabled },
-                { id: 'yearlyEmailEnabled', label: 'Report annuale', help: 'Il 31 dicembre', checked: yearlyEmailEnabled },
-                { id: 'weeklyBudgetEmailEnabled', label: 'Report budget settimanale', help: 'Ogni domenica, con lo stato dei budget', checked: weeklyBudgetEmailEnabled },
+                {
+                  id: 'monthlyEmailEnabled',
+                  type: 'monthly',
+                  label: 'Mensile',
+                  help: 'Il 1° di ogni mese, sul mese appena chiuso',
+                  sendLabel: `Invia ora il riepilogo di ${MONTH_NAMES[lastMonth.month - 1].toLowerCase()} ${lastMonth.year}`,
+                  checked: monthlyEmailEnabled,
+                },
+                {
+                  id: 'yearlyEmailEnabled',
+                  type: 'yearly',
+                  label: 'Annuale',
+                  help: "Il 1° gennaio, sull'anno appena chiuso",
+                  sendLabel: `Invia ora il riepilogo del ${lastYear}`,
+                  checked: yearlyEmailEnabled,
+                },
               ] as const).map((row) => (
-                <div key={row.id} className="flex items-center justify-between gap-4 py-3">
-                  <div className="min-w-0">
-                    <Label htmlFor={row.id} className="text-[13px] font-medium">{row.label}</Label>
-                    <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">{row.help}</p>
+                <div key={row.id} className="py-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <Label htmlFor={row.id} className="text-[13px] font-medium">{row.label}</Label>
+                      <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">{row.help}</p>
+                    </div>
+                    <Switch
+                      id={row.id}
+                      checked={row.checked}
+                      onCheckedChange={(checked) => onChange({ [row.id]: checked })}
+                      disabled={isDemo}
+                      className={cn('shrink-0', INTERACTIVE_CONTROL_CLASS)}
+                    />
                   </div>
-                  <Switch
-                    id={row.id}
-                    checked={row.checked}
-                    onCheckedChange={(checked) => onChange({ [row.id]: checked })}
-                    disabled={isDemo}
-                    className={cn('shrink-0', INTERACTIVE_CONTROL_CLASS)}
-                  />
+                  {row.checked && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2.5"
+                      disabled={isDemo || monthlyEmailRecipients.length === 0 || sendingTestEmailType !== null}
+                      onClick={() => void sendTestEmail(row.type)}
+                    >
+                      {sendingTestEmailType === row.type ? (
+                        <span className="flex items-center gap-2">
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Invio in corso…
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Send className="h-4 w-4" />
+                          {row.sendLabel}
+                        </span>
+                      )}
+                    </Button>
+                  )}
                 </div>
               ))}
+              {anyEmailEnabled && (
+                <p className="pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                  Manda adesso il riepilogo dell&apos;ultimo periodo chiuso, anche se è già partito.
+                </p>
+              )}
             </div>
 
             {anyEmailEnabled && (
@@ -691,39 +734,6 @@ export function GeneraleTab({
                   </ul>
                 )}
 
-                <div className="mt-3.5 flex flex-wrap gap-2">
-                  {([
-                    { type: 'monthly' as const, label: 'Invia mensile ora', enabled: monthlyEmailEnabled },
-                    { type: 'quarterly' as const, label: 'Invia trimestrale ora', enabled: quarterlyEmailEnabled },
-                    { type: 'semiannual' as const, label: 'Invia semestrale ora', enabled: semiAnnualEmailEnabled },
-                    { type: 'yearly' as const, label: 'Invia annuale ora', enabled: yearlyEmailEnabled },
-                    { type: 'weekly-budget' as const, label: 'Invia report budget ora', enabled: weeklyBudgetEmailEnabled },
-                  ] as const).filter(({ enabled }) => enabled).map(({ type, label }) => (
-                    <Button
-                      key={type}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={isDemo || monthlyEmailRecipients.length === 0 || sendingTestEmailType !== null}
-                      onClick={() => void sendTestEmail(type)}
-                    >
-                      {sendingTestEmailType === type ? (
-                        <span className="flex items-center gap-2">
-                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          Invio in corso…
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <Send className="h-4 w-4" />
-                          {label}
-                        </span>
-                      )}
-                    </Button>
-                  ))}
-                </div>
-                <p className="mt-2 text-[11px] leading-[1.45] text-muted-foreground">
-                  Invia il riepilogo del periodo corrente per verificare il formato. Salva prima le impostazioni.
-                </p>
               </div>
             )}
           </div>

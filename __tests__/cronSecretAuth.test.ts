@@ -15,13 +15,15 @@ const { runDividendScrapingMock, runExpenseCreationMock, runNextCouponScheduling
     runNextCouponSchedulingMock: vi.fn(),
   }));
 
+const { collectionMock } = vi.hoisted(() => ({
+  collectionMock: vi.fn(() => ({
+    get: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
+  })),
+}));
+
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: { verifyIdToken: vi.fn() },
-  adminDb: {
-    collection: vi.fn(() => ({
-      get: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
-    })),
-  },
+  adminDb: { collection: collectionMock },
 }));
 
 vi.mock('@/lib/server/dividendProcessor', () => ({
@@ -35,31 +37,14 @@ vi.mock('@/lib/services/hallOfFameService.server', () => ({
   updateHallOfFame: vi.fn(),
 }));
 
+// Mocks needed by the periodic-emails cron route
 vi.mock('@/lib/server/monthlyEmailService', () => ({
-  isLastDayOfMonthItaly: vi.fn(() => false),
-  isLastDayOfQuarterItaly: vi.fn(() => false),
-  isLastDayOfHalfYearItaly: vi.fn(() => false),
-  isLastDayOfYearItaly: vi.fn(() => false),
-  monthToQuarter: vi.fn(),
-  monthToSemester: vi.fn(),
   getSettingsAdmin: vi.fn(),
   buildAndSendForPeriod: vi.fn(),
-  buildAndSendQuarterly: vi.fn(),
-  buildAndSendSemiAnnual: vi.fn(),
-  buildAndSendYearly: vi.fn(),
 }));
 
 vi.mock('@/lib/server/ecbRatesService', () => ({
   refreshEcbRatesIfStale: vi.fn(),
-}));
-
-vi.mock('@/lib/server/weeklyBudgetEmailService', () => ({
-  isWeeklyBudgetDayItaly: vi.fn(() => false),
-  buildAndSendWeeklyBudget: vi.fn(),
-}));
-
-vi.mock('@/lib/utils/dateHelpers', () => ({
-  getItalyMonthYear: vi.fn(() => ({ month: 4, year: 2026 })),
 }));
 
 function makeRequest(url: string, authHeader?: string): NextRequest {
@@ -228,5 +213,41 @@ describe('GET /api/cron/monthly-snapshot auth', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true });
+  });
+});
+
+// ─── Route-level tests for periodic-emails ───────────────────────────────
+
+describe('GET /api/cron/periodic-emails auth', () => {
+  let GET: CronRouteHandler;
+
+  beforeAll(async () => {
+    ({ GET } = await import('@/app/api/cron/periodic-emails/route'));
+  }, MODULE_LOAD_TIMEOUT_MS);
+
+  beforeEach(() => {
+    vi.stubEnv('CRON_SECRET', 'test-cron-secret');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+  });
+
+  it('returns 401 without the secret and reads nothing', async () => {
+    const response = await GET(makeRequest('http://localhost/api/cron/periodic-emails'));
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(collectionMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when the Authorization header carries a wrong secret', async () => {
+    const response = await GET(
+      makeRequest('http://localhost/api/cron/periodic-emails', 'Bearer wrong-secret')
+    );
+
+    expect(response.status).toBe(401);
+    expect(collectionMock).not.toHaveBeenCalled();
   });
 });

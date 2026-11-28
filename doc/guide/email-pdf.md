@@ -1,12 +1,12 @@
 # Email periodiche e PDF export
 
-> **Quando aprire questa guida** — chi tocca `lib/server/{monthlyEmailService,weeklyBudgetEmailService,emailHtml,emailPeriodComparison,emailAiComment}.ts`, `lib/utils/{emailNarrative,pdfNarrative}.ts`, `lib/utils/pdfGenerator.tsx`, `lib/services/pdfDataService.ts`, `components/pdf/*`, `lib/constants/printTokens.ts`, il cron `app/api/cron/monthly-snapshot/route.ts`. Entrambe rendono fuori dal DOM: si verificano renderizzandole, e nessuna verifica è nella suite. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: § *Files*, sotto.
+> **Quando aprire questa guida** — chi tocca `lib/server/{monthlyEmailService,emailHtml,emailPeriodComparison,emailAiComment,emailDeliveries}.ts`, `lib/utils/{emailNarrative,emailSchedule,pdfNarrative}.ts`, `lib/utils/pdfGenerator.tsx`, `lib/services/pdfDataService.ts`, `components/pdf/*`, `lib/constants/printTokens.ts`, il cron `app/api/cron/periodic-emails/route.ts`, «Invia ora» `app/api/user/monthly-email/send/route.ts`. Entrambe rendono fuori dal DOM: si verificano renderizzandole, e nessuna verifica è nella suite. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: § *Files*, sotto.
 
 ## Files
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Email · PDF · token fuori dal DOM**: `lib/constants/printTokens.ts` (l'unica sede di un hex fuori dal DOM); email `lib/utils/emailNarrative.ts` (parole), `lib/server/emailHtml.ts` (chrome, tabelle annidate), `lib/server/{monthlyEmailService,weeklyBudgetEmailService,emailPeriodComparison,emailAiComment}.ts`; PDF `lib/utils/pdfNarrative.ts` (`pdfSafeText` = il confine WinAnsi), `components/pdf/primitives/*` (`PDF_RAMP`), `lib/utils/pdfGenerator.tsx` → `lib/services/pdfDataService.ts` → `components/pdf/{PDFDocument,sections/*}`, `lib/utils/pdfTimeFilters.ts`, `types/pdf.ts`; cron `app/api/cron/monthly-snapshot/route.ts` (phases 2-8), `lib/server/{assetAdminRepository,dividendUseCase,dividendProcessor}.ts`
+- **Email · PDF · token fuori dal DOM**: `lib/constants/printTokens.ts` (l'unica sede di un hex fuori dal DOM); email `lib/utils/emailNarrative.ts` (parole), `lib/server/emailHtml.ts` (chrome, tabelle annidate), `lib/server/{monthlyEmailService,emailPeriodComparison,emailAiComment}.ts`, what is due `lib/utils/emailSchedule.ts`, the ledger `lib/server/emailDeliveries.ts`; PDF `lib/utils/pdfNarrative.ts` (`pdfSafeText` = il confine WinAnsi), `components/pdf/primitives/*` (`PDF_RAMP`), `lib/utils/pdfGenerator.tsx` → `lib/services/pdfDataService.ts` → `components/pdf/{PDFDocument,sections/*}`, `lib/utils/pdfTimeFilters.ts`, `types/pdf.ts`; crons `app/api/cron/periodic-emails/route.ts` (the emails) and `app/api/cron/monthly-snapshot/route.ts` (the snapshot, phases 7-8), the manual send `app/api/user/monthly-email/send/route.ts`, `lib/server/{assetAdminRepository,dividendUseCase,dividendProcessor}.ts`
 
 ## PDF Export (`lib/utils/pdfGenerator.tsx`, `lib/services/pdfDataService.ts`, `lib/utils/pdfTimeFilters.ts`)
 
@@ -60,7 +60,36 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   «28,2% di quanto è entrato», «−30,0% …» with the typographic minus, no note without income or below the savings
   floor (`meaningfulSavingsRate`) — the euro figure above it says it. Pinned by `__tests__/pdfNarrative.test.ts`.
 
-## Periodic Emails (`lib/server/monthlyEmailService.ts`, `weeklyBudgetEmailService.ts`)
+## Periodic Emails (`lib/server/monthlyEmailService.ts`)
+
+- **Two emails, about a CLOSED period, the day after it ends, once** (2026-11-28). The monthly leaves on the 1st
+  for the month just closed, the yearly on 1 January for the year just closed; the 2nd and the 3rd are catch-up days
+  (`emailsDueOn`, `EMAIL_CATCH_UP_DAYS`, `lib/utils/emailSchedule.ts`). Why: an email sent on the last day was
+  about a period still running — its last evening's expenses and the dividends credited overnight were missing.
+- **Their own cron, an hour after the snapshot's**: `/api/cron/periodic-emails` at `0 19 * * *` UTC (`vercel.json`),
+  20:00 or 21:00 in Rome — the same Italian day. Twenty-seven days a month it reads nothing and answers
+  `{ emails: { sent: 0, skipped: 0, errors: 0 } }`. It reads the CLOSED month's snapshot, last written by the
+  snapshot cron on that month's last evening, so the two crons' order on the 1st does not matter. On 1 January the
+  two comments are written side by side (`Promise.all`): two `high` requests in a row do not fit `maxDuration` 300 s.
+- **The ledger `emailDeliveries/{userId}_{kind}_{periodKey}`** (server-only, `allow read, write: if false`;
+  `lib/server/emailDeliveries.ts`): a run CLAIMS (`status: 'sending'`, a transaction that reads before it writes),
+  SENDS, CONFIRMS (`'sent'`). A send that throws, or one with nothing to send (no snapshot), RELEASES the claim for
+  the next run; a confirm that fails after the email went out does NOT release — the email would leave twice the
+  same day. A claim older than `EMAIL_CLAIM_STALE_MS` (30 minutes) is a crashed run and can be claimed again.
+- **The window is the period's Italian bounds**: `buildPeriodEmailData` and `emailPeriodComparison` read expenses and
+  dividends from `getItalyMonthBoundsUtc(year, startMonth).start` to `getItalyMonthBoundsUtc(year, month).end` — a
+  row dated 1 November 00:00 in Rome is November's, one dated 31 October 23:30 is October's, in every zone the
+  server runs in.
+- **«Invia ora»** (`POST /api/user/monthly-email/send`, `{ periodType: 'monthly' | 'yearly' }`, absent = monthly,
+  any other value 400 before any read, the demo 403) sends the LAST CLOSED period (`lastClosedMonth` /
+  `lastClosedYear`), never the month in progress, even if the cron already sent it; the send is recorded with
+  `manual: true`, so the cron does not send that period again. A failed record is logged, the email still counts.
+- **One link back to the app** (`emailAppLink`, `lib/server/emailHtml.ts`): a table-cell button «Apri Net Worth
+  Tracker» → `{NEXT_PUBLIC_APP_URL}/dashboard`, right under the verdict, in print-token colours; `''` when the URL
+  is absent or not `https://` — a dev or emulator URL in a real inbox is a link to nowhere.
+- **A year takes its article** (2026-11-28): `periodBaselineAfter` writes «sul 2025» and «Rispetto al 2025» where the
+  yearly email printed «su il 2025» and «Rispetto a il 2025»; a month keeps none («su settembre»). Pinned in
+  `__tests__/emailNarrative.test.ts`.
 
 - **A verdict over tiles, out of the DOM** (2026-09-01). Both messages open on a RULE-GENERATED
   verdict from `lib/utils/emailNarrative.ts` — never on the AI comment, whose generation is
@@ -71,7 +100,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   Token Rule*). The chrome — shell, verdict, tile, hero, KPI row, ranked rows, budget track,
   comparison table, alert rows — lives in `lib/server/emailHtml.ts`, and **every layout is a nested
   table**: Outlook on Windows renders through Word, so flex and grid do not exist there.
-- **ONE template serves the four period types.** They differ only in labels (resolved from the
+- **ONE template serves the two period types.** They differ only in labels (resolved from the
   period by `emailNarrative`) and in which tiles exist: Budget and the Hall of Fame standing are
   monthly, the income Top 10 is yearly, and **«Rispetto a un anno fa» is ABSENT on a yearly email**
   (`previousEqualsYoy`) because there the two baselines are the same window and every figure in it
@@ -85,37 +114,45 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **A ranked list shows six rows and a residual.** The categories are ranked BY AMOUNT, so a
   catch-all category outranks real ones — that is correct, and the residual row is what keeps the
   shares reaching 100%.
-- **Four period types** with independent cron phases, so 31 Dec can send Q4 + H2 + yearly (intentional). Adding one is a
-  wide fan-out: the union, `MonthlyEmailData`, the date and label helpers, `buildPeriodEmailData`, `buildAndSend*`, the
-  cron phase, the send route and the settings 3-place + toggle + test-send button.
 - **Income targets have their own tile** (`Obiettivi di entrata`): «am I within my budgets?» and «did what I expected arrive?» are two questions, and only the first has a limit to breach. The budget track carries **today's mark on the row's own window** — day of month for a monthly budget, day of year for an annual one — drawn as a split table row, because out of the DOM there is no positioning to overlay it with.
-- **The weekly budget email is a SEPARATE module and nothing in it is weekly**: it is *sent* on Sunday, but its numbers
-  are month-to-date and year-to-date. `buildCommentContext` (pure, exported, tested) states the day-of-month, tags the
-  overall as a MENSILE ceiling with an A FINE MESE projection and forbids "fine anno"/"settimana" for monthly budgets.
-  **When you add a figure here or to its prompt, name its window** (the cashflow block under the budgets names its
-  own, in its header and its note).
-- Over-budget rows carry `overspendExpenses` (actual overruns only) sourced from `getPeriodExpensesForItem` so they
-  reconcile with the row's `spent`. Always run user notes through `escapeHtml`.
 - **Comparison data is deterministic, AI only interprets**: **net worth = end-of-period snapshots (point-in-time);
   income/expenses/savings = flows over the window**, made explicit in the caption. The Hall of Fame mention is likewise
   deterministic, ranked with `lib/utils/hallOfFameRecords.ts` — the SAME definition as the in-app page.
 - **The email AI comment is a DEDICATED Anthropic call**, not the assistant pipeline; AI and comparison failures are
   both non-blocking — and so is the context bundle, built inside the same `try`.
-- **Only a reply that ended on `end_turn` is a comment** (2026-10-12): both emails read it through
-  `readCompleteEmailComment` (`lib/server/emailAiComment.ts`). A Sonnet 5.5 decline is an HTTP 200 with
+- **The comment's markdown becomes HTML in `emailMarkdownToHtml`** (`lib/server/emailHtml.ts`, 2026-11-28): bold,
+  italics, headings, bullet and numbered lists with one level of indented sub-items (`foldSubLists` hangs them on the
+  item above as a nested `<ul>`), and tables. A table becomes an email `<table>` with a right-aligned
+  column of figures. A list and a table are written on ONE line, because a newline inside them would become a `<br/>`.
+  The October 2026 email on Opus 5.5 printed its tables as pipes and an empty line between every bullet, and both
+  models' sub-items as «  - voce»; the tests are in `__tests__/emailHtml.test.ts`.
+- **The comment's contract** (`buildEmailPeriodicFormatContract`, owner, phase F, 2026-11-28): a year has ONE
+  comparison section, «Rispetto all'anno precedente», because its previous period IS the previous year (with two,
+  both models wrote two paragraphs saying the 2024 was missing). The contract closes on the email rule: no offer to
+  act («se vuoi, preparo…»), no name of the app's data blocks («dati sulla Hall of Fame non ce ne sono»), and a goal,
+  instrument, category or account called by its exact name, never shortened (Sonnet dropped a goal's first word). The
+  yearly subject is «Riepilogo annuale 2025 — Net Worth Tracker». Pinned in `__tests__/assistantPromptBundle.test.ts`
+  and `__tests__/monthlyEmailService.test.ts`.
+- **Only a reply that ended on `end_turn` is a comment** (2026-10-12): the comment is read through
+  `readCompleteEmailComment` (`lib/server/emailAiComment.ts`). A decline is an HTTP 200 with
   `stop_reason: 'refusal'` that can follow some text, a `max_tokens` cut stops mid-sentence, a `pause_turn` is the
   server-tool loop paused: each is a fragment, and an email cannot say «incompleto» the way Rendimenti's dialog does, so
-  it goes out WITHOUT the AI tile, as when the call fails (the log says why). Both calls run with the server-side fallback
+  it goes out WITHOUT the AI tile, as when the call fails (the log says why). The call runs with the server-side fallback
   (`betas: [SERVER_SIDE_FALLBACK_BETA]` + `fallbacks: 'default'` on `anthropic.beta.messages`, `lib/constants/aiModels.ts`):
-  a `cyber` or `frontier_llm` decline is rewritten by Sonnet 5 in the same call — a non-streamed mid-output decline omits
-  the declined partial — and the email names no model; the log line says which one wrote the comment. Pinned by
-  `generateEmailAiComment` / `generateWeeklyBudgetComment` in `__tests__/{monthlyEmailService,weeklyBudgetEmailService}.test.ts`
-  (both exported for that; refusal and cut seen red before the fix).
-- **Both AI comments read the CASHFLOW 12 MESI block** (owner, 2026-11-07, doc/guide/assistente.md § Prompt
-  builders): `generateEmailAiComment` and `buildAndSendWeeklyBudget` read it at the send instant through
-  `readCashflowBlockForPrompt`; it closes the periodic user turn and sits under the weekly budgets, `system`
-  untouched. A failed read sends the email WITHOUT the comment and spends no call — never a comment on a silent
-  empty cashflow; with no API key the weekly email does not read the block at all (2026-11-07).
+  a `cyber` or `frontier_llm` decline is rewritten by the fallback model in the same call, and the email names no
+  model; the log line says which one wrote the comment. Pinned by `generateEmailAiComment` in
+  `__tests__/monthlyEmailService.test.ts` (exported for that; refusal and cut seen red before the fix).
+- **Sonnet 5.5, streamed, read whole** (owner, 2026-11-28; Opus 5.5 from 2026-11-23): `EMAIL_ANALYSIS_MODEL =
+  'claude-sonnet-5-5'`, adaptive thinking, `effort: 'high'`, through `anthropic.beta.messages.stream({…}).finalMessage()`. The SDK refuses a
+  NON-streamed request above 21.333 `max_tokens` («Streaming is required»), and the yearly asks 24.000: sent with
+  `create`, it would always leave without its comment. Pinned by the spy on `stream` (`create` answers nothing).
+  Why not Opus: on the mirror (phase F, 2026-11-28) Opus 5.5 at `high` took 168–204 s for a monthly and 174 s for a
+  yearly, and on 1 January the cron sends both in ONE call under `maxDuration = 300` — the yearly would be killed,
+  left «sending», and sent on the 2nd by the stale claim (or twice, if the kill fell between Resend and the confirm).
+- **The AI comment reads the CASHFLOW 12 MESI block** (owner, 2026-11-07, doc/guide/assistente.md § Prompt
+  builders): `generateEmailAiComment` reads it at the send instant through `readCashflowBlockForPrompt`; it closes
+  the periodic user turn, `system` untouched. A failed read sends the email WITHOUT the comment and spends no call —
+  never a comment on a silent empty cashflow.
 - **The prompt BODY is the assistant's own block**: `buildEmailAiPrompt` = `formatBundleForPrompt(bundle, label)` +
   the sections only the email has (market effect, comparisons, category deltas, Hall of Fame, budget alerts,
   household split), then the CASHFLOW 12 MESI block under its note — the one figure that is not the window's. Do not
@@ -148,7 +185,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The periodic comment's contract names the spending types as the app prints them** (2026-11-12):
   «Spese Necessarie/Spese Non Necessarie/Debiti» (`buildEmailPeriodicFormatContract`, `lib/server/assistant/prompts.ts`), never
   the labels retired on 2026-10-20.
-- **`max_tokens` scales with the period** (6000/8000/8000/10000), and the format contract names the period in its
+- **`max_tokens` scales with the period** (`EMAIL_AI_MAX_TOKENS`: 16.000 monthly, 24.000 yearly, thinking included), and the format contract names the period in its
   length line instead of a word count. Web search is offered only when `includeMacroContext` allows it, like the
   assistant's structured analyses.
 - **A deficit without a baseline reads as the Cashflow tile reads it** (2026-11-12): the period verdict's fallback
@@ -200,7 +237,16 @@ PDF half seen from inside the section, this is the recipe for both surfaces.
   December and measures from January. TWR, ROI and the two yields are annualised over 9 months against the page's 10; the
   dividends received are the same. The TOTAL export has the page's whole-history window, and its twelve yield fields were
   equal to the page's, field by field.
-- **An email with an AI comment reads the cashflow twice** (2026-11-07): the periodic one the bundle on its window
-  and the CASHFLOW 12 MESI block on the whole history, the weekly one the budget rows and the block — two queries
-  apart, accepted for a cron that sends a handful.
+- **An email with an AI comment reads the cashflow twice** (2026-11-07): the bundle on its window and the CASHFLOW 12
+  MESI block on the whole history — two queries apart, accepted for a cron that sends a handful. The block is read at
+  the send, so on the 1st the new month's first day is already in it.
+- **After the third day of the month only «Invia ora» sends** (2026-11-28): a cron that missed the 1st, the 2nd and the
+  3rd leaves no trace and no notice; a period without a snapshot is retried on the 2nd and the 3rd, then silently
+  dropped.
+- **The ledger does not stop a manual send**: «Invia ora» sends the closed period again even when the cron sent it.
+- **A confirm that fails after the email went out** leaves the claim «sending»: the same day nothing leaves again, but
+  past `EMAIL_CLAIM_STALE_MS` the next day's run claims it and sends the period a second time.
+- **On 1 January the two emails arrive in no fixed order**: the two comments are written side by side.
+- **The comment keeps its six sections**, not the Assistente's one form (an email is scanned by section; the owner
+  asked for the form in the chat). **No unsubscribe link**: the recipients are the owner's own list in Impostazioni.
 - **Fuori dal DOM restano tre punti ciechi**: le email non rispecchiano i cinque temi nominati (scelta — si leggono su una scheda bianca); «un hex sta solo in `printTokens`» è documentato ma **non applicato da un linter**; e `@react-pdf/renderer` scarta in SILENZIO ogni carattere fuori da WinAnsi (`pdfSafeText` copre U+2212; frecce, simboli ed emoji no). Le tre superfici si verificano solo renderizzandole, e **nessuna di quelle verifiche è nella suite**. doc/guide/email-pdf.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
