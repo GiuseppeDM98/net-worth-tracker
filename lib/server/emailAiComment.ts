@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 
 /**
- * The comment an email may print from one non-streamed Sonnet response, or null.
+ * The comment an email may print from one response (streamed, read whole), or null.
  *
  * Only a response that ended on `end_turn` is a comment (2026-10-12). A decline is an HTTP 200
  * with `stop_reason: 'refusal'` that can follow some text, and a `max_tokens` cut stops

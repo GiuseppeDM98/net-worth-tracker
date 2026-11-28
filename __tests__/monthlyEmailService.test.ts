@@ -18,10 +18,15 @@ vi.mock('resend', () => {
 
 // Per-collection query chains — filled per-test
 const collectionMocks: Record<string, unknown> = {};
+// Every `where(field, op, value)` the service sent, per collection — cleared per test that reads it.
+const whereCalls: Record<string, unknown[][]> = {};
+const recordWhere = (name: string, args: unknown[]) => {
+  (whereCalls[name] ??= []).push(args);
+};
 
 /** The chainable shape the mocked adminDb query exposes; every node resolves to the same result. */
 interface QueryChainMock {
-  where: () => QueryChainMock;
+  where: (...args: unknown[]) => QueryChainMock;
   limit: () => { get: () => Promise<unknown> };
   get: () => Promise<unknown>;
 }
@@ -41,7 +46,10 @@ function buildQueryMock(name: string) {
   });
   function chainNode(): QueryChainMock {
     return {
-      where: () => chainNode(),
+      where: (...args: unknown[]) => {
+        recordWhere(name, args);
+        return chainNode();
+      },
       limit: () => terminal(),
       get: vi.fn().mockImplementation(() =>
         Promise.resolve(collectionMocks[name] ?? { empty: true, docs: [] })
@@ -55,7 +63,10 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: (name: string) => ({
       doc: () => ({ get: () => Promise.resolve(mockBudgetDoc) }),
-      where: () => buildQueryMock(name),
+      where: (...args: unknown[]) => {
+        recordWhere(name, args);
+        return buildQueryMock(name);
+      },
     }),
   },
   adminAuth: { verifyIdToken: vi.fn() },
@@ -75,16 +86,25 @@ vi.mock('@/lib/services/assistantMonthContextService', async (importActual) => {
   return { ...actual, buildAssistantPeriodRangeContext: vi.fn(actual.buildAssistantPeriodRangeContext) };
 });
 
-// The SDK is imported lazily inside the comment generator: one fake client answers on both
-// `messages.create` and `beta.messages.create`, so the test reads the response handling, not
-// which door the request went through.
-const { anthropicCreateMock } = vi.hoisted(() => ({ anthropicCreateMock: vi.fn() }));
+// The SDK is imported lazily inside the comment generator. The request is STREAMED and read whole
+// (`beta.messages.stream(...).finalMessage()`): the SDK refuses a non-streamed request above 21.333
+// `max_tokens`, and the yearly asks 24.000. `create` is a spy that answers nothing, so a request
+// sent through it leaves no comment and the tests below see it.
+const { anthropicStreamMock, anthropicCreateMock } = vi.hoisted(() => ({
+  anthropicStreamMock: vi.fn(),
+  anthropicCreateMock: vi.fn(),
+}));
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class {
-    messages = { create: anthropicCreateMock };
-    beta = { messages: { create: anthropicCreateMock } };
+    messages = { create: anthropicCreateMock, stream: anthropicStreamMock };
+    beta = { messages: { create: anthropicCreateMock, stream: anthropicStreamMock } };
   },
 }));
+
+/** The streamed request answers this message once read whole. */
+function respond(message: unknown) {
+  anthropicStreamMock.mockReturnValue({ finalMessage: () => Promise.resolve(message) });
+}
 
 vi.mock('@/lib/utils/dateHelpers', async () => {
   const actual = await vi.importActual<typeof import('@/lib/utils/dateHelpers')>(
@@ -96,19 +116,6 @@ vi.mock('@/lib/utils/dateHelpers', async () => {
 import {
   buildEmailAiPrompt,
   resolveEmailPeriodRange,
-  isLastDayOfMonthItaly,
-  isLastDayOfQuarterItaly,
-  isLastDayOfHalfYearItaly,
-  isLastDayOfYearItaly,
-  monthToQuarter,
-  monthToSemester,
-  getQuarterStartMonth,
-  getSemesterStartMonth,
-  getPreviousQuarterEnd,
-  getPreviousHalfEnd,
-  getMostRecentCompletedQuarterEnd,
-  getMostRecentCompletedHalfYearEnd,
-  getMostRecentCompletedYearEnd,
   computeAssetClassPerformers,
   aggregateExpenses,
   buildMonthlyEmailData,
@@ -127,6 +134,7 @@ import type { AssistantMemoryItem, AssistantMonthContextBundle, AssistantPrefere
 import type { MonthlySnapshot } from '@/types/assets';
 import type { BudgetAlert } from '@/types/budget';
 import { emptyAssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
+import { getItalyMonthBoundsUtc } from '@/lib/utils/dateHelpers';
 
 // ─── Shared fixtures ──────────────────────────────────────────────────────────
 
@@ -169,7 +177,7 @@ function makePreferences(overrides: Partial<AssistantPreferences> = {}): Assista
   };
 }
 
-/** A bundle shaped like the one the range builder produces for a completed quarter. */
+/** A bundle shaped like the one the range builder produces for a completed period of three months. */
 function makeBundle(overrides: Partial<AssistantMonthContextBundle> = {}): AssistantMonthContextBundle {
   return {
     selector: { year: 2026, month: 9 },
@@ -274,7 +282,7 @@ const BUDGET_ALERT: BudgetAlert = {
 describe('generateEmailAiComment', () => {
   const previousKey = process.env.ANTHROPIC_API_KEY;
 
-  /** A non-streamed response: a thinking block, then the text, then why it stopped. */
+  /** The message read whole: a thinking block, then the text, then why it stopped. */
   function answer(text: string, stopReason: string) {
     return {
       model: 'claude-sonnet-5-5',
@@ -289,29 +297,30 @@ describe('generateEmailAiComment', () => {
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     anthropicCreateMock.mockReset();
+    anthropicStreamMock.mockReset();
     vi.mocked(getAssistantMemoryDocument).mockRejectedValueOnce(new Error('no memory'));
     vi.mocked(buildAssistantPeriodRangeContext).mockResolvedValueOnce(makeBundle());
     readCashflowBlockMock.mockReset().mockResolvedValue('--- CASHFLOW 12 MESI (x) ---\nX');
   });
 
   it('reads the cashflow block once for the user and puts it in the user turn, never in system (2026-11-07)', async () => {
-    anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
+    respond(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
 
     await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
 
     expect(readCashflowBlockMock).toHaveBeenCalledTimes(1);
     expect(readCashflowBlockMock.mock.calls[0][0]).toBe('user-1');
-    const params = anthropicCreateMock.mock.calls[0][0] as { system: string; messages: { content: string }[] };
+    const params = anthropicStreamMock.mock.calls[0][0] as { system: string; messages: { content: string }[] };
     expect(params.messages[0].content).toContain('--- CASHFLOW 12 MESI (x) ---\nX');
     expect(params.system).not.toContain('CASHFLOW 12 MESI');
   });
 
   it('sends none of the Assistente\'s tools: the comment has the web search alone, as before (2026-11-26)', async () => {
-    anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
+    respond(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
 
     await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
 
-    const params = anthropicCreateMock.mock.calls[0][0] as { system: string; tools?: { name: string }[] };
+    const params = anthropicStreamMock.mock.calls[0][0] as { system: string; tools?: { name: string }[] };
     for (const name of ['cashflow_totali', 'cashflow_confronto', 'cashflow_righe', 'budget_stato', 'centri_di_costo']) {
       expect(JSON.stringify(params)).not.toContain(name);
     }
@@ -324,6 +333,7 @@ describe('generateEmailAiComment', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     expect(await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison())).toBeNull();
+    expect(anthropicStreamMock).not.toHaveBeenCalled();
     expect(anthropicCreateMock).not.toHaveBeenCalled();
   });
 
@@ -333,19 +343,38 @@ describe('generateEmailAiComment', () => {
   });
 
   it('keeps a comment that ends on end_turn', async () => {
-    anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
+    respond(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
 
     const comment = await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
 
     expect(comment).toBe('Il patrimonio è cresciuto di 5000 €.');
   });
 
+  it('streams the request to Sonnet 5.5, never through create', async () => {
+    respond(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
+
+    const comment = await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
+
+    expect(comment).toBe('Il patrimonio è cresciuto di 5000 €.');
+    expect(anthropicCreateMock).not.toHaveBeenCalled();
+    expect(anthropicStreamMock.mock.calls[0][0]).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 16000, output_config: { effort: 'high' } });
+  });
+
+  it('gives the yearly comment 24000 tokens, above the non-streamed ceiling', async () => {
+    respond(answer('Il 2025 è cresciuto di 5000 €.', 'end_turn'));
+
+    const comment = await generateEmailAiComment('user-1', makeMonthlyData({ periodType: 'yearly', month: 12, year: 2025 }), makeComparison());
+
+    expect(comment).toBe('Il 2025 è cresciuto di 5000 €.');
+    expect(anthropicStreamMock.mock.calls[0][0]).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 24000 });
+  });
+
   it('asks for the default server-side fallback', async () => {
-    anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
+    respond(answer('Il patrimonio è cresciuto di 5000 €.', 'end_turn'));
 
     await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
 
-    expect(anthropicCreateMock.mock.calls[0][0]).toMatchObject({
+    expect(anthropicStreamMock.mock.calls[0][0]).toMatchObject({
       model: EMAIL_ANALYSIS_MODEL,
       betas: [SERVER_SIDE_FALLBACK_BETA],
       fallbacks: 'default',
@@ -353,9 +382,9 @@ describe('generateEmailAiComment', () => {
   });
 
   it('drops a comment the model declined half-way (stop_reason refusal)', async () => {
-    // Sonnet 5.5 declines with HTTP 200: the half paragraph written before the refusal must
+    // The model declines with HTTP 200: the half paragraph written before the refusal must
     // not reach the inbox as if it were the comment — the email goes out without it.
-    anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di', 'refusal'));
+    respond(answer('Il patrimonio è cresciuto di', 'refusal'));
 
     const comment = await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
 
@@ -363,7 +392,7 @@ describe('generateEmailAiComment', () => {
   });
 
   it('drops a comment cut at max_tokens', async () => {
-    anthropicCreateMock.mockResolvedValue(answer('Il patrimonio è cresciuto di 5000 €. Il merc', 'max_tokens'));
+    respond(answer('Il patrimonio è cresciuto di 5000 €. Il merc', 'max_tokens'));
 
     const comment = await generateEmailAiComment('user-1', makeMonthlyData(), makeComparison());
 
@@ -416,15 +445,15 @@ describe('buildEmailAiPrompt', () => {
 
   it('labels the data block with the email period, not with the closing month', () => {
     const { userContent } = buildEmailAiPrompt(
-      makeMonthlyData({ periodType: 'quarterly', quarter: 3, month: 9, year: 2026 }),
+      makeMonthlyData({ periodType: 'yearly', month: 12, year: 2026 }),
       makeComparison(),
       makeBundle(),
       makePreferences(),
       []
     );
 
-    expect(userContent).toContain('=== DATI FINANZIARI: Q3 2026 ===');
-    expect(userContent).not.toContain('=== DATI FINANZIARI: Settembre 2026 ===');
+    expect(userContent).toContain('=== DATI FINANZIARI: Anno 2026 ===');
+    expect(userContent).not.toContain('=== DATI FINANZIARI: Dicembre 2026 ===');
   });
 
   it('states the market effect as a computed figure, not something to estimate', () => {
@@ -529,7 +558,7 @@ describe('buildEmailAiPrompt', () => {
 
   it('omits the budget alerts on a non-monthly period even if some are attached', () => {
     const { userContent } = buildEmailAiPrompt(
-      makeMonthlyData({ periodType: 'quarterly', quarter: 3, month: 9, budgetAlerts: [BUDGET_ALERT] }),
+      makeMonthlyData({ periodType: 'yearly', month: 12, budgetAlerts: [BUDGET_ALERT] }),
       makeComparison(),
       makeBundle(),
       makePreferences(),
@@ -615,8 +644,6 @@ describe('buildEmailAiPrompt', () => {
   it('names the period in the length line and states the new patrimony section', () => {
     const cases: Array<[MonthlyEmailData['periodType'], string]> = [
       ['monthly', 'un mese'],
-      ['quarterly', 'un trimestre'],
-      ['semiannual', 'un semestre'],
       ['yearly', 'un anno'],
     ];
 
@@ -666,268 +693,8 @@ describe('resolveEmailPeriodRange', () => {
       label: 'Luglio 2026',
     });
     expect(
-      resolveEmailPeriodRange(makeMonthlyData({ periodType: 'quarterly', quarter: 3, year: 2026, month: 9 }))
-    ).toEqual({ year: 2026, startMonth: 7, endMonth: 9, label: 'Q3 2026' });
-    expect(
-      resolveEmailPeriodRange(makeMonthlyData({ periodType: 'semiannual', semester: 2, year: 2026, month: 12 }))
-    ).toEqual({ year: 2026, startMonth: 7, endMonth: 12, label: '2° Semestre 2026' });
-    expect(
       resolveEmailPeriodRange(makeMonthlyData({ periodType: 'yearly', year: 2025, month: 12 }))
     ).toEqual({ year: 2025, startMonth: 1, endMonth: 12, label: 'Anno 2025' });
-  });
-});
-
-// ─── isLastDayOfMonthItaly ────────────────────────────────────────────────────
-
-describe('isLastDayOfMonthItaly', () => {
-  it('returns true on January 31', () => {
-    expect(isLastDayOfMonthItaly(new Date('2025-01-31T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns false on January 30', () => {
-    expect(isLastDayOfMonthItaly(new Date('2025-01-30T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns true on December 31', () => {
-    expect(isLastDayOfMonthItaly(new Date('2025-12-31T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns false on December 30', () => {
-    expect(isLastDayOfMonthItaly(new Date('2025-12-30T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns true on April 30 (30-day month)', () => {
-    expect(isLastDayOfMonthItaly(new Date('2025-04-30T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns false on April 29', () => {
-    expect(isLastDayOfMonthItaly(new Date('2025-04-29T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns true on Feb 28 in non-leap year', () => {
-    expect(isLastDayOfMonthItaly(new Date('2025-02-28T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns true on Feb 29 in leap year', () => {
-    expect(isLastDayOfMonthItaly(new Date('2024-02-29T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns false on Feb 28 in leap year', () => {
-    expect(isLastDayOfMonthItaly(new Date('2024-02-28T10:00:00Z'))).toBe(false);
-  });
-});
-
-// ─── isLastDayOfQuarterItaly ──────────────────────────────────────────────────
-
-describe('isLastDayOfQuarterItaly', () => {
-  it('returns true on March 31 (end of Q1)', () => {
-    expect(isLastDayOfQuarterItaly(new Date('2026-03-31T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns false on March 30', () => {
-    expect(isLastDayOfQuarterItaly(new Date('2026-03-30T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns true on June 30 (end of Q2)', () => {
-    expect(isLastDayOfQuarterItaly(new Date('2026-06-30T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns true on September 30 (end of Q3)', () => {
-    expect(isLastDayOfQuarterItaly(new Date('2026-09-30T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns true on December 31 (end of Q4)', () => {
-    expect(isLastDayOfQuarterItaly(new Date('2026-12-31T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns false on January 31 (last day of month but not quarter)', () => {
-    expect(isLastDayOfQuarterItaly(new Date('2026-01-31T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns false on February 28', () => {
-    expect(isLastDayOfQuarterItaly(new Date('2026-02-28T10:00:00Z'))).toBe(false);
-  });
-});
-
-// ─── isLastDayOfYearItaly ─────────────────────────────────────────────────────
-
-describe('isLastDayOfYearItaly', () => {
-  it('returns true on December 31', () => {
-    expect(isLastDayOfYearItaly(new Date('2025-12-31T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns false on December 30', () => {
-    expect(isLastDayOfYearItaly(new Date('2025-12-30T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns false on November 30', () => {
-    expect(isLastDayOfYearItaly(new Date('2025-11-30T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns false on January 1', () => {
-    expect(isLastDayOfYearItaly(new Date('2025-01-01T10:00:00Z'))).toBe(false);
-  });
-});
-
-// ─── monthToQuarter ───────────────────────────────────────────────────────────
-
-describe('monthToQuarter', () => {
-  it.each([
-    [1, 1], [2, 1], [3, 1],
-    [4, 2], [5, 2], [6, 2],
-    [7, 3], [8, 3], [9, 3],
-    [10, 4], [11, 4], [12, 4],
-  ])('month %i → Q%i', (month, expectedQuarter) => {
-    expect(monthToQuarter(month)).toBe(expectedQuarter);
-  });
-});
-
-// ─── getQuarterStartMonth ─────────────────────────────────────────────────────
-
-describe('getQuarterStartMonth', () => {
-  it.each([
-    [3, 1], [6, 4], [9, 7], [12, 10],
-  ])('end month %i → start month %i', (end, start) => {
-    expect(getQuarterStartMonth(end)).toBe(start);
-  });
-});
-
-// ─── getPreviousQuarterEnd ────────────────────────────────────────────────────
-
-describe('getPreviousQuarterEnd', () => {
-  it('Q2 (month 6) → Q1 same year (month 3)', () => {
-    expect(getPreviousQuarterEnd(2026, 6)).toEqual({ year: 2026, month: 3 });
-  });
-
-  it('Q1 (month 3) → Q4 previous year (month 12)', () => {
-    expect(getPreviousQuarterEnd(2026, 3)).toEqual({ year: 2025, month: 12 });
-  });
-
-  it('Q4 (month 12) → Q3 same year (month 9)', () => {
-    expect(getPreviousQuarterEnd(2026, 12)).toEqual({ year: 2026, month: 9 });
-  });
-});
-
-// ─── getMostRecentCompletedQuarterEnd ─────────────────────────────────────────
-
-describe('getMostRecentCompletedQuarterEnd', () => {
-  it('April 19 2026 → March 2026 (Q1 completed)', () => {
-    const result = getMostRecentCompletedQuarterEnd(new Date('2026-04-19T10:00:00Z'));
-    expect(result).toEqual({ year: 2026, month: 3 });
-  });
-
-  it('January 5 2026 → December 2025 (Q4 previous year)', () => {
-    const result = getMostRecentCompletedQuarterEnd(new Date('2026-01-05T10:00:00Z'));
-    expect(result).toEqual({ year: 2025, month: 12 });
-  });
-
-  it('July 1 2026 → June 2026 (Q2 completed)', () => {
-    const result = getMostRecentCompletedQuarterEnd(new Date('2026-07-01T10:00:00Z'));
-    expect(result).toEqual({ year: 2026, month: 6 });
-  });
-
-  it('October 15 2026 → September 2026 (Q3 completed)', () => {
-    const result = getMostRecentCompletedQuarterEnd(new Date('2026-10-15T10:00:00Z'));
-    expect(result).toEqual({ year: 2026, month: 9 });
-  });
-});
-
-// ─── getMostRecentCompletedYearEnd ───────────────────────────────────────────
-
-describe('getMostRecentCompletedYearEnd', () => {
-  it('April 19 2026 → December 2025', () => {
-    const result = getMostRecentCompletedYearEnd(new Date('2026-04-19T10:00:00Z'));
-    expect(result).toEqual({ year: 2025, month: 12 });
-  });
-
-  it('January 1 2026 → December 2025', () => {
-    const result = getMostRecentCompletedYearEnd(new Date('2026-01-01T10:00:00Z'));
-    expect(result).toEqual({ year: 2025, month: 12 });
-  });
-});
-
-// ─── Semi-annual period helpers ──────────────────────────────────────────────
-
-describe('isLastDayOfHalfYearItaly', () => {
-  it('returns true on June 30 (end of H1)', () => {
-    expect(isLastDayOfHalfYearItaly(new Date('2026-06-30T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns true on December 31 (end of H2)', () => {
-    expect(isLastDayOfHalfYearItaly(new Date('2026-12-31T10:00:00Z'))).toBe(true);
-  });
-
-  it('returns false on June 29', () => {
-    expect(isLastDayOfHalfYearItaly(new Date('2026-06-29T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns false on March 31 (quarter end, not half-year end)', () => {
-    expect(isLastDayOfHalfYearItaly(new Date('2026-03-31T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns false on September 30 (quarter end, not half-year end)', () => {
-    expect(isLastDayOfHalfYearItaly(new Date('2026-09-30T10:00:00Z'))).toBe(false);
-  });
-
-  it('returns false on July 31 (last day of month but not half-year)', () => {
-    expect(isLastDayOfHalfYearItaly(new Date('2026-07-31T10:00:00Z'))).toBe(false);
-  });
-});
-
-describe('monthToSemester', () => {
-  it('maps June (6) to H1', () => {
-    expect(monthToSemester(6)).toBe(1);
-  });
-  it('maps December (12) to H2', () => {
-    expect(monthToSemester(12)).toBe(2);
-  });
-});
-
-describe('getSemesterStartMonth', () => {
-  it('H1 (end month 6) starts in January (1)', () => {
-    expect(getSemesterStartMonth(6)).toBe(1);
-  });
-  it('H2 (end month 12) starts in July (7)', () => {
-    expect(getSemesterStartMonth(12)).toBe(7);
-  });
-});
-
-describe('getPreviousHalfEnd', () => {
-  it('H1 (June) → H2 of the previous year (December)', () => {
-    expect(getPreviousHalfEnd(2026, 6)).toEqual({ year: 2025, month: 12 });
-  });
-  it('H2 (December) → H1 of the same year (June)', () => {
-    expect(getPreviousHalfEnd(2026, 12)).toEqual({ year: 2026, month: 6 });
-  });
-});
-
-describe('getMostRecentCompletedHalfYearEnd', () => {
-  it('July 1 2026 → June 2026 (H1 completed)', () => {
-    expect(getMostRecentCompletedHalfYearEnd(new Date('2026-07-01T10:00:00Z'))).toEqual({
-      year: 2026,
-      month: 6,
-    });
-  });
-  it('February 2 2026 → December 2025 (H2 previous year)', () => {
-    expect(getMostRecentCompletedHalfYearEnd(new Date('2026-02-02T10:00:00Z'))).toEqual({
-      year: 2025,
-      month: 12,
-    });
-  });
-  // Consistent with getMostRecentCompletedQuarterEnd: a period counts as completed once the
-  // current Italy time is past midnight of its last day (so on June 30 daytime, H1 is complete).
-  it('June 30 2026 daytime → June 2026 (H1 just completed)', () => {
-    expect(getMostRecentCompletedHalfYearEnd(new Date('2026-06-30T10:00:00Z'))).toEqual({
-      year: 2026,
-      month: 6,
-    });
-  });
-
-  it('June 15 2026 → December 2025 (H1 still in progress)', () => {
-    expect(getMostRecentCompletedHalfYearEnd(new Date('2026-06-15T10:00:00Z'))).toEqual({
-      year: 2025,
-      month: 12,
-    });
   });
 });
 
@@ -1021,6 +788,24 @@ describe('generateEmailHtml', () => {
     const html = generateEmailHtml(makeMonthlyData());
     expect(html).toContain('Marzo è cresciuto: il mercato ha spinto');
     expect(html).toContain('Marzo 2025');
+  });
+
+  it('puts the link back to the app right under the verdict, only on an https app URL', () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://example.com/');
+    try {
+      // With the AI comment present: the link sits above it, not under it.
+      const html = generateEmailHtml(makeMonthlyData({ aiComment: 'Il mese ha retto.' }));
+      const verdictEnd = html.indexOf('</h1>');
+      const link = html.indexOf('href="https://example.com/dashboard"');
+      expect(link).toBeGreaterThan(verdictEnd);
+      // Nothing but the verdict's own sentence between the headline and the button: no tile (a tile opens on its rule).
+      expect(html.slice(verdictEnd, link)).not.toContain('border-top:1px solid');
+      expect(html.match(/<a /g)?.length).toBe(1);
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
+      expect(generateEmailHtml(makeMonthlyData())).not.toContain('Apri Net Worth Tracker');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('puts the verdict in the inbox preview, so the reader knows before opening', () => {
@@ -1186,18 +971,9 @@ describe('generateEmailHtml', () => {
   });
 
   it('speaks each period in its own words', () => {
-    const quarterly = generateEmailHtml(makeMonthlyData({ periodType: 'quarterly', quarter: 1, month: 3, year: 2026 }));
-    expect(quarterly).toContain('Q1 2026');
-    expect(quarterly).toContain('Riepilogo trimestrale');
-    expect(quarterly).toContain('Il primo trimestre');
-
     const yearly = generateEmailHtml(makeMonthlyData({ periodType: 'yearly', month: 12, year: 2025 }));
     expect(yearly).toContain('Anno 2025');
     expect(yearly).toContain('Riepilogo annuale');
-
-    const semiannual = generateEmailHtml(makeMonthlyData({ periodType: 'semiannual', semester: 1, month: 6, year: 2026 }));
-    expect(semiannual).toContain('1° Semestre 2026');
-    expect(semiannual).toContain('Riepilogo semestrale');
   });
 
   it('renders the year-earlier tile when the two baselines are different windows', () => {
@@ -1445,57 +1221,44 @@ describe('buildMonthlyEmailData', () => {
   });
 });
 
-// ─── buildPeriodEmailData — quarterly ────────────────────────────────────────
+// ─── buildPeriodEmailData — the Italian window ───────────────────────────────
 
-describe('buildPeriodEmailData (quarterly)', () => {
+describe('buildPeriodEmailData reads the period between its Italian bounds', () => {
   beforeEach(() => {
     Object.keys(collectionMocks).forEach((k) => delete collectionMocks[k]);
-  });
-
-  it('returns null when no end-of-quarter snapshot exists', async () => {
-    collectionMocks['monthly-snapshots'] = { empty: true, docs: [] };
-    const result = await buildPeriodEmailData('user-1', 2026, 3, 'quarterly');
-    expect(result).toBeNull();
-  });
-
-  it('returns quarterly data with correct periodType and quarter', async () => {
-    collectionMocks['monthly-snapshots'] = {
-      empty: false,
-      docs: [
-        {
-          data: () => ({
-            totalNetWorth: 200000,
-            liquidNetWorth: 50000,
-            byAssetClass: { equity: 150000, cash: 50000 },
-          }),
-        },
-      ],
-    };
-    collectionMocks['expenses'] = { docs: [] };
-    collectionMocks['dividends'] = { docs: [] };
-
-    const result = await buildPeriodEmailData('user-1', 2026, 3, 'quarterly');
-    expect(result).not.toBeNull();
-    expect(result!.periodType).toBe('quarterly');
-    expect(result!.quarter).toBe(1);
-  });
-
-  it('aggregates dividends across the full quarter', async () => {
+    Object.keys(whereCalls).forEach((k) => delete whereCalls[k]);
     collectionMocks['monthly-snapshots'] = {
       empty: false,
       docs: [{ data: () => ({ totalNetWorth: 100, liquidNetWorth: 50, byAssetClass: {} }) }],
     };
     collectionMocks['expenses'] = { docs: [] };
-    collectionMocks['dividends'] = {
-      docs: [
-        { data: () => ({ grossAmountEur: 300 }) },
-        { data: () => ({ grossAmountEur: 200 }) },
-      ],
-    };
+    collectionMocks['dividends'] = { docs: [] };
+  });
 
-    const result = await buildPeriodEmailData('user-1', 2026, 3, 'quarterly');
-    expect(result!.dividendTotal).toBe(500);
-    expect(result!.dividendCount).toBe(2);
+  /** The instant of the `>=` and the `<=` the service sent on one collection. */
+  const bounds = (name: string) => {
+    const calls = whereCalls[name] ?? [];
+    const at = (op: string) => {
+      const value = calls.find((args) => args[1] === op)?.[2] as { toDate?: () => Date } | Date | undefined;
+      return value instanceof Date ? value.getTime() : value?.toDate?.().getTime();
+    };
+    return { start: at('>='), end: at('<=') };
+  };
+
+  it('November 2026: the expenses and the dividends from 1 November 00:00 to 30 November 23:59:59.999 in Rome', async () => {
+    await buildPeriodEmailData('user-1', 2026, 11, 'monthly');
+    const italian = getItalyMonthBoundsUtc(2026, 11);
+    for (const name of ['expenses', 'dividends']) {
+      expect(bounds(name)).toEqual({ start: italian.start.getTime(), end: italian.end.getTime() });
+    }
+  });
+
+  it('the year 2025: from 1 January to 31 December, Italian', async () => {
+    await buildPeriodEmailData('user-1', 2025, 12, 'yearly');
+    expect(bounds('expenses')).toEqual({
+      start: getItalyMonthBoundsUtc(2025, 1).start.getTime(),
+      end: getItalyMonthBoundsUtc(2025, 12).end.getTime(),
+    });
   });
 });
 
@@ -1532,7 +1295,6 @@ describe('buildPeriodEmailData (yearly)', () => {
     expect(result).not.toBeNull();
     expect(result!.periodType).toBe('yearly');
     expect(result!.month).toBe(12);
-    expect(result!.quarter).toBeUndefined();
   });
 });
 
@@ -1553,27 +1315,13 @@ describe('sendMonthlyEmail', () => {
     );
   });
 
-  it('uses "Riepilogo Trimestrale" subject for quarterly', async () => {
-    await sendMonthlyEmail(
-      ['a@b.com'],
-      makeMonthlyData({ periodType: 'quarterly', quarter: 1, month: 3, year: 2026 })
-    );
-    expect(resendSendMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subject: expect.stringContaining('Riepilogo Trimestrale'),
-      })
-    );
-  });
-
-  it('uses "Riepilogo Annuale" subject for yearly', async () => {
+  it('names the year once in the yearly subject: «Riepilogo annuale 2025»', async () => {
     await sendMonthlyEmail(
       ['a@b.com'],
       makeMonthlyData({ periodType: 'yearly', month: 12, year: 2025 })
     );
     expect(resendSendMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subject: expect.stringContaining('Riepilogo Annuale'),
-      })
+      expect.objectContaining({ subject: 'Riepilogo annuale 2025 — Net Worth Tracker' })
     );
   });
 

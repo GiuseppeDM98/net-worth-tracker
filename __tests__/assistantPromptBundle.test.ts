@@ -1019,6 +1019,28 @@ describe('the answer contract: one form for every mode but Registra', () => {
     }
   });
 
+  it('gives a year ONE comparison section, a month two (owner, phase F, 2026-11-28)', () => {
+    const yearly = buildEmailPeriodicFormatContract('yearly');
+    const monthly = buildEmailPeriodicFormatContract('monthly');
+    expect(yearly).toContain("3. **Rispetto all'anno precedente**");
+    expect(yearly).not.toContain("Confronto con l'anno precedente");
+    expect(yearly).not.toContain('Rispetto al periodo precedente');
+    expect(yearly).toContain('4. **Entrate e spese');
+    expect(yearly).toContain('5. **Azioni o attenzioni**');
+    expect(monthly).toContain('3. **Rispetto al periodo precedente**');
+    expect(monthly).toContain("4. **Confronto con l'anno precedente**");
+    expect(monthly).toContain('6. **Azioni o attenzioni**');
+  });
+
+  it('tells the emails they are emails: no offer to act, no name of the data blocks, names never shortened', () => {
+    for (const contract of [buildEmailPeriodicFormatContract('monthly'), buildEmailPeriodicFormatContract('yearly')]) {
+      expect(contract).toContain("È un'email: chi legge non può risponderti.");
+      expect(contract).toContain('Non offrire di fare qualcosa');
+      expect(contract).toContain('Non nominare i blocchi di dati');
+      expect(contract).toContain('con il nome esatto dei dati, senza accorciarlo');
+    }
+  });
+
   it('tells every mode but Registra of the tools on the data; Registra and the emails have none (2026-11-26)', () => {
     for (const system of Object.values(systems)) expect(system).toContain('# Gli strumenti sui tuoi dati');
     expect(registerSystem).not.toContain('# Gli strumenti sui tuoi dati');

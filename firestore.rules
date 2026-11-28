@@ -226,6 +226,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Server-only: what the cron sent, so a period leaves once (2026-11-23).
+    match /emailDeliveries/{deliveryId} {
+      allow read, write: if false;
+    }
+
     // Archivio giornaliero - una riga al giorno per mese, scritta SOLO dallo snapshot (Admin SDK).
     // Percorso annidato sotto lo uid, come budgetHistory: la rule non tocca resource.data e un mese
     // mai scritto risponde null.

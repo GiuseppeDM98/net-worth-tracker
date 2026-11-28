@@ -281,34 +281,6 @@ export function getPeriodActual(item: BudgetItem, expenses: Expense[], now: Date
   return getMonthActualForItem(item, expenses, year, getItalyMonth(now));
 }
 
-/**
- * Returns the individual expenses a budget item matches in its current period,
- * relative to `now`, sorted by absolute amount descending (largest first).
- *
- * Period window mirrors getPeriodActual: monthly → the current month; annual →
- * the current year (year-to-date). Reuses expenseMatchesItem so the listed
- * expenses always reconcile with the total getPeriodActual reports — the email's
- * per-expense breakdown can never disagree with the row's spent amount.
- */
-export function getPeriodExpensesForItem(
-  item: BudgetItem,
-  expenses: Expense[],
-  now: Date = new Date()
-): Expense[] {
-  const year = getItalyYear(now);
-  const month = item.period === 'annual' ? null : getItalyMonth(now);
-
-  const matched: Expense[] = [];
-  for (const expense of expenses) {
-    const { month: expMonth, year: expYear } = getItalyMonthYear(toDate(expense.date));
-    if (expYear !== year) continue;
-    if (month !== null && expMonth !== month) continue;
-    if (!expenseMatchesItem(expense, item)) continue;
-    matched.push(expense);
-  }
-  return matched.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
-}
-
 // ==================== Default Pre-fill ====================
 
 /**

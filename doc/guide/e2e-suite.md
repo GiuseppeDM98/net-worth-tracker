@@ -177,7 +177,11 @@ Measured on the Windows machine (Core Ultra 7 258V: 4 fast cores + 4 slow, no hy
   scripts pin the base project, and their start was most of a seed's time): four projects in 21–30 s, one in 14,7 s.
   The base seed (`scripts/seedEmulator.ts`) is laid by `global-setup` too, in every project — the base one included —
   when the project has none or has another month's (a stamp, `e2eSeedStamps/base`): the calendar drift of the base
-  seed no longer waits for someone to remember four re-seeds.
+  seed no longer waits for someone to remember four re-seeds. The stamp also KEEPS a project a spec broke: a base
+  account left wrong stays wrong in every later run of the month, even after the spec is fixed (2026-11-28: a settings
+  save that dropped the seed's equity sub-targets in `demo-net-worth-w1`, two runs red after the fix). Read the base
+  document in each project, then delete that project's `e2eSeedStamps/base`; `npm run emulators:seed` repairs only
+  the base project.
 - **The emulator's JVM grows with the projects**: 0,5 GB at start, 3,4–4,0 GB after two and a half hours and 27
   launches with six projects. Restart it past ~3 GB (`DEADLINE_EXCEEDED` was seen at 2,5 GB, doc/guide/e2e-emulatori.md).
 - **Nothing else runs on the machine while a run is measured or gated** — no type-check, build or second suite: a

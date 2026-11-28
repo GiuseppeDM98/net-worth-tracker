@@ -439,14 +439,11 @@ describe('describeEmails', () => {
       plain(
         describeEmails({
           monthly: true,
-          quarterly: false,
-          semiAnnual: false,
-          yearly: false,
-          weeklyBudget: true,
+          yearly: true,
           recipientCount: 2,
         })
       )
-    ).toBe('Report mensile e budget settimanale attivi, verso 2 destinatari.');
+    ).toBe('Report mensile e annuale attivi, verso 2 destinatari.');
   });
 
   it('uses the singular for one report and one recipient', () => {
@@ -454,10 +451,7 @@ describe('describeEmails', () => {
       plain(
         describeEmails({
           monthly: true,
-          quarterly: false,
-          semiAnnual: false,
           yearly: false,
-          weeklyBudget: false,
           recipientCount: 1,
         })
       )
@@ -469,14 +463,11 @@ describe('describeEmails', () => {
       plain(
         describeEmails({
           monthly: true,
-          quarterly: true,
-          semiAnnual: false,
           yearly: false,
-          weeklyBudget: false,
           recipientCount: 0,
         })
       )
-    ).toBe('Report mensile e trimestrale attivi, ma senza destinatari: aggiungi un indirizzo o non parte nulla.');
+    ).toBe('Report mensile attivo, ma senza destinatari: aggiungi un indirizzo o non parte nulla.');
   });
 
   it('states the all-off state', () => {
@@ -484,10 +475,7 @@ describe('describeEmails', () => {
       plain(
         describeEmails({
           monthly: false,
-          quarterly: false,
-          semiAnnual: false,
           yearly: false,
-          weeklyBudget: false,
           recipientCount: 2,
         })
       )

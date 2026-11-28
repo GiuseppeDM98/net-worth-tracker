@@ -47,6 +47,8 @@ email (`:302-334`). The owner keeps the monthly and the yearly. What is wrong wi
 6. The email has one link, «Apri Net Worth Tracker», when `NEXT_PUBLIC_APP_URL` is set and begins with `https://`;
    none otherwise. Proof: H1.
 7. The AI comment runs on Opus 5.5, on a streamed request; a truncated comment is still dropped, never sent cut.
+   Changed in phase F (owner, 2026-11-28): Sonnet 5.5 at effort `high` — on Opus a monthly took 168–204 s and a
+   yearly 174 s, both in one call on 1 January under the 300 s limit (doc/guide/email-pdf.md).
    Proof: A1.
 8. The emails leave from their OWN cron (`/api/cron/periodic-emails`, 19:00 UTC), an hour after the snapshots; both
    cron routes declare `maxDuration = 300`. Proof: C0, V1.
@@ -58,7 +60,8 @@ email (`:302-334`). The owner keeps the monthly and the yearly. What is wrong wi
 - **Decision 24** (owner, 2026-11-23): keep «Mensile» and «Annuale»; remove the quarterly, the half-yearly and the
   Sunday budget email.
 - **Decision 26** (owner, 2026-11-23): send the day after, with the period closed.
-- **Decision 27** (owner, 2026-11-23): the emails' model is Opus 5.5, like the Assistente's.
+- **Decision 27** (owner, 2026-11-23): the emails' model is Opus 5.5, like the Assistente's. Superseded in phase F
+  (owner, 2026-11-28): Sonnet 5.5 at effort `high`, for the 300 s of the 1 January call.
 - **Decision 75** (owner, 2026-11-23): the periodic emails get a cron of their own, and the comment keeps effort
   `high`. The hours, one per cron (Vercel fires a daily cron anywhere inside its hour): snapshots and dividends at
   18:00 UTC, the periodic emails at 19:00, the spending review (DATI-11) at 20:00.
@@ -390,7 +393,8 @@ ledger's own rules; `emailDeliveries.test.ts` uses the same fake.
 The grep that closes criterion 1 — on the proper names, since `quarterly` and `semiannual` are also a coupon's and a
 pension fund's frequency: `grep -rnE
 "quarterlyEmailEnabled|semiAnnualEmailEnabled|weeklyBudget|weekly-budget|buildAndSend(Quarterly|SemiAnnual|Yearly)|isLastDayOf(Month|Quarter|HalfYear|Year)Italy|MostRecentCompleted|monthToQuarter|monthToSemester|QuarterStartMonth|SemesterStartMonth|PreviousQuarterEnd|PreviousHalfEnd|Riepilogo (Trimestrale|Semestrale)"
-app lib components types __tests__ e2e scripts` prints nothing.
+app lib components types __tests__ e2e scripts --exclude=monthlyEmailSendRoute.test.ts` prints nothing (owner, 2026-11-28: S2 names
+`'weekly-budget'` on purpose, to prove it is refused).
 
 ## 7. Guided verification (WORKFLOW.md § 2)
 
